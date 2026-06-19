@@ -446,6 +446,7 @@ const ImmersiveWorkout = ({
         </div>
 
       </div>
+      </div>
       {/* END TABLET SPLIT WRAPPER */}
 
       {/* FINISH CONFIRMATION MODAL */}
