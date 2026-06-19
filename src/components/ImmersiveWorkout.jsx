@@ -381,17 +381,38 @@ const ImmersiveWorkout = ({
       {/* CONTROLS (Bottom) */}
       <div className="w-full sm:w-[45%] lg:w-[40%] px-4 pb-8 sm:pb-4 space-y-6 sm:space-y-8 flex flex-col justify-center overflow-y-auto shrink-0 relative z-10">
         
-        {/* Sets Indicator */}
-        <div className="flex items-center justify-center gap-2">
-          {logs.map((s, i) => (
-            <div 
-              key={i} 
-              className={`h-2 rounded-full transition-all ${
-                s.done ? `w-8 ${t.bgAccent}` : 
-                i === activeSetIdx ? `w-12 ${t.bgAccent}` : `w-4 ${theme === 'dark' ? 'bg-white/20' : 'bg-black/10'}`
-              }`} 
-            />
-          ))}
+        {/* Top Controls: Undo | Sets | Skip */}
+        <div className="flex items-center justify-between gap-4">
+          <button 
+            onClick={handlePrevSet}
+            disabled={currentIndex === 0 && activeSetIdx === 0}
+            className={`p-3 rounded-2xl ${theme === 'dark' ? 'bg-white/10 hover:bg-white/20' : 'bg-black/10 hover:bg-black/20'} disabled:opacity-30 transition`}
+            title="Kembali / Undo Set"
+          >
+            <ChevronLeft size={24} />
+          </button>
+
+          <div className="flex-1 flex items-center justify-center gap-2">
+            {logs.map((s, i) => (
+              <button 
+                key={i} 
+                onClick={() => { playSoundEffect('click', soundEnabled); onToggleSet(ex.id, i); }}
+                className={`h-2 rounded-full transition-all hover:scale-110 active:scale-95 ${
+                  s.done ? `w-8 ${t.bgAccent}` : 
+                  i === activeSetIdx ? `w-12 ${t.bgAccent}` : `w-4 ${theme === 'dark' ? 'bg-white/20' : 'bg-black/10'}`
+                }`} 
+                title={`Toggle Set ${i + 1}`}
+              />
+            ))}
+          </div>
+
+          <button 
+            onClick={handleNextEx}
+            className={`p-3 rounded-2xl ${theme === 'dark' ? 'bg-white/10 hover:bg-white/20' : 'bg-black/10 hover:bg-black/20'} transition`}
+            title="Skip Latihan"
+          >
+            <ChevronRight size={24} />
+          </button>
         </div>
 
         {/* Scroll Pickers */}
@@ -428,51 +449,40 @@ const ImmersiveWorkout = ({
           )}
         </div>
 
-        {/* Actions Row */}
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={handlePrevSet}
-            disabled={currentIndex === 0 && activeSetIdx === 0}
-            className="p-4 rounded-2xl ${t.bgApp}/10 dark:bg-white/10 disabled:opacity-30 transition"
-          >
-            <ChevronLeft size={28} />
-          </button>
-
-          <div className="flex-1 relative">
-            {restTimer !== 0 && !isAllDone ? (
-              <div className={`w-full relative flex items-stretch justify-between rounded-2xl shadow-xl transition-all overflow-hidden border ${
-                restTimer < 0 ? 'bg-rose-500 border-rose-500' : `${t.bgAccentSoft} ${t.borderAccent}`
-              }`}>
-                {restTimer > 0 && maxRestTimer > 0 && (
-                  <div 
-                    className={`absolute top-0 left-0 h-full transition-all duration-1000 ease-linear pointer-events-none ${theme === 'dark' ? 'bg-white/25' : 'bg-black/25'}`}
-                    style={{ width: `${Math.min(100, Math.max(0, ((maxRestTimer - restTimer) / maxRestTimer) * 100))}%` }}
-                  />
-                )}
-                <button onClick={(e) => { e.stopPropagation(); setRestTimer(prev => prev - 5); }} className={`relative z-10 w-16 sm:w-20 flex items-center justify-center bg-transparent ${theme === 'dark' ? 'hover:bg-white/10 active:bg-white/20 border-white/20' : 'hover:bg-black/10 active:bg-black/20 border-black/10'} ${t.textMain} font-black transition-colors border-r h2`}>-5</button>
-                <button onClick={() => setRestTimer(0)} className={`relative z-10 flex-1 py-4 flex items-center justify-center font-black h2 ${t.textMain} ${theme === 'dark' ? 'active:bg-white/10' : 'active:bg-black/10'} transition-colors`}>
-                  REST: {formatTime(restTimer)}
-                </button>
-                <button onClick={(e) => { e.stopPropagation(); setRestTimer(prev => prev + 5); }} className={`relative z-10 w-16 sm:w-20 flex items-center justify-center bg-transparent ${theme === 'dark' ? 'hover:bg-white/10 active:bg-white/20 border-white/20' : 'hover:bg-black/10 active:bg-black/20 border-black/10'} ${t.textMain} font-black transition-colors border-l h2`}>+5</button>
-              </div>
-            ) : !isAllDone ? (
-              <button 
-                onClick={handleDoneClick}
-                className={`w-full py-4 rounded-2xl ${t.bgAccent} font-black h2 flex items-center justify-center gap-2 shadow-xl active:scale-95 transition-all`}
-              >
-                <Check size={24} /> SELESAI SET {activeSetIdx + 1}
+        {/* Actions Row (Full Width) */}
+        <div className="w-full relative">
+          {restTimer !== 0 && !isAllDone ? (
+            <div className={`w-full relative flex items-stretch justify-between rounded-2xl shadow-xl transition-all overflow-hidden border ${
+              restTimer < 0 ? 'bg-rose-500 border-rose-500' : `${t.bgAccentSoft} ${t.borderAccent}`
+            }`}>
+              {restTimer > 0 && maxRestTimer > 0 && (
+                <div 
+                  className={`absolute top-0 left-0 h-full transition-all duration-1000 ease-linear pointer-events-none ${theme === 'dark' ? 'bg-white/25' : 'bg-black/25'}`}
+                  style={{ width: `${Math.min(100, Math.max(0, ((maxRestTimer - restTimer) / maxRestTimer) * 100))}%` }}
+                />
+              )}
+              <button onClick={(e) => { e.stopPropagation(); setRestTimer(prev => prev - 5); }} className={`relative z-10 w-16 sm:w-20 flex items-center justify-center bg-transparent ${theme === 'dark' ? 'hover:bg-white/10 active:bg-white/20 border-white/20' : 'hover:bg-black/10 active:bg-black/20 border-black/10'} ${t.textMain} font-black transition-colors border-r h2`}>-5</button>
+              <button onClick={() => setRestTimer(0)} className={`relative z-10 flex-1 py-4 flex items-center justify-center font-black h2 ${t.textMain} ${theme === 'dark' ? 'active:bg-white/10' : 'active:bg-black/10'} transition-colors`}>
+                REST: {formatTime(restTimer)}
               </button>
-            ) : (
-              <button 
-                onClick={handleNextEx}
-                className={`w-full py-4 rounded-2xl ${t.bgAccent} font-black h2 flex items-center justify-center gap-2 shadow-xl active:scale-95 transition-all`}
-              >
-                {currentIndex === allExercises.length - 1 ? 'FINISH WORKOUT' : 'LATIHAN BERIKUTNYA'}
-              </button>
-            )}
-          </div>
+              <button onClick={(e) => { e.stopPropagation(); setRestTimer(prev => prev + 5); }} className={`relative z-10 w-16 sm:w-20 flex items-center justify-center bg-transparent ${theme === 'dark' ? 'hover:bg-white/10 active:bg-white/20 border-white/20' : 'hover:bg-black/10 active:bg-black/20 border-black/10'} ${t.textMain} font-black transition-colors border-l h2`}>+5</button>
+            </div>
+          ) : !isAllDone ? (
+            <button 
+              onClick={handleDoneClick}
+              className={`w-full py-4 rounded-2xl ${t.bgAccent} font-black h2 flex items-center justify-center gap-2 shadow-xl active:scale-95 transition-all`}
+            >
+              <Check size={24} /> SELESAI SET {activeSetIdx + 1}
+            </button>
+          ) : (
+            <button 
+              onClick={handleNextEx}
+              className={`w-full py-4 rounded-2xl ${t.bgAccent} font-black h2 flex items-center justify-center gap-2 shadow-xl active:scale-95 transition-all`}
+            >
+              {currentIndex === allExercises.length - 1 ? 'FINISH WORKOUT' : 'LATIHAN BERIKUTNYA'}
+            </button>
+          )}
         </div>
-
       </div>
       </div>
       {/* END TABLET SPLIT WRAPPER */}
