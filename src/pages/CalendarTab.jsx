@@ -530,9 +530,9 @@ const CalendarTab = ({
             {selectedDate !== todayStr && (
               <button
                 onClick={() => { playSoundEffect('click', soundEnabled); setSelectedDate(todayStr); setCalendarDate(new Date()); }}
-                className={`absolute right-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${t.bgAccentSoft} ${t.textAccent} hover:opacity-80 transition-opacity`}
+                className={`absolute right-0 text-[10px] font-bold px-2.5 py-0.5 rounded-full ${t.bgAccent} text-white hover:opacity-80 transition-opacity`}
               >
-                <CalendarDays size={10} className="inline mr-0.5 -mt-px" />Hari Ini
+                Hari Ini
               </button>
             )}
             <button 
