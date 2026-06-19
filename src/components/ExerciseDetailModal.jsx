@@ -35,14 +35,64 @@ const ExerciseDetailModal = ({
   const [activeMediaIndex, setActiveMediaIndex] = React.useState(0);
   const activeMedia = mediaItems[activeMediaIndex];
 
-  // (Removed complex YouTube message listener to use native loop parameters instead)
+  // Custom YouTube Looping Logic reliably using e.source
+  React.useEffect(() => {
+    const handleMessage = (e) => {
+      if (e.origin !== "https://www.youtube.com") return;
+      try {
+        const data = JSON.parse(e.data);
+        if (data.event === "infoDelivery" && data.info && data.info.playerState === 0) {
+          // Video ended, send seekTo 0 and play to the iframe that emitted the event
+          e.source.postMessage(JSON.stringify({event: "command", func: "seekTo", args: [0, true]}), "*");
+          e.source.postMessage(JSON.stringify({event: "command", func: "playVideo", args: []}), "*");
+        }
+      } catch (err) {}
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
+
+  const handleIframeLoad = (e) => {
+    e.target.contentWindow.postMessage(JSON.stringify({event: "listening"}), "*");
+  };
+
+  // Swipe logic for media carousel
+  const [touchStart, setTouchStart] = useState(null);
+  const [touchEnd, setTouchEnd] = useState(null);
+
+  const minSwipeDistance = 40;
+
+  const onTouchStart = (e) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e) => setTouchEnd(e.targetTouches[0].clientX);
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+    if (isLeftSwipe && mediaItems.length > 1) {
+      setActiveMediaIndex(prev => prev < mediaItems.length - 1 ? prev + 1 : 0);
+    }
+    if (isRightSwipe && mediaItems.length > 1) {
+      setActiveMediaIndex(prev => prev > 0 ? prev - 1 : mediaItems.length - 1);
+    }
+  };
 
   return (
     <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in`} onClick={onClose}>
       <div className={`w-full max-w-md mx-auto ${t.bgCard} rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 border ${t.border}`} onClick={e => e.stopPropagation()}>
         
         {/* Header with Video/Image */}
-        <div className="relative bg-black w-full aspect-[4/5] flex-shrink-0 flex items-center justify-center overflow-hidden group">
+        <div 
+          className="relative bg-black w-full aspect-[4/5] flex-shrink-0 flex items-center justify-center overflow-hidden group touch-pan-y"
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
           {(() => {
             if (!activeMedia) return <Dumbbell size={64} className="text-white/20" />;
             
@@ -52,9 +102,10 @@ const ExerciseDetailModal = ({
               if (videoId) {
                 return (
                   <iframe 
-                    src={`https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&loop=1&playlist=${videoId}&controls=0&modestbranding=1&playsinline=1&rel=0`}
+                    src={`https://www.youtube.com/embed/${videoId}?enablejsapi=1&autoplay=1&mute=1&controls=0&modestbranding=1&playsinline=1&rel=0&disablekb=1&iv_load_policy=3`}
                     title="YouTube video player" 
                     frameBorder="0" 
+                    onLoad={handleIframeLoad}
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
                     className="exercise-video-iframe w-[140%] h-[140%] max-w-none pointer-events-none scale-[1.15]"
                   ></iframe>
