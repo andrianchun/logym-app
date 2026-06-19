@@ -164,12 +164,28 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
   const scrollRef = useRef(null);
 
   useEffect(() => {
-     if(scrollRef.current && chartDataObj.data.length > 0) {
+     if(scrollRef.current && chartDataObj.data.length > 0 && activeChartLines.length > 0) {
         const data = chartDataObj.data;
-        const targetDate = selectedDate || getLocalYMD(new Date());
-        let idx = data.findIndex(d => d.rawDate === targetDate);
-        if (idx === -1) idx = data.length - 1;
         
+        // Find the latest index where ANY of the activeChartLines has a valid value
+        let latestIdxWithData = -1;
+        for (let i = data.length - 1; i >= 0; i--) {
+            if (activeChartLines.some(line => {
+                const val = data[i][line];
+                return val !== undefined && val !== null && val !== 0;
+            })) {
+                latestIdxWithData = i;
+                break;
+            }
+        }
+        
+        let idx = latestIdxWithData;
+        if (idx === -1) {
+             const targetDate = selectedDate || getLocalYMD(new Date());
+             idx = data.findIndex(d => d.rawDate === targetDate);
+             if (idx === -1) idx = data.length - 1;
+        }
+
         setTimeout(() => {
             if(scrollRef.current) {
                 const clientW = scrollRef.current.clientWidth;
@@ -180,7 +196,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
             }
         }, 10);
      }
-  }, [chartDataObj, selectedDate]);
+  }, [chartDataObj, selectedDate, activeChartLines]);
 
   useEffect(() => { 
     if (chartDataObj.recentItems && chartDataObj.recentItems.length > 0) {
