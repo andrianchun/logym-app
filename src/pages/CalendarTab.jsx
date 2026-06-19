@@ -463,7 +463,7 @@ const CalendarTab = ({
                   const isSelected = dateKey === selectedDate;
                   const completedCount = workouts.filter(w => checkIsCompletedStrict(w, dateKey)).length;
                   let cellStyle = `aspect-square p-0.5 sm:p-1 relative flex flex-col items-center justify-start rounded-lg transition-all cursor-pointer border border-transparent hover:border-slate-500/30 ${t.textMain}`;
-                  if (isSelected) cellStyle += ` ring-2 ring-offset-2 ${theme === 'dark' ? 'ring-offset-[#0c1a2a]' : 'ring-offset-white'} ${t.ringAccent}`;
+                  if (isSelected) cellStyle += ` ring-1 ${t.ringAccent}`;
                   const spanClass = isToday
                     ? `flex items-center justify-center w-6 h-6 rounded-full ${t.bgAccent} text-white font-black body-md`
                     : `body-md font-medium ${workouts.length > 0 && completedCount === workouts.length ? t.textAccent : ''}`;
