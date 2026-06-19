@@ -152,30 +152,38 @@ const ExerciseCard = ({
                 </button>
               </div>
 
-              {exType === 'weight' && (
-                <div><SwipeInput value={s.w} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'w', val)} disabled={s.done} step={2.5} soundEnabled={soundEnabled} className={`w-full ${t.inputBg} h-8 rounded text-center font-black ${t.textMain} no-spinners transition-colors body-lg`} /></div>
-              )}
-              
-              {/* KHUSUS TIMER DURASI */}
-               {exType === 'time' && (
-                <div className="flex space-x-1 items-center justify-center px-1">
-                   {activeTimer.idx === setIdx ? (
-                      <div className={`w-full ${t.inputBg} h-8 rounded flex items-center justify-center font-black text-emerald-500 body-lg ring-1 ring-emerald-500`}>
-                         {formatTime(activeTimer.timeLeft)}
-                      </div>
-                   ) : (
-                      <SwipeInput value={s.d} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'd', val)} disabled={s.done} step={1} soundEnabled={soundEnabled} className={`w-full ${t.inputBg} h-8 rounded text-center font-black ${t.textMain} no-spinners transition-colors body-lg`} />
-                   )}
-                   {!s.done && (
-                     <button onClick={() => toggleTimer(setIdx, s.d)} className={`h-8 w-8 shrink-0 rounded flex items-center justify-center text-white transition-all ${activeTimer.idx === setIdx ? 'bg-rose-500' : 'bg-emerald-500 hover:opacity-80'}`}>
-                        {activeTimer.idx === setIdx ? <Square size={14}/> : <Play size={14} className="ml-0.5"/>}
-                     </button>
-                   )}
+              {s.skipped ? (
+                <div className={`${exType === 'weight' ? 'col-span-2' : 'col-span-1'} flex items-center justify-center font-bold text-rose-500 bg-rose-500/10 rounded h-8 border border-rose-500/20 tracking-wider text-xs sm:text-sm`}>
+                  SKIPPED
                 </div>
-              )}
+              ) : (
+                <>
+                  {exType === 'weight' && (
+                    <div><SwipeInput value={s.w} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'w', val)} disabled={s.done} step={2.5} soundEnabled={soundEnabled} className={`w-full ${t.inputBg} h-8 rounded text-center font-black ${t.textMain} no-spinners transition-colors body-lg`} /></div>
+                  )}
+                  
+                  {/* KHUSUS TIMER DURASI */}
+                   {exType === 'time' && (
+                    <div className="flex space-x-1 items-center justify-center px-1">
+                       {activeTimer.idx === setIdx ? (
+                          <div className={`w-full ${t.inputBg} h-8 rounded flex items-center justify-center font-black text-emerald-500 body-lg ring-1 ring-emerald-500`}>
+                             {formatTime(activeTimer.timeLeft)}
+                          </div>
+                       ) : (
+                          <SwipeInput value={s.d} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'd', val)} disabled={s.done} step={1} soundEnabled={soundEnabled} className={`w-full ${t.inputBg} h-8 rounded text-center font-black ${t.textMain} no-spinners transition-colors body-lg`} />
+                       )}
+                       {!s.done && (
+                         <button onClick={() => toggleTimer(setIdx, s.d)} className={`h-8 w-8 shrink-0 rounded flex items-center justify-center text-white transition-all ${activeTimer.idx === setIdx ? 'bg-rose-500' : 'bg-emerald-500 hover:opacity-80'}`}>
+                            {activeTimer.idx === setIdx ? <Square size={14}/> : <Play size={14} className="ml-0.5"/>}
+                         </button>
+                       )}
+                    </div>
+                  )}
 
-              {(exType === 'weight' || exType === 'reps') && (
-                <div><SwipeInput value={s.r} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'r', val)} disabled={s.done} step={1} soundEnabled={soundEnabled} className={`w-full ${t.inputBg} h-8 rounded text-center font-black ${t.textMain} no-spinners transition-colors body-lg`} /></div>
+                  {(exType === 'weight' || exType === 'reps') && (
+                    <div><SwipeInput value={s.r} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'r', val)} disabled={s.done} step={1} soundEnabled={soundEnabled} className={`w-full ${t.inputBg} h-8 rounded text-center font-black ${t.textMain} no-spinners transition-colors body-lg`} /></div>
+                  )}
+                </>
               )}
 
               <div className="flex justify-center">
