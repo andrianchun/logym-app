@@ -424,7 +424,7 @@ const CalendarTab = ({
             <button onClick={() => { playSoundEffect('click', soundEnabled); setSlideDirection('right'); setCalendarDate(new Date(year, month + 1, 1));}} className={`p-2 rounded-lg ${t.btnBg} hover:${t.bgAccentSoft} hover:${t.textAccent} transition-colors`}><ChevronRight size={20}/></button>
           </div>
         
-        <div className="grid grid-cols-7 gap-1 mb-2">
+        <div className="grid grid-cols-7 gap-1 mb-2 px-1">
             {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (<div key={i} className={`text-center caption uppercase ${t.textMuted}`}>{day}</div>))}
         </div>
         <PanoramicSlider
@@ -453,7 +453,7 @@ const CalendarTab = ({
             const panelCells = getGridCellsForDate(panelDate);
 
             return (
-              <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
+              <div className="grid grid-cols-7 gap-0.5 sm:gap-1 px-1">
                 {panelCells.map((dateObj, idx) => {
                   if (!dateObj) return <div key={`blank-${idx}`} className="p-1 sm:p-2"></div>;
                   const dateKey = getLocalYMD(dateObj);
@@ -465,8 +465,8 @@ const CalendarTab = ({
                   let cellStyle = `aspect-square p-0.5 sm:p-1 relative flex flex-col items-center justify-start rounded-lg transition-all cursor-pointer border border-transparent hover:border-slate-500/30 ${t.textMain}`;
                   if (isSelected) cellStyle += ` ring-1 ${t.ringAccent}`;
                   const spanClass = isToday
-                    ? `flex items-center justify-center w-6 h-6 rounded-full ${t.bgAccent} text-white font-black body-md`
-                    : `body-md font-medium ${workouts.length > 0 && completedCount === workouts.length ? t.textAccent : ''}`;
+                    ? `flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 rounded-full ${t.bgAccent} text-white font-black text-xs sm:body-md`
+                    : `text-xs sm:body-md font-medium ${workouts.length > 0 && completedCount === workouts.length ? t.textAccent : ''}`;
                   return (
                     <div
                       key={dateKey}
