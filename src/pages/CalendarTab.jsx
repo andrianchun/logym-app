@@ -468,7 +468,7 @@ const CalendarTab = ({
       {/* SCROLLABLE INLINE WORKOUT DETAILS */}
       <div 
          ref={scrollContainerRef}
-         className={`flex-1 overflow-y-auto hide-scrollbar pb-6 pt-10 sm:pt-6 px-3 sm:px-6 animate-in fade-in rounded-b-3xl sm:rounded-2xl border border-t-0 sm:border-t ${t.border} ${theme === 'dark' ? 'bg-[#061626]' : 'bg-[#f0f2f5]'} shadow-inner -mt-6 sm:mt-2 sm:mb-2 relative z-0`}
+         className={`flex-1 flex flex-col overflow-y-auto hide-scrollbar pb-6 pt-10 sm:pt-6 px-3 sm:px-6 animate-in fade-in rounded-b-3xl sm:rounded-2xl border border-t-0 sm:border-t ${t.border} ${theme === 'dark' ? 'bg-[#061626]' : 'bg-[#f0f2f5]'} shadow-inner -mt-6 sm:mt-2 sm:mb-2 relative z-0`}
          onScroll={(e) => {
             if (e.currentTarget.scrollTop > 20 && calendarMode === 'monthly') {
                setCalendarDate(new Date(selectedDate));
