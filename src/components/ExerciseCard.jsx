@@ -62,7 +62,7 @@ const ExerciseCard = ({
   };
 
   return (
-    <div className={`py-5 px-1 sm:px-2 border-b border-black/5 dark:border-white/5 last:border-b-0 ${isAllDone ? 'bg-emerald-500/5' : ''} ${isSkip ? 'opacity-50 grayscale' : ''} relative overflow-hidden transition-all`}>
+    <div className={`py-5 px-1 sm:px-2 border-b border-black/5 dark:border-white/5 last:border-b-0 ${isAllDone ? 'bg-emerald-500/5' : ''} relative overflow-hidden transition-all`}>
       
       {/* WATERMARK BACKGROUND */}
       <div className="absolute -right-6 -bottom-6 opacity-[0.03] dark:opacity-[0.04] pointer-events-none transform -rotate-12 z-0">
@@ -73,7 +73,7 @@ const ExerciseCard = ({
       <div className="mb-3 relative z-10">
          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
              <div className="flex items-start gap-3 min-w-0">
-                 <span className={`shrink-0 flex items-center justify-center bg-black/5 dark:bg-white/10 rounded-lg w-8 h-8 body-lg font-black ${t.textAccent} shadow-sm`}>
+                 <span className={`shrink-0 flex items-center justify-center bg-black/5 dark:bg-white/10 rounded-lg w-8 h-8 body-lg font-black ${t.textAccent} shadow-sm ${isSkip ? 'opacity-50 grayscale' : ''}`}>
                     {isExtra ? '+' : idx + 1}
                  </span>
                  <div className="min-w-0">
@@ -116,7 +116,9 @@ const ExerciseCard = ({
          </div>
       </div>
       
-      {/* BARIS PROGRES */}
+      {/* KONTEN SETS & PROGRESS (GRAYSCALED IF SKIPPED) */}
+      <div className={isSkip ? 'opacity-50 grayscale pointer-events-none' : ''}>
+        {/* BARIS PROGRES */}
       <div className="mb-3 relative z-10">
          {!isSkip && (
              <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full mt-2 overflow-hidden">
@@ -198,12 +200,78 @@ const ExerciseCard = ({
               </div>
 
             </div>
-          ))}
 
-          <button onClick={() => { playSoundEffect('click', soundEnabled); onAddSet(ex.id); }} className={`w-full mt-2 py-2 caption border-2 border-dashed ${t.border} rounded-lg ${t.textMuted} hover:${t.textAccent} transition-colors`}>
-            + {lang.addSet || 'Tambah Set'}
-          </button>
-        </div>    </div>
+            {sets.map((s, setIdx) => (
+              <div key={setIdx} className={`grid ${exType==='weight' ? 'grid-cols-[1.5fr_2.5fr_2.5fr_1.5fr]' : 'grid-cols-[1.5fr_3.5fr_1.5fr]'} gap-1 mb-1 items-center text-center transition-all ${s.skipped ? 'opacity-75' : s.done ? 'opacity-50' : ''}`}>
+                
+                <div className="relative flex justify-center">
+                  <button 
+                    onClick={() => {
+                      if (deletingSetIdx === setIdx) {
+                        playSoundEffect('click', soundEnabled);
+                        onRemoveSet(ex.id, setIdx);
+                        setDeletingSetIdx(null);
+                      } else {
+                        playSoundEffect('click', soundEnabled);
+                        setDeletingSetIdx(setIdx);
+                      }
+                    }}
+                    onBlur={() => setDeletingSetIdx(null)}
+                    className={`body-md rounded w-full max-w-[40px] h-8 flex items-center justify-center transition-all ${deletingSetIdx === setIdx ? 'bg-rose-500 text-white shadow-lg scale-110' : t.btnBg}`}
+                  >
+                    {deletingSetIdx === setIdx ? <X size={14}/> : (setIdx + 1)}
+                  </button>
+                </div>
+
+                {s.skipped ? (
+                  <div className={`${exType === 'weight' ? 'col-span-2' : 'col-span-1'} flex items-center justify-center font-bold text-rose-500 bg-rose-500/10 rounded h-8 border border-rose-500/20 tracking-wider text-xs sm:text-sm`}>
+                    SKIPPED
+                  </div>
+                ) : (
+                  <>
+                    {exType === 'weight' && (
+                      <div><SwipeInput value={s.w} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'w', val)} disabled={s.done} step={2.5} soundEnabled={soundEnabled} className={`w-full ${t.inputBg} h-8 rounded text-center font-black ${t.textMain} no-spinners transition-colors body-lg`} /></div>
+                    )}
+                    
+                    {/* KHUSUS TIMER DURASI */}
+                     {exType === 'time' && (
+                      <div className="flex space-x-1 items-center justify-center px-1">
+                         {activeTimer.idx === setIdx ? (
+                            <div className={`w-full ${t.inputBg} h-8 rounded flex items-center justify-center font-black text-emerald-500 body-lg ring-1 ring-emerald-500`}>
+                               {formatTime(activeTimer.timeLeft)}
+                            </div>
+                         ) : (
+                            <SwipeInput value={s.d} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'd', val)} disabled={s.done} step={1} soundEnabled={soundEnabled} className={`w-full ${t.inputBg} h-8 rounded text-center font-black ${t.textMain} no-spinners transition-colors body-lg`} />
+                         )}
+                         {!s.done && (
+                           <button onClick={() => toggleTimer(setIdx, s.d)} className={`h-8 w-8 shrink-0 rounded flex items-center justify-center text-white transition-all ${activeTimer.idx === setIdx ? 'bg-rose-500' : 'bg-emerald-500 hover:opacity-80'}`}>
+                              {activeTimer.idx === setIdx ? <Square size={14}/> : <Play size={14} className="ml-0.5"/>}
+                           </button>
+                         )}
+                      </div>
+                    )}
+
+                    {(exType === 'weight' || exType === 'reps') && (
+                      <div><SwipeInput value={s.r} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'r', val)} disabled={s.done} step={1} soundEnabled={soundEnabled} className={`w-full ${t.inputBg} h-8 rounded text-center font-black ${t.textMain} no-spinners transition-colors body-lg`} /></div>
+                    )}
+                  </>
+                )}
+
+                <div className="flex justify-center">
+                  <button onClick={() => { playSoundEffect('click', soundEnabled); onToggleSet(ex.id, setIdx); }} disabled={activeTimer.idx === setIdx} className={`w-full max-w-[40px] h-8 rounded-lg flex justify-center items-center font-bold transition-all ${s.skipped ? 'bg-rose-500/20 text-rose-500 border border-rose-500/50 hover:bg-rose-500/30' : s.done ? t.bgAccent + ' border border-transparent text-white' : 'bg-transparent border ' + t.borderAccentSoft + ' ' + t.textAccent + ' hover:bg-black/5 dark:hover:bg-white/5'} ${activeTimer.idx === setIdx ? 'opacity-30 cursor-not-allowed' : ''}`}>
+                    {s.skipped ? <X size={16} /> : <CheckCircle size={16} />}
+                  </button>
+                </div>
+
+              </div>
+            ))}
+
+            <button onClick={() => { playSoundEffect('click', soundEnabled); onAddSet(ex.id); }} className={`w-full mt-2 py-2 caption border-2 border-dashed ${t.border} rounded-lg ${t.textMuted} hover:${t.textAccent} transition-colors`}>
+              + {lang.addSet || 'Tambah Set'}
+            </button>
+          </div>
+        </div>
+    </div>
   );
 };
 
