@@ -144,15 +144,16 @@ const CalendarTab = ({
 
       const [year, month, day] = dateStr.split('-');
       const [hour, minute] = timeStr.split(':');
-      const scheduleDate = new Date(year, parseInt(month)-1, day, hour, minute);
+      const targetTime = new Date(year, parseInt(month)-1, day, hour, minute);
+      const scheduleDate = new Date(targetTime.getTime() - 30 * 60 * 1000); // 30 menit sebelumnya
       
       if (scheduleDate.getTime() < Date.now()) return null;
 
       const notifId = Math.floor(Math.random() * 1000000);
       await LocalNotifications.schedule({
         notifications: [{
-          title: "Waktunya Latihan! 🏋️",
-          body: `Hari ini jadwalmu: ${programName}. Yuk mulai sesimu sekarang!`,
+          title: "Persiapan Latihan! 🏋️",
+          body: `Jadwal ${programName} dimulai 30 menit lagi. Yuk bersiap-siap!`,
           id: notifId,
           schedule: { at: scheduleDate },
           actionTypeId: "",
