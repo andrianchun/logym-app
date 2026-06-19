@@ -468,7 +468,7 @@ const CalendarTab = ({
       {/* SCROLLABLE INLINE WORKOUT DETAILS */}
       <div 
          ref={scrollContainerRef}
-         className={`flex-1 overflow-y-auto hide-scrollbar pb-6 pt-10 sm:pt-6 px-3 sm:px-6 animate-in fade-in rounded-b-3xl sm:rounded-2xl border border-t-0 sm:border-t ${t.border} ${theme === 'dark' ? 'bg-[#061626]' : 'bg-[#f0f2f5]'} shadow-inner -mt-6 sm:mt-2 sm:mb-2 relative z-0`}
+         className={`flex-1 overflow-y-auto hide-scrollbar pb-6 pt-14 sm:pt-10 px-3 sm:px-6 animate-in fade-in rounded-b-3xl sm:rounded-2xl border border-t-0 sm:border-t ${t.border} ${theme === 'dark' ? 'bg-[#061626]' : 'bg-[#f0f2f5]'} shadow-inner -mt-6 sm:mt-2 sm:mb-2 relative z-0`}
          onScroll={(e) => {
             if (e.currentTarget.scrollTop > 20 && calendarMode === 'monthly') {
                setCalendarDate(new Date(selectedDate));
@@ -515,7 +515,7 @@ const CalendarTab = ({
 
                    return (
                      <div className="flex flex-col h-full min-h-[60vh]">
-                       <div className="px-3 sm:px-6">
+                       <div className="px-3 sm:px-6 pt-2">
                          {(hasTargetCompleted || hasTargetPlanned) && (
                              <div className="flex space-x-2 mb-6">
                                  <button onClick={() => { playSoundEffect('click', soundEnabled); setShowActionMenu(showActionMenu === 'copyMove' ? null : 'copyMove');}} className={`flex-1 py-3 rounded-xl caption font-bold ${t.btnBg} border ${showActionMenu === 'copyMove' ? t.borderAccent : t.border} flex items-center justify-center transition-colors`}><Copy size={16} className="mr-2"/> Salin / Pindah</button>
