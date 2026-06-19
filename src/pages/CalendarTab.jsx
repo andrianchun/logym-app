@@ -437,110 +437,165 @@ const CalendarTab = ({
       <div className="shrink-0 z-10 pt-2 relative sm:w-[55%] md:w-[60%] lg:w-[65%] sm:h-full sm:overflow-y-auto hide-scrollbar sm:pr-2">
         <div className={`p-3 sm:p-4 rounded-2xl ${t.bgCard} shadow-sm border ${t.border} relative z-10`}>
           <div className="flex justify-between items-center mb-4">
-            <button onClick={() => { playSoundEffect('click', soundEnabled); setSlideDirection('left'); setCalendarDate(new Date(year, month - 1, 1));}} className={`p-2 rounded-lg ${t.btnBg} hover:${t.bgAccentSoft} hover:${t.textAccent} transition-colors`}><ChevronLeft size={20}/></button>
-            <div className="flex flex-col items-center">
-               <h2 className={`h2 ${t.textMain} uppercase tracking-wider`}>{monthName}</h2>
-            </div>
-            <button onClick={() => { playSoundEffect('click', soundEnabled); setSlideDirection('right'); setCalendarDate(new Date(year, month + 1, 1));}} className={`p-2 rounded-lg ${t.btnBg} hover:${t.bgAccentSoft} hover:${t.textAccent} transition-colors`}><ChevronRight size={20}/></button>
+            <button onClick={() => {
+              playSoundEffect('click', soundEnabled);
+              setSlideDirection('left');
+              if (calendarMode === 'monthPicker') setCalendarDate(new Date(year - 1, month, 1));
+              else if (calendarMode === 'yearPicker') setCalendarDate(new Date(year - 12, month, 1));
+              else setCalendarDate(new Date(year, month - 1, 1));
+            }} className={`p-2 rounded-lg ${t.btnBg} hover:${t.bgAccentSoft} hover:${t.textAccent} transition-colors`}><ChevronLeft size={20}/></button>
+            <button 
+              onClick={() => {
+                playSoundEffect('click', soundEnabled);
+                if (calendarMode === 'weekly' || calendarMode === 'monthly') setCalendarMode('monthPicker');
+                else if (calendarMode === 'monthPicker') setCalendarMode('yearPicker');
+              }}
+              className={`flex flex-col items-center hover:opacity-70 transition-opacity cursor-pointer`}
+            >
+               <h2 className={`h2 ${t.textMain} uppercase tracking-wider`}>
+                 {calendarMode === 'yearPicker' ? `${year - 5} – ${year + 6}` : calendarMode === 'monthPicker' ? `${year}` : monthName}
+               </h2>
+            </button>
+            <button onClick={() => {
+              playSoundEffect('click', soundEnabled);
+              setSlideDirection('right');
+              if (calendarMode === 'monthPicker') setCalendarDate(new Date(year + 1, month, 1));
+              else if (calendarMode === 'yearPicker') setCalendarDate(new Date(year + 12, month, 1));
+              else setCalendarDate(new Date(year, month + 1, 1));
+            }} className={`p-2 rounded-lg ${t.btnBg} hover:${t.bgAccentSoft} hover:${t.textAccent} transition-colors`}><ChevronRight size={20}/></button>
           </div>
         
-        <div className="grid grid-cols-7 gap-1 mb-2 px-1 py-1">
-            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (<div key={i} className={`text-center caption uppercase ${t.textMuted}`}>{day}</div>))}
-        </div>
-        <PanoramicSlider
-          onSwipeLeft={() => {
-            playSoundEffect('click', soundEnabled);
-            setSlideDirection('right');
-            if (calendarMode === 'weekly') {
-              const newDate = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), calendarDate.getDate() + 7);
-              setCalendarDate(newDate);
-              const newSelected = new Date(selectedDate);
-              newSelected.setDate(newSelected.getDate() + 7);
-              setSelectedDate(getLocalYMD(newSelected));
-            } else {
-              setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 1));
-            }
-          }}
-          onSwipeRight={() => {
-            playSoundEffect('click', soundEnabled);
-            setSlideDirection('left');
-            if (calendarMode === 'weekly') {
-              const newDate = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), calendarDate.getDate() - 7);
-              setCalendarDate(newDate);
-              const newSelected = new Date(selectedDate);
-              newSelected.setDate(newSelected.getDate() - 7);
-              setSelectedDate(getLocalYMD(newSelected));
-            } else {
-              setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() - 1, 1));
-            }
-          }}
-          onUpSwipe={() => {
-            if (calendarMode === 'monthly') { setCalendarDate(new Date(selectedDate)); setCalendarMode('weekly'); playSoundEffect('click', soundEnabled); }
-          }}
-          onDownSwipe={() => {
-            if (calendarMode === 'weekly') { setCalendarMode('monthly'); playSoundEffect('click', soundEnabled); }
-          }}
-          renderPanel={(panelType) => {
-            let panelDate = calendarDate;
-            if (panelType === 'prev') panelDate = getAdjacentCalendarDate(calendarDate, -1);
-            else if (panelType === 'next') panelDate = getAdjacentCalendarDate(calendarDate, 1);
-            const panelCells = getGridCellsForDate(panelDate);
+        {calendarMode === 'yearPicker' ? (
+          <div className="grid grid-cols-3 gap-2 px-1 py-1 animate-in fade-in zoom-in-95 duration-200">
+            {Array.from({ length: 12 }, (_, i) => year - 5 + i).map(y => (
+              <button
+                key={y}
+                onClick={() => { playSoundEffect('click', soundEnabled); setCalendarDate(new Date(y, month, 1)); setCalendarMode('monthPicker'); }}
+                className={`py-3 rounded-xl text-sm font-bold transition-all ${y === new Date().getFullYear() ? `${t.bgAccent} text-white` : `${t.btnBg} ${t.textMain} hover:${t.bgAccentSoft}`}`}
+              >
+                {y}
+              </button>
+            ))}
+          </div>
+        ) : calendarMode === 'monthPicker' ? (
+          <div className="grid grid-cols-3 gap-2 px-1 py-1 animate-in fade-in zoom-in-95 duration-200">
+            {(lang === 'id' 
+              ? ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
+              : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+            ).map((m, i) => (
+              <button
+                key={i}
+                onClick={() => { playSoundEffect('click', soundEnabled); setCalendarDate(new Date(year, i, 1)); setCalendarMode('monthly'); }}
+                className={`py-3 rounded-xl text-sm font-bold transition-all ${i === new Date().getMonth() && year === new Date().getFullYear() ? `${t.bgAccent} text-white` : `${t.btnBg} ${t.textMain} hover:${t.bgAccentSoft}`}`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-7 gap-1 mb-2 px-1 py-1">
+              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (<div key={i} className={`text-center caption uppercase ${t.textMuted}`}>{day}</div>))}
+            </div>
+            <PanoramicSlider
+              onSwipeLeft={() => {
+                playSoundEffect('click', soundEnabled);
+                setSlideDirection('right');
+                if (calendarMode === 'weekly') {
+                  const newDate = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), calendarDate.getDate() + 7);
+                  setCalendarDate(newDate);
+                  const newSelected = new Date(selectedDate);
+                  newSelected.setDate(newSelected.getDate() + 7);
+                  setSelectedDate(getLocalYMD(newSelected));
+                } else {
+                  setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 1));
+                }
+              }}
+              onSwipeRight={() => {
+                playSoundEffect('click', soundEnabled);
+                setSlideDirection('left');
+                if (calendarMode === 'weekly') {
+                  const newDate = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), calendarDate.getDate() - 7);
+                  setCalendarDate(newDate);
+                  const newSelected = new Date(selectedDate);
+                  newSelected.setDate(newSelected.getDate() - 7);
+                  setSelectedDate(getLocalYMD(newSelected));
+                } else {
+                  setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() - 1, 1));
+                }
+              }}
+              onUpSwipe={() => {
+                if (calendarMode === 'monthly') { setCalendarDate(new Date(selectedDate)); setCalendarMode('weekly'); playSoundEffect('click', soundEnabled); }
+              }}
+              onDownSwipe={() => {
+                if (calendarMode === 'weekly') { setCalendarMode('monthly'); playSoundEffect('click', soundEnabled); }
+              }}
+              renderPanel={(panelType) => {
+                let panelDate = calendarDate;
+                if (panelType === 'prev') panelDate = getAdjacentCalendarDate(calendarDate, -1);
+                else if (panelType === 'next') panelDate = getAdjacentCalendarDate(calendarDate, 1);
+                const panelCells = getGridCellsForDate(panelDate);
 
-            return (
-              <div className="grid grid-cols-7 gap-0.5 sm:gap-1 px-1 py-1">
-                {panelCells.map((dateObj, idx) => {
-                  if (!dateObj) return <div key={`blank-${idx}`} className="p-1 sm:p-2"></div>;
-                  const dateKey = getLocalYMD(dateObj);
-                  const day = dateObj.getDate();
-                  const workouts = getDayWorkouts(dateKey);
-                  const isToday = dateKey === todayStr;
-                  const isSelected = dateKey === selectedDate;
-                  const completedCount = workouts.filter(w => checkIsCompletedStrict(w, dateKey)).length;
-                  let cellStyle = `aspect-square p-0.5 sm:p-1 relative flex flex-col items-center justify-start rounded-lg transition-all cursor-pointer border border-transparent hover:border-slate-500/30 ${t.textMain}`;
-                  if (isSelected) cellStyle += ` ring-1 ${t.ringAccent}`;
-                  const spanClass = isToday
-                    ? `flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 rounded-full ${t.bgAccent} text-white font-black text-xs sm:body-md`
-                    : `text-xs sm:body-md font-medium ${workouts.length > 0 && completedCount === workouts.length ? t.textAccent : ''}`;
-                  return (
-                    <div
-                      key={dateKey}
-                      onClick={() => { playSoundEffect('click', soundEnabled); setSelectedDate(dateKey); setShowProgramSelect(false); setShowActionMenu(null); }}
-                      draggable={workouts.length > 0}
-                      onDragStart={(e) => handleDragStart(e, dateKey)}
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={(e) => handleDrop(e, dateKey)}
-                      className={cellStyle}
-                    >
-                      <span className={spanClass}>{day}</span>
-                      {workouts.length > 0 && (
-                        <div className="flex gap-0.5 mt-0.5 flex-wrap justify-center px-1">
-                          {workouts.map(w => (
-                            <div key={w.id} className={`w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full ${checkIsCompletedStrict(w, dateKey) ? (theme === 'dark' ? 'bg-[#41759b]' : 'bg-[#B79347]') : (theme === 'dark' ? 'bg-[#294c65]' : 'bg-[#CBB989]')}`} />
-                          ))}
+                return (
+                  <div className="grid grid-cols-7 gap-0.5 sm:gap-1 px-1 py-1">
+                    {panelCells.map((dateObj, idx) => {
+                      if (!dateObj) return <div key={`blank-${idx}`} className="p-1 sm:p-2"></div>;
+                      const dateKey = getLocalYMD(dateObj);
+                      const day = dateObj.getDate();
+                      const workouts = getDayWorkouts(dateKey);
+                      const isToday = dateKey === todayStr;
+                      const isSelected = dateKey === selectedDate;
+                      const completedCount = workouts.filter(w => checkIsCompletedStrict(w, dateKey)).length;
+                      let cellStyle = `aspect-square p-0.5 sm:p-1 relative flex flex-col items-center justify-start rounded-lg transition-all cursor-pointer border border-transparent hover:border-slate-500/30 ${t.textMain}`;
+                      if (isSelected) cellStyle += ` ring-1 ${t.ringAccent}`;
+                      const spanClass = isToday
+                        ? `flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 rounded-full ${t.bgAccent} text-white font-black text-xs sm:body-md`
+                        : `text-xs sm:body-md font-medium ${workouts.length > 0 && completedCount === workouts.length ? t.textAccent : ''}`;
+                      return (
+                        <div
+                          key={dateKey}
+                          onClick={() => { playSoundEffect('click', soundEnabled); setSelectedDate(dateKey); setShowProgramSelect(false); setShowActionMenu(null); }}
+                          draggable={workouts.length > 0}
+                          onDragStart={(e) => handleDragStart(e, dateKey)}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={(e) => handleDrop(e, dateKey)}
+                          className={cellStyle}
+                        >
+                          <span className={spanClass}>{day}</span>
+                          {workouts.length > 0 && (
+                            <div className="flex gap-0.5 mt-0.5 flex-wrap justify-center px-1">
+                              {workouts.map(w => (
+                                <div key={w.id} className={`w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full ${checkIsCompletedStrict(w, dateKey) ? (theme === 'dark' ? 'bg-[#41759b]' : 'bg-[#B79347]') : (theme === 'dark' ? 'bg-[#294c65]' : 'bg-[#CBB989]')}`} />
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          }}
-        />
+                      );
+                    })}
+                  </div>
+                );
+              }}
+            />
+          </>
+        )}
+
         <div className="flex items-center justify-center relative pt-3 pb-1 -mb-2 mt-2">
             {selectedDate !== todayStr && (
               <button
-                onClick={() => { playSoundEffect('click', soundEnabled); setSelectedDate(todayStr); setCalendarDate(new Date()); }}
+                onClick={() => { playSoundEffect('click', soundEnabled); setSelectedDate(todayStr); setCalendarDate(new Date()); setCalendarMode('weekly'); }}
                 className={`absolute right-0 text-[10px] font-bold px-2.5 py-0.5 rounded-full ${t.bgAccent} text-white hover:opacity-80 transition-opacity`}
               >
                 Hari Ini
               </button>
             )}
-            <button 
-              onClick={() => { playSoundEffect('click', soundEnabled); if (calendarMode === 'monthly') setCalendarDate(new Date(selectedDate)); setCalendarMode(calendarMode === 'monthly' ? 'weekly' : 'monthly'); }}
-              className="text-zinc-500 hover:text-emerald-500 transition-colors"
-            >
-              {calendarMode === 'monthly' ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
-            </button>
+            {(calendarMode === 'monthly' || calendarMode === 'weekly') && (
+              <button 
+                onClick={() => { playSoundEffect('click', soundEnabled); if (calendarMode === 'monthly') setCalendarDate(new Date(selectedDate)); setCalendarMode(calendarMode === 'monthly' ? 'weekly' : 'monthly'); }}
+                className="text-zinc-500 hover:text-emerald-500 transition-colors"
+              >
+                {calendarMode === 'monthly' ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+              </button>
+            )}
         </div>
       </div>
       </div>
