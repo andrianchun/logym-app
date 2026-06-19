@@ -55,9 +55,13 @@ const PanoramicSlider = ({ onSwipeLeft, onSwipeRight, renderPanel, swipeThreshol
       requestAnimationFrame(() => {
           if (scrollRef.current) {
              scrollRef.current.style.scrollBehavior = 'auto';
+             scrollRef.current.style.overflowX = 'hidden';
              scrollRef.current.scrollLeft = cw;
           }
-          setTimeout(() => { isResetting.current = false; }, 50);
+          setTimeout(() => { 
+             if (scrollRef.current) scrollRef.current.style.overflowX = 'auto';
+             isResetting.current = false; 
+          }, 150);
       });
     } else if (el.scrollLeft >= cw * (1 + swipeThreshold)) {
       isResetting.current = true;
@@ -65,9 +69,13 @@ const PanoramicSlider = ({ onSwipeLeft, onSwipeRight, renderPanel, swipeThreshol
       requestAnimationFrame(() => {
           if (scrollRef.current) {
              scrollRef.current.style.scrollBehavior = 'auto';
+             scrollRef.current.style.overflowX = 'hidden';
              scrollRef.current.scrollLeft = cw;
           }
-          setTimeout(() => { isResetting.current = false; }, 50);
+          setTimeout(() => { 
+             if (scrollRef.current) scrollRef.current.style.overflowX = 'auto';
+             isResetting.current = false; 
+          }, 150);
       });
     }
   };
