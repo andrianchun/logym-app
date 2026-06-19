@@ -52,8 +52,8 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   const [manualTab, setManualTab] = useState('komposisi'); 
   const [modalDate, setModalDate] = useState(activeDate);
 
-  const [isKomposisiExpanded, setIsKomposisiExpanded] = useState(false);
-  const [isProgressExpanded, setIsProgressExpanded] = useState(false);
+  const [isKomposisiExpanded, setIsKomposisiExpanded] = useState(true);
+  const [isProgressExpanded, setIsProgressExpanded] = useState(true);
 
   const emptyBio = {
     bodyScore: 0, weight: 0, height: 0, bmi: 0, bmiStatus: '-', bodyFat: 0, bodyFatStatus: '-',
@@ -350,7 +350,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
           />
           </div>
       )}
-      </div>
+      )}
 
       {/* 2. KARTU AKTIVITAS HARIAN & MINGGUAN */}
       <div className={`p-5 rounded-2xl border ${t.border} ${t.bgCard} shadow-sm`}>
@@ -399,6 +399,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
              </div>
              <span className={`h2 ${t.textAccent}`}>{bioData.weeklyDuration || '-'} <span className="caption text-zinc-500">Mins</span></span>
          </div>
+      </div>
       </div>
 
       {/* --- GRUP PROGRESS --- */}
