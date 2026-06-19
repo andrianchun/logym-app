@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import Model from './react-body-highlighter/index.js';
+import { ChevronDown } from 'lucide-react';
 import { normalizeMuscleKey } from '../data/constants';
 
 // Mapping from LyFit standard keys to react-body-highlighter muscle names
@@ -33,6 +34,18 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
     const [selectedMuscle, setSelectedMuscle] = useState(null);
     const [tooltipPos, setTooltipPos] = useState({ left: 0, top: 0 });
     const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const dropdownRef = useRef(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setIsDropdownOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
     const radarLabels = useMemo(() => ({
         "chest": { EN: "Chest", ID: "Dada" },
@@ -180,15 +193,36 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
             <div className="flex justify-between items-center mb-4">
                 <h3 className={`${t.textMain} font-black body-md uppercase tracking-wider`}>Progres Otot</h3>
                 
-                <select 
-                    value={timeFilter} 
-                    onChange={e => { playSoundEffect('click', soundEnabled); setTimeFilter(e.target.value); }}
-                    className={`body-sm font-bold p-2 rounded-xl ${t.inputBg} ${t.textMain} outline-none border ${t.border} cursor-pointer w-auto`}
-                >
-                    <option value="1m">1 Bulan Terakhir</option>
-                    <option value="3m">3 Bulan Terakhir</option>
-                    <option value="all">Keseluruhan</option>
-                </select>
+                <div className="relative" ref={dropdownRef}>
+                    <button 
+                        onClick={() => { playSoundEffect('click', soundEnabled); setIsDropdownOpen(!isDropdownOpen); }}
+                        className={`body-sm font-bold p-2 pl-3 pr-2 rounded-xl flex items-center justify-between space-x-2 ${t.inputBg} ${t.textMain} border ${t.border} transition-colors`}
+                    >
+                        <span>{timeFilter === '1m' ? '1 Bulan Terakhir' : timeFilter === '3m' ? '3 Bulan Terakhir' : 'Keseluruhan'}</span>
+                        <ChevronDown size={14} className={`transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {isDropdownOpen && (
+                        <div className={`absolute top-full right-0 mt-2 w-44 rounded-xl border ${t.border} ${t.bgCard} shadow-lg overflow-hidden z-[60] animate-in zoom-in-95 origin-top-right`}>
+                            {[
+                                { val: '1m', label: '1 Bulan Terakhir' },
+                                { val: '3m', label: '3 Bulan Terakhir' },
+                                { val: 'all', label: 'Keseluruhan' }
+                            ].map(opt => (
+                                <button
+                                    key={opt.val}
+                                    onClick={() => {
+                                        playSoundEffect('click', soundEnabled);
+                                        setTimeFilter(opt.val);
+                                        setIsDropdownOpen(false);
+                                    }}
+                                    className={`w-full text-left px-4 py-3 body-sm font-bold transition-colors ${timeFilter === opt.val ? t.textAccent + ' bg-emerald-500/10 dark:bg-emerald-500/10' : t.textMuted + ' hover:' + t.textMain + ' hover:bg-black/5 dark:hover:bg-white/5'}`}
+                                >
+                                    {opt.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
 
             <div className={`relative flex w-full p-1.5 rounded-full ${t.btnBg} mb-6`}>

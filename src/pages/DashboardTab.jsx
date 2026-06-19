@@ -283,74 +283,75 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
       <div className="flex flex-col sm:grid sm:grid-cols-2 sm:gap-6 sm:items-start space-y-4 sm:space-y-0">
       {/* --- GRUP KOMPOSISI & BIOMETRIK --- */}
       <div className="flex flex-col space-y-4">
-        {/* 1. KARTU BODY COMPOSITION */}
-        <div className={`p-5 rounded-2xl border ${t.border} ${t.bgCard} shadow-sm relative overflow-hidden z-10`}>
-         <div className="flex justify-between items-center mb-5 relative z-10">
-             <div>
-                 <h3 className={`h3 ${t.textMain}`}>Komposisi Tubuh</h3>
-                 {bioDataDate && bioDataDate !== activeDate && (
-                     <p className={`caption ${t.textMuted} mt-0.5`} style={{fontSize: '0.65rem'}}>Data dari: {new Date(bioDataDate).toLocaleDateString(language==='ID'?'id-ID':'en-US', { day: 'numeric', month: 'short' })}</p>
-                 )}
-             </div>
-             <div className="flex items-center space-x-2">
-                 <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(bioDataDate || activeDate); setShowDetailsModal(true); }} className={`p-1.5 rounded-full ${t.btnBg} ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Info size={14}/></button>
-                 <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(activeDate); setManualTab('komposisi'); setShowManualModal(true); }} className={`p-1.5 rounded-full ${t.btnBg} ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Pencil size={14}/></button>
-             </div>
-         </div>
-         
-         <div className="flex items-center space-x-6 mb-5 relative z-10">
-             <div className={`w-20 h-20 shrink-0 rounded-full flex flex-col items-center justify-center border-[3px] ${scoreStyle} shadow-sm`}>
-                <span className="h1">{bioData.bodyScore || '-'}</span>
-                <span className="h3 mt-1 opacity-70">SCORE</span>
-             </div>
-             <div className="flex-1 space-y-3">
-                 <div className="flex justify-between items-center border-b border-dashed border-slate-500/20 pb-2">
-                     <span className={`caption ${t.textMuted}`}>BMI (Asia)</span>
-                     <div className="text-right flex items-center space-x-1.5">
-                        <span className={`h2 ${t.textMain}`}>{bioData.bmi || '-'}</span>
-                        <span className={`h3 ${bioData.bmiStatus === 'Normal' ? 'text-emerald-500' : bioData.bmiStatus === 'Overweight' ? 'text-amber-500' : bioData.bmiStatus === 'Obese' ? 'text-rose-500' : 'text-blue-500'}`}>{bioData.bmiStatus}</span>
-                     </div>
-                 </div>
-                 <div className="flex justify-between items-center pb-1">
-                     <span className={`caption ${t.textMuted}`}>Body Fat</span>
-                     <div className="text-right flex items-center space-x-1.5">
-                        <span className={`h2 ${t.textMain}`}>{bioData.bodyFat || '-'} <span className="caption font-normal text-zinc-500">%</span></span>
-                        <span className={`h3 ${bioData.bodyFatStatus === 'Normal' ? 'text-emerald-500' : bioData.bodyFatStatus === 'Overfat' ? 'text-amber-500' : bioData.bodyFatStatus === 'Obese' ? 'text-rose-500' : 'text-blue-500'}`}>{bioData.bodyFatStatus}</span>
-                     </div>
-                 </div>
-             </div>
-         </div>
-
-         <div className="grid grid-cols-4 gap-2 relative z-10 pt-4 border-t border-dashed border-slate-500/20">
-             <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{bioData.bmr || '-'}</span><span className={`h3 ${t.textMuted} mt-0.5`}>BMR</span></div>
-             <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{bioData.muscleMass || '-'} <span className="caption font-normal text-zinc-500">kg</span></span><span className={`h3 ${t.textMuted} mt-0.5`}>Massa Otot</span></div>
-             <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{bioData.musclePercent || '-'} <span className="caption font-normal text-zinc-500">%</span></span><span className={`h3 ${t.textMuted} mt-0.5`}>Kadar Otot</span></div>
-             <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{bioData.visceralFat || '-'}</span><span className={`h3 ${t.textMuted} mt-0.5`}>Visceral</span></div>
-             <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{bioData.waterPercent || '-'} <span className="caption font-normal text-zinc-500">%</span></span><span className={`h3 ${t.textMuted} mt-0.5`}>Kadar Air</span></div>
-             <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{bioData.proteinPercent || '-'} <span className="caption font-normal text-zinc-500">%</span></span><span className={`h3 ${t.textMuted} mt-0.5`}>Protein</span></div>
-             <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{bioData.waist || '-'} <span className="caption font-normal text-zinc-500">cm</span></span><span className={`h3 ${t.textMuted} mt-0.5`}>L. Perut</span></div>
-             <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{bioData.bodyAge || '-'} <span className="caption font-normal text-zinc-500">th</span></span><span className={`h3 ${t.textMuted} mt-0.5`}>Usia Tubuh</span></div>
-         </div>
-         
-         <button 
-             onClick={() => { playSoundEffect('click', soundEnabled); setIsKomposisiExpanded(!isKomposisiExpanded); }}
-             className="w-full flex items-center justify-center pt-3 pb-1 -mb-2 mt-2 text-zinc-500 hover:text-emerald-500 transition-colors"
-         >
-             {isKomposisiExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
-         </button>
-      </div>
-
-      {isKomposisiExpanded && (
-          <div className={`rounded-b-3xl border border-t-0 ${t.border} ${theme === 'dark' ? 'bg-[#061626]' : 'bg-[#f0f2f5]'} shadow-inner -mt-6 pt-6 relative z-0 animate-in slide-in-from-top-4 fade-in`}>
-          <DashboardChart 
-             t={t} theme={theme} history={history} 
-             soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
-             onPointClick={handleChartPointClick}
-             isSubCard={true}
-          />
+        {/* 1. KARTU BODY COMPOSITION & EXPANDED CHART */}
+        <div className="flex flex-col w-full min-w-0">
+          <div className={`p-5 rounded-2xl border ${t.border} ${t.bgCard} shadow-sm relative overflow-hidden z-10`}>
+           <div className="flex justify-between items-center mb-5 relative z-10">
+               <div>
+                   <h3 className={`h3 ${t.textMain}`}>Komposisi Tubuh</h3>
+                   {bioDataDate && bioDataDate !== activeDate && (
+                       <p className={`caption ${t.textMuted} mt-0.5`} style={{fontSize: '0.65rem'}}>Data dari: {new Date(bioDataDate).toLocaleDateString(language==='ID'?'id-ID':'en-US', { day: 'numeric', month: 'short' })}</p>
+                   )}
+               </div>
+               <div className="flex items-center space-x-2">
+                   <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(bioDataDate || activeDate); setShowDetailsModal(true); }} className={`p-1.5 rounded-full ${t.btnBg} ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Info size={14}/></button>
+                   <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(activeDate); setManualTab('komposisi'); setShowManualModal(true); }} className={`p-1.5 rounded-full ${t.btnBg} ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Pencil size={14}/></button>
+               </div>
+           </div>
+           
+           <div className="flex items-center space-x-6 mb-5 relative z-10">
+               <div className={`w-20 h-20 shrink-0 rounded-full flex flex-col items-center justify-center border-[3px] ${scoreStyle} shadow-sm`}>
+                  <span className="h1">{bioData.bodyScore || '-'}</span>
+                  <span className="h3 mt-1 opacity-70">SCORE</span>
+               </div>
+               <div className="flex-1 space-y-3">
+                   <div className="flex justify-between items-center border-b border-dashed border-slate-500/20 pb-2">
+                       <span className={`caption ${t.textMuted}`}>BMI (Asia)</span>
+                       <div className="text-right flex items-center space-x-1.5">
+                          <span className={`h2 ${t.textMain}`}>{bioData.bmi || '-'}</span>
+                          <span className={`h3 ${bioData.bmiStatus === 'Normal' ? 'text-emerald-500' : bioData.bmiStatus === 'Overweight' ? 'text-amber-500' : bioData.bmiStatus === 'Obese' ? 'text-rose-500' : 'text-blue-500'}`}>{bioData.bmiStatus}</span>
+                       </div>
+                   </div>
+                   <div className="flex justify-between items-center pb-1">
+                       <span className={`caption ${t.textMuted}`}>Body Fat</span>
+                       <div className="text-right flex items-center space-x-1.5">
+                          <span className={`h2 ${t.textMain}`}>{bioData.bodyFat || '-'} <span className="caption font-normal text-zinc-500">%</span></span>
+                          <span className={`h3 ${bioData.bodyFatStatus === 'Normal' ? 'text-emerald-500' : bioData.bodyFatStatus === 'Overfat' ? 'text-amber-500' : bioData.bodyFatStatus === 'Obese' ? 'text-rose-500' : 'text-blue-500'}`}>{bioData.bodyFatStatus}</span>
+                       </div>
+                   </div>
+               </div>
+           </div>
+  
+           <div className="grid grid-cols-4 gap-2 relative z-10 pt-4 border-t border-dashed border-slate-500/20">
+               <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{bioData.bmr || '-'}</span><span className={`h3 ${t.textMuted} mt-0.5`}>BMR</span></div>
+               <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{bioData.muscleMass || '-'} <span className="caption font-normal text-zinc-500">kg</span></span><span className={`h3 ${t.textMuted} mt-0.5`}>Massa Otot</span></div>
+               <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{bioData.musclePercent || '-'} <span className="caption font-normal text-zinc-500">%</span></span><span className={`h3 ${t.textMuted} mt-0.5`}>Kadar Otot</span></div>
+               <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{bioData.visceralFat || '-'}</span><span className={`h3 ${t.textMuted} mt-0.5`}>Visceral</span></div>
+               <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{bioData.waterPercent || '-'} <span className="caption font-normal text-zinc-500">%</span></span><span className={`h3 ${t.textMuted} mt-0.5`}>Kadar Air</span></div>
+               <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{bioData.proteinPercent || '-'} <span className="caption font-normal text-zinc-500">%</span></span><span className={`h3 ${t.textMuted} mt-0.5`}>Protein</span></div>
+               <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{bioData.waist || '-'} <span className="caption font-normal text-zinc-500">cm</span></span><span className={`h3 ${t.textMuted} mt-0.5`}>L. Perut</span></div>
+               <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{bioData.bodyAge || '-'} <span className="caption font-normal text-zinc-500">th</span></span><span className={`h3 ${t.textMuted} mt-0.5`}>Usia Tubuh</span></div>
+           </div>
+           
+           <button 
+               onClick={() => { playSoundEffect('click', soundEnabled); setIsKomposisiExpanded(!isKomposisiExpanded); }}
+               className="w-full flex items-center justify-center pt-1.5 pb-2.5 -mb-2 mt-2 text-zinc-500 hover:text-emerald-500 transition-colors"
+           >
+               {isKomposisiExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+           </button>
           </div>
-      )}
-      )}
+  
+          {isKomposisiExpanded && (
+              <div className={`rounded-b-3xl border border-t-0 ${t.border} ${theme === 'dark' ? 'bg-[#061626]' : 'bg-[#f0f2f5]'} shadow-inner -mt-6 pt-6 relative z-0 animate-in slide-in-from-top-4 fade-in`}>
+              <DashboardChart 
+                 t={t} theme={theme} history={history} 
+                 soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
+                 onPointClick={handleChartPointClick}
+                 isSubCard={true}
+              />
+              </div>
+          )}
+        </div>
 
       {/* 2. KARTU AKTIVITAS HARIAN & MINGGUAN */}
       <div className={`p-5 rounded-2xl border ${t.border} ${t.bgCard} shadow-sm`}>
@@ -415,7 +416,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
         />
         <button 
              onClick={() => { playSoundEffect('click', soundEnabled); setIsProgressExpanded(!isProgressExpanded); }}
-             className="w-full flex items-center justify-center pb-2 pt-2 text-zinc-500 hover:text-emerald-500 transition-colors"
+             className="w-full flex items-center justify-center pt-1.5 pb-2.5 text-zinc-500 hover:text-emerald-500 transition-colors"
          >
              {isProgressExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
          </button>
