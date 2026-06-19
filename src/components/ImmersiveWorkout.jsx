@@ -103,25 +103,39 @@ const ImmersiveWorkout = ({
   };
 
   const mediaItems = React.useMemo(() => parseMedia(ex), [ex]);
+  const [ytLoaded, setYtLoaded] = React.useState(false);
   const [activeMediaIndex, setActiveMediaIndex] = React.useState(0);
-
+  
   React.useEffect(() => {
     setActiveMediaIndex(0);
   }, [currentIndex]);
+
+  React.useEffect(() => {
+    setYtLoaded(false);
+  }, [activeMediaIndex, currentIndex]);
 
   const activeMedia = mediaItems[activeMediaIndex];
 
   // Pause / Play Logic
   React.useEffect(() => {
-    const iframe = document.querySelector('.immersive-video-iframe');
-    const videoObj = document.querySelector('.immersive-video-html5');
-    if (isPaused) {
-      if (iframe) iframe.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
-      if (videoObj) videoObj.pause();
-    } else {
-      if (iframe) iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
-      if (videoObj) videoObj.play();
-    }
+    const iframes = document.querySelectorAll('.immersive-video-iframe');
+    const videoObjs = document.querySelectorAll('.immersive-video-html5');
+    
+    iframes.forEach((iframe, idx) => {
+      if (idx === activeMediaIndex && !isPaused) {
+        iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
+      } else {
+        iframe.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
+      }
+    });
+
+    videoObjs.forEach((videoObj, idx) => {
+      if (idx === activeMediaIndex && !isPaused) {
+        videoObj.play();
+      } else {
+        videoObj.pause();
+      }
+    });
   }, [isPaused, activeMediaIndex, currentIndex]);
 
   // Swipe Logic
@@ -275,37 +289,53 @@ const ImmersiveWorkout = ({
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
       >
-        {(() => {
-          if (!activeMedia) return <Dumbbell size={80} className="opacity-10" />;
-          
-          if (activeMedia.type === 'youtube') {
-            const match = activeMedia.url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})/);
-            const videoId = match ? match[1] : null;
-            if (videoId) {
-              return (
-                <>
-                  {!ytLoaded && (
-                    <div className="absolute inset-0  flex items-center justify-center z-10">
-                      <Clock className="animate-spin opacity-20" size={32} />
-                    </div>
-                  )}
-                  <iframe 
-                    src={`https://www.youtube.com/embed/${videoId}?enablejsapi=1&autoplay=1&mute=1&controls=0&modestbranding=1&playsinline=1&rel=0&disablekb=1&iv_load_policy=3`}
-                    title="YouTube video player" 
-                    frameBorder="0" 
-                    onLoad={handleIframeLoad}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                    className="immersive-video-iframe w-[150%] h-[150%] max-w-none pointer-events-none scale-[1.35] sm:scale-125"
-                  ></iframe>
-                </>
-              );
-            }
-          }
-          if (activeMedia.type === 'video') {
-            return <video src={activeMedia.url} autoPlay loop muted playsInline className="immersive-video-html5 w-full h-full object-contain opacity-80 pointer-events-none" />;
-          }
-          return <img src={activeMedia.url} alt={ex.name} className="w-full h-full object-contain opacity-80 pointer-events-none" />;
-        })()}
+        <div 
+          className="flex h-full w-full transition-transform duration-300 ease-in-out"
+          style={{ 
+            transform: `translateX(-${activeMediaIndex * (100 / Math.max(1, mediaItems.length))}%)`,
+            width: `${Math.max(1, mediaItems.length) * 100}%`
+          }}
+        >
+          {mediaItems.length === 0 ? (
+            <div className="w-full h-full flex items-center justify-center">
+              <Dumbbell size={80} className="opacity-10" />
+            </div>
+          ) : (
+            mediaItems.map((media, idx) => (
+              <div key={idx} className="h-full flex items-center justify-center shrink-0 relative overflow-hidden" style={{ width: `${100 / mediaItems.length}%` }}>
+                {(() => {
+                  if (media.type === 'youtube') {
+                    const match = media.url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})/);
+                    const videoId = match ? match[1] : null;
+                    if (videoId) {
+                      return (
+                        <>
+                          {!ytLoaded && idx === activeMediaIndex && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-[#040f1a] z-10">
+                              <Clock className="animate-spin text-white/50" size={32} />
+                            </div>
+                          )}
+                          <iframe 
+                            src={`https://www.youtube.com/embed/${videoId}?enablejsapi=1&autoplay=${idx === activeMediaIndex && !isPaused ? '1' : '0'}&mute=1&controls=0&modestbranding=1&playsinline=1&rel=0&disablekb=1&iv_load_policy=3`}
+                            title="YouTube video player" 
+                            frameBorder="0" 
+                            onLoad={handleIframeLoad}
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                            className={`immersive-video-iframe w-[150%] h-[150%] max-w-none pointer-events-none scale-[1.35] sm:scale-125 transition-opacity duration-700 ${ytLoaded || idx !== activeMediaIndex ? 'opacity-100' : 'opacity-0'}`}
+                          ></iframe>
+                        </>
+                      );
+                    }
+                  }
+                  if (media.type === 'video') {
+                    return <video src={media.url} autoPlay={idx === activeMediaIndex && !isPaused} loop muted playsInline className="immersive-video-html5 w-full h-full object-contain opacity-80 pointer-events-none" />;
+                  }
+                  return <img src={media.url} alt={ex.name} className="w-full h-full object-contain opacity-80 pointer-events-none" />;
+                })()}
+              </div>
+            ))
+          )}
+        </div>
 
         {/* Carousel Controls */}
         {mediaItems.length > 1 && (
