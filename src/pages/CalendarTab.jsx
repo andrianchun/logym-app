@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Info, CheckCircle, CalendarDays, Edit2, PlayCircle, Trash2, X, Copy, Repeat, Plus, Clock, Bell, CalendarPlus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Info, CheckCircle, CalendarDays, Edit2, PlayCircle, X, Copy, Repeat, Plus, Clock, Bell, CalendarPlus, CalendarCheck } from 'lucide-react';
 import { getLocalYMD } from '../data/constants';
 import PanoramicSlider from '../components/PanoramicSlider';
 import { LocalNotifications } from '@capacitor/local-notifications';
@@ -205,6 +205,16 @@ const CalendarTab = ({
   const handleAddToNativeCalendar = (workoutId, programName, dateStr, timeStr) => {
     playSoundEffect('click', soundEnabled);
     
+    // Optimistic sync marker
+    setHistory(prev => {
+       const h = { ...prev };
+       const d = h[dateStr];
+       if (d && d.workouts) {
+         h[dateStr] = { ...d, workouts: d.workouts.map(w => w.id === workoutId ? { ...w, gcalSynced: true } : w) };
+       }
+       return h;
+    });
+
     let startD, endD;
     const effectiveTimeStr = timeStr || defaultReminderTime || "15:00";
     
@@ -842,8 +852,8 @@ const CalendarTab = ({
                               <div key={w.id} className={`p-4 rounded-2xl ${isCompleted ? 'border ' + t.borderAccentSoft + ' ' + t.bgAccentSoft : 'border-2 border-dashed ' + t.borderAccentSoft + ' bg-black/5 dark:bg-white/5'} flex flex-col relative transition-all ${isExpanded ? 'ring-2 ' + t.ringAccent : 'hover:scale-[1.02] cursor-pointer'}`} onClick={() => { if(!isExpanded) { playSoundEffect('click', soundEnabled); setExpandedWorkoutId(w.id); setCalendarDate(new Date(targetDateStr)); setCalendarMode('weekly'); } }}>
                                 <div className="absolute top-3 right-3 flex items-center gap-1 z-10">
                                   {!isCompleted && (
-                                    <button onClick={(e) => { e.stopPropagation(); handleAddToNativeCalendar(w.id, w.programName, targetDateStr, w.reminderTime); }} className="p-1.5 text-blue-500/50 hover:text-blue-500 hover:bg-blue-500/10 rounded-lg transition-colors" title="Tambah ke Kalender">
-                                      <CalendarPlus size={16} />
+                                    <button onClick={(e) => { e.stopPropagation(); handleAddToNativeCalendar(w.id, w.programName, targetDateStr, w.reminderTime); }} className={`p-1.5 rounded-lg transition-colors ${w.gcalSynced ? 'text-emerald-500 hover:bg-emerald-500/10' : 'text-blue-500/50 hover:text-blue-500 hover:bg-blue-500/10'}`} title={w.gcalSynced ? "Sudah disinkron (Klik lagi untuk kirim ulang)" : "Tambah ke Kalender"}>
+                                      {w.gcalSynced ? <CalendarCheck size={16} /> : <CalendarPlus size={16} />}
                                     </button>
                                   )}
                                   <button onClick={(e) => { e.stopPropagation(); removeWorkout(w.id); }} className="p-1.5 text-rose-500/50 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors" title="Hapus Jadwal">
