@@ -1028,6 +1028,7 @@ export default function App() {
                history={history} setHistory={setHistory} setActiveTab={setActiveTab}
                activeProgramId={activeProgramId} setActiveProgramId={setActiveProgramId} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
                warmupVideos={warmupVideos} cooldownVideos={cooldownVideos} onOpenDetail={setGlobalDetailExercise}
+               exerciseLibrary={exerciseLibrary}
                exerciseLogs={exerciseLogs} skippedExercises={skippedExercises} extraExercises={extraExercises}
                onSetChange={handleSetChange} onToggleSet={handleToggleSet} onAddSet={handleAddSet} onRemoveSet={handleRemoveSet}
                onToggleSkip={handleToggleSkip} onRemoveExtra={handleRemoveExtraEx}
@@ -1078,6 +1079,7 @@ export default function App() {
              soundEnabled={soundEnabled}
              warmupVideos={warmupVideos} setWarmupVideos={setWarmupVideos}
              cooldownVideos={cooldownVideos} setCooldownVideos={setCooldownVideos}
+             onOpenDetail={setGlobalDetailExercise}
            />
          )}
 
