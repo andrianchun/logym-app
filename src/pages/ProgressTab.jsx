@@ -167,7 +167,6 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
      if(scrollRef.current && chartDataObj.data.length > 0 && activeChartLines.length > 0) {
         const data = chartDataObj.data;
         
-        // Find the latest index where ANY of the activeChartLines has a valid value
         let latestIdxWithData = -1;
         for (let i = data.length - 1; i >= 0; i--) {
             if (activeChartLines.some(line => {
@@ -179,22 +178,33 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
             }
         }
         
-        let idx = latestIdxWithData;
-        if (idx === -1) {
-             const targetDate = selectedDate || getLocalYMD(new Date());
-             idx = data.findIndex(d => d.rawDate === targetDate);
-             if (idx === -1) idx = data.length - 1;
-        }
+        if (latestIdxWithData !== -1) {
+             const latestDateObj = new Date(data[latestIdxWithData].rawDate);
+             const oneMonthAgo = new Date(latestDateObj.getTime() - 30 * 24 * 60 * 60 * 1000);
+             const oneMonthAgoStr = getLocalYMD(oneMonthAgo);
 
-        setTimeout(() => {
-            if(scrollRef.current) {
-                const clientW = scrollRef.current.clientWidth;
-                const totalScrollWidth = scrollRef.current.scrollWidth;
-                const ratio = data.length > 1 ? (idx / (data.length - 1)) : 0.5;
-                const pointCenter = ratio * totalScrollWidth;
-                scrollRef.current.scrollLeft = Math.max(0, pointCenter - (clientW / 2));
-            }
-        }, 10);
+             let startIdx = latestIdxWithData;
+             while (startIdx > 0 && data[startIdx - 1].rawDate >= oneMonthAgoStr) {
+                 startIdx--;
+             }
+
+             const numPoints = latestIdxWithData - startIdx + 1;
+             const clientW = scrollRef.current.clientWidth || (window.innerWidth - 40);
+             
+             let newPointWidth = clientW / Math.max(1.5, numPoints); // Use 1.5 to leave slight padding if only 1 point
+             if (newPointWidth > 200) newPointWidth = 200;
+             if (newPointWidth < 15) newPointWidth = 15;
+
+             setPointWidth(newPointWidth);
+             scrollTarget.current = startIdx * newPointWidth;
+        } else {
+             // Fallback
+             const targetDate = selectedDate || getLocalYMD(new Date());
+             let idx = data.findIndex(d => d.rawDate === targetDate);
+             if (idx === -1) idx = data.length - 1;
+             
+             scrollTarget.current = Math.max(0, (idx * pointWidth) - (scrollRef.current.clientWidth / 2));
+        }
      }
   }, [chartDataObj, selectedDate, activeChartLines]);
 
