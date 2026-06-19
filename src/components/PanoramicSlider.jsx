@@ -1,104 +1,142 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 
-const PanoramicSlider = ({ onSwipeLeft, onSwipeRight, renderPanel, swipeThreshold = 0.5, onUpSwipe, onDownSwipe }) => {
-  const scrollRef = useRef(null);
-  const [isReady, setIsReady] = useState(false);
-  const isResetting = useRef(false);
-
-  // Touch tracking to prevent mid-drag resets
-  const isTouching = useRef(false);
-
-  // Vertical swipe detection
+const PanoramicSlider = ({ onSwipeLeft, onSwipeRight, renderPanel, swipeThreshold = 0.25, onUpSwipe, onDownSwipe }) => {
+  const containerRef = useRef(null);
+  const [offsetX, setOffsetX] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
+  
   const touchStartY = useRef(null);
   const touchStartX = useRef(null);
+  const isHorizontalDrag = useRef(false);
+  const lastTouchTime = useRef(0);
 
   const handleTouchStart = (e) => {
-    isTouching.current = true;
+    if (isAnimating) return; // Block touches while snapping
     touchStartY.current = e.touches[0].clientY;
     touchStartX.current = e.touches[0].clientX;
+    lastTouchTime.current = Date.now();
+    setIsDragging(true);
+    isHorizontalDrag.current = null; // null means undetermined
+  };
+
+  const handleTouchMove = (e) => {
+    if (!isDragging || isAnimating) return;
+    
+    const currentY = e.touches[0].clientY;
+    const currentX = e.touches[0].clientX;
+    const distanceY = touchStartY.current - currentY;
+    const distanceX = touchStartX.current - currentX;
+
+    // Determine swipe direction on first move
+    if (isHorizontalDrag.current === null) {
+      if (Math.abs(distanceX) > Math.abs(distanceY)) {
+        isHorizontalDrag.current = true;
+      } else {
+        isHorizontalDrag.current = false;
+      }
+    }
+
+    if (!isHorizontalDrag.current) {
+      // It's a vertical scroll, let browser handle it normally
+      return; 
+    }
+
+    // It's a horizontal scroll, prevent default to stop page scrolling
+    if (e.cancelable) {
+      e.preventDefault();
+    }
+    
+    // Add resistance at the edges if we wanted, but we have infinite loop so no edges
+    setOffsetX(-distanceX);
   };
 
   const handleTouchEnd = (e) => {
-    isTouching.current = false;
+    if (!isDragging || isAnimating) return;
+    setIsDragging(false);
+    
     if (touchStartY.current === null || touchStartX.current === null) return;
     const touchEndY = e.changedTouches[0].clientY;
     const touchEndX = e.changedTouches[0].clientX;
     const distanceY = touchStartY.current - touchEndY;
     const distanceX = touchStartX.current - touchEndX;
+    const timeElapsed = Date.now() - lastTouchTime.current;
 
-    if (Math.abs(distanceY) > 40 && Math.abs(distanceY) > Math.abs(distanceX)) {
-      if (distanceY > 0 && onUpSwipe) onUpSwipe();
-      if (distanceY < 0 && onDownSwipe) onDownSwipe();
+    // Handle vertical swipe detection (for changing calendar mode)
+    if (isHorizontalDrag.current === false) {
+      if (Math.abs(distanceY) > 40) {
+        if (distanceY > 0 && onUpSwipe) onUpSwipe();
+        if (distanceY < 0 && onDownSwipe) onDownSwipe();
+      }
+      setOffsetX(0);
+      return;
     }
-  };
 
-  useEffect(() => {
-    if (scrollRef.current && !isReady) {
-      scrollRef.current.scrollLeft = scrollRef.current.clientWidth;
-      setIsReady(true);
-    }
-  }, [isReady]);
+    const cw = containerRef.current?.clientWidth || window.innerWidth;
+    const threshold = cw * swipeThreshold;
+    const isFastSwipe = timeElapsed < 300 && Math.abs(distanceX) > 30;
 
-  // Handle window resize to keep it centered
-  useEffect(() => {
-    const handleResize = () => {
-      if (scrollRef.current) scrollRef.current.scrollLeft = scrollRef.current.clientWidth;
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+    setIsAnimating(true);
 
-  const handleScroll = (e) => {
-    // DO NOT reset if the user is still actively dragging
-    if (!isReady || isResetting.current || isTouching.current) return;
-    
-    const el = e.currentTarget;
-    const cw = el.clientWidth;
-    if (cw === 0) return;
-
-    // Wait for the browser's native scroll-snap to reach the end of the panel
-    if (el.scrollLeft <= 1) {
-      isResetting.current = true;
-      onSwipeRight();
-      
-      // Instant momentum kill trick
-      el.style.overflowX = 'hidden';
-      el.scrollLeft = cw;
-      void el.offsetHeight; // Force reflow
-      el.style.overflowX = 'auto';
-      
-      setTimeout(() => { isResetting.current = false; }, 30);
-    } else if (el.scrollLeft >= cw * 2 - 1) {
-      isResetting.current = true;
-      onSwipeLeft();
-      
-      // Instant momentum kill trick
-      el.style.overflowX = 'hidden';
-      el.scrollLeft = cw;
-      void el.offsetHeight; // Force reflow
-      el.style.overflowX = 'auto';
-      
-      setTimeout(() => { isResetting.current = false; }, 30);
+    if (distanceX > threshold || (isFastSwipe && distanceX > 0)) {
+      // Swiped Left -> go to Next
+      setOffsetX(-cw);
+      setTimeout(() => {
+        onSwipeLeft();
+        // Instantly reset position without animation
+        setIsDragging(true); // Temporarily trick the style to disable transition
+        setOffsetX(0);
+        setTimeout(() => {
+           setIsDragging(false);
+           setIsAnimating(false);
+        }, 50);
+      }, 300); // Wait for CSS transition (0.3s)
+    } else if (distanceX < -threshold || (isFastSwipe && distanceX < 0)) {
+      // Swiped Right -> go to Prev
+      setOffsetX(cw);
+      setTimeout(() => {
+        onSwipeRight();
+        setIsDragging(true);
+        setOffsetX(0);
+        setTimeout(() => {
+           setIsDragging(false);
+           setIsAnimating(false);
+        }, 50);
+      }, 300);
+    } else {
+      // Snap back to center (didn't pass threshold)
+      setOffsetX(0);
+      setTimeout(() => {
+         setIsAnimating(false);
+      }, 300);
     }
   };
 
   return (
     <div 
-      ref={scrollRef}
-      onScroll={handleScroll}
+      ref={containerRef}
+      className="w-full overflow-hidden relative touch-pan-y"
       onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
-      className={`flex overflow-x-auto snap-x snap-mandatory hide-scrollbar w-full ${isReady ? 'opacity-100' : 'opacity-0'} transition-opacity duration-200`}
-      style={{ scrollBehavior: 'auto', touchAction: 'pan-x pan-y' }}
+      onTouchCancel={handleTouchEnd}
     >
-      <div className="w-full shrink-0 snap-center flex flex-col justify-start">
-        {renderPanel('prev')}
-      </div>
-      <div className="w-full shrink-0 snap-center flex flex-col justify-start">
-        {renderPanel('curr')}
-      </div>
-      <div className="w-full shrink-0 snap-center flex flex-col justify-start">
-        {renderPanel('next')}
+      <div 
+        className="flex w-[300%] -ml-[100%]"
+        style={{ 
+          transform: `translate3d(${offsetX}px, 0, 0)`,
+          transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)' 
+        }}
+      >
+        <div className="w-1/3 shrink-0 flex flex-col justify-start">
+          {renderPanel('prev')}
+        </div>
+        <div className="w-1/3 shrink-0 flex flex-col justify-start">
+          {renderPanel('curr')}
+        </div>
+        <div className="w-1/3 shrink-0 flex flex-col justify-start">
+          {renderPanel('next')}
+        </div>
       </div>
     </div>
   );
