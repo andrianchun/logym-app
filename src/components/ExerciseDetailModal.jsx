@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Dumbbell, History, Calculator, Replace, Video, Info, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Dumbbell, History, Calculator, Replace, Video, Info, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { formatTarget } from '../data/constants';
 
 const ExerciseDetailModal = ({ 
@@ -40,7 +40,7 @@ const ExerciseDetailModal = ({
   const [touchEnd, setTouchEnd] = useState(null);
   const [isVideoReady, setIsVideoReady] = useState(false);
 
-  useEffect(() => {
+  React.useEffect(() => {
     setIsVideoReady(false);
   }, [activeMediaIndex]);
 
