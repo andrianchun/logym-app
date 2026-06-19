@@ -72,13 +72,45 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
 
   // Auto scroll ke tengah titik data terbaru
   useEffect(() => {
-     if(scrollRef.current && multiChartData.length > 0) {
-        const clientW = scrollRef.current.clientWidth;
-        const scrollW = scrollRef.current.scrollWidth;
-        const targetX = scrollW - (pointWidth / 2); // Right-most point roughly
-        scrollRef.current.scrollLeft = targetX - (clientW / 2);
+     if(scrollRef.current && multiChartData.length > 0 && activeChartMetrics.length > 0) {
+        const data = multiChartData;
+        
+        let latestIdxWithData = -1;
+        for (let i = data.length - 1; i >= 0; i--) {
+            if (activeChartMetrics.some(metric => {
+                const val = data[i][metric];
+                return val !== undefined && val !== null && val !== 0;
+            })) {
+                latestIdxWithData = i;
+                break;
+            }
+        }
+        
+        if (latestIdxWithData !== -1) {
+             const latestDateObj = new Date(data[latestIdxWithData].dateFull);
+             const oneMonthAgo = new Date(latestDateObj.getTime() - 30 * 24 * 60 * 60 * 1000);
+             const oneMonthAgoStr = getLocalYMD(oneMonthAgo);
+
+             let startIdx = latestIdxWithData;
+             while (startIdx > 0 && data[startIdx - 1].dateFull >= oneMonthAgoStr) {
+                 startIdx--;
+             }
+
+             const numPoints = latestIdxWithData - startIdx + 1;
+             const clientW = scrollRef.current.clientWidth || (window.innerWidth - 64);
+             
+             let newPointWidth = clientW / Math.max(1.5, numPoints);
+             if (newPointWidth > 200) newPointWidth = 200;
+             if (newPointWidth < 15) newPointWidth = 15;
+
+             setPointWidth(newPointWidth);
+             scrollTarget.current = startIdx * newPointWidth;
+        } else {
+             const clientW = scrollRef.current.clientWidth || (window.innerWidth - 64);
+             scrollTarget.current = Math.max(0, ((data.length - 1) * pointWidth) - (clientW / 2));
+        }
      }
-  }, [multiChartData, pointWidth]);
+  }, [multiChartData, activeChartMetrics]);
   const scrollTarget = useRef(null);
 
   const [yDomains, setYDomains] = useState({});
