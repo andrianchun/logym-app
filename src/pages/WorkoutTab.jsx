@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Moon, Play, CalendarDays, X, CheckCircle, ChevronDown, ChevronUp, Dumbbell } from 'lucide-react';
+import { fetchExercisesFromApi } from '../utils/exerciseDbApi';
 
 // Import Komponen Pecahan
 import WorkoutHeader from '../components/WorkoutHeader';
@@ -94,14 +95,26 @@ const WorkoutTab = ({
 
   const activeProgram = activeProgramsList[0] || programs[0];
   
-  const handleOpenDetail = (ex) => {
+  const handleOpenDetail = async (ex) => {
      playSoundEffect('click', soundEnabled);
-     // Ambil data lengkap (termasuk instructions & equipment) dari database
+     // Ambil data dari library lokal
      let fullEx = exerciseLibrary?.find(e => String(e.id) === String(ex.id));
      if (!fullEx) {
-         // Fallback ke nama jika ID beda format (angka vs string 'edb-...')
          fullEx = exerciseLibrary?.find(e => e.name.toLowerCase() === ex.name.toLowerCase());
      }
+
+     // Ambil instruksi & gif dari database lengkap jika belum ada
+     if (!fullEx || !fullEx.instructions || fullEx.instructions.length === 0) {
+         try {
+             const onlineDb = await fetchExercisesFromApi();
+             const onlineMatch = onlineDb.find(e => e.name.toLowerCase() === (fullEx?.name || ex.name).toLowerCase());
+             if (onlineMatch) {
+                 // Gabungkan dan utamakan instruksi/gif/equipment dari onlineDb
+                 fullEx = { ...onlineMatch, ...fullEx, instructions: onlineMatch.instructions, equipment: onlineMatch.equipment || fullEx?.equipment };
+             }
+         } catch (err) {}
+     }
+
      setDetailExercise({ ...(fullEx || {}), ...ex });
   };
 
