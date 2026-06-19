@@ -77,14 +77,18 @@ const ExerciseCard = ({
                     {isExtra ? '+' : idx + 1}
                  </span>
                  <div className="min-w-0">
-                     <h3 className={`h2 truncate pr-2 flex items-center gap-1.5 flex-wrap ${isSkip ? 'line-through opacity-50' : t.textMain}`}>
+                     <h3 className={`h2 truncate pr-2 flex items-center gap-1.5 flex-wrap ${isSkip ? 'opacity-50' : t.textMain}`}>
                         {ex.name}
                         {isCustom && <span className="px-1 py-0.5 bg-emerald-500 text-white rounded text-[8px] font-black leading-none shadow-md border border-black/10 text-center uppercase">CUSTOM</span>}
-                        {isSkip && <span className="px-1.5 py-0.5 bg-rose-500/20 text-rose-500 border border-rose-500/30 rounded text-[9px] font-black leading-none shadow-sm uppercase no-underline">SKIPPED</span>}
                      </h3>
                      <p className={`caption uppercase tracking-wider opacity-60 truncate mt-1 ${t.textMuted}`}>
                         {formatTarget(ex.target, lang?.id)}   {ex.equipment || 'Lainnya'}
                      </p>
+                     {isSkip && (
+                        <div className="mt-1.5 inline-block px-2 py-0.5 bg-rose-500/20 text-rose-500 border border-rose-500/30 rounded text-xs font-black tracking-wider uppercase shadow-sm">
+                          SKIPPED
+                        </div>
+                     )}
                  </div>
              </div>
              
