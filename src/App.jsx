@@ -1029,7 +1029,7 @@ export default function App() {
 
       <Header setConfirmModal={setConfirmModal} t={t} theme={theme} user={user} showSettings={showSettings} setShowSettings={setShowSettings} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} activeTab={activeTab} setActiveTab={setActiveTab} isOffline={isOffline} />
       
-      <main className={`${(activeTab === 'calendar' || activeTab === 'database') ? 'px-4 pb-4 pt-0 h-[calc(100vh-140px)] flex flex-col' : 'p-4'} max-w-2xl mx-auto min-h-[70vh]`}>
+      <main className={`${(activeTab === 'calendar' || activeTab === 'database') ? 'px-4 pb-4 pt-0 h-[calc(100vh-140px)] flex flex-col max-w-5xl mx-auto w-full' : 'p-4 max-w-2xl mx-auto w-full'} min-h-[70vh]`}>
          {activeTab === 'dashboard' && (
              <DashboardTab setConfirmModal={setConfirmModal} 
                t={t} lang={lang} language={language} user={user} history={history} setHistory={setHistory} programs={programs}

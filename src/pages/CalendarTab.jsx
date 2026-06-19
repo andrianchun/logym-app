@@ -386,7 +386,7 @@ const CalendarTab = ({
   return (
     <div className={`flex flex-col sm:flex-row h-[calc(100vh-120px)] overflow-hidden ${t.textMain} sm:gap-2`}>
       {/* STICKY CALENDAR HEADER */}
-      <div className="shrink-0 z-10 pt-2 relative sm:w-[40%] sm:h-full sm:overflow-y-auto hide-scrollbar sm:pr-2">
+      <div className="shrink-0 z-10 pt-2 relative sm:w-[55%] md:w-[60%] lg:w-[65%] sm:h-full sm:overflow-y-auto hide-scrollbar sm:pr-2">
         <div className={`p-3 sm:p-4 rounded-2xl ${t.bgCard} shadow-sm border ${t.border} relative z-10`}>
           <div className="flex justify-between items-center mb-4">
             <button onClick={() => { playSoundEffect('click', soundEnabled); setSlideDirection('left'); setCalendarDate(new Date(year, month - 1, 1));}} className={`p-2 rounded-lg ${t.btnBg} hover:${t.bgAccentSoft} hover:${t.textAccent} transition-colors`}><ChevronLeft size={20}/></button>
