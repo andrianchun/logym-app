@@ -26,7 +26,6 @@ import DatabaseTab from './pages/DatabaseTab';
 import ProgramTab from './pages/ProgramTab';
 
 // --- IMPORT MODALS ---
-import VideoModal from './modals/VideoModal';
 import ConfirmModal from './modals/ConfirmModal';
 import AddExerciseModal from './modals/AddExerciseModal';
 import SettingsModal from './modals/SettingsModal';
