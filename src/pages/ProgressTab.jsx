@@ -310,7 +310,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
   };
 
   return (
-    <div className="p-5 animate-in fade-in duration-300">
+    <div className="px-5 pt-5 pb-1 animate-in fade-in duration-300">
         <div className="flex justify-between items-center mb-5">
            <h3 className={`h3 ${t.textMain}`}>Progres Latihan</h3>
         </div>
@@ -357,7 +357,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
           </div>
         </div>
 
-        <div className="grid grid-rows-2 grid-flow-col gap-2 overflow-x-auto pb-4 hide-scrollbar snap-x auto-cols-max" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="grid grid-rows-2 grid-flow-col gap-2 overflow-x-auto pb-2 hide-scrollbar snap-x auto-cols-max" style={{ WebkitOverflowScrolling: 'touch' }}>
           {chartDataObj.items.length === 0 && <span className={`body-md ${t.textMuted} italic`}>Belum ada data.</span>}
           {chartDataObj.items.map((item, idx) => {
              const isActive = activeChartLines.includes(item); 
