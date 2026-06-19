@@ -205,23 +205,16 @@ const CalendarTab = ({
   const handleAddToNativeCalendar = (workoutId, programName, dateStr, timeStr) => {
     playSoundEffect('click', soundEnabled);
     
-    let startStr = "";
-    let endStr = "";
-    
+    let startD, endD;
     if (timeStr) {
       const [year, month, day] = dateStr.split('-');
       const [hour, minute] = timeStr.split(':');
-      
-      const startD = new Date(year, parseInt(month)-1, day, hour, minute);
-      const endD = new Date(startD.getTime() + 60 * 60 * 1000); // +1 jam
-      
-      const pad = n => String(n).padStart(2, '0');
-      startStr = `${startD.getFullYear()}${pad(startD.getMonth()+1)}${pad(startD.getDate())}T${pad(startD.getHours())}${pad(startD.getMinutes())}00`;
-      endStr = `${endD.getFullYear()}${pad(endD.getMonth()+1)}${pad(endD.getDate())}T${pad(endD.getHours())}${pad(endD.getMinutes())}00`;
+      startD = new Date(year, parseInt(month)-1, day, hour, minute);
+      endD = new Date(startD.getTime() + 60 * 60 * 1000); // +1 jam
     } else {
       const [year, month, day] = dateStr.split('-');
-      startStr = `${year}${month}${day}T000000`;
-      endStr = `${year}${month}${day}T235900`;
+      startD = new Date(year, parseInt(month)-1, day, 0, 0);
+      endD = new Date(year, parseInt(month)-1, day, 23, 59);
     }
 
     let exList = "";
@@ -239,38 +232,21 @@ const CalendarTab = ({
     }
 
     const title = `Workout: ${programName}`;
-    const details = `Sesi latihan LyFit: ${programName}${exList}`;
+    const details = `Sesi latihan LyFit: ${programName}${exList}\n\n*Catatan: Google Calendar Web menggunakan pengingat default akunmu (misal 10 menit). Atur pengingat ke 30 menit secara manual jika perlu.`;
     
-    const icsData = [
-      "BEGIN:VCALENDAR",
-      "VERSION:2.0",
-      "PRODID:-//LyFit App//EN",
-      "CALSCALE:GREGORIAN",
-      "BEGIN:VEVENT",
-      `UID:${workoutId}-${Date.now()}@lyfit.app`,
-      `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z`,
-      `DTSTART:${startStr}`,
-      `DTEND:${endStr}`,
-      `SUMMARY:${title.replace(/\n/g, '\\n')}`,
-      `DESCRIPTION:${details.replace(/\n/g, '\\n')}`,
-      "BEGIN:VALARM",
-      "TRIGGER:-PT30M",
-      "ACTION:DISPLAY",
-      "DESCRIPTION:Reminder",
-      "END:VALARM",
-      "END:VEVENT",
-      "END:VCALENDAR"
-    ].join("\r\n");
-
-    const blob = new Blob([icsData], { type: 'text/calendar;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `LyFit-${programName.replace(/\s+/g, '-')}.ics`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const pad = n => String(n).padStart(2, '0');
+    const startGcal = `${startD.getUTCFullYear()}${pad(startD.getUTCMonth()+1)}${pad(startD.getUTCDate())}T${pad(startD.getUTCHours())}${pad(startD.getUTCMinutes())}00Z`;
+    const endGcal = `${endD.getUTCFullYear()}${pad(endD.getUTCMonth()+1)}${pad(endD.getUTCDate())}T${pad(endD.getUTCHours())}${pad(endD.getUTCMinutes())}00Z`;
+    
+    const webUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${startGcal}/${endGcal}&details=${encodeURIComponent(details)}`;
+    
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    if (isAndroid) {
+        const intentUrl = `intent://#Intent;action=android.intent.action.INSERT;mimetype=vnd.android.cursor.dir/event;S.title=${encodeURIComponent(title)};S.description=${encodeURIComponent(details)};l.beginTime=${startD.getTime()};l.endTime=${endD.getTime()};S.browser_fallback_url=${encodeURIComponent(webUrl)};scheme=content;end`;
+        window.location.href = intentUrl;
+    } else {
+        window.open(webUrl, '_blank');
+    }
   };
 
   const handleCopyOrMove = (actionType) => {
