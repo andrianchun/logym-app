@@ -117,35 +117,51 @@ const ExerciseDetailModal = ({
         {/* Kolom Kiri: Header with Video/Image */}
         <div className="w-full sm:w-[45%] flex flex-col relative shrink-0 bg-black aspect-square sm:aspect-auto">
           <div 
-            className="relative w-full h-full flex items-center justify-center overflow-hidden group touch-pan-y"
+            className="relative w-full h-full overflow-hidden group touch-pan-y"
             onTouchStart={onTouchStart}
             onTouchMove={onTouchMove}
             onTouchEnd={onTouchEnd}
           >
-            {(() => {
-              if (!activeMedia) return <Dumbbell size={64} className="text-white/20" />;
-              
-              if (activeMedia.type === 'youtube') {
-                const match = activeMedia.url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})/);
-                const videoId = match ? match[1] : null;
-                if (videoId) {
-                  return (
-                    <iframe 
-                      src={`https://www.youtube.com/embed/${videoId}?enablejsapi=1&autoplay=1&mute=1&controls=0&modestbranding=1&playsinline=1&rel=0&disablekb=1&iv_load_policy=3`}
-                      title="YouTube video player" 
-                      frameBorder="0" 
-                      onLoad={handleIframeLoad}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                      className="exercise-video-iframe w-[140%] h-[140%] max-w-none pointer-events-none scale-[1.15]"
-                    ></iframe>
-                  );
-                }
-              }
-              if (activeMedia.type === 'video') {
-                return <video src={activeMedia.url} autoPlay loop muted playsInline className="w-full h-full object-contain opacity-80 pointer-events-none" />;
-              }
-              return <img src={activeMedia.url} alt={ex.name} className="w-full h-full object-contain opacity-80 pointer-events-none" />;
-            })()}
+            <div 
+              className="flex h-full transition-transform duration-300 ease-in-out"
+              style={{ 
+                transform: `translateX(-${activeMediaIndex * (100 / Math.max(1, mediaItems.length))}%)`,
+                width: `${Math.max(1, mediaItems.length) * 100}%`
+              }}
+            >
+              {mediaItems.length === 0 ? (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Dumbbell size={64} className="text-white/20" />
+                </div>
+              ) : (
+                mediaItems.map((media, idx) => (
+                  <div key={idx} className="h-full flex items-center justify-center shrink-0 overflow-hidden" style={{ width: `${100 / mediaItems.length}%` }}>
+                    {(() => {
+                      if (media.type === 'youtube') {
+                        const match = media.url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})/);
+                        const videoId = match ? match[1] : null;
+                        if (videoId) {
+                          return (
+                            <iframe 
+                              src={`https://www.youtube.com/embed/${videoId}?enablejsapi=1&autoplay=${idx === activeMediaIndex ? '1' : '0'}&mute=1&controls=0&modestbranding=1&playsinline=1&rel=0&disablekb=1&iv_load_policy=3`}
+                              title="YouTube video player" 
+                              frameBorder="0" 
+                              onLoad={handleIframeLoad}
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                              className="exercise-video-iframe w-[140%] h-[140%] max-w-none pointer-events-none scale-[1.15]"
+                            ></iframe>
+                          );
+                        }
+                      }
+                      if (media.type === 'video') {
+                        return <video src={media.url} autoPlay={idx === activeMediaIndex} loop muted playsInline className="w-full h-full object-contain opacity-80 pointer-events-none" />;
+                      }
+                      return <img src={media.url} alt={ex.name} className="w-full h-full object-contain opacity-80 pointer-events-none" />;
+                    })()}
+                  </div>
+                ))
+              )}
+            </div>
 
             {/* Carousel Controls */}
             {mediaItems.length > 1 && (
