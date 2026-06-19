@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 // --- IMPORT CAPACITOR (FULLSCREEN) ---
 import { Capacitor } from '@capacitor/core';
 import { StatusBar } from '@capacitor/status-bar';
+import { LocalNotifications } from '@capacitor/local-notifications';
 
 // --- IMPORT MESIN FIREBASE ---
 import { auth, db } from './firebase';
@@ -95,6 +96,19 @@ export default function App() {
     if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
       Notification.requestPermission();
     }
+
+    // Listener: Ketuk notifikasi workout → buka tab Workout
+    if (Capacitor.isNativePlatform()) {
+      LocalNotifications.addListener('localNotificationActionPerformed', (notification) => {
+        if (notification.notification.id === 9999) {
+          setActiveTab('workout');
+          if (sessionToRun) {
+            setFocusWorkoutId(sessionToRun);
+            setIsImmersiveMode(true);
+          }
+        }
+      });
+    }
   }, []);
 
   useEffect(() => {
@@ -142,6 +156,65 @@ export default function App() {
 
     return () => clearTimeout(timeout);
   }, [restTargetTime, soundEnabled]);
+
+  // ==========================================
+  // PERSISTENT WORKOUT NOTIFICATION (Android)
+  // ==========================================
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    
+    const NOTIF_ID = 9999;
+
+    const formatNotifTime = (secs) => {
+      const h = Math.floor(secs / 3600);
+      const m = Math.floor((secs % 3600) / 60);
+      const s = Math.floor(secs % 60);
+      return h > 0 ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}` : `${m}:${s.toString().padStart(2, '0')}`;
+    };
+
+    const showNotification = async () => {
+      try {
+        const perm = await LocalNotifications.requestPermissions();
+        if (perm.display !== 'granted') return;
+
+        const elapsed = workoutStartTime ? Math.floor((Date.now() - workoutStartTime) / 1000) : 0;
+        await LocalNotifications.schedule({
+          notifications: [{
+            id: NOTIF_ID,
+            title: '🏋️ Workout Sedang Berjalan',
+            body: `Durasi: ${formatNotifTime(elapsed)} — Ketuk untuk kembali ke LyFit`,
+            ongoing: true,
+            autoCancel: false,
+            smallIcon: 'ic_launcher',
+            sound: null,
+            schedule: { at: new Date(Date.now() + 100) },
+          }]
+        });
+      } catch (err) {
+        console.warn('Notification error:', err);
+      }
+    };
+
+    const cancelNotification = async () => {
+      try {
+        await LocalNotifications.cancel({ notifications: [{ id: NOTIF_ID }] });
+      } catch (err) {
+        console.warn('Cancel notification error:', err);
+      }
+    };
+
+    if (isWorkoutActive && workoutStartTime) {
+      showNotification();
+      const interval = setInterval(() => showNotification(), 30000); // Update setiap 30 detik
+      return () => {
+        clearInterval(interval);
+        // Jangan cancel di sini — cancel hanya saat workout benar-benar selesai
+      };
+    } else {
+      cancelNotification();
+    }
+  }, [isWorkoutActive, workoutStartTime]);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
