@@ -22,9 +22,8 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
     exerciseLibrary.forEach(ex => exLookup[ex.id] = ex); 
 
     const now = new Date();
-    const msPerDay = 86400000;
-    let daysLimit = 90; // Fixed 90 days for Brush scroll
-    const startDate = new Date(now.getTime() - (daysLimit * msPerDay));
+    // Allow all data instead of limiting to 90 days
+    const startDate = new Date(now.getTime() - (5000 * 86400000)); // ~13 years (effectively no limit)
     const startStr = getLocalYMD(startDate);
 
     // Ambil history yang sudah selesai saja
