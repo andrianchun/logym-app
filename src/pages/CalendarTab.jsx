@@ -536,11 +536,13 @@ const CalendarTab = ({
                    const targetDateStr = getLocalYMD(d);
                    const panelWorkouts = getSelectedWorkoutsForDate(targetDateStr);
 
-                   if (panelWorkouts.length === 0) return <div className="p-4 text-center caption opacity-50 px-3 sm:px-6">Tidak ada jadwal</div>;
-
                    return (
-                     <div className="space-y-4 mb-6 px-3 sm:px-6">
-                        {panelWorkouts.map(w => {
+                     <>
+                       <div className="space-y-4 mb-6 px-3 sm:px-6">
+                         {panelWorkouts.length === 0 ? (
+                            <div className="p-4 text-center caption opacity-50">Tidak ada jadwal</div>
+                         ) : (
+                           panelWorkouts.map(w => {
                            const isCompleted = checkIsCompletedStrict(w, targetDateStr);
                            const isExpanded = expandedWorkoutId === w.id;
                            const prog = w.programId === 'adhoc' 
@@ -619,7 +621,8 @@ const CalendarTab = ({
                                 )}
                              </div>
                            );
-                         })}
+                         })
+                       )}
                       </div>
 
                          <div className="px-3 sm:px-6 pb-6 mt-auto">
@@ -660,7 +663,7 @@ const CalendarTab = ({
                               </button>
                             )}
                          </div>
-                       </div>
+                     </>
                    );
                }}
             />
