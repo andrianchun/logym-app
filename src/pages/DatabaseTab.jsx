@@ -163,10 +163,9 @@ const ExerciseForm = ({ t, lang, formData, setFormData, onSave, onCancel, isEdit
 // ═══════════════════════════════════════════════════════════════════
 // ─── Main Component: DatabaseTab ──────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════
-const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, soundEnabled, warmupVideos, setWarmupVideos, cooldownVideos, setCooldownVideos }) => {
+const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, soundEnabled, warmupVideos, setWarmupVideos, cooldownVideos, setCooldownVideos, onOpenDetail }) => {
   // ── Tab State ────────────────────────────────────────────────────
   const [viewMode, setViewMode] = useState('all'); // 'all' | 'custom'
-  const [detailExercise, setDetailExercise] = useState(null);
 
   // ── Form State ───────────────────────────────────────────────────
   const [editingId, setEditingId] = useState(null);
@@ -449,17 +448,7 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
   // ═══════════════════════════════════════════════════════════════
   return (
     <>
-      {/* DETAIL MODAL */}
-      {detailExercise && (
-        <ExerciseDetailModal 
-          ex={detailExercise} 
-          onClose={() => setDetailExercise(null)} 
-          t={t} lang={lang} soundEnabled={soundEnabled} 
-          exerciseLogs={{}} 
-        />
-      )}
-
-      <div className={`animate-in fade-in duration-300 flex-1 flex flex-col min-h-0 ${detailExercise ? 'hidden' : ''}`}>
+      <div className={`animate-in fade-in duration-300 flex-1 flex flex-col min-h-0`}>
         
         <div className={`flex-shrink-0 z-10 ${t.bg} pt-4 pb-3 -mx-4 px-4 space-y-4 border-b ${t.border}`}>
         {/* ── Tab Switcher (All vs Custom) ───────────────────────── */}
@@ -637,7 +626,7 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
                     onToggleFavorite={handleToggleFavorite}
                     onEdit={() => handleStartEdit(ex)}
                     onDelete={() => handleDelete(ex)}
-                    onOpenDetail={() => setDetailExercise(ex)}
+                    onOpenDetail={() => onOpenDetail(ex)}
                   />
                 );
               })}
@@ -699,17 +688,6 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
 
         </div>
       </div>
-
-      {/* Exercise Detail Modal */}
-      {detailExercise && (
-        <ExerciseDetailModal
-          ex={detailExercise}
-          onClose={() => setDetailExercise(null)}
-          t={t}
-          lang={lang}
-          soundEnabled={soundEnabled}
-        />
-      )}
 
       {/* Add / Edit Form Modal */}
       {(isAdding || editingId !== null) && (
