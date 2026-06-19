@@ -21,5 +21,7 @@ const FilterChips = ({ t, label, options, selected, onToggle, formatOption }) =>
         ))}
       </div>
     </div>
+  );
+};
 
 export default FilterChips;
