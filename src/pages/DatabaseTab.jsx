@@ -41,16 +41,20 @@ const ExerciseForm = ({ t, lang, formData, setFormData, onSave, onCancel, isEdit
   return (
     <div className={`fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in`} onClick={onCancel}>
       <div 
-        className={`w-full max-w-md mx-auto ${t.bgCard} rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200 border ${t.border} p-6 space-y-5`}
+        className={`w-full max-w-md sm:max-w-3xl mx-auto ${t.bgCard} rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200 border ${t.border} p-6`}
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center pb-2">
+        <div className="flex justify-between items-center pb-4 border-b border-dashed border-slate-500/20 mb-5">
           <h3 className={`h2 ${t.textAccent}`}>
             {isEditing ? (lang?.editExercise || 'Edit Latihan') : (lang?.addExercise || 'Tambah Latihan Baru')}
           </h3>
           <button onClick={onCancel} className={`p-2 rounded-full ${t.inputBg} hover:opacity-80`}><X size={20}/></button>
         </div>
 
+      <div className="flex flex-col sm:grid sm:grid-cols-2 sm:gap-8 space-y-5 sm:space-y-0">
+        
+        {/* Kolom Kiri */}
+        <div className="space-y-5">
       {/* Name */}
       <div>
         <label className={`body-md ${t.textMuted} mb-1 block`}>{lang?.exerciseName || 'Nama Latihan'}</label>
@@ -80,7 +84,10 @@ const ExerciseForm = ({ t, lang, formData, setFormData, onSave, onCancel, isEdit
           ))}
         </div>
       </div>
+      </div> {/* Akhir Kolom Kiri */}
 
+      {/* Kolom Kanan */}
+      <div className="space-y-5">
       {/* Equipment + Type Row */}
       <div className="grid grid-cols-2 gap-3">
         <div>
@@ -165,7 +172,12 @@ const ExerciseForm = ({ t, lang, formData, setFormData, onSave, onCancel, isEdit
           <Check size={18} /> {lang?.save || 'Simpan Latihan'}
         </button>
       </div>
+      </div>
       <div className="pb-8"></div>
+      
+      </div> {/* Akhir Kolom Kanan */}
+      </div> {/* Akhir Grid */}
+      
       </div>
     </div>
   );
@@ -629,7 +641,7 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
               </p>
             </div>
           ) : (
-            <div className="space-y-3 pb-8">
+            <div className="flex flex-col sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:gap-4 space-y-3 sm:space-y-0 pb-8">
               {displayedList.map((ex, idx) => {
                 const isCustom = ex.id > 1000000 && ex.source !== 'exercisedb';
                 return (

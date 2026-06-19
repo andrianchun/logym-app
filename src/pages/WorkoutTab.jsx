@@ -298,34 +298,37 @@ const WorkoutTab = ({
                     </button>
                     
                     {isExpanded && (
-                      <div className="p-4 space-y-4 animate-in slide-in-from-top-2 fade-in duration-200">
+                      <div className="p-4 space-y-4 sm:space-y-0 sm:flex sm:flex-row sm:overflow-x-auto sm:snap-x sm:gap-4 sm:pb-6 hide-scrollbar animate-in slide-in-from-top-2 fade-in duration-200">
                         {prog.exercises?.map((ex, idx) => (
-                          <ExerciseCard 
-                            key={`${prog.id}-${ex.id}-${idx}`} ex={ex} idx={idx} isExtra={false}
-                            t={t} lang={lang} soundEnabled={soundEnabled}
-                            isSkip={!!skippedExercises[ex.id]} 
-                            onToggleSkip={() => onToggleSkip(ex.id)} 
-                            onReplaceClick={() => setActiveAddModalTarget({ type: 'replace', id: ex.id, muscle: ex.target?.[0] })}
-                            onRemoveExtra={onRemoveExtra} 
-                            onOpenVideo={() => handleOpenDetail(ex)}
-                            sets={getSetLogs(ex)}
-                            onUpdateSet={(exId, setIdx, field, val) => {
-                              setSessionToRun(prog.workoutId);
-                              onSetChange(exId, setIdx, field, val);
-                            }} 
-                            onToggleSet={(exId, setIdx) => {
-                              setSessionToRun(prog.workoutId);
-                              onToggleSet(exId, setIdx);
-                            }} 
-                            onAddSet={(exId) => {
-                              setSessionToRun(prog.workoutId);
-                              onAddSet(exId);
-                            }} 
-                            onRemoveSet={(exId, setIdx) => {
-                              setSessionToRun(prog.workoutId);
-                              onRemoveSet(exId, setIdx);
-                            }}
-                          />
+                          <div key={`${prog.id}-${ex.id}-${idx}`} className="sm:w-[340px] sm:shrink-0 sm:snap-center sm:bg-black/5 sm:dark:bg-white/5 sm:rounded-3xl sm:border sm:border-black/5 sm:dark:border-white/5 sm:overflow-hidden relative flex flex-col">
+                            <ExerciseCard 
+                              ex={ex} idx={idx} isExtra={false}
+                              t={t} lang={lang} soundEnabled={soundEnabled}
+                              isSkip={!!skippedExercises[ex.id]} 
+                              onToggleSkip={() => onToggleSkip(ex.id)} 
+                              onReplaceClick={() => setActiveAddModalTarget({ type: 'replace', id: ex.id, muscle: ex.target?.[0] })}
+                              onRemoveExtra={onRemoveExtra} 
+                              onOpenVideo={() => handleOpenDetail(ex)}
+                              sets={getSetLogs(ex)}
+                              onUpdateSet={(exId, setIdx, field, val) => {
+                                setSessionToRun(prog.workoutId);
+                                onSetChange(exId, setIdx, field, val);
+                              }} 
+                              onToggleSet={(exId, setIdx) => {
+                                setSessionToRun(prog.workoutId);
+                                onToggleSet(exId, setIdx);
+                              }} 
+                              onAddSet={(exId) => {
+                                setSessionToRun(prog.workoutId);
+                                onAddSet(exId);
+                              }} 
+                              onRemoveSet={(exId, setIdx) => {
+                                setSessionToRun(prog.workoutId);
+                                onRemoveSet(exId, setIdx);
+                              }}
+                              onReplaceExercise={() => { setDetailExercise(ex); setShowAlternativeModal(true); }}
+                            />
+                          </div>
                         ))}
                       </div>
                     )}
@@ -345,33 +348,36 @@ const WorkoutTab = ({
                   </button>
                   
                   {expandedSessions['extra'] && (
-                    <div className="p-4 space-y-4 animate-in slide-in-from-top-2 fade-in duration-200">
+                    <div className="p-4 space-y-4 sm:space-y-0 sm:flex sm:flex-row sm:overflow-x-auto sm:snap-x sm:gap-4 sm:pb-6 hide-scrollbar animate-in slide-in-from-top-2 fade-in duration-200">
                       {extraExercises.map((ex, idx) => (
-                        <ExerciseCard 
-                          key={ex.id} ex={ex} idx={activeProgram.exercises?.length + idx || idx} isExtra={true}
-                          t={t} lang={lang} soundEnabled={soundEnabled}
-                          isSkip={!!skippedExercises[ex.id]} 
-                          onToggleSkip={() => onToggleSkip(ex.id)} 
-                          onRemoveExtra={onRemoveExtra} 
-                          onOpenVideo={() => handleOpenDetail(ex)}
-                          sets={getSetLogs(ex)}
-                          onUpdateSet={(exId, setIdx, field, val) => {
-                            setSessionToRun('extra');
-                            onSetChange(exId, setIdx, field, val);
-                          }} 
-                          onToggleSet={(exId, setIdx) => {
-                            setSessionToRun('extra');
-                            onToggleSet(exId, setIdx);
-                          }} 
-                          onAddSet={(exId) => {
-                            setSessionToRun('extra');
-                            onAddSet(exId);
-                          }} 
-                          onRemoveSet={(exId, setIdx) => {
-                            setSessionToRun('extra');
-                            onRemoveSet(exId, setIdx);
-                          }}
-                        />
+                        <div key={ex.id} className="sm:w-[340px] sm:shrink-0 sm:snap-center sm:bg-black/5 sm:dark:bg-white/5 sm:rounded-3xl sm:border sm:border-black/5 sm:dark:border-white/5 sm:overflow-hidden relative flex flex-col">
+                          <ExerciseCard 
+                            ex={ex} idx={activeProgram.exercises?.length + idx || idx} isExtra={true}
+                            t={t} lang={lang} soundEnabled={soundEnabled}
+                            isSkip={!!skippedExercises[ex.id]} 
+                            onToggleSkip={() => onToggleSkip(ex.id)} 
+                            onRemoveExtra={onRemoveExtra} 
+                            onOpenVideo={() => handleOpenDetail(ex)}
+                            sets={getSetLogs(ex)}
+                            onUpdateSet={(exId, setIdx, field, val) => {
+                              setSessionToRun('extra');
+                              onSetChange(exId, setIdx, field, val);
+                            }} 
+                            onToggleSet={(exId, setIdx) => {
+                              setSessionToRun('extra');
+                              onToggleSet(exId, setIdx);
+                            }} 
+                            onAddSet={(exId) => {
+                              setSessionToRun('extra');
+                              onAddSet(exId);
+                            }} 
+                            onRemoveSet={(exId, setIdx) => {
+                              setSessionToRun('extra');
+                              onRemoveSet(exId, setIdx);
+                            }}
+                            onReplaceExercise={() => { setDetailExercise(ex); setShowAlternativeModal(true); }}
+                          />
+                        </div>
                       ))}
                     </div>
                   )}

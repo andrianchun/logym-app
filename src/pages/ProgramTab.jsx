@@ -187,13 +187,13 @@ const ProgramTab = ({ setConfirmModal, t, lang, programs, setPrograms, exerciseL
   // RENDER
   // ==========================================
   return (
-    <div className="space-y-6 animate-in fade-in duration-300 pb-10">
+    <div className="flex flex-col sm:flex-row sm:items-start sm:gap-6 animate-in fade-in duration-300 pb-10">
 
       {/* ===== SECTION 1: PROGRAM PILL TABS ===== */}
-      <div className="relative">
+      <div className="relative w-full sm:w-[35%] sm:sticky sm:top-20 sm:pr-2">
         <div
           ref={pillScrollRef}
-          className="flex gap-2 overflow-x-auto md:flex-wrap md:overflow-visible hide-scrollbar pb-1 -mx-1 px-1"
+          className="flex sm:flex-col gap-2 overflow-x-auto sm:overflow-x-visible md:flex-wrap md:overflow-visible hide-scrollbar pb-1 sm:pb-4 -mx-1 sm:mx-0 px-1 sm:px-0"
         >
           {programs.map(prog => (
             <button
@@ -206,14 +206,14 @@ const ProgramTab = ({ setConfirmModal, t, lang, programs, setPrograms, exerciseL
                 }`}
             >
               {prog.name}
-              <span className={`ml-1.5 text-[10px] opacity-70`}>({prog.exercises.length})</span>
+              <span className={`ml-1.5 sm:ml-auto sm:text-[11px] text-[10px] opacity-70`}>({prog.exercises.length})</span>
             </button>
           ))}
 
           {/* Create new program button */}
           <button
             onClick={handleCreateProgram}
-            className={`flex-shrink-0 flex items-center px-4 py-2.5 rounded-xl font-bold body-md whitespace-nowrap border-2 border-dashed ${t.borderAccentSoft} ${t.textAccent} hover:${t.bgAccentSoft} transition-all duration-200 active:scale-95`}
+            className={`flex-shrink-0 flex items-center justify-center px-4 py-2.5 rounded-xl font-bold body-md whitespace-nowrap border-2 border-dashed ${t.borderAccentSoft} ${t.textAccent} hover:${t.bgAccentSoft} transition-all duration-200 active:scale-95`}
           >
             <Plus size={14} className="mr-1" /> {lang.newProgram || 'Buat Baru'}
           </button>
@@ -222,7 +222,7 @@ const ProgramTab = ({ setConfirmModal, t, lang, programs, setPrograms, exerciseL
 
       {/* ===== SECTION 2: PROGRAM DETAIL ===== */}
       {activeProgram && (
-        <div className="space-y-5">
+        <div className="space-y-5 w-full sm:w-[65%] mt-6 sm:mt-0">
 
           {/* --- 2a: PROGRAM HEADER --- */}
           <div className={`p-5 rounded-2xl border ${t.border} ${t.bgCard} shadow-sm`}>

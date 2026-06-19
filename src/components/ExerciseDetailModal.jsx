@@ -84,10 +84,10 @@ const ExerciseDetailModal = ({
 
   return (
     <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in`} onClick={onClose}>
-      <div className={`w-full max-w-md md:max-w-4xl mx-auto ${t.bgCard} rounded-t-3xl sm:rounded-3xl overflow-hidden flex flex-col md:flex-row max-h-[90vh] animate-in zoom-in-95 duration-200 border ${t.border}`} onClick={e => e.stopPropagation()}>
+      <div className={`w-full max-w-md sm:max-w-4xl mx-auto ${t.bgCard} rounded-t-3xl sm:rounded-3xl overflow-hidden flex flex-col sm:flex-row max-h-[90vh] animate-in zoom-in-95 duration-200 border ${t.border}`} onClick={e => e.stopPropagation()}>
         
         {/* Kolom Kiri: Header with Video/Image */}
-        <div className="w-full md:w-[45%] flex flex-col relative shrink-0 bg-black aspect-square md:aspect-auto">
+        <div className="w-full sm:w-[45%] flex flex-col relative shrink-0 bg-black aspect-square sm:aspect-auto">
           <div 
             className="relative w-full h-full flex items-center justify-center overflow-hidden group touch-pan-y"
             onTouchStart={onTouchStart}
@@ -146,7 +146,7 @@ const ExerciseDetailModal = ({
               </div>
             )}
             
-            <button onClick={onClose} className="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 backdrop-blur-sm transition-all md:hidden">
+            <button onClick={onClose} className="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 backdrop-blur-sm transition-all sm:hidden">
               <X size={20} />
             </button>
             
@@ -162,9 +162,9 @@ const ExerciseDetailModal = ({
         </div>
 
         {/* Kolom Kanan: Action Tabs & Tab Content */}
-        <div className="w-full md:w-[55%] flex flex-col bg-black/5 dark:bg-black/20 overflow-hidden h-full relative">
+        <div className="w-full sm:w-[55%] flex flex-col bg-black/5 dark:bg-black/20 overflow-hidden h-full relative">
           {/* Desktop Close Button */}
-          <button onClick={onClose} className="hidden md:flex absolute top-3 right-3 bg-black/5 hover:bg-rose-500 hover:text-white dark:bg-white/5 dark:hover:bg-rose-500 text-slate-500 dark:text-slate-300 p-2 rounded-full transition-all z-20">
+          <button onClick={onClose} className="hidden sm:flex absolute top-3 right-3 bg-black/5 hover:bg-rose-500 hover:text-white dark:bg-white/5 dark:hover:bg-rose-500 text-slate-500 dark:text-slate-300 p-2 rounded-full transition-all z-20">
             <X size={20} />
           </button>
 

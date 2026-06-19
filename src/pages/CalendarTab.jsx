@@ -384,9 +384,9 @@ const CalendarTab = ({
   const hasCompleted = selectedWorkouts.some(w => checkIsCompletedStrict(w, selectedDate));
 
   return (
-    <div className={`flex flex-col h-[calc(100vh-120px)] overflow-hidden ${t.textMain}`}>
+    <div className={`flex flex-col sm:flex-row h-[calc(100vh-120px)] overflow-hidden ${t.textMain} sm:gap-2`}>
       {/* STICKY CALENDAR HEADER */}
-      <div className="shrink-0 z-10 pt-2 relative">
+      <div className="shrink-0 z-10 pt-2 relative sm:w-[40%] sm:h-full sm:overflow-y-auto hide-scrollbar sm:pr-2">
         <div className={`p-3 sm:p-4 rounded-2xl ${t.bgCard} shadow-sm border ${t.border} relative z-10`}>
           <div className="flex justify-between items-center mb-4">
             <button onClick={() => { playSoundEffect('click', soundEnabled); setSlideDirection('left'); setCalendarDate(new Date(year, month - 1, 1));}} className={`p-2 rounded-lg ${t.btnBg} hover:${t.bgAccentSoft} hover:${t.textAccent} transition-colors`}><ChevronLeft size={20}/></button>
@@ -459,7 +459,7 @@ const CalendarTab = ({
 
       {/* SCROLLABLE INLINE WORKOUT DETAILS */}
       <div 
-         className={`flex-1 overflow-y-auto hide-scrollbar pb-6 pt-10 px-3 sm:px-4 animate-in fade-in rounded-b-3xl border border-t-0 ${t.border} ${theme === 'dark' ? 'bg-[#061626]' : 'bg-[#f0f2f5]'} shadow-inner -mt-6 relative z-0`}
+         className={`flex-1 overflow-y-auto hide-scrollbar pb-6 pt-10 sm:pt-6 px-3 sm:px-6 animate-in fade-in rounded-b-3xl sm:rounded-2xl border border-t-0 sm:border-t ${t.border} ${theme === 'dark' ? 'bg-[#061626]' : 'bg-[#f0f2f5]'} shadow-inner -mt-6 sm:mt-2 sm:mb-2 relative z-0`}
          onTouchStart={onDetTouchStart}
          onTouchMove={onDetTouchMove}
          onTouchEnd={onDetTouchEnd}

@@ -280,10 +280,9 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          </div>
       </div>
 
-
-
+      <div className="flex flex-col sm:grid sm:grid-cols-2 sm:gap-6 sm:items-start space-y-4 sm:space-y-0">
       {/* --- GRUP KOMPOSISI & BIOMETRIK --- */}
-      <div className="flex flex-col">
+      <div className="flex flex-col space-y-4">
         {/* 1. KARTU BODY COMPOSITION */}
         <div className={`p-5 rounded-2xl border ${t.border} ${t.bgCard} shadow-sm relative overflow-hidden z-10`}>
          <div className="flex justify-between items-center mb-5 relative z-10">
@@ -401,11 +400,12 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
              <span className={`h2 ${t.textAccent}`}>{bioData.weeklyDuration || '-'} <span className="caption text-zinc-500">Mins</span></span>
          </div>
       </div>
+      </div>
 
 
       
       {/* --- GRUP PROGRESS --- */}
-      <div className="flex flex-col mt-4">
+      <div className="flex flex-col w-full min-w-0">
         {/* SECTION: PROGRESS TAB — Main card */}
         <div className={`rounded-2xl border ${t.border} ${t.bgCard} shadow-sm relative z-10 flex flex-col`}>
         <ProgressTab 
@@ -432,6 +432,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
             />
           </div>
       )}
+      </div>
       </div>
 
       {/* MODULAR MODALS */}
