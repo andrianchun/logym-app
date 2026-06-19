@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Info, CheckCircle, CalendarDays, Edit2, PlayCircle, Trash2, X, Copy, Repeat, Plus, Clock } from 'lucide-react';
 import { getLocalYMD } from '../data/constants';
+import PanoramicSlider from '../components/PanoramicSlider';
 import { LocalNotifications } from '@capacitor/local-notifications';
 
 const CalendarTab = ({ 
@@ -460,9 +461,9 @@ const CalendarTab = ({
       {/* SCROLLABLE INLINE WORKOUT DETAILS */}
       <div 
          className={`flex-1 overflow-y-auto hide-scrollbar pb-6 pt-10 sm:pt-6 px-3 sm:px-6 animate-in fade-in rounded-b-3xl sm:rounded-2xl border border-t-0 sm:border-t ${t.border} ${theme === 'dark' ? 'bg-[#061626]' : 'bg-[#f0f2f5]'} shadow-inner -mt-6 sm:mt-2 sm:mb-2 relative z-0`}
-         onTouchStart={onDetTouchStart}
-         onTouchMove={onDetTouchMove}
-         onTouchEnd={onDetTouchEnd}
+         
+         
+         
          onScroll={(e) => {
             if (e.currentTarget.scrollTop > 20 && calendarMode === 'monthly') {
                setCalendarDate(new Date(selectedDate));
@@ -509,125 +510,119 @@ const CalendarTab = ({
           )}
 
           {selectedWorkouts.length > 0 && (
-            <div className="space-y-4 mb-6">
-               {selectedWorkouts.map(w => {
-                 const isCompleted = checkIsCompletedStrict(w, selectedDate);
-                 const isExpanded = expandedWorkoutId === w.id;
-                 // Untuk adhoc, exercises tersimpan langsung di w.exercises
-                 const prog = w.programId === 'adhoc' 
-                   ? { id: 'adhoc', name: w.programName || 'Sesi Ekstra', exercises: w.exercises || [] }
-                   : programs.find(p => p.id === w.programId);
-                  
-                 const dData = history[selectedDate] || {};
-                 const sessionLogs = (dData._activeSession && dData._activeSession.exerciseLogs && Object.keys(dData._activeSession.exerciseLogs).length > 0) ? dData._activeSession.exerciseLogs : exerciseLogs;
-                 const sessionSkipped = (dData._activeSession && dData._activeSession.skippedExercises) ? dData._activeSession.skippedExercises : skippedExercises;
+            <div className="-mx-3 sm:-mx-6">
+            <PanoramicSlider
+               onSwipeLeft={() => { 
+                   const d = new Date(selectedDate);
+                   d.setDate(d.getDate() + 1);
+                   setSelectedDate(getLocalYMD(d));
+                   setCalendarDate(new Date(d));
+                   playSoundEffect('click', soundEnabled);
+               }}
+               onSwipeRight={() => {
+                   const d = new Date(selectedDate);
+                   d.setDate(d.getDate() - 1);
+                   setSelectedDate(getLocalYMD(d));
+                   setCalendarDate(new Date(d));
+                   playSoundEffect('click', soundEnabled);
+               }}
+               renderPanel={(panelType) => {
+                   const d = new Date(selectedDate);
+                   if (panelType === 'prev') d.setDate(d.getDate() - 1);
+                   else if (panelType === 'next') d.setDate(d.getDate() + 1);
+                   const targetDateStr = getLocalYMD(d);
+                   const panelWorkouts = getSelectedWorkoutsForDate(targetDateStr);
 
-                 // Ambil logs untuk ditampilkan
-                 const logsToUse = (w.log && Object.keys(w.log).length > 0) ? w.log : sessionLogs;
-                 const skippedToUse = w.skipped || sessionSkipped;
+                   if (panelWorkouts.length === 0) return <div className="p-4 text-center caption opacity-50 px-3 sm:px-6">Tidak ada jadwal</div>;
 
-                  return (
-                   <div key={w.id} className={`p-4 rounded-2xl ${isCompleted ? 'border ' + t.borderAccentSoft + ' ' + t.bgAccentSoft : 'border-2 border-dashed ' + t.borderAccentSoft + ' bg-black/5 dark:bg-white/5'} flex flex-col relative transition-all ${isExpanded ? 'ring-2 ' + t.ringAccent : 'hover:scale-[1.02] cursor-pointer'}`} onClick={() => { if(!isExpanded) { playSoundEffect('click', soundEnabled); setExpandedWorkoutId(w.id); setCalendarDate(new Date(selectedDate)); setCalendarMode('weekly'); } }}>
-                      <button onClick={(e) => { e.stopPropagation(); removeWorkout(w.id); }} className="absolute top-3 right-3 p-1.5 text-rose-500/50 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors z-10"><Trash2 size={16} /></button>
-                      <div className="flex items-center mb-2 pr-8">
-                        {isCompleted ? <CheckCircle size={18} className={`${t.textAccent} mr-2`} /> : <PlayCircle size={18} className={`${t.textMuted} mr-2`} />}
-                        <span className="font-black text-left">{w.programName}</span>
-                      </div>
-                      <div className="flex flex-col gap-1 mt-1">
-                        {isCompleted ? (
-                          <div className="caption opacity-60 mt-2 flex flex-wrap items-center gap-2">
-                            <span>Selesai: {w.timestamp}</span>
-                            <span className="w-1 h-1 rounded-full bg-current opacity-50"></span>
-                            <span>{w.duration || '00:00'} menit</span>
-                          </div>
-                        ) : (
-                          <div className="caption opacity-60 mt-1">Status: Direncanakan</div>
-                        )}
-                      </div>
-
-                      {/* Accordion Content */}
-                      {isExpanded && (
-                        <div className="mt-4 animate-in slide-in-from-top-2 fade-in duration-200">
-                          <div className="space-y-1.5 mb-4">
-                            {prog?.exercises?.map((ex, idx) => {
-                               const exLogKey = `${ex.id}-${w.id}`;
-                               const exLogs = logsToUse?.[exLogKey] || logsToUse?.[ex.id];
-                               const doneSets = exLogs ? exLogs.filter(s => s.done && !s.skipped) : [];
-                               const isSkipped = skippedToUse?.[exLogKey] || skippedToUse?.[ex.id];
-                               const isNotDoneWhenCompleted = isCompleted && doneSets.length === 0;
-
-                               const shouldShowNotDone = (isSkipped || isNotDoneWhenCompleted) && doneSets.length === 0;
-
-                               if (shouldShowNotDone) {
-                                  return (
-                                    <div key={ex.id} className={`p-2 px-3 rounded-lg border ${t.border} bg-black/5 dark:bg-white/5 opacity-50 flex justify-between items-center`}>
-                                      <div className="body-md truncate mr-2 line-through opacity-70">{idx + 1}. {ex.name}</div>
-                                      <div className="text-[10px] font-bold text-rose-500">{isSkipped ? 'Di-skip' : 'Tidak Dikerjakan'}</div>
+                   return (
+                     <div className="space-y-4 mb-6 px-3 sm:px-6">
+                        {panelWorkouts.map(w => {
+                           const isCompleted = checkIsCompletedStrict(w, targetDateStr);
+                           const isExpanded = expandedWorkoutId === w.id;
+                           const prog = w.programId === 'adhoc' 
+                             ? { id: 'adhoc', name: w.programName || 'Sesi Ekstra', exercises: w.exercises || [] }
+                             : programs.find(p => p.id === w.programId);
+                            
+                           const dData = history[targetDateStr] || {};
+                           const sessionLogs = (dData._activeSession && dData._activeSession.exerciseLogs && Object.keys(dData._activeSession.exerciseLogs).length > 0) ? dData._activeSession.exerciseLogs : exerciseLogs;
+                           const sessionSkipped = (dData._activeSession && dData._activeSession.skippedExercises) ? dData._activeSession.skippedExercises : skippedExercises;
+                           const logsToUse = (w.log && Object.keys(w.log).length > 0) ? w.log : sessionLogs;
+                           const skippedToUse = w.skipped || sessionSkipped;
+          
+                            return (
+                             <div key={w.id} className={`p-4 rounded-2xl ${isCompleted ? 'border ' + t.borderAccentSoft + ' ' + t.bgAccentSoft : 'border-2 border-dashed ' + t.borderAccentSoft + ' bg-black/5 dark:bg-white/5'} flex flex-col relative transition-all ${isExpanded ? 'ring-2 ' + t.ringAccent : 'hover:scale-[1.02] cursor-pointer'}`} onClick={() => { if(!isExpanded) { playSoundEffect('click', soundEnabled); setExpandedWorkoutId(w.id); setCalendarDate(new Date(targetDateStr)); setCalendarMode('weekly'); } }}>
+                                <button onClick={(e) => { e.stopPropagation(); removeWorkout(w.id); }} className="absolute top-3 right-3 p-1.5 text-rose-500/50 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors z-10"><Trash2 size={16} /></button>
+                                <div className="flex items-center mb-2 pr-8">
+                                  {isCompleted ? <CheckCircle size={18} className={`${t.textAccent} mr-2`} /> : <PlayCircle size={18} className={`${t.textMuted} mr-2`} />}
+                                  <span className="font-black text-left">{w.programName}</span>
+                                </div>
+                                <div className="flex flex-col gap-1 mt-1">
+                                  {isCompleted ? (
+                                    <div className="caption opacity-60 mt-2 flex flex-wrap items-center gap-2">
+                                      <span>Selesai: {w.timestamp}</span>
+                                      <span className="w-1 h-1 rounded-full bg-current opacity-50"></span>
+                                      <span>{w.duration || '00:00'} menit</span>
                                     </div>
-                                  );
-                               }
-
-                               let textStr = "";
-                               if (doneSets.length > 0) {
-                                  const maxW = Math.max(...doneSets.map(s => Number(s.w) || 0)) || ex.defaultWeight || 0;
-                                  const maxR = Math.max(...doneSets.map(s => Number(s.r) || 0)) || ex.reps || 0;
-                                  const maxD = Math.max(...doneSets.map(s => Number(s.d) || 0)) || ex.duration || 0;
-                                  
-                                  if (ex.type === 'time') {
-                                      textStr = `${doneSets.length} x ${maxD}s`;
-                                  } else if (ex.type === 'reps') {
-                                      textStr = `${doneSets.length} x ${maxR}`;
-                                  } else {
-                                      textStr = `${doneSets.length} x ${maxR} x ${maxW} kg`;
-                                  }
-                               } else {
-                                  if (exLogs && exLogs.length > 0) {
-                                     textStr = "Belum dimulai";
-                                  } else {
-                                     textStr = "Belum dimulai";
-                                  }
-                               }
-
-                               return (
-                                 <div key={ex.id} className={`p-2 px-3 rounded-lg border ${t.border} bg-black/5 dark:bg-white/5 flex justify-between items-center`}>
-                                   <div className="body-md truncate mr-2">{idx + 1}. {ex.name}</div>
-                                   <div className="body-md font-mono whitespace-nowrap opacity-80">{textStr}</div>
-                                 </div>
-                               );
-                            })}
-                          </div>
-                          
-                          <div className="flex gap-2">
-                             <button 
-                               onClick={(e) => { e.stopPropagation(); setExpandedWorkoutId(null); setCalendarMode('monthly'); }}
-                               className={`flex-1 py-3 rounded-xl border border-dashed ${t.border} body-lg font-bold`}
-                             >
-                               Tutup
-                             </button>
-                             <button 
-                               onClick={(e) => { 
-                                 e.stopPropagation(); 
-                                 const hasExercises = w.exercises && w.exercises.length > 0;
-                                 if (!isCompleted && !hasExercises) {
-                                   playSoundEffect('click', soundEnabled);
-                                   navigateToWorkoutDate(selectedDate);
-                                 } else {
-                                   handleEditPastWorkout(selectedDate, w); 
-                                 }
-                               }}
-                               className={`flex-[2] py-3 rounded-xl ${t.bgAccent} text-white font-black body-lg flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all`}
-                             >
-                               <Edit2 size={16} /> {isCompleted ? 'Edit Riwayat' : ((w.exercises && w.exercises.length > 0) ? 'Mulai Latihan' : 'Edit Latihan')}
-                             </button>
-                          </div>
-                        </div>
-                      )}
-                   </div>
-                 );
-               })}
+                                  ) : (
+                                    <div className="caption opacity-60 mt-1">Status: Direncanakan</div>
+                                  )}
+                                </div>
+                                {isExpanded && (
+                                  <div className="mt-4 animate-in slide-in-from-top-2 fade-in duration-200">
+                                    <div className="space-y-1.5 mb-4">
+                                      {prog?.exercises?.map((ex, idx) => {
+                                         const exLogKey = `${ex.id}-${w.id}`;
+                                         const exLogs = logsToUse?.[exLogKey] || logsToUse?.[ex.id];
+                                         const doneSets = exLogs ? exLogs.filter(s => s.done && !s.skipped) : [];
+                                         const isSkipped = skippedToUse?.[exLogKey] || skippedToUse?.[ex.id];
+                                         const isNotDoneWhenCompleted = isCompleted && doneSets.length === 0;
+                                         const shouldShowNotDone = (isSkipped || isNotDoneWhenCompleted) && doneSets.length === 0;
+          
+                                         if (shouldShowNotDone) {
+                                            return (
+                                              <div key={ex.id} className={`p-2 px-3 rounded-lg border ${t.border} bg-black/5 dark:bg-white/5 opacity-50 flex justify-between items-center`}>
+                                                <div className="body-md truncate mr-2 line-through opacity-70">{idx + 1}. {ex.name}</div>
+                                                <div className="text-[10px] font-bold text-rose-500">{isSkipped ? 'Di-skip' : 'Tidak Dikerjakan'}</div>
+                                              </div>
+                                            );
+                                         }
+          
+                                         let textStr = "";
+                                         if (doneSets.length > 0) {
+                                            const maxW = Math.max(...doneSets.map(s => Number(s.w) || 0)) || ex.defaultWeight || 0;
+                                            const maxR = Math.max(...doneSets.map(s => Number(s.r) || 0)) || ex.reps || 0;
+                                            const maxD = Math.max(...doneSets.map(s => Number(s.d) || 0)) || ex.duration || 0;
+                                            if (ex.type === 'time') textStr = `${doneSets.length} x ${maxD}s`;
+                                            else if (ex.type === 'reps') textStr = `${doneSets.length} x ${maxR}`;
+                                            else textStr = `${doneSets.length} x ${maxR} x ${maxW} kg`;
+                                         } else textStr = "Belum dimulai";
+          
+                                         return (
+                                           <div key={ex.id} className={`p-2 px-3 rounded-lg border ${t.border} bg-black/5 dark:bg-white/5 flex justify-between items-center`}>
+                                             <div className="body-md truncate mr-2">{idx + 1}. {ex.name}</div>
+                                             <div className="body-md font-mono whitespace-nowrap opacity-80">{textStr}</div>
+                                           </div>
+                                         );
+                                      })}
+                                    </div>
+                                    <div className="flex gap-2">
+                                       <button onClick={(e) => { e.stopPropagation(); setExpandedWorkoutId(null); setCalendarMode('monthly'); }} className={`flex-1 py-3 rounded-xl border border-dashed ${t.border} body-lg font-bold`}>Tutup</button>
+                                       <button onClick={(e) => { e.stopPropagation(); const hasExercises = w.exercises && w.exercises.length > 0; if (!isCompleted && !hasExercises) { playSoundEffect('click', soundEnabled); navigateToWorkoutDate(targetDateStr); } else { handleEditPastWorkout(targetDateStr, w); } }} className={`flex-[2] py-3 rounded-xl ${t.bgAccent} text-white font-black body-lg flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all`}>
+                                         <Edit2 size={16} /> {isCompleted ? 'Edit Riwayat' : ((w.exercises && w.exercises.length > 0) ? 'Mulai Latihan' : 'Edit Latihan')}
+                                       </button>
+                                    </div>
+                                  </div>
+                                )}
+                             </div>
+                           );
+                         })}
+                      </div>
+                   );
+               }}
+            />
             </div>
           )}
-
           {!showProgramSelect ? (
             <button 
                onClick={() => { playSoundEffect('click', soundEnabled); setShowProgramSelect(true); }}

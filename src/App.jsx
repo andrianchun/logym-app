@@ -1063,9 +1063,6 @@ export default function App() {
                
                // Focus
                focusWorkoutId={focusWorkoutId} setFocusWorkoutId={setFocusWorkoutId}
-               
-               // Library for alternatives
-               exerciseLibrary={exerciseLibrary}
              />
          )}
          
