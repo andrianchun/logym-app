@@ -17,7 +17,6 @@ const WorkoutTab = ({
   activeProgramId, setActiveProgramId,
   soundEnabled, playSoundEffect, 
   warmupVideos, cooldownVideos,
-  setActiveVideoModal,
   
   // --- PROPS DARI APP.JSX ---
   exerciseLogs, skippedExercises, extraExercises,
@@ -258,7 +257,7 @@ const WorkoutTab = ({
               t={t} lang={lang} language={language}
               selectedDate={selectedDate} setSelectedDate={setSelectedDate}
               soundEnabled={soundEnabled} playSoundEffect={playSoundEffect}
-              warmupVideos={warmupVideos} onOpenVideo={setActiveVideoModal}
+              warmupVideos={warmupVideos} onOpenVideo={(url) => setDetailExercise({ name: 'Pemanasan', ytVideo: url, type: 'warmup' })}
               activeProgram={activeProgram}
             />
 
@@ -371,7 +370,7 @@ const WorkoutTab = ({
 
             <WorkoutFooter 
               t={t} lang={lang} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect}
-              cooldownVideos={cooldownVideos} onOpenVideo={setActiveVideoModal}
+              cooldownVideos={cooldownVideos} onOpenVideo={(url) => setDetailExercise({ name: 'Pendinginan', ytVideo: url, type: 'cooldown' })}
               isCurrentlyCompleted={isCurrentlyCompleted} onSaveWorkout={onSaveWorkout}
             />
           </>

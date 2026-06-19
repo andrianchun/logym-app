@@ -75,7 +75,7 @@ export default function App() {
 
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const [activeVideoModal, setActiveVideoModal] = useState(null);
+  const [globalDetailExercise, setGlobalDetailExercise] = useState(null);
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
   const [activeAddModalTarget, setActiveAddModalTarget] = useState(null); 
 
@@ -445,7 +445,7 @@ export default function App() {
 
     const handlePopState = () => {
       // Prioritas 1: Tutup modal/dialog yang terbuka
-      if (activeVideoModal) { setActiveVideoModal(null); window.history.pushState({ lyfit: true }, ''); return; }
+      if (globalDetailExercise) { setGlobalDetailExercise(null); window.history.pushState({ lyfit: true }, ''); return; }
       if (showSettings) { setShowSettings(false); window.history.pushState({ lyfit: true }, ''); return; }
       if (showHelp) { setShowHelp(false); window.history.pushState({ lyfit: true }, ''); return; }
       if (confirmModal.isOpen) { setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null }); window.history.pushState({ lyfit: true }, ''); return; }
@@ -467,7 +467,7 @@ export default function App() {
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [activeVideoModal, showSettings, showHelp, confirmModal.isOpen, activeAddModalTarget, activeTab]);
+  }, [globalDetailExercise, showSettings, showHelp, confirmModal.isOpen, activeAddModalTarget, activeTab]);
 
   // ==========================================
   // 5. MESIN AUTOSAVE LOG LATIHAN KE KALENDER
@@ -992,7 +992,14 @@ export default function App() {
       <ConfirmModal confirmModal={confirmModal} setConfirmModal={setConfirmModal} t={t} lang={lang} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} />
       <AddExerciseModal t={t} lang={lang} activeAddModalTarget={activeAddModalTarget} setActiveAddModalTarget={setActiveAddModalTarget} exerciseLibrary={exerciseLibrary} onAddExerciseTarget={addExerciseTarget} setActiveTab={setActiveTab} />
       <HelpModal showHelp={showHelp} setShowHelp={setShowHelp} t={t} lang={lang} />
-      <VideoModal activeVideoModal={activeVideoModal} setActiveVideoModal={setActiveVideoModal} />
+      {globalDetailExercise && (
+        <ExerciseDetailModal 
+          ex={globalDetailExercise} 
+          onClose={() => setGlobalDetailExercise(null)} 
+          t={t} lang={lang} soundEnabled={soundEnabled} 
+          historyData={[]}
+        />
+      )}
       
       <SettingsModal 
          showSettings={showSettings} setShowSettings={setShowSettings} t={t} lang={lang} 
@@ -1021,7 +1028,7 @@ export default function App() {
                t={t} lang={lang} language={language} programs={programs} selectedDate={selectedDate} setSelectedDate={setSelectedDate}
                history={history} setHistory={setHistory} setActiveTab={setActiveTab}
                activeProgramId={activeProgramId} setActiveProgramId={setActiveProgramId} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
-               warmupVideos={warmupVideos} cooldownVideos={cooldownVideos} setActiveVideoModal={setActiveVideoModal}
+               warmupVideos={warmupVideos} cooldownVideos={cooldownVideos} onOpenDetail={setGlobalDetailExercise}
                exerciseLogs={exerciseLogs} skippedExercises={skippedExercises} extraExercises={extraExercises}
                onSetChange={handleSetChange} onToggleSet={handleToggleSet} onAddSet={handleAddSet} onRemoveSet={handleRemoveSet}
                onToggleSkip={handleToggleSkip} onRemoveExtra={handleRemoveExtraEx}

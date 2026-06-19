@@ -22,11 +22,11 @@ const ExerciseDetailModal = ({
   const parseMedia = (exercise) => {
     let items = [];
     if (exercise.ytVideo) {
-      const urls = exercise.ytVideo.split(' ').filter(v => v.trim());
+      const urls = exercise.ytVideo.split(/(?:,|\s)+/).filter(v => v.trim());
       urls.forEach(u => items.push({ type: 'youtube', url: u }));
     }
     if (exercise.gifUrl) {
-      const urls = exercise.gifUrl.split(' ').filter(v => v.trim());
+      const urls = exercise.gifUrl.split(/(?:,|\s)+/).filter(v => v.trim());
       urls.forEach(u => items.push({ type: u.match(/\.(mp4|webm)$/i) ? 'video' : 'image', url: u }));
     }
     return items;
@@ -35,28 +35,7 @@ const ExerciseDetailModal = ({
   const [activeMediaIndex, setActiveMediaIndex] = React.useState(0);
   const activeMedia = mediaItems[activeMediaIndex];
 
-  // Custom YouTube Looping Logic to avoid Playlist UI overlay
-  React.useEffect(() => {
-    const handleMessage = (e) => {
-      if (e.origin !== "https://www.youtube.com") return;
-      try {
-        const data = JSON.parse(e.data);
-        if (data.event === "infoDelivery" && data.info && data.info.playerState === 0) {
-          const iframe = document.querySelector('.exercise-video-iframe');
-          if (iframe && iframe.contentWindow === e.source) {
-            iframe.contentWindow.postMessage(JSON.stringify({event: "command", func: "seekTo", args: [0, true]}), "*");
-            iframe.contentWindow.postMessage(JSON.stringify({event: "command", func: "playVideo", args: []}), "*");
-          }
-        }
-      } catch (err) {}
-    };
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, []);
-
-  const handleIframeLoad = (e) => {
-    e.target.contentWindow.postMessage(JSON.stringify({event: "listening"}), "*");
-  };
+  // (Removed complex YouTube message listener to use native loop parameters instead)
 
   return (
     <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in`} onClick={onClose}>
@@ -73,10 +52,9 @@ const ExerciseDetailModal = ({
               if (videoId) {
                 return (
                   <iframe 
-                    src={`https://www.youtube.com/embed/${videoId}?enablejsapi=1&autoplay=1&mute=1&controls=0&modestbranding=1&playsinline=1&rel=0&disablekb=1&iv_load_policy=3`}
+                    src={`https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&loop=1&playlist=${videoId}&controls=0&modestbranding=1&playsinline=1&rel=0`}
                     title="YouTube video player" 
                     frameBorder="0" 
-                    onLoad={handleIframeLoad}
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
                     className="exercise-video-iframe w-[140%] h-[140%] max-w-none pointer-events-none scale-[1.15]"
                   ></iframe>
@@ -130,122 +108,129 @@ const ExerciseDetailModal = ({
           </div>
         </div>
 
-        {/* Action Tabs */}
-        <div className={`flex border-b ${t.border} flex-shrink-0`}>
-          <button 
-            onClick={() => setActiveTab('info')}
-            className={`flex-1 py-3 body-md flex flex-col items-center gap-1 transition-all ${activeTab === 'info' ? `${t.textAccent} border-b-2 ${t.borderAccent}` : t.textMuted}`}
-          >
-            <Info size={18} /> Instruksi
-          </button>
-          <button 
-            onClick={() => setActiveTab('history')}
-            className={`flex-1 py-3 body-md flex flex-col items-center gap-1 transition-all ${activeTab === 'history' ? `${t.textAccent} border-b-2 ${t.borderAccent}` : t.textMuted}`}
-          >
-            <History size={18} /> Riwayat
-          </button>
-          <button 
-            onClick={() => setActiveTab('calc')}
-            className={`flex-1 py-3 body-md flex flex-col items-center gap-1 transition-all ${activeTab === 'calc' ? `${t.textAccent} border-b-2 ${t.borderAccent}` : t.textMuted}`}
-          >
-            <Calculator size={18} /> 1RM Calc
-          </button>
-        </div>
+        {/* Action Tabs - Disembunyikan untuk video Pemanasan/Pendinginan */}
+        {ex.type !== 'warmup' && ex.type !== 'cooldown' && (
+          <div className={`flex border-b ${t.border} flex-shrink-0`}>
+            <button 
+              onClick={() => setActiveTab('info')}
+              className={`flex-1 py-3 body-md flex flex-col items-center gap-1 transition-all ${activeTab === 'info' ? `${t.textAccent} border-b-2 ${t.borderAccent}` : t.textMuted}`}
+            >
+              <Info size={18} /> Instruksi
+            </button>
+            <button 
+              onClick={() => setActiveTab('history')}
+              className={`flex-1 py-3 body-md flex flex-col items-center gap-1 transition-all ${activeTab === 'history' ? `${t.textAccent} border-b-2 ${t.borderAccent}` : t.textMuted}`}
+            >
+              <History size={18} /> Riwayat
+            </button>
+            <button 
+              onClick={() => setActiveTab('calc')}
+              className={`flex-1 py-3 body-md flex flex-col items-center gap-1 transition-all ${activeTab === 'calc' ? `${t.textAccent} border-b-2 ${t.borderAccent}` : t.textMuted}`}
+            >
+              <Calculator size={18} /> 1RM Calc
+            </button>
+          </div>
+        )}
 
-        {/* Content Area */}
-        <div className="p-5 overflow-y-auto hide-scrollbar flex-1">
-          
-          {activeTab === 'info' && (
-            <div className="space-y-4 animate-in fade-in">
-              <div>
-                <h3 className={`body-lg font-bold ${t.textMuted} mb-2`}>Peralatan</h3>
-                <p className={`body-lg font-bold ${t.textMain}`}>{ex.equipment || 'Bodyweight'}</p>
-              </div>
+        <div className="p-5 overflow-y-auto hide-scrollbar flex-1 bg-black/5 dark:bg-black/20">
+          {ex.type !== 'warmup' && ex.type !== 'cooldown' ? (
+            <>
+              {activeTab === 'info' && (
+                <div className="space-y-4 animate-in fade-in">
+                  <div>
+                    <h3 className={`body-lg font-bold ${t.textMuted} mb-2`}>Peralatan</h3>
+                    <p className={`body-lg font-bold ${t.textMain}`}>{ex.equipment || 'Bodyweight'}</p>
+                  </div>
 
-              {!ex.ytVideo && (
-                <div className={`p-4 rounded-2xl border ${t.border} bg-rose-500/5`}>
-                  <p className={`body-md ${t.textMuted} mb-3`}>Belum ada video tutorial untuk latihan ini.</p>
-                  <a 
-                    href={`https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name + ' shorts tutorial @DeltaBolic @fitnessonlineapp @officialdemic')}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-rose-500 text-white font-bold body-lg hover:bg-rose-600 active:scale-95 transition-all"
-                  >
-                    <Video size={16} /> Cari Video Shorts di YouTube
-                  </a>
+                  {!ex.ytVideo && (
+                    <div className={`p-4 rounded-2xl border ${t.border} bg-rose-500/5`}>
+                      <p className={`body-md ${t.textMuted} mb-3`}>Belum ada video tutorial untuk latihan ini.</p>
+                      <a 
+                        href={`https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name + ' shorts tutorial @DeltaBolic @fitnessonlineapp @officialdemic')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-rose-500 text-white font-bold body-lg hover:bg-rose-600 active:scale-95 transition-all"
+                      >
+                        <Video size={16} /> Cari Video Shorts di YouTube
+                      </a>
+                    </div>
+                  )}
+                  
+                  <div>
+                    <h3 className={`body-lg font-bold ${t.textMuted} mb-2`}>Cara Melakukan</h3>
+                    {ex.instructions && ex.instructions.length > 0 ? (
+                      <ol className="list-decimal pl-5 space-y-2">
+                        {ex.instructions.map((step, i) => (
+                          <li key={i} className={`body-lg ${t.textMain} opacity-90 leading-relaxed`}>{step}</li>
+                        ))}
+                      </ol>
+                    ) : (
+                      <p className={`body-lg ${t.textMuted} italic`}>Tidak ada instruksi khusus dari database.</p>
+                    )}
+                  </div>
                 </div>
               )}
-              
-              
-              <div>
-                <h3 className={`body-lg font-bold ${t.textMuted} mb-2`}>Cara Melakukan</h3>
-                {ex.instructions && ex.instructions.length > 0 ? (
-                  <ol className="list-decimal pl-5 space-y-2">
-                    {ex.instructions.map((step, i) => (
-                      <li key={i} className={`body-lg ${t.textMain} opacity-90 leading-relaxed`}>{step}</li>
-                    ))}
-                  </ol>
-                ) : (
-                  <p className={`body-lg ${t.textMuted} italic`}>Tidak ada instruksi khusus dari database.</p>
-                )}
-              </div>
-            </div>
-          )}
 
-          {activeTab === 'history' && (
-            <div className="space-y-3 animate-in fade-in">
-               {(!historyData || historyData.length === 0) ? (
-                 <div className={`text-center py-8 ${t.textMuted}`}>
-                   <History size={32} className="mx-auto mb-2 opacity-30" />
-                   <p className="body-lg font-bold">Belum ada riwayat latihan ini.</p>
-                 </div>
-               ) : (
-                 historyData.map((log, i) => (
-                   <div key={i} className={`p-3 rounded-xl border ${t.border} ${t.bgCard} flex justify-between items-center`}>
-                     <div>
-                       <p className={`body-md ${t.textMuted}`}>{log.date}</p>
-                       <p className={`body-lg font-bold ${t.textMain}`}>{log.programName}</p>
+              {activeTab === 'history' && (
+                <div className="space-y-3 animate-in fade-in">
+                   {(!historyData || historyData.length === 0) ? (
+                     <div className={`text-center py-8 ${t.textMuted}`}>
+                       <History size={32} className="mx-auto mb-2 opacity-30" />
+                       <p className="body-lg font-bold">Belum ada riwayat latihan ini.</p>
                      </div>
-                     <div className="text-right">
-                       <p className={`h2 ${t.textAccent}`}>{log.maxWeight} <span className="body-md">kg</span></p>
-                       <p className={`body-md ${t.textMuted}`}>{log.totalSets} set</p>
+                   ) : (
+                     historyData.map((log, i) => (
+                       <div key={i} className={`p-3 rounded-xl border ${t.border} ${t.bgCard} flex justify-between items-center`}>
+                         <div>
+                           <p className={`body-md ${t.textMuted}`}>{log.date}</p>
+                           <p className={`body-lg font-bold ${t.textMain}`}>{log.programName}</p>
+                         </div>
+                         <div className="text-right">
+                           <p className={`h2 ${t.textAccent}`}>{log.maxWeight} <span className="body-md">kg</span></p>
+                           <p className={`body-md ${t.textMuted}`}>{log.totalSets} set</p>
+                         </div>
+                       </div>
+                     ))
+                   )}
+                </div>
+              )}
+
+              {activeTab === 'calc' && (
+                <div className="space-y-5 animate-in fade-in text-center">
+                   <p className={`body-md ${t.textMuted}`}>Gunakan kalkulator One Rep Max (1RM) untuk mengestimasi beban maksimal yang bisa kamu angkat 1 kali berdasarkan set terbaikmu.</p>
+                   
+                   <div className="grid grid-cols-2 gap-4">
+                     <div>
+                       <label className={`body-md ${t.textMuted} mb-1 block`}>Beban (kg)</label>
+                       <input 
+                         type="number" min="0" 
+                         value={calcWeight} onChange={e => setCalcWeight(Number(e.target.value))}
+                         className={`w-full px-3 py-3 rounded-xl ${t.inputBg} ${t.textMain} font-black text-center h2 outline-none focus:ring-2 ${t.ringAccent}`}
+                       />
+                     </div>
+                     <div>
+                       <label className={`body-md ${t.textMuted} mb-1 block`}>Repetisi</label>
+                       <input 
+                         type="number" min="1" 
+                         value={calcReps} onChange={e => setCalcReps(Number(e.target.value))}
+                         className={`w-full px-3 py-3 rounded-xl ${t.inputBg} ${t.textMain} font-black text-center h2 outline-none focus:ring-2 ${t.ringAccent}`}
+                       />
                      </div>
                    </div>
-                 ))
-               )}
+
+                   <div className={`p-6 rounded-2xl bg-gradient-to-br ${t.gradientBg} shadow-lg shadow-amber-500/20`}>
+                     <p className="text-white/80 body-md uppercase tracking-wider mb-1">Estimasi 1RM Kamu</p>
+                     <p className="text-white h1">{oneRM} <span className="h2">kg</span></p>
+                   </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="p-6 text-center text-zinc-500 italic flex flex-col items-center gap-3">
+              <Video size={48} className="opacity-20" />
+              Tonton video di atas untuk panduan gerakan.
             </div>
           )}
-
-          {activeTab === 'calc' && (
-            <div className="space-y-5 animate-in fade-in text-center">
-               <p className={`body-md ${t.textMuted}`}>Gunakan kalkulator One Rep Max (1RM) untuk mengestimasi beban maksimal yang bisa kamu angkat 1 kali berdasarkan set terbaikmu.</p>
-               
-               <div className="grid grid-cols-2 gap-4">
-                 <div>
-                   <label className={`body-md ${t.textMuted} mb-1 block`}>Beban (kg)</label>
-                   <input 
-                     type="number" min="0" 
-                     value={calcWeight} onChange={e => setCalcWeight(Number(e.target.value))}
-                     className={`w-full px-3 py-3 rounded-xl ${t.inputBg} ${t.textMain} font-black text-center h2 outline-none focus:ring-2 ${t.ringAccent}`}
-                   />
-                 </div>
-                 <div>
-                   <label className={`body-md ${t.textMuted} mb-1 block`}>Repetisi</label>
-                   <input 
-                     type="number" min="1" 
-                     value={calcReps} onChange={e => setCalcReps(Number(e.target.value))}
-                     className={`w-full px-3 py-3 rounded-xl ${t.inputBg} ${t.textMain} font-black text-center h2 outline-none focus:ring-2 ${t.ringAccent}`}
-                   />
-                 </div>
-               </div>
-
-               <div className={`p-6 rounded-2xl bg-gradient-to-br ${t.gradientBg} shadow-lg shadow-amber-500/20`}>
-                 <p className="text-white/80 body-md uppercase tracking-wider mb-1">Estimasi 1RM Kamu</p>
-                 <p className="text-white h1">{oneRM} <span className="h2">kg</span></p>
-               </div>
-            </div>
-          )}
-
         </div>
 
       </div>
