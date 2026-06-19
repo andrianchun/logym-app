@@ -743,11 +743,11 @@ const CalendarTab = ({
           </>
         )}
 
-        <div className="flex items-center justify-center relative pt-3 pb-1 -mb-2 mt-2">
-            {selectedDate !== todayStr && (
+        <div className="flex items-center justify-center relative pt-3 pb-3 mb-2 mt-2">
+            {(selectedDate !== todayStr || calendarDate.getMonth() !== new Date().getMonth() || calendarDate.getFullYear() !== new Date().getFullYear()) && (
               <button
-                onClick={() => { playSoundEffect('click', soundEnabled); setSelectedDate(todayStr); setCalendarDate(new Date()); setCalendarMode('weekly'); }}
-                className={`absolute right-0 text-[10px] font-bold px-2.5 py-0.5 rounded-full ${t.bgAccent} text-white hover:opacity-80 transition-opacity`}
+                onClick={() => { playSoundEffect('click', soundEnabled); setSelectedDate(todayStr); setCalendarDate(new Date()); }}
+                className={`absolute right-4 text-[10px] font-bold px-3 py-1 rounded-full ${t.bgAccent} text-white hover:opacity-80 transition-opacity shadow-sm`}
               >
                 Hari Ini
               </button>
