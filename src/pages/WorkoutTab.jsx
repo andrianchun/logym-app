@@ -38,7 +38,8 @@ const WorkoutTab = ({
   isImmersiveMode, setIsImmersiveMode,
   restTimer, setRestTimer,
   sessionToRun, setSessionToRun,
-  resumeDurationSecs, setResumeDurationSecs
+  resumeDurationSecs, setResumeDurationSecs,
+  unitSystem
 }) => {
   
   const [detailExercise, setDetailExercise] = useState(null);
@@ -58,10 +59,11 @@ const WorkoutTab = ({
           workoutId: w.id, 
           status: w.status, 
           log: w.log,
-          exercises: p.exercises ? p.exercises.map(ex => ({
+          exercises: p.exercises ? (w.overriddenExercises || p.exercises).map(ex => ({
               ...ex,
               originalId: ex.id,
-              id: `${ex.id}-${w.id}`
+              id: `${ex.id}-${w.id}`,
+              workoutId: w.id
           })) : []
       } : null;
     })
@@ -119,13 +121,39 @@ const WorkoutTab = ({
   };
 
   const handleSelectAlternative = (newEx) => {
-     // Tambahkan sebagai extra exercise
-     const adhocEx = { ...newEx, id: `${newEx.id}-${Date.now()}`, sets: detailExercise?.sets || 3, reps: detailExercise?.reps || 10, duration: detailExercise?.duration || 10 };
-     onAddExtraExercise(adhocEx);
-     
-     // Logika penggantian: skip yang lama (detailExercise)
-     if (detailExercise?.id) {
-       onToggleSkip(detailExercise.id);
+     if (!detailExercise) return;
+     const workoutId = detailExercise.workoutId;
+     const originalExId = detailExercise.originalId;
+
+     if (workoutId) {
+       setHistory(prev => {
+          const h = { ...prev };
+          const dayData = h[selectedDate];
+          if (!dayData) return h;
+          
+          const wIdx = dayData.workouts.findIndex(w => w.id === workoutId);
+          if (wIdx > -1) {
+             const w = dayData.workouts[wIdx];
+             if (w.programId === 'adhoc') {
+                const exIdx = w.exercises.findIndex(e => e.id === originalExId);
+                if (exIdx > -1) {
+                   w.exercises[exIdx] = { ...newEx, sets: detailExercise.sets || 3, reps: detailExercise.reps || 10, duration: detailExercise.duration || 10, id: newEx.id };
+                }
+             } else {
+                const p = programs.find(p => p.id === w.programId);
+                if (p) {
+                   if (!w.overriddenExercises) {
+                      w.overriddenExercises = JSON.parse(JSON.stringify(p.exercises));
+                   }
+                   const exIdx = w.overriddenExercises.findIndex(e => e.id === originalExId);
+                   if (exIdx > -1) {
+                      w.overriddenExercises[exIdx] = { ...newEx, sets: detailExercise.sets || 3, reps: detailExercise.reps || 10, duration: detailExercise.duration || 10, id: newEx.id };
+                   }
+                }
+             }
+          }
+          return h;
+       });
      }
      
      setShowAlternativeModal(false);
@@ -214,6 +242,7 @@ const WorkoutTab = ({
       {isImmersiveMode && (
         <ImmersiveWorkout 
           t={t}
+          unitSystem={unitSystem}
           programs={programs}
           activeProgramId={activeProgramId}
           activeProgramsList={sessionToRun === 'extra' ? [] : activeProgramsList.filter(p => p.workoutId === sessionToRun || p.id === sessionToRun)}
@@ -246,6 +275,7 @@ const WorkoutTab = ({
           t={t} lang={lang} soundEnabled={soundEnabled} 
           exerciseLogs={exerciseLogs}
           onReplace={(ex) => setShowAlternativeModal(true)}
+          unitSystem={unitSystem}
         />
       )}
 
@@ -303,14 +333,16 @@ const WorkoutTab = ({
                       <div className="p-4 space-y-4 sm:space-y-0 sm:flex sm:flex-row sm:overflow-x-auto sm:snap-x sm:gap-4 sm:pb-6 hide-scrollbar animate-in slide-in-from-top-2 fade-in duration-200">
                         {prog.exercises?.map((ex, idx) => (
                           <div key={`${prog.id}-${ex.id}-${idx}`} className="sm:w-[340px] sm:shrink-0 sm:snap-center sm:bg-black/5 sm:dark:bg-white/5 sm:rounded-3xl sm:border sm:border-black/5 sm:dark:border-white/5 sm:overflow-hidden relative flex flex-col">
-                            <ExerciseCard 
-                              ex={ex} idx={idx} isExtra={false}
-                              t={t} lang={lang} soundEnabled={soundEnabled}
-                              isSkip={!!skippedExercises[ex.id]} 
-                              onToggleSkip={() => onToggleSkip(ex.id)} 
-                              onRemoveExtra={onRemoveExtra} 
-                              onOpenVideo={() => handleOpenDetail(ex)}
-                              sets={getSetLogs(ex)}
+                              <ExerciseCard 
+                                ex={ex} idx={idx} isExtra={false}
+                                t={t} lang={lang} soundEnabled={soundEnabled}
+                                unitSystem={unitSystem}
+                                isSkip={!!skippedExercises[ex.id]} 
+                                onToggleSkip={() => onToggleSkip(ex.id)} 
+                                onRemoveExtra={onRemoveExtra} 
+                                onOpenVideo={() => handleOpenDetail(ex)}
+                                onReplaceClick={() => { setDetailExercise(ex); setShowAlternativeModal(true); }}
+                                sets={getSetLogs(ex)}
                               onUpdateSet={(exId, setIdx, field, val) => {
                                 setSessionToRun(prog.workoutId);
                                 onSetChange(exId, setIdx, field, val);
@@ -355,6 +387,7 @@ const WorkoutTab = ({
                           <ExerciseCard 
                             ex={ex} idx={activeProgram.exercises?.length + idx || idx} isExtra={true}
                             t={t} lang={lang} soundEnabled={soundEnabled}
+                            unitSystem={unitSystem}
                             isSkip={!!skippedExercises[ex.id]} 
                             onToggleSkip={() => onToggleSkip(ex.id)} 
                             onRemoveExtra={onRemoveExtra} 

@@ -54,6 +54,8 @@ export default function App() {
   const [weekStartDay, setWeekStartDay] = useState(0); // 0: Sunday, 1: Monday
   const [defaultReminderTime, setDefaultReminderTime] = useState("15:00");
   const [reminderEnabled, setReminderEnabled] = useState(true);
+  const [biometricStandard, setBiometricStandard] = useState('asia'); // 'asia' | 'western'
+  const [unitSystem, setUnitSystem] = useState('metric'); // 'metric' | 'imperial'
 
   const [exerciseLibrary, setExerciseLibrary] = useState(defaultMasterExercises);
   const [programs, setPrograms] = useState(defaultPrograms);
@@ -339,6 +341,8 @@ export default function App() {
               setWeekStartDay(parsedSettings.weekStartDay || 0);
               setDefaultReminderTime(parsedSettings.defaultReminderTime || "15:00");
               setReminderEnabled(parsedSettings.reminderEnabled ?? true);
+              setBiometricStandard(parsedSettings.biometricStandard || 'asia');
+              setUnitSystem(parsedSettings.unitSystem || 'metric');
             }
           } catch (err) {
             console.error("Parse Error saat load data utama (MENCEGAH AUTO-SAVE UNTUK MENGHINDARI DATA HILANG):", err);
@@ -395,7 +399,7 @@ export default function App() {
         setDoc(mainDocRef, {
           programs,
           exerciseLibrary,
-          settings: { theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled },
+          settings: { theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem },
           updatedAt: new Date().toISOString()
         }, { merge: true }).catch(err => console.error("Auto-save Cloud gagal:", err));
 
@@ -1019,6 +1023,7 @@ export default function App() {
           onClose={() => setGlobalDetailExercise(null)} 
           t={t} lang={lang} soundEnabled={soundEnabled} 
           historyData={[]}
+          unitSystem={unitSystem}
         />
       )}
       
@@ -1030,6 +1035,8 @@ export default function App() {
          weekStartDay={weekStartDay} setWeekStartDay={setWeekStartDay}
          defaultReminderTime={defaultReminderTime} setDefaultReminderTime={setDefaultReminderTime}
          reminderEnabled={reminderEnabled} setReminderEnabled={setReminderEnabled}
+         biometricStandard={biometricStandard} setBiometricStandard={setBiometricStandard}
+         unitSystem={unitSystem} setUnitSystem={setUnitSystem}
          undoStack={undoStack} redoStack={redoStack} handleUndo={handleUndo} handleRedo={handleRedo}
          setShowHelp={setShowHelp}
          exportData={exportData} handleImportFile={handleImportFile}
@@ -1044,6 +1051,7 @@ export default function App() {
                t={t} lang={lang} language={language} user={user} history={history} setHistory={setHistory} programs={programs}
                navigateToWorkoutDate={navigateToWorkoutDate} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect}
                theme={theme} exerciseLibrary={exerciseLibrary} selectedDate={selectedDate}
+               biometricStandard={biometricStandard} unitSystem={unitSystem}
              />
          )}
          
@@ -1072,6 +1080,7 @@ export default function App() {
                
                // Focus
                focusWorkoutId={focusWorkoutId} setFocusWorkoutId={setFocusWorkoutId}
+               unitSystem={unitSystem}
              />
          )}
          
@@ -1082,6 +1091,7 @@ export default function App() {
                exerciseLogs={exerciseLogs} skippedExercises={skippedExercises} handleEditPastWorkout={handleEditPastWorkout}
                selectedDate={selectedDate} setSelectedDate={setSelectedDate} setActiveTab={setActiveTab}
                weekStartDay={weekStartDay} defaultReminderTime={defaultReminderTime} reminderEnabled={reminderEnabled}
+               unitSystem={unitSystem}
              />
          )}
 

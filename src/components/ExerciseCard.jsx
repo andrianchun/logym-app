@@ -7,10 +7,11 @@ import { playSoundEffect } from '../utils/audio';
 
 const ExerciseCard = ({
   ex, idx, isExtra = false,
-  t, lang, soundEnabled,
+  t, lang, soundEnabled, unitSystem,
   isSkip, onToggleSkip, onRemoveExtra, onOpenVideo, onReplaceClick,
   sets, onUpdateSet, onToggleSet, onAddSet, onRemoveSet
 }) => {
+  const isImp = unitSystem === 'imperial';
   const exType = ex.type || 'weight';
   const isCustom = ex.id > 1000000 && ex.source !== 'exercisedb';
   const doneCount = sets.filter(s => s.done).length;
@@ -107,11 +108,9 @@ const ExerciseCard = ({
                        <ArrowLeftRight size={16} />
                    </button>
                )}
-               {ex.ytVideo && (
-                   <button onClick={() => { playSoundEffect('click', soundEnabled); onOpenVideo(ex); }} className={`${t.textMuted} p-2 bg-black/5 dark:bg-white/5 rounded-xl hover:${t.textAccent} transition-colors`}>
-                       <Info size={16} />
-                   </button>
-               )}
+               <button onClick={() => { playSoundEffect('click', soundEnabled); onOpenVideo(ex); }} className={`${t.textMuted} p-2 bg-black/5 dark:bg-white/5 rounded-xl hover:${t.textAccent} transition-colors`}>
+                   <Info size={16} />
+               </button>
              </div>
          </div>
       </div>
@@ -131,7 +130,7 @@ const ExerciseCard = ({
       <div className={`mt-3 relative z-10 ${isSkip ? 'hidden' : ''}`}>
           <div className={`grid ${exType==='weight' ? 'grid-cols-[1.5fr_2.5fr_2.5fr_1.5fr]' : 'grid-cols-[1.5fr_3.5fr_1.5fr]'} gap-1 mb-1 px-1 h3 ${t.textMuted} text-center items-center`}>
             <div>{lang.set}</div>
-            {exType === 'weight' && <div>kg</div>}
+            {exType === 'weight' && <div>{isImp ? 'lbs' : 'kg'}</div>}
             {exType === 'time' && <div>Menit / Timer</div>}
             {(exType === 'weight' || exType === 'reps') && <div>Reps</div>}
             <div>{lang.done}</div>
@@ -166,7 +165,7 @@ const ExerciseCard = ({
                 ) : (
                   <>
                     {exType === 'weight' && (
-                      <div><SwipeInput value={s.w} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'w', val)} disabled={s.done} step={2.5} soundEnabled={soundEnabled} className={`w-full ${t.inputBg} h-8 rounded text-center font-black ${t.textMain} no-spinners transition-colors body-lg`} /></div>
+                      <div><SwipeInput value={isImp ? Math.round(Number(s.w || 0) * 2.20462 * 10)/10 : s.w} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'w', isImp ? Number((val / 2.20462).toFixed(2)) : val)} disabled={s.done} step={isImp ? 5 : 2.5} soundEnabled={soundEnabled} className={`w-full ${t.inputBg} h-8 rounded text-center font-black ${t.textMain} no-spinners transition-colors body-lg`} /></div>
                     )}
                     
                     {/* KHUSUS TIMER DURASI */}

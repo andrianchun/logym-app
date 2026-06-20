@@ -119,13 +119,18 @@ const ProgramTab = ({ setConfirmModal, t, lang, programs, setPrograms, exerciseL
   };
 
   const handleRemoveExercise = (exId) => {
-    playSoundEffect('click', soundEnabled);
-    if (window.confirm(lang.confirmRemoveEx || 'Yakin ingin menghapus latihan ini dari program?')) {
-      setPrograms(programs.map(p => p.id === activeProgramId ? {
-        ...p,
-        exercises: p.exercises.filter(ex => ex.id !== exId)
-      } : p));
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Hapus Latihan?',
+      message: lang.confirmRemoveEx || 'Yakin ingin menghapus latihan ini dari program?',
+      onConfirm: () => {
+        playSoundEffect('click', soundEnabled);
+        setPrograms(programs.map(p => p.id === activeProgramId ? {
+          ...p,
+          exercises: p.exercises.filter(ex => ex.id !== exId)
+        } : p));
+      }
+    });
   };
 
   const handleMoveExercise = (idx, direction) => {

@@ -187,7 +187,7 @@ const ExerciseForm = ({ t, lang, formData, setFormData, onSave, onCancel, isEdit
 // ═══════════════════════════════════════════════════════════════════
 // ─── Main Component: DatabaseTab ──────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════
-const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, soundEnabled, warmupVideos, setWarmupVideos, cooldownVideos, setCooldownVideos, onOpenDetail }) => {
+const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, soundEnabled, warmupVideos, setWarmupVideos, cooldownVideos, setCooldownVideos, onOpenDetail, setConfirmModal }) => {
   // ── Tab State ────────────────────────────────────────────────────
   const [viewMode, setViewMode] = useState('all'); // 'all' | 'custom'
 
@@ -466,10 +466,15 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
   };
 
   const handleDelete = (ex) => {
-    playSoundEffect('click', soundEnabled);
-    if (window.confirm(`Hapus "${ex.name}" secara permanen?`)) {
-      setExerciseLibrary(prev => prev.filter(e => e.id !== ex.id));
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Hapus Latihan?',
+      message: `Yakin hapus "${ex.name}" secara permanen dari database master?`,
+      onConfirm: () => {
+        playSoundEffect('click', soundEnabled);
+        setExerciseLibrary(prev => prev.filter(e => e.id !== ex.id));
+      }
+    });
   };
 
   // ═══════════════════════════════════════════════════════════════

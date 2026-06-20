@@ -5,6 +5,7 @@ import { playSoundEffect } from '../utils/audio';
 
 const ImmersiveWorkout = ({
   t,
+  unitSystem,
   programs,
   activeProgramId,
   activeProgramsList,
@@ -252,6 +253,8 @@ const ImmersiveWorkout = ({
 
   if (!ex) return null;
 
+  const isImp = unitSystem === 'imperial';
+
   const isAllDone = logs.every(s => s.done);
   const theme = t?.bgApp?.includes('040f1a') ? 'dark' : 'light';
 
@@ -439,11 +442,11 @@ const ImmersiveWorkout = ({
         <div className="flex items-center justify-center gap-4 px-2">
           {ex.type !== 'time' && (
             <div className="flex-1 flex flex-col items-center">
-              <span className="body-md mb-2 uppercase">Beban (kg)</span>
+              <span className="body-md mb-2 uppercase">Beban ({isImp ? 'lbs' : 'kg'})</span>
               <ScrollPicker 
-                value={activeSet?.w || 0} 
-                onChange={(val) => onSetChange(ex.id, activeSetIdx, 'w', val)}
-                min={0} max={200} step={2.5} width="w-full max-w-[120px]" theme={theme}
+                value={isImp ? Math.round(Number(activeSet?.w || 0) * 2.20462 * 10)/10 : (activeSet?.w || 0)} 
+                onChange={(val) => onSetChange(ex.id, activeSetIdx, 'w', isImp ? Number((val / 2.20462).toFixed(2)) : val)}
+                min={0} max={isImp ? 440 : 200} step={isImp ? 5 : 2.5} width="w-full max-w-[120px]" theme={theme}
               />
             </div>
           )}

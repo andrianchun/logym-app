@@ -8,8 +8,10 @@ const ExerciseDetailModal = ({
   t, 
   lang, 
   historyData, 
-  onReplace 
+  onReplace,
+  unitSystem
 }) => {
+  const isImp = unitSystem === 'imperial';
   const [activeTab, setActiveTab] = useState('info'); // info, history, calc
   const [calcWeight, setCalcWeight] = useState(50);
   const [calcReps, setCalcReps] = useState(10);
@@ -319,7 +321,7 @@ const ExerciseDetailModal = ({
                              <p className={`body-lg font-bold ${t.textMain}`}>{log.programName}</p>
                            </div>
                            <div className="text-right">
-                             <p className={`h2 ${t.textAccent}`}>{log.maxWeight} <span className="body-md">kg</span></p>
+                             <p className={`h2 ${t.textAccent}`}>{isImp ? Number((log.maxWeight * 2.20462).toFixed(1)) : log.maxWeight} <span className="body-md">{isImp ? 'lbs' : 'kg'}</span></p>
                              <p className={`body-md ${t.textMuted}`}>{log.totalSets} set</p>
                            </div>
                          </div>
@@ -335,7 +337,7 @@ const ExerciseDetailModal = ({
                      
                      <div className="grid grid-cols-2 gap-4">
                        <div>
-                         <label className={`body-md ${t.textMuted} mb-1 block`}>Beban (kg)</label>
+                         <label className={`body-md ${t.textMuted} mb-1 block`}>Beban ({isImp ? 'lbs' : 'kg'})</label>
                          <input 
                            type="number" min="0" 
                            value={calcWeight} onChange={e => setCalcWeight(Number(e.target.value))}
@@ -354,7 +356,7 @@ const ExerciseDetailModal = ({
   
                      <div className={`p-6 rounded-2xl bg-gradient-to-br ${t.gradientBg} shadow-lg shadow-amber-500/20`}>
                        <p className="text-white/80 body-md uppercase tracking-wider mb-1">Estimasi 1RM Kamu</p>
-                       <p className="text-white h1">{oneRM} <span className="h2">kg</span></p>
+                       <p className="text-white h1">{oneRM} <span className="h2">{isImp ? 'lbs' : 'kg'}</span></p>
                      </div>
                   </div>
                 </div>

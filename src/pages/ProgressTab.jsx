@@ -3,7 +3,7 @@ import { TrendingUp } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
 import { getLocalYMD, formatTarget, normalizeMuscleKey } from '../data/constants';
 
-const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibrary, soundEnabled, playSoundEffect, selectedDate }) => {
+const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibrary, soundEnabled, playSoundEffect, selectedDate, unitSystem }) => {
   const [chartType, setChartType] = useState('exercise');
   const [activeChartLines, setActiveChartLines] = useState([]);
 
@@ -20,6 +20,16 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
     const exLookup = {};
     programs.forEach(p => p.exercises.forEach(ex => exLookup[ex.id] = ex));
     exerciseLibrary.forEach(ex => exLookup[ex.id] = ex); 
+    
+    Object.values(history).forEach(d => {
+      d?.workouts?.forEach(w => {
+         if (w.exercises) w.exercises.forEach(ex => exLookup[ex.id] = ex);
+         if (w.overriddenExercises) w.overriddenExercises.forEach(ex => exLookup[ex.id] = ex);
+      });
+      if (d?._activeSession?.extraExercises) {
+         d._activeSession.extraExercises.forEach(ex => exLookup[ex.id] = ex);
+      }
+    });
 
     const now = new Date();
     // Allow all data instead of limiting to 90 days
@@ -69,12 +79,13 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
               const exName = ex.name;
               const exType = ex.type || 'weight';
               const exTargets = Array.isArray(ex.target) ? ex.target : [ex.target || 'Lainnya'];
+              const isImp = unitSystem === 'imperial';
               
               Object.values(sets).forEach(s => {
                   if (s && s.done && !s.skipped) {
                       if (isMusc) {
                           let volume = 0;
-                          if (exType === 'weight') volume = (Number(s.w) * Number(s.r));
+                          if (exType === 'weight') volume = (Number(s.w) * Number(s.r)) * (isImp ? 2.20462 : 1);
                           else if (exType === 'reps') volume = Number(s.r);
                           else if (exType === 'time') volume = Number(s.d);
 
@@ -87,7 +98,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                           }
                       } else {
                           let val = 0;
-                          if (exType === 'weight') val = Number(s.w);
+                          if (exType === 'weight') val = Number(s.w) * (isImp ? 2.20462 : 1);
                           else if (exType === 'reps') val = Number(s.r);
                           else if (exType === 'time') val = Number(s.d);
 
@@ -103,6 +114,15 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
     });
 
     const finalDataPoints = Object.values(aggregatedByDate).sort((a,b) => a.rawDate.localeCompare(b.rawDate));
+    
+    // Round to 1 decimal place to prevent floating point issues and long labels
+    finalDataPoints.forEach(pt => {
+        Object.keys(pt).forEach(k => {
+            if (k !== 'date' && k !== 'rawDate' && typeof pt[k] === 'number') {
+                pt[k] = Number(pt[k].toFixed(1));
+            }
+        });
+    });
     
     let recentItems = new Set();
     const todayStr = selectedDate || getLocalYMD(new Date());
@@ -158,7 +178,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
     }
 
     return { data: finalDataPoints, items: Array.from(itemsSet), recentItems: Array.from(recentItems) };
-  }, [chartType, language, history, programs, exerciseLibrary, selectedDate]);
+  }, [chartType, language, history, programs, exerciseLibrary, selectedDate, unitSystem]);
 
   const scrollRef = useRef(null);
 
@@ -334,6 +354,8 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
     setActiveChartLines(prev => prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]); 
   };
 
+  const isImp = unitSystem === 'imperial';
+
   return (
     <div className="px-5 pt-5 pb-1 animate-in fade-in duration-300">
         <div className="flex justify-between items-center mb-5">
@@ -370,7 +392,35 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                <div style={{ width: `${chartWidth}px`, height: '288px' }}>
                 <LineChart width={chartWidth} height={288} data={chartDataObj.data} style={{ outline: 'none' }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#27272a' : '#e2e8f0'} vertical={false} />
-                  <Tooltip cursor={{ stroke: theme === 'dark' ? '#52525b' : '#d4d4d8', strokeWidth: 1, strokeDasharray: '3 3' }} contentStyle={{ backgroundColor: theme === 'dark' ? '#18181b' : '#ffffff', borderRadius: '12px', border: '1px solid ' + t.border, padding: '8px 12px', fontSize: '11px', fontWeight: 'bold', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', maxWidth: '200px', whiteSpace: 'normal', wordWrap: 'break-word' }} wrapperStyle={{ zIndex: 100 }} itemStyle={{ padding: 0, margin: 0, marginTop: '4px', whiteSpace: 'normal' }} labelStyle={{ color: theme === 'dark' ? '#a1a1aa' : '#71717a', marginBottom: '4px', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }} />
+                  <Tooltip 
+                     formatter={(value, name, props) => {
+                         let unit = '';
+                         if (chartType === 'muscle') {
+                             unit = isImp ? ' lbs' : ' kg';
+                         } else {
+                             let foundEx = exerciseLibrary?.find(e => e.name === props.dataKey);
+                             if (!foundEx && programs) {
+                                 for (let p of programs) {
+                                     const ex = p.exercises?.find(e => e.name === props.dataKey);
+                                     if (ex) { foundEx = ex; break; }
+                                 }
+                             }
+                             if (foundEx) {
+                                 if (foundEx.type === 'time') unit = ' s';
+                                 else if (foundEx.type === 'reps') unit = ' reps';
+                                 else unit = isImp ? ' lbs' : ' kg';
+                             } else {
+                                 unit = isImp ? ' lbs' : ' kg';
+                             }
+                         }
+                         return [`${value}${unit}`, name];
+                     }}
+                     cursor={{ stroke: theme === 'dark' ? '#52525b' : '#d4d4d8', strokeWidth: 1, strokeDasharray: '3 3' }} 
+                     contentStyle={{ backgroundColor: theme === 'dark' ? '#18181b' : '#ffffff', borderRadius: '12px', border: '1px solid ' + t.border, padding: '8px 12px', fontSize: '11px', fontWeight: 'bold', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', maxWidth: '200px', whiteSpace: 'normal', wordWrap: 'break-word' }} 
+                     wrapperStyle={{ zIndex: 100 }} 
+                     itemStyle={{ padding: 0, margin: 0, marginTop: '4px', whiteSpace: 'normal' }} 
+                     labelStyle={{ color: theme === 'dark' ? '#a1a1aa' : '#71717a', marginBottom: '4px', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }} 
+                  />
                   <XAxis dataKey="date" stroke={theme === 'dark' ? '#a1a1aa' : '#64748b'} fontSize={10} tickLine={false} axisLine={false} padding={{ left: 20, right: 20 }} />
                   <YAxis hide={true} domain={yDomain} allowDataOverflow={true} />
                   {chartDataObj.items.map((item, idx) => ( activeChartLines.includes(item) && <Line key={item} type="monotone" name={chartType === 'muscle' ? formatTarget(item, lang?.id) : item} dataKey={item} stroke={chartColors[idx % chartColors.length]} strokeWidth={2} dot={{ r: 2, strokeWidth: 0, fill: chartColors[idx % chartColors.length] }} activeDot={{ r: 4, strokeWidth: 0, fill: chartColors[idx % chartColors.length] }} connectNulls={true} isAnimationActive={false} /> ))}

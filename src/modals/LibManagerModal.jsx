@@ -3,7 +3,7 @@ import { X, Search, Edit2, Plus, Filter, Link as LinkIcon, Dumbbell } from 'luci
 import { formatTarget, normalizeMuscleKey, muscleOptions, equipmentOptions } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
 
-const LibManagerModal = ({ showLibManager, setShowLibManager, t, exerciseLibrary, setExerciseLibrary, soundEnabled }) => {
+const LibManagerModal = ({ showLibManager, setShowLibManager, t, exerciseLibrary, setExerciseLibrary, soundEnabled, setConfirmModal }) => {
   const [viewMode, setViewMode] = useState('list');
   const [editForm, setEditForm] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,10 +26,15 @@ const LibManagerModal = ({ showLibManager, setShowLibManager, t, exerciseLibrary
   });
 
   const handleDelete = (id) => {
-    playSoundEffect('click', soundEnabled);
-    if (window.confirm('Yakin hapus dari database master? (Riwayat lama yang memakai ID ini namanya akan menjadi "Unknown")')) {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Hapus Master Latihan?',
+      message: 'Yakin hapus dari database master? (Riwayat lama yang memakai ID ini namanya akan menjadi "Unknown")',
+      onConfirm: () => {
+        playSoundEffect('click', soundEnabled);
         setExerciseLibrary(exerciseLibrary.filter(ex => ex.id !== id));
-    }
+      }
+    });
   };
 
   const openForm = (ex = null) => {

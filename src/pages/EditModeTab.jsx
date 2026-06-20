@@ -2,7 +2,7 @@ import React from 'react';
 import { X, CheckCircle, GripVertical } from 'lucide-react';
 import { playSoundEffect } from '../utils/audio';
 
-const EditModeTab = ({ t, lang, programs, setPrograms, setIsEditingMode, setActiveAddModalTarget, soundEnabled }) => {
+const EditModeTab = ({ t, lang, programs, setPrograms, setIsEditingMode, setActiveAddModalTarget, soundEnabled, setConfirmModal }) => {
 
   const handleUpdateEx = (progId, exId, field, val) => {
     // Membiarkan string kosong ('') saat sedang diketik
@@ -14,13 +14,18 @@ const EditModeTab = ({ t, lang, programs, setPrograms, setIsEditingMode, setActi
   };
 
   const handleRemoveEx = (progId, exId) => {
-    playSoundEffect('click', soundEnabled);
-    if(window.confirm('Yakin ingin menghapus latihan ini dari program master?')) {
-      setPrograms(programs.map(p => p.id === progId ? { 
-        ...p, 
-        exercises: p.exercises.filter(ex => ex.id !== exId) 
-      } : p));
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Hapus Latihan?',
+      message: 'Yakin ingin menghapus latihan ini dari program master?',
+      onConfirm: () => {
+        playSoundEffect('click', soundEnabled);
+        setPrograms(programs.map(p => p.id === progId ? { 
+          ...p, 
+          exercises: p.exercises.filter(ex => ex.id !== exId) 
+        } : p));
+      }
+    });
   };
 
   const handleRenameProg = (progId, newName) => {

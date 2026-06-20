@@ -30,7 +30,7 @@ const MiniBox = ({ label, value, unit, t, theme }) => (
     </div>
 );
 
-const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, exerciseLibrary, navigateToWorkoutDate, soundEnabled, playSoundEffect, theme, selectedDate }) => {
+const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, exerciseLibrary, navigateToWorkoutDate, soundEnabled, playSoundEffect, theme, selectedDate, biometricStandard, unitSystem, setConfirmModal }) => {
   const todayStr = getLocalYMD(new Date());
   const activeDate = selectedDate || todayStr;
 
@@ -173,10 +173,18 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      if (newData.height > 0 && newData.weight > 0) {
          const hMeter = newData.height / 100;
          newData.bmi = Number((newData.weight / (hMeter * hMeter)).toFixed(1));
-         if (newData.bmi < 18.5) newData.bmiStatus = 'Underweight';
-         else if (newData.bmi <= 22.9) newData.bmiStatus = 'Normal';
-         else if (newData.bmi <= 24.9) newData.bmiStatus = 'Overweight';
-         else newData.bmiStatus = 'Obese';
+         
+         if (biometricStandard === 'western') {
+             if (newData.bmi < 18.5) newData.bmiStatus = 'Underweight';
+             else if (newData.bmi <= 24.9) newData.bmiStatus = 'Normal';
+             else if (newData.bmi <= 29.9) newData.bmiStatus = 'Overweight';
+             else newData.bmiStatus = 'Obese';
+         } else {
+             if (newData.bmi < 18.5) newData.bmiStatus = 'Underweight';
+             else if (newData.bmi <= 22.9) newData.bmiStatus = 'Normal';
+             else if (newData.bmi <= 24.9) newData.bmiStatus = 'Overweight';
+             else newData.bmiStatus = 'Obese';
+         }
      }
      if (newData.bodyFat > 0) {
          if (newData.bodyFat < 10) newData.bodyFatStatus = 'Rendah';
@@ -211,36 +219,33 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
 
   const handleDeleteBioData = () => {
      playSoundEffect('click', soundEnabled);
-     const tabName = manualTab === 'komposisi' ? 'Komposisi Tubuh' : 'Aktivitas Harian';
-     if(window.confirm(`Yakin ingin menghapus data ${tabName} di tanggal ${modalDate}?`)) {
-         setHistory(prev => {
-             const newHistory = { ...prev };
-             if (newHistory[modalDate] && newHistory[modalDate].bioData) {
-                 const currentBio = newHistory[modalDate].bioData;
-                 const newBio = { ...currentBio };
-                 
-                 if (manualTab === 'komposisi') {
-                     ['weight', 'height', 'waist', 'bmi', 'bmiStatus', 'bodyFat', 'bodyFatStatus', 'bmr', 'muscleMass', 'musclePercent', 'visceralFat', 'waterPercent', 'proteinPercent', 'bodyAge', 'bodyScore'].forEach(k => newBio[k] = null);
-                 } else {
-                     ['steps', 'energyScore', 'activeMinutes', 'activityCalories', 'sleep', 'sleepLog', 'heartRate', 'minHeartRate', 'maxHeartRate', 'bloodPressure', 'waterIntake', 'weeklyDuration', 'weeklySessions', 'weeklyCalories'].forEach(k => newBio[k] = null);
-                 }
-                 
-                 const isCompletelyEmpty = Object.values(newBio).every(v => v === null || v === undefined || v === '');
-                 
-                 if (isCompletelyEmpty) {
-                     if (!newHistory[modalDate].programId && !newHistory[modalDate].status && (!newHistory[modalDate].workouts || newHistory[modalDate].workouts.length === 0)) {
-                         newHistory[modalDate] = { _delete: true };
-                     } else {
-                         newHistory[modalDate] = { ...newHistory[modalDate], bioData: null };
-                     }
-                 } else {
-                     newHistory[modalDate] = { ...newHistory[modalDate], bioData: newBio };
-                 }
+     setHistory(prev => {
+         const newHistory = { ...prev };
+         if (newHistory[modalDate] && newHistory[modalDate].bioData) {
+             const currentBio = newHistory[modalDate].bioData;
+             const newBio = { ...currentBio };
+             
+             if (manualTab === 'komposisi') {
+                 ['weight', 'height', 'waist', 'bmi', 'bmiStatus', 'bodyFat', 'bodyFatStatus', 'bmr', 'muscleMass', 'musclePercent', 'visceralFat', 'waterPercent', 'proteinPercent', 'bodyAge', 'bodyScore'].forEach(k => newBio[k] = null);
+             } else {
+                 ['steps', 'energyScore', 'activeMinutes', 'activityCalories', 'sleep', 'sleepLog', 'heartRate', 'minHeartRate', 'maxHeartRate', 'bloodPressure', 'waterIntake', 'weeklyDuration', 'weeklySessions', 'weeklyCalories'].forEach(k => newBio[k] = null);
              }
-             return newHistory;
-         });
-         setShowManualModal(false);
-     }
+             
+             const isCompletelyEmpty = Object.values(newBio).every(v => v === null || v === undefined || v === '');
+             
+             if (isCompletelyEmpty) {
+                 if (!newHistory[modalDate].programId && !newHistory[modalDate].status && (!newHistory[modalDate].workouts || newHistory[modalDate].workouts.length === 0)) {
+                     newHistory[modalDate] = { _delete: true };
+                 } else {
+                     newHistory[modalDate] = { ...newHistory[modalDate], bioData: null };
+                 }
+             } else {
+                 newHistory[modalDate] = { ...newHistory[modalDate], bioData: newBio };
+             }
+         }
+         return newHistory;
+     });
+     setShowManualModal(false);
   };
 
   const handleChartPointClick = (clickedDateStr) => {
@@ -254,6 +259,9 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
 
   const isAnyAppConnected = connectedApps.healthconnect || connectedApps.lyfeat;
   const scoreStyle = getScoreColor(bioData.bodyScore);
+  const isImp = unitSystem === 'imperial';
+  const dispMainMuscle = isImp && bioData.muscleMass ? Number((bioData.muscleMass * 2.20462).toFixed(1)) : bioData.muscleMass || '-';
+  const dispMainWaist = isImp && bioData.waist ? Number((bioData.waist * 0.393701).toFixed(1)) : bioData.waist || '-';
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300 pb-6">
@@ -306,7 +314,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                </div>
                <div className="flex-1 space-y-3">
                    <div className="flex justify-between items-center border-b border-dashed border-slate-500/20 pb-2">
-                       <span className={`caption ${t.textMuted}`}>BMI (Asia)</span>
+                       <span className={`caption ${t.textMuted}`}>BMI ({biometricStandard === 'western' ? 'Western' : 'Asia'})</span>
                        <div className="text-right flex items-center space-x-1.5">
                           <span className={`h2 ${t.textMain}`}>{bioData.bmi || '-'}</span>
                           <span className={`h3 ${bioData.bmiStatus === 'Normal' ? 'text-emerald-500' : bioData.bmiStatus === 'Overweight' ? 'text-amber-500' : bioData.bmiStatus === 'Obese' ? 'text-rose-500' : 'text-blue-500'}`}>{bioData.bmiStatus}</span>
@@ -324,12 +332,12 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   
            <div className="grid grid-cols-4 gap-2 relative z-10 pt-4 border-t border-dashed border-slate-500/20">
                <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{bioData.bmr || '-'}</span><span className={`h3 ${t.textMuted} mt-0.5`}>BMR</span></div>
-               <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{bioData.muscleMass || '-'} <span className="caption font-normal text-zinc-500">kg</span></span><span className={`h3 ${t.textMuted} mt-0.5`}>Massa Otot</span></div>
+               <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{dispMainMuscle} <span className="caption font-normal text-zinc-500">{isImp ? 'lbs' : 'kg'}</span></span><span className={`h3 ${t.textMuted} mt-0.5`}>Massa Otot</span></div>
                <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{bioData.musclePercent || '-'} <span className="caption font-normal text-zinc-500">%</span></span><span className={`h3 ${t.textMuted} mt-0.5`}>Kadar Otot</span></div>
                <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{bioData.visceralFat || '-'}</span><span className={`h3 ${t.textMuted} mt-0.5`}>Visceral</span></div>
                <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{bioData.waterPercent || '-'} <span className="caption font-normal text-zinc-500">%</span></span><span className={`h3 ${t.textMuted} mt-0.5`}>Kadar Air</span></div>
                <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{bioData.proteinPercent || '-'} <span className="caption font-normal text-zinc-500">%</span></span><span className={`h3 ${t.textMuted} mt-0.5`}>Protein</span></div>
-               <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{bioData.waist || '-'} <span className="caption font-normal text-zinc-500">cm</span></span><span className={`h3 ${t.textMuted} mt-0.5`}>L. Perut</span></div>
+               <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{dispMainWaist} <span className="caption font-normal text-zinc-500">{isImp ? 'in' : 'cm'}</span></span><span className={`h3 ${t.textMuted} mt-0.5`}>L. Perut</span></div>
                <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{bioData.bodyAge || '-'} <span className="caption font-normal text-zinc-500">th</span></span><span className={`h3 ${t.textMuted} mt-0.5`}>Usia Tubuh</span></div>
            </div>
            
@@ -348,6 +356,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                  soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
                  onPointClick={handleChartPointClick}
                  isSubCard={true}
+                 unitSystem={unitSystem}
               />
               </div>
           )}
@@ -413,6 +422,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
           soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
           selectedDate={selectedDate}
           isSubCard={false}
+          unitSystem={unitSystem}
         />
         <button 
              onClick={() => { playSoundEffect('click', soundEnabled); setIsProgressExpanded(!isProgressExpanded); }}
@@ -441,6 +451,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
         showManualModal={showManualModal} setShowManualModal={setShowManualModal} manualTab={manualTab} setManualTab={setManualTab}
         modalDate={modalDate} setModalDate={setModalDate} formBio={formBio} setFormBio={setFormBio} bioData={bioData}
         handleSaveManualData={handleSaveManualData} handleDeleteBioData={handleDeleteBioData} soundEnabled={soundEnabled}
+        unitSystem={unitSystem} setConfirmModal={setConfirmModal}
       />
 
       {/* DETAIL BIOMETRIK MODAL */}
@@ -465,13 +476,16 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                <div className="flex-1 overflow-y-auto px-4 pb-10 hide-scrollbar space-y-3">
                    {(() => {
                        const displayBioData = history[modalDate]?.bioData || emptyBio;
+                       const dispWeight = isImp && displayBioData.weight ? Number((displayBioData.weight * 2.20462).toFixed(1)) : displayBioData.weight || '0';
+                       const dispMuscle = isImp && displayBioData.muscleMass ? Number((displayBioData.muscleMass * 2.20462).toFixed(1)) : displayBioData.muscleMass || 0;
+                       const dispWaist = isImp && displayBioData.waist ? Number((displayBioData.waist * 0.393701).toFixed(1)) : displayBioData.waist || 0;
                        return (
                            <>
                                {/* Hero Weight */}
                                <div className="flex flex-col items-center justify-center py-6 relative">
                                    <div className="flex items-baseline relative z-10">
-                                       <span className={`text-6xl font-black tracking-tighter ${t.textMain}`}>{displayBioData.weight || '0'}</span>
-                                       <span className={`body-lg ml-1 ${t.textMuted}`}>kg</span>
+                                       <span className={`text-6xl font-black tracking-tighter ${t.textMain}`}>{dispWeight}</span>
+                                       <span className={`body-lg ml-1 ${t.textMuted}`}>{isImp ? 'lbs' : 'kg'}</span>
                                    </div>
                                    <div className="flex items-center justify-center space-x-2 mt-2">
                                        <div className="h-px w-6 bg-zinc-500/30"></div>
@@ -482,14 +496,14 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                                {/* List of metrics with Segmented Bars */}
                                <div className="flex flex-col space-y-3">
                                    {[
-                                       { label: 'BMI', val: displayBioData.bmi, unit: '', t: [18.5, 25.0, 30.0], c: ['bg-sky-500', 'bg-emerald-500', 'bg-amber-500', 'bg-orange-500'], labels: ['Under', 'Standard', 'Overweight', 'High'], status: displayBioData.bmiStatus, sColor: displayBioData.bmiStatus === 'Normal' ? 'text-emerald-500' : 'text-amber-500' },
+                                       { label: 'BMI', val: displayBioData.bmi, unit: '', t: biometricStandard === 'western' ? [18.5, 25.0, 30.0] : [18.5, 23.0, 25.0], c: ['bg-sky-500', 'bg-emerald-500', 'bg-amber-500', 'bg-orange-500'], labels: ['Under', 'Standard', 'Overweight', 'High'], status: displayBioData.bmiStatus, sColor: displayBioData.bmiStatus === 'Normal' ? 'text-emerald-500' : 'text-amber-500' },
                                        { label: 'Body fat percentage', val: displayBioData.bodyFat, unit: '%', t: [10, 20, 25], c: ['bg-sky-500', 'bg-emerald-500', 'bg-amber-500', 'bg-orange-500'], labels: ['Low', 'Standard', 'Overfat', 'Obese'], status: displayBioData.bodyFatStatus, sColor: displayBioData.bodyFatStatus === 'Normal' ? 'text-emerald-500' : 'text-amber-500' },
-                                       { label: 'Muscle mass', val: displayBioData.muscleMass, unit: 'kg', t: [30], c: ['bg-sky-500', 'bg-emerald-500'], labels: ['Under', 'Standard'], status: displayBioData.musclePercent >= 33 ? 'Standard' : 'Under', sColor: displayBioData.musclePercent >= 33 ? 'text-emerald-500' : 'text-amber-500' },
+                                       { label: 'Muscle mass', val: dispMuscle, unit: isImp ? 'lbs' : 'kg', t: isImp ? [66] : [30], c: ['bg-sky-500', 'bg-emerald-500'], labels: ['Under', 'Standard'], status: displayBioData.musclePercent >= 33 ? 'Standard' : 'Under', sColor: displayBioData.musclePercent >= 33 ? 'text-emerald-500' : 'text-amber-500' },
                                        { label: 'Muscle percentage', val: displayBioData.musclePercent, unit: '%', t: [30], c: ['bg-sky-500', 'bg-emerald-500'], labels: ['Under', 'Standard'], status: displayBioData.musclePercent >= 33 ? 'Standard' : 'Under', sColor: displayBioData.musclePercent >= 33 ? 'text-emerald-500' : 'text-amber-500' },
                                        { label: 'Protein percentage', val: displayBioData.proteinPercent, unit: '%', t: [16], c: ['bg-sky-500', 'bg-emerald-500'], labels: ['Under', 'Standard'], status: displayBioData.proteinPercent >= 16 ? 'Standard' : 'Under', sColor: displayBioData.proteinPercent >= 16 ? 'text-emerald-500' : 'text-amber-500' },
                                        { label: 'Water percentage', val: displayBioData.waterPercent, unit: '%', t: [45, 65], c: ['bg-sky-500', 'bg-emerald-500', 'bg-amber-500'], labels: ['Low', 'Standard', 'High'], status: (displayBioData.waterPercent >= 45 && displayBioData.waterPercent <= 65) ? 'Standard' : 'Low', sColor: (displayBioData.waterPercent >= 45 && displayBioData.waterPercent <= 65) ? 'text-emerald-500' : 'text-amber-500' },
                                        { label: 'Visceral fat rating', val: displayBioData.visceralFat, unit: '', t: [10, 15], c: ['bg-emerald-500', 'bg-amber-500', 'bg-orange-500'], labels: ['Standard', 'High', 'Very high'], status: displayBioData.visceralFat < 10 ? 'Standard' : 'Very high', sColor: displayBioData.visceralFat < 10 ? 'text-emerald-500' : 'text-orange-500' },
-                                       { label: 'Waist circumference', val: displayBioData.waist, unit: 'cm', t: [90], c: ['bg-emerald-500', 'bg-orange-500'], labels: ['Standard', 'Over'], status: displayBioData.waist < 90 ? 'Standard' : 'Over', sColor: displayBioData.waist < 90 ? 'text-emerald-500' : 'text-orange-500' }
+                                       { label: 'Waist circumference', val: dispWaist, unit: isImp ? 'in' : 'cm', t: isImp ? [35.4] : [90], c: ['bg-emerald-500', 'bg-orange-500'], labels: ['Standard', 'Over'], status: displayBioData.waist < 90 ? 'Standard' : 'Over', sColor: displayBioData.waist < 90 ? 'text-emerald-500' : 'text-orange-500' }
                        ].map((item, idx) => {
                            const v = Number(item.val) || 0;
                            let pointerPos = 0;

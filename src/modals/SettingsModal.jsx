@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Moon, Sun, Globe, Volume2, VolumeX, Timer, Download, Upload, CalendarDays, Bell, BellOff, Clock } from 'lucide-react';
+import { X, Moon, Sun, Globe, Volume2, VolumeX, Timer, Download, Upload, CalendarDays, Bell, BellOff, Clock, Activity, Scale } from 'lucide-react';
 import SwipeInput from '../components/SwipeInput';
 
 export default function SettingsModal({
@@ -13,7 +13,9 @@ export default function SettingsModal({
   undoStack, redoStack, handleUndo, handleRedo,
   setShowLibManager, setShowHelp,
   exportData, handleImportFile,
-  user, handleLogout
+  user, handleLogout,
+  biometricStandard, setBiometricStandard,
+  unitSystem, setUnitSystem
 }) {
   if (!showSettings) return null;
 
@@ -140,6 +142,33 @@ export default function SettingsModal({
                 </div>
               )}
             </div>
+
+            {/* Standar Biometrik */}
+            <div className="flex justify-between items-center py-2">
+              <div className={`flex items-center space-x-3 ${t.textMain} shrink-0`}>
+                <Activity size={20} className={t.textAccent}/> 
+                <span className="font-bold">Standar BMI</span>
+              </div>
+              <div className={`relative flex w-32 p-1 rounded-full ${t.btnBg} shrink-0`}>
+                 <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full transition-transform duration-300 ease-out ${t.bgAccent} shadow-sm`} style={{ transform: biometricStandard === 'western' ? 'translateX(100%)' : 'translateX(0)', left: '4px' }}></div>
+                 <button onClick={() => setBiometricStandard('asia')} className={`flex flex-1 justify-center items-center py-1.5 rounded-full relative z-10 transition-colors duration-300 ${biometricStandard === 'asia' ? 'text-white' : t.textMuted} text-xs font-bold`}>Asia</button>
+                 <button onClick={() => setBiometricStandard('western')} className={`flex flex-1 justify-center items-center py-1.5 rounded-full relative z-10 transition-colors duration-300 ${biometricStandard === 'western' ? 'text-white' : t.textMuted} text-xs font-bold`}>Western</button>
+              </div>
+            </div>
+
+            {/* Sistem Satuan */}
+            <div className="flex justify-between items-center py-2">
+              <div className={`flex items-center space-x-3 ${t.textMain} shrink-0`}>
+                <Scale size={20} className={t.textAccent}/> 
+                <span className="font-bold">Sistem Satuan</span>
+              </div>
+              <div className={`relative flex w-32 p-1 rounded-full ${t.btnBg} shrink-0`}>
+                 <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full transition-transform duration-300 ease-out ${t.bgAccent} shadow-sm`} style={{ transform: unitSystem === 'imperial' ? 'translateX(100%)' : 'translateX(0)', left: '4px' }}></div>
+                 <button onClick={() => setUnitSystem('metric')} className={`flex flex-1 justify-center items-center py-1.5 rounded-full relative z-10 transition-colors duration-300 ${unitSystem === 'metric' ? 'text-white' : t.textMuted} text-xs font-bold`}>Kg/Cm</button>
+                 <button onClick={() => setUnitSystem('imperial')} className={`flex flex-1 justify-center items-center py-1.5 rounded-full relative z-10 transition-colors duration-300 ${unitSystem === 'imperial' ? 'text-white' : t.textMuted} text-xs font-bold`}>Lbs/Ft</button>
+              </div>
+            </div>
+
           </div>
 
           <hr className={t.border} />

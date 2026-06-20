@@ -2,7 +2,8 @@ import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { getLocalYMD } from '../data/constants';
 
-const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPointClick }) => {
+const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPointClick, unitSystem }) => {
+  const isImp = unitSystem === 'imperial';
   const chartMetricsList = [
       { key: 'weight', label: 'Berat Badan', color: '#41759b' },
       { key: 'bodyFat', label: 'Body Fat %', color: '#B79347' },
@@ -48,12 +49,12 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
           data.push({
               name: d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }),
               dateFull: entry.dateStr,
-              weight: histBio?.weight ? Number(histBio.weight) : null,
+              weight: histBio?.weight ? Number((isImp ? Number(histBio.weight) * 2.20462 : Number(histBio.weight)).toFixed(1)) : null,
               bodyFat: histBio?.bodyFat ? Number(histBio.bodyFat) : null,
               musclePercent: histBio?.musclePercent ? Number(histBio.musclePercent) : null,
               visceralFat: histBio?.visceralFat ? Number(histBio.visceralFat) : null,
               bmr: histBio?.bmr ? Number(histBio.bmr) : null,
-              waist: histBio?.waist ? Number(histBio.waist) : null,
+              waist: histBio?.waist ? Number((isImp ? Number(histBio.waist) * 0.393701 : Number(histBio.waist)).toFixed(1)) : null,
               bpSys: bpSys,
               heartRate: histBio?.heartRate ? Number(histBio.heartRate) : null,
               steps: histBio?.steps ? Math.round(Number(histBio.steps) / 100) : null,
@@ -264,7 +265,22 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
                     }}
                  >
                     <CartesianGrid strokeDasharray="3 3" stroke={t.border} vertical={false} opacity={0.5} />
-                    <Tooltip cursor={{ stroke: theme === 'dark' ? '#52525b' : '#d4d4d8', strokeWidth: 1, strokeDasharray: '3 3' }} contentStyle={{ backgroundColor: theme === 'dark' ? '#18181b' : '#ffffff', borderRadius: '12px', border: '1px solid ' + t.border, padding: '8px 12px', fontSize: '11px', fontWeight: 'bold', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} itemStyle={{ padding: 0, margin: 0, marginTop: '4px' }} labelStyle={{ color: theme === 'dark' ? '#a1a1aa' : '#71717a', marginBottom: '4px', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }} />
+                    <Tooltip 
+                       formatter={(value, name, props) => {
+                           let unit = '';
+                           if (props.dataKey === 'weight') unit = isImp ? ' lbs' : ' kg';
+                           else if (props.dataKey === 'waist') unit = isImp ? ' in' : ' cm';
+                           else if (['bodyFat', 'musclePercent', 'waterPercent', 'proteinPercent'].includes(props.dataKey)) unit = '%';
+                           else if (props.dataKey === 'bmr') unit = ' kcal';
+                           else if (props.dataKey === 'activeMinutes' || props.dataKey === 'weeklyDuration') unit = ' m';
+                           else if (props.dataKey === 'heartRate') unit = ' bpm';
+                           return [`${value}${unit}`, name];
+                       }}
+                       cursor={{ stroke: theme === 'dark' ? '#52525b' : '#d4d4d8', strokeWidth: 1, strokeDasharray: '3 3' }} 
+                       contentStyle={{ backgroundColor: theme === 'dark' ? '#18181b' : '#ffffff', borderRadius: '12px', border: '1px solid ' + t.border, padding: '8px 12px', fontSize: '11px', fontWeight: 'bold', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} 
+                       itemStyle={{ padding: 0, margin: 0, marginTop: '4px' }} 
+                       labelStyle={{ color: theme === 'dark' ? '#a1a1aa' : '#71717a', marginBottom: '4px', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }} 
+                    />
                     <XAxis dataKey="name" stroke={theme === 'dark' ? '#a1a1aa' : '#64748b'} fontSize={10} tickLine={false} axisLine={false} />
                     {chartMetricsList.map(metric => (
                         activeChartMetrics.includes(metric.key) && 

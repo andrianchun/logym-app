@@ -9,8 +9,10 @@ const CalendarTab = ({
   selectedDate, setSelectedDate,
   setActiveTab, soundEnabled, playSoundEffect, navigateToWorkoutDate,
   exerciseLogs, skippedExercises, handleEditPastWorkout,
-  weekStartDay = 0, defaultReminderTime = "15:00", reminderEnabled = true
+  weekStartDay = 0, defaultReminderTime = "15:00", reminderEnabled = true,
+  unitSystem, setConfirmModal
 }) => {
+  const isImp = unitSystem === 'imperial';
   const [calendarDate, setCalendarDate] = useState(new Date());
   
   const [calendarMode, setCalendarMode] = useState('monthly');
@@ -257,8 +259,9 @@ const CalendarTab = ({
        const w = d.workouts.find(wk => wk.id === workoutId);
        if (w) {
           const prog = programs.find(p => p.id === w.programId);
-          if (prog && prog.exercises) {
-             exList = "\n\nDaftar Latihan:\n" + prog.exercises.map((ex, i) => `${i+1}. ${ex.name}`).join("\n");
+          if (prog && (w.overriddenExercises || prog.exercises)) {
+             const exrs = w.overriddenExercises || prog.exercises;
+             exList = "\n\nDaftar Latihan:\n" + exrs.map((ex, i) => `${i+1}. ${ex.name}`).join("\n");
           } else if (w.programId === 'adhoc' && w.exercises) {
              exList = "\n\nDaftar Latihan:\n" + w.exercises.map((ex, i) => `${i+1}. ${ex.name}`).join("\n");
           }
@@ -420,45 +423,51 @@ const CalendarTab = ({
   };
 
   const removeWorkout = (workoutId) => {
-    if(!window.confirm('Yakin ingin menghapus jadwal ini?')) return;
-    playSoundEffect('click', soundEnabled);
-    
-    const dCheck = history[selectedDate];
-    if (dCheck && dCheck.workouts) {
-      const workoutToRemove = dCheck.workouts.find(w => w.id === workoutId);
-      if (workoutToRemove && workoutToRemove.reminderNotifId) {
-        cancelWorkoutNotification(workoutToRemove.reminderNotifId);
-      }
-    }
-
-    setHistory(prev => {
-      const h = { ...prev };
-      const d = h[selectedDate];
-      if (d) {
-        if (workoutId === 'virtual_adhoc') {
-          h[selectedDate] = { ...d, _activeSession: { ...(d._activeSession || {}), extraExercises: [] } };
-        } else if (d.workouts) {
-          const workoutToRemove = d.workouts.find(w => w.id === workoutId);
-          let newActiveSession = { ...(d._activeSession || {}) };
-          
-          if (workoutToRemove) {
-             const progExercises = workoutToRemove.programId === 'adhoc' ? workoutToRemove.exercises : programs.find(p => p.id === workoutToRemove.programId)?.exercises;
-             if (progExercises) {
-               const newLogs = { ...(newActiveSession.exerciseLogs || {}) };
-               const newSkipped = { ...(newActiveSession.skippedExercises || {}) };
-               progExercises.forEach(ex => {
-                  delete newLogs[ex.id];
-                  delete newSkipped[ex.id];
-               });
-               newActiveSession.exerciseLogs = newLogs;
-               newActiveSession.skippedExercises = newSkipped;
-             }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Hapus Jadwal?',
+      message: 'Yakin ingin menghapus jadwal ini?',
+      onConfirm: () => {
+        playSoundEffect('click', soundEnabled);
+        
+        const dCheck = history[selectedDate];
+        if (dCheck && dCheck.workouts) {
+          const workoutToRemove = dCheck.workouts.find(w => w.id === workoutId);
+          if (workoutToRemove && workoutToRemove.reminderNotifId) {
+            cancelWorkoutNotification(workoutToRemove.reminderNotifId);
           }
-
-          h[selectedDate] = { ...d, workouts: d.workouts.filter(w => w.id !== workoutId), _activeSession: newActiveSession };
         }
+
+        setHistory(prev => {
+          const h = { ...prev };
+          const d = h[selectedDate];
+          if (d) {
+            if (workoutId === 'virtual_adhoc') {
+              h[selectedDate] = { ...d, _activeSession: { ...(d._activeSession || {}), extraExercises: [] } };
+            } else if (d.workouts) {
+              const workoutToRemove = d.workouts.find(w => w.id === workoutId);
+              let newActiveSession = { ...(d._activeSession || {}) };
+              
+              if (workoutToRemove) {
+                 const progExercises = workoutToRemove.programId === 'adhoc' ? workoutToRemove.exercises : programs.find(p => p.id === workoutToRemove.programId)?.exercises;
+                 if (progExercises) {
+                   const newLogs = { ...(newActiveSession.exerciseLogs || {}) };
+                   const newSkipped = { ...(newActiveSession.skippedExercises || {}) };
+                   progExercises.forEach(ex => {
+                      delete newLogs[ex.id];
+                      delete newSkipped[ex.id];
+                   });
+                   newActiveSession.exerciseLogs = newLogs;
+                   newActiveSession.skippedExercises = newSkipped;
+                 }
+              }
+
+              h[selectedDate] = { ...d, workouts: d.workouts.filter(w => w.id !== workoutId), _activeSession: newActiveSession };
+            }
+          }
+          return h;
+        });
       }
-      return h;
     });
   };
 
@@ -527,7 +536,7 @@ const CalendarTab = ({
   const getExercisesForWorkout = (w) => {
     if (w.programId === 'adhoc') return w.exercises || [];
     const prog = programs.find(p => p.id === w.programId);
-    return prog?.exercises || [];
+    return w.overriddenExercises || prog?.exercises || [];
   };
 
   const checkIsCompleted = (w, dateStr) => {
@@ -926,7 +935,7 @@ const CalendarTab = ({
                                 {isExpanded && (
                                   <div className="mt-4 animate-in slide-in-from-top-2 fade-in duration-200">
                                     <div className="space-y-1.5 mb-4">
-                                      {prog?.exercises?.map((ex, idx) => {
+                                      {(w.overriddenExercises || prog?.exercises)?.map((ex, idx) => {
                                          const exLogKey = `${ex.id}-${w.id}`;
                                          const exLogs = logsToUse?.[exLogKey] || logsToUse?.[ex.id];
                                          const doneSets = exLogs ? exLogs.filter(s => s.done && !s.skipped) : [];
@@ -950,7 +959,7 @@ const CalendarTab = ({
                                             const maxD = Math.max(...doneSets.map(s => Number(s.d) || 0)) || ex.duration || 0;
                                             if (ex.type === 'time') textStr = `${doneSets.length} x ${maxD}s`;
                                             else if (ex.type === 'reps') textStr = `${doneSets.length} x ${maxR}`;
-                                            else textStr = `${doneSets.length} x ${maxR} x ${maxW} kg`;
+                                            else textStr = `${doneSets.length} x ${maxR} x ${isImp ? Math.round(maxW * 2.20462 * 10)/10 + ' lbs' : maxW + ' kg'}`;
                                          } else textStr = "Belum dimulai";
           
                                          return (
