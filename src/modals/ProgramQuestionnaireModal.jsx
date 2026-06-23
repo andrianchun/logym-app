@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Target, Activity, Calendar, Dumbbell, ChevronRight, ChevronLeft, Sparkles, X, CheckCircle2 } from 'lucide-react';
+import { Target, Activity, Calendar, Dumbbell, Clock, ChevronRight, ChevronLeft, Sparkles, X, CheckCircle2 } from 'lucide-react';
 import { PROGRAM_PLANS } from '../data/programTemplates';
 import { playSoundEffect } from '../utils/audio';
 
@@ -9,7 +9,8 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
     goal: null,
     experience: null,
     days: [], // Now an array of selected days
-    equipment: null
+    equipment: null,
+    duration: null
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [recommendedPlan, setRecommendedPlan] = useState(null);
@@ -18,7 +19,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
   useEffect(() => {
     if (isOpen) {
       setStep(0);
-      setAnswers({ goal: null, experience: null, days: [], equipment: null });
+      setAnswers({ goal: null, experience: null, days: [], equipment: null, duration: null });
       setIsGenerating(false);
       setRecommendedPlan(null);
     }
@@ -30,7 +31,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
     playSoundEffect('click', soundEnabled);
     setAnswers(prev => ({ ...prev, [key]: value }));
     
-    if (step < 3) {
+    if (step < 4) {
       setStep(step + 1);
     } else {
       generateProgram({ ...answers, [key]: value });
@@ -44,7 +45,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
 
   const generateProgram = (finalAnswers) => {
     setIsGenerating(true);
-    setStep(4);
+    setStep(5);
     playSoundEffect('success', soundEnabled);
     
     setTimeout(() => {
@@ -64,14 +65,14 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
 
       setRecommendedPlan(bestMatch);
       setIsGenerating(false);
-      setStep(5);
+      setStep(6);
     }, 2000);
   };
 
   const handleAccept = () => {
     playSoundEffect('success', soundEnabled);
     // Attach the chosen days to the recommended plan so we know their schedule
-    onComplete({ ...recommendedPlan, assignedDays: answers.days, userExperience: answers.experience });
+    onComplete({ ...recommendedPlan, assignedDays: answers.days, userExperience: answers.experience, duration: answers.duration });
     onClose();
   };
 
@@ -113,6 +114,16 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
         { id: 'dumbbell', label: 'Dumbbell Only', desc: 'Hanya punya Dumbbell / Home Gym.' },
         { id: 'bodyweight', label: 'Bodyweight', desc: 'Tanpa alat sama sekali.' }
       ]
+    },
+    {
+      title: "Berapa lama waktu latihan Anda per sesi?",
+      key: 'duration',
+      icon: <Clock className="text-pink-500 mb-4" size={40} />,
+      options: [
+        { id: 'short', label: 'Singkat (< 45 Menit)', desc: 'Cocok untuk jadwal yang padat.' },
+        { id: 'medium', label: 'Sedang (45 - 60 Menit)', desc: 'Durasi standar yang optimal.' },
+        { id: 'long', label: 'Lama (> 60 Menit)', desc: 'Bisa melakukan banyak variasi latihan.' }
+      ]
     }
   ];
 
@@ -147,12 +158,12 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
   };
 
   return (
-    <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in`}>
+    <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in`} onClick={onClose}>
       <div className={`w-full max-w-lg mx-auto ${t.bgCard} rounded-[32px] overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300 border border-white/10`} onClick={e => e.stopPropagation()}>
         
         {/* HEADER */}
         <div className="flex justify-between items-center p-5 pb-2 shrink-0 relative z-10">
-          {step > 0 && step < 4 ? (
+          {step > 0 && step < 5 ? (
             <button onClick={handleBack} className={`p-2 rounded-full ${t.inputBg} hover:${t.bgAccentSoft} transition-colors`}>
               <ChevronLeft size={20} className={t.textMain} />
             </button>
@@ -160,7 +171,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
           
           <div className="flex-1 text-center">
             <h3 className={`font-black text-lg ${t.textMain} flex items-center justify-center gap-2`}>
-              <Sparkles size={18} className="text-amber-500" /> Lyfit Coach AI
+              Lyfit Coach
             </h3>
           </div>
 
@@ -170,15 +181,15 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
         </div>
 
         {/* PROGRESS BAR */}
-        {step < 4 && (
+        {step < 5 && (
           <div className="px-6 pt-2 pb-4">
             <div className={`h-1.5 w-full ${t.inputBg} rounded-full overflow-hidden flex`}>
               <div 
                 className={`h-full ${t.bgAccent} transition-all duration-500 ease-out`}
-                style={{ width: `${((step) / 4) * 100}%` }}
+                style={{ width: `${((step) / 5) * 100}%` }}
               />
             </div>
-            <p className={`text-center text-xs mt-2 font-bold ${t.textMuted}`}>Langkah {step + 1} dari 4</p>
+            <p className={`text-center text-xs mt-2 font-bold ${t.textMuted}`}>Langkah {step + 1} dari 5</p>
           </div>
         )}
 
@@ -186,7 +197,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
         <div className="flex-1 overflow-y-auto p-6 pt-2 hide-scrollbar">
           
           {/* QUESTION STEPS */}
-          {step < 4 && (
+          {step < 5 && (
             <div className="animate-in slide-in-from-right-4 fade-in duration-300 flex flex-col h-full">
               <div className="flex flex-col items-center text-center mb-8 shrink-0">
                 {steps[step].icon}
@@ -237,7 +248,6 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
 
                   {/* Dynamic Recommendation Block */}
                   <div className={`mt-auto p-4 rounded-2xl ${answers.days.length > 0 ? t.bgAccentSoft : t.inputBg} border ${answers.days.length > 0 ? t.borderAccentSoft : 'border-transparent'} transition-colors duration-300 text-center`}>
-                    <Sparkles size={24} className={`mx-auto mb-2 ${answers.days.length > 0 ? t.textAccent : t.textMuted} transition-colors`} />
                     <p className={`font-bold text-sm ${answers.days.length > 0 ? t.textMain : t.textMuted}`}>
                       {getDynamicRecommendation(answers.days.length)}
                     </p>
@@ -262,7 +272,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
           )}
 
           {/* GENERATING STEP */}
-          {step === 4 && (
+          {step === 5 && (
             <div className="flex flex-col items-center justify-center py-20 animate-in fade-in zoom-in duration-500">
               <div className="relative">
                 <div className={`absolute inset-0 ${t.bgAccent} blur-xl opacity-30 animate-pulse rounded-full`}></div>
@@ -278,7 +288,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
           )}
 
           {/* RESULT STEP */}
-          {step === 5 && recommendedPlan && (
+          {step === 6 && recommendedPlan && (
             <div className="animate-in slide-in-from-bottom-8 fade-in duration-500 pb-4">
               <div className="flex flex-col items-center text-center mb-6">
                 <div className={`w-16 h-16 ${t.bgAccentSoft} ${t.textAccent} rounded-full flex items-center justify-center mb-4`}>

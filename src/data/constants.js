@@ -1,9 +1,9 @@
 export const equipmentOptions = ["Assisted", "Band", "Barbell", "Body Weight", "Bosu Ball", "Cable", "Dumbbell", "Elliptical Machine", "EZ Barbell", "Hammer", "Kettlebell", "Leverage Machine", "Machine", "Medicine Ball", "Olympic Barbell", "Resistance Band", "Roller", "Rope", "Rowing Machine", "Skierg", "Sled Machine", "Smith Machine", "Stability Ball", "Stationary Bike", "Stepmill Machine", "Tire", "Trap Bar", "Treadmill", "Upper Body Ergometer", "Weighted", "Wheel Roller", "Lainnya"];
 
 export const exerciseTypeLabels = {
-  weight: 'Beban & Reps',
-  reps: 'Hanya Repetisi',
-  time: 'Hanya Durasi',
+  weight: 'Beban & Repetisi',
+  reps: 'Repetisi',
+  time: 'Durasi',
 };
 
 export const defaultMasterExercises = [
@@ -136,3 +136,6 @@ export const getVideoId = (url) => {
     return match ? match[1] : null;
   } catch (e) { return null; }
 };
+export const supersetColors = [{ border: 'border-r-emerald-500', bg: 'bg-emerald-500/10', text: 'text-emerald-500/90', hoverBg: 'hover:bg-emerald-500/20' }, { border: 'border-r-blue-500', bg: 'bg-blue-500/10', text: 'text-blue-500/90', hoverBg: 'hover:bg-blue-500/20' }, { border: 'border-r-purple-500', bg: 'bg-purple-500/10', text: 'text-purple-500/90', hoverBg: 'hover:bg-purple-500/20' }, { border: 'border-r-amber-500', bg: 'bg-amber-500/10', text: 'text-amber-500/90', hoverBg: 'hover:bg-amber-500/20' }, { border: 'border-r-rose-500', bg: 'bg-rose-500/10', text: 'text-rose-500/90', hoverBg: 'hover:bg-rose-500/20' }, { border: 'border-r-cyan-500', bg: 'bg-cyan-500/10', text: 'text-cyan-500/90', hoverBg: 'hover:bg-cyan-500/20' }];
+
+export const getSupersetColorStyle = (supersetId) => { if (!supersetId) return null; const charCode = supersetId.charCodeAt(0) - 65; const index = Math.max(0, charCode) % supersetColors.length; return supersetColors[index]; };

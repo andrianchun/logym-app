@@ -97,6 +97,7 @@ export default function App() {
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
   const [showExitToast, setShowExitToast] = useState(false);
+  const [showSupersetToast, setShowSupersetToast] = useState(false);
   const backPressedOnce = useRef(false);
 
   // ==========================================
@@ -767,13 +768,13 @@ export default function App() {
     const todayData = history[selectedDate];
     if (todayData && todayData.workouts) {
        for (const w of todayData.workouts) {
-          const found = (w.overriddenExercises || w.exercises || []).find(e => e.id === exId || e.originalId === baseIdStr || e.originalId === baseIdNum);
+          const found = (w.overriddenExercises || w.exercises || []).find(e => e?.id === exId || e?.originalId === baseIdStr || e?.originalId === baseIdNum);
           if (found) return found;
        }
     }
 
     // 2. Cari di programs & extraExercises
-    return [...programs.map(p=>p.exercises).flat(), ...extraExercises].find(e => e.id === exId || e.id === baseIdNum || e.id === baseIdStr);
+    return [...programs.map(p => p.exercises || []).flat(), ...extraExercises].find(e => e?.id === exId || e?.id === baseIdNum || e?.id === baseIdStr);
   };
 
   const handleSetChange = (exId, setIdx, field, val) => {
@@ -796,7 +797,7 @@ export default function App() {
     setLastActionTime(Date.now()); // Trigger Autosave
   };
 
-  const handleToggleSet = (exId, setIdx) => {
+  const handleToggleSet = (exId, setIdx, siblingIds = null) => {
     playSoundEffect('click', soundEnabled);
     setExerciseLogs(prev => {
       const ex = getBaseEx(exId);
@@ -810,13 +811,41 @@ export default function App() {
       // Gunakan rest time per program, fallback ke default global
       const activeProgram = programs.find(p => p.id === activeProgramId) || programs[0];
       const programRestTime = activeProgram?.restTime || defaultRestTime;
+      
+      let isSupersetComplete = true;
+      const isSuperset = siblingIds && siblingIds.length > 1;
+      
+      if (isSuperset) {
+        for (const sId of siblingIds) {
+          if (sId === exId) {
+            if (!isDoneNow) { isSupersetComplete = false; break; }
+            continue;
+          }
+          const siblingLogs = prev[sId] || getSetLogs(getBaseEx(sId), sId);
+          if (!siblingLogs[setIdx] || !siblingLogs[setIdx].done) {
+            isSupersetComplete = false;
+            break;
+          }
+        }
+      }
+
       if (isDoneNow && !currentLogs[setIdx].skipped) {
-        setRestTimer(programRestTime); // Legacy fallback
-        setRestTargetTime(Date.now() + (programRestTime * 1000));
-        if (!isWorkoutActive) {
-          setIsWorkoutActive(true);
-          setWorkoutStartTime(Date.now() - (resumeDurationSecs * 1000));
-          setResumeDurationSecs(0);
+        if (!isSuperset || isSupersetComplete) {
+          setRestTimer(programRestTime); // Legacy fallback
+          setRestTargetTime(Date.now() + (programRestTime * 1000));
+          if (!isWorkoutActive) {
+            setIsWorkoutActive(true);
+            setWorkoutStartTime(Date.now() - (resumeDurationSecs * 1000));
+            setResumeDurationSecs(0);
+          }
+        } else if (isSuperset) {
+          setShowSupersetToast(true);
+          setTimeout(() => setShowSupersetToast(false), 3000);
+          if (!isWorkoutActive) {
+            setIsWorkoutActive(true);
+            setWorkoutStartTime(Date.now() - (resumeDurationSecs * 1000));
+            setResumeDurationSecs(0);
+          }
         }
       }
       return { ...prev, [exId]: currentLogs };
@@ -835,25 +864,37 @@ export default function App() {
     setLastActionTime(Date.now());
   };
 
-  const handleAddSet = (exId) => {
+  const handleAddSet = (exIds) => {
     playSoundEffect('click', soundEnabled);
+    const ids = Array.isArray(exIds) ? exIds : [exIds];
     setExerciseLogs(prev => {
-      const ex = getBaseEx(exId);
-      const currentLogs = prev[exId] ? [...prev[exId]] : getSetLogs(ex, exId);
-      const lastSet = currentLogs[currentLogs.length - 1] || { w: ex.defaultWeight || 0, r: ex.reps || 10, d: ex.duration || 10 };
-      currentLogs.push({ w: lastSet.w, r: lastSet.r, d: lastSet.d, done: false });
-      return { ...prev, [exId]: currentLogs };
+      let newPrev = { ...prev };
+      ids.forEach(id => {
+        const ex = getBaseEx(id);
+        if (!ex) return;
+        const currentLogs = newPrev[id] ? [...newPrev[id]] : getSetLogs(ex, id);
+        const lastSet = currentLogs[currentLogs.length - 1] || { w: ex.defaultWeight || 0, r: ex.reps || 10, d: ex.duration || 10 };
+        currentLogs.push({ w: lastSet.w, r: lastSet.r, d: lastSet.d, done: false });
+        newPrev[id] = currentLogs;
+      });
+      return newPrev;
     });
     setLastActionTime(Date.now()); // Trigger Autosave
   };
 
-  const handleRemoveSet = (exId, setIdx) => {
+  const handleRemoveSet = (exIds, setIdx) => {
     playSoundEffect('click', soundEnabled);
+    const ids = Array.isArray(exIds) ? exIds : [exIds];
     setExerciseLogs(prev => {
-      const ex = getBaseEx(exId);
-      const currentLogs = prev[exId] ? [...prev[exId]] : getSetLogs(ex, exId);
-      currentLogs.splice(setIdx, 1);
-      return { ...prev, [exId]: currentLogs };
+      let newPrev = { ...prev };
+      ids.forEach(id => {
+        const ex = getBaseEx(id);
+        if (!ex) return;
+        const currentLogs = newPrev[id] ? [...newPrev[id]] : getSetLogs(ex, id);
+        currentLogs.splice(setIdx, 1);
+        newPrev[id] = currentLogs;
+      });
+      return newPrev;
     });
     setLastActionTime(Date.now()); // Trigger Autosave
   };
@@ -1259,6 +1300,13 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Toast Lanjut Latihan Berikutnya */}
+      <div className={`fixed top-1/2 left-0 right-0 -translate-y-1/2 z-[100] pointer-events-none flex justify-center transition-all duration-500 ease-in-out ${showSupersetToast ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
+        <div className={`w-full py-5 flex items-center justify-center ${t.bgAccent} bg-opacity-90 ${t.textButton}`}>
+          <span className="font-black whitespace-nowrap text-base tracking-widest uppercase opacity-90 mix-blend-overlay">Lanjut Latihan Berikutnya!</span>
+        </div>
+      </div>
       <BottomNav t={t} lang={lang} activeTab={activeTab} setActiveTab={setActiveTab} setIsEditingMode={setIsEditingMode} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} />
     </div>
   );

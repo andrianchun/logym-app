@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { SkipForward, Video, CheckCircle, Play, Square, Info, ArrowLeftRight, X, Dumbbell } from 'lucide-react';
 import EquipmentIcon from './EquipmentIcon';
 import SwipeInput from './SwipeInput';
-import { formatTarget, exerciseTypeLabels } from '../data/constants';
+import { formatTarget, exerciseTypeLabels, getVideoId, getSupersetColorStyle } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
+import { getCachedExercises } from '../utils/exerciseDbApi';
 
 const ExerciseCard = ({
   ex, idx, isExtra = false,
@@ -63,20 +64,53 @@ const ExerciseCard = ({
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
+  const supersetStyle = getSupersetColorStyle(ex.supersetId);
+
   return (
     <div className={`py-5 px-1 sm:px-2 border-b border-black/5 dark:border-white/5 last:border-b-0 ${isAllDone ? 'bg-emerald-500/5' : ''} relative overflow-hidden transition-all`}>
       
-      {/* WATERMARK BACKGROUND */}
-      <div className="absolute -right-6 -bottom-6 opacity-[0.03] dark:opacity-[0.04] pointer-events-none transform -rotate-12 z-0">
+      {/* WATERMARK BACKGROUND (TETAP ADA SEBAGAI CADANGAN SELURUH KARTU) */}
+      <div className="absolute -right-6 -bottom-6 opacity-[0.02] dark:opacity-[0.03] pointer-events-none transform -rotate-12 z-0">
           <EquipmentIcon equipment={ex.equipment} size={160} />
       </div>
 
       {/* HEADER KARTU */}
-      <div className="mb-3 relative z-10">
-         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-             <div className="flex items-start gap-3 min-w-0">
-                 <span className={`shrink-0 flex items-center justify-center bg-black/5 dark:bg-white/10 rounded-lg w-8 h-8 body-lg font-black ${t.textAccent} shadow-sm ${isSkip ? 'opacity-50 grayscale' : ''}`}>
-                    {isExtra ? '+' : idx + 1}
+      <div className="mb-3 pb-3 relative z-10">
+         {/* BACKGROUND IMAGE / THUMBNAIL KHUSUS HEADER */}
+         <div className="absolute -top-5 -right-2 bottom-0 w-[65%] pointer-events-none opacity-50 z-0" style={{ maskImage: 'linear-gradient(to right, transparent, black 60%)', WebkitMaskImage: 'linear-gradient(to right, transparent, black 60%)' }}>
+             {(() => {
+                const apiExercises = getCachedExercises();
+                const apiMatch = (!ex.gifUrl && !isCustom) ? apiExercises.find(e => e.name.toLowerCase() === ex.name.toLowerCase()) : null;
+                const finalGifUrl = ex.gifUrl || apiMatch?.gifUrl;
+                const ytId = getVideoId(ex.ytVideo);
+                
+                if (finalGifUrl) {
+                    return <img src={finalGifUrl} alt={ex.name} loading="lazy" className="w-full h-full object-cover object-[100%_25%]" />;
+                } else if (ytId) {
+                    return <img 
+                      src={`https://img.youtube.com/vi/${ytId}/maxresdefault.jpg`} 
+                      onError={(e) => {
+                        if (e.target.src.includes('maxresdefault')) {
+                          e.target.src = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+                          e.target.className = "absolute top-1/2 left-1/2 w-[240%] h-auto max-w-none -translate-x-1/2 -translate-y-[25%] object-cover";
+                        }
+                      }}
+                      alt={ex.name} 
+                      loading="lazy" 
+                      className="absolute top-1/2 left-1/2 w-[320%] h-auto max-w-none -translate-x-1/2 -translate-y-[25%] object-cover" 
+                    />;
+                } else {
+                    return null;
+                }
+             })()}
+         </div>
+
+         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 relative z-10">
+             
+             {/* KIRI: NO & INFO LATIHAN */}
+             <div className="flex gap-2">
+                 <span className={`text-xl font-black ${isSkip ? 'opacity-50' : t.textAccent} pt-0.5`}>
+                     {isExtra ? '+' : `${idx + 1}.`}
                  </span>
                  <div className="min-w-0">
                      <h3 className={`h2 truncate pr-2 flex items-center gap-1.5 flex-wrap ${isSkip ? 'opacity-50' : t.textMain}`}>
@@ -100,44 +134,47 @@ const ExerciseCard = ({
                           SKIPPED
                         </div>
                      )}
+
+                     {/* ACTIONS ROW */}
+                     <div className="flex flex-wrap items-center gap-1.5 mt-1.5 shrink-0 self-start -ml-1">
+                         {isExtra && (
+                             <button onClick={() => onRemoveExtra(ex.id)} className={`p-2 bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl transition-colors`}>
+                                 <X size={16} />
+                             </button>
+                         )}
+                         <button onClick={() => { playSoundEffect('click', soundEnabled); onToggleSkip(ex.id); }} className={`${t.textMuted} p-2 ${isSkip ? 'bg-rose-500 text-white' : 'bg-black/5 dark:bg-white/5 hover:text-rose-500 hover:bg-rose-500/10'} rounded-xl transition-colors`}>
+                             <SkipForward size={16} className={isSkip ? "text-white" : ""} />
+                         </button>
+                         {!isExtra && onReplaceClick && (
+                             <button onClick={() => { playSoundEffect('click', soundEnabled); onReplaceClick(ex.id); }} className={`${t.textMuted} p-2 bg-black/5 dark:bg-white/5 rounded-xl hover:text-amber-500 transition-colors`}>
+                                 <ArrowLeftRight size={16} />
+                             </button>
+                         )}
+                         <button onClick={() => { playSoundEffect('click', soundEnabled); onOpenVideo(ex); }} className={`${t.textMuted} p-2 bg-black/5 dark:bg-white/5 rounded-xl hover:${t.textAccent} transition-colors`}>
+                             <Info size={16} />
+                         </button>
+                         {ex.supersetId && (
+                             <div className={`ml-1 px-2 py-1 ${supersetStyle.bg} ${supersetStyle.text} rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center shadow-sm`}>
+                                 SUPERSET
+                             </div>
+                         )}
+                     </div>
                  </div>
              </div>
-             
-             {/* ACTIONS ROW */}
-             <div className="flex space-x-1.5 shrink-0 self-start">
-               {isExtra && (
-                   <button onClick={() => onRemoveExtra(ex.id)} className={`p-2 bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl transition-colors`}>
-                       <X size={16} />
-                   </button>
-               )}
-               <button onClick={() => { playSoundEffect('click', soundEnabled); onToggleSkip(ex.id); }} className={`${t.textMuted} p-2 ${isSkip ? 'bg-rose-500 text-white' : 'bg-black/5 dark:bg-white/5 hover:text-rose-500 hover:bg-rose-500/10'} rounded-xl transition-colors`}>
-                   <SkipForward size={16} className={isSkip ? "text-white" : ""} />
-               </button>
-               {!isExtra && onReplaceClick && (
-                   <button onClick={() => { playSoundEffect('click', soundEnabled); onReplaceClick(ex.id); }} className={`${t.textMuted} p-2 bg-black/5 dark:bg-white/5 rounded-xl hover:text-amber-500 transition-colors`}>
-                       <ArrowLeftRight size={16} />
-                   </button>
-               )}
-               <button onClick={() => { playSoundEffect('click', soundEnabled); onOpenVideo(ex); }} className={`${t.textMuted} p-2 bg-black/5 dark:bg-white/5 rounded-xl hover:${t.textAccent} transition-colors`}>
-                   <Info size={16} />
-               </button>
-             </div>
          </div>
-      </div>
-      
-      {/* KONTEN SETS & PROGRESS (GRAYSCALED IF SKIPPED) */}
-      <div className={isSkip ? 'opacity-50 grayscale pointer-events-none' : ''}>
-        {/* BARIS PROGRES */}
-      <div className="mb-3 relative z-10">
+
+         {/* BARIS PROGRES (MENEMPEL DI BAWAH THUMBNAIL) */}
          {!isSkip && (
-             <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full mt-2 overflow-hidden">
+             <div className="absolute left-0 bottom-0 w-full h-1 bg-black/10 dark:bg-white/10 z-20">
                  <div className={`h-full ${t.bgAccent} transition-all duration-500 ease-out`} style={{width: `${progressPercent}%`}}></div>
              </div>
          )}
       </div>
-
+      
+      {/* KONTEN SETS & PROGRESS (GRAYSCALED IF SKIPPED) */}
+      <div className={isSkip ? 'opacity-50 grayscale pointer-events-none' : ''}>
       {/* DAFTAR SET LATIHAN */}
-      <div className={`mt-3 relative z-10 ${isSkip ? 'hidden' : ''}`}>
+      <div className={`mt-2 relative z-10 ${isSkip ? 'hidden' : ''}`}>
           <div className={`grid ${exType==='weight' ? 'grid-cols-[1.5fr_2.5fr_2.5fr_1.5fr]' : 'grid-cols-[1.5fr_3.5fr_1.5fr]'} gap-1 mb-1 px-1 h3 ${t.textMuted} text-center items-center`}>
             <div>{lang.set}</div>
             {exType === 'weight' && <div>{isImp ? 'lbs' : 'kg'}</div>}

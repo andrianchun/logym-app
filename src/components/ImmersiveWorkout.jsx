@@ -28,8 +28,8 @@ const ImmersiveWorkout = ({
   activeGymId,
   setRestTargetTime
 }) => {
-  // 1. Gather all active exercises
-  const allExercises = useMemo(() => {
+  // 1. Gather all active exercise groups
+  const validExercises = useMemo(() => {
     const baseExercises = activeProgramsList 
       ? activeProgramsList.flatMap(p => p.exercises || [])
       : (programs.find(p => p.id === activeProgramId) || programs[0])?.exercises || [];
@@ -37,14 +37,16 @@ const ImmersiveWorkout = ({
   }, [activeProgramsList, activeProgramId, programs, extraExercises, skippedExercises]);
 
   const [currentIndex, setCurrentIndex] = useState(() => {
-    for (let i = 0; i < allExercises.length; i++) {
-      const ex = allExercises[i];
-      const logs = exerciseLogs[ex.id];
-      if (!logs || logs.some(set => !set.done)) return i;
+    for (let i = 0; i < validExercises.length; i++) {
+      const eItem = validExercises[i];
+      const logs = exerciseLogs[eItem.id];
+      const isGroupIncomplete = !logs || logs.some(set => !set.done);
+      if (isGroupIncomplete) return i;
     }
-    return allExercises.length > 0 ? allExercises.length - 1 : 0;
+    return validExercises.length > 0 ? validExercises.length - 1 : 0;
   });
-  const ex = allExercises[currentIndex];
+  
+  const ex = validExercises[currentIndex];
 
   // 2. Workout Timer (Total Duration)
   const [workoutSeconds, setWorkoutSeconds] = useState(0);
@@ -78,40 +80,24 @@ const ImmersiveWorkout = ({
   }, [restTimer]);
 
   // 3. Current Set Logic
-  const logs = ex ? exerciseLogs[ex.id] || Array.from({length: ex.sets || 3}).map(() => ({
-    w: ex.defaultWeight || 0, r: ex.reps || 10, d: ex.duration || 10, done: false
-  })) : [];
+  const getLogsForEx = (exItem) => exerciseLogs[exItem.id] || Array.from({length: exItem.sets || 3}).map(() => ({
+    w: exItem.defaultWeight || 0, r: exItem.reps || 10, d: exItem.duration || 10, done: false
+  }));
 
-  const firstIncompleteSet = logs.findIndex(s => !s.done);
-  const activeSetIdx = firstIncompleteSet === -1 ? logs.length - 1 : firstIncompleteSet;
+  const logs = ex ? getLogsForEx(ex) : [];
+
+  let activeSetIdx = 0;
+  if (ex) {
+     const incompleteIdx = getLogsForEx(ex).findIndex(s => !s.done);
+     if (incompleteIdx !== -1) {
+       activeSetIdx = incompleteIdx;
+     } else {
+       activeSetIdx = Math.max(0, getLogsForEx(ex).length - 1);
+     }
+  }
+
   const activeSet = logs[activeSetIdx];
-
-  const handleDoneClick = () => {
-    if (!ex) return;
-    playSoundEffect('success', soundEnabled);
-    onToggleSet(ex.id, activeSetIdx);
-    
-    // Timer istirahat sudah diurus oleh App.jsx via onToggleSet
-  };
-
-  const handleSkipSet = () => {
-    if (!ex) return;
-    playSoundEffect('click', soundEnabled);
-    if (!isAllDone) {
-      if (onSkipSet) {
-        onSkipSet(ex.id, activeSetIdx);
-      } else {
-        onToggleSet(ex.id, activeSetIdx);
-      }
-      // Immediately cancel the rest timer that App.jsx triggers
-      setTimeout(() => {
-        setRestTimer(0);
-        if (setRestTargetTime) setRestTargetTime(null);
-      }, 50);
-    } else {
-      handleNextEx();
-    }
-  };
+  const isAllDone = ex && getLogsForEx(ex).length > 0 && getLogsForEx(ex).every(s => s.done || s.skipped);
 
   const parseMedia = (exercise) => {
     if (!exercise) return [];
@@ -231,7 +217,7 @@ const ImmersiveWorkout = ({
 
   const handleNextEx = () => {
     playSoundEffect('click', soundEnabled);
-    if (currentIndex < allExercises.length - 1) {
+    if (currentIndex < validExercises.length - 1) {
       setCurrentIndex(currentIndex + 1);
     } else {
       setShowFinishConfirm(true);
@@ -240,17 +226,59 @@ const ImmersiveWorkout = ({
 
   const handlePrevSet = () => {
     playSoundEffect('click', soundEnabled);
-    const isAllDone = logs.every(s => s.done);
+    const targetSetIdx = isAllDone ? Math.max(0, activeSetIdx) : activeSetIdx - 1;
     
-    if (isAllDone && logs.length > 0) {
-      // All sets done, undo the last set
-      onToggleSet(ex.id, logs.length - 1);
-    } else if (activeSetIdx > 0) {
-      // Undo the previous set
-      onToggleSet(ex.id, activeSetIdx - 1);
+    if (targetSetIdx >= 0 && (!isAllDone || logs.length > 0)) {
+       const itemLogs = getLogsForEx(ex);
+       if (itemLogs[targetSetIdx]?.done || itemLogs[targetSetIdx]?.skipped) {
+          onToggleSet(ex.id, targetSetIdx);
+       }
     } else if (currentIndex > 0) {
-      // First set of current exercise, go to previous exercise
       setCurrentIndex(currentIndex - 1);
+    }
+  };
+
+  const advanceAfterSet = () => {
+    if (ex.supersetId) {
+      const supersetGroup = validExercises.filter(e => e.supersetId === ex.supersetId);
+      const mySupersetIdx = supersetGroup.findIndex(e => e.id === ex.id);
+      const isLastSibling = mySupersetIdx === supersetGroup.length - 1;
+      
+      setTimeout(() => {
+        if (isLastSibling) {
+          let isAllDone = true;
+          supersetGroup.forEach(s => {
+              const sLogs = exerciseLogs[s.id] || [];
+              if (sLogs.some(l => !l.done && !l.skipped)) isAllDone = false;
+          });
+          
+          if (!isAllDone) {
+            const firstSiblingGlobalIdx = validExercises.findIndex(e => e.id === supersetGroup[0].id);
+            setCurrentIndex(firstSiblingGlobalIdx);
+          }
+        } else {
+          setCurrentIndex(currentIndex + 1);
+        }
+      }, 50);
+    }
+  };
+
+  const handleDoneClick = () => {
+    if (!ex) return;
+    playSoundEffect('success', soundEnabled);
+    const itemLogs = getLogsForEx(ex);
+    if (!itemLogs[activeSetIdx]?.done) {
+      onToggleSet(ex.id, activeSetIdx);
+    }
+    advanceAfterSet();
+  };
+
+  const handleSkipSet = () => {
+    if (!ex) return;
+    playSoundEffect('click', soundEnabled);
+    if (!isAllDone) {
+       onSkipSet(ex.id, activeSetIdx);
+       advanceAfterSet();
     }
   };
 
@@ -258,7 +286,6 @@ const ImmersiveWorkout = ({
 
   const isImp = unitSystem === 'imperial';
 
-  const isAllDone = logs.every(s => s.done);
   const theme = t?.bgApp?.includes('040f1a') ? 'dark' : 'light';
 
   const handleIframeLoad = (e) => {
@@ -300,7 +327,7 @@ const ImmersiveWorkout = ({
       <div className="absolute top-0 left-0 w-full h-1 ${t.bgApp}/10 dark:bg-white/10 z-20">
         <div 
           className="h-full  transition-all duration-300"
-          style={{ width: `${((currentIndex + 1) / allExercises.length) * 100}%` }}
+          style={{ width: `${((currentIndex + 1) / validExercises.length) * 100}%` }}
         />
       </div>
 
@@ -404,9 +431,16 @@ const ImmersiveWorkout = ({
         </button>
 
         <div className="absolute bottom-0 left-0 w-full p-6 bg-gradient-to-t from-black via-black/80 to-transparent">
-          <p className={`${t.textAccent} body-md tracking-widest mb-1`}>
-            EXERCISE {currentIndex + 1} OF {allExercises.length}
-          </p>
+          <div className="flex items-center gap-2 mb-1">
+            <p className={`${t.textAccent} body-md tracking-widest`}>
+              EXERCISE {currentIndex + 1} OF {validExercises.length}
+            </p>
+            {ex.supersetId && (
+              <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${t.bgAccentSoft} ${t.textAccent}`}>
+                SUPERSET {ex.supersetId}
+              </span>
+            )}
+          </div>
           <h1 className="h1 text-white leading-tight drop-shadow-lg">{ex.name}</h1>
         </div>
       </div>
@@ -449,37 +483,47 @@ const ImmersiveWorkout = ({
         </div>
 
         {/* Scroll Pickers */}
-        <div className="flex items-center justify-center gap-4 px-2">
-          {ex.type !== 'time' && (
-            <div className="flex-1 flex flex-col items-center">
-              <span className="body-md mb-2 uppercase">Beban ({isImp ? 'lbs' : 'kg'})</span>
-              <ScrollPicker 
-                value={isImp ? Math.round(Number(activeSet?.w || 0) * 2.20462 * 10)/10 : (activeSet?.w || 0)} 
-                onChange={(val) => onSetChange(ex.id, activeSetIdx, 'w', isImp ? Number((val / 2.20462).toFixed(2)) : val)}
-                min={0} max={isImp ? 440 : 200} step={isImp ? 5 : 2.5} width="w-full max-w-[120px]" theme={theme}
-              />
-            </div>
-          )}
-          
-          {ex.type === 'time' ? (
-            <div className="flex-1 flex flex-col items-center">
-              <span className="body-md mb-2 uppercase">Durasi (dtk)</span>
-              <ScrollPicker 
-                value={activeSet?.d || 15} 
-                onChange={(val) => onSetChange(ex.id, activeSetIdx, 'd', val)}
-                min={5} max={300} step={5} width="w-full max-w-[120px]" theme={theme}
-              />
-            </div>
-          ) : (
-            <div className="flex-1 flex flex-col items-center">
-              <span className="body-md mb-2 uppercase">Repetisi</span>
-              <ScrollPicker 
-                value={activeSet?.r || 10} 
-                onChange={(val) => onSetChange(ex.id, activeSetIdx, 'r', val)}
-                min={1} max={50} step={1} width="w-full max-w-[120px]" theme={theme}
-              />
-            </div>
-          )}
+        <div className="flex flex-col gap-6">
+          {(() => {
+            const itemLogs = getLogsForEx(ex);
+            const itemSet = itemLogs[activeSetIdx] || itemLogs[0];
+            return (
+              <div key={ex.id} className="w-full flex flex-col px-2">
+                <div className="flex items-center justify-center gap-4">
+                  {ex.type !== 'time' && (
+                    <div className="flex-1 flex flex-col items-center">
+                      <span className="body-md mb-2 uppercase">Beban ({isImp ? 'lbs' : 'kg'})</span>
+                      <ScrollPicker 
+                        value={isImp ? Math.round(Number(itemSet?.w || 0) * 2.20462 * 10)/10 : (itemSet?.w || 0)} 
+                        onChange={(val) => onSetChange(ex.id, activeSetIdx, 'w', isImp ? Number((val / 2.20462).toFixed(2)) : val)}
+                        min={0} max={isImp ? 440 : 200} step={isImp ? 5 : 2.5} width="w-full max-w-[120px]" theme={theme}
+                      />
+                    </div>
+                  )}
+                  
+                  {ex.type === 'time' ? (
+                    <div className="flex-1 flex flex-col items-center">
+                      <span className="body-md mb-2 uppercase">Durasi (dtk)</span>
+                      <ScrollPicker 
+                        value={itemSet?.d || 15} 
+                        onChange={(val) => onSetChange(ex.id, activeSetIdx, 'd', val)}
+                        min={5} max={300} step={5} width="w-full max-w-[120px]" theme={theme}
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex flex-col items-center">
+                      <span className="body-md mb-2 uppercase">Repetisi</span>
+                      <ScrollPicker 
+                        value={itemSet?.r || 10} 
+                        onChange={(val) => onSetChange(ex.id, activeSetIdx, 'r', val)}
+                        min={1} max={50} step={1} width="w-full max-w-[120px]" theme={theme}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Actions Row (Full Width) */}
@@ -512,7 +556,7 @@ const ImmersiveWorkout = ({
               onClick={handleNextEx}
               className={`w-full py-4 rounded-2xl ${t.bgAccent} font-black h2 flex items-center justify-center gap-2 shadow-xl active:scale-95 transition-all`}
             >
-              {currentIndex === allExercises.length - 1 ? 'FINISH WORKOUT' : 'LATIHAN BERIKUTNYA'}
+              {currentIndex === validExercises.length - 1 ? 'FINISH WORKOUT' : 'LATIHAN BERIKUTNYA'}
             </button>
           )}
         </div>

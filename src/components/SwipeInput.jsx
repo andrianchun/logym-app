@@ -159,7 +159,7 @@ const SwipeInput = ({ value, onChange, disabled, step = 1, className, min = 0, s
                 onTouchMove={onTouchMove}
                 onTouchEnd={onTouchEnd}
                 onTouchCancel={onTouchEnd}
-                className={`${className} ${isGlow ? 'flash-glow' : ''}`}
+                className={`text-center ${className} ${isGlow ? 'flash-glow' : ''}`}
             />
         </div>
     );

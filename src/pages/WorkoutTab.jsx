@@ -10,6 +10,7 @@ import ImmersiveWorkout from '../components/ImmersiveWorkout';
 import ExerciseDetailModal from '../components/ExerciseDetailModal';
 import AlternativeExerciseModal from '../components/AlternativeExerciseModal';
 import EmptyWorkoutState from '../components/EmptyWorkoutState';
+import { getSupersetColorStyle } from '../data/constants';
 
 const WorkoutTab = ({ 
   t, lang, language, programs, 
@@ -132,6 +133,23 @@ const WorkoutTab = ({
 
   const toggleSession = (id) => {
     setExpandedSessions(prev => prev[id] ? {} : { [id]: true });
+  };
+
+  const groupExercises = (exercisesList) => {
+    const grouped = [];
+    (exercisesList || []).forEach((ex, idx) => {
+      if (ex.supersetId) {
+        const lastGroup = grouped[grouped.length - 1];
+        if (lastGroup && lastGroup.isSuperset && lastGroup.supersetId === ex.supersetId) {
+          lastGroup.items.push({ ex, idx });
+        } else {
+          grouped.push({ isSuperset: true, supersetId: ex.supersetId, items: [{ ex, idx }] });
+        }
+      } else {
+        grouped.push({ isSuperset: false, items: [{ ex, idx }] });
+      }
+    });
+    return grouped;
   };
 
   const isProgramCompleted = (prog) => {
@@ -392,9 +410,13 @@ const WorkoutTab = ({
                     
                     {isExpanded && (
                       <div className="p-4 space-y-4 sm:space-y-0 sm:flex sm:flex-row sm:overflow-x-auto sm:snap-x sm:gap-4 sm:pb-6 hide-scrollbar animate-in slide-in-from-top-2 fade-in duration-200">
-                        {prog.exercises?.map((ex, idx) => (
-                          <div key={`${prog.id}-${ex.id}-${idx}`} className="sm:w-[340px] sm:shrink-0 sm:snap-center sm:bg-black/5 sm:dark:bg-white/5 sm:rounded-3xl sm:border sm:border-black/5 sm:dark:border-white/5 sm:overflow-hidden relative flex flex-col">
+                        {groupExercises(prog.exercises).map((group, gIdx) => {
+                          const ssStyle = group.isSuperset ? getSupersetColorStyle(group.supersetId) : null;
+                          return (
+                          <div key={`${prog.id}-group-${gIdx}`} className={`sm:w-[340px] sm:shrink-0 sm:snap-center sm:bg-black/5 sm:dark:bg-white/5 sm:rounded-3xl sm:border sm:border-black/5 sm:dark:border-white/5 sm:overflow-hidden relative flex flex-col mb-4 sm:mb-0 last:mb-0 ${ssStyle ? 'border-r-[6px] pr-1 ' + ssStyle.border : ''}`}>
+                            {group.items.map(({ex, idx}) => (
                               <ExerciseCard 
+                                key={`${prog.id}-${ex.id}-${idx}`}
                                 ex={ex} idx={idx} isExtra={false}
                                 t={t} lang={lang} soundEnabled={soundEnabled}
                                 unitSystem={unitSystem}
@@ -404,26 +426,41 @@ const WorkoutTab = ({
                                 onOpenVideo={() => handleOpenDetail(ex)}
                                 onReplaceClick={() => { setDetailExercise(ex); setShowAlternativeModal(true); }}
                                 sets={getSetLogs(ex)}
-                              onUpdateSet={(exId, setIdx, field, val) => {
-                                setSessionToRun(prog.workoutId);
-                                onSetChange(exId, setIdx, field, val);
-                              }} 
-                              onToggleSet={(exId, setIdx) => {
-                                setSessionToRun(prog.workoutId);
-                                onToggleSet(exId, setIdx);
-                              }} 
-                              onAddSet={(exId) => {
-                                setSessionToRun(prog.workoutId);
-                                onAddSet(exId);
-                              }} 
-                              onRemoveSet={(exId, setIdx) => {
-                                setSessionToRun(prog.workoutId);
-                                onRemoveSet(exId, setIdx);
-                              }}
-                              onReplaceExercise={() => { setDetailExercise(ex); setShowAlternativeModal(true); }}
-                            />
+                                onUpdateSet={(exId, setIdx, field, val) => {
+                                  setSessionToRun(prog.workoutId);
+                                  onSetChange(exId, setIdx, field, val);
+                                }} 
+                                onToggleSet={(exId, setIdx) => {
+                                  setSessionToRun(prog.workoutId);
+                                  let siblingIds = null;
+                                  if (ex.supersetId) {
+                                    siblingIds = prog.exercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
+                                  }
+                                  onToggleSet(exId, setIdx, siblingIds);
+                                }} 
+                                onAddSet={(exId) => {
+                                  setSessionToRun(prog.workoutId);
+                                  if (ex.supersetId) {
+                                    const siblings = prog.exercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
+                                    onAddSet(siblings);
+                                  } else {
+                                    onAddSet(exId);
+                                  }
+                                }} 
+                                onRemoveSet={(exId, setIdx) => {
+                                  setSessionToRun(prog.workoutId);
+                                  if (ex.supersetId) {
+                                    const siblings = prog.exercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
+                                    onRemoveSet(siblings, setIdx);
+                                  } else {
+                                    onRemoveSet(exId, setIdx);
+                                  }
+                                }}
+                                onReplaceExercise={() => { setDetailExercise(ex); setShowAlternativeModal(true); }}
+                              />
+                            ))}
                           </div>
-                        ))}
+                        );})}
                       </div>
                     )}
                   </div>
@@ -443,37 +480,56 @@ const WorkoutTab = ({
                   
                   {expandedSessions['extra'] && (
                     <div className="p-4 space-y-4 sm:space-y-0 sm:flex sm:flex-row sm:overflow-x-auto sm:snap-x sm:gap-4 sm:pb-6 hide-scrollbar animate-in slide-in-from-top-2 fade-in duration-200">
-                      {extraExercises.map((ex, idx) => (
-                        <div key={ex.id} className="sm:w-[340px] sm:shrink-0 sm:snap-center sm:bg-black/5 sm:dark:bg-white/5 sm:rounded-3xl sm:border sm:border-black/5 sm:dark:border-white/5 sm:overflow-hidden relative flex flex-col">
-                          <ExerciseCard 
-                            ex={ex} idx={activeProgram.exercises?.length + idx || idx} isExtra={true}
-                            t={t} lang={lang} soundEnabled={soundEnabled}
-                            unitSystem={unitSystem}
-                            isSkip={!!skippedExercises[ex.id]} 
-                            onToggleSkip={() => onToggleSkip(ex.id)} 
-                            onRemoveExtra={onRemoveExtra} 
-                            onOpenVideo={() => handleOpenDetail(ex)}
-                            sets={getSetLogs(ex)}
-                            onUpdateSet={(exId, setIdx, field, val) => {
-                              setSessionToRun('extra');
-                              onSetChange(exId, setIdx, field, val);
-                            }} 
-                            onToggleSet={(exId, setIdx) => {
-                              setSessionToRun('extra');
-                              onToggleSet(exId, setIdx);
-                            }} 
-                            onAddSet={(exId) => {
-                              setSessionToRun('extra');
-                              onAddSet(exId);
-                            }} 
-                            onRemoveSet={(exId, setIdx) => {
-                              setSessionToRun('extra');
-                              onRemoveSet(exId, setIdx);
-                            }}
-                            onReplaceExercise={() => { setDetailExercise(ex); setShowAlternativeModal(true); }}
-                          />
+                      {groupExercises(extraExercises).map((group, gIdx) => {
+                        const ssStyle = group.isSuperset ? getSupersetColorStyle(group.supersetId) : null;
+                        return (
+                        <div key={`extra-group-${gIdx}`} className={`sm:w-[340px] sm:shrink-0 sm:snap-center sm:bg-black/5 sm:dark:bg-white/5 sm:rounded-3xl sm:border sm:border-black/5 sm:dark:border-white/5 sm:overflow-hidden relative flex flex-col mb-4 sm:mb-0 last:mb-0 ${ssStyle ? 'border-r-[6px] pr-1 ' + ssStyle.border : ''}`}>
+                          {group.items.map(({ex, idx}) => (
+                            <ExerciseCard 
+                              key={ex.id}
+                              ex={ex} idx={activeProgram.exercises?.length + idx || idx} isExtra={true}
+                              t={t} lang={lang} soundEnabled={soundEnabled}
+                              unitSystem={unitSystem}
+                              isSkip={!!skippedExercises[ex.id]} 
+                              onToggleSkip={() => onToggleSkip(ex.id)} 
+                              onRemoveExtra={onRemoveExtra} 
+                              onOpenVideo={() => handleOpenDetail(ex)}
+                              sets={getSetLogs(ex)}
+                              onUpdateSet={(exId, setIdx, field, val) => {
+                                setSessionToRun('extra');
+                                onSetChange(exId, setIdx, field, val);
+                              }} 
+                              onToggleSet={(exId, setIdx) => {
+                                setSessionToRun('extra');
+                                let siblingIds = null;
+                                if (ex.supersetId) {
+                                  siblingIds = extraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
+                                }
+                                onToggleSet(exId, setIdx, siblingIds);
+                              }} 
+                              onAddSet={(exId) => {
+                                setSessionToRun('extra');
+                                if (ex.supersetId) {
+                                  const siblings = extraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
+                                  onAddSet(siblings);
+                                } else {
+                                  onAddSet(exId);
+                                }
+                              }} 
+                              onRemoveSet={(exId, setIdx) => {
+                                setSessionToRun('extra');
+                                if (ex.supersetId) {
+                                  const siblings = extraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
+                                  onRemoveSet(siblings, setIdx);
+                                } else {
+                                  onRemoveSet(exId, setIdx);
+                                }
+                              }}
+                              onReplaceExercise={() => { setDetailExercise(ex); setShowAlternativeModal(true); }}
+                            />
+                          ))}
                         </div>
-                      ))}
+                      );})}
                     </div>
                   )}
                 </div>

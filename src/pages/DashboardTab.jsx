@@ -53,7 +53,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   const [showManualModal, setShowManualModal] = useState(false);
   const [manualTab, setManualTab] = useState('komposisi');
   const [modalDate, setModalDate] = useState(activeDate);
-  const [isProgressExpanded, setIsProgressExpanded] = useState(false);
+  const [isProgressExpanded, setIsProgressExpanded] = useState(true);
   
   // TARGET SETTINGS
   const [showTargetModal, setShowTargetModal] = useState(false);

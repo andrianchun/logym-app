@@ -1,9 +1,9 @@
 import { defaultMasterExercises } from './constants';
 
-const getEx = (id, sets, reps) => {
+const getEx = (id, sets, reps, supersetId = null) => {
   const ex = defaultMasterExercises.find(e => e.id === id);
   if (!ex) return null;
-  return { ...ex, id: Date.now() + Math.random(), originalId: id, sets, reps };
+  return { ...ex, id: Date.now() + Math.random(), originalId: id, sets, reps, ...(supersetId && { supersetId }) };
 };
 
 export const PROGRAM_PLANS = [
@@ -19,10 +19,10 @@ export const PROGRAM_PLANS = [
         name: 'Full Body Complete',
         restTime: 90,
         exercises: [
-          getEx(108, 3, 10), // Squat
-          getEx(115, 3, 10), // Flat Bench
-          getEx(113, 3, 12), // Lat Pulldown
-          getEx(114, 3, 12), // DB Shoulder Press
+          getEx(108, 3, 10, "A"), // Squat
+          getEx(115, 3, 10, "A"), // Flat Bench
+          getEx(113, 3, 12, "B"), // Lat Pulldown
+          getEx(114, 3, 12, "B"), // DB Shoulder Press
           getEx(109, 3, 10), // RDL
           getEx(112, 3, 15), // Cable Crunch
         ].filter(Boolean)

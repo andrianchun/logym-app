@@ -203,7 +203,16 @@ export const mapToLyFitFormat = (apiEx) => {
  */
 export let cachedMappedExercises = null;
 
-export const getCachedExercises = () => cachedMappedExercises || [];
+export const getCachedExercises = () => {
+  if (!cachedMappedExercises) {
+    try {
+      cachedMappedExercises = localExerciseDb.map(mapToLyFitFormat);
+    } catch (e) {
+      return [];
+    }
+  }
+  return cachedMappedExercises;
+};
 
 export const fetchExercisesFromApi = async () => {
   if (cachedMappedExercises) return cachedMappedExercises;

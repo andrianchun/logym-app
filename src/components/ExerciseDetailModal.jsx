@@ -354,7 +354,7 @@ const ExerciseDetailModal = ({
                       {ex.instructions && ex.instructions.length > 0 ? (
                         <ol className="list-decimal pl-5 space-y-2">
                           {ex.instructions.map((step, i) => (
-                            <li key={i} className={`body-lg ${t.textMain} opacity-90 leading-relaxed`}>{step}</li>
+                            <li key={i} className={`body-lg ${t.textMain} opacity-90 leading-relaxed`}>{step.replace(/^\d+[\.\)]\s*/, '')}</li>
                           ))}
                         </ol>
                       ) : (

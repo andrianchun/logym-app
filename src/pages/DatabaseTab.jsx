@@ -15,22 +15,36 @@ const blankExercise = () => ({
   id: Date.now(),
   name: '',
   target: [],
-  instructions: [],
+  instructions: ['1. '],
   type: 'weight',
   equipment: 'Lainnya',
   defaultWeight: 0,
   ytVideo: '',
   gifUrl: '',
+  source: 'custom',
 });
 
 const exerciseTypeLabels = {
-  weight: 'Beban & Reps',
-  reps: 'Hanya Repetisi',
-  time: 'Hanya Durasi',
+  weight: 'Beban & Repetisi',
+  reps: 'Repetisi',
+  time: 'Durasi',
 };
 
 // ─── Sub-component: ExerciseForm ───────────────────────────────────
-const ExerciseForm = ({ t, lang, formData, setFormData, onSave, onCancel, isEditing }) => {
+const ExerciseForm = ({ t, lang, formData, setFormData, originalData, onSave, onCancel, isEditing }) => {
+  const [openDropdown, setOpenDropdown] = useState(null);
+  const dropdownRef = React.useRef(null);
+  
+  React.useEffect(() => {
+      const handleClickOutside = (e) => {
+          if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+              setOpenDropdown(null);
+          }
+      };
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const toggleMuscle = (m) => {
     setFormData(prev => ({
       ...prev,
@@ -38,7 +52,17 @@ const ExerciseForm = ({ t, lang, formData, setFormData, onSave, onCancel, isEdit
     }));
   };
 
-  const canSave = formData.name.trim().length > 0 && formData.target.length > 0;
+  const hasChanges = originalData ? (
+    formData.name !== originalData.name ||
+    formData.type !== originalData.type ||
+    formData.equipment !== originalData.equipment ||
+    formData.defaultWeight !== originalData.defaultWeight ||
+    formData.ytVideo !== originalData.ytVideo ||
+    JSON.stringify(formData.target) !== JSON.stringify(originalData.target) ||
+    JSON.stringify(formData.instructions) !== JSON.stringify(originalData.instructions)
+  ) : true;
+
+  const canSave = formData.name.trim().length > 0 && formData.target.length > 0 && hasChanges;
 
   return (
     <div className={`fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in`} onClick={onCancel}>
@@ -46,13 +70,6 @@ const ExerciseForm = ({ t, lang, formData, setFormData, onSave, onCancel, isEdit
         className={`w-full max-w-md sm:max-w-3xl mx-auto ${t.bgCard} rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200 border ${t.border} p-6`}
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center pb-4 border-b border-dashed border-slate-500/20 mb-5">
-          <h3 className={`h2 ${t.textAccent}`}>
-            {isEditing ? (lang?.editExercise || 'Edit Latihan') : (lang?.addExercise || 'Tambah Latihan Baru')}
-          </h3>
-          <button onClick={onCancel} className={`p-2 rounded-full ${t.inputBg} hover:opacity-80`}><X size={20}/></button>
-        </div>
-
       <div className="flex flex-col sm:grid sm:grid-cols-2 sm:gap-8 space-y-5 sm:space-y-0">
         
         {/* Kolom Kiri */}
@@ -96,90 +113,151 @@ const ExerciseForm = ({ t, lang, formData, setFormData, onSave, onCancel, isEdit
       </div> {/* Akhir Kolom Kiri */}
 
       {/* Kolom Kanan */}
-      <div className="space-y-5">
-      {/* Equipment + Type Row */}
-      <div className="grid grid-cols-2 gap-3 items-end">
-        <div className="w-full">
-          <label className={`body-md ${t.textMuted} mb-1 block`}>{lang?.equipment || 'Equipment'}</label>
+      <div className="space-y-5" ref={dropdownRef}>
+      {/* Equipment and Type */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* Equipment */}
+        <div>
+          <label className={`body-md ${t.textMuted} mb-2 block`}>{lang?.equipment || 'Equipment'}</label>
           <div className="relative">
-            <select
-              value={formData.equipment}
-              onChange={(e) => setFormData(prev => ({ ...prev, equipment: e.target.value }))}
-              className={`w-full px-3 py-3 rounded-xl ${t.inputBg} ${t.textMain} body-lg outline-none appearance-none cursor-pointer focus:ring-2 ${t.ringAccent}`}
+            <button 
+                onClick={(e) => { e.preventDefault(); setOpenDropdown(openDropdown === 'equipment' ? null : 'equipment'); }}
+                className={`relative z-[60] w-full body-lg font-bold p-3 px-4 rounded-xl flex items-center justify-between space-x-2 ${t.inputBg} ${t.textMain} border border-transparent focus:ring-2 focus:${t.ringAccent} transition-colors`}
             >
-              {equipmentOptions.map(eq => <option key={eq} value={eq}>{eq}</option>)}
-            </select>
-            <ChevronDown size={14} className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${t.textMuted}`} />
+                <span>{formData.equipment}</span>
+                <ChevronDown size={16} className={`transition-transform duration-200 ${openDropdown === 'equipment' ? 'rotate-180' : ''} ${t.textMuted}`} />
+            </button>
+            {openDropdown === 'equipment' && (
+                <div className={`absolute top-full right-0 left-0 -mt-3 pt-4 pb-1 rounded-b-2xl border ${t.border} border-t-0 ${t.bgCard} shadow-xl max-h-60 overflow-y-auto overflow-x-hidden custom-scrollbar z-[50] animate-in slide-in-from-top-2 origin-top`}>
+                    {equipmentOptions.map(eq => (
+                        <button
+                            key={eq}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                setFormData(prev => ({ ...prev, equipment: eq }));
+                                setOpenDropdown(null);
+                            }}
+                            className={`w-full text-left px-4 py-3 body-sm font-bold transition-colors ${formData.equipment === eq ? t.textAccent + ' bg-emerald-500/10 dark:bg-emerald-500/10' : t.textMuted + ' hover:' + t.textMain + ' hover:bg-black/5 dark:hover:bg-white/5'}`}
+                        >
+                            {eq}
+                        </button>
+                    ))}
+                </div>
+            )}
           </div>
         </div>
+
+        {/* Type */}
         <div>
-          <label className={`body-md ${t.textMuted} mb-1 block`}>{lang?.exerciseType || 'Tipe Latihan'}</label>
+          <label className={`body-md ${t.textMuted} mb-2 block`}>{lang?.exerciseType || 'Tipe Latihan'}</label>
           <div className="relative">
-            <select
-              value={formData.type}
-              onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value }))}
-              className={`w-full px-3 py-3 rounded-xl ${t.inputBg} ${t.textMain} body-lg outline-none appearance-none cursor-pointer focus:ring-2 ${t.ringAccent}`}
+            <button 
+                onClick={(e) => { e.preventDefault(); setOpenDropdown(openDropdown === 'type' ? null : 'type'); }}
+                className={`relative z-[60] w-full body-lg font-bold p-3 px-4 rounded-xl flex items-center justify-between space-x-2 ${t.inputBg} ${t.textMain} border border-transparent focus:ring-2 focus:${t.ringAccent} transition-colors`}
             >
-              {Object.entries(exerciseTypeLabels).map(([val, label]) => (
-                <option key={val} value={val}>{label}</option>
-              ))}
-            </select>
-            <ChevronDown size={14} className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${t.textMuted}`} />
+                <span>{exerciseTypeLabels[formData.type]}</span>
+                <ChevronDown size={16} className={`transition-transform duration-200 ${openDropdown === 'type' ? 'rotate-180' : ''} ${t.textMuted}`} />
+            </button>
+            {openDropdown === 'type' && (
+                <div className={`absolute top-full right-0 left-0 -mt-3 pt-4 pb-1 rounded-b-2xl border ${t.border} border-t-0 ${t.bgCard} shadow-xl max-h-60 overflow-y-auto overflow-x-hidden custom-scrollbar z-[50] animate-in slide-in-from-top-2 origin-top`}>
+                    {Object.entries(exerciseTypeLabels).map(([val, label]) => (
+                        <button
+                            key={val}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                setFormData(prev => ({ ...prev, type: val }));
+                                setOpenDropdown(null);
+                            }}
+                            className={`w-full text-left px-4 py-3 body-sm font-bold transition-colors ${formData.type === val ? t.textAccent + ' bg-emerald-500/10 dark:bg-emerald-500/10' : t.textMuted + ' hover:' + t.textMain + ' hover:bg-black/5 dark:hover:bg-white/5'}`}
+                        >
+                            {label}
+                        </button>
+                    ))}
+                </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Default Weight + YouTube Row */}
-      <div className="grid grid-cols-2 gap-3 items-end">
-        <div className="w-full">
-          <label className={`body-md ${t.textMuted} mb-1 block`}>{lang?.defaultWeight || 'Beban Default (kg)'}</label>
-          <SwipeInput language={lang?.id || 'ID'}
-            value={formData.defaultWeight || 0}
-            onChange={(val) => setFormData(prev => ({ ...prev, defaultWeight: val }))}
-            min={0}
-            step={0.5}
-            placeholder="0"
-            className={`w-full px-3 py-3 rounded-xl ${t.inputBg} ${t.textMain} body-lg outline-none focus:ring-2 ${t.ringAccent} placeholder:opacity-30 dark:placeholder:opacity-40`}
-          />
-        </div>
-        <div className="w-full">
-          <label className={`body-md ${t.textMuted} mb-1 block flex items-center`}>
-            <LinkIcon size={12} className="mr-1" /> YouTube URL
-          </label>
-          <input
-            type="url"
-            value={formData.ytVideo || ''}
-            onChange={(e) => setFormData(prev => ({ ...prev, ytVideo: e.target.value }))}
-            placeholder="https://youtu.be/..."
-            className={`w-full px-3 py-3 rounded-xl ${t.inputBg} ${t.textMain} body-lg outline-none focus:ring-2 ${t.ringAccent} placeholder:opacity-30 dark:placeholder:opacity-40`}
-          />
-        </div>
+      {/* Video Link */}
+      <div className="w-full">
+        <label className={`body-md ${t.textMuted} mb-1 block`}>
+          {lang?.videoLink || 'Link Video'} <span className="text-[10px] opacity-60 ml-1 font-normal">(thumbnail diambil otomatis dari video)</span>
+        </label>
+        <input
+          type="url"
+          value={formData.ytVideo || ''}
+          onChange={(e) => setFormData(prev => ({ ...prev, ytVideo: e.target.value }))}
+          placeholder="https://youtu.be/..."
+          className={`w-full px-3 py-3 rounded-xl ${t.inputBg} ${t.textMain} body-lg outline-none focus:ring-2 ${t.ringAccent} placeholder:opacity-30 dark:placeholder:opacity-40`}
+        />
       </div>
 
       {/* Instructions */}
       <div>
-        <label className={`body-md ${t.textMuted} mb-1 block`}>{lang?.howTo || 'Cara Melakukan (Opsional)'}</label>
+        <label className={`body-md ${t.textMuted} mb-2 block`}>{lang?.howTo || 'Cara Melakukan (Opsional)'}</label>
         <textarea
           value={Array.isArray(formData.instructions) ? formData.instructions.join('\n') : (formData.instructions || '')}
           onChange={(e) => setFormData(prev => ({ ...prev, instructions: e.target.value.split('\n') }))}
-          placeholder="Langkah 1...&#10;Langkah 2..."
-          rows={3}
-          className={`w-full px-3 py-3 rounded-xl ${t.inputBg} ${t.textMain} body-lg outline-none focus:ring-2 ${t.ringAccent} resize-none placeholder:opacity-30 dark:placeholder:opacity-40`}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              const el = e.target;
+              const val = el.value;
+              const cursor = el.selectionStart;
+              const textBefore = val.substring(0, cursor);
+              const lines = textBefore.split('\n');
+              const lastLine = lines[lines.length - 1];
+              
+              const match = lastLine.match(/^(\d+)([\.\)]\s+)(.*)$/);
+              if (match) {
+                e.preventDefault();
+                const num = parseInt(match[1], 10);
+                const separator = match[2];
+                const content = match[3];
+                
+                if (content.trim() === '') {
+                  const newTextBefore = lines.slice(0, -1).join('\n') + (lines.length > 1 ? '\n' : '');
+                  const newText = newTextBefore + val.substring(el.selectionEnd);
+                  const newCursor = newTextBefore.length;
+                  
+                  setFormData(prev => ({ ...prev, instructions: newText.split('\n') }));
+                  setTimeout(() => { el.selectionStart = el.selectionEnd = newCursor; }, 0);
+                  return;
+                }
+                
+                const insertText = `\n${num + 1}${separator}`;
+                const newText = textBefore + insertText + val.substring(el.selectionEnd);
+                const newCursor = textBefore.length + insertText.length;
+                
+                setFormData(prev => ({ ...prev, instructions: newText.split('\n') }));
+                setTimeout(() => { el.selectionStart = el.selectionEnd = newCursor; }, 0);
+              }
+            }
+          }}
+          placeholder="1. Posisikan tubuh...&#10;2. Angkat beban..."
+          rows={6}
+          className={`w-full p-4 rounded-xl ${t.inputBg} ${t.textMain} body-lg outline-none focus:ring-2 ${t.ringAccent} placeholder:opacity-30 dark:placeholder:opacity-40 custom-scrollbar resize-y min-h-[140px]`}
         />
       </div>
 
       {/* Action Buttons */}
-      <div className="flex gap-3 pt-3">
-        <button
-          onClick={onSave}
-          disabled={!canSave}
-          className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl text-white body-lg font-black transition-all ${
-            canSave ? `${t.bgAccent} shadow-xl hover:opacity-90 active:scale-95` : 'bg-gray-400 cursor-not-allowed opacity-50'
-          }`}
-        >
-          <Check size={18} /> {lang?.save || 'Simpan Latihan'}
-        </button>
-      </div>
+        <div className="flex gap-3 pt-4 border-t border-dashed border-slate-500/20 mt-4">
+          <button
+            onClick={onCancel}
+            className={`flex-[0.8] py-4 rounded-xl body-lg font-bold transition-all ${t.inputBg} ${t.textMain} hover:opacity-80 active:scale-95`}
+          >
+            Batal
+          </button>
+          <button
+            onClick={onSave}
+            disabled={!canSave}
+            className={`flex-[1.5] flex items-center justify-center py-4 rounded-xl text-white body-lg font-black transition-all ${
+              canSave ? `${t.bgAccent} shadow-lg hover:opacity-90 active:scale-95` : 'bg-slate-500 cursor-not-allowed opacity-50'
+            }`}
+          >
+            <span className="whitespace-nowrap leading-none">{isEditing ? (lang?.save || 'Simpan Perubahan') : 'Simpan Custom'}</span>
+          </button>
+        </div>
 
       </div> {/* Akhir Kolom Kanan */}
       </div> {/* Akhir Grid */}
@@ -194,15 +272,15 @@ const ExerciseForm = ({ t, lang, formData, setFormData, onSave, onCancel, isEdit
 
 // ═══════════════════════════════════════════════════════════════════
 // ─── Main Component: DatabaseTab ──────────────────────────────────
-// ═══════════════════════════════════════════════════════════════════
 const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, soundEnabled, warmupVideos, setWarmupVideos, cooldownVideos, setCooldownVideos, onOpenDetail, setConfirmModal, theme, gymProfiles, setGymProfiles, activeGymId, setActiveGymId }) => {
   // ── Tab State ────────────────────────────────────────────────────
   const [viewMode, setViewMode] = useState('all'); // 'all' | 'custom'
 
-  // ── Form State ───────────────────────────────────────────────────
+  // 🟢 Form State 🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢
   const [editingId, setEditingId] = useState(null);
   const [isAdding, setIsAdding] = useState(false);
   const [formData, setFormData] = useState(blankExercise());
+  const [originalData, setOriginalData] = useState(null);
 
   // ── Filter & Search State ────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
@@ -259,18 +337,28 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
     const localMap = new Map();
     exerciseLibrary.forEach(localEx => {
       const key = localEx.name.trim().toLowerCase();
+      
+      let enrichedEx = { ...localEx };
+      if (onlineMap.has(key)) {
+        const onlineEx = onlineMap.get(key);
+        enrichedEx.instructions = onlineEx.instructions || enrichedEx.instructions;
+        enrichedEx.gifUrl = onlineEx.gifUrl || enrichedEx.gifUrl;
+      }
+
       if (!localMap.has(key)) {
-        let enrichedEx = { ...localEx };
-        if (onlineMap.has(key)) {
-          const onlineEx = onlineMap.get(key);
-          enrichedEx.instructions = onlineEx.instructions || enrichedEx.instructions;
-          enrichedEx.gifUrl = onlineEx.gifUrl || enrichedEx.gifUrl;
-        }
         localMap.set(key, enrichedEx);
       } else {
         const existing = localMap.get(key);
-        if (!existing.ytVideo && localEx.ytVideo) {
-           existing.ytVideo = localEx.ytVideo;
+        // Jika latihan yang baru (localEx) adalah custom (id > 1000000 atau source === 'custom'),
+        // maka timpa latihan master yang sudah ada di Map.
+        if (localEx.id > 1000000 || localEx.source === 'custom') {
+          if (!enrichedEx.ytVideo && existing.ytVideo) enrichedEx.ytVideo = existing.ytVideo;
+          localMap.set(key, enrichedEx);
+        } else {
+          // Jika bukan custom (misal duplikat master), gabungkan saja ytVideo-nya
+          if (!existing.ytVideo && localEx.ytVideo) {
+             existing.ytVideo = localEx.ytVideo;
+          }
         }
       }
     });
@@ -432,19 +520,26 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
         const key = normalizeMuscleKey(m);
         return key === 'full_body' ? m : key; // Fallback jika tidak dikenali
       });
-      setFormData({ ...ex, target: normalizedTargets });
+      const finalInstructions = Array.isArray(ex.instructions) && ex.instructions.length > 0 ? ex.instructions : ['1. '];
+      const newData = { ...ex, target: normalizedTargets, instructions: finalInstructions };
+      setFormData(newData);
+      setOriginalData(newData);
     } else {
       setIsAdding(true);
       setEditingId(null);
       const normalizedTarget = Array.isArray(ex.target) ? ex.target.map(normalizeMuscleKey) : [normalizeMuscleKey(ex.target || 'Lainnya')];
-      setFormData({ 
+      const finalInstructions = Array.isArray(ex.instructions) && ex.instructions.length > 0 ? ex.instructions : ['1. '];
+      const newData = { 
         ...ex, 
         id: Date.now(), 
         source: 'custom',
         isFavorite: false,
         name: `${ex.name}`,
-        target: normalizedTarget
-      });
+        target: normalizedTarget,
+        instructions: finalInstructions
+      };
+      setFormData(newData);
+      setOriginalData(newData);
       setViewMode('custom');
     }
   };
@@ -454,6 +549,7 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
     setEditingId(null);
     setIsAdding(true);
     setFormData(blankExercise());
+    setOriginalData(null);
   };
 
   const handleSave = () => {
@@ -475,6 +571,7 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
       setIsAdding(false);
     }
     setFormData(blankExercise());
+    setOriginalData(null);
   };
 
   const handleCancel = () => {
@@ -482,6 +579,7 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
     setEditingId(null);
     setIsAdding(false);
     setFormData(blankExercise());
+    setOriginalData(null);
   };
 
   const handleDelete = (ex) => {
@@ -793,7 +891,7 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
 
       {/* Add / Edit Form Modal */}
       {isAdding && (
-        <ExerciseForm t={t} lang={lang} formData={formData} setFormData={setFormData} onSave={handleSave} onCancel={handleCancel} isEditing={false} />
+        <ExerciseForm t={t} lang={lang} formData={formData} setFormData={setFormData} originalData={originalData} onSave={handleSave} onCancel={handleCancel} isEditing={false} />
       )}
 
       {editingId !== null && (
@@ -802,6 +900,7 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
           lang={lang}
           formData={formData}
           setFormData={setFormData}
+          originalData={originalData}
           onSave={handleSave}
           onCancel={handleCancel}
           isEditing={true}

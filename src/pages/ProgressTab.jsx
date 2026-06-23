@@ -180,7 +180,13 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
         }
     }
 
-    const sortedItems = Array.from(itemsSet).sort((a,b) => (itemFreq[b] || 0) - (itemFreq[a] || 0));
+    const sortedItems = Array.from(itemsSet).sort((a,b) => {
+        const aRecent = recentItems.has(a);
+        const bRecent = recentItems.has(b);
+        if (aRecent && !bRecent) return -1;
+        if (!aRecent && bRecent) return 1;
+        return (itemFreq[b] || 0) - (itemFreq[a] || 0);
+    });
     return { data: finalDataPoints, items: sortedItems, recentItems: Array.from(recentItems) };
   }, [chartType, language, history, programs, exerciseLibrary, selectedDate, unitSystem]);
 
@@ -438,25 +444,15 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
 
         <div key={chartType} className="grid grid-rows-2 grid-flow-col gap-2 overflow-x-auto pb-2 hide-scrollbar auto-cols-max" style={{ WebkitOverflowScrolling: 'touch' }}>
           {chartDataObj.items.length === 0 && <span className={`body-md ${t.textMuted} italic`}>Belum ada data.</span>}
-          {(() => {
-             const activeItems = [];
-             const inactiveItems = [];
-             chartDataObj.items.forEach((item, idx) => {
-                 const isActive = activeChartLines.includes(item);
-                 const element = { item, idx, isActive };
-                 if (isActive) activeItems.push(element);
-                 else inactiveItems.push(element);
-             });
-             
-             return [...activeItems, ...inactiveItems].map(({ item, idx, isActive }) => {
-                 const color = chartColors[idx % chartColors.length];
-                 return (
-                   <button key={item} onClick={() => toggleChartLine(item)} className="px-3 py-1.5 rounded-full caption font-black transition-all border active:scale-95 whitespace-nowrap flex items-center justify-center h-8" style={{ backgroundColor: isActive ? color : 'transparent', borderColor: color, color: isActive ? '#fff' : color, opacity: isActive ? 1 : 0.5 }}>
-                     {chartType === 'muscle' ? formatTarget(item, lang?.id) : item}
-                   </button>
-                 )
-             });
-          })()}
+          {chartDataObj.items.map((item, idx) => {
+             const isActive = activeChartLines.includes(item);
+             const color = chartColors[idx % chartColors.length];
+             return (
+               <button key={item} onClick={() => toggleChartLine(item)} className="px-3 py-1.5 rounded-full caption font-black transition-all border active:scale-95 whitespace-nowrap flex items-center justify-center h-8" style={{ backgroundColor: isActive ? color : 'transparent', borderColor: color, color: isActive ? '#fff' : color, opacity: isActive ? 1 : 0.5 }}>
+                 {chartType === 'muscle' ? formatTarget(item, lang?.id) : item}
+               </button>
+             )
+          })}
         </div>
         
     </div>
