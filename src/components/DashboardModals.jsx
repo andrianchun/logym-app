@@ -300,7 +300,7 @@ const DashboardModals = ({
                   </div>
               )}
 
-              <div className="flex-1 overflow-y-auto space-y-4 body-md pb-6 hide-scrollbar px-5 pt-0">
+              <div className="flex-1 overflow-hidden space-y-4 body-md pb-2 px-5 pt-0">
                  {manualTab === 'komposisi' ? (
                    <div className="grid grid-cols-2 gap-2.5">
                          <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Berat Badan ({isImp ? 'lbs' : 'kg'})</label><SwipeInput language={lang?.id || 'ID'} value={formBio.weight === 0 ? '' : (isImp ? Math.round(formBio.weight * 2.20462 * 10)/10 : formBio.weight)} onChange={(val) => {
