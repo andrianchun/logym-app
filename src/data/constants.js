@@ -83,6 +83,7 @@ export const muscleOptions = Object.keys(muscleDictionary);
 
 export const normalizeMuscleKey = (str) => {
   if (!str) return 'full_body';
+  if (typeof str !== 'string') str = String(str);
   if (muscleDictionary[str]) return str;
   const s = str.toLowerCase().trim();
   if (s.includes('dada atas') || s.includes('upper chest')) return 'chest_upper';

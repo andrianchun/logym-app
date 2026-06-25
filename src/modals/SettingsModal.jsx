@@ -15,7 +15,8 @@ export default function SettingsModal({
   exportData, handleImportFile,
   user, handleLogout,
   biometricStandard, setBiometricStandard,
-  unitSystem, setUnitSystem
+  unitSystem, setUnitSystem,
+  userGeminiApiKey, setUserGeminiApiKey
 }) {
   if (!showSettings) return null;
 
@@ -170,6 +171,26 @@ export default function SettingsModal({
               </div>
             </div>
 
+          </div>
+
+          {/* 1.5 AI SCANNER SETTINGS */}
+          <div className={`p-5 rounded-2xl border ${t.border} ${t.bgApp} space-y-3`}>
+            <p className={`body-md ${t.textMuted} uppercase tracking-wider mb-2 flex items-center gap-2`}>
+              <Activity size={16} /> AI Scanner (Optional)
+            </p>
+            <div className="space-y-2">
+              <label className={`caption ${t.textMuted} block`}>Personal Gemini API Key (Fallback)</label>
+              <input 
+                type="password"
+                value={userGeminiApiKey || ''}
+                onChange={(e) => setUserGeminiApiKey(e.target.value)}
+                placeholder="AIzaSy..."
+                className={`w-full font-mono text-sm px-4 py-2.5 rounded-xl outline-none border ${t.border} focus:ring-2 ${t.ringAccent} ${t.inputBg} ${t.textMain}`}
+              />
+              <p className={`text-[10px] ${t.textMuted} leading-tight`}>
+                Tinggalkan kosong untuk memakai server bawaan. Jika server sedang sibuk, kamu bisa memasukkan API Key gratis dari <a href="https://aistudio.google.com" target="_blank" rel="noreferrer" className="text-blue-500 underline">Google AI Studio</a>.
+              </p>
+            </div>
           </div>
 
           {/* 2. FITUR EXPORT / IMPORT JSON */}

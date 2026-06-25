@@ -17,12 +17,27 @@ const CalendarTab = ({
   const isImp = unitSystem === 'imperial';
   const [calendarDate, setCalendarDate] = useState(new Date());
   
+  const [isTablet, setIsTablet] = useState(window.innerWidth >= 640);
   const [calendarMode, setCalendarMode] = useState('monthly');
+
+  useEffect(() => {
+    const handleResize = () => {
+      const tablet = window.innerWidth >= 640;
+      setIsTablet(tablet);
+      if (tablet && calendarMode === 'weekly') {
+        setCalendarMode('monthly');
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [calendarMode]);
+  
   const [showActionMenu, setShowActionMenu] = useState(null); 
   const [showProgramSelect, setShowProgramSelect] = useState(false);
   const [targetDateInput, setTargetDateInput] = useState('');
 
   const scrollContainerRef = useRef(null);
+  const calendarSliderRef = useRef(null);
 
   const [repeatDays, setRepeatDays] = useState(1);
   const [repeatCount, setRepeatCount] = useState(4);
@@ -30,6 +45,15 @@ const CalendarTab = ({
   const [expandedWorkoutId, setExpandedWorkoutId] = useState(null);
   const [notificationModalTarget, setNotificationModalTarget] = useState(null);
   const [slideDirection, setSlideDirection] = useState('right');
+  
+  const [detailSlideAnim, setDetailSlideAnim] = useState(null);
+  const changeSelectedDateWithAnim = (newDateStr) => {
+    if (newDateStr === selectedDate) return;
+    const isNext = newDateStr > selectedDate;
+    setDetailSlideAnim(isNext ? 'left' : 'right');
+    setSelectedDate(newDateStr);
+    setTimeout(() => setDetailSlideAnim(null), 300);
+  };
 
   // Swipe states for Header
   const touchStart = useRef(null);
@@ -104,12 +128,12 @@ const CalendarTab = ({
     const currentSelected = new Date(selectedDate);
     if (distanceX > 50 && Math.abs(distanceX) > Math.abs(distanceY)) { 
        currentSelected.setDate(currentSelected.getDate() + 1); 
-       setSelectedDate(getLocalYMD(currentSelected)); 
+       changeSelectedDateWithAnim(getLocalYMD(currentSelected)); 
        setCalendarDate(new Date(currentSelected));
        playSoundEffect('click', soundEnabled);
     } else if (distanceX < -50 && Math.abs(distanceX) > Math.abs(distanceY)) {
        currentSelected.setDate(currentSelected.getDate() - 1); 
-       setSelectedDate(getLocalYMD(currentSelected)); 
+       changeSelectedDateWithAnim(getLocalYMD(currentSelected)); 
        setCalendarDate(new Date(currentSelected));
        playSoundEffect('click', soundEnabled);
     }
@@ -505,7 +529,7 @@ const CalendarTab = ({
       wks.push({
         id: 'virtual_adhoc',
         programId: 'adhoc',
-        programName: 'Sesi Ekstra',
+        programName: 'Ekstra',
         status: 'planned',
         log: dData._activeSession.exerciseLogs || {},
         exercises: dData._activeSession.extraExercises
@@ -652,10 +676,13 @@ const CalendarTab = ({
             <div className="flex justify-between items-center mb-4">
             <button onClick={() => {
               playSoundEffect('click', soundEnabled);
-              setSlideDirection('left');
-              if (calendarMode === 'monthPicker') setCalendarDate(new Date(year - 1, month, 1));
-              else if (calendarMode === 'yearPicker') setCalendarDate(new Date(year - 12, month, 1));
-              else setCalendarDate(new Date(year, month - 1, 1));
+              if (calendarMode === 'monthly' || calendarMode === 'weekly') {
+                if (calendarSliderRef.current) calendarSliderRef.current.slideRight();
+              } else {
+                setSlideDirection('left');
+                if (calendarMode === 'monthPicker') setCalendarDate(new Date(year - 1, month, 1));
+                else if (calendarMode === 'yearPicker') setCalendarDate(new Date(year - 12, month, 1));
+              }
             }} className={`p-2 rounded-lg ${t.btnBg} hover:${t.bgAccentSoft} hover:${t.textAccent} transition-colors`}><ChevronLeft size={20}/></button>
             <button 
               onClick={() => {
@@ -671,10 +698,13 @@ const CalendarTab = ({
             </button>
             <button onClick={() => {
               playSoundEffect('click', soundEnabled);
-              setSlideDirection('right');
-              if (calendarMode === 'monthPicker') setCalendarDate(new Date(year + 1, month, 1));
-              else if (calendarMode === 'yearPicker') setCalendarDate(new Date(year + 12, month, 1));
-              else setCalendarDate(new Date(year, month + 1, 1));
+              if (calendarMode === 'monthly' || calendarMode === 'weekly') {
+                if (calendarSliderRef.current) calendarSliderRef.current.slideLeft();
+              } else {
+                setSlideDirection('right');
+                if (calendarMode === 'monthPicker') setCalendarDate(new Date(year + 1, month, 1));
+                else if (calendarMode === 'yearPicker') setCalendarDate(new Date(year + 12, month, 1));
+              }
             }} className={`p-2 rounded-lg ${t.btnBg} hover:${t.bgAccentSoft} hover:${t.textAccent} transition-colors`}><ChevronRight size={20}/></button>
           </div>
         
@@ -711,6 +741,7 @@ const CalendarTab = ({
               {(weekStartDay === 1 ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'] : ['S', 'M', 'T', 'W', 'T', 'F', 'S']).map((day, i) => (<div key={i} className={`text-center caption uppercase ${t.textMuted}`}>{day}</div>))}
             </div>
             <PanoramicSlider
+              ref={calendarSliderRef}
               onSwipeLeft={() => {
                 playSoundEffect('click', soundEnabled);
                 setSlideDirection('right');
@@ -719,7 +750,7 @@ const CalendarTab = ({
                   setCalendarDate(newDate);
                   const newSelected = new Date(selectedDate);
                   newSelected.setDate(newSelected.getDate() + 7);
-                  setSelectedDate(getLocalYMD(newSelected));
+                  changeSelectedDateWithAnim(getLocalYMD(newSelected));
                 } else {
                   setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 1));
                 }
@@ -732,7 +763,7 @@ const CalendarTab = ({
                   setCalendarDate(newDate);
                   const newSelected = new Date(selectedDate);
                   newSelected.setDate(newSelected.getDate() - 7);
-                  setSelectedDate(getLocalYMD(newSelected));
+                  changeSelectedDateWithAnim(getLocalYMD(newSelected));
                 } else {
                   setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() - 1, 1));
                 }
@@ -767,7 +798,7 @@ const CalendarTab = ({
                       return (
                         <div
                           key={dateKey}
-                          onClick={() => { playSoundEffect('click', soundEnabled); setSelectedDate(dateKey); setShowProgramSelect(false); setShowActionMenu(null); }}
+                          onClick={() => { playSoundEffect('click', soundEnabled); changeSelectedDateWithAnim(dateKey); setShowProgramSelect(false); setShowActionMenu(null); }}
                           draggable={workouts.length > 0}
                           onDragStart={(e) => handleDragStart(e, dateKey)}
                           onDragOver={(e) => e.preventDefault()}
@@ -795,13 +826,13 @@ const CalendarTab = ({
         <div className="flex items-center justify-center relative pt-3 pb-3 mb-2 mt-2">
             {(selectedDate !== todayStr || calendarDate.getMonth() !== new Date().getMonth() || calendarDate.getFullYear() !== new Date().getFullYear()) && (
               <button
-                onClick={() => { playSoundEffect('click', soundEnabled); setSelectedDate(todayStr); setCalendarDate(new Date()); }}
+                onClick={() => { playSoundEffect('click', soundEnabled); changeSelectedDateWithAnim(todayStr); setCalendarDate(new Date()); }}
                 className={`absolute right-4 text-[10px] font-bold px-3 py-1 rounded-full ${t.bgAccent} text-white hover:opacity-80 transition-opacity shadow-sm`}
               >
                 Hari Ini
               </button>
             )}
-            {(calendarMode === 'monthly' || calendarMode === 'weekly') && (
+            {(calendarMode === 'monthly' || calendarMode === 'weekly') && !isTablet && (
               <button 
                 onClick={() => { playSoundEffect('click', soundEnabled); if (calendarMode === 'monthly') setCalendarDate(new Date(selectedDate)); setCalendarMode(calendarMode === 'monthly' ? 'weekly' : 'monthly'); }}
                 className="text-zinc-500 hover:text-emerald-500 transition-colors"
@@ -819,7 +850,7 @@ const CalendarTab = ({
          ref={scrollContainerRef}
          className={`flex-1 flex flex-col overflow-y-auto hide-scrollbar pb-6 pt-10 sm:pt-6 px-3 sm:px-6 animate-in fade-in rounded-b-3xl sm:rounded-2xl border border-t-0 sm:border-t ${t.border} ${theme === 'dark' ? 'bg-[#061626]' : 'bg-[#f0f2f5]'} shadow-inner -mt-6 sm:mt-2 sm:mb-2 relative z-0`}
          onScroll={(e) => {
-            if (e.currentTarget.scrollTop > 20 && calendarMode === 'monthly') {
+            if (e.currentTarget.scrollTop > 20 && calendarMode === 'monthly' && !isTablet) {
                setCalendarDate(new Date(selectedDate));
                setCalendarMode('weekly');
             }
@@ -842,12 +873,12 @@ const CalendarTab = ({
                    playSoundEffect('click', soundEnabled);
                }}
                onDownSwipe={() => {
-                   if (scrollContainerRef.current && scrollContainerRef.current.scrollTop <= 10 && calendarMode === 'weekly') {
+                   if (scrollContainerRef.current && scrollContainerRef.current.scrollTop <= 10 && calendarMode === 'weekly' && !isTablet) {
                        setCalendarMode('monthly');
                    }
                }}
                onUpSwipe={() => {
-                   if (calendarMode === 'monthly') {
+                   if (calendarMode === 'monthly' && !isTablet) {
                        setCalendarMode('weekly');
                    }
                }}
@@ -856,14 +887,27 @@ const CalendarTab = ({
                    if (panelType === 'prev') d.setDate(d.getDate() - 1);
                    else if (panelType === 'next') d.setDate(d.getDate() + 1);
                    const targetDateStr = getLocalYMD(d);
-                   const panelWorkouts = getSelectedWorkoutsForDate(targetDateStr);
+                   let panelWorkouts = getSelectedWorkoutsForDate(targetDateStr);
+                   // Filter out 'planned' workouts if their parent plan is inactive
+                   panelWorkouts = panelWorkouts.filter(w => {
+                      if (w.status === 'completed' || w.programId === 'adhoc') return true;
+                      const prog = programs.find(p => p.id === w.programId);
+                      if (!prog) return false; // Hide planned workouts if program is deleted
+                      const pPlanId = prog.planId || 'custom';
+                      return activePlanIds.includes(pPlanId);
+                   });
+
 
                    const isTargetPastOrToday = d <= new Date(); // roughly check if target date is in past/today for hasCompleted/hasPlanned
                    const hasTargetCompleted = panelWorkouts.some(w => checkIsCompletedStrict(w, targetDateStr));
                    const hasTargetPlanned = panelWorkouts.length > 0;
 
+                   const isCurr = panelType === 'curr';
                    return (
-                     <div className="flex flex-col h-full">
+                     <div 
+                        key={isCurr ? selectedDate : panelType}
+                        className={`flex flex-col h-full ${isCurr && detailSlideAnim ? `anim-slide-${detailSlideAnim}` : ''}`}
+                     >
                        <div className="px-3 sm:px-6 pb-6 flex flex-col gap-3">
                          {(hasTargetCompleted || hasTargetPlanned) && (
                              <div className="flex gap-2">
@@ -943,7 +987,7 @@ const CalendarTab = ({
                                   const prog = w.programId === 'adhoc' 
                                     ? null
                                     : programs.find(p => p.id === w.programId);
-                                  const parentPlanName = prog?.planName || (prog?.planId ? 'Latihan Kustom' : 'Sesi Ekstra');
+                                  const parentPlanName = prog?.planName || (prog?.planId ? 'Latihan Kustom' : 'Ekstra');
                                   if (!acc[parentPlanName]) acc[parentPlanName] = [];
                                   acc[parentPlanName].push(w);
                                   return acc;
@@ -961,7 +1005,7 @@ const CalendarTab = ({
                                       const isCompleted = checkIsCompletedStrict(w, targetDateStr);
                                       const isExpanded = expandedWorkoutId === w.id;
                                       const prog = w.programId === 'adhoc' 
-                                        ? { id: 'adhoc', name: w.programName || 'Sesi Ekstra', exercises: w.exercises || [] }
+                                        ? { id: 'adhoc', name: w.programName || 'Ekstra', exercises: w.exercises || [] }
                                         : programs.find(p => p.id === w.programId);
                                        
                                       const dData = history[targetDateStr] || {};
@@ -974,7 +1018,7 @@ const CalendarTab = ({
                                       const estDuration = Math.round((w.overriddenExercises || prog?.exercises || []).reduce((acc, ex) => acc + (parseInt(ex.sets) || 3), 0) * (45 + (parseInt(w.restTime) || parseInt(prog?.restTime) || 90)) / 60) || 0;
 
                                              return (
-                                         <div key={w.id} className={`p-4 rounded-2xl ${isCompleted ? 'border ' + t.borderAccentSoft + ' ' + t.bgAccentSoft : 'border-2 border-dashed ' + t.borderAccentSoft + ' bg-black/5 dark:bg-white/5'} flex flex-col relative transition-all ${isExpanded ? 'ring-2 ' + t.ringAccent : 'hover:scale-[1.02] cursor-pointer'}`} onClick={() => { if(!isExpanded) { playSoundEffect('click', soundEnabled); setExpandedWorkoutId(w.id); setCalendarDate(new Date(targetDateStr)); setCalendarMode('weekly'); } }}>
+                                         <div id={`workout-card-${w.programId}`} key={w.id} className={`p-4 rounded-2xl ${isCompleted ? 'border ' + t.borderAccentSoft + ' ' + t.bgAccentSoft : 'border-2 border-dashed ' + t.borderAccentSoft + ' bg-black/5 dark:bg-white/5'} flex flex-col relative transition-all ${isExpanded ? 'ring-2 ' + t.ringAccent : 'hover:scale-[1.02] cursor-pointer'}`} onClick={() => { if(!isExpanded) { playSoundEffect('click', soundEnabled); setExpandedWorkoutId(w.id); setCalendarDate(new Date(targetDateStr)); setCalendarMode('weekly'); } }}>
                                            <div className="absolute top-3 right-3 flex items-center gap-1 z-10">
                                              <button onClick={(e) => { e.stopPropagation(); removeWorkout(w.id); }} className="p-1.5 text-rose-500/50 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors" title="Hapus Jadwal">
                                                <X size={16} />
@@ -1055,9 +1099,11 @@ const CalendarTab = ({
                                                </div>
                                                <div className="flex gap-2">
                                                   <button onClick={(e) => { e.stopPropagation(); setExpandedWorkoutId(null); setCalendarMode('monthly'); }} className={`flex-1 py-3 rounded-xl border border-dashed ${t.border} body-lg font-bold`}>Tutup</button>
-                                                  <button onClick={(e) => { e.stopPropagation(); const hasExercises = w.exercises && w.exercises.length > 0; if (!isCompleted && !hasExercises) { playSoundEffect('click', soundEnabled); navigateToWorkoutDate(targetDateStr, w.programId); } else { handleEditPastWorkout(targetDateStr, w); } }} className={`flex-[2] py-3 rounded-xl ${t.bgAccent} text-white font-black body-lg flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all`}>
-                                                    <Edit2 size={16} /> {isCompleted ? 'Edit Riwayat' : ((w.exercises && w.exercises.length > 0) ? 'Mulai Latihan' : 'Edit Latihan')}
-                                                  </button>
+                                                  {(!isCompleted || getExercisesForWorkout(w).length > 0) && (
+                                                    <button onClick={(e) => { e.stopPropagation(); const hasExercises = getExercisesForWorkout(w).length > 0; if (!isCompleted && !hasExercises) { playSoundEffect('click', soundEnabled); navigateToWorkoutDate(targetDateStr, w.programId); } else { handleEditPastWorkout(targetDateStr, w); } }} className={`flex-[2] py-3 rounded-xl ${t.bgAccent} text-white font-black body-lg flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all`}>
+                                                      <Edit2 size={16} /> {isCompleted ? 'Edit Riwayat' : (getExercisesForWorkout(w).length > 0 ? 'Mulai Latihan' : 'Edit Latihan')}
+                                                    </button>
+                                                  )}
                                                </div>
                                              </div>
                                            )}
@@ -1072,54 +1118,12 @@ const CalendarTab = ({
                          </div>
 
                          {activePlanIds.length > 0 && (
-                           !showProgramSelect ? (
                              <button 
                                 onClick={() => setShowProgramSelect(true)}
                                 className={`w-full py-4 rounded-2xl border-2 border-dashed ${t.borderAccentSoft} ${t.textAccent} font-bold body-lg flex items-center justify-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors`}
                              >
-                                <Plus size={18} /> Tambah Program
+                                <Plus size={18} /> Tambah Sesi
                              </button>
-                           ) : (
-                             <div className="animate-in fade-in slide-in-from-top-2 duration-200">
-                                <div className="flex items-center justify-between mb-3">
-                                  <p className="font-bold body-md">Pilih Program:</p>
-                                  <button onClick={() => setShowProgramSelect(false)} className={`p-1.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10 ${t.textMain}`}>
-                                    <X size={16} />
-                                  </button>
-                                </div>
-                                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                                  {
-                                    (() => {
-                                      const filteredProgs = programs.filter(p => activePlanIds.includes('custom') ? (!p.planId || p.planId === 'custom') : activePlanIds.includes(p.planId));
-                                      const grouped = filteredProgs.reduce((acc, p) => {
-                                        const planName = p.planName || 'Latihan Kustom';
-                                        if (!acc[planName]) acc[planName] = [];
-                                        acc[planName].push(p);
-                                        return acc;
-                                      }, {});
-                                      
-                                      return Object.entries(grouped).map(([gName, progs]) => (
-                                        <div key={gName} className="mb-4 last:mb-0">
-                                          <p className={`text-xs font-black mb-2 px-1 uppercase tracking-wider ${t.textAccent}`}>{gName}</p>
-                                          <div className="space-y-2">
-                                            {progs.map(p => (
-                                               <button 
-                                                 key={p.id} 
-                                                 onClick={() => addWorkoutToDate(p)}
-                                                 className={`w-full p-3.5 rounded-xl border-2 border-transparent bg-black/5 dark:bg-white/5 text-left body-lg font-bold hover:border-black/10 dark:hover:border-white/10 hover:${t.bgAccentSoft} hover:${t.textAccent} transition-all flex justify-between items-center`}
-                                               >
-                                                 {p.name}
-                                                 <Plus size={18} className="opacity-50" />
-                                               </button>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      ));
-                                    })()
-                                  }
-                                </div>
-                             </div>
-                           )
                          )}
 
                          {panelWorkouts.some(w => !checkIsCompletedStrict(w, targetDateStr)) && targetDateStr === todayStr && (
@@ -1138,6 +1142,77 @@ const CalendarTab = ({
             </div>
       </div>
     </div>
+
+      {/* JADWALKAN SESI DIALOG */}
+      {showProgramSelect && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center px-6" onClick={() => setShowProgramSelect(false)}>
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm animate-in fade-in duration-200" />
+          <div 
+            className={`relative w-full max-w-xs rounded-3xl p-5 shadow-2xl border ${t.border} animate-in zoom-in-95 fade-in duration-300`}
+            style={{ 
+              background: (t.bgCard?.includes('0a1f32') || t.bgCard?.includes('040f1a')) 
+                ? 'rgba(15, 40, 60, 0.65)' 
+                : 'rgba(255, 255, 255, 0.65)', 
+              backdropFilter: 'blur(40px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(40px) saturate(180%)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl ${t.bgAccentSoft} flex items-center justify-center`}>
+                  <CalendarPlus size={20} className={t.textAccent} />
+                </div>
+                <h3 className={`font-black body-lg ${t.textMain}`}>Jadwalkan Sesi</h3>
+              </div>
+              <button onClick={() => setShowProgramSelect(false)} className={`p-2 rounded-full hover:bg-black/10 dark:hover:bg-white/10 ${t.textMuted}`}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className={`h-px mb-4 ${(t.bgCard?.includes('0a1f32') || t.bgCard?.includes('040f1a')) ? 'bg-white/10' : 'bg-black/10'}`} />
+
+            <div className="space-y-4 max-h-64 overflow-y-auto pr-1">
+              {(() => {
+                const filtered = programs.filter(p => activePlanIds.includes(p.planId || 'custom'));
+                const grouped = filtered.reduce((acc, p) => {
+                  const key = p.planName || 'Kustom';
+                  if (!acc[key]) acc[key] = [];
+                  acc[key].push(p);
+                  return acc;
+                }, {});
+                return Object.entries(grouped).map(([gName, progs]) => (
+                  <div key={gName}>
+                    <p className={`text-[10px] font-black uppercase tracking-wider ${t.textMuted} mb-2 px-1`}>{gName}</p>
+                    <div className="space-y-1.5">
+                      {progs.map(p => (
+                        <button 
+                          key={p.id} 
+                          onClick={() => addWorkoutToDate(p)}
+                          className={`w-full p-3 rounded-xl text-left body-lg font-bold transition-all flex justify-between items-center ${t.textMain}`}
+                          style={{ background: (t.bgCard?.includes('0a1f32') || t.bgCard?.includes('040f1a')) ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }}
+                        >
+                          {p.name}
+                          <Plus size={16} className="opacity-40" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+
+            <div className={`h-px mt-4 mb-3 ${(t.bgCard?.includes('0a1f32') || t.bgCard?.includes('040f1a')) ? 'bg-white/10' : 'bg-black/10'}`} />
+
+            <button 
+              onClick={() => { playSoundEffect('click', soundEnabled); setShowProgramSelect(false); setActiveTab('program'); }}
+              className={`w-full py-3 rounded-2xl text-center caption font-bold ${t.textMuted} hover:${t.textAccent} transition-colors`}
+            >
+              Kelola Program →
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* NOTIFICATION MODAL */}
       {notificationModalTarget && (

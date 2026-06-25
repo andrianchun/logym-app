@@ -255,9 +255,11 @@ const ExerciseCard = ({
             {exType === 'time' && <div>Menit</div>}
             {exType !== 'time' && <div>Reps</div>}
             {onAddWarmupSets && exType === 'weight' ? (
-              <button onClick={() => { playSoundEffect('click', soundEnabled); onAddWarmupSets(ex.id); }} className={`col-span-2 py-1.5 caption border border-rose-500/30 bg-rose-500/10 rounded-lg text-rose-500 hover:bg-rose-500/20 transition-colors flex items-center justify-center font-bold whitespace-nowrap`} title="Buat Set Pemanasan Otomatis">
-                Pemanasan
-              </button>
+              <div className="col-span-2 flex justify-center w-full pr-1">
+                <button onClick={() => { playSoundEffect('click', soundEnabled); onAddWarmupSets(ex.id); }} className={`w-full max-w-[76px] py-1 caption border ${t.borderAccentSoft} bg-black/5 dark:bg-white/5 rounded-lg ${t.textAccent} hover:${t.bgAccentSoft} transition-colors flex items-center justify-center font-bold whitespace-nowrap`} title="Buat Set Pemanasan Otomatis">
+                  Pemanasan
+                </button>
+              </div>
             ) : (
               <>
                 <div></div>
@@ -282,7 +284,7 @@ const ExerciseCard = ({
                       }
                     }}
                     onBlur={() => setDeletingSetIdx(null)}
-                    className={`body-md rounded w-full max-w-[40px] h-8 flex items-center justify-center transition-all ${deletingSetIdx === setIdx ? 'bg-rose-500 text-white shadow-lg scale-110' : (s.type === 'warmup' ? t.btnBg + ' border border-rose-500/30 text-rose-500' : t.btnBg)}`}
+                    className={`body-md rounded w-full max-w-[40px] h-8 flex items-center justify-center transition-all ${deletingSetIdx === setIdx ? 'bg-rose-500 text-white shadow-lg scale-110' : (s.type === 'warmup' ? t.btnBg + ' border ' + t.borderAccentSoft + ' ' + t.textAccent : t.btnBg)}`}
                   >
                     {deletingSetIdx === setIdx ? <X size={14}/> : (s.type === 'warmup' ? <Flame size={14} className="opacity-80"/> : getWorkingSetNumber(setIdx))}
                   </button>

@@ -3,7 +3,7 @@ import { TrendingUp } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
 import { getLocalYMD, formatTarget, normalizeMuscleKey } from '../data/constants';
 
-const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibrary, soundEnabled, playSoundEffect, selectedDate, unitSystem }) => {
+const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibrary, soundEnabled, playSoundEffect, selectedDate, unitSystem, activePlanIds }) => {
   const [chartType, setChartType] = useState('exercise');
   const [activeChartLines, setActiveChartLines] = useState([]);
 
@@ -240,12 +240,42 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
   }, [chartDataObj, selectedDate, activeChartLines]);
 
   useEffect(() => { 
-    if (chartDataObj.recentItems && chartDataObj.recentItems.length > 0) {
-        setActiveChartLines(chartDataObj.recentItems);
-    } else {
-        setActiveChartLines(chartDataObj.items.slice(0, 3)); 
+    let activeItems = [];
+    if (activePlanIds && activePlanIds.length > 0) {
+      const activeProgs = programs.filter(p => activePlanIds.includes(p.planId || 'custom'));
+      activeProgs.forEach(prog => {
+        prog.exercises?.forEach(ex => {
+          if (chartType === 'exercise') {
+            activeItems.push(ex.name);
+          } else if (chartType === 'muscle') {
+            const libEx = exerciseLibrary.find(e => e.id === ex.id);
+            if (libEx && libEx.target) {
+              const targets = Array.isArray(libEx.target) ? libEx.target : [libEx.target];
+              targets.forEach(muscle => {
+                if (typeof muscle === 'string' && muscle) {
+                  const mKey = normalizeMuscleKey(muscle);
+                  activeItems.push(formatTarget(mKey, lang.progress));
+                }
+              });
+            }
+          }
+        });
+      });
     }
-  }, [chartType, chartDataObj]);
+    
+    // Ensure uniqueness
+    activeItems = [...new Set(activeItems)];
+    
+    // Filter to only include items that actually exist in chartDataObj.items
+    const validActiveItems = activeItems.filter(item => chartDataObj.items.includes(item));
+
+    if (validActiveItems.length > 0) {
+        setActiveChartLines(validActiveItems);
+    } else {
+        // Fallback to top 6 most frequent/recent items
+        setActiveChartLines(chartDataObj.items.slice(0, 6)); 
+    }
+  }, [chartType, chartDataObj, activePlanIds, programs, exerciseLibrary, lang.progress]);
 
   // Pinch-to-zoom logic
   const [pointWidth, setPointWidth] = useState(55);

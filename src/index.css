@@ -49,6 +49,22 @@ input:disabled { opacity: 0.5; }
     0% { background-color: rgba(14, 165, 233, 0.5); }
     100% { background-color: inherit; }
 }
+
+@keyframes customSlideInFromRight {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+@keyframes customSlideInFromLeft {
+    from { transform: translateX(-100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+.anim-slide-left {
+    animation: customSlideInFromRight 0.3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+.anim-slide-right {
+    animation: customSlideInFromLeft 0.3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
 .flash-glow { animation: flashGlow 0.5s ease-out; }
 svg:focus, .recharts-wrapper:focus, .recharts-surface:focus { outline: none !important; }
 .scrollbar-hide::-webkit-scrollbar { display: none; }

@@ -123,10 +123,24 @@ const SortableExerciseItem = ({ ex, prevEx, idx, routineId, t, lang, soundEnable
   );
 };
 
-const ProgramTab = ({ setConfirmModal, t, lang, programs, setPrograms, exerciseLibrary, soundEnabled, setActiveAddModalTarget, saveStateToHistory, openQuestionnaire, activePlanIds = [], setActivePlanIds, gymProfiles }) => {
+const ProgramTab = ({ setConfirmModal, t, lang, programs, setPrograms, exerciseLibrary, soundEnabled, setActiveAddModalTarget, saveStateToHistory, openQuestionnaire, activePlanIds = [], setActivePlanIds, gymProfiles, focusRoutineId, setFocusRoutineId }) => {
   
   const isDark = t.bgCard !== 'bg-white';
   const [expandedRoutineId, setExpandedRoutineId] = useState(null);
+
+  useEffect(() => {
+    if (focusRoutineId) {
+      setExpandedRoutineId(focusRoutineId);
+      setTimeout(() => {
+        const el = document.getElementById(`routine-${focusRoutineId}`);
+        if (el) {
+          const y = el.getBoundingClientRect().top + window.scrollY - 100;
+          window.scrollTo({ top: y, behavior: 'smooth' });
+        }
+        if (setFocusRoutineId) setFocusRoutineId(null);
+      }, 300); // Wait for expand animation
+    }
+  }, [focusRoutineId, setFocusRoutineId]);
   const [warmupUrlInput, setWarmupUrlInput] = useState('');
   const [reorderingId, setReorderingId] = useState(null); 
   const [draggedExId, setDraggedExId] = useState(null);
@@ -688,7 +702,7 @@ const ProgramTab = ({ setConfirmModal, t, lang, programs, setPrograms, exerciseL
                   const isExpanded = expandedRoutineId === routine.id;
                   const estDuration = Math.round(routine.exercises.reduce((acc, ex) => acc + (parseInt(ex.sets) || 3), 0) * (45 + (parseInt(routine.restTime) || 90)) / 60);
                   return (
-                    <div key={routine.id} className={`border-t ${t.border}`}>
+                    <div id={`routine-${routine.id}`} key={routine.id} className={`border-t ${t.border}`}>
                       <div 
                         onClick={() => { if(!isExpanded) { playSoundEffect('swipe', soundEnabled); setExpandedRoutineId(routine.id); } }}
                         className={`w-full px-5 py-4 transition-colors ${isExpanded ? t.bgAccentSoft : `hover:${t.inputBg} cursor-pointer`}`}

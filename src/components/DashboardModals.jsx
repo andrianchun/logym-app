@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Check, CalendarDays, Loader2, ShieldAlert, HeartPulse } from 'lucide-react';
+import { X, Check, CalendarDays, Loader2, ShieldAlert, HeartPulse, Camera } from 'lucide-react';
 import { playSoundEffect } from '../utils/audio';
 import SwipeInput from './SwipeInput';
+import { extractBiometricsFromImage } from '../utils/aiVision';
 
 // --- IMPORT CAPACITOR & HEALTH CONNECT BARU ---
 import { Capacitor } from '@capacitor/core';
@@ -12,11 +13,67 @@ const DashboardModals = ({
   t, lang, showSyncModal, setShowSyncModal, connectedApps, handleToggleApp,
   showManualModal, setShowManualModal, manualTab, setManualTab, 
   modalDate, setModalDate, formBio, setFormBio, bioData,
-  handleSaveManualData, handleDeleteBioData, soundEnabled, unitSystem, setConfirmModal
+  handleSaveManualData, handleDeleteBioData, soundEnabled, unitSystem, setConfirmModal,
+  userGeminiApiKey
 }) => {
   const isImp = unitSystem === 'imperial';
 
   const [authSim, setAuthSim] = useState(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanError, setScanError] = useState('');
+
+  const handleAIScan = async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      setIsScanning(true);
+      setScanError('');
+      playSoundEffect('click', soundEnabled);
+
+      try {
+          const reader = new FileReader();
+          reader.readAsDataURL(file);
+          reader.onload = async () => {
+              const base64Data = reader.result.split(',')[1];
+              const mimeType = file.type;
+
+              try {
+                  const aiData = await extractBiometricsFromImage(base64Data, mimeType, userGeminiApiKey);
+                  setFormBio(prev => {
+                      const newBio = { ...prev };
+                      if (aiData.weight) newBio.weight = aiData.weight;
+                      if (aiData.bodyFat) newBio.bodyFat = aiData.bodyFat;
+                      if (aiData.muscleMass) newBio.muscleMass = aiData.muscleMass;
+                      if (aiData.steps) newBio.steps = aiData.steps;
+                      if (aiData.activeMinutes) newBio.activeMinutes = aiData.activeMinutes;
+                      if (aiData.activityCalories) newBio.activityCalories = aiData.activityCalories;
+                      if (aiData.sleep) newBio.sleep = aiData.sleep;
+                      if (aiData.energyScore) newBio.energyScore = aiData.energyScore;
+                      if (aiData.heartRate) newBio.heartRate = aiData.heartRate;
+                      if (aiData.bloodPressure) newBio.bloodPressure = aiData.bloodPressure;
+                      return newBio;
+                  });
+                  playSoundEffect('success', soundEnabled);
+              } catch (err) {
+                  if (err.message === 'RATE_LIMIT_EXCEEDED') {
+                      setScanError('Server penuh. Masukkan API Key pribadimu di Pengaturan untuk bypass limit.');
+                  } else {
+                      setScanError(err.message || 'Gagal membaca gambar');
+                  }
+              } finally {
+                  setIsScanning(false);
+              }
+          };
+          reader.onerror = () => {
+              setScanError('Gagal memuat gambar');
+              setIsScanning(false);
+          };
+      } catch (err) {
+          setScanError('Gagal memproses gambar');
+          setIsScanning(false);
+      }
+      e.target.value = '';
+  };
 
   const triggerConnection = async (appKey) => {
       playSoundEffect('click', soundEnabled);
@@ -149,6 +206,10 @@ const DashboardModals = ({
                     </div>
                  </div>
                  <div className="flex space-x-2">
+                     <label className={`p-2 rounded-full ${isScanning ? 'bg-zinc-500/20 text-zinc-500' : 'bg-blue-500/10 text-blue-500 hover:bg-blue-500/20'} transition-colors cursor-pointer`} title="Scan Foto via AI">
+                         {isScanning ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
+                         <input type="file" accept="image/*" capture="environment" onChange={handleAIScan} className="hidden" disabled={isScanning} />
+                     </label>
                      <button 
                          onClick={() => { 
                              setConfirmModal({
@@ -174,6 +235,13 @@ const DashboardModals = ({
                      <button onClick={() => setManualTab('harian')} className={`flex-1 py-2 rounded-full caption font-black relative z-10 transition-colors duration-300 ${manualTab === 'harian' ? 'text-white' : t.textMuted}`}>Data Harian</button>
                  </div>
               </div>
+
+              {scanError && (
+                  <div className="mx-5 mb-2 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-start space-x-2">
+                      <ShieldAlert size={16} className="text-rose-500 shrink-0 mt-0.5" />
+                      <p className="text-xs text-rose-500 leading-tight">{scanError}</p>
+                  </div>
+              )}
 
               <div className="flex-1 overflow-y-auto space-y-4 body-md pb-6 hide-scrollbar px-5 pt-2">
                  {manualTab === 'komposisi' ? (

@@ -32,7 +32,7 @@ const MiniBox = ({ label, value, unit, t, theme }) => (
     </div>
 );
 
-const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, exerciseLibrary, navigateToWorkoutDate, soundEnabled, playSoundEffect, theme, selectedDate, biometricStandard, unitSystem, setConfirmModal, activityTargets, setActivityTargets, gymProfiles, activeGymId }) => {
+const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, exerciseLibrary, navigateToWorkoutDate, soundEnabled, playSoundEffect, theme, selectedDate, biometricStandard, unitSystem, setConfirmModal, activityTargets, setActivityTargets, gymProfiles, activeGymId, activePlanIds, userGeminiApiKey }) => {
   const todayStr = getLocalYMD(new Date());
   const activeDate = todayStr; // Selalu tampilkan hari ini, terlepas dari kalender latihan
 
@@ -523,6 +523,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
               soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
               selectedDate={selectedDate}
               isSubCard={false}
+              activePlanIds={activePlanIds}
               unitSystem={unitSystem}
             />
             <button 
@@ -555,7 +556,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
         showManualModal={showManualModal} setShowManualModal={setShowManualModal} manualTab={manualTab} setManualTab={setManualTab}
         modalDate={modalDate} setModalDate={setModalDate} formBio={formBio} setFormBio={setFormBio} bioData={bioData}
         handleSaveManualData={handleSaveManualData} handleDeleteBioData={handleDeleteBioData} soundEnabled={soundEnabled}
-        unitSystem={unitSystem} setConfirmModal={setConfirmModal}
+        unitSystem={unitSystem} setConfirmModal={setConfirmModal} userGeminiApiKey={userGeminiApiKey}
       />
 
       {/* DETAIL BIOMETRIK MODAL */}

@@ -56,34 +56,38 @@ const WorkoutTab = ({
 
   const todayStr = getLocalYMD(new Date());
 
-  let sourceWorkouts = (history[selectedDate]?.workouts || []).filter(w => {
-    const p = programs.find(prog => prog.id === w.programId);
-    const wPlanId = (p ? p.planId : null) || 'custom';
-    
-    if (w.programId !== 'adhoc') {
-        if (!activePlanIds.includes(wPlanId)) return false;
-    }
-    return true;
-  });
+  let sourceWorkouts = [...(history[selectedDate]?.workouts || [])];
   
-  if (sourceWorkouts.length === 0) {
-    if (selectedDate >= todayStr && activePlanIds.length > 0) {
-      const planRoutines = programs.filter(p => activePlanIds.includes(p.planId || 'custom'));
-      if (planRoutines.length > 0) {
-        const dateObj = new Date(selectedDate);
-        const dayName = DAY_MAP[dateObj.getDay()];
-        
-        const projectedRoutines = planRoutines.filter(r => r.assignedDays && r.assignedDays.includes(dayName));
-        if (projectedRoutines.length > 0) {
-          sourceWorkouts = projectedRoutines.map(pr => ({
-            id: `projected_${pr.id}_${selectedDate}`,
-            programId: pr.id,
-            programName: pr.name,
-            status: 'planned',
-            isProjected: true,
-            log: {}
-          }));
-        }
+  // Filter out 'planned' workouts if their parent plan is inactive
+  sourceWorkouts = sourceWorkouts.filter(w => {
+     if (w.status === 'completed' || w.programId === 'adhoc') return true;
+     const prog = programs.find(p => p.id === w.programId);
+     if (!prog) return false; // Hide planned workouts if program is deleted
+     const pPlanId = prog.planId || 'custom';
+     return activePlanIds.includes(pPlanId);
+  });
+
+  if (selectedDate >= todayStr && activePlanIds.length > 0) {
+    const planRoutines = programs.filter(p => activePlanIds.includes(p.planId || 'custom'));
+    if (planRoutines.length > 0) {
+      const dateObj = new Date(selectedDate);
+      const dayName = DAY_MAP[dateObj.getDay()];
+      
+      const projectedRoutines = planRoutines.filter(r => r.assignedDays && r.assignedDays.includes(dayName));
+      if (projectedRoutines.length > 0) {
+        projectedRoutines.forEach(pr => {
+          const alreadyInHistory = sourceWorkouts.some(w => w.programId === pr.id);
+          if (!alreadyInHistory) {
+            sourceWorkouts.push({
+              id: `projected_${pr.id}_${selectedDate}`,
+              programId: pr.id,
+              programName: pr.name,
+              status: 'planned',
+              isProjected: true,
+              log: {}
+            });
+          }
+        });
       }
     }
   }
@@ -91,7 +95,7 @@ const WorkoutTab = ({
   const activeProgramsList = sourceWorkouts
     .map(w => {
       if (w.programId === 'adhoc') {
-         return { id: 'adhoc', name: w.programName || 'Sesi Ekstra', exercises: w.exercises || [], workoutId: w.id, status: w.status, log: w.log };
+         return { id: 'adhoc', name: w.programName || 'Ekstra', exercises: w.exercises || [], workoutId: w.id, status: w.status, log: w.log };
       }
       const p = programs.find(p => p.id === w.programId);
       return p ? { 
@@ -119,6 +123,13 @@ const WorkoutTab = ({
          if (found) targetWorkoutId = found.workoutId;
       }
       setExpandedSessions({ [targetWorkoutId]: true });
+      setTimeout(() => {
+        const el = document.getElementById(`session-${targetWorkoutId}`);
+        if (el) {
+          const y = el.getBoundingClientRect().top + window.scrollY - 80;
+          window.scrollTo({ top: y, behavior: 'smooth' });
+        }
+      }, 100);
       setFocusWorkoutId(null);
     } else if (activeProgramsList.length > 0 && Object.keys(expandedSessions).length === 0 && !hasAutoExpanded.current) {
       setExpandedSessions({ [activeProgramsList[0].workoutId]: true });
@@ -523,18 +534,18 @@ const WorkoutTab = ({
               {activeProgramsList.map((prog, pIdx) => {
                 const isExpanded = !!expandedSessions[prog.workoutId];
                 return (
-                  <div key={prog.workoutId} className={`mb-4 rounded-2xl border ${prog.status === 'completed' ? 'border-emerald-500/30' : t.border} bg-black/5 dark:bg-white/5 overflow-hidden transition-all`}>
+                  <div id={`session-${prog.workoutId}`} key={prog.workoutId} className={`mb-4 rounded-2xl border ${prog.status === 'completed' ? 'border-emerald-500/30' : t.border} bg-black/5 dark:bg-white/5 overflow-hidden transition-all`}>
                     <button 
                       onClick={() => { playSoundEffect('click', soundEnabled); toggleSession(prog.workoutId); }}
                       className={`w-full p-4 flex items-start justify-between font-black text-left ${isExpanded ? t.bgAccentSoft + ' ' + t.textAccent : ''} transition-colors`}
                     >
-                      <div className="flex flex-col items-start gap-1 flex-1 min-w-0 pr-4">
+                      <div className="flex flex-col items-start gap-0.5 flex-1 min-w-0 pr-4">
                         <div className="flex items-center gap-2">
                           {isProgramCompleted(prog) && <CheckCircle size={16} className="text-emerald-500 shrink-0 mt-0.5" />}
                           <span className="body-lg uppercase tracking-widest break-words leading-tight">Sesi {pIdx + 1}: {prog.name}</span>
                         </div>
                         {prog.planName && (
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded bg-black/10 dark:bg-white/10 opacity-70`}>{prog.planName}</span>
+                          <span className={`text-xs ${t.textMuted} font-medium`}>Program: {prog.planName}</span>
                         )}
                       </div>
                       <div className="flex items-center gap-1 caption opacity-60 font-bold shrink-0 mt-0.5"><span>{prog.exercises?.length || 0} Latihan</span>{isExpanded ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}</div>
@@ -616,7 +627,7 @@ const WorkoutTab = ({
                     onClick={() => { playSoundEffect('click', soundEnabled); toggleSession('extra'); }}
                     className={`w-full p-4 flex items-center justify-between font-black text-left ${expandedSessions['extra'] ? t.bgAccentSoft + ' ' + t.textAccent : ''} transition-colors`}
                   >
-                    <span className="body-lg uppercase tracking-widest">Sesi Ekstra</span>
+                    <span className="body-lg uppercase tracking-widest">Ekstra</span>
                     <div className="flex items-center gap-1 caption opacity-60 font-bold"><span>{extraExercises.length} Latihan</span>{expandedSessions['extra'] ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}</div>
                   </button>
                   
@@ -737,7 +748,7 @@ const WorkoutTab = ({
         const isCompleted = isAllSetsDone;
         const isDisabled = !hasExercises || allSkipped || isCompleted;
 
-        let btnText = isExtra ? "MULAI SESI EKSTRA" : "MULAI SESI LATIHAN";
+        let btnText = isExtra ? "MULAI EKSTRA" : "MULAI SESI LATIHAN";
         let btnIcon = <Play size={20} />;
         let btnClass = t.bgAccent + " shadow-xl shadow-[color:var(--tw-shadow-color)] disabled:opacity-50 text-white border border-white/20";
 

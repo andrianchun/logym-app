@@ -1,6 +1,6 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useImperativeHandle, forwardRef } from 'react';
 
-const PanoramicSlider = ({ onSwipeLeft, onSwipeRight, renderPanel, swipeThreshold = 0.25, onUpSwipe, onDownSwipe, className = '' }) => {
+const PanoramicSlider = forwardRef(({ onSwipeLeft, onSwipeRight, renderPanel, swipeThreshold = 0.25, onUpSwipe, onDownSwipe, className = '' }, ref) => {
   const containerRef = useRef(null);
   const [offsetX, setOffsetX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -10,6 +10,33 @@ const PanoramicSlider = ({ onSwipeLeft, onSwipeRight, renderPanel, swipeThreshol
   const touchStartX = useRef(null);
   const isHorizontalDrag = useRef(false);
   const lastTouchTime = useRef(0);
+
+  useImperativeHandle(ref, () => ({
+    slideLeft: () => {
+      if (isAnimating) return;
+      setIsAnimating(true);
+      const cw = containerRef.current?.clientWidth || window.innerWidth;
+      setOffsetX(-cw);
+      setTimeout(() => {
+        if(onSwipeLeft) onSwipeLeft();
+        setIsDragging(true);
+        setOffsetX(0);
+        setTimeout(() => { setIsDragging(false); setIsAnimating(false); }, 50);
+      }, 300);
+    },
+    slideRight: () => {
+      if (isAnimating) return;
+      setIsAnimating(true);
+      const cw = containerRef.current?.clientWidth || window.innerWidth;
+      setOffsetX(cw);
+      setTimeout(() => {
+        if(onSwipeRight) onSwipeRight();
+        setIsDragging(true);
+        setOffsetX(0);
+        setTimeout(() => { setIsDragging(false); setIsAnimating(false); }, 50);
+      }, 300);
+    }
+  }));
 
   const handleTouchStart = (e) => {
     if (isAnimating) return; // Block touches while snapping
@@ -140,6 +167,6 @@ const PanoramicSlider = ({ onSwipeLeft, onSwipeRight, renderPanel, swipeThreshol
       </div>
     </div>
   );
-};
+});
 
 export default PanoramicSlider;

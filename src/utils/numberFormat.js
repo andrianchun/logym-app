@@ -32,13 +32,47 @@ export const parseFormattedNumber = (formattedValue, language = 'ID') => {
     let str = formattedValue.toString();
     
     if (language === 'ID') {
-        // Remove all dots (thousands separator), then replace comma with dot (decimal separator)
-        str = str.replace(/\./g, '').replace(/,/g, '.');
+        if (str.includes(',')) {
+            // Comma is present, it acts as the decimal separator. All dots are thousands separators.
+            str = str.replace(/\./g, '').replace(/,/g, '.');
+        } else {
+            // No comma. Check if the last dot is acting as a decimal separator.
+            const lastDotIndex = str.lastIndexOf('.');
+            if (lastDotIndex !== -1) {
+                const charsAfterDot = str.length - 1 - lastDotIndex;
+                if (charsAfterDot < 3) {
+                    // It's a decimal separator (e.g., "10.5", "10.", "1.00")
+                    const integerPart = str.substring(0, lastDotIndex).replace(/\./g, '');
+                    const fractionalPart = str.substring(lastDotIndex + 1);
+                    str = integerPart + '.' + fractionalPart;
+                } else {
+                    // 3 or more digits after the dot (e.g., "1.000", "1.0000"). Assume thousands separator.
+                    str = str.replace(/\./g, '');
+                }
+            }
+        }
     } else {
-        // Remove all commas (thousands separator)
-        str = str.replace(/,/g, '');
+        // EN mode: commas are thousands separators, dot is decimal.
+        if (str.includes('.')) {
+            // Dot is present, so comma is definitively a thousands separator.
+            str = str.replace(/,/g, '');
+        } else {
+            // No dot. Check if the last comma is acting as a decimal separator.
+            const lastCommaIndex = str.lastIndexOf(',');
+            if (lastCommaIndex !== -1) {
+                const charsAfterComma = str.length - 1 - lastCommaIndex;
+                if (charsAfterComma < 3) {
+                    // It's a decimal separator (e.g., "10,5", "10,")
+                    const integerPart = str.substring(0, lastCommaIndex).replace(/,/g, '');
+                    const fractionalPart = str.substring(lastCommaIndex + 1);
+                    str = integerPart + '.' + fractionalPart;
+                } else {
+                    // 3 or more digits after the comma (e.g., "1,000", "1,0000"). Assume thousands separator.
+                    str = str.replace(/,/g, '');
+                }
+            }
+        }
     }
     
-    // Return the cleaned string or a parsed float
-    return str; // We return string so input fields don't lose trailing decimals like "10."
+    return str;
 };

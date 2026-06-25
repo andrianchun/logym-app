@@ -60,13 +60,49 @@ export default function App() {
   const [userProfile, setUserProfile] = useState({ goal: null, experience: null });
   const [gymProfiles, setGymProfiles] = useState([{ id: 'default', name: 'Lyfit Gym', equipment: 'all', config: {} }]);
   const [activeGymId, setActiveGymId] = useState('default');
+  const [userGeminiApiKey, setUserGeminiApiKey] = useState('');
   const [activityTargets, setActivityTargets] = useState({ steps: 10000, weeklyDuration: 150, sleep: 8 });
 
   const [exerciseLibrary, setExerciseLibrary] = useState(defaultMasterExercises);
   const [programs, setPrograms] = useState(defaultPrograms);
   const [history, setHistory] = useState({});
   
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, _setActiveTab] = useState('dashboard');
+
+  const setActiveTab = (newTab) => {
+    if (typeof newTab === 'function') newTab = newTab(activeTab);
+    if (newTab === activeTab) return;
+
+    const emptyCustomPrograms = programs.filter(p => {
+        const isCustom = p.planId === 'custom' || (p.planId && p.planId.startsWith('custom-'));
+        return isCustom && (!p.exercises || p.exercises.length === 0);
+    });
+
+    if (emptyCustomPrograms.length > 0) {
+       setConfirmModal({
+           isOpen: true,
+           title: 'Bersihkan Sesi Kosong?',
+           message: `Sistem mendeteksi ada ${emptyCustomPrograms.length} program custom kosong (tidak ada latihannya sama sekali). Apakah kamu ingin menghapusnya agar daftar programmu tetap rapi?`,
+           onConfirm: () => {
+               playSoundEffect('success', soundEnabled);
+               setPrograms(prev => prev.filter(p => !emptyCustomPrograms.some(emp => emp.id === p.id)));
+               setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null, onCancel: null });
+               _setActiveTab(newTab);
+           },
+           onCancel: () => {
+               const targetProg = emptyCustomPrograms[0];
+               setFocusRoutineId(targetProg.id);
+               _setActiveTab('program');
+               setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null, onCancel: null });
+           }
+       });
+       return;
+    }
+
+    _setActiveTab(newTab);
+  };
+
+  const [focusRoutineId, setFocusRoutineId] = useState(null);
   const [isEditingMode, setIsEditingMode] = useState(false);
   const [restTimer, setRestTimer] = useState(0); // Legacy, might be replaced by restTargetTime
 
@@ -74,6 +110,7 @@ export default function App() {
   const [isWorkoutActive, setIsWorkoutActive] = useState(false);
   const [workoutStartTime, setWorkoutStartTime] = useState(null);
   const [resumeDurationSecs, setResumeDurationSecs] = useState(0);
+  const [sessionSnapshot, setSessionSnapshot] = useState(null);
   const [restTargetTime, setRestTargetTime] = useState(null);
   const [isImmersiveMode, setIsImmersiveMode] = useState(false);
   const [sessionToRun, setSessionToRun] = useState(null);
@@ -437,6 +474,7 @@ export default function App() {
               if (parsedSettings.activePlanIds) setActivePlanIds(parsedSettings.activePlanIds);
                 else if (parsedSettings.activePlanId) setActivePlanIds([parsedSettings.activePlanId]);
               if (parsedSettings.userProfile) setUserProfile(parsedSettings.userProfile);
+              if (parsedSettings.userGeminiApiKey) setUserGeminiApiKey(parsedSettings.userGeminiApiKey);
             }
           } catch (err) {
             console.error("Parse Error saat load data utama (MENCEGAH AUTO-SAVE UNTUK MENGHINDARI DATA HILANG):", err);
@@ -493,7 +531,7 @@ export default function App() {
         setDoc(mainDocRef, {
           programs,
           exerciseLibrary,
-          settings: { theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, gymProfiles, activeGymId, activityTargets, activePlanIds, userProfile },
+          settings: { theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, gymProfiles, activeGymId, activityTargets, activePlanIds, userProfile, userGeminiApiKey },
           updatedAt: new Date().toISOString()
         }, { merge: true }).catch(err => console.error("Auto-save Cloud gagal:", err));
 
@@ -891,6 +929,7 @@ export default function App() {
           setRestTimer(programRestTime); // Legacy fallback
           setRestTargetTime(Date.now() + (programRestTime * 1000));
           if (!isWorkoutActive) {
+            setSessionSnapshot({ exerciseLogs: JSON.parse(JSON.stringify(exerciseLogs)), skippedExercises: JSON.parse(JSON.stringify(skippedExercises)), extraExercises: JSON.parse(JSON.stringify(extraExercises)) });
             setIsWorkoutActive(true);
             setWorkoutStartTime(Date.now() - (resumeDurationSecs * 1000));
             setResumeDurationSecs(0);
@@ -899,6 +938,7 @@ export default function App() {
           setShowSupersetToast(true);
           setTimeout(() => setShowSupersetToast(false), 3000);
           if (!isWorkoutActive) {
+            setSessionSnapshot({ exerciseLogs: JSON.parse(JSON.stringify(exerciseLogs)), skippedExercises: JSON.parse(JSON.stringify(skippedExercises)), extraExercises: JSON.parse(JSON.stringify(extraExercises)) });
             setIsWorkoutActive(true);
             setWorkoutStartTime(Date.now() - (resumeDurationSecs * 1000));
             setResumeDurationSecs(0);
@@ -1013,38 +1053,36 @@ export default function App() {
             setWorkoutStartTime(null);
             setRestTargetTime(null);
             setRestTimer(0);
+              const targetDateStr = selectedDate;
             
-            const targetDateStr = selectedDate;
-            const targetDayData = history[targetDateStr];
-            
-            // 1. Ambil data asli dari w.log yang sudah sah tersimpan di database
             let restoredLogs = {};
             let restoredSkipped = {};
+            let restoredExtra = [];
             
-            if (targetDayData && targetDayData.workouts) {
-               targetDayData.workouts.forEach(w => {
-                  if (w.log && Object.keys(w.log).length > 0) {
-                     restoredLogs = { ...restoredLogs, ...w.log };
-                  }
-                  if (w.skipped) {
-                     restoredSkipped = { ...restoredSkipped, ...w.skipped };
-                  }
-               });
+            if (sessionSnapshot) {
+               restoredLogs = sessionSnapshot.exerciseLogs;
+               restoredSkipped = sessionSnapshot.skippedExercises;
+               restoredExtra = sessionSnapshot.extraExercises;
             }
             
-            // 2. Terapkan state kembali ke memori UI
+            setHistory(prev => {
+              const prevDayData = prev[targetDateStr] || {};
+              return {
+                 ...prev,
+                 [targetDateStr]: {
+                    ...prevDayData,
+                    _activeSession: {
+                       exerciseLogs: restoredLogs,
+                       skippedExercises: restoredSkipped,
+                       extraExercises: restoredExtra
+                    }
+                 }
+              }
+            });
             setExerciseLogs(restoredLogs);
             setSkippedExercises(restoredSkipped);
-            setExtraExercises([]); // Buang latihan ekstra yang belum di-save
-            
-            setHistory(prev => {
-              const h = { ...prev };
-              if (h[targetDateStr]) {
-                  // 3. Hapus _activeSession agar sesi yang gantung ini benar-benar terhapus
-                  delete h[targetDateStr]._activeSession;
-              }
-              return h;
-            });
+            setExtraExercises(restoredExtra);
+            setSessionSnapshot(null);          
         }
     });
   };
@@ -1064,10 +1102,9 @@ export default function App() {
     setRestTargetTime(null);
     setRestTimer(0);
     setExerciseLogs({});
-    
-    if (progId === 'extra') {
-       setExtraExercises([]);
-    }
+    setSkippedExercises({});
+    setExtraExercises([]);
+    setSessionSnapshot(null);
 
     const targetDateStr = selectedDate;
 
@@ -1088,7 +1125,7 @@ export default function App() {
       let workouts = [...(dayData.workouts || [])];
       
       if (progId === 'extra') {
-        const adhocIdx = workouts.findIndex(w => w.programId === 'adhoc');
+        const adhocIdx = workouts.findIndex(w => w.programId === 'adhoc' && w.status !== 'completed');
         if (adhocIdx >= 0) {
           const existingW = workouts[adhocIdx];
           workouts[adhocIdx] = {
@@ -1097,19 +1134,33 @@ export default function App() {
             log: cleanLogs,
             exercises: extraExercises,
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            duration: durationSecs > 0 ? formatDur(durationSecs) : (existingW.duration ? (typeof existingW.duration === 'number' ? formatDur(existingW.duration * 60) : existingW.duration) : '00:00')
+            duration: formatDur(durationSecs)
           };
         } else {
-          workouts.push({
-            id: `adhoc_${Date.now()}`,
-            programId: 'adhoc',
-            programName: 'Sesi Ekstra',
-            status: 'completed',
-            log: cleanLogs,
-            exercises: extraExercises,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            duration: durationSecs > 0 ? formatDur(durationSecs) : '00:00'
-          });
+          // Check if there's an already completed adhoc session being edited (focusWorkoutId)
+          const completedAdhocIdx = workouts.findIndex(w => w.id === focusWorkoutId && w.programId === 'adhoc');
+          if (completedAdhocIdx >= 0) {
+              const existingW = workouts[completedAdhocIdx];
+              workouts[completedAdhocIdx] = {
+                ...existingW,
+                status: 'completed',
+                log: cleanLogs,
+                exercises: extraExercises,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                duration: formatDur(durationSecs)
+              };
+          } else {
+              workouts.push({
+                id: `adhoc_${Date.now()}`,
+                programId: 'adhoc',
+                programName: 'Ekstra',
+                status: 'completed',
+                log: cleanLogs,
+                exercises: extraExercises,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                duration: formatDur(durationSecs)
+              });
+          }
         }
       } else {
         // Untuk program biasa
@@ -1131,7 +1182,7 @@ export default function App() {
               status: 'completed',
               log: cleanLogs,
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              duration: durationSecs > 0 ? formatDur(durationSecs) : (w.duration ? (typeof w.duration === 'number' ? formatDur(w.duration * 60) : w.duration) : '00:00')
+              duration: formatDur(durationSecs)
             };
           }
           return w;
@@ -1235,26 +1286,48 @@ export default function App() {
     setResumeDurationSecs(0);
     
     // Load the specific log for this workout if it exists
+    let logsToLoad = {};
+    let skippedToLoad = {};
+    let extraToLoad = [];
+    
+    const dayData = history[dateStr] || {};
     if (w.log && Object.keys(w.log).length > 0) {
-      setExerciseLogs(w.log);
+      logsToLoad = w.log;
     } else {
-      const dayData = history[dateStr];
       if (dayData && dayData._activeSession && dayData._activeSession.exerciseLogs && Object.keys(dayData._activeSession.exerciseLogs).length > 0) {
-        setExerciseLogs(dayData._activeSession.exerciseLogs);
+        logsToLoad = dayData._activeSession.exerciseLogs;
       } else {
         // Fallback
-        let mergedLogs = {};
         if (dayData && dayData.workouts) {
           dayData.workouts.forEach(work => {
-            if (work.log) mergedLogs = { ...mergedLogs, ...work.log };
+            if (work.log) logsToLoad = { ...logsToLoad, ...work.log };
           });
         }
-        setExerciseLogs(mergedLogs);
       }
     }
     
-    // Reset skipped exercises for safety
-    setSkippedExercises({});
+    if (w.programId === 'adhoc' && w.exercises && w.exercises.length > 0) {
+      extraToLoad = w.exercises;
+    } else if (dayData && dayData._activeSession && dayData._activeSession.extraExercises) {
+      extraToLoad = dayData._activeSession.extraExercises;
+    }
+
+    if (w.skipped && Object.keys(w.skipped).length > 0) {
+      skippedToLoad = w.skipped;
+    } else if (dayData && dayData._activeSession && dayData._activeSession.skippedExercises) {
+      skippedToLoad = dayData._activeSession.skippedExercises;
+    }
+    
+    setExerciseLogs(logsToLoad);
+    setSkippedExercises(skippedToLoad);
+    setExtraExercises(extraToLoad);
+    
+    setSessionSnapshot({
+        exerciseLogs: JSON.parse(JSON.stringify(logsToLoad)),
+        skippedExercises: JSON.parse(JSON.stringify(skippedToLoad)),
+        extraExercises: JSON.parse(JSON.stringify(extraToLoad))
+    });
+
     setActiveTab('workout');
   };
 
@@ -1354,10 +1427,11 @@ export default function App() {
          exerciseLibrary={exerciseLibrary}
       />
       
-      <SettingsModal 
-         showSettings={showSettings} setShowSettings={setShowSettings} t={t} lang={lang} 
-         theme={theme} setTheme={setTheme} language={language} setLanguage={setLanguage} 
-         soundEnabled={soundEnabled} setSoundEnabled={setSoundEnabled}
+        <SettingsModal 
+           showSettings={showSettings} setShowSettings={setShowSettings} t={t} lang={lang} 
+           theme={theme} setTheme={setTheme} language={language} setLanguage={setLanguage} 
+           soundEnabled={soundEnabled} setSoundEnabled={setSoundEnabled}
+           userGeminiApiKey={userGeminiApiKey} setUserGeminiApiKey={setUserGeminiApiKey}
          defaultRestTime={defaultRestTime} setDefaultRestTime={setDefaultRestTime}
          weekStartDay={weekStartDay} setWeekStartDay={setWeekStartDay}
          defaultReminderTime={defaultReminderTime} setDefaultReminderTime={setDefaultReminderTime}
@@ -1377,10 +1451,12 @@ export default function App() {
              <DashboardTab setConfirmModal={setConfirmModal} 
                t={t} lang={lang} language={language} user={user} history={history} setHistory={setHistory} programs={programs}
                navigateToWorkoutDate={navigateToWorkoutDate} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect}
-               theme={theme} exerciseLibrary={exerciseLibrary} selectedDate={selectedDate}
+               theme={theme} exerciseLibrary={exerciseLibrary} selectedDate={selectedDate} activePlanIds={activePlanIds}
                biometricStandard={biometricStandard} unitSystem={unitSystem}
                activityTargets={activityTargets} setActivityTargets={setActivityTargets}
                gymProfiles={gymProfiles} activeGymId={activeGymId}
+               activePlanIds={activePlanIds}
+               userGeminiApiKey={userGeminiApiKey}
              />
          )}
          
@@ -1437,6 +1513,7 @@ export default function App() {
                openQuestionnaire={() => setShowQuestionnaire(true)}
                activePlanIds={activePlanIds} setActivePlanIds={setActivePlanIds}
                gymProfiles={gymProfiles}
+               focusRoutineId={focusRoutineId} setFocusRoutineId={setFocusRoutineId}
              />
          )}
 

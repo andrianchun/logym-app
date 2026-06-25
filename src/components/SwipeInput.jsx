@@ -74,14 +74,19 @@ const SwipeInput = ({ value, onChange, disabled, step = 1, className, min = 0, s
                 onChange('');
                 return;
             }
+
+            // Limit to max 2 decimal places during manual typing
+            if (parsed.includes('.')) {
+                const fraction = parsed.split('.')[1];
+                if (fraction && fraction.length > 2) {
+                    return; // Ignore the keystroke
+                }
+            }
             
-            // Allow typing trailing decimals like "10."
-            // However, we need to know if the user just typed a localized decimal separator at the end
-            const decSep = language === 'ID' ? ',' : '.';
+            // Allow typing trailing decimals like "10." or "10,"
+            // Regardless of language, if the user typed a punctuation mark at the end, treat it as starting a decimal
             let toStore = parsed;
-            
-            // If the user typed a comma/dot at the end, append a dot to the raw parsed value so we know
-            if (val.endsWith(decSep) && !parsed.includes('.')) {
+            if ((val.endsWith(',') || val.endsWith('.')) && !parsed.includes('.')) {
                 toStore = parsed + '.';
             }
             
