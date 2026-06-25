@@ -10,7 +10,6 @@ import ImmersiveWorkout from '../components/ImmersiveWorkout';
 import ExerciseDetailModal from '../components/ExerciseDetailModal';
 import AlternativeExerciseModal from '../components/AlternativeExerciseModal';
 import EmptyWorkoutState from '../components/EmptyWorkoutState';
-import { getSupersetColorStyle } from '../data/constants';
 
 const WorkoutTab = ({ 
   t, lang, language, programs, 
@@ -21,8 +20,9 @@ const WorkoutTab = ({
   warmupVideos, cooldownVideos,
   
   // --- PROPS DARI APP.JSX ---
+  exerciseLibrary, setExerciseLibrary,
   exerciseLogs, skippedExercises, extraExercises,
-  onSetChange, onToggleSet, onSkipSet, onAddSet, onRemoveSet,
+  onSetChange, onToggleSet, onSkipSet, onAddSet, onAddWarmupSets, onRemoveSet,
   onToggleSkip, onRemoveExtra,
   isCurrentlyCompleted, onSaveWorkout, onCancelWorkout,
   onAddExtraClick, onAddExtraExercise,
@@ -36,12 +36,11 @@ const WorkoutTab = ({
   focusWorkoutId, setFocusWorkoutId,
 
   // Library
-  exerciseLibrary,
   isImmersiveMode, setIsImmersiveMode,
   restTimer, setRestTimer,
   sessionToRun, setSessionToRun,
   resumeDurationSecs, setResumeDurationSecs,
-  unitSystem, activePlanId
+  unitSystem, userProfile, activePlanIds = [], showSupersetToast
 }) => {
   
   const [detailExercise, setDetailExercise] = useState(null);
@@ -62,18 +61,14 @@ const WorkoutTab = ({
     const wPlanId = (p ? p.planId : null) || 'custom';
     
     if (w.programId !== 'adhoc') {
-      if (activePlanId === 'custom') {
-        if (wPlanId !== 'custom') return false;
-      } else {
-        if (wPlanId !== activePlanId) return false;
-      }
+        if (!activePlanIds.includes(wPlanId)) return false;
     }
     return true;
   });
   
   if (sourceWorkouts.length === 0) {
-    if (selectedDate >= todayStr && activePlanId && activePlanId !== 'custom') {
-      const planRoutines = programs.filter(p => p.planId === activePlanId);
+    if (selectedDate >= todayStr && activePlanIds.length > 0) {
+      const planRoutines = programs.filter(p => activePlanIds.includes(p.planId || 'custom'));
       if (planRoutines.length > 0) {
         const dateObj = new Date(selectedDate);
         const dayName = DAY_MAP[dateObj.getDay()];
@@ -247,6 +242,131 @@ const WorkoutTab = ({
     }));
   };
 
+    const getOverloadHint = (exItem) => {
+      if (!exItem || !exerciseLibrary || exItem.type === 'time') return null;
+      
+      let historyMax10RM = 0;
+      let lastSessionWeight = 0;
+      let lastSessionReps = 0;
+      let mostRecentDateMs = 0;
+      
+      // 1. Scan history
+      Object.keys(history || {}).forEach(dateStr => {
+        const day = history[dateStr];
+        const dateMs = new Date(dateStr).getTime();
+        
+        if (day.workouts) {
+          day.workouts.forEach(w => {
+            const exLogKey = `${exItem.id}-${w.id}`;
+            const targetLog = w.log && (w.log[exLogKey] || w.log[exItem.id]);
+
+            if (w.status === 'completed' && targetLog) {
+              let bestWeightInSession = 0;
+              let bestRepsAtWeight = 0;
+              
+              targetLog.forEach(s => {
+                if (!s.skipped && s.type !== 'warmup' && s.w > 0 && s.r > 0) {
+                  const c1RM = Number(s.w) * (1 + Number(s.r) / 30);
+                  const c10RM = c1RM / 1.3333;
+                  if (c10RM > historyMax10RM) historyMax10RM = c10RM;
+                  
+                  if (Number(s.w) > bestWeightInSession) {
+                    bestWeightInSession = Number(s.w);
+                    bestRepsAtWeight = Number(s.r);
+                  } else if (Number(s.w) === bestWeightInSession && Number(s.r) > bestRepsAtWeight) {
+                    bestRepsAtWeight = Number(s.r);
+                  }
+                }
+              });
+              
+              if (bestWeightInSession > 0 && dateMs > mostRecentDateMs) {
+                mostRecentDateMs = dateMs;
+                lastSessionWeight = bestWeightInSession;
+                lastSessionReps = bestRepsAtWeight;
+              }
+            }
+          });
+        }
+      });
+
+      // 2. Scan current session
+      let currentMax10RM = 0;
+      const currentLogs = exerciseLogs[exItem.id] || getSetLogs(exItem) || [];
+      currentLogs.forEach(s => {
+        if (s.done && !s.skipped && s.type !== 'warmup' && s.w > 0 && s.r > 0) {
+          const c1RM = Number(s.w) * (1 + Number(s.r) / 30);
+          const c10RM = c1RM / 1.3333;
+          if (c10RM > currentMax10RM) currentMax10RM = c10RM;
+        }
+      });
+      
+      historyMax10RM = Math.round(historyMax10RM * 10) / 10;
+      currentMax10RM = Math.round(currentMax10RM * 10) / 10;
+      
+      const true10RM = Math.max(historyMax10RM, currentMax10RM);
+      const isNewRecord = currentMax10RM > historyMax10RM && historyMax10RM > 0;
+      
+      if (isNewRecord) {
+        return {
+          title: "🏆 REKOR BARU DIPECAHKAN!",
+          text: `Mantap! Kamu baru saja buat rekor 10RM baru: ${currentMax10RM} ${unitSystem === 'imperial' ? 'lbs' : 'kg'}!\n\nLanjutkan kerja kerasnya! 💪`
+        };
+      }
+      
+      const hasLastSession = lastSessionWeight > 0;
+      const uStr = unitSystem === 'imperial' ? 'lbs' : 'kg';
+      
+      if (hasLastSession) {
+        const targetReps = exItem.reps || 10;
+        const reachedTarget = lastSessionReps >= targetReps;
+        
+        let missionText = "";
+        const goal = userProfile?.goal || 'muscle_gain';
+        const exp = userProfile?.experience || 'beginner';
+        
+        if (goal === 'fat_loss') {
+           missionText = `Pertahankan beban sesi lalu:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nJika sedang defisit kalori, fokus jaga massa otot, tidak perlu memaksakan naik beban jika tidak fit.`;
+        } else if (goal === 'strength') {
+           if (reachedTarget) {
+             missionText = `Kekuatan optimal sesi lalu:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nHari ini wajib NAIK BEBAN! Ayo, semangat! 💪`;
+           } else {
+             missionText = `Sesi lalu:\n${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps\n\nFokus pada kekuatan! Usahakan NAIK BEBAN sedikit, walaupun reps sedikit turun.`;
+           }
+        } else if (goal === 'general') {
+           if (reachedTarget) {
+             missionText = `Stamina bagus di sesi lalu:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nKamu boleh coba naikkan beban pelan-pelan (2,5 ${uStr}) kalau masih sanggup.`;
+           } else {
+             missionText = `Sesi lalu:\n${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps\n\nJika ini sudah nyaman, lanjutkan latihan dengan beban ini. Nikmati prosesnya, agar tubuh tetap bugar.`;
+           }
+        } else {
+           // muscle_gain / Default
+           if (reachedTarget) {
+             if (exp === 'beginner') {
+               missionText = `Target reps sesi lalu tercapai:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nDi fase Newbie Gains, ototmu sangat gampang berkembang, sikat NAIK BEBAN (2.5 ${uStr}) sekarang!`;
+             } else if (exp === 'advanced') {
+               missionText = `Target reps sesi lalu tercapai:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nCoba microload (+1.25 ${uStr}) atau perbaiki tempo sebelum benar-benar naik beban berat. Aman, tidak perlu tergesa-gesa!`;
+             } else {
+               missionText = `Kamu menembus target reps sesi lalu:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nSaatnya NAIK BEBAN (2.5 ${uStr}) hari ini, reps boleh turun sedikit.`;
+             }
+           } else {
+             missionText = `Sesi lalu:\n${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps (Target: ${targetReps} Reps)\n\nHari ini fokus TAMBAH REPETISI, sampai menembus target! Beban masih tetap.`;
+           }
+        }
+        
+        return {
+          title: "🎯 TARGET HARI INI",
+          text: `${missionText}\n\n🏆 All-Time 10RM: ${true10RM} ${uStr}`,
+          mode: reachedTarget ? 'praise' : 'push'
+        };
+      } else {
+        return {
+          title: "🎯 TARGET HARI INI",
+          text: `Atur beban yang cukup menantang untuk diangkat 10 repetisi dengan form benar.\n\n🏆 All-Time 10RM: ${true10RM > 0 ? true10RM + ' ' + uStr : '-'}`,
+          mode: 'neutral'
+        };
+      }
+    };
+
   const handleStartWorkout = (progId) => {
     playSoundEffect('success', soundEnabled);
     setSessionToRun(progId);
@@ -342,18 +462,25 @@ const WorkoutTab = ({
           workoutStartTime={workoutStartTime}
           restTimer={restTimer}
           setRestTimer={setRestTimer}
+          setRestTargetTime={setRestTargetTime}
+          showSupersetToast={showSupersetToast}
+          exerciseLibrary={exerciseLibrary}
+          getOverloadHint={getOverloadHint}
         />
       )}
 
       {detailExercise && !showAlternativeModal && (
         <ExerciseDetailModal 
-          ex={detailExercise} 
-          onClose={() => setDetailExercise(null)} 
-          t={t} lang={lang} soundEnabled={soundEnabled} 
-          exerciseLogs={exerciseLogs}
-          onReplace={(ex) => setShowAlternativeModal(true)}
-          unitSystem={unitSystem}
-        />
+            ex={detailExercise} 
+            onClose={() => setDetailExercise(null)} 
+            t={t} lang={lang} soundEnabled={soundEnabled} 
+            fullHistory={history}
+            onReplace={(ex) => setShowAlternativeModal(true)}
+            unitSystem={unitSystem}
+            exerciseLibrary={exerciseLibrary}
+            setExerciseLibrary={setExerciseLibrary}
+            programs={programs}
+          />
       )}
 
       <AlternativeExerciseModal
@@ -379,7 +506,7 @@ const WorkoutTab = ({
             handleAddAdhocSession={handleAddAdhocSession}
             programs={programs}
             handleAddProgramToToday={handleAddProgramToToday}
-            activePlanId={activePlanId}
+            activePlanIds={activePlanIds}
           />
         ) : (
           <>
@@ -401,9 +528,14 @@ const WorkoutTab = ({
                       onClick={() => { playSoundEffect('click', soundEnabled); toggleSession(prog.workoutId); }}
                       className={`w-full p-4 flex items-start justify-between font-black text-left ${isExpanded ? t.bgAccentSoft + ' ' + t.textAccent : ''} transition-colors`}
                     >
-                      <div className="flex items-start gap-2 flex-1 min-w-0 pr-4">
-                        {isProgramCompleted(prog) && <CheckCircle size={16} className="text-emerald-500 shrink-0 mt-0.5" />}
-                        <span className="body-lg uppercase tracking-widest break-words leading-tight">Sesi {pIdx + 1}: {prog.name}</span>
+                      <div className="flex flex-col items-start gap-1 flex-1 min-w-0 pr-4">
+                        <div className="flex items-center gap-2">
+                          {isProgramCompleted(prog) && <CheckCircle size={16} className="text-emerald-500 shrink-0 mt-0.5" />}
+                          <span className="body-lg uppercase tracking-widest break-words leading-tight">Sesi {pIdx + 1}: {prog.name}</span>
+                        </div>
+                        {prog.planName && (
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded bg-black/10 dark:bg-white/10 opacity-70`}>{prog.planName}</span>
+                        )}
                       </div>
                       <div className="flex items-center gap-1 caption opacity-60 font-bold shrink-0 mt-0.5"><span>{prog.exercises?.length || 0} Latihan</span>{isExpanded ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}</div>
                     </button>
@@ -411,9 +543,9 @@ const WorkoutTab = ({
                     {isExpanded && (
                       <div className="p-4 space-y-4 sm:space-y-0 sm:flex sm:flex-row sm:overflow-x-auto sm:snap-x sm:gap-4 sm:pb-6 hide-scrollbar animate-in slide-in-from-top-2 fade-in duration-200">
                         {groupExercises(prog.exercises).map((group, gIdx) => {
-                          const ssStyle = group.isSuperset ? getSupersetColorStyle(group.supersetId) : null;
                           return (
-                          <div key={`${prog.id}-group-${gIdx}`} className={`sm:w-[340px] sm:shrink-0 sm:snap-center sm:bg-black/5 sm:dark:bg-white/5 sm:rounded-3xl sm:border sm:border-black/5 sm:dark:border-white/5 sm:overflow-hidden relative flex flex-col mb-4 sm:mb-0 last:mb-0 ${ssStyle ? 'border-r-[6px] pr-1 ' + ssStyle.border : ''}`}>
+                          <div key={`${prog.id}-group-${gIdx}`} className={`sm:w-[340px] sm:shrink-0 sm:snap-center sm:bg-black/5 sm:dark:bg-white/5 sm:rounded-3xl sm:border sm:border-black/5 sm:dark:border-white/5 sm:overflow-hidden relative flex flex-col mb-4 sm:mb-0 last:mb-0 ${group.isSuperset ? 'pr-3' : ''}`}>
+                            {group.isSuperset && <div className={`absolute top-0 bottom-0 right-0 w-[6px] rounded-l-md z-20 ${t.bgAccent}`}></div>}
                             {group.items.map(({ex, idx}) => (
                               <ExerciseCard 
                                 key={`${prog.id}-${ex.id}-${idx}`}
@@ -426,6 +558,7 @@ const WorkoutTab = ({
                                 onOpenVideo={() => handleOpenDetail(ex)}
                                 onReplaceClick={() => { setDetailExercise(ex); setShowAlternativeModal(true); }}
                                 sets={getSetLogs(ex)}
+                                overloadHint={getOverloadHint(ex)}
                                 onUpdateSet={(exId, setIdx, field, val) => {
                                   setSessionToRun(prog.workoutId);
                                   onSetChange(exId, setIdx, field, val);
@@ -447,6 +580,15 @@ const WorkoutTab = ({
                                     onAddSet(exId);
                                   }
                                 }} 
+                                onAddWarmupSets={(exId) => {
+                                  setSessionToRun(prog.workoutId);
+                                  if (ex.supersetId) {
+                                    const siblings = prog.exercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
+                                    onAddWarmupSets(siblings);
+                                  } else {
+                                    onAddWarmupSets(exId);
+                                  }
+                                }}
                                 onRemoveSet={(exId, setIdx) => {
                                   setSessionToRun(prog.workoutId);
                                   if (ex.supersetId) {
@@ -480,11 +622,11 @@ const WorkoutTab = ({
                   
                   {expandedSessions['extra'] && (
                     <div className="p-4 space-y-4 sm:space-y-0 sm:flex sm:flex-row sm:overflow-x-auto sm:snap-x sm:gap-4 sm:pb-6 hide-scrollbar animate-in slide-in-from-top-2 fade-in duration-200">
-                      {groupExercises(extraExercises).map((group, gIdx) => {
-                        const ssStyle = group.isSuperset ? getSupersetColorStyle(group.supersetId) : null;
-                        return (
-                        <div key={`extra-group-${gIdx}`} className={`sm:w-[340px] sm:shrink-0 sm:snap-center sm:bg-black/5 sm:dark:bg-white/5 sm:rounded-3xl sm:border sm:border-black/5 sm:dark:border-white/5 sm:overflow-hidden relative flex flex-col mb-4 sm:mb-0 last:mb-0 ${ssStyle ? 'border-r-[6px] pr-1 ' + ssStyle.border : ''}`}>
-                          {group.items.map(({ex, idx}) => (
+                        {groupExercises(extraExercises).map((group, gIdx) => {
+                          return (
+                          <div key={`extra-group-${gIdx}`} className={`sm:w-[340px] sm:shrink-0 sm:snap-center sm:bg-black/5 sm:dark:bg-white/5 sm:rounded-3xl sm:border sm:border-black/5 sm:dark:border-white/5 sm:overflow-hidden relative flex flex-col mb-4 sm:mb-0 last:mb-0 ${group.isSuperset ? 'pr-3' : ''}`}>
+                            {group.isSuperset && <div className={`absolute top-0 bottom-0 right-0 w-[6px] rounded-l-md z-20 ${t.bgAccent}`}></div>}
+                            {group.items.map(({ex, idx}) => (
                             <ExerciseCard 
                               key={ex.id}
                               ex={ex} idx={activeProgram.exercises?.length + idx || idx} isExtra={true}
@@ -516,6 +658,15 @@ const WorkoutTab = ({
                                   onAddSet(exId);
                                 }
                               }} 
+                              onAddWarmupSets={(exId) => {
+                                setSessionToRun('extra');
+                                if (ex.supersetId) {
+                                  const siblings = extraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
+                                  onAddWarmupSets(siblings);
+                                } else {
+                                  onAddWarmupSets(exId);
+                                }
+                              }}
                               onRemoveSet={(exId, setIdx) => {
                                 setSessionToRun('extra');
                                 if (ex.supersetId) {

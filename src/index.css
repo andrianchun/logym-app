@@ -56,3 +56,40 @@ svg:focus, .recharts-wrapper:focus, .recharts-surface:focus { outline: none !imp
 
 * { outline: none !important; -webkit-tap-highlight-color: transparent !important; }
 .recharts-wrapper, .recharts-surface, .recharts-layer { outline: none !important; }
+
+video::-webkit-media-controls,
+video::-webkit-media-controls-enclosure,
+video::-webkit-media-controls-panel,
+video::-webkit-media-controls-start-playback-button,
+video::-webkit-media-controls-overlay-play-button {
+  display: none !important;
+  -webkit-appearance: none;
+}
+
+/* GLOBAL MODAL SCROLL LOCK */
+body:has(.fixed.inset-0:not(.pointer-events-none)) {
+  overflow: hidden !important;
+}
+
+/* Fix native time/date picker icons in dark mode */
+.dark input[type="time"]::-webkit-calendar-picker-indicator,
+.dark input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(0.8);
+}
+
+/* AI Coach Banner Background */
+.bg-coach {
+  background-image: url('/bg-program.png');
+  background-repeat: no-repeat;
+  mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 100%);
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 100%);
+  background-size: auto 200%;
+  background-position: right -90px bottom -190px;
+}
+
+@media (min-width: 640px) { /* sm breakpoint (Tablet/PC) */
+  .bg-coach {
+    background-size: auto 240%;
+    background-position: right -110px bottom -300px;
+  }
+}

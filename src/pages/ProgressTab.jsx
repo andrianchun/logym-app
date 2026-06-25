@@ -7,7 +7,9 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
   const [chartType, setChartType] = useState('exercise');
   const [activeChartLines, setActiveChartLines] = useState([]);
 
-  const chartColors = ['#41759b', '#B79347', '#93a6b2', '#A7967D', '#81571E', '#294c65', '#CBB989', '#738a98', '#957c4c', '#5b829e', '#c3a870'];
+  const chartColors = theme === 'dark' 
+    ? ['#41759b', '#B79347', '#93a6b2', '#A7967D', '#81571E', '#294c65', '#CBB989', '#738a98', '#957c4c', '#5b829e', '#c3a870']
+    : ['#2563eb', '#1e3a8a', '#0891b2', '#4f46e5', '#334155', '#d97706', '#0284c7', '#475569', '#1d4ed8', '#0f172a', '#b45309'];
 
   // ==========================================
   // MESIN PERHITUNGAN GRAFIK (DIROMBAK UNTUK DETAIL PER SET)
@@ -401,7 +403,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
             {chartDataObj.data.length > 0 ? (
                <div style={{ width: `${chartWidth}px`, height: '288px' }}>
                 <LineChart width={chartWidth} height={288} data={chartDataObj.data} style={{ outline: 'none' }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#27272a' : '#e2e8f0'} vertical={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#3f3f46' : '#cbd5e1'} vertical={false} />
                   <Tooltip 
                      formatter={(value, name, props) => {
                          let unit = '';

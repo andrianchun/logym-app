@@ -6,7 +6,6 @@ const SwipeInput = ({ value, onChange, disabled, step = 1, className, min = 0, s
     const inputRef = useRef(null);
     const dragRef = useRef({ isDragging: false, startY: 0, startVal: 0, lastCalculatedValue: undefined });
     const [isFocused, setIsFocused] = useState(false);
-    const [isGlow, setIsGlow] = useState(false);
     
     // STATE LOKAL: Untuk render 60fps tanpa menunggu parent re-render
     const [localValue, setLocalValue] = useState(value);
@@ -16,13 +15,6 @@ const SwipeInput = ({ value, onChange, disabled, step = 1, className, min = 0, s
         if (!dragRef.current.isDragging) {
             setLocalValue(value);
         }
-    }, [value]);
-
-    useEffect(() => {
-       if (dragRef.current.isDragging) return;
-       setIsGlow(true);
-       const timer = setTimeout(() => setIsGlow(false), 300);
-       return () => clearTimeout(timer);
     }, [value]);
 
     const onTouchStart = (e) => {
@@ -159,7 +151,7 @@ const SwipeInput = ({ value, onChange, disabled, step = 1, className, min = 0, s
                 onTouchMove={onTouchMove}
                 onTouchEnd={onTouchEnd}
                 onTouchCancel={onTouchEnd}
-                className={`text-center ${className} ${isGlow ? 'flash-glow' : ''}`}
+                className={`text-center ${className}`}
             />
         </div>
     );

@@ -134,8 +134,5 @@ export const getVideoId = (url) => {
     const urlToParse = srcMatch ? srcMatch[1] : url;
     const match = urlToParse.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})/);
     return match ? match[1] : null;
-  } catch (e) { return null; }
+  } catch (e) { return null;  };
 };
-export const supersetColors = [{ border: 'border-r-emerald-500', bg: 'bg-emerald-500/10', text: 'text-emerald-500/90', hoverBg: 'hover:bg-emerald-500/20' }, { border: 'border-r-blue-500', bg: 'bg-blue-500/10', text: 'text-blue-500/90', hoverBg: 'hover:bg-blue-500/20' }, { border: 'border-r-purple-500', bg: 'bg-purple-500/10', text: 'text-purple-500/90', hoverBg: 'hover:bg-purple-500/20' }, { border: 'border-r-amber-500', bg: 'bg-amber-500/10', text: 'text-amber-500/90', hoverBg: 'hover:bg-amber-500/20' }, { border: 'border-r-rose-500', bg: 'bg-rose-500/10', text: 'text-rose-500/90', hoverBg: 'hover:bg-rose-500/20' }, { border: 'border-r-cyan-500', bg: 'bg-cyan-500/10', text: 'text-cyan-500/90', hoverBg: 'hover:bg-cyan-500/20' }];
-
-export const getSupersetColorStyle = (supersetId) => { if (!supersetId) return null; const charCode = supersetId.charCodeAt(0) - 65; const index = Math.max(0, charCode) % supersetColors.length; return supersetColors[index]; };

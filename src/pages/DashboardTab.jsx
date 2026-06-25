@@ -321,7 +321,19 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
       <div className="flex flex-col space-y-4">
         {/* 1. KARTU BODY COMPOSITION & EXPANDED CHART */}
         <div className="flex flex-col w-full min-w-0">
-          <div className={`p-5 rounded-2xl border ${t.border} ${t.bgCard} shadow-sm relative overflow-hidden z-10`}>
+          <div className={`p-5 border ${t.border} ${t.bgCard} shadow-sm relative overflow-hidden z-10 transition-all duration-300 ${isKomposisiExpanded ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'}`}>
+           {/* --- Background Image Layer --- */}
+           <div 
+             className="absolute inset-0 z-0 opacity-70 dark:opacity-40 pointer-events-none"
+             style={{
+               backgroundImage: "url('/bg-dashboard.png')",
+               backgroundSize: '200%',
+               backgroundPosition: '35% 0%',
+               maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 100%)',
+               WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 100%)'
+             }}
+           />
+           {/* ------------------------------ */}
            <div className="flex justify-between items-center mb-5 relative z-10">
                <div>
                    <h3 className={`h3 ${t.textMain}`}>Komposisi Tubuh</h3>
@@ -371,14 +383,15 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
            
            <button 
                onClick={() => { playSoundEffect('click', soundEnabled); setIsKomposisiExpanded(!isKomposisiExpanded); }}
-               className="w-full flex items-center justify-center pt-1.5 pb-2.5 -mb-2 mt-2 text-zinc-500 hover:text-emerald-500 transition-colors"
+               className="w-full flex items-center justify-center pt-2 pb-3 -mb-5 mt-4 text-zinc-500 hover:text-emerald-500 transition-colors"
            >
                {isKomposisiExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
            </button>
           </div>
   
-          {isKomposisiExpanded && (
-              <div className={`rounded-b-3xl border border-t-0 ${t.border} ${theme === 'dark' ? 'bg-[#061626]' : 'bg-[#f0f2f5]'} shadow-inner -mt-6 pt-6 relative z-0 animate-in slide-in-from-top-4 fade-in`}>
+          <div className={`grid transition-all duration-300 ease-in-out ${isKomposisiExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
+            <div className="overflow-hidden">
+              <div className={`rounded-b-3xl border border-t-0 ${t.border} ${theme === 'dark' ? 'bg-[#061626]' : 'bg-[#f0f2f5]'} shadow-inner -mt-12 pt-12 relative z-0`}>
               <DashboardChart 
                  t={t} theme={theme} history={history} 
                  soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
@@ -387,12 +400,26 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                  unitSystem={unitSystem}
               />
               </div>
-          )}
+            </div>
+          </div>
         </div>
 
       {/* 2. KARTU AKTIVITAS HARIAN & MINGGUAN */}
-      <div className={`p-5 rounded-2xl border ${t.border} ${t.bgCard} shadow-sm`}>
-         <div className="flex justify-between items-center mb-4">
+      <div className={`p-5 rounded-2xl border ${t.border} ${t.bgCard} shadow-sm relative overflow-hidden`}>
+         {/* --- Background Image Layer --- */}
+         <div 
+           className="absolute inset-0 z-0 opacity-70 dark:opacity-40 pointer-events-none"
+             style={{
+               backgroundImage: "url('/bg-activity.png')",
+               backgroundSize: '150%',
+               backgroundPosition: '60% 15px',
+               backgroundRepeat: 'no-repeat',
+               maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 100%)',
+             WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 100%)'
+           }}
+         />
+         {/* ------------------------------ */}
+         <div className="flex justify-between items-center mb-4 relative z-10">
              <h3 className={`h3 ${t.textMain}`}>Aktivitas Harian</h3>
              <div className="flex space-x-2">
                  <button onClick={() => { playSoundEffect('click', soundEnabled); setShowTargetModal(true); }} className={`p-1.5 rounded-full ${t.btnBg} ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Settings size={14}/></button>
@@ -400,7 +427,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
              </div>
          </div>
 
-         <div className="flex flex-col space-y-4 mb-4">
+         <div className="flex flex-col space-y-4 mb-4 relative z-10">
              {/* Row 1: Langkah Kaki & Detak Jantung */}
              <div className="flex justify-between items-center border-b border-dashed border-slate-500/20 pb-3">
                  <div className="flex flex-col w-[45%]">
@@ -448,7 +475,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
              const isGoalReached = weeklyDur >= targetDur;
              
              return (
-                 <div className={`relative p-4 rounded-2xl border ${isGoalReached ? t.borderAccent : t.border} overflow-hidden flex justify-between items-center shadow-sm`}>
+                 <div className={`relative z-10 p-4 rounded-2xl border ${isGoalReached ? t.borderAccent : t.border} overflow-hidden flex justify-between items-center shadow-sm`}>
                      {/* Background progress bar */}
                      <div className="absolute inset-0 bg-black/5 dark:bg-white/5"></div>
                      <div className={`absolute top-0 bottom-0 left-0 ${t.bgAccent} transition-all duration-1000 opacity-15 dark:opacity-25`} style={{ width: `${weeklyProgress}%` }}></div>
@@ -475,24 +502,40 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
       {/* --- GRUP PROGRESS --- */}
       <div className="flex flex-col w-full min-w-0">
         {/* SECTION: PROGRESS TAB — Main card */}
-        <div className={`rounded-2xl border ${t.border} ${t.bgCard} shadow-sm relative z-10 flex flex-col`}>
-        <ProgressTab 
-          t={t} lang={lang} language={language} theme={theme} 
-          history={history} programs={programs} exerciseLibrary={exerciseLibrary} 
-          soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
-          selectedDate={selectedDate}
-          isSubCard={false}
-          unitSystem={unitSystem}
-        />
-        <button 
-             onClick={() => { playSoundEffect('click', soundEnabled); setIsProgressExpanded(!isProgressExpanded); }}
-             className="w-full flex items-center justify-center pt-1.5 pb-2.5 text-zinc-500 hover:text-emerald-500 transition-colors"
-         >
-             {isProgressExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
-         </button>
+        <div className={`border ${t.border} ${t.bgCard} shadow-sm relative z-10 flex flex-col transition-all duration-300 ${isProgressExpanded ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'} overflow-hidden`}>
+          {/* --- Background Image Layer --- */}
+          <div 
+            className="absolute inset-0 z-0 opacity-70 dark:opacity-40 pointer-events-none"
+            style={{
+              backgroundImage: "url('/bg-progress.png')",
+              backgroundSize: '160%',
+              backgroundPosition: '60% 15px',
+              backgroundRepeat: 'no-repeat',
+              maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 100%)',
+              WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 100%)'
+            }}
+          />
+          {/* ------------------------------ */}
+          <div className="relative z-10 flex-1 flex flex-col">
+            <ProgressTab 
+              t={t} lang={lang} language={language} theme={theme} 
+              history={history} programs={programs} exerciseLibrary={exerciseLibrary} 
+              soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
+              selectedDate={selectedDate}
+              isSubCard={false}
+              unitSystem={unitSystem}
+            />
+            <button 
+                 onClick={() => { playSoundEffect('click', soundEnabled); setIsProgressExpanded(!isProgressExpanded); }}
+                 className="w-full flex items-center justify-center pt-2 pb-3 mt-2 text-zinc-500 hover:text-emerald-500 transition-colors"
+             >
+                 {isProgressExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+             </button>
+          </div>
       </div>
-      {isProgressExpanded && (
-          <div className={`rounded-b-3xl border border-t-0 ${t.border} ${theme === 'dark' ? 'bg-[#061626]' : 'bg-[#f0f2f5]'} shadow-inner -mt-6 pt-6 relative z-0 animate-in slide-in-from-top-4 fade-in`}>
+      <div className={`grid transition-all duration-300 ease-in-out ${isProgressExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
+        <div className="overflow-hidden">
+          <div className={`rounded-b-3xl border border-t-0 ${t.border} ${theme === 'dark' ? 'bg-[#061626]' : 'bg-[#f0f2f5]'} shadow-inner -mt-12 pt-12 relative z-0`}>
             <MuscleProgress 
               t={t} theme={theme} lang={lang}
               history={history} programs={programs} exerciseLibrary={exerciseLibrary}
@@ -500,7 +543,8 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
               isSubCard={true}
             />
           </div>
-      )}
+        </div>
+      </div>
       </div>
       </div>
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Search, Filter, Edit2, Plus, Dumbbell, Loader2, RefreshCw, Link as LinkIcon, X, Check, AlertCircle, ChevronDown, Database, Globe, Heart } from 'lucide-react';
 import { formatTarget, normalizeMuscleKey, muscleOptions, equipmentOptions, getVideoId } from '../data/constants';
 import EquipmentIcon from '../components/EquipmentIcon';
@@ -18,6 +18,7 @@ const blankExercise = () => ({
   instructions: ['1. '],
   type: 'weight',
   equipment: 'Lainnya',
+  level: 'beginner',
   defaultWeight: 0,
   ytVideo: '',
   gifUrl: '',
@@ -28,6 +29,12 @@ const exerciseTypeLabels = {
   weight: 'Beban & Repetisi',
   reps: 'Repetisi',
   time: 'Durasi',
+};
+
+const levelLabels = {
+  beginner: 'Pemula',
+  intermediate: 'Menengah',
+  advanced: 'Mahir',
 };
 
 // ─── Sub-component: ExerciseForm ───────────────────────────────────
@@ -56,6 +63,7 @@ const ExerciseForm = ({ t, lang, formData, setFormData, originalData, onSave, on
     formData.name !== originalData.name ||
     formData.type !== originalData.type ||
     formData.equipment !== originalData.equipment ||
+    formData.level !== originalData.level ||
     formData.defaultWeight !== originalData.defaultWeight ||
     formData.ytVideo !== originalData.ytVideo ||
     JSON.stringify(formData.target) !== JSON.stringify(originalData.target) ||
@@ -115,7 +123,7 @@ const ExerciseForm = ({ t, lang, formData, setFormData, originalData, onSave, on
       {/* Kolom Kanan */}
       <div className="space-y-5" ref={dropdownRef}>
       {/* Equipment and Type */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-[4fr_5fr] gap-3">
         {/* Equipment */}
         <div>
           <label className={`body-md ${t.textMuted} mb-2 block`}>{lang?.equipment || 'Equipment'}</label>
@@ -179,19 +187,52 @@ const ExerciseForm = ({ t, lang, formData, setFormData, originalData, onSave, on
         </div>
       </div>
 
-      {/* Video Link */}
-      <div className="w-full">
-        <label className={`body-md ${t.textMuted} mb-1 block`}>
-          {lang?.videoLink || 'Link Video'} <span className="text-[10px] opacity-60 ml-1 font-normal">(thumbnail diambil otomatis dari video)</span>
-        </label>
-        <input
-          type="url"
-          value={formData.ytVideo || ''}
-          onChange={(e) => setFormData(prev => ({ ...prev, ytVideo: e.target.value }))}
-          placeholder="https://youtu.be/..."
-          className={`w-full px-3 py-3 rounded-xl ${t.inputBg} ${t.textMain} body-lg outline-none focus:ring-2 ${t.ringAccent} placeholder:opacity-30 dark:placeholder:opacity-40`}
-        />
-      </div>
+        <div className="grid grid-cols-[4fr_5fr] gap-3">
+          {/* Level */}
+          <div className="w-full">
+            <label className={`body-md ${t.textMuted} mb-2 block`}>Level Latihan</label>
+            <div className="relative">
+              <button 
+                  onClick={(e) => { e.preventDefault(); setOpenDropdown(openDropdown === 'level' ? null : 'level'); }}
+                  className={`relative z-[50] w-full body-lg font-bold p-3 px-4 rounded-xl flex items-center justify-between space-x-2 ${t.inputBg} ${t.textMain} border border-transparent focus:ring-2 focus:${t.ringAccent} transition-colors`}
+              >
+                  <span>{levelLabels[formData.level] || 'Pemula'}</span>
+                  <ChevronDown size={16} className={`transition-transform duration-200 ${openDropdown === 'level' ? 'rotate-180' : ''} ${t.textMuted}`} />
+              </button>
+              {openDropdown === 'level' && (
+                  <div className={`absolute top-full right-0 left-0 -mt-3 pt-4 pb-1 rounded-b-2xl border ${t.border} border-t-0 ${t.bgCard} shadow-xl max-h-60 overflow-y-auto overflow-x-hidden custom-scrollbar z-[40] animate-in slide-in-from-top-2 origin-top`}>
+                      {Object.entries(levelLabels).map(([val, label]) => (
+                          <button
+                              key={val}
+                              onClick={(e) => {
+                                  e.preventDefault();
+                                  setFormData(prev => ({ ...prev, level: val }));
+                                  setOpenDropdown(null);
+                              }}
+                              className={`w-full text-left px-4 py-3 body-sm font-bold transition-colors ${formData.level === val ? t.textAccent + ' bg-emerald-500/10 dark:bg-emerald-500/10' : t.textMuted + ' hover:' + t.textMain + ' hover:bg-black/5 dark:hover:bg-white/5'}`}
+                          >
+                              {label}
+                          </button>
+                      ))}
+                  </div>
+              )}
+            </div>
+          </div>
+    
+          {/* Video Link */}
+          <div className="w-full">
+            <label className={`body-md ${t.textMuted} mb-2 block`}>
+              {lang?.videoLink || 'Link Video'}
+            </label>
+            <input
+              type="url"
+              value={formData.ytVideo || ''}
+              onChange={(e) => setFormData(prev => ({ ...prev, ytVideo: e.target.value }))}
+              placeholder="https://youtu.be/..."
+              className={`w-full px-3 py-3 rounded-xl ${t.inputBg} ${t.textMain} body-lg outline-none focus:ring-2 ${t.ringAccent} placeholder:opacity-30 dark:placeholder:opacity-40`}
+            />
+          </div>
+        </div>
 
       {/* Instructions */}
       <div>
@@ -241,23 +282,23 @@ const ExerciseForm = ({ t, lang, formData, setFormData, originalData, onSave, on
       </div>
 
       {/* Action Buttons */}
-        <div className="flex gap-3 pt-4 border-t border-dashed border-slate-500/20 mt-4">
-          <button
-            onClick={onCancel}
-            className={`flex-[0.8] py-4 rounded-xl body-lg font-bold transition-all ${t.inputBg} ${t.textMain} hover:opacity-80 active:scale-95`}
-          >
-            Batal
-          </button>
-          <button
-            onClick={onSave}
-            disabled={!canSave}
-            className={`flex-[1.5] flex items-center justify-center py-4 rounded-xl text-white body-lg font-black transition-all ${
-              canSave ? `${t.bgAccent} shadow-lg hover:opacity-90 active:scale-95` : 'bg-slate-500 cursor-not-allowed opacity-50'
-            }`}
-          >
-            <span className="whitespace-nowrap leading-none">{isEditing ? (lang?.save || 'Simpan Perubahan') : 'Simpan Custom'}</span>
-          </button>
-        </div>
+      <div className="flex space-x-3 mt-4">
+        <button 
+          onClick={onCancel}
+          className={`flex-1 flex items-center justify-center py-4 rounded-xl body-lg font-black transition-all bg-black/5 dark:bg-white/5 border ${t.border} ${t.textMain} hover:bg-black/10 dark:hover:bg-white/10 active:scale-95`}
+        >
+          <span className="whitespace-nowrap leading-none">{lang?.cancel || 'Batal'}</span>
+        </button>
+        <button 
+          onClick={(e) => { e.preventDefault(); onSave(); }}
+          disabled={!canSave}
+          className={`flex-[1.5] flex items-center justify-center py-4 rounded-xl text-white body-lg font-black transition-all ${
+            canSave ? `${t.bgAccent} shadow-lg hover:opacity-90 active:scale-95` : 'bg-slate-600/50 text-white/50 cursor-not-allowed'
+          }`}
+        >
+          <span className="whitespace-nowrap leading-none">{isEditing ? (lang?.save || 'Simpan Perubahan') : 'Simpan Custom'}</span>
+        </button>
+      </div>
 
       </div> {/* Akhir Kolom Kanan */}
       </div> {/* Akhir Grid */}
@@ -275,6 +316,36 @@ const ExerciseForm = ({ t, lang, formData, setFormData, originalData, onSave, on
 const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, soundEnabled, warmupVideos, setWarmupVideos, cooldownVideos, setCooldownVideos, onOpenDetail, setConfirmModal, theme, gymProfiles, setGymProfiles, activeGymId, setActiveGymId }) => {
   // ── Tab State ────────────────────────────────────────────────────
   const [viewMode, setViewMode] = useState('all'); // 'all' | 'custom'
+
+  // --- Swipe Logic for Tab Switch ---
+  const touchStartX = useRef(null);
+  const touchEndX = useRef(null);
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e) => {
+    touchEndX.current = null;
+    touchStartX.current = e.targetTouches[0].clientX;
+  };
+
+  const onTouchMove = (e) => {
+    touchEndX.current = e.targetTouches[0].clientX;
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStartX.current || !touchEndX.current) return;
+    const distance = touchStartX.current - touchEndX.current;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+    
+    if (isLeftSwipe && viewMode === 'all') {
+      setViewMode('custom');
+      playSoundEffect('swipe', soundEnabled);
+    }
+    if (isRightSwipe && viewMode === 'custom') {
+      setViewMode('all');
+      playSoundEffect('swipe', soundEnabled);
+    }
+  };
 
   // 🟢 Form State 🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢
   const [editingId, setEditingId] = useState(null);
@@ -540,7 +611,6 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
       };
       setFormData(newData);
       setOriginalData(newData);
-      setViewMode('custom');
     }
   };
 
@@ -572,6 +642,7 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
     }
     setFormData(blankExercise());
     setOriginalData(null);
+    setViewMode('custom');
   };
 
   const handleCancel = () => {
@@ -796,7 +867,12 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
         </div>
         
         {/* Exercise List */}
-        <div className="flex-1 overflow-y-auto min-h-0 -mx-4 px-4 pt-4 pb-6 hide-scrollbar">
+        <div 
+          className="flex-1 overflow-y-auto min-h-0 -mx-4 px-4 pt-4 pb-6 hide-scrollbar"
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
           {displayedList.length === 0 ? (
             <div className={`flex flex-col items-center justify-center py-16 rounded-2xl border border-dashed ${t.border}`}>
               {onlineLoading ? (

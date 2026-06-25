@@ -74,7 +74,7 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
         <div className={`w-full max-w-md mx-auto ${t.bgCard} rounded-3xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden border ${t.border}`} onClick={e => e.stopPropagation()}>
           <div className={`p-4 border-b ${t.border} flex justify-between items-center`}>
             <h3 className={`text-xl font-bold ${t.textAccent}`}>Kelola Profil Gym</h3>
-            <button onClick={onClose} className={`p-2 rounded-full ${t.btnBg} hover:opacity-80`}><X size={20} className={t.text} /></button>
+            <button onClick={onClose} className={`p-2 rounded-full ${t.btnBg} hover:opacity-80`}><X size={20} className={t.textMain} /></button>
           </div>
           
           <div className="p-4 overflow-y-auto flex-1 space-y-3">
@@ -88,7 +88,7 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
                   }}
                 >
                   <div className="flex items-center gap-2">
-                    <span className={`font-bold ${activeGymId === gym.id ? t.textAccent : t.text}`}>{gym.name}</span>
+                    <span className={`font-bold ${activeGymId === gym.id ? t.textAccent : t.textMain}`}>{gym.name}</span>
                     {activeGymId === gym.id && <Check size={16} className={t.textAccent} />}
                   </div>
                   <p className={`text-xs ${t.textMuted} mt-1`}>
@@ -97,7 +97,7 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
                 </div>
                 <div className="flex gap-2">
                   {gym.id !== 'default' && (
-                    <button onClick={() => handleEditGym(gym)} className={`p-2 rounded-xl ${t.btnBg} hover:opacity-80`}><Edit2 size={16} className={t.text} /></button>
+                    <button onClick={() => handleEditGym(gym)} className={`p-2 rounded-xl ${t.btnBg} hover:opacity-80`}><Edit2 size={16} className={t.textMain} /></button>
                   )}
                   {gym.id !== 'default' && gymProfiles.length > 1 && (
                     <button onClick={() => handleDeleteGym(gym)} className="p-2 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20"><X size={16} /></button>
@@ -157,7 +157,7 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
               value={conf.barWeight}
               onChange={val => updateConfig(eqName, 'barWeight', val)}
               step={0.5} min={0} soundEnabled={soundEnabled}
-              className={`w-full bg-transparent border-b border-slate-500/30 pb-1 outline-none ${t.text} font-semibold text-center`}
+              className={`w-full bg-transparent border-b border-slate-500/30 pb-1 outline-none ${t.textMain} font-semibold text-center`}
               placeholder="0"
             />
           </div>
@@ -168,7 +168,7 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
             value={conf.increment}
             onChange={val => updateConfig(eqName, 'increment', val)}
             step={0.5} min={0} soundEnabled={soundEnabled}
-            className={`w-full bg-transparent border-b border-slate-500/30 pb-1 outline-none ${t.text} font-semibold text-center`}
+            className={`w-full bg-transparent border-b border-slate-500/30 pb-1 outline-none ${t.textMain} font-semibold text-center`}
             placeholder={isBarbellBased ? "Misal: 2.5" : "Misal: 5"}
           />
         </div>
@@ -193,8 +193,9 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
               type="text" 
               value={editingGym.name}
               onChange={e => setEditingGym({...editingGym, name: e.target.value})}
-              className={`w-full bg-transparent border-b-2 ${t.border} focus:border-primary pb-2 outline-none text-xl font-bold ${t.text}`}
-              placeholder="Contoh: MegaFit Center"
+              className={`w-full bg-transparent border-b-2 ${t.border} focus:${t.borderAccent} pb-2 outline-none text-xl font-bold ${t.textMain}`}
+              placeholder="Misal: Fitness First, Home Gym..."
+              autoFocus
             />
           </div>
 
@@ -222,15 +223,15 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
               {equipmentOptions.map(eq => {
                 const isActive = editingGym.equipment.includes(eq);
                 return (
-                  <div key={eq} className={`border ${isActive ? 'border-primary/50' : t.border} rounded-2xl p-3 ${t.bg}`}>
+                  <div key={eq} className={`border ${isActive ? t.borderAccentSoft : t.border} rounded-2xl p-3 ${t.bgCard}`}>
                     <div 
                       className="flex items-center gap-3 cursor-pointer"
                       onClick={() => toggleEquipment(eq)}
                     >
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center border transition-colors ${isActive ? 'bg-primary border-primary' : `border-slate-500/30 ${t.bgCard}`}`}>
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center border transition-colors ${isActive ? t.bgAccent : `border-slate-500/30 ${t.bgCard}`}`}>
                         {isActive && <Check size={14} className="text-white" />}
                       </div>
-                      <span className={`font-semibold ${isActive ? t.text : t.textMuted}`}>{eq}</span>
+                      <span className={`font-semibold ${isActive ? t.textMain : t.textMuted}`}>{eq}</span>
                     </div>
                     {isActive && renderConfigFields(eq)}
                   </div>

@@ -1,23 +1,139 @@
-import React, { useState } from 'react';
-import { X, Dumbbell, History, Calculator, Replace, Video, Info, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
+import { X, Dumbbell, History, Calculator, Replace, Video, Info, ChevronLeft, ChevronRight, Loader2, Play } from 'lucide-react';
 import { formatTarget } from '../data/constants';
+import SwipeInput from './SwipeInput';
 
 const ExerciseDetailModal = ({ 
   ex: initialEx, 
   onClose, 
   t, 
   lang, 
-  historyData, 
+  fullHistory, 
   onReplace,
-  unitSystem
+  unitSystem,
+  exerciseLibrary,
+  setExerciseLibrary,
+  programs
 }) => {
   const isImp = unitSystem === 'imperial';
+  const existingLibEx = exerciseLibrary?.find(e => e.name?.toLowerCase() === initialEx.name?.toLowerCase() || e.id === initialEx.id);
+  const stored10RM = existingLibEx?.rm10 || 0;
+  const storedLastWeight = existingLibEx?.lastWeight || 0;
+
   const [activeTab, setActiveTab] = useState('info'); // info, history, calc
-  const [calcWeight, setCalcWeight] = useState(50);
+  const [calcWeight, setCalcWeight] = useState(stored10RM || storedLastWeight || 50);
   const [calcReps, setCalcReps] = useState(10);
+  const [showRmInfo, setShowRmInfo] = useState(false);
+  const [isRmSaved, setIsRmSaved] = useState(false);
+
+  const historyData = useMemo(() => {
+    if (!fullHistory || !initialEx) return [];
+    const logs = [];
+    Object.entries(fullHistory).forEach(([date, dayData]) => {
+      if (!dayData || !dayData.workouts) return;
+      // Handle both array of workouts or object mapping (just in case)
+      const workoutsArray = Array.isArray(dayData.workouts) ? dayData.workouts : Object.values(dayData.workouts);
+      workoutsArray.forEach(w => {
+        if (w.status !== 'completed') return;
+
+        let completedSets = [];
+        let realProgId = w.programId;
+        if (realProgId && realProgId.startsWith('projected_')) {
+            realProgId = realProgId.replace('projected_', '').split('_')[0];
+        }
+        
+        let pName = w.name || w.programName || 'Sesi Latihan';
+        if (realProgId && realProgId !== 'adhoc' && realProgId !== 'custom') {
+           const p = programs?.find(prog => prog.id === realProgId);
+           if (p && p.name) {
+             pName = p.planName ? `${p.planName} - ${p.name}` : p.name;
+           }
+        }
+        
+        if (w.log) {
+          let targetExIds = [];
+
+          if (realProgId === 'adhoc' || realProgId === 'custom') {
+            if (w.exercises) {
+               const matchingExs = w.exercises.filter(e => e.id === initialEx.id || e.name?.trim().toLowerCase() === initialEx.name?.trim().toLowerCase());
+               targetExIds = matchingExs.map(e => e.id);
+            }
+          } else {
+            const p = programs?.find(prog => prog.id === realProgId);
+            if (p && p.exercises) {
+               const matchingExs = p.exercises.filter(e => e.id === initialEx.id || e.name?.trim().toLowerCase() === initialEx.name?.trim().toLowerCase());
+               targetExIds = matchingExs.map(e => e.id);
+            }
+          }
+          
+          targetExIds.forEach(tId => {
+             const compositeKey = `${tId}-${w.id}`;
+             const exactKey = tId;
+             if (w.log[compositeKey]) {
+                completedSets.push(...w.log[compositeKey].filter(s => s.done));
+             } else if (w.log[exactKey]) {
+                completedSets.push(...w.log[exactKey].filter(s => s.done));
+             }
+          });
+          
+          // Fallback if still not found
+          if (completedSets.length === 0 && w.log[initialEx.id]) {
+             completedSets.push(...w.log[initialEx.id].filter(s => s.done));
+          }
+        }
+        
+        if (completedSets.length === 0 && w.exercises) {
+          const targetEx = w.exercises.find(e => e.id === initialEx.id || e.name?.trim().toLowerCase() === initialEx.name?.trim().toLowerCase());
+          if (targetEx && targetEx.sets) {
+            completedSets = targetEx.sets.filter(s => s.done);
+          }
+        }
+
+        if (completedSets.length > 0) {
+          logs.push({
+            date,
+            programName: pName,
+            sets: completedSets.map(s => ({
+              w: Number(s.w) || 0,
+              r: Number(s.r) || 0,
+              rpe: s.rpe || '',
+              notes: s.notes || ''
+            }))
+          });
+        }
+      });
+    });
+    return logs.sort((a, b) => new Date(b.date) - new Date(a.date));
+  }, [fullHistory, initialEx]);
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+    const [y, m, d] = parts;
+    const isIndo = lang?.id === 'ID' || t?.settings !== 'Settings';
+    return isIndo ? `${d}/${m}/${y}` : `${m}/${d}/${y}`;
+  };
 
   // Epley formula: 1RM = weight * (1 + reps/30)
   const oneRM = calcReps > 1 ? Math.round(calcWeight * (1 + calcReps / 30)) : calcWeight;
+  const calculated10RM = Math.round((oneRM / 1.3333) * 10) / 10;
+
+  const handleSave10RM = () => {
+    if (!setExerciseLibrary) return;
+    setExerciseLibrary(lib => {
+      const idx = lib.findIndex(e => e.name?.toLowerCase() === initialEx.name?.toLowerCase() || e.id === initialEx.id);
+      if (idx >= 0) {
+        const newLib = [...lib];
+        newLib[idx] = { ...newLib[idx], rm10: calculated10RM };
+        return newLib;
+      }
+      return [...lib, { ...initialEx, rm10: calculated10RM, id: initialEx.id || Date.now(), isFavorite: false }];
+    });
+    setIsRmSaved(true);
+    setTimeout(() => setIsRmSaved(false), 2000);
+  };
 
   const [ex, setEx] = useState(initialEx);
 
@@ -45,6 +161,57 @@ const ExerciseDetailModal = ({
   }, [initialEx]);
 
   if (!ex) return null;
+
+  if (ex.type === 'warmup' || ex.type === 'cooldown') {
+    const urls = ex.ytVideo ? ex.ytVideo.split(/(?:,|\s)+/).filter(v => v.trim()) : [];
+    const videos = urls.map(url => {
+        const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})/);
+        return { url, videoId: match ? match[1] : null };
+    }).filter(v => v.videoId);
+
+    return createPortal(
+      <div className={`fixed inset-0 z-[100] flex flex-col ${t.bgApp}`}>
+        <div className="p-4 flex justify-between items-center bg-black/80 absolute top-0 w-full z-20">
+          <h2 className="h2 text-white drop-shadow-md">{ex.name}</h2>
+          <button onClick={onClose} className="p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition">
+            <X size={20} strokeWidth={2.5} />
+          </button>
+        </div>
+
+        <div className="flex-1 w-full mt-[72px] overflow-y-auto hide-scrollbar pb-10">
+          {videos.length === 0 ? (
+            <div className="p-10 flex flex-col items-center text-center opacity-50 mt-20">
+              <Video size={64} className={`mb-4 ${t.textMuted}`} />
+              <p className={`h3 ${t.textMuted}`}>Tidak ada link video yang tersedia.</p>
+            </div>
+          ) : (
+            <div className="flex flex-col space-y-8 p-4">
+              {videos.map((vid, i) => (
+                <div key={i} className={`flex flex-col rounded-3xl overflow-hidden shadow-xl ${t.bgCard}`}>
+                  <div className="w-full relative pt-[56.25%] bg-black">
+                    <iframe 
+                      src={`https://www.youtube.com/embed/${vid.videoId}?enablejsapi=1&controls=1&modestbranding=1&playsinline=1&rel=0`}
+                      title="YouTube video player" 
+                      frameBorder="0" 
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                      allowFullScreen
+                      className="absolute top-0 left-0 w-full h-full"
+                    ></iframe>
+                  </div>
+                  <div className="p-4">
+                    <a href={`https://youtu.be/${vid.videoId}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl bg-red-600 text-white font-bold body-lg hover:bg-red-700 active:scale-95 transition-all">
+                      <Play size={20} className="fill-white" /> Buka di Aplikasi YouTube
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>,
+      document.body
+    );
+  }
 
   const parseMedia = (exercise) => {
     let items = [];
@@ -147,7 +314,7 @@ const ExerciseDetailModal = ({
     }
   };
 
-  return (
+  return createPortal(
     <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in`} onClick={onClose}>
       <div className={`w-full max-w-md sm:max-w-4xl mx-auto ${t.bgCard} rounded-3xl overflow-hidden flex flex-col sm:flex-row h-[85vh] sm:h-[80vh] animate-in zoom-in-95 duration-200 border ${t.border}`} onClick={e => e.stopPropagation()}>
         
@@ -313,7 +480,7 @@ const ExerciseDetailModal = ({
               onClick={() => setActiveTab('calc')}
               className={`flex-1 py-3 body-md flex flex-col items-center gap-1 transition-all ${activeTab === 'calc' ? `${t.textAccent} border-b-2 ${t.borderAccent}` : t.textMuted}`}
             >
-              <Calculator size={18} /> 1RM Calc
+              <Calculator size={18} /> RM Calc
             </button>
           </div>
         )}
@@ -365,8 +532,8 @@ const ExerciseDetailModal = ({
                 </div>
 
                 {/* Tab 2: Riwayat */}
-                <div className="w-1/3 h-full p-5 overflow-y-auto hide-scrollbar">
-                  <div className="space-y-3">
+                <div className="w-1/3 h-full p-3 overflow-y-auto hide-scrollbar">
+                  <div className="space-y-0">
                      {(!historyData || historyData.length === 0) ? (
                        <div className={`text-center py-8 ${t.textMuted}`}>
                          <History size={32} className="mx-auto mb-2 opacity-30" />
@@ -374,14 +541,38 @@ const ExerciseDetailModal = ({
                        </div>
                      ) : (
                        historyData.map((log, i) => (
-                         <div key={i} className={`p-3 rounded-xl border ${t.border} ${t.bgCard} flex justify-between items-center`}>
-                           <div>
-                             <p className={`body-md ${t.textMuted}`}>{log.date}</p>
-                             <p className={`body-lg font-bold ${t.textMain}`}>{log.programName}</p>
+                         <div key={i} className={`mb-3 pb-3 border-b border-dashed last:border-b-0 ${t.border}`}>
+                           <div className="flex items-center mb-1.5 px-1">
+                             <div className={`caption ${t.textMuted} w-[65px] shrink-0`}>
+                               {formatDate(log.date)}
+                             </div>
+                             <div className={`caption font-bold ${t.textMain} flex-1 truncate`}>
+                               {log.programName}
+                             </div>
                            </div>
-                           <div className="text-right">
-                             <p className={`h2 ${t.textAccent}`}>{isImp ? Number((log.maxWeight * 2.20462).toFixed(1)) : log.maxWeight} <span className="body-md">{isImp ? 'lbs' : 'kg'}</span></p>
-                             <p className={`body-md ${t.textMuted}`}>{log.totalSets} set</p>
+                           <div className={`w-full overflow-hidden rounded-md bg-black/5 dark:bg-white/5`}>
+                             <table className="w-full text-[10px] table-fixed">
+                               <thead className={`bg-black/10 dark:bg-white/10 ${t.textMuted}`}>
+                                 <tr>
+                                   <th className="py-1 text-center w-8">Set</th>
+                                   <th className="py-1 text-center w-14">Beban</th>
+                                   <th className="py-1 text-center w-10">Reps</th>
+                                   <th className="py-1 text-center border-l border-black/5 dark:border-white/5 w-10">RPE</th>
+                                   <th className="py-1 px-2 text-left">Notes</th>
+                                 </tr>
+                               </thead>
+                               <tbody>
+                                 {log.sets.map((s, idx) => (
+                                    <tr key={idx} className={`border-t border-black/5 dark:border-white/5 ${t.textMain}`}>
+                                      <td className="py-1.5 text-center font-bold opacity-70">{idx + 1}</td>
+                                      <td className={`py-1.5 text-center font-bold ${t.textAccent}`}>{isImp ? Number((s.w * 2.20462).toFixed(1)) : s.w} <span className="text-[8px]">{isImp ? 'lbs' : 'kg'}</span></td>
+                                      <td className="py-1.5 text-center font-bold">{s.r}</td>
+                                      <td className={`py-1.5 text-center border-l border-black/5 dark:border-white/5 ${s.rpe ? '' : 'opacity-30'}`}>{s.rpe || '-'}</td>
+                                      <td className={`py-1.5 px-2 text-left italic truncate ${s.notes ? '' : 'opacity-30'}`} title={s.notes}>{s.notes || '-'}</td>
+                                    </tr>
+                                 ))}
+                               </tbody>
+                             </table>
                            </div>
                          </div>
                        ))
@@ -390,35 +581,71 @@ const ExerciseDetailModal = ({
                 </div>
 
                 {/* Tab 3: 1RM Calc */}
-                <div className="w-1/3 h-full p-5 overflow-y-auto hide-scrollbar">
-                  <div className="space-y-5 text-center pb-8">
-                     <p className={`body-md ${t.textMuted}`}>Gunakan kalkulator One Rep Max (1RM) untuk mengestimasi beban maksimal yang bisa kamu angkat 1 kali berdasarkan set terbaikmu.</p>
-                     
-                     <div className="grid grid-cols-2 gap-4">
-                       <div>
-                         <label className={`body-md ${t.textMuted} mb-1 block`}>Beban ({isImp ? 'lbs' : 'kg'})</label>
-                         <input 
-                           type="number" min="0" 
-                           value={calcWeight} onChange={e => setCalcWeight(Number(e.target.value))}
-                           className={`w-full px-3 py-3 rounded-xl ${t.inputBg} ${t.textMain} font-black text-center h2 outline-none focus:ring-2 ${t.ringAccent}`}
-                         />
+                <div className="w-1/3 h-full p-4 overflow-y-auto hide-scrollbar relative">
+                    <div className="space-y-4 text-center pb-5">
+                       <div className="flex items-center justify-center gap-2">
+                          <h3 className={`h3 ${t.textMain}`}>Kalkulator RM</h3>
+                          <button onClick={() => setShowRmInfo(!showRmInfo)} className={`p-1.5 rounded-full ${t.inputBg} ${t.textMuted} hover:${t.textAccent} transition-colors`}>
+                             <Info size={16} />
+                          </button>
                        </div>
-                       <div>
-                         <label className={`body-md ${t.textMuted} mb-1 block`}>Repetisi</label>
-                         <input 
-                           type="number" min="1" 
-                           value={calcReps} onChange={e => setCalcReps(Number(e.target.value))}
-                           className={`w-full px-3 py-3 rounded-xl ${t.inputBg} ${t.textMain} font-black text-center h2 outline-none focus:ring-2 ${t.ringAccent}`}
-                         />
+                       
+                       {showRmInfo && (
+                          <div className={`p-3.5 rounded-xl ${t.bgCard} border ${t.border} text-left text-xs ${t.textMuted} space-y-2 shadow-lg mb-4`}>
+                             <p>Kalkulator RM (Repetition Maximum) digunakan untuk mengestimasi beban maksimal yang bisa kamu angkat berdasarkan set terbaikmu.</p>
+                             <p>Jika kamu sudah tahu kapasitas bebanmu (misal: "saya biasa angkat 50kg, 8 repetisi"), masukkan angkanya di bawah lalu <b>Simpan</b> sebagai baseline 10RM.</p>
+                             <p>Jika kamu belum tahu kapasitas beban, silakan dicoba dengan beban ringan terlebih dahulu, naikkan bebannya bertahap sampai cukup untuk 10 repetisi.</p>
+                             <p>Aplikasi LyFit mencatat rekor 10RM otomatis selama kamu latihan, jadi kamu tidak wajib input manual di sini.</p>
+                          </div>
+                       )}
+
+                       <div className="grid grid-cols-2 gap-3">
+                         <div>
+                           <label className={`body-md ${t.textMuted} block mb-0.5`}>Beban ({isImp ? 'lbs' : 'kg'})</label>
+                           <SwipeInput 
+                             value={calcWeight} 
+                             onChange={(val) => setCalcWeight(Math.max(0, val))} 
+                             step={2.5}
+                             min={0}
+                             language={lang?.id || 'ID'}
+                             className={`w-full px-3 py-2 rounded-xl ${t.inputBg} ${t.textMain} font-black text-center h2 outline-none focus:ring-2 ${t.ringAccent}`}
+                           />
+                         </div>
+                         <div>
+                           <label className={`body-md ${t.textMuted} block mb-0.5`}>Repetisi</label>
+                           <SwipeInput 
+                             value={calcReps} 
+                             onChange={(val) => setCalcReps(Math.max(1, val))} 
+                             step={1}
+                             min={1}
+                             language={lang?.id || 'ID'}
+                             className={`w-full px-3 py-2 rounded-xl ${t.inputBg} ${t.textMain} font-black text-center h2 outline-none focus:ring-2 ${t.ringAccent}`}
+                           />
+                         </div>
                        </div>
                      </div>
   
-                     <div className={`p-6 rounded-2xl bg-gradient-to-br ${t.gradientBg} shadow-lg shadow-amber-500/20`}>
-                       <p className="text-white/80 body-md uppercase tracking-wider mb-1">Estimasi 1RM Kamu</p>
-                       <p className="text-white h1">{oneRM} <span className="h2">{isImp ? 'lbs' : 'kg'}</span></p>
+                     <div className={`p-5 rounded-2xl bg-gradient-to-br ${t.gradientBg} shadow-xl border border-white/10`}>
+                       <div className="flex justify-between items-center mb-3 border-b border-white/20 pb-3">
+                         <div>
+                           <p className="text-white/80 text-[10px] uppercase tracking-wider mb-0.5">Estimasi 1RM</p>
+                           <p className="text-white h3">{oneRM} <span className="body-md">{isImp ? 'lbs' : 'kg'}</span></p>
+                         </div>
+                         <div className="text-right">
+                           <p className="text-white/80 text-[10px] uppercase tracking-wider mb-0.5">Estimasi 10RM</p>
+                           <p className="text-white h3">{calculated10RM} <span className="body-md">{isImp ? 'lbs' : 'kg'}</span></p>
+                         </div>
+                       </div>
+                       
+                       <button 
+                         onClick={handleSave10RM}
+                         disabled={isRmSaved || calculated10RM === stored10RM}
+                         className={`w-full py-2.5 font-black body-lg rounded-xl shadow-md transition-all ${isRmSaved ? t.bgAccent : (calculated10RM === stored10RM ? 'bg-white/20 text-white/50 cursor-not-allowed' : 'bg-white text-black hover:bg-zinc-100 active:scale-95')}`}
+                       >
+                         {isRmSaved ? 'Tersimpan ✓' : 'Simpan'}
+                       </button>
                      </div>
                   </div>
-                </div>
               </div>
             ) : (
               <div className="p-6 h-full text-center text-zinc-500 italic flex flex-col items-center justify-center gap-3">
@@ -430,7 +657,8 @@ const ExerciseDetailModal = ({
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

@@ -28,12 +28,12 @@ const WorkoutHeader = ({
       {!hideWarmup && (
         <div className="flex space-x-3">
           <button 
-             onClick={() => { playSoundEffect('click', soundEnabled); onOpenVideo({name: lang.warmup || 'Pemanasan', ytVideo: programWarmup});}} 
-             className="flex-1 bg-amber-500/10 text-amber-500 py-3 px-2 rounded-2xl border border-amber-500/30 flex justify-center items-center hover:bg-amber-500/20 transition-all body-lg shadow-sm active:scale-95"
+             onClick={() => { playSoundEffect('click', soundEnabled); onOpenVideo(programWarmup);}} 
+             className="flex-1 bg-rose-500/10 text-rose-500 py-3 px-2 rounded-2xl border border-rose-500/30 flex justify-center items-center hover:bg-rose-500/20 transition-all body-lg shadow-sm active:scale-95"
           >
              <Flame size={16} className="mr-2"/> {lang.warmup || 'Pemanasan'}
              {activeProgram?.warmupVideoUrls?.length > 0 && (
-               <span className="ml-1.5 h3 bg-amber-500/20 px-1.5 py-0.5 rounded-full">Kustom</span>
+               <span className="ml-1.5 h3 bg-rose-500/20 px-1.5 py-0.5 rounded-full">Kustom</span>
              )}
           </button>
         </div>

@@ -13,10 +13,10 @@ const UnifiedExerciseCard = ({ t, lang, ex, onEdit, onDelete, onToggleFavorite, 
       style={index !== undefined ? { animationDelay: `${(index % 15) * 20}ms` } : {}}
     >
       {/* Background Image (Right side) */}
-      <div 
-        className="absolute inset-y-0 right-0 w-[55%] pointer-events-none opacity-50"
-        style={{ maskImage: 'linear-gradient(to right, transparent, black 60%)', WebkitMaskImage: 'linear-gradient(to right, transparent, black 60%)' }}
-      >
+        <div 
+          className="absolute inset-y-0 right-0 w-[55%] pointer-events-none mix-blend-multiply dark:mix-blend-normal opacity-80"
+          style={{ maskImage: 'linear-gradient(105deg, transparent 15%, black 85%)', WebkitMaskImage: 'linear-gradient(105deg, transparent 15%, black 85%)' }}
+        >
           {(() => {
              const apiExercises = getCachedExercises();
              const apiMatch = (!ex.gifUrl && !isCustom) ? apiExercises.find(e => e.name.toLowerCase() === ex.name.toLowerCase()) : null;
@@ -76,28 +76,28 @@ const UnifiedExerciseCard = ({ t, lang, ex, onEdit, onDelete, onToggleFavorite, 
       <div className="flex items-center gap-1.5 pr-4 pl-2 py-4 flex-shrink-0 z-20">
         {actionButton ? actionButton : (
           <>
-            <button
-              onClick={(e) => { e.stopPropagation(); onToggleFavorite && onToggleFavorite(ex); }}
-              className={`p-2.5 rounded-xl backdrop-blur-md transition-all ${isFav ? 'bg-emerald-500/20 text-emerald-500' : 'bg-black/10 dark:bg-white/10 text-slate-500 hover:bg-emerald-500/20 hover:text-emerald-500'} active:scale-90`}
-              title={isFav ? "Hapus dari Favorit" : "Tambah ke Favorit"}
-            >
-              <Heart size={16} fill={isFav ? "currentColor" : "none"} className={isFav ? "text-emerald-500" : ""} />
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); onEdit && onEdit(ex); }}
-              className={`p-2.5 rounded-xl bg-black/10 dark:bg-white/10 text-sky-500 hover:bg-sky-500/20 active:scale-90 transition-all opacity-80 hover:opacity-100 backdrop-blur-md`}
-              title="Edit"
-            >
-              <Edit2 size={16} />
-            </button>
-            {isCustom && (
               <button
-                onClick={(e) => { e.stopPropagation(); onDelete && onDelete(ex); }}
-                className="p-2.5 rounded-xl bg-black/10 dark:bg-white/10 text-rose-500 hover:bg-rose-500/20 active:scale-90 transition-all opacity-80 hover:opacity-100 backdrop-blur-md"
-                title="Hapus"
-              >
-                <X size={16} />
-              </button>
+                  onClick={(e) => { e.stopPropagation(); onToggleFavorite && onToggleFavorite(ex); }}
+                  className={`p-2.5 rounded-xl shadow-sm border ${t.border} ${t.bgCard} transition-all ${isFav ? `${t.textAccent}` : 'text-slate-500 hover:opacity-80'} active:scale-90`}
+                  title={isFav ? "Hapus dari Favorit" : "Tambah ke Favorit"}
+                >
+                  <Heart size={16} fill={isFav ? "currentColor" : "none"} />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onEdit && onEdit(ex); }}
+                  className={`p-2.5 rounded-xl shadow-sm border ${t.border} ${t.bgCard} ${t.textAccent} active:scale-90 transition-all hover:opacity-80`}
+                  title="Edit"
+                >
+                  <Edit2 size={16} />
+                </button>
+              {isCustom && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDelete && onDelete(ex); }}
+                  className={`p-2.5 rounded-xl shadow-sm border ${t.border} ${t.bgCard} text-rose-500 active:scale-90 transition-all hover:opacity-80`}
+                  title="Hapus"
+                >
+                  <X size={16} />
+                </button>
             )}
           </>
         )}

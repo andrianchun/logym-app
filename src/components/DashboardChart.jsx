@@ -6,17 +6,17 @@ import { formatNumber } from '../utils/numberFormat';
 const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPointClick, unitSystem, language }) => {
   const isImp = unitSystem === 'imperial';
   const chartMetricsList = [
-      { key: 'weight', label: 'Berat Badan', color: '#41759b' },
-      { key: 'bodyFat', label: 'Body Fat %', color: '#B79347' },
-      { key: 'musclePercent', label: 'Otot %', color: '#93a6b2' },
-      { key: 'visceralFat', label: 'Visceral', color: '#A7967D' },
-      { key: 'bmr', label: 'BMR', color: '#81571E' },
-      { key: 'waist', label: 'Lkr Perut', color: '#294c65' },
-      { key: 'bpSys', label: 'Tensi (Sistolik)', color: '#CBB989' },
-      { key: 'heartRate', label: 'Nadi (bpm)', color: '#738a98' },
-      { key: 'steps', label: 'Langkah (x100)', color: '#957c4c' },
-      { key: 'activeMinutes', label: 'Wkt Aktif (m)', color: '#5b829e' },
-      { key: 'weeklyDuration', label: 'Workout (m)', color: '#c3a870' },
+      { key: 'weight', label: 'Berat Badan', color: theme === 'dark' ? '#41759b' : '#2563eb' },
+      { key: 'bodyFat', label: 'Body Fat %', color: theme === 'dark' ? '#B79347' : '#d97706' },
+      { key: 'musclePercent', label: 'Otot %', color: theme === 'dark' ? '#93a6b2' : '#0284c7' },
+      { key: 'visceralFat', label: 'Visceral', color: theme === 'dark' ? '#A7967D' : '#475569' },
+      { key: 'bmr', label: 'BMR', color: theme === 'dark' ? '#81571E' : '#b45309' },
+      { key: 'waist', label: 'Lkr Perut', color: theme === 'dark' ? '#294c65' : '#1e3a8a' },
+      { key: 'bpSys', label: 'Tensi (Sistolik)', color: theme === 'dark' ? '#CBB989' : '#0891b2' },
+      { key: 'heartRate', label: 'Nadi (bpm)', color: theme === 'dark' ? '#738a98' : '#4f46e5' },
+      { key: 'steps', label: 'Langkah (x100)', color: theme === 'dark' ? '#957c4c' : '#334155' },
+      { key: 'activeMinutes', label: 'Wkt Aktif (m)', color: theme === 'dark' ? '#5b829e' : '#1d4ed8' },
+      { key: 'weeklyDuration', label: 'Workout (m)', color: theme === 'dark' ? '#c3a870' : '#854d0e' },
   ];
 
   const [activeChartMetrics, setActiveChartMetrics] = useState(['weight', 'bodyFat', 'musclePercent', 'visceralFat', 'waist']);
@@ -253,7 +253,14 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
               onTouchMoveCapture={handleTouchMove}
               className="w-full overflow-x-auto scrollbar-hide mb-4 touch-pan-x" 
               style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}>
-             <div style={{ width: `${chartWidth}px`, height: '224px' }} className="cursor-crosshair">
+             <div style={{ width: `${chartWidth}px`, height: '224px' }} className="cursor-crosshair relative">
+                 {/* Gimmick Grid Lines */}
+                 <svg className="absolute inset-0 w-full h-full pointer-events-none z-0" style={{ padding: '10px 0 30px 0' }}>
+                     {[0, 25, 50, 75, 100].map((pct, i) => (
+                         <line key={i} x1="0" y1={`${pct}%`} x2="100%" y2={`${pct}%`} stroke={theme === 'dark' ? '#3f3f46' : '#cbd5e1'} strokeDasharray="3 3" strokeWidth="1" />
+                     ))}
+                 </svg>
+
                  <LineChart 
                     width={chartWidth}
                     height={224}
@@ -265,24 +272,6 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
                         }
                     }}
                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke={t.border} vertical={false} opacity={0.5} />
-                    <YAxis 
-                        yAxisId="left" 
-                        domain={['auto', 'auto']} 
-                        tick={{ fontSize: 10, fill: theme === 'dark' ? '#94a3b8' : '#64748b' }} 
-                        axisLine={false} 
-                        tickLine={false} 
-                        tickFormatter={(val) => formatNumber(val, language)}
-                    />
-                    <YAxis 
-                        yAxisId="right" 
-                        orientation="right" 
-                        domain={[0, 'auto']} 
-                        tick={{ fontSize: 10, fill: theme === 'dark' ? '#94a3b8' : '#64748b' }} 
-                        axisLine={false} 
-                        tickLine={false} 
-                        tickFormatter={(val) => formatNumber(val, language)}
-                    />
                     <Tooltip 
                        formatter={(value, name, props) => {
                            let unit = '';
@@ -300,10 +289,13 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
                        labelStyle={{ color: theme === 'dark' ? '#a1a1aa' : '#71717a', marginBottom: '4px', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }} 
                     />
                     <XAxis dataKey="name" stroke={theme === 'dark' ? '#a1a1aa' : '#64748b'} fontSize={10} tickLine={false} axisLine={false} />
-                    {chartMetricsList.map(metric => (
-                        activeChartMetrics.includes(metric.key) && 
-                        <YAxis key={`y-${metric.key}`} yAxisId={metric.key} domain={yDomains[metric.key] || ['auto', 'auto']} hide={true} allowDataOverflow={true} />
-                    ))}
+                    {chartMetricsList.map(metric => {
+                        if (!activeChartMetrics.includes(metric.key)) return null;
+                        const isFirstActive = activeChartMetrics[0] === metric.key;
+                        return (
+                            <YAxis key={`y-${metric.key}`} yAxisId={metric.key} domain={yDomains[metric.key] || ['auto', 'auto']} hide={!isFirstActive} tickFormatter={() => ''} axisLine={false} tickLine={false} width={isFirstActive ? 1 : 0} allowDataOverflow={true} />
+                        );
+                    })}
                     {chartMetricsList.map(metric => (
                         activeChartMetrics.includes(metric.key) && 
                         <Line key={metric.key} yAxisId={metric.key} type="monotone" name={metric.label} dataKey={metric.key} stroke={metric.color} strokeWidth={2} dot={{ r: 2, strokeWidth: 0, fill: metric.color }} activeDot={{ r: 4, strokeWidth: 0, fill: metric.color }} connectNulls={true} isAnimationActive={false} />

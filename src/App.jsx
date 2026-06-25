@@ -57,6 +57,7 @@ export default function App() {
   const [reminderEnabled, setReminderEnabled] = useState(true);
   const [biometricStandard, setBiometricStandard] = useState('asia'); // 'asia' | 'western'
   const [unitSystem, setUnitSystem] = useState('metric'); // 'metric' | 'imperial'
+  const [userProfile, setUserProfile] = useState({ goal: null, experience: null });
   const [gymProfiles, setGymProfiles] = useState([{ id: 'default', name: 'Lyfit Gym', equipment: 'all', config: {} }]);
   const [activeGymId, setActiveGymId] = useState('default');
   const [activityTargets, setActivityTargets] = useState({ steps: 10000, weeklyDuration: 150, sleep: 8 });
@@ -79,9 +80,9 @@ export default function App() {
 
   const [selectedDate, setSelectedDate] = useState(getLocalYMD(new Date()));
   const [loadedDate, setLoadedDate] = useState(null);
-  const [activePlanId, setActivePlanId] = useState(null);
+  const [activePlanIds, setActivePlanIds] = useState([]);
   const [activeProgramId, setActiveProgramId] = useState(defaultPrograms[0]?.id || null);
-  const [focusWorkoutId, setFocusWorkoutId] = useState(null);
+    const [focusWorkoutId, setFocusWorkoutId] = useState(null);
 
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
@@ -156,60 +157,62 @@ export default function App() {
 
   const handleApplyRecommendedPlan = (plan) => {
     playSoundEffect('success', soundEnabled);
-    const newPlanId = `plan-${Date.now()}`;
+    const newPlanId = plan.id || `plan-${Date.now()}`;
     const userExperience = plan.userExperience || 'beginner';
+    
+    if (plan.userGoal || plan.userExperience) {
+      setUserProfile(prev => ({
+        goal: plan.userGoal || prev.goal,
+        experience: plan.userExperience || prev.experience
+      }));
+    }
+
+    if (plan.gymProfileId && plan.gymProfileId !== 'ADD_NEW_GYM') {
+      setActiveGymId(plan.gymProfileId);
+    }
+
+    let baseName = plan.name || 'Program Cerdas AI';
+    let uniqueName = baseName;
+    let counter = 2;
+    while (programs.some(p => p.planName === uniqueName)) {
+      uniqueName = `${baseName} (${counter})`;
+      counter++;
+    }
 
     const newPrograms = plan.routines.map((routine, idx) => {
-      
-      // AI EXPERIENCE-BASED SWAPPING LOGIC
-      const adjustedExercises = routine.exercises.map(ex => {
-        const masterEx = defaultMasterExercises.find(m => m.id === (ex.originalId || ex.id));
-        
-        // If already matches user level or no master found, keep original
-        if (!masterEx || !masterEx.level || masterEx.level === userExperience) return ex;
-        
-        // Find an alternative that matches user level AND shares the primary muscle target
-        const primaryTarget = masterEx.target[0];
-        const altEx = defaultMasterExercises.find(m => 
-          m.level === userExperience && 
-          m.target.includes(primaryTarget) && 
-          m.id !== masterEx.id
-        );
-
-        if (altEx) {
-          // Swap it! Keep the original sets and reps/duration to maintain program structure
-          return {
-            ...altEx,
-            id: Date.now() + Math.random(),
-            originalId: altEx.id,
-            sets: ex.sets,
-            reps: ex.reps,
-            duration: ex.duration
-          };
-        }
-        
-        return ex; // Fallback
-      });
-
       return {
         id: `prog-${Date.now()}-${idx}`,
-        name: routine.name,
-        restTime: routine.restTime,
-        warmupVideoUrls: [],
-        exercises: adjustedExercises,
+        name: routine.name.replace(/\s*\([^)]*\)/g, ''),
+        restTime: routine.restTime || 90,
+        warmupVideoUrls: routine.warmupVideoUrls || [],
+        cooldownVideoUrls: routine.cooldownVideoUrls || [],
+        exercises: routine.exercises.map(ex => ({
+          ...ex,
+          id: Date.now() + Math.random(),
+          originalId: ex.id
+        })),
         planId: newPlanId,
-        planName: plan.name,
+        planName: uniqueName,
         planLevel: userExperience,
-        assignedDays: (plan.assignedDays && plan.assignedDays[idx]) ? [plan.assignedDays[idx]] : [] 
+        assignedDays: routine.day ? [routine.day] : [] 
       };
     });
+    
     const updatedPrograms = [...programs, ...newPrograms];
     setPrograms(updatedPrograms);
-    setActivePlanId(newPlanId);
+    setActivePlanIds([newPlanId]);
     setActiveProgramId(newPrograms[0].id);
     setActiveTab('program');
     localStorage.setItem('lyfit_onboarding_completed', 'true');
     setShowQuestionnaire(false);
+
+    setTimeout(() => {
+      const layout = window.innerWidth < 640 ? 'mobile' : 'desktop';
+      const el = document.getElementById(`plan-${layout}-${newPlanId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
   };
 
   // ==========================================
@@ -330,6 +333,7 @@ export default function App() {
     let unsubscribeHistory = null;
     
     if (user) {
+      isUpdatingFromServer.current = true;
       const currentYear = new Date().getFullYear().toString();
       const mainDocRef = doc(db, "users", user.uid);
       const historyDocRef = doc(db, "users", user.uid, "history_years", currentYear);
@@ -416,21 +420,23 @@ export default function App() {
             }
             if (data.settings) {
               const parsedSettings = typeof data.settings === 'string' ? JSON.parse(data.settings) : data.settings;
-              setTheme(parsedSettings.theme || 'dark');
-              setLanguage(parsedSettings.language || 'ID');
-              setSoundEnabled(parsedSettings.soundEnabled ?? true);
-              setDefaultRestTime(parsedSettings.defaultRestTime || 120);
-              setWarmupVideos(parsedSettings.warmupVideos || defaultWarmupVideos);
-              setCooldownVideos(parsedSettings.cooldownVideos || defaultCooldownVideos);
-              setWeekStartDay(parsedSettings.weekStartDay || 0);
-              setDefaultReminderTime(parsedSettings.defaultReminderTime || "15:00");
-              setReminderEnabled(parsedSettings.reminderEnabled ?? true);
-              setBiometricStandard(parsedSettings.biometricStandard || 'asia');
-              setUnitSystem(parsedSettings.unitSystem || 'metric');
-              setGymProfiles(parsedSettings.gymProfiles || [{ id: 'default', name: 'Lyfit Gym', equipment: 'all', config: {} }]);
-              setActiveGymId(parsedSettings.activeGymId || 'default');
-              setActivityTargets(parsedSettings.activityTargets || { steps: 10000, weeklyDuration: 150, sleep: 8 });
-              setActivePlanId(parsedSettings.activePlanId !== undefined ? parsedSettings.activePlanId : null);
+              if (parsedSettings.theme) setTheme(parsedSettings.theme);
+              if (parsedSettings.language) setLanguage(parsedSettings.language);
+              if (parsedSettings.soundEnabled !== undefined) setSoundEnabled(parsedSettings.soundEnabled);
+              if (parsedSettings.defaultRestTime) setDefaultRestTime(parsedSettings.defaultRestTime);
+              if (parsedSettings.warmupVideos) setWarmupVideos(parsedSettings.warmupVideos);
+              if (parsedSettings.cooldownVideos) setCooldownVideos(parsedSettings.cooldownVideos);
+              if (parsedSettings.weekStartDay !== undefined) setWeekStartDay(parsedSettings.weekStartDay);
+              if (parsedSettings.defaultReminderTime) setDefaultReminderTime(parsedSettings.defaultReminderTime);
+              if (parsedSettings.reminderEnabled !== undefined) setReminderEnabled(parsedSettings.reminderEnabled);
+              if (parsedSettings.biometricStandard) setBiometricStandard(parsedSettings.biometricStandard);
+              if (parsedSettings.unitSystem) setUnitSystem(parsedSettings.unitSystem);
+              if (parsedSettings.gymProfiles) setGymProfiles(parsedSettings.gymProfiles);
+              if (parsedSettings.activeGymId) setActiveGymId(parsedSettings.activeGymId);
+              if (parsedSettings.activityTargets) setActivityTargets(parsedSettings.activityTargets);
+              if (parsedSettings.activePlanIds) setActivePlanIds(parsedSettings.activePlanIds);
+                else if (parsedSettings.activePlanId) setActivePlanIds([parsedSettings.activePlanId]);
+              if (parsedSettings.userProfile) setUserProfile(parsedSettings.userProfile);
             }
           } catch (err) {
             console.error("Parse Error saat load data utama (MENCEGAH AUTO-SAVE UNTUK MENGHINDARI DATA HILANG):", err);
@@ -487,7 +493,7 @@ export default function App() {
         setDoc(mainDocRef, {
           programs,
           exerciseLibrary,
-          settings: { theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, gymProfiles, activeGymId, activityTargets, activePlanId },
+          settings: { theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, gymProfiles, activeGymId, activityTargets, activePlanIds, userProfile },
           updatedAt: new Date().toISOString()
         }, { merge: true }).catch(err => console.error("Auto-save Cloud gagal:", err));
 
@@ -514,7 +520,7 @@ export default function App() {
       
       return () => clearTimeout(timer);
     }
-  }, [history, programs, exerciseLibrary, theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, gymProfiles, activeGymId, activityTargets, activePlanId, user, isDataLoaded]);
+  }, [history, programs, exerciseLibrary, theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, gymProfiles, activeGymId, activityTargets, activePlanIds, user, isDataLoaded]);
 
   // ==========================================
   // 3.5. REAL-TIME SYNC EXERCISE LOGS TO HISTORY
@@ -542,6 +548,20 @@ export default function App() {
     window.history.pushState({ lyfit: true }, '');
 
     const handlePopState = () => {
+      const activeModals = Array.from(document.querySelectorAll('.fixed.inset-0:not(.pointer-events-none)')).filter(el => window.getComputedStyle(el).display !== 'none');
+      if (activeModals.length > 0) {
+        const topModal = activeModals[activeModals.length - 1];
+        const closeBtn = Array.from(topModal.querySelectorAll('button')).find(b => ['batal', 'tutup'].includes((b.textContent||'').trim().toLowerCase()));
+        if (closeBtn) closeBtn.click();
+        else {
+          const xIcon = topModal.querySelector('svg.lucide-x');
+          if (xIcon && xIcon.closest('button')) xIcon.closest('button').click();
+          else topModal.click();
+        }
+        window.history.pushState({ lyfit: true }, '');
+        return;
+      }
+
       // Prioritas 1: Tutup modal/dialog yang terbuka
       if (globalDetailExercise) { setGlobalDetailExercise(null); window.history.pushState({ lyfit: true }, ''); return; }
       if (showSettings) { setShowSettings(false); window.history.pushState({ lyfit: true }, ''); return; }
@@ -685,17 +705,26 @@ export default function App() {
   const lang = { ...(dict[language] || dict['ID']), id: language };
 
   const t = {
-    bgApp: theme === 'dark' ? 'bg-[#040f1a]' : 'bg-[#f8f9fa]', bgCard: theme === 'dark' ? 'bg-[#0a1f32]' : 'bg-white',
-    textMain: theme === 'dark' ? 'text-slate-100' : 'text-slate-800', textMuted: theme === 'dark' ? 'text-[#93a6b2]' : 'text-[#A7967D]',
-    border: theme === 'dark' ? 'border-[#294c65]/50' : 'border-[#DEDDDE]', textAccent: theme === 'dark' ? 'text-[#93a6b2]' : 'text-[#B79347]',
-    bgAccent: theme === 'dark' ? 'bg-[#41759b] text-white' : 'bg-[#B79347] text-white', bgAccentSoft: theme === 'dark' ? 'bg-[#294c65]/30' : 'bg-[#CBB989]/20',
-    borderAccent: theme === 'dark' ? 'border-[#41759b]' : 'border-[#B79347]', borderAccentSoft: theme === 'dark' ? 'border-[#41759b]/30' : 'border-[#B79347]/30',
-    ringAccent: theme === 'dark' ? 'ring-[#41759b]' : 'ring-[#B79347]', shadowAccent: theme === 'dark' ? 'shadow-[#41759b]/30' : 'shadow-[#B79347]/30',
-    gradientText: theme === 'dark' ? 'from-[#93a6b2] to-[#41759b]' : 'from-[#B79347] to-[#81571E]', gradientBg: theme === 'dark' ? 'from-[#41759b] to-[#294c65]' : 'from-[#B79347] to-[#81571E]',
-    inputBg: theme === 'dark' ? 'bg-[#040f1a]/50' : 'bg-[#DEDDDE]/30', btnBg: theme === 'dark' ? 'bg-[#294c65]/30' : 'bg-[#CBB989]/10',
+    bgApp: theme === 'dark' ? 'bg-[#040f1a]' : 'bg-slate-50', 
+    bgCard: theme === 'dark' ? 'bg-[#0a1f32]' : 'bg-white',
+    textMain: theme === 'dark' ? 'text-slate-100' : 'text-slate-900', 
+    textMuted: theme === 'dark' ? 'text-[#93a6b2]' : 'text-slate-500',
+    border: theme === 'dark' ? 'border-[#294c65]/50' : 'border-slate-300', 
+    textAccent: theme === 'dark' ? 'text-[#93a6b2]' : 'text-[#41759b]',
+    bgAccent: theme === 'dark' ? 'bg-[#41759b] text-white' : 'bg-[#41759b] text-white', 
+    bgAccentSoft: theme === 'dark' ? 'bg-[#294c65]/30' : 'bg-[#41759b]/10',
+    borderAccent: theme === 'dark' ? 'border-[#41759b]' : 'border-[#41759b]', 
+    borderAccentSoft: theme === 'dark' ? 'border-[#41759b]/30' : 'border-[#41759b]/30',
+    ringAccent: theme === 'dark' ? 'ring-[#41759b]' : 'ring-[#41759b]', 
+    shadowAccent: theme === 'dark' ? 'shadow-[#41759b]/30' : 'shadow-[#41759b]/30',
+    gradientText: theme === 'dark' ? 'from-[#93a6b2] to-[#41759b]' : 'from-[#41759b] to-[#294c65]', 
+    gradientBg: theme === 'dark' ? 'from-[#41759b] to-[#294c65]' : 'from-[#41759b] to-[#294c65]',
+    inputBg: theme === 'dark' ? 'bg-[#040f1a]/50' : 'bg-slate-100', 
+    btnBg: theme === 'dark' ? 'bg-[#294c65]/30' : 'bg-[#41759b]/10',
     navBg: theme === 'dark' ? 'bg-[#040f1a]/80 backdrop-blur-md' : 'bg-white/90 backdrop-blur-md',
-    navIconActive: theme === 'dark' ? 'text-[#93a6b2]' : 'text-[#B79347]', navIconInactive: theme === 'dark' ? 'text-[#294c65]' : 'text-[#A7967D]',
-    placeholderAccent: theme === 'dark' ? 'placeholder-[#93a6b2]/40' : 'placeholder-[#B79347]/40'
+    navIconActive: theme === 'dark' ? 'text-[#93a6b2]' : 'text-[#41759b]', 
+    navIconInactive: theme === 'dark' ? 'text-[#294c65]' : 'text-slate-400',
+    placeholderAccent: theme === 'dark' ? 'placeholder-[#93a6b2]/40' : 'placeholder-[#41759b]/40'
   };
 
   const navigateToWorkoutDate = (dateStr, progId) => { 
@@ -757,7 +786,16 @@ export default function App() {
 
   const getSetLogs = (ex, idToCheck) => {
     if (exerciseLogs[idToCheck]) return exerciseLogs[idToCheck];
-    return Array.from({length: ex?.sets || 3}).map(() => ({ w: ex?.defaultWeight || 0, r: ex?.reps || 10, d: ex?.duration || 10, done: false }));
+    
+    const libMatch = exerciseLibrary.find(e => e.id === ex?.id || e.name?.toLowerCase() === ex?.name?.toLowerCase());
+    const suggestedWeight = libMatch?.lastWeight || libMatch?.rm10 || ex?.defaultWeight || 0;
+    
+    return Array.from({length: ex?.sets || 3}).map(() => ({ 
+      w: suggestedWeight, 
+      r: ex?.reps || 10, 
+      d: ex?.duration || 10, 
+      done: false 
+    }));
   };
 
   const getBaseEx = (exId) => {
@@ -782,13 +820,17 @@ export default function App() {
       const ex = getBaseEx(exId);
       const currentLogs = prev[exId] ? [...prev[exId]] : getSetLogs(ex, exId);
       
-      const numVal = Number(val);
-      currentLogs[setIdx] = { ...currentLogs[setIdx], [field]: numVal };
+      const finalVal = (field === 'notes') ? val : Number(val);
+      currentLogs[setIdx] = { ...currentLogs[setIdx], [field]: finalVal };
 
       // AUTO-COPY: Salin nilai ke set-set berikutnya yang belum "done"
-      for (let i = setIdx + 1; i < currentLogs.length; i++) {
-        if (!currentLogs[i].done) {
-          currentLogs[i] = { ...currentLogs[i], [field]: numVal };
+      if (['w', 'r', 'd'].includes(field)) {
+        if (currentLogs[setIdx].type !== 'warmup') {
+          for (let i = setIdx + 1; i < currentLogs.length; i++) {
+            if (!currentLogs[i].done && currentLogs[i].type !== 'warmup') {
+              currentLogs[i] = { ...currentLogs[i], [field]: finalVal };
+            }
+          }
         }
       }
 
@@ -830,6 +872,21 @@ export default function App() {
       }
 
       if (isDoneNow && !currentLogs[setIdx].skipped) {
+        // --- UPDATE LAST WEIGHT ONLY ---
+        const weight = Number(currentLogs[setIdx].w) || 0;
+        if (ex && weight > 0 && (!ex.type || ex.type === 'weight' || ex.type === 'reps')) {
+           setExerciseLibrary(lib => {
+              const existingIdx = lib.findIndex(e => e.name?.toLowerCase() === ex.name?.toLowerCase() || e.id === ex.id);
+              if (existingIdx >= 0 && lib[existingIdx].lastWeight !== weight) {
+                  const newLib = [...lib];
+                  newLib[existingIdx] = { ...newLib[existingIdx], lastWeight: weight };
+                  return newLib;
+              }
+              return lib;
+           });
+        }
+        // --- END UPDATE LAST WEIGHT ---
+
         if (!isSuperset || isSupersetComplete) {
           setRestTimer(programRestTime); // Legacy fallback
           setRestTargetTime(Date.now() + (programRestTime * 1000));
@@ -880,6 +937,31 @@ export default function App() {
       return newPrev;
     });
     setLastActionTime(Date.now()); // Trigger Autosave
+  };
+
+  const handleAddWarmupSets = (exIds) => {
+    playSoundEffect('click', soundEnabled);
+    const ids = Array.isArray(exIds) ? exIds : [exIds];
+    setExerciseLogs(prev => {
+      let newPrev = { ...prev };
+      ids.forEach(id => {
+        const ex = getBaseEx(id);
+        if (!ex) return;
+        const currentLogs = newPrev[id] ? [...newPrev[id]] : getSetLogs(ex, id);
+        
+        const firstWorkingSet = currentLogs.find(s => s.type !== 'warmup') || currentLogs[0] || { w: ex.defaultWeight || 20 };
+        const targetW = Number(firstWorkingSet?.w) || 20;
+        
+        const warmupSets = [
+          { w: Math.round(targetW * 0.5), r: 8, d: 0, type: 'warmup', notes: 'Warm-up 50%', done: false },
+          { w: Math.round(targetW * 0.75), r: 4, d: 0, type: 'warmup', notes: 'Warm-up 75%', done: false }
+        ];
+        
+        newPrev[id] = [...warmupSets, ...currentLogs];
+      });
+      return newPrev;
+    });
+    setLastActionTime(Date.now());
   };
 
   const handleRemoveSet = (exIds, setIdx) => {
@@ -981,12 +1063,25 @@ export default function App() {
     setWorkoutStartTime(null);
     setRestTargetTime(null);
     setRestTimer(0);
+    setExerciseLogs({});
     
     if (progId === 'extra') {
        setExtraExercises([]);
     }
 
     const targetDateStr = selectedDate;
+
+    const cleanLogs = {};
+    if (exerciseLogs) {
+      Object.keys(exerciseLogs).forEach(id => {
+        if (Array.isArray(exerciseLogs[id])) {
+          cleanLogs[id] = exerciseLogs[id].filter(s => s.type !== 'warmup');
+        } else {
+          cleanLogs[id] = exerciseLogs[id];
+        }
+      });
+    }
+
     setHistory(prev => {
       const h = { ...prev };
       const dayData = h[targetDateStr] || { workouts: [] };
@@ -999,7 +1094,7 @@ export default function App() {
           workouts[adhocIdx] = {
             ...existingW,
             status: 'completed',
-            log: exerciseLogs,
+            log: cleanLogs,
             exercises: extraExercises,
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             duration: durationSecs > 0 ? formatDur(durationSecs) : (existingW.duration ? (typeof existingW.duration === 'number' ? formatDur(existingW.duration * 60) : existingW.duration) : '00:00')
@@ -1010,7 +1105,7 @@ export default function App() {
             programId: 'adhoc',
             programName: 'Sesi Ekstra',
             status: 'completed',
-            log: exerciseLogs,
+            log: cleanLogs,
             exercises: extraExercises,
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             duration: durationSecs > 0 ? formatDur(durationSecs) : '00:00'
@@ -1018,25 +1113,95 @@ export default function App() {
         }
       } else {
         // Untuk program biasa
+        let isTargetFound = false;
         workouts = workouts.map(w => {
           const isTargetWorkout = focusWorkoutId 
             ? (w.id === focusWorkoutId) 
             : (progId ? (w.id === progId || w.programId === progId) : w.status === 'planned');
             
           if (isTargetWorkout) {
+            isTargetFound = true;
+            let realProgramId = w.programId;
+            if (realProgramId && realProgramId.startsWith('projected_')) {
+                realProgramId = realProgramId.replace('projected_', '').split('_')[0];
+            }
             return {
               ...w,
+              programId: realProgramId,
               status: 'completed',
-              log: exerciseLogs,
+              log: cleanLogs,
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
               duration: durationSecs > 0 ? formatDur(durationSecs) : (w.duration ? (typeof w.duration === 'number' ? formatDur(w.duration * 60) : w.duration) : '00:00')
             };
           }
           return w;
         });
+
+        if (!isTargetFound) {
+            let pName = 'Sesi Latihan';
+            let pId = progId;
+            if (focusWorkoutId && focusWorkoutId.startsWith('projected_')) {
+                pId = focusWorkoutId.replace('projected_','').split('_')[0];
+            } else if (progId && progId.startsWith('projected_')) {
+                pId = progId.replace('projected_','').split('_')[0];
+            }
+            const p = programs.find(pr => pr.id === pId || pr.id === progId);
+            if (p) {
+               pName = p.name;
+               pId = p.id;
+            }
+            workouts.push({
+               id: focusWorkoutId || progId || `completed_${Date.now()}`,
+               programId: pId,
+               programName: pName,
+               status: 'completed',
+               log: cleanLogs,
+               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+               duration: durationSecs > 0 ? formatDur(durationSecs) : '00:00'
+            });
+        }
       }
       
       h[targetDateStr] = { ...dayData, workouts, _activeSession: progId === 'extra' ? { ...(dayData._activeSession || {}), extraExercises: [] } : dayData._activeSession };
+      
+      // Update Exercise Library dengan True 10RM dari seluruh riwayat
+      setExerciseLibrary(lib => {
+        let newLib = [...lib];
+        let libChanged = false;
+        Object.keys(cleanLogs).forEach(exId => {
+           let true10RM = 0;
+           let lastWeight = 0;
+           Object.values(h).forEach(day => {
+             if (day.workouts) {
+               day.workouts.forEach(wk => {
+                 if (wk.status === 'completed' && wk.log && wk.log[exId]) {
+                   wk.log[exId].forEach(s => {
+                     if (!s.skipped && s.type !== 'warmup' && s.w > 0 && s.r > 0) {
+                       const c1RM = Number(s.w) * (1 + Number(s.r) / 30);
+                       const c10RM = c1RM / 1.3333;
+                       if (c10RM > true10RM) true10RM = c10RM;
+                       lastWeight = s.w;
+                     }
+                   });
+                 }
+               });
+             }
+           });
+           
+           if (true10RM > 0) {
+              const existingIdx = newLib.findIndex(e => String(e.id) === String(exId));
+              if (existingIdx >= 0) {
+                 const rounded10RM = Math.round(true10RM * 10) / 10;
+                 if (newLib[existingIdx].rm10 !== rounded10RM || newLib[existingIdx].lastWeight !== lastWeight) {
+                   newLib[existingIdx] = { ...newLib[existingIdx], rm10: rounded10RM, lastWeight };
+                   libChanged = true;
+                 }
+              }
+           }
+        });
+        return libChanged ? newLib : lib;
+      });
+
       return h;
     });
 
@@ -1164,8 +1329,11 @@ export default function App() {
           ex={globalDetailExercise} 
           onClose={() => setGlobalDetailExercise(null)} 
           t={t} lang={lang} soundEnabled={soundEnabled} 
-          historyData={[]}
+          fullHistory={history}
           unitSystem={unitSystem}
+          exerciseLibrary={exerciseLibrary}
+          setExerciseLibrary={setExerciseLibrary}
+          programs={programs}
         />
       )}
       
@@ -1179,6 +1347,11 @@ export default function App() {
          t={t}
          lang={lang}
          soundEnabled={soundEnabled}
+         gymProfiles={gymProfiles}
+         setGymProfiles={setGymProfiles}
+         activeGymId={activeGymId}
+         setActiveGymId={setActiveGymId}
+         exerciseLibrary={exerciseLibrary}
       />
       
       <SettingsModal 
@@ -1213,13 +1386,14 @@ export default function App() {
          
          {activeTab === 'workout' && (
              <WorkoutTab 
-               t={t} lang={lang} language={language} programs={programs} selectedDate={selectedDate} setSelectedDate={setSelectedDate}
-               history={history} setHistory={setHistory} setActiveTab={setActiveTab}
-               activeProgramId={activeProgramId} setActiveProgramId={setActiveProgramId} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
+              t={t} lang={lang} language={language} programs={programs} selectedDate={selectedDate} setSelectedDate={setSelectedDate}
+              history={history} setHistory={setHistory} setActiveTab={setActiveTab}
+              unitSystem={unitSystem} userProfile={userProfile}
+              activeProgramId={activeProgramId} setActiveProgramId={setActiveProgramId} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
                warmupVideos={warmupVideos} cooldownVideos={cooldownVideos} onOpenDetail={setGlobalDetailExercise}
-               exerciseLibrary={exerciseLibrary}
+               exerciseLibrary={exerciseLibrary} setExerciseLibrary={setExerciseLibrary}
                exerciseLogs={exerciseLogs} skippedExercises={skippedExercises} extraExercises={extraExercises}
-               onSetChange={handleSetChange} onToggleSet={handleToggleSet} onSkipSet={handleSkipSet} onAddSet={handleAddSet} onRemoveSet={handleRemoveSet}
+               onSetChange={handleSetChange} onToggleSet={handleToggleSet} onSkipSet={handleSkipSet} onAddSet={handleAddSet} onAddWarmupSets={handleAddWarmupSets} onRemoveSet={handleRemoveSet}
                onToggleSkip={handleToggleSkip} onRemoveExtra={handleRemoveExtraEx}
                isCurrentlyCompleted={isCurrentlyCompleted} onSaveWorkout={handleSaveWorkout} onCancelWorkout={handleCancelWorkout}
                gymProfiles={gymProfiles} activeGymId={activeGymId}
@@ -1234,11 +1408,11 @@ export default function App() {
                restTimer={restTimer} setRestTimer={setRestTimer}
                sessionToRun={sessionToRun} setSessionToRun={setSessionToRun}
                resumeDurationSecs={resumeDurationSecs} setResumeDurationSecs={setResumeDurationSecs}
+               showSupersetToast={showSupersetToast}
                
                // Focus
                focusWorkoutId={focusWorkoutId} setFocusWorkoutId={setFocusWorkoutId}
-               unitSystem={unitSystem}
-               activePlanId={activePlanId}
+               activePlanIds={activePlanIds}
              />
          )}
          
@@ -1250,7 +1424,7 @@ export default function App() {
                selectedDate={selectedDate} setSelectedDate={setSelectedDate} setActiveTab={setActiveTab}
                weekStartDay={weekStartDay} defaultReminderTime={defaultReminderTime} reminderEnabled={reminderEnabled}
                unitSystem={unitSystem}
-               activePlanId={activePlanId}
+               activePlanIds={activePlanIds}
              />
          )}
 
@@ -1261,7 +1435,8 @@ export default function App() {
                setActiveAddModalTarget={setActiveAddModalTarget}
                saveStateToHistory={saveStateToHistory}
                openQuestionnaire={() => setShowQuestionnaire(true)}
-               activePlanId={activePlanId} setActivePlanId={setActivePlanId}
+               activePlanIds={activePlanIds} setActivePlanIds={setActivePlanIds}
+               gymProfiles={gymProfiles}
              />
          )}
 
@@ -1302,11 +1477,13 @@ export default function App() {
       )}
 
       {/* Toast Lanjut Latihan Berikutnya */}
-      <div className={`fixed top-1/2 left-0 right-0 -translate-y-1/2 z-[100] pointer-events-none flex justify-center transition-all duration-500 ease-in-out ${showSupersetToast ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
-        <div className={`w-full py-5 flex items-center justify-center ${t.bgAccent} bg-opacity-90 ${t.textButton}`}>
-          <span className="font-black whitespace-nowrap text-base tracking-widest uppercase opacity-90 mix-blend-overlay">Lanjut Latihan Berikutnya!</span>
+      {!isImmersiveMode && (
+        <div className={`fixed top-1/2 left-0 right-0 -translate-y-1/2 z-[100] pointer-events-none flex justify-center transition-all duration-500 ease-in-out ${showSupersetToast ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
+          <div className={`w-full py-5 flex items-center justify-center ${t.bgAccent} bg-opacity-90 ${t.textButton}`}>
+            <span className="font-black whitespace-nowrap text-base tracking-widest uppercase opacity-90 mix-blend-overlay">Lanjut Latihan Berikutnya!</span>
+          </div>
         </div>
-      </div>
+      )}
       <BottomNav t={t} lang={lang} activeTab={activeTab} setActiveTab={setActiveTab} setIsEditingMode={setIsEditingMode} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} />
     </div>
   );

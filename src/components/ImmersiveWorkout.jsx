@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Play, Pause, ChevronRight, ChevronLeft, Dumbbell, Check, Info, Clock, Minimize2, SkipForward } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { X, Play, Pause, ChevronRight, ChevronLeft, Dumbbell, Check, Info, Clock, Minimize2, SkipForward, ClipboardEdit, Brain } from 'lucide-react';
 import ScrollPicker from './ScrollPicker';
 import { exerciseTypeLabels } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
@@ -26,7 +27,9 @@ const ImmersiveWorkout = ({
   setRestTimer,
   gymProfiles,
   activeGymId,
-  setRestTargetTime
+  setRestTargetTime,
+  showSupersetToast,
+  getOverloadHint
 }) => {
   // 1. Gather all active exercise groups
   const validExercises = useMemo(() => {
@@ -52,6 +55,7 @@ const ImmersiveWorkout = ({
   const [workoutSeconds, setWorkoutSeconds] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
+  const [showHint, setShowHint] = useState(false);
 
   useEffect(() => {
     let interval;
@@ -65,6 +69,16 @@ const ImmersiveWorkout = ({
   }, [isPaused, workoutStartTime]);
 
   // Rest Timer will be handled globally in App.jsx but we can display it here if passed as prop
+
+  const [activeSetDetail, setActiveSetDetail] = useState(null);
+  const [showIntensityInfo, setShowIntensityInfo] = useState(false);
+
+  const handleSaveSetDetail = (exId, setIdx, details) => {
+    onSetChange(exId, setIdx, 'notes', details.notes);
+    onSetChange(exId, setIdx, 'rir', details.rir);
+    onSetChange(exId, setIdx, 'rpe', details.rpe);
+    setActiveSetDetail(null);
+  };
 
   const formatTime = (totalSeconds) => {
     const isNegative = totalSeconds < 0;
@@ -119,6 +133,7 @@ const ImmersiveWorkout = ({
   
   React.useEffect(() => {
     setActiveMediaIndex(0);
+    setShowHint(false);
   }, [currentIndex]);
 
   React.useEffect(() => {
@@ -141,9 +156,17 @@ const ImmersiveWorkout = ({
     });
 
     videoObjs.forEach((videoObj, idx) => {
-      if (idx === activeMediaIndex && !isPaused) {
-        videoObj.play();
+      if (idx === activeMediaIndex) {
+        if (!isPaused) {
+          videoObj.playbackRate = 1;
+          videoObj.play().catch(() => {});
+        } else {
+          videoObj.playbackRate = 0;
+          // Kita biarkan video statusnya "playing" di mata browser agar overlay pause tidak muncul
+          videoObj.play().catch(() => {});
+        }
       } else {
+        videoObj.playbackRate = 1;
         videoObj.pause();
       }
     });
@@ -193,19 +216,17 @@ const ImmersiveWorkout = ({
           // Loop before it ends using seekTo(0.1) to avoid triggering the native loading/pause spinner
           if (data.info.duration && data.info.currentTime) {
             if (data.info.duration - data.info.currentTime < 0.5) {
-              const iframe = document.querySelector('.immersive-video-iframe');
-              if (iframe && iframe.contentWindow === e.source) {
-                iframe.contentWindow.postMessage(JSON.stringify({event: "command", func: "seekTo", args: [0.1, true]}), "*");
-                iframe.contentWindow.postMessage(JSON.stringify({event: "command", func: "playVideo", args: []}), "*");
+              if (e.source) {
+                e.source.postMessage(JSON.stringify({event: "command", func: "seekTo", args: [0.1, true]}), "*");
+                e.source.postMessage(JSON.stringify({event: "command", func: "playVideo", args: []}), "*");
               }
             }
           }
           // Fallback if it somehow hits ended state (0)
           if (data.info.playerState === 0) {
-            const iframe = document.querySelector('.immersive-video-iframe');
-            if (iframe && iframe.contentWindow === e.source) {
-              iframe.contentWindow.postMessage(JSON.stringify({event: "command", func: "seekTo", args: [0.1, true]}), "*");
-              iframe.contentWindow.postMessage(JSON.stringify({event: "command", func: "playVideo", args: []}), "*");
+            if (e.source) {
+              e.source.postMessage(JSON.stringify({event: "command", func: "seekTo", args: [0.1, true]}), "*");
+              e.source.postMessage(JSON.stringify({event: "command", func: "playVideo", args: []}), "*");
             }
           }
         }
@@ -227,11 +248,14 @@ const ImmersiveWorkout = ({
   const handlePrevSet = () => {
     playSoundEffect('click', soundEnabled);
     const targetSetIdx = isAllDone ? Math.max(0, activeSetIdx) : activeSetIdx - 1;
-    
     if (targetSetIdx >= 0 && (!isAllDone || logs.length > 0)) {
        const itemLogs = getLogsForEx(ex);
        if (itemLogs[targetSetIdx]?.done || itemLogs[targetSetIdx]?.skipped) {
-          onToggleSet(ex.id, targetSetIdx);
+          let siblingIds = null;
+          if (ex.supersetId) {
+             siblingIds = validExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
+          }
+          onToggleSet(ex.id, targetSetIdx, siblingIds);
        }
     } else if (currentIndex > 0) {
       setCurrentIndex(currentIndex - 1);
@@ -268,7 +292,11 @@ const ImmersiveWorkout = ({
     playSoundEffect('success', soundEnabled);
     const itemLogs = getLogsForEx(ex);
     if (!itemLogs[activeSetIdx]?.done) {
-      onToggleSet(ex.id, activeSetIdx);
+      let siblingIds = null;
+      if (ex.supersetId) {
+         siblingIds = validExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
+      }
+      onToggleSet(ex.id, activeSetIdx, siblingIds);
     }
     advanceAfterSet();
   };
@@ -334,13 +362,13 @@ const ImmersiveWorkout = ({
       {/* TABLET SPLIT WRAPPER */}
       <div className="flex-1 flex flex-col sm:flex-row w-full mt-16 overflow-hidden">
 
-      {/* MAIN VISUAL (Center) */}
-      <div 
-        className="flex-1 relative mb-6 sm:mb-4 rounded-3xl mx-4 sm:mr-0 overflow-hidden shadow-2xl border border-white/10 group touch-pan-y bg-black"
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-      >
+        {/* MAIN VISUAL (Center) */}
+        <div 
+          className="flex-1 relative mb-6 sm:mb-4 rounded-3xl mx-4 sm:mr-0 overflow-hidden shadow-lg border border-black/5 dark:border-white/10 group touch-pan-y bg-black"
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
         <div 
           className="flex h-full w-full transition-transform duration-300 ease-in-out"
           style={{ 
@@ -380,7 +408,7 @@ const ImmersiveWorkout = ({
                     }
                   }
                   if (media.type === 'video') {
-                    return <video src={media.url} autoPlay={idx === activeMediaIndex && !isPaused} loop muted playsInline className="immersive-video-html5 w-full h-full object-cover opacity-80 pointer-events-none scale-[1.10]" />;
+                    return <video src={media.url} autoPlay={idx === activeMediaIndex && !isPaused} loop muted playsInline disablePictureInPicture controlsList="nodownload nofullscreen noremoteplayback" className="immersive-video-html5 w-full h-full object-cover opacity-80 pointer-events-none scale-[1.10]" />;
                   }
                   return <img src={media.url} alt={ex.name} className="w-full h-full object-cover opacity-80 pointer-events-none scale-[1.10]" />;
                 })()}
@@ -430,24 +458,131 @@ const ImmersiveWorkout = ({
           <Info size={24} />
         </button>
 
-        <div className="absolute bottom-0 left-0 w-full p-6 bg-gradient-to-t from-black via-black/80 to-transparent">
-          <div className="flex items-center gap-2 mb-1">
-            <p className={`${t.textAccent} body-md tracking-widest`}>
-              EXERCISE {currentIndex + 1} OF {validExercises.length}
-            </p>
-            {ex.supersetId && (
-              <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${t.bgAccentSoft} ${t.textAccent}`}>
-                SUPERSET {ex.supersetId}
-              </span>
-            )}
+        <div className="absolute bottom-0 left-0 w-full p-6 bg-gradient-to-t from-black via-black/80 to-transparent flex items-end justify-between">
+          <div className="flex-1 pr-4">
+            <div className="flex flex-wrap items-center gap-2 mb-1 font-bold text-white/70 tracking-widest text-[10px] drop-shadow-md">
+              <p className="shrink-0 uppercase">
+                EXERCISE {currentIndex + 1} OF {validExercises.length}
+              </p>
+              {ex.supersetId && (
+                <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${t.bgAccent} text-white shadow-[0_0_12px_rgba(255,255,255,0.3)] border border-white/20 shrink-0`}>
+                  SUPERSET {ex.supersetId}
+                </span>
+              )}
+            </div>
+            <h1 className="h1 text-white leading-tight drop-shadow-lg mb-1">{ex.name}</h1>
           </div>
-          <h1 className="h1 text-white leading-tight drop-shadow-lg">{ex.name}</h1>
+          
+          {/* COACH BUTTON */}
+          {ex.type === 'weight' && (
+            <div className="relative shrink-0 z-50">
+              <button 
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowHint(true); }}
+                className={`p-3 ${t.bgAccent} border-none text-white rounded-xl shadow-lg shadow-black/30 dark:shadow-black/60 transition-all flex items-center justify-center`}
+              >
+                <Brain size={24} className="animate-pulse" />
+              </button>
+              {showHint && createPortal(
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                  <div className="absolute inset-0 bg-black/60 backdrop-blur-md animate-in fade-in" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); setShowHint(false); }} />
+                    <div className={`relative overflow-hidden w-[90%] max-w-[340px] min-h-[480px] p-6 flex flex-col justify-between rounded-[32px] ${t.bgCard} shadow-2xl ring-1 ring-black/5 dark:ring-white/10 z-10 text-center leading-snug animate-in fade-in zoom-in-95 duration-300`} onClick={e => e.stopPropagation()}>
+                      <div 
+                        className="absolute inset-0 z-0 opacity-80 dark:opacity-60 pointer-events-none mix-blend-multiply dark:mix-blend-normal"
+                        style={{ 
+                           backgroundImage: `url('${getOverloadHint && getOverloadHint(ex)?.mode === 'praise' ? '/coach-praise.png' : getOverloadHint && getOverloadHint(ex)?.mode === 'push' ? '/coach-push.png' : '/bg-dashboard.png'}')`,
+                           backgroundSize: '180%',
+                                          backgroundPosition: 'center 40px',
+                           backgroundRepeat: 'no-repeat',
+                           maskImage: 'linear-gradient(to bottom, black 30%, transparent 90%)',
+                           WebkitMaskImage: 'linear-gradient(to bottom, black 30%, transparent 90%)'
+                        }}
+                      />
+                      <div className="relative z-10 flex flex-col h-full flex-1">
+                          <div className="flex justify-center w-full">
+                            <div className="flex items-center gap-2.5 bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 pl-2.5 pr-4 py-2 rounded-full shadow-inner mt-2">
+                              <div className={`w-8 h-8 rounded-full ${t.bgAccent} flex items-center justify-center shadow-lg`}>
+                                <Brain size={16} className="text-white" />
+                              </div>
+                              <span className={`font-black text-[11px] tracking-widest uppercase ${t.textMain}`}>Lyfit Coach</span>
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-center mt-auto pt-32 pb-2">
+                            {getOverloadHint && getOverloadHint(ex) ? (
+                               <>
+                                 <span className={`font-black text-lg tracking-widest uppercase block mb-3 ${t.textMain}`}>{getOverloadHint(ex).title}</span>
+                                 <span className={`${t.textMuted} text-sm block whitespace-pre-wrap font-medium leading-relaxed`}>{getOverloadHint(ex).text}</span>
+                               </>
+                            ) : (
+                               <span className={`${t.textMuted} text-sm font-medium whitespace-pre-wrap leading-relaxed`}>Belum ada rekor 10RM.\n\nGunakan beban yang menantang tapi sanggup diangkat 10x dengan benar (RPE 8).</span>
+                            )}
+                          </div>
+                      </div>
+                    </div>
+                  </div>,
+                document.body
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Toast Lanjut Latihan Berikutnya (Immersive Only) */}
+        <div className={`absolute top-1/2 left-0 right-0 -translate-y-1/2 z-50 pointer-events-none flex justify-center transition-all duration-500 ease-in-out ${showSupersetToast ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
+          <div className={`w-full py-5 flex items-center justify-center ${t.bgAccent} bg-opacity-90 ${t.textButton}`}>
+            <span className="font-black whitespace-nowrap text-base tracking-widest uppercase opacity-90 mix-blend-overlay text-center px-4">Lanjut Latihan Berikutnya!</span>
+          </div>
         </div>
       </div>
 
       {/* CONTROLS (Bottom) */}
       <div className="w-full sm:w-[45%] lg:w-[40%] px-4 pb-8 sm:pb-4 space-y-6 sm:space-y-8 flex flex-col justify-center overflow-y-auto shrink-0 relative z-10">
         
+
+        {/* Scroll Pickers */}
+        <div className="flex flex-col gap-6">
+          {(() => {
+            const itemLogs = getLogsForEx(ex);
+            const itemSet = itemLogs[activeSetIdx] || itemLogs[0];
+            return (
+              <div key={ex.id} className="w-full flex flex-col">
+                  <div className="flex items-center justify-center gap-4">
+                    {ex.type !== 'time' && (
+                      <div className="flex-1 flex flex-col items-center relative">
+                        <div className="flex items-center gap-1.5 mb-2 relative z-20">
+                           <span className="body-md uppercase">{isImp ? 'LBS' : 'KG'}</span>
+                        </div>
+                        <ScrollPicker 
+                        value={isImp ? Math.round(Number(itemSet?.w || 0) * 2.20462 * 10)/10 : (itemSet?.w || 0)} 
+                        onChange={(val) => onSetChange(ex.id, activeSetIdx, 'w', isImp ? Number((val / 2.20462).toFixed(2)) : val)}
+                        min={0} max={isImp ? 440 : 200} step={isImp ? 5 : 2.5} width="w-full" theme={theme}
+                      />
+                    </div>
+                  )}
+                  
+                  {ex.type === 'time' ? (
+                    <div className="flex-1 flex flex-col items-center">
+                      <span className="body-md mb-2 uppercase">Durasi (dtk)</span>
+                      <ScrollPicker 
+                        value={itemSet?.d || 15} 
+                        onChange={(val) => onSetChange(ex.id, activeSetIdx, 'd', val)}
+                        min={5} max={300} step={5} width="w-full" theme={theme}
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex flex-col items-center">
+                      <span className="body-md mb-2 uppercase">Repetisi</span>
+                      <ScrollPicker 
+                        value={itemSet?.r || 10} 
+                        onChange={(val) => onSetChange(ex.id, activeSetIdx, 'r', val)}
+                        min={1} max={50} step={1} width="w-full" theme={theme}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+
         {/* Top Controls: Undo | Sets | Skip */}
         <div className="flex items-center justify-between gap-4">
           <button 
@@ -482,54 +617,10 @@ const ImmersiveWorkout = ({
           </button>
         </div>
 
-        {/* Scroll Pickers */}
-        <div className="flex flex-col gap-6">
-          {(() => {
-            const itemLogs = getLogsForEx(ex);
-            const itemSet = itemLogs[activeSetIdx] || itemLogs[0];
-            return (
-              <div key={ex.id} className="w-full flex flex-col px-2">
-                <div className="flex items-center justify-center gap-4">
-                  {ex.type !== 'time' && (
-                    <div className="flex-1 flex flex-col items-center">
-                      <span className="body-md mb-2 uppercase">Beban ({isImp ? 'lbs' : 'kg'})</span>
-                      <ScrollPicker 
-                        value={isImp ? Math.round(Number(itemSet?.w || 0) * 2.20462 * 10)/10 : (itemSet?.w || 0)} 
-                        onChange={(val) => onSetChange(ex.id, activeSetIdx, 'w', isImp ? Number((val / 2.20462).toFixed(2)) : val)}
-                        min={0} max={isImp ? 440 : 200} step={isImp ? 5 : 2.5} width="w-full max-w-[120px]" theme={theme}
-                      />
-                    </div>
-                  )}
-                  
-                  {ex.type === 'time' ? (
-                    <div className="flex-1 flex flex-col items-center">
-                      <span className="body-md mb-2 uppercase">Durasi (dtk)</span>
-                      <ScrollPicker 
-                        value={itemSet?.d || 15} 
-                        onChange={(val) => onSetChange(ex.id, activeSetIdx, 'd', val)}
-                        min={5} max={300} step={5} width="w-full max-w-[120px]" theme={theme}
-                      />
-                    </div>
-                  ) : (
-                    <div className="flex-1 flex flex-col items-center">
-                      <span className="body-md mb-2 uppercase">Repetisi</span>
-                      <ScrollPicker 
-                        value={itemSet?.r || 10} 
-                        onChange={(val) => onSetChange(ex.id, activeSetIdx, 'r', val)}
-                        min={1} max={50} step={1} width="w-full max-w-[120px]" theme={theme}
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })()}
-        </div>
-
         {/* Actions Row (Full Width) */}
         <div className="w-full relative">
           {restTimer !== 0 && !isAllDone ? (
-            <div className={`w-full relative flex items-stretch justify-between rounded-2xl shadow-xl transition-all overflow-hidden border ${
+            <div className={`w-full relative flex items-stretch justify-between rounded-2xl shadow-xl transition-colors overflow-hidden border ${
               restTimer < 0 ? 'bg-rose-500 border-rose-500' : `${t.bgAccentSoft} ${t.borderAccent}`
             }`}>
               {restTimer > 0 && maxRestTimer > 0 && (
@@ -545,16 +636,34 @@ const ImmersiveWorkout = ({
               <button onClick={(e) => { e.stopPropagation(); setRestTimer(prev => prev + 5); }} className={`relative z-10 w-16 sm:w-20 flex items-center justify-center bg-transparent ${theme === 'dark' ? 'hover:bg-white/10 active:bg-white/20 border-white/20' : 'hover:bg-black/10 active:bg-black/20 border-black/10'} ${t.textMain} font-black transition-colors border-l h2`}>+5</button>
             </div>
           ) : !isAllDone ? (
-            <button 
-              onClick={handleDoneClick}
-              className={`w-full py-4 rounded-2xl ${t.bgAccent} font-black h2 flex items-center justify-center gap-2 shadow-xl active:scale-95 transition-all`}
-            >
-              <Check size={24} /> SELESAI SET {activeSetIdx + 1}
-            </button>
+            <div className="flex gap-2 w-full">
+              {(() => {
+                const s = getLogsForEx(ex)[activeSetIdx] || {};
+                const isFilled = s.notes || s.rir || s.rpe;
+                return (
+                  <button 
+                    onClick={() => {
+                       playSoundEffect('click', soundEnabled);
+                       setActiveSetDetail({ setIdx: activeSetIdx, rir: s.rir !== undefined && s.rir !== '' ? s.rir : 3, rpe: s.rpe !== undefined && s.rpe !== '' ? s.rpe : 7, notes: s.notes || '' });
+                    }}
+                    className={`w-16 sm:w-20 rounded-2xl ${isFilled ? `${t.bgAccent} text-white` : `${t.bgAccentSoft} ${t.textAccent}`} hover:opacity-80 transition flex items-center justify-center shrink-0 shadow-xl`}
+                    title="Catatan Set"
+                  >
+                    <ClipboardEdit size={24} />
+                  </button>
+                );
+              })()}
+              <button 
+                onClick={handleDoneClick}
+                className={`flex-1 py-4 rounded-2xl ${t.bgAccent} font-black h2 flex items-center justify-center gap-2 shadow-xl hover:opacity-90 active:opacity-80 transition-opacity`}
+              >
+                <Check size={24} /> SELESAI SET {activeSetIdx + 1}
+              </button>
+            </div>
           ) : (
             <button 
               onClick={handleNextEx}
-              className={`w-full py-4 rounded-2xl ${t.bgAccent} font-black h2 flex items-center justify-center gap-2 shadow-xl active:scale-95 transition-all`}
+              className={`w-full py-4 rounded-2xl ${t.bgAccent} font-black h2 flex items-center justify-center gap-2 shadow-xl hover:opacity-90 active:opacity-80 transition-opacity`}
             >
               {currentIndex === validExercises.length - 1 ? 'FINISH WORKOUT' : 'LATIHAN BERIKUTNYA'}
             </button>
@@ -588,6 +697,87 @@ const ImmersiveWorkout = ({
                 Selesaikan
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* SET DETAILS MODAL */}
+      {activeSetDetail !== null && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in zoom-in-95" onClick={() => setActiveSetDetail(null)}>
+          <div className={`w-full max-w-sm p-5 rounded-2xl border ${t.border} ${t.bgCard} shadow-2xl`} onClick={e => e.stopPropagation()}>
+              <h3 className="text-xl font-black mb-4">Catatan Set {activeSetDetail.setIdx + 1}</h3>
+            
+            <div className="mb-5 bg-black/5 dark:bg-white/5 p-3 rounded-xl border border-black/5 dark:border-white/5">
+              <div className="flex justify-between items-center mb-2">
+                <div className="flex items-center gap-1">
+                    <label className="text-sm font-bold">Intensitas Set</label>
+                  <button onClick={(e) => { e.stopPropagation(); setShowIntensityInfo(!showIntensityInfo); }} className={`p-1 rounded-full hover:bg-black/10 dark:hover:bg-white/10 ${t.textMuted} hover:${t.textAccent} transition-colors`}>
+                    <Info size={14} />
+                  </button>
+                </div>
+                  <div className={`text-sm font-black px-3 py-1 rounded-md ${t.bgAccent} text-white`}>
+                  RPE {activeSetDetail.rpe !== '' ? activeSetDetail.rpe : 7} / RIR {activeSetDetail.rir !== '' ? activeSetDetail.rir : 3}
+                </div>
+              </div>
+              
+              {showIntensityInfo && (
+                  <div className="p-3 mb-3 rounded-lg bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 animate-in slide-in-from-top-1">
+                    <div className="text-xs sm:text-sm text-gray-500 space-y-2">
+                      <p>
+                        <strong>RPE (Perceived Exertion):</strong> Skala 1-10 seberapa berat usaha latihan dengan beban tersebut.
+                      </p>
+                      <ul className="list-disc pl-4 space-y-1">
+                        <li><strong>RPE 7-8:</strong> Ideal untuk sebagian besar latihan (sisa tenaga 2-3 repetisi).</li>
+                        <li><strong>RPE 9:</strong> Sangat berat, sisa tenaga 1 repetisi. Biasanya dipakai di set terakhir suatu gerakan.</li>
+                        <li><strong>RPE 10:</strong> Maksimal, gagal angkat (<i>failure</i>). Gunakan dengan bijak, biasanya hanya di repetisi paling terakhir dari sesi latihan.</li>
+                      </ul>
+                      <p className="opacity-80 italic mt-1">
+                        *Berbanding terbalik dengan RIR (Reps in Reserve) atau sisa repetisi sebelum gagal angkat. RIR 2 sama dengan RPE 8.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+              <input 
+                type="range" 
+                min="1" max="10" step="0.5"
+                value={activeSetDetail.rpe !== '' ? activeSetDetail.rpe : 7} 
+                onChange={e => {
+                  const rpe = Number(e.target.value);
+                  const rir = 10 - rpe;
+                  setActiveSetDetail({...activeSetDetail, rir, rpe});
+                }}
+                  className="w-full cursor-pointer mt-2 mb-2"
+                />
+              </div>
+
+              <div className="mb-5">
+                <label className="text-sm font-bold mb-2 block">Catatan Tambahan</label>
+                <div className="flex flex-wrap gap-2 mb-3">
+                {["Terlalu Ringan", "Cukup Menantang", "Berat Banget", "Gagal Angkat", "Form Rusak"].map(tag => (
+                  <button 
+                    key={tag} 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      playSoundEffect('click', soundEnabled);
+                      const currentNotes = activeSetDetail.notes ? activeSetDetail.notes + (activeSetDetail.notes.endsWith(' ') ? '' : ', ') : '';
+                      if(!currentNotes.includes(tag)) {
+                        setActiveSetDetail({...activeSetDetail, notes: currentNotes + tag});
+                      }
+                    }}
+                      className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors`}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+              <textarea rows="3" placeholder="Bagaimana rasanya set ini?" value={activeSetDetail.notes} onChange={e => setActiveSetDetail({...activeSetDetail, notes: e.target.value})} className={`w-full p-3 rounded-xl ${t.inputBg} ${t.textMain} placeholder-black/30 dark:placeholder-white/30 body-lg resize-none outline-none focus:ring-1 focus:${t.ringAccent}`}></textarea>
+            </div>
+
+              <div className="flex gap-3 mt-2">
+                <button onClick={() => setActiveSetDetail(null)} className={`flex-1 py-3 rounded-xl border border-dashed ${t.border} font-bold text-base hover:opacity-80`}>Batal</button>
+                <button onClick={() => handleSaveSetDetail(ex.id, activeSetDetail.setIdx, activeSetDetail)} className={`flex-[2] py-3 rounded-xl ${t.bgAccent} text-white font-black text-lg shadow-xl hover:opacity-90`}>Simpan</button>
+              </div>
           </div>
         </div>
       )}
