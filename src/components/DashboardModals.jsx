@@ -39,8 +39,8 @@ const DashboardModals = ({
           img.onload = async () => {
               URL.revokeObjectURL(objectUrl);
               const canvas = document.createElement('canvas');
-              const MAX_WIDTH = 1000;
-              const MAX_HEIGHT = 1000;
+              const MAX_WIDTH = 2500;
+              const MAX_HEIGHT = 2500;
               let width = img.width;
               let height = img.height;
 
@@ -61,8 +61,8 @@ const DashboardModals = ({
               const ctx = canvas.getContext('2d');
               ctx.drawImage(img, 0, 0, width, height);
 
-              // Konversi ke base64 JPEG kualitas 70% (ukuran jadi jauh lebih kecil)
-              const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+              // Konversi ke base64 JPEG kualitas 80%
+              const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
               const base64Data = dataUrl.split(',')[1];
               const mimeType = 'image/jpeg';
 
@@ -94,12 +94,12 @@ const DashboardModals = ({
                   setIsScanning(false);
               }
           };
-          reader.onerror = () => {
+          img.onerror = () => {
               setScanError('Gagal memuat gambar');
               setIsScanning(false);
           };
       } catch (err) {
-          setScanError('Gagal memproses gambar');
+          setScanError('Gagal memproses gambar: ' + err.message);
           setIsScanning(false);
       }
       e.target.value = '';
