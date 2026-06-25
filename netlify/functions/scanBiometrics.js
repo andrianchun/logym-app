@@ -28,9 +28,11 @@ For sleep, use "Hh Mm" format (e.g., "7h 30m").
 {
   "weight": number (kg),
   "height": number (cm),
+  "bmi": number,
   "bodyFat": number (%),
   "muscleMass": number (kg),
   "musclePercent": number (%),
+  "boneMass": number (kg),
   "visceralFat": number,
   "waterPercent": number (%),
   "proteinPercent": number (%),

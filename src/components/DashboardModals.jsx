@@ -76,6 +76,8 @@ const DashboardModals = ({
                       if (aiData.bodyFat) newBio.bodyFat = aiData.bodyFat;
                       if (aiData.muscleMass) newBio.muscleMass = aiData.muscleMass;
                       // Detailed Body Composition
+                      if (aiData.bmi) newBio.bmi = aiData.bmi;
+                      if (aiData.boneMass) newBio.boneMass = aiData.boneMass;
                       if (aiData.musclePercent) newBio.musclePercent = aiData.musclePercent;
                       if (aiData.visceralFat) newBio.visceralFat = aiData.visceralFat;
                       if (aiData.waterPercent) newBio.waterPercent = aiData.waterPercent;
@@ -84,6 +86,15 @@ const DashboardModals = ({
                       if (aiData.bodyAge) newBio.bodyAge = aiData.bodyAge;
                       if (aiData.bodyScore) newBio.bodyScore = aiData.bodyScore;
                       if (aiData.bellyCircumference) newBio.bellyCircumference = aiData.bellyCircumference;
+
+                      // Kalkulasi cerdas Tinggi <-> BMI jika salah satu hilang
+                      if (newBio.weight && newBio.weight > 0) {
+                          if (newBio.bmi && newBio.bmi > 0 && (!newBio.height || newBio.height === 0)) {
+                              newBio.height = Math.round(Math.sqrt(newBio.weight / newBio.bmi) * 100);
+                          } else if (newBio.height && newBio.height > 0 && (!newBio.bmi || newBio.bmi === 0)) {
+                              newBio.bmi = Number((newBio.weight / Math.pow(newBio.height / 100, 2)).toFixed(1));
+                          }
+                      }
                       // Activity & Heart
                       if (aiData.steps) newBio.steps = aiData.steps;
                       if (aiData.activeMinutes) newBio.activeMinutes = aiData.activeMinutes;
@@ -292,7 +303,14 @@ const DashboardModals = ({
               <div className="flex-1 overflow-y-auto space-y-4 body-md pb-6 hide-scrollbar px-5 pt-2">
                  {manualTab === 'komposisi' ? (
                    <div className="grid grid-cols-2 gap-4">
-                         <div><label className={`block ${t.textMuted} mb-1.5`}>Berat Badan ({isImp ? 'lbs' : 'kg'})</label><SwipeInput language={lang?.id || 'ID'} value={formBio.weight === 0 ? '' : (isImp ? Math.round(formBio.weight * 2.20462 * 10)/10 : formBio.weight)} onChange={(val) => setFormBio({...formBio, weight: isImp ? Number((val / 2.20462).toFixed(2)) : val})} step={0.1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-3 rounded-xl outline-none font-black text-center`} placeholder={ph(isImp ? bioData?.weight * 2.20462 : bioData?.weight, isImp ? "154" : "70")} /></div>
+                         <div><label className={`block ${t.textMuted} mb-1.5`}>Berat Badan ({isImp ? 'lbs' : 'kg'})</label><SwipeInput language={lang?.id || 'ID'} value={formBio.weight === 0 ? '' : (isImp ? Math.round(formBio.weight * 2.20462 * 10)/10 : formBio.weight)} onChange={(val) => {
+                             const wKg = isImp ? Number((val / 2.20462).toFixed(2)) : val;
+                             let newBmi = formBio.bmi;
+                             let newHeight = formBio.height;
+                             if (newHeight > 0) newBmi = Number((wKg / Math.pow(newHeight / 100, 2)).toFixed(1));
+                             else if (newBmi > 0) newHeight = Math.round(Math.sqrt(wKg / newBmi) * 100);
+                             setFormBio({...formBio, weight: wKg, bmi: newBmi, height: newHeight});
+                         }} step={0.1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-3 rounded-xl outline-none font-black text-center`} placeholder={ph(isImp ? bioData?.weight * 2.20462 : bioData?.weight, isImp ? "154" : "70")} /></div>
                          
                          {isImp ? (
                              <div><label className={`block ${t.textMuted} mb-1.5`}>Tinggi Badan (ft & in)</label>
@@ -308,11 +326,25 @@ const DashboardModals = ({
                                  </div>
                              </div>
                          ) : (
-                             <div><label className={`block ${t.textMuted} mb-1.5`}>Tinggi Badan (cm)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.height === 0 ? '' : formBio.height} onChange={(val) => setFormBio({...formBio, height: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-3 rounded-xl outline-none font-black text-center`} placeholder={ph(bioData?.height, "170")} /></div>
+                             <div><label className={`block ${t.textMuted} mb-1.5`}>Tinggi Badan (cm)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.height === 0 ? '' : formBio.height} onChange={(val) => {
+                                 let newBmi = formBio.bmi;
+                                 if (formBio.weight > 0 && val > 0) {
+                                     newBmi = Number((formBio.weight / Math.pow(val / 100, 2)).toFixed(1));
+                                 }
+                                 setFormBio({...formBio, height: val, bmi: newBmi});
+                             }} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-3 rounded-xl outline-none font-black text-center`} placeholder={ph(bioData?.height, "170")} /></div>
                          )}
 
                          <div><label className={`block ${t.textMuted} mb-1`}>Lingkar Perut ({isImp ? 'in' : 'cm'})</label><SwipeInput language={lang?.id || 'ID'} value={formBio.waist === 0 ? '' : (isImp ? Math.round(formBio.waist * 0.393701 * 10)/10 : formBio.waist)} onChange={(val) => setFormBio({...formBio, waist: isImp ? Number((val / 0.393701).toFixed(2)) : val})} step={0.1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-3 rounded-xl outline-none font-black text-center`} placeholder={ph(isImp ? bioData?.waist * 0.393701 : bioData?.waist, isImp ? "31.5" : "80")} /></div>
                          <div><label className={`block ${t.textMuted} mb-1`}>BMR (kcal)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.bmr === 0 ? '' : formBio.bmr} onChange={(val) => setFormBio({...formBio, bmr: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-3 rounded-xl outline-none font-black text-center`} placeholder={ph(bioData?.bmr, "1500")} /></div>
+                         <div><label className={`block ${t.textMuted} mb-1`}>BMI</label><SwipeInput language={lang?.id || 'ID'} value={formBio.bmi === 0 ? '' : formBio.bmi} onChange={(val) => {
+                             let newHeight = formBio.height;
+                             if (formBio.weight > 0 && val > 0 && (!formBio.height || formBio.height === 0)) {
+                                 newHeight = Math.round(Math.sqrt(formBio.weight / val) * 100);
+                             }
+                             setFormBio({...formBio, bmi: val, height: newHeight});
+                         }} step={0.1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-3 rounded-xl outline-none font-black text-center`} placeholder={ph(bioData?.bmi, "22.5")} /></div>
+                         <div><label className={`block ${t.textMuted} mb-1`}>Massa Tulang ({isImp ? 'lbs' : 'kg'})</label><SwipeInput language={lang?.id || 'ID'} value={formBio.boneMass === 0 ? '' : (isImp ? Math.round(formBio.boneMass * 2.20462 * 10)/10 : formBio.boneMass)} onChange={(val) => setFormBio({...formBio, boneMass: isImp ? Number((val / 2.20462).toFixed(2)) : val})} step={0.1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-3 rounded-xl outline-none font-black text-center`} placeholder={ph(isImp ? bioData?.boneMass * 2.20462 : bioData?.boneMass, isImp ? "6.6" : "3.0")} /></div>
                          <div><label className={`block ${t.textMuted} mb-1`}>Massa Otot ({isImp ? 'lbs' : 'kg'})</label><SwipeInput language={lang?.id || 'ID'} value={formBio.muscleMass === 0 ? '' : (isImp ? Math.round(formBio.muscleMass * 2.20462 * 10)/10 : formBio.muscleMass)} onChange={(val) => setFormBio({...formBio, muscleMass: isImp ? Number((val / 2.20462).toFixed(2)) : val})} step={0.1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-3 rounded-xl outline-none font-black text-center`} placeholder={ph(isImp ? bioData?.muscleMass * 2.20462 : bioData?.muscleMass, isImp ? "66" : "30")} /></div>
                          <div><label className={`block ${t.textMuted} mb-1`}>Kadar Otot (%)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.musclePercent === 0 ? '' : formBio.musclePercent} onChange={(val) => setFormBio({...formBio, musclePercent: val})} step={0.1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-3 rounded-xl outline-none font-black text-center`} placeholder={ph(bioData?.musclePercent, "40")} /></div>
                          <div><label className={`block ${t.textMuted} mb-1`}>Kadar Lemak (%)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.bodyFat === 0 ? '' : formBio.bodyFat} onChange={(val) => setFormBio({...formBio, bodyFat: val})} step={0.1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-3 rounded-xl outline-none font-black text-center`} placeholder={ph(bioData?.bodyFat, "20")} /></div>

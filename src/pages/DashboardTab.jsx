@@ -80,7 +80,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
 
   const emptyBio = {
     bodyScore: 0, weight: 0, height: 0, bmi: 0, bmiStatus: '-', bodyFat: 0, bodyFatStatus: '-',
-    muscleMass: 0, musclePercent: 0, waterPercent: 0, visceralFat: 0, bmr: 0, bodyAge: 0, 
+    muscleMass: 0, musclePercent: 0, boneMass: 0, waterPercent: 0, visceralFat: 0, bmr: 0, bodyAge: 0, 
     waist: 0, waistToHip: 0, proteinPercent: 0, bodyType: '-', weightSuggestion: '-',
     steps: 0, activeMinutes: 0, activityCalories: 0, sleep: '', energyScore: 0, 
     heartRate: 0, minHeartRate: 0, maxHeartRate: 0, bloodPressure: '', waterIntake: 0,
