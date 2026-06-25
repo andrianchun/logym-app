@@ -18,20 +18,36 @@ exports.handler = async function (event, context) {
             return { statusCode: 500, body: JSON.stringify({ error: 'Server API key missing' }) };
         }
 
-        const prompt = `Extract biometric and activity data from this image. 
-Return ONLY a valid JSON object matching the exact keys below. Use numeric values, except for 'sleep' which should be a string (e.g. "7h 30m"). If a value is not found, omit the key or set it to null.
-Do NOT wrap the response in markdown code blocks. Just return the raw JSON object.
-Expected keys:
+        const prompt = `You are a highly advanced medical and fitness data extractor. Analyze the provided image, which may be a screenshot of a health app, a smart scale app (like Zepp Life, Mi Fit, Garmin, Huawei Health, Renpho), a smartwatch screen, or a medical document.
+Extract all numerical biometric data and fitness metrics you can find.
+Pay close attention to all available fields like Body Score, BMR, Visceral Fat, Body Water, Protein, Body Age, etc.
+Format your response STRICTLY as a valid JSON object matching this schema. Use null if a field is completely missing or cannot be inferred.
+Ensure numbers are extracted accurately (e.g., 56.6 instead of 566).
+For sleep, use "Hh Mm" format (e.g., "7h 30m").
+
 {
+  "weight": number (kg),
+  "height": number (cm),
+  "bodyFat": number (%),
+  "muscleMass": number (kg),
+  "musclePercent": number (%),
+  "visceralFat": number,
+  "waterPercent": number (%),
+  "proteinPercent": number (%),
+  "bmr": number (kcal),
+  "bodyAge": number,
+  "bodyScore": number,
+  "bellyCircumference": number (cm),
   "steps": number,
   "activeMinutes": number,
   "activityCalories": number,
   "sleep": string,
   "energyScore": number,
-  "weight": number,
-  "bodyFat": number,
-  "muscleMass": number,
   "heartRate": number,
+  "minHeartRate": number,
+  "maxHeartRate": number,
+  "weeklySessions": number,
+  "weeklyDuration": number,
   "bloodPressure": string
 }`;
 

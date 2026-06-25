@@ -70,15 +70,31 @@ const DashboardModals = ({
                   const aiData = await extractBiometricsFromImage(base64Data, mimeType, userGeminiApiKey);
                   setFormBio(prev => {
                       const newBio = { ...prev };
+                      // Basic Metrics
                       if (aiData.weight) newBio.weight = aiData.weight;
+                      if (aiData.height) newBio.height = aiData.height;
                       if (aiData.bodyFat) newBio.bodyFat = aiData.bodyFat;
                       if (aiData.muscleMass) newBio.muscleMass = aiData.muscleMass;
+                      // Detailed Body Composition
+                      if (aiData.musclePercent) newBio.musclePercent = aiData.musclePercent;
+                      if (aiData.visceralFat) newBio.visceralFat = aiData.visceralFat;
+                      if (aiData.waterPercent) newBio.waterPercent = aiData.waterPercent;
+                      if (aiData.proteinPercent) newBio.proteinPercent = aiData.proteinPercent;
+                      if (aiData.bmr) newBio.bmr = aiData.bmr;
+                      if (aiData.bodyAge) newBio.bodyAge = aiData.bodyAge;
+                      if (aiData.bodyScore) newBio.bodyScore = aiData.bodyScore;
+                      if (aiData.bellyCircumference) newBio.bellyCircumference = aiData.bellyCircumference;
+                      // Activity & Heart
                       if (aiData.steps) newBio.steps = aiData.steps;
                       if (aiData.activeMinutes) newBio.activeMinutes = aiData.activeMinutes;
                       if (aiData.activityCalories) newBio.activityCalories = aiData.activityCalories;
                       if (aiData.sleep) newBio.sleep = aiData.sleep;
                       if (aiData.energyScore) newBio.energyScore = aiData.energyScore;
                       if (aiData.heartRate) newBio.heartRate = aiData.heartRate;
+                      if (aiData.minHeartRate) newBio.minHeartRate = aiData.minHeartRate;
+                      if (aiData.maxHeartRate) newBio.maxHeartRate = aiData.maxHeartRate;
+                      if (aiData.weeklySessions) newBio.weeklySessions = aiData.weeklySessions;
+                      if (aiData.weeklyDuration) newBio.weeklyDuration = aiData.weeklyDuration;
                       if (aiData.bloodPressure) newBio.bloodPressure = aiData.bloodPressure;
                       return newBio;
                   });
