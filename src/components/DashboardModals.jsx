@@ -263,7 +263,7 @@ const DashboardModals = ({
                     </div>
                  </div>
                  <div className="flex space-x-2">
-                     <label className={`p-2 rounded-full ${isScanning ? 'bg-zinc-500/20 text-zinc-500' : 'bg-blue-500/10 text-blue-500 hover:bg-blue-500/20'} transition-colors cursor-pointer`} title="Scan Foto via AI">
+                     <label className={`p-2 rounded-full ${isScanning ? 'bg-zinc-500/20 text-zinc-500' : `${t.btnBg} ${t.textAccent} hover:brightness-110`} transition-all cursor-pointer shadow-sm`} title="Scan Foto via AI">
                          {isScanning ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
                          <input type="file" accept="image/*" capture="environment" onChange={handleAIScan} className="hidden" disabled={isScanning} />
                      </label>
