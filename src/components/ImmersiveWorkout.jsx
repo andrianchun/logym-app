@@ -600,9 +600,11 @@ const ImmersiveWorkout = ({
                 key={i} 
                 style={{ flex: i === activeSetIdx ? 3 : (s.done || s.skipped ? 2 : 1) }}
                 className={`h-2 rounded-full transition-all duration-300 ${
+                  s.type === 'warmup' ? `bg-yellow-500` :
                   s.skipped ? `bg-rose-500` :
                   s.done ? `bg-emerald-500` : 
-                  i === activeSetIdx ? `${t.bgAccent} shadow-[0_0_10px_rgba(255,255,255,0.3)]` : `${theme === 'dark' ? 'bg-white/20' : 'bg-black/10'}`
+                  i === activeSetIdx ? `${t.bgAccent} shadow-[0_0_10px_rgba(255,255,255,0.3)]` : 
+                  `${theme === 'dark' ? 'bg-white/20' : 'bg-black/10'}`
                 }`} 
               />
             ))}
