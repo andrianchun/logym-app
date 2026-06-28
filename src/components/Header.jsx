@@ -1,7 +1,7 @@
 import React from 'react';
 import { User, Settings, Users, WifiOff } from 'lucide-react';
 
-const Header = ({ t, theme, user, showSettings, setShowSettings, soundEnabled, playSoundEffect, activeTab, setActiveTab, setConfirmModal, isOffline }) => {
+const Header = ({ t, theme, user, showSettings, setShowSettings, setShowProfileModal, soundEnabled, playSoundEffect, activeTab, setActiveTab, setConfirmModal, isOffline }) => {
   return (
     <header 
       className={`sticky top-0 z-40 ${t?.navBg || 'bg-white'} border-b ${t?.border || 'border-gray-200'} px-4 flex justify-between items-center transition-colors duration-300`}
@@ -11,14 +11,14 @@ const Header = ({ t, theme, user, showSettings, setShowSettings, soundEnabled, p
       {/* BAGIAN KIRI: LOGO */}
       <div className="flex items-center">
         <img 
-          src={theme === 'dark' ? "/logo-dark.png" : "/logo-light.png"} 
+          src={theme === 'dark' ? "/banner-dark.png" : "/banner-light.png"} 
           alt="Logo LyFit" 
-          className="h-10 w-auto object-contain drop-shadow-sm ml-1" 
+          className="h-8 w-auto object-contain drop-shadow-sm" 
         />
       </div>
       
       {/* BAGIAN KANAN: SETTINGS & PROFIL (SOSIAL) */}
-      <div className="flex items-center space-x-3 mr-1">
+      <div className="flex items-center space-x-3">
         
         {/* Indikator Offline */}
         {isOffline && (
@@ -42,9 +42,9 @@ const Header = ({ t, theme, user, showSettings, setShowSettings, soundEnabled, p
           <Settings size={22} strokeWidth={2} />
         </button>
 
-        {/* Tombol Profil & Sosial (Roadmap) */}
+        {/* Tombol Profil & Sosial */}
         <button 
-          onClick={() => { if(playSoundEffect) playSoundEffect('click', soundEnabled); alert("Dasbor Profil, Komunitas & Leaderboard akan segera hadir di update mendatang!"); }}
+          onClick={() => { if(playSoundEffect) playSoundEffect('click', soundEnabled); setShowProfileModal(true); }}
           className="relative rounded-full transition-transform active:scale-95 shadow-sm"
         >
           {user?.photoURL ? (

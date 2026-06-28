@@ -158,7 +158,7 @@ const DashboardModals = ({
           try {
               // Langsung minta semua izin sekaligus dalam 1 pintu
               await HealthConnect.requestHealthPermissions({
-                  read: ['Weight', 'BodyFat', 'Steps', 'HeartRate', 'SleepSession'],
+                  read: ['Weight', 'BodyFat', 'Steps', 'HeartRate', 'SleepSession', 'ExerciseSession', 'TotalCaloriesBurned', 'ActiveCaloriesBurned', 'BasalMetabolicRate', 'Height', 'Nutrition', 'OxygenSaturation'],
                   write: []
               });
 
@@ -354,8 +354,7 @@ const DashboardModals = ({
                          <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Massa Otot ({isImp ? 'lbs' : 'kg'})</label><SwipeInput language={lang?.id || 'ID'} value={formBio.muscleMass === 0 ? '' : (isImp ? Math.round(formBio.muscleMass * 2.20462 * 10)/10 : formBio.muscleMass)} onChange={(val) => setFormBio({...formBio, muscleMass: isImp ? Number((val / 2.20462).toFixed(2)) : val})} step={0.1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(isImp ? bioData?.muscleMass * 2.20462 : bioData?.muscleMass, isImp ? "66" : "30")} /></div>
                          <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Kadar Otot (%)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.musclePercent === 0 ? '' : formBio.musclePercent} onChange={(val) => setFormBio({...formBio, musclePercent: val})} step={0.1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.musclePercent, "40")} /></div>
 
-                         <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>BMR (kcal)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.bmr === 0 ? '' : formBio.bmr} onChange={(val) => setFormBio({...formBio, bmr: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.bmr, "1500")} /></div>
-                         <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Body Score (0-100)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.bodyScore === 0 ? '' : formBio.bodyScore} onChange={(val) => setFormBio({...formBio, bodyScore: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.bodyScore, "80")} /></div>
+
 
                          <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Kadar Lemak (%)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.bodyFat === 0 ? '' : formBio.bodyFat} onChange={(val) => setFormBio({...formBio, bodyFat: val})} step={0.1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.bodyFat, "20")} /></div>
                          <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Visceral Fat</label><SwipeInput language={lang?.id || 'ID'} value={formBio.visceralFat === 0 ? '' : formBio.visceralFat} onChange={(val) => setFormBio({...formBio, visceralFat: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.visceralFat, "5")} /></div>
@@ -364,7 +363,10 @@ const DashboardModals = ({
                          <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Kadar Air (%)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.waterPercent === 0 ? '' : formBio.waterPercent} onChange={(val) => setFormBio({...formBio, waterPercent: val})} step={0.1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.waterPercent, "60")} /></div>
 
                          <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Usia Sel Tubuh (th)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.bodyAge === 0 ? '' : formBio.bodyAge} onChange={(val) => setFormBio({...formBio, bodyAge: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.bodyAge, "25")} /></div>
-                         <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Massa Tulang ({isImp ? 'lbs' : 'kg'})</label><SwipeInput language={lang?.id || 'ID'} value={formBio.boneMass === 0 ? '' : (isImp ? Math.round(formBio.boneMass * 2.20462 * 10)/10 : formBio.boneMass)} onChange={(val) => setFormBio({...formBio, boneMass: isImp ? Number((val / 2.20462).toFixed(2)) : val})} step={0.1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(isImp ? bioData?.boneMass * 2.20462 : bioData?.boneMass, isImp ? "6.6" : "3.0")} /></div>
+                         <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Mineral Tulang (%)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.boneMass === 0 ? '' : formBio.boneMass} onChange={(val) => setFormBio({...formBio, boneMass: val})} step={0.1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.boneMass, "5.5")} /></div>
+
+                         <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>BMR (kcal)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.bmr === 0 ? '' : formBio.bmr} onChange={(val) => setFormBio({...formBio, bmr: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.bmr, "1500")} /></div>
+                         <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Body Score (0-100)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.bodyScore === 0 ? '' : formBio.bodyScore} onChange={(val) => setFormBio({...formBio, bodyScore: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.bodyScore, "80")} /></div>
                      </div>
                  ) : (
                     <div className="space-y-4">
@@ -413,14 +415,7 @@ const DashboardModals = ({
                             </div>
                         </div>
 
-                        {/* Rekap Latihan Mingguan */}
-                        <div className="mt-2 pt-4 border-t border-dashed border-zinc-700">
-                            <span className={`block ${t.textAccent} mb-3 uppercase tracking-wider text-[10px] font-bold`}>Rekap Latihan Mingguan</span>
-                            <div className="grid grid-cols-2 gap-2.5">
-                                <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Total Sesi (x)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.weeklySessions || ''} onChange={(val) => setFormBio({...formBio, weeklySessions: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.weeklySessions, "3")} /></div>
-                                <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Durasi (Menit)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.weeklyDuration || ''} onChange={(val) => setFormBio({...formBio, weeklyDuration: val})} step={10} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.weeklyDuration, "120")} /></div>
-                            </div>
-                        </div>
+
                     </div>
                  )}
               </div>

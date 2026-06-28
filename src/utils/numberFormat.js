@@ -37,19 +37,9 @@ export const parseFormattedNumber = (formattedValue, language = 'ID') => {
             str = str.replace(/\./g, '').replace(/,/g, '.');
         } else {
             // No comma. Check if the last dot is acting as a decimal separator.
-            const lastDotIndex = str.lastIndexOf('.');
-            if (lastDotIndex !== -1) {
-                const charsAfterDot = str.length - 1 - lastDotIndex;
-                if (charsAfterDot < 3) {
-                    // It's a decimal separator (e.g., "10.5", "10.", "1.00")
-                    const integerPart = str.substring(0, lastDotIndex).replace(/\./g, '');
-                    const fractionalPart = str.substring(lastDotIndex + 1);
-                    str = integerPart + '.' + fractionalPart;
-                } else {
-                    // 3 or more digits after the dot (e.g., "1.000", "1.0000"). Assume thousands separator.
-                    str = str.replace(/\./g, '');
-                }
-            }
+            // Di mode ID, kita asumsikan semua titik (dot) adalah pemisah ribuan.
+            // Input desimal dari keyboard numpad (.) sudah di-intercept di SwipeInput menjadi koma (,).
+            str = str.replace(/\./g, '');
         }
     } else {
         // EN mode: commas are thousands separators, dot is decimal.

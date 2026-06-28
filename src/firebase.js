@@ -1,7 +1,8 @@
 // src/firebase.js
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 // TODO: Nanti kamu harus mengganti teks "KODE_RAHASIA_..." ini 
 // dengan kode asli dari akun Firebase Console milikmu.
@@ -21,14 +22,9 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
-// Menyalakan Fitur Database Master
-export const db = getFirestore(app);
-
-// Aktifkan Offline Persistence (PWA)
-enableIndexedDbPersistence(db).catch((err) => {
-  if (err.code === 'failed-precondition') {
-    console.warn("Multiple tabs open, persistence can only be enabled in one tab at a a time.");
-  } else if (err.code === 'unimplemented') {
-    console.warn("The current browser does not support all of the features required to enable persistence");
-  }
+// Menyalakan Fitur Database Master dengan Offline Persistence Aktif (PWA)
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
 });
+
+export const storage = getStorage(app);

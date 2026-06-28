@@ -3,9 +3,30 @@ import { TrendingUp } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
 import { getLocalYMD, formatTarget, normalizeMuscleKey } from '../data/constants';
 
-const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibrary, soundEnabled, playSoundEffect, selectedDate, unitSystem, activePlanIds }) => {
-  const [chartType, setChartType] = useState('exercise');
-  const [activeChartLines, setActiveChartLines] = useState([]);
+const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibrary, soundEnabled, playSoundEffect, selectedDate, unitSystem, activePlanIds, isSubCard = false }) => {
+  const [chartType, setChartType] = useState(() => {
+      try {
+          const saved = localStorage.getItem('lyfit_prog_chart_type');
+          if (saved) return saved;
+      } catch(e) {}
+      return 'exercise';
+  });
+  
+  const [activeChartLines, setActiveChartLines] = useState(() => {
+      try {
+          const saved = localStorage.getItem('lyfit_prog_chart_lines');
+          if (saved) return JSON.parse(saved);
+      } catch(e) {}
+      return [];
+  });
+
+  useEffect(() => {
+      localStorage.setItem('lyfit_prog_chart_type', chartType);
+  }, [chartType]);
+  
+  useEffect(() => {
+      localStorage.setItem('lyfit_prog_chart_lines', JSON.stringify(activeChartLines));
+  }, [activeChartLines]);
 
   const chartColors = theme === 'dark' 
     ? ['#41759b', '#B79347', '#93a6b2', '#A7967D', '#81571E', '#294c65', '#CBB989', '#738a98', '#957c4c', '#5b829e', '#c3a870']
@@ -196,6 +217,14 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
 
   useEffect(() => {
      if(scrollRef.current && chartDataObj.data.length > 0 && activeChartLines.length > 0) {
+        if (isSubCard) {
+            const savedScroll = localStorage.getItem('lyfit_prog_scrollLeft');
+            if (savedScroll !== null) {
+                scrollTarget.current = Number(savedScroll);
+            }
+            return;
+        }
+
         const data = chartDataObj.data;
         
         let latestIdxWithData = -1;
@@ -240,6 +269,8 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
   }, [chartDataObj, selectedDate, activeChartLines]);
 
   useEffect(() => { 
+    if (isSubCard) return;
+    
     let activeItems = [];
     if (activePlanIds && activePlanIds.length > 0) {
       const activeProgs = programs.filter(p => activePlanIds.includes(p.planId || 'custom'));
@@ -270,7 +301,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
     const validActiveItems = activeItems.filter(item => chartDataObj.items.includes(item));
 
     if (validActiveItems.length > 0) {
-        setActiveChartLines(validActiveItems);
+        setActiveChartLines(validActiveItems.slice(0, 6));
     } else {
         // Fallback to top 6 most frequent/recent items
         setActiveChartLines(chartDataObj.items.slice(0, 6)); 
@@ -278,7 +309,14 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
   }, [chartType, chartDataObj, activePlanIds, programs, exerciseLibrary, lang.progress]);
 
   // Pinch-to-zoom logic
-  const [pointWidth, setPointWidth] = useState(55);
+  const [pointWidth, setPointWidth] = useState(() => {
+      try {
+          const saved = localStorage.getItem('lyfit_prog_pointWidth');
+          if (saved) return Number(saved);
+      } catch(e) {}
+      return 55;
+  });
+  useEffect(() => { localStorage.setItem('lyfit_prog_pointWidth', pointWidth); }, [pointWidth]);
   const touchState = useRef({ initialDist: 0, initialPointWidth: 55, pinchRatio: 0, scrollRelCenterX: 0 });
   const scrollTarget = useRef(null);
 
@@ -328,6 +366,9 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
       if (!rafRef.current) {
           rafRef.current = requestAnimationFrame(() => {
               updateYDomain();
+              if (scrollRef.current) {
+                  localStorage.setItem('lyfit_prog_scrollLeft', scrollRef.current.scrollLeft);
+              }
               rafRef.current = null;
           });
       }
@@ -393,31 +434,39 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
 
   const toggleChartLine = (item) => { 
     playSoundEffect('click', soundEnabled); 
-    setActiveChartLines(prev => prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]); 
+    setActiveChartLines(prev => {
+        if (prev.includes(item)) return prev.filter(i => i !== item);
+        if (prev.length >= 6) return [...prev.slice(1), item];
+        return [...prev, item];
+    }); 
   };
 
   const isImp = unitSystem === 'imperial';
 
   return (
-    <div className="px-5 pt-5 pb-1 animate-in fade-in duration-300">
+    <div className={`${!isSubCard ? 'px-5 pt-5 pb-1' : ''} animate-in fade-in duration-300`}>
+        {!isSubCard && (
         <div className="flex justify-between items-center mb-5">
            <h3 className={`h3 ${t.textMain}`}>Progres Latihan</h3>
         </div>
+        )}
         
+        {!isSubCard && (
         <div className={`mb-5 border-b border-dashed ${t.border} pb-5`}>
            <div className={`relative flex w-full p-1.5 rounded-full ${t.btnBg}`}>
                <div className={`absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] rounded-full transition-transform duration-300 ease-out ${t.bgAccent} shadow-sm`} style={{ transform: chartType === 'exercise' ? 'translateX(0)' : 'translateX(100%)', left: '6px' }}></div>
                
-               <button onClick={() => { playSoundEffect('click', soundEnabled); setChartType('exercise');}} className={`flex-1 py-3 rounded-full body-lg font-black relative z-10 transition-colors duration-300 ${chartType === 'exercise' ? 'text-white' : t.textMuted}`}>{lang.progExercise || 'Per Latihan'}</button>
-               <button onClick={() => { playSoundEffect('click', soundEnabled); setChartType('muscle');}} className={`flex-1 py-3 rounded-full body-lg font-black relative z-10 transition-colors duration-300 ${chartType === 'muscle' ? 'text-white' : t.textMuted}`}>{lang.progMuscle || 'Per Otot'}</button>
+               <button onClick={() => { playSoundEffect('click', soundEnabled); setChartType('exercise');}} className={`flex-1 py-3 rounded-full body-lg font-black relative z-10 transition-colors duration-300 ${chartType === 'exercise' ? 'text-white' : t.textMuted}`}>{lang?.progExercise || 'Per Latihan'}</button>
+               <button onClick={() => { playSoundEffect('click', soundEnabled); setChartType('muscle');}} className={`flex-1 py-3 rounded-full body-lg font-black relative z-10 transition-colors duration-300 ${chartType === 'muscle' ? 'text-white' : t.textMuted}`}>{lang?.progMuscle || 'Per Otot'}</button>
            </div>
         </div>
+        )}
         
-        <div className="flex mb-5 bg-black/5 rounded-2xl relative">
+        <div className={`flex ${isSubCard ? 'mb-1' : 'mb-5'} bg-black/5 rounded-2xl relative`}>
           
           {chartDataObj.data.length > 0 && (
               <div className={`w-12 shrink-0 pointer-events-none flex items-center border-r border-slate-500/10 z-10 bg-transparent py-3`}>
-                    <LineChart width={48} height={288} data={chartDataObj.data} margin={{ top: 5, right: 0, left: 4, bottom: 5 }}>
+                    <LineChart width={48} height={isSubCard ? 250 : 288} data={chartDataObj.data} margin={{ top: 5, right: 0, left: 4, bottom: 5 }}>
                        <YAxis stroke={theme === 'dark' ? '#a1a1aa' : '#64748b'} fontSize={10} tickLine={false} axisLine={false} width={40} domain={yDomain} allowDataOverflow={true} tickFormatter={(v) => v > 999 ? (v/1000).toFixed(1)+'k' : v} />
                        {chartDataObj.items.map((item, idx) => ( activeChartLines.includes(item) && <Line key={item} type="monotone" dataKey={item} stroke="transparent" dot={false} activeDot={false} isAnimationActive={false} /> ))}
                     </LineChart>
@@ -425,14 +474,14 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
           )}
 
           <div ref={scrollRef} 
-               onScroll={handleScroll}
-               onTouchStartCapture={handleTouchStart} 
-               onTouchMoveCapture={handleTouchMove}
-               className="flex-1 overflow-x-auto scrollbar-hide touch-pan-x p-3 pl-0" 
+               onScroll={!isSubCard ? handleScroll : undefined}
+               onTouchStartCapture={!isSubCard ? handleTouchStart : undefined} 
+               onTouchMoveCapture={!isSubCard ? handleTouchMove : undefined}
+               className={`flex-1 overflow-x-auto scrollbar-hide touch-pan-x p-3 pl-0 ${isSubCard ? 'pointer-events-none' : ''}`} 
                style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}>
             {chartDataObj.data.length > 0 ? (
-               <div style={{ width: `${chartWidth}px`, height: '288px' }}>
-                <LineChart width={chartWidth} height={288} data={chartDataObj.data} style={{ outline: 'none' }}>
+               <div style={{ width: `${chartWidth}px`, height: isSubCard ? '250px' : '288px' }}>
+                <LineChart width={chartWidth} height={isSubCard ? 250 : 288} data={chartDataObj.data} style={{ outline: 'none' }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#3f3f46' : '#cbd5e1'} vertical={false} />
                   <Tooltip 
                      formatter={(value, name, props) => {
@@ -474,18 +523,28 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
           </div>
         </div>
 
-        <div key={chartType} className="grid grid-rows-2 grid-flow-col gap-2 overflow-x-auto pb-2 hide-scrollbar auto-cols-max" style={{ WebkitOverflowScrolling: 'touch' }}>
-          {chartDataObj.items.length === 0 && <span className={`body-md ${t.textMuted} italic`}>Belum ada data.</span>}
-          {chartDataObj.items.map((item, idx) => {
-             const isActive = activeChartLines.includes(item);
-             const color = chartColors[idx % chartColors.length];
-             return (
-               <button key={item} onClick={() => toggleChartLine(item)} className="px-3 py-1.5 rounded-full caption font-black transition-all border active:scale-95 whitespace-nowrap flex items-center justify-center h-8" style={{ backgroundColor: isActive ? color : 'transparent', borderColor: color, color: isActive ? '#fff' : color, opacity: isActive ? 1 : 0.5 }}>
-                 {chartType === 'muscle' ? formatTarget(item, lang?.id) : item}
-               </button>
-             )
-          })}
-        </div>
+        {isSubCard ? (
+             <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 mt-0 mb-0">
+                 {chartDataObj.items.filter(item => activeChartLines.includes(item)).map((item, idx) => (
+                     <div key={item} className="flex items-center space-x-1.5">
+                         <div className="w-2.5 h-2.5 rounded-[3px]" style={{ backgroundColor: chartColors[chartDataObj.items.indexOf(item) % chartColors.length] }}></div>
+                         <span className="text-[9px] font-bold text-white/70 uppercase tracking-widest">{chartType === 'muscle' ? formatTarget(item, lang?.id) : item}</span>
+                     </div>
+                 ))}
+             </div>
+        ) : (
+            <div key={chartType} className="grid grid-rows-2 grid-flow-col gap-2 overflow-x-auto pb-2 hide-scrollbar auto-cols-max" style={{ WebkitOverflowScrolling: 'touch' }}>
+              {chartDataObj.items.length === 0 && <span className={`body-md ${t.textMuted} italic`}>Belum ada data.</span>}
+              {chartDataObj.items.map((item, idx) => {
+                 const isActive = activeChartLines.includes(item);
+                 return (
+                   <button key={item} onClick={() => toggleChartLine(item)} className="px-3 py-1.5 rounded-full caption font-black transition-all border active:scale-95 whitespace-nowrap snap-start flex items-center justify-center h-8" style={{ backgroundColor: isActive ? chartColors[idx % chartColors.length] : 'transparent', borderColor: chartColors[idx % chartColors.length], color: isActive ? '#fff' : chartColors[idx % chartColors.length], opacity: isActive ? 1 : 0.5 }}>
+                      {chartType === 'muscle' ? formatTarget(item, lang?.id) : item}
+                   </button>
+                 )
+              })}
+            </div>
+        )}
         
     </div>
   );

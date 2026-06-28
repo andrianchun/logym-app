@@ -3,7 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { getLocalYMD } from '../data/constants';
 import { formatNumber } from '../utils/numberFormat';
 
-const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPointClick, unitSystem, language }) => {
+const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPointClick, unitSystem, language, isSubCard = false }) => {
   const isImp = unitSystem === 'imperial';
   const chartMetricsList = [
       { key: 'weight', label: 'Berat Badan', color: theme === 'dark' ? '#41759b' : '#2563eb' },
@@ -19,11 +19,21 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
       { key: 'weeklyDuration', label: 'Workout (m)', color: theme === 'dark' ? '#c3a870' : '#854d0e' },
   ];
 
-  const [activeChartMetrics, setActiveChartMetrics] = useState(['weight', 'bodyFat', 'musclePercent', 'visceralFat', 'waist']);
+  const [activeChartMetrics, setActiveChartMetrics] = useState(() => {
+      try {
+          const saved = localStorage.getItem('lyfit_chart_metrics');
+          if (saved) return JSON.parse(saved);
+      } catch(e) {}
+      return ['weight', 'bodyFat', 'musclePercent', 'visceralFat', 'waist'];
+  });
 
   const toggleChartMetric = (key) => {
       playSoundEffect('click', soundEnabled);
-      setActiveChartMetrics(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+      setActiveChartMetrics(prev => {
+          const newMetrics = prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key];
+          localStorage.setItem('lyfit_chart_metrics', JSON.stringify(newMetrics));
+          return newMetrics;
+      });
   };
 
   const multiChartData = useMemo(() => {
@@ -242,16 +252,18 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
   const chartWidth = Math.max(multiChartData.length * pointWidth, window.innerWidth - 64);
 
   return (
-    <div className="p-5">
+    <div className={!isSubCard ? "p-5" : ""}>
+         {!isSubCard && (
          <div className="flex justify-between items-center mb-5 relative z-10">
             <span className={`h3 ${t.textMuted}`}>Biometrik Klinis</span>
          </div>
+         )}
 
          <div ref={scrollRef} 
-              onScroll={handleScroll}
-              onTouchStartCapture={handleTouchStart} 
-              onTouchMoveCapture={handleTouchMove}
-              className="w-full overflow-x-auto scrollbar-hide mb-4 touch-pan-x" 
+              onScroll={!isSubCard ? handleScroll : undefined}
+              onTouchStartCapture={!isSubCard ? handleTouchStart : undefined} 
+              onTouchMoveCapture={!isSubCard ? handleTouchMove : undefined}
+              className={`w-full overflow-x-auto scrollbar-hide mb-4 touch-pan-x ${isSubCard ? 'pointer-events-none' : ''}`} 
               style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}>
              <div style={{ width: `${chartWidth}px`, height: '224px' }} className="cursor-crosshair relative">
                  {/* Gimmick Grid Lines */}
@@ -303,7 +315,20 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
                  </LineChart>
              </div>
          </div>
-         <div className="grid grid-rows-2 grid-flow-col gap-2 overflow-x-auto pb-4 hide-scrollbar snap-x auto-cols-max" style={{ WebkitOverflowScrolling: 'touch' }}>
+         
+         {isSubCard && (
+             <div className="flex flex-wrap justify-center gap-x-3 gap-y-2 mt-2 mb-2">
+                 {chartMetricsList.filter(m => activeChartMetrics.includes(m.key)).map(metric => (
+                     <div key={metric.key} className="flex items-center space-x-1.5">
+                         <div className="w-2.5 h-2.5 rounded-[3px]" style={{ backgroundColor: metric.color }}></div>
+                         <span className="text-[9px] font-bold text-white/70 uppercase tracking-widest">{metric.label}</span>
+                     </div>
+                 ))}
+             </div>
+         )}
+         
+         {!isSubCard && (
+         <div className="flex gap-2 overflow-x-auto pb-4 hide-scrollbar snap-x" style={{ WebkitOverflowScrolling: 'touch' }}>
             {chartMetricsList.map(metric => {
                 const isActive = activeChartMetrics.includes(metric.key);
                 return (
@@ -313,6 +338,7 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
                 )
             })}
          </div>
+         )}
     </div>
   );
 };

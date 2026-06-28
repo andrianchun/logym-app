@@ -28,9 +28,9 @@ const muscleMapping = {
     'abductors': ['adductor', 'abductors']
 };
 
-export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, theme, soundEnabled, playSoundEffect }) => {
+export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, theme, soundEnabled, playSoundEffect, isSubCard = false, forceViewMode = null }) => {
     const [timeFilter, setTimeFilter] = useState('1m'); // '1m', '3m', 'all'
-    const [viewMode, setViewMode] = useState('image'); // 'image' or 'radar'
+    const [viewMode, setViewMode] = useState(forceViewMode || 'image'); // 'image' or 'radar'
     const [selectedMuscle, setSelectedMuscle] = useState(null);
     const [tooltipPos, setTooltipPos] = useState({ left: 0, top: 0 });
     const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
@@ -105,6 +105,11 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
         for (const dayData of Object.values(filteredHistory)) {
             if (!dayData || !dayData.workouts) continue;
             for (const workout of dayData.workouts) {
+                // Ensure exercises from this specific workout are in lookup
+                (workout.overriddenExercises || workout.exercises || []).forEach(ex => {
+                    if (ex && ex.id) exLookup[ex.id] = ex;
+                });
+
                 if (!workout.log) continue;
                 for (const [exIdStr, sets] of Object.entries(workout.log)) {
                     const baseId = typeof exIdStr === 'string' && exIdStr.includes('-') ? Number(exIdStr.split('-')[0]) : Number(exIdStr);
@@ -189,7 +194,8 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
     }, [bodyData, lang]);
 
     return (
-        <div className="p-5">
+        <div className={!isSubCard ? "p-5" : ""}>
+            {!isSubCard && (
             <div className="flex justify-between items-center mb-4">
                 <h3 className={`${t.textMain} font-black body-md uppercase tracking-wider`}>Progres Otot</h3>
                 
@@ -224,15 +230,18 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
                     )}
                 </div>
             </div>
+            )}
 
+            {!isSubCard && (
             <div className={`relative flex w-full p-1.5 rounded-full ${t.btnBg} mb-6`}>
                <div className={`absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] rounded-full transition-transform duration-300 ease-out ${t.bgAccent} shadow-sm`} style={{ transform: viewMode === 'image' ? 'translateX(0)' : 'translateX(100%)', left: '6px' }}></div>
                
                <button onClick={() => { playSoundEffect('click', soundEnabled); setViewMode('image');}} className={`flex-1 py-2.5 rounded-full body-md font-black relative z-10 transition-colors duration-300 ${viewMode === 'image' ? 'text-white' : t.textMuted}`}>Visual Otot</button>
                <button onClick={() => { playSoundEffect('click', soundEnabled); setViewMode('radar');}} className={`flex-1 py-2.5 rounded-full body-md font-black relative z-10 transition-colors duration-300 ${viewMode === 'radar' ? 'text-white' : t.textMuted}`}>Grafik Radar</button>
             </div>
+            )}
 
-            <div className="relative min-h-[350px] flex justify-center items-center">
+            <div className={`relative ${isSubCard ? 'min-h-[250px]' : 'min-h-[350px]'} flex justify-center items-center`}>
                 {viewMode === 'image' ? (
                     <div className="flex flex-row gap-2 sm:gap-8 justify-center items-start w-full">
                         <div className="flex flex-col items-center w-1/2 max-w-[180px]">
@@ -269,10 +278,10 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
                         </div>
                     </div>
                 ) : (
-                    <div className="w-full h-[350px]">
+                    <div className={`w-full ${isSubCard ? 'h-[250px]' : 'h-[350px]'}`}>
                         {radarData.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
-                                <RadarChart cx="50%" cy="50%" outerRadius={isMobile ? "55%" : "70%"} data={radarData}>
+                                <RadarChart cx="50%" cy="50%" outerRadius={isSubCard ? "55%" : (isMobile ? "55%" : "70%")} data={radarData}>
                                     <PolarGrid stroke={theme === 'dark' ? '#3f3f46' : '#cbd5e1'} />
                                     <PolarAngleAxis dataKey="muscle" tick={{ fill: theme === 'dark' ? '#a1a1aa' : '#64748b', fontSize: 10, fontWeight: 700 }} />
                                     <Radar name="Skor Otot" dataKey="score" stroke={theme === 'dark' ? '#629bc4' : '#41759b'} fill={theme === 'dark' ? '#41759b' : '#41759b'} fillOpacity={0.6} />

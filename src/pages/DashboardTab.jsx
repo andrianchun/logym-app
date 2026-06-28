@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Activity, Zap, Brain, Footprints, HeartPulse, Moon, Droplets, Droplet, Dumbbell, Scale, RefreshCw, Trophy, Link2, Pencil, Settings, Info, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Activity, Zap, Brain, Footprints, HeartPulse, Moon, Droplets, Droplet, Dumbbell, Scale, RefreshCw, Trophy, Link2, Pencil, Settings, Info, X, ChevronDown, ChevronUp, Wind, Utensils, Flame, Clock } from 'lucide-react';
 import { getLocalYMD } from '../data/constants';
 import { HealthConnect } from 'capacitor-health-connect';
 import DashboardModals from '../components/DashboardModals';
@@ -97,7 +97,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      const sortedDates = Object.keys(history).filter(d => d <= activeDate).sort((a,b) => b.localeCompare(a));
      for (let date of sortedDates) {
          const dayBio = history[date]?.bioData;
-         if (dayBio && dayBio.weight > 0) {
+         if (dayBio && (Number(dayBio.weight) > 0 || Number(dayBio.bodyFat) > 0 || Number(dayBio.musclePercent) > 0 || Number(dayBio.bmr) > 0 || Number(dayBio.bodyScore) > 0)) {
              latestBodyData = dayBio;
              bodyDataDate = date;
              break;
@@ -109,23 +109,26 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          height: 170, 
          weight: 70,
          ...(latestBodyData || {}),
-         steps: todayDailyData.steps || 0,
-         activeMinutes: todayDailyData.activeMinutes || 0,
-         activityCalories: todayDailyData.activityCalories || 0,
-         sleep: todayDailyData.sleep || '',
-         energyScore: todayDailyData.energyScore || 0,
-         heartRate: todayDailyData.heartRate || 0,
-         minHeartRate: todayDailyData.minHeartRate || 0,
-         maxHeartRate: todayDailyData.maxHeartRate || 0,
-         bloodPressure: todayDailyData.bloodPressure || '',
-         waterIntake: todayDailyData.waterIntake || 0,
+         steps: todayDailyData.steps !== undefined ? todayDailyData.steps : (emptyBio.steps || 0),
+         activeMinutes: todayDailyData.activeMinutes !== undefined ? todayDailyData.activeMinutes : (emptyBio.activeMinutes || 0),
+         activityCalories: todayDailyData.activityCalories !== undefined ? todayDailyData.activityCalories : (emptyBio.activityCalories || 0),
+         sleep: todayDailyData.sleep !== undefined ? todayDailyData.sleep : (emptyBio.sleep || ''),
+         energyScore: todayDailyData.energyScore !== undefined ? todayDailyData.energyScore : (emptyBio.energyScore || 0),
+         heartRate: todayDailyData.heartRate !== undefined ? todayDailyData.heartRate : (emptyBio.heartRate || 0),
+         minHeartRate: todayDailyData.minHeartRate !== undefined ? todayDailyData.minHeartRate : (emptyBio.minHeartRate || 0),
+         maxHeartRate: todayDailyData.maxHeartRate !== undefined ? todayDailyData.maxHeartRate : (emptyBio.maxHeartRate || 0),
+         bloodPressure: todayDailyData.bloodPressure !== undefined ? todayDailyData.bloodPressure : (emptyBio.bloodPressure || ''),
+         waterIntake: todayDailyData.waterIntake !== undefined ? todayDailyData.waterIntake : (emptyBio.waterIntake || 0),
+         weeklyDuration: todayDailyData.weeklyDuration !== undefined ? todayDailyData.weeklyDuration : emptyBio.weeklyDuration,
+         weeklySessions: todayDailyData.weeklySessions !== undefined ? todayDailyData.weeklySessions : emptyBio.weeklySessions,
+         weeklyCalories: todayDailyData.weeklyCalories !== undefined ? todayDailyData.weeklyCalories : emptyBio.weeklyCalories,
      };
      
      return { 
          bioData: mergedData,
          bioDataDate: bodyDataDate
      };
-  }, [history, todayStr]);
+  }, [history, activeDate, todayStr]);
 
   // ==========================================
   // FUNGSI AKSI (TOMBOL & FORM)
@@ -183,11 +186,60 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
 
   useEffect(() => {
      if (showManualModal) {
+         let initialBio = { ...emptyBio };
          if (history[modalDate] && history[modalDate].bioData) {
-             setFormBio(history[modalDate].bioData);
-         } else {
-             setFormBio({ ...emptyBio });
+             initialBio = { ...history[modalDate].bioData };
          }
+         
+         // Injeksi nilai Smart Merge agar UI Swipe Input menampilkan angka yang tersinkronisasi
+         let dailyActive = Number(initialBio.activeMinutes || 0);
+         let internalToday = 0;
+         const todayWorkouts = history[modalDate]?.workouts || [];
+         todayWorkouts.forEach(w => {
+             if (w.duration) {
+                 if (typeof w.duration === 'number') internalToday += w.duration;
+                 else if (typeof w.duration === 'string') {
+                     const parts = w.duration.split(':').map(Number);
+                     if (parts.length === 3) internalToday += Math.round(((parts[0]||0)*3600 + (parts[1]||0)*60 + (parts[2]||0)) / 60);
+                     else if (parts.length === 2) internalToday += Math.round(((parts[0]||0)*60 + (parts[1]||0)) / 60);
+                 }
+             }
+         });
+         dailyActive = Math.max(dailyActive, internalToday);
+         
+         let weeklyDur = 0;
+         let weeklySess = 0;
+         const end = new Date(modalDate);
+         for (let i = 0; i < 7; i++) {
+             const d = new Date(end);
+             d.setDate(end.getDate() - i);
+             const dateStr = getLocalYMD(d);
+             const dayData = history[dateStr] || {};
+             let extDur = Number(dayData.bioData?.activeMinutes || 0);
+             let intDur = 0;
+             const wks = dayData.workouts || [];
+             weeklySess += wks.length;
+             wks.forEach(w => {
+                 if (w.duration) {
+                     if (typeof w.duration === 'number') intDur += w.duration;
+                     else if (typeof w.duration === 'string') {
+                         const parts = w.duration.split(':').map(Number);
+                         if (parts.length === 3) intDur += Math.round(((parts[0]||0)*3600 + (parts[1]||0)*60 + (parts[2]||0)) / 60);
+                         else if (parts.length === 2) intDur += Math.round(((parts[0]||0)*60 + (parts[1]||0)) / 60);
+                     }
+                 }
+             });
+             weeklyDur += Math.max(extDur, intDur);
+         }
+         
+         if (initialBio.weeklyDuration !== undefined && initialBio.weeklyDuration !== '') weeklyDur = Number(initialBio.weeklyDuration);
+         if (initialBio.weeklySessions !== undefined && initialBio.weeklySessions !== '') weeklySess = Number(initialBio.weeklySessions);
+         
+         initialBio.activeMinutes = dailyActive;
+         initialBio.weeklyDuration = weeklyDur;
+         initialBio.weeklySessions = weeklySess;
+         
+         setFormBio(initialBio);
      }
   }, [modalDate, showManualModal, history]);
 
@@ -219,25 +271,56 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   };
 
   const getScoreColor = (score) => {
-      if (!score) return 'text-zinc-500 border-zinc-500/30';
-      if (score >= 90) return 'text-emerald-500 border-emerald-500/50';
-      if (score >= 80) return 'text-lime-500 border-lime-500/50';
-      if (score >= 60) return 'text-amber-500 border-amber-500/50';
-      return 'text-rose-500 border-rose-500/50';
+      const isDark = theme === 'dark';
+      if (!score) return isDark ? 'text-zinc-500 border-zinc-500/30 bg-black/40' : 'text-zinc-500 border-zinc-300 bg-white/50';
+      if (score >= 80) return isDark ? 'text-[#10b981] border-[#10b981]/50 bg-black/40' : 'text-[#059669] border-[#059669] bg-white/50';
+      if (score >= 60) return isDark ? 'text-[#f59e0b] border-[#f59e0b]/50 bg-black/40' : 'text-[#d97706] border-[#d97706] bg-white/50';
+      return isDark ? 'text-[#f43f5e] border-[#f43f5e]/50 bg-black/40' : 'text-[#e11d48] border-[#e11d48] bg-white/50';
   };
 
   const handleSaveManualData = () => {
      playSoundEffect('click', soundEnabled);
-     const evaluatedData = evaluateBiometrics(formBio);
      
-     setHistory(prev => ({
-         ...prev,
-         [modalDate]: {
-             ...(prev[modalDate] || {}),
-             bioData: evaluatedData
+     setConfirmModal({
+         isOpen: true,
+         title: 'Simpan Data Manual?',
+         message: 'Data manual akan menjadi prioritas dan menimpa sinkronisasi otomatis dari alat/aplikasi lain pada hari ini.',
+         onConfirm: () => {
+             let dataToSave = { ...formBio };
+             if (modalDate === activeDate) {
+                 if (Number(dataToSave.activeMinutes) === mergedDailyActiveMinutes) delete dataToSave.activeMinutes;
+                 if (Number(dataToSave.weeklyDuration) === mergedWeeklyActiveMinutes) delete dataToSave.weeklyDuration;
+                 if (Number(dataToSave.weeklySessions) === mergedWeeklySessions) delete dataToSave.weeklySessions;
+             } else {
+                 if (dataToSave.activeMinutes === '') delete dataToSave.activeMinutes;
+                 if (dataToSave.weeklyDuration === '') delete dataToSave.weeklyDuration;
+                 if (dataToSave.weeklySessions === '') delete dataToSave.weeklySessions;
+             }
+
+             const evaluatedData = evaluateBiometrics(dataToSave);
+             
+             // Penanda untuk mencegah auto-sync menimpa data yang diketik manual
+             const manualFlags = {};
+             Object.keys(evaluatedData).forEach(k => {
+                 if (evaluatedData[k] !== null && evaluatedData[k] !== '') manualFlags[k] = true;
+             });
+             
+             setHistory(prev => {
+                 const existingBio = prev[modalDate]?.bioData || {};
+                 return {
+                     ...prev,
+                     [modalDate]: {
+                         ...(prev[modalDate] || {}),
+                         bioData: {
+                             ...evaluatedData,
+                             _manualFlags: { ...(existingBio._manualFlags || {}), ...manualFlags }
+                         }
+                     }
+                 };
+             });
+             setShowManualModal(false);
          }
-     }));
-     setShowManualModal(false);
+     });
   };
 
   const handleDeleteBioData = () => {
@@ -249,7 +332,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
              const newBio = { ...currentBio };
              
              if (manualTab === 'komposisi') {
-                 ['weight', 'height', 'waist', 'bmi', 'bmiStatus', 'bodyFat', 'bodyFatStatus', 'bmr', 'muscleMass', 'musclePercent', 'visceralFat', 'waterPercent', 'proteinPercent', 'bodyAge', 'bodyScore'].forEach(k => newBio[k] = null);
+                 ['weight', 'height', 'waist', 'bmi', 'bmiStatus', 'bodyFat', 'bodyFatStatus', 'bmr', 'muscleMass', 'musclePercent', 'boneMass', 'visceralFat', 'waterPercent', 'proteinPercent', 'bodyAge', 'bodyScore'].forEach(k => newBio[k] = null);
              } else {
                  ['steps', 'energyScore', 'activeMinutes', 'activityCalories', 'sleep', 'sleepLog', 'heartRate', 'minHeartRate', 'maxHeartRate', 'bloodPressure', 'waterIntake', 'weeklyDuration', 'weeklySessions', 'weeklyCalories'].forEach(k => newBio[k] = null);
              }
@@ -286,6 +369,93 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   const dispMainMuscle = isImp && bioData.muscleMass ? Number((bioData.muscleMass * 2.20462).toFixed(1)) : bioData.muscleMass || '-';
   const dispMainWaist = isImp && bioData.waist ? Number((bioData.waist * 0.393701).toFixed(1)) : bioData.waist || '-';
 
+  // Smart Merge Deduplication (LyFit Internal + BioData/HealthConnect)
+  const { mergedDailyActiveMinutes, mergedDailyCalories, mergedWeeklyActiveMinutes, mergedWeeklyWorkoutDuration, mergedWeeklySessions, mergedWeeklyCalories } = useMemo(() => {
+     const currentWeight = Number(bioData.weight) || 70; // Asumsi 70kg jika tidak ada data
+     let dailyActive = Number(bioData.activeMinutes || 0);
+     let dailyCals = Number(bioData.activityCalories || 0);
+     
+     const todayWks = history[activeDate]?.workouts || [];
+     const todayCompletedWks = todayWks.filter(w => w.status === 'completed' || w.programId === 'adhoc');
+     
+     let intTodayDur = 0;
+     let intTodayCals = 0;
+     todayCompletedWks.forEach(w => {
+         let wDuration = 0;
+         if (w.duration) {
+             if (typeof w.duration === 'number') wDuration = w.duration;
+             else if (typeof w.duration === 'string') {
+                 const parts = w.duration.split(':').map(Number);
+                 if (parts.length === 3) wDuration = Math.round(((parts[0]||0)*3600 + (parts[1]||0)*60 + (parts[2]||0)) / 60);
+                 else if (parts.length === 2) wDuration = Math.round(((parts[0]||0)*60 + (parts[1]||0)) / 60);
+             }
+         }
+         intTodayDur += wDuration;
+         intTodayCals += Math.round(currentWeight * 6.0 * (wDuration / 60));
+     });
+     
+     dailyActive = Math.max(dailyActive, intTodayDur);
+     dailyCals = Math.max(dailyCals, intTodayCals);
+     
+     let weeklyDur = 0;
+     let weeklyWorkoutDur = 0;
+     let weeklySess = 0;
+     let weeklyCals = 0;
+     const end = new Date(activeDate);
+     
+     for (let i = 0; i < 7; i++) {
+         const d = new Date(end);
+         d.setDate(end.getDate() - i);
+         const dateStr = getLocalYMD(d);
+         const dayData = history[dateStr] || {};
+         
+         let extDur = Number(dayData.bioData?.activeMinutes || 0);
+         let extCal = Number(dayData.bioData?.activityCalories || 0);
+         const dayWeight = Number(dayData.bioData?.weight) || currentWeight;
+         
+         let intDur = 0;
+         let intCal = 0;
+         
+         const wks = dayData.workouts || [];
+         const completedWks = wks.filter(w => w.status === 'completed' || w.programId === 'adhoc');
+         weeklySess += completedWks.length;
+         
+         completedWks.forEach(w => {
+             let wDuration = 0;
+             if (w.duration) {
+                 if (typeof w.duration === 'number') wDuration = w.duration;
+                 else if (typeof w.duration === 'string') {
+                     const parts = w.duration.split(':').map(Number);
+                     if (parts.length === 3) wDuration = Math.round(((parts[0]||0)*3600 + (parts[1]||0)*60 + (parts[2]||0)) / 60);
+                     else if (parts.length === 2) wDuration = Math.round(((parts[0]||0)*60 + (parts[1]||0)) / 60);
+                 }
+             }
+             intDur += wDuration;
+             intCal += Math.round(dayWeight * 6.0 * (wDuration / 60));
+         });
+         
+         weeklyDur += Math.max(extDur, intDur);
+         weeklyWorkoutDur += intDur;
+         weeklyCals += Math.max(extCal, intCal);
+     }
+     
+     // Override with manual weekly if user explicitly saved a modified value in the modal
+     // Ini memastikan jika user secara eksplisit mengubah angkanya di Modal Input (baik naik atau turun), 
+     // sistem akan menghormati input tersebut untuk hari ini.
+     if (bioData.weeklyDuration !== undefined && bioData.weeklyDuration !== '') weeklyDur = Number(bioData.weeklyDuration);
+     if (bioData.weeklySessions !== undefined && bioData.weeklySessions !== '') weeklySess = Number(bioData.weeklySessions);
+     if (bioData.weeklyCalories !== undefined && bioData.weeklyCalories !== '') weeklyCals = Number(bioData.weeklyCalories);
+     
+     return { 
+         mergedDailyActiveMinutes: dailyActive, 
+         mergedDailyCalories: dailyCals,
+         mergedWeeklyActiveMinutes: weeklyDur, 
+         mergedWeeklyWorkoutDuration: weeklyWorkoutDur,
+         mergedWeeklySessions: weeklySess,
+         mergedWeeklyCalories: weeklyCals
+     };
+  }, [history, activeDate, bioData]);
+
   return (
     <div className="space-y-4 animate-in fade-in duration-300 pb-6">
       
@@ -321,14 +491,14 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
       <div className="flex flex-col space-y-4">
         {/* 1. KARTU BODY COMPOSITION & EXPANDED CHART */}
         <div className="flex flex-col w-full min-w-0">
-          <div className={`p-5 border ${t.border} ${t.bgCard} shadow-sm relative overflow-hidden z-10 transition-all duration-300 ${isKomposisiExpanded ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'}`}>
+          <div className={`p-4 border ${t.border} ${t.bgCard} shadow-sm relative overflow-hidden z-10 transition-all duration-300 flex flex-col justify-between ${isKomposisiExpanded ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'}`}>
            {/* --- Background Image Layer --- */}
            <div 
              className="absolute inset-0 z-0 opacity-70 dark:opacity-40 pointer-events-none"
              style={{
                backgroundImage: "url('/bg-dashboard.png')",
                backgroundSize: '200%',
-               backgroundPosition: '35% 0%',
+               backgroundPosition: '38% 10%',
                maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 100%)',
                WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 100%)'
              }}
@@ -347,43 +517,68 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                </div>
            </div>
            
-           <div className="flex items-center space-x-6 mb-5 relative z-10">
-               <div className={`w-20 h-20 shrink-0 rounded-full flex flex-col items-center justify-center border-[3px] ${scoreStyle} shadow-sm`}>
-                  <span className="h1">{formatNumber(bioData.bodyScore, language) || '-'}</span>
-                  <span className="h3 mt-1 opacity-70">SCORE</span>
-               </div>
-               <div className="flex-1 space-y-3">
-                   <div className="flex justify-between items-center border-b border-dashed border-slate-500/20 pb-2">
-                       <span className={`caption ${t.textMuted}`}>BMI ({biometricStandard === 'western' ? 'Western' : 'Asia'})</span>
-                       <div className="text-right flex items-center space-x-1.5">
-                          <span className={`h2 ${t.textMain}`}>{formatNumber(bioData.bmi, language) || '-'}</span>
-                          <span className={`h3 ${bioData.bmiStatus === 'Normal' ? 'text-emerald-500' : bioData.bmiStatus === 'Overweight' ? 'text-amber-500' : bioData.bmiStatus === 'Obese' ? 'text-rose-500' : 'text-blue-500'}`}>{bioData.bmiStatus}</span>
+           <div className="flex justify-between items-end w-full relative z-10 mb-1 flex-1">
+               <div className="w-[55%] flex flex-col space-y-1 justify-end h-full">
+                   {/* Fisik */}
+                   <div className="flex flex-col">
+                       <span className={`text-[10px] ${t.textMuted} mb-0.5 font-bold`}>Fisik</span>
+                       <div className="flex items-baseline space-x-1.5">
+                           <span className={`text-lg font-black ${t.textMain} leading-none`}>{isImp && bioData.weight ? Number((bioData.weight * 2.20462).toFixed(1)) : bioData.weight || '-'} <span className="text-[9px] font-normal text-zinc-500">{isImp ? 'lbs' : 'kg'}</span></span>
+                           <span className="text-zinc-300 dark:text-zinc-600 text-[10px]">|</span>
+                           <span className={`text-lg font-black ${t.textMain} leading-none`}>{isImp && bioData.height ? Number((bioData.height * 0.393701).toFixed(1)) : bioData.height || '-'} <span className="text-[9px] font-normal text-zinc-500">{isImp ? 'in' : 'cm'}</span></span>
                        </div>
                    </div>
-                   <div className="flex justify-between items-center pb-1">
-                       <span className={`caption ${t.textMuted}`}>Body Fat</span>
-                       <div className="text-right flex items-center space-x-1.5">
-                          <span className={`h2 ${t.textMain}`}>{formatNumber(bioData.bodyFat, language) || '-'} <span className="caption font-normal text-zinc-500">%</span></span>
-                          <span className={`h3 ${bioData.bodyFatStatus === 'Normal' ? 'text-emerald-500' : bioData.bodyFatStatus === 'Overfat' ? 'text-amber-500' : bioData.bodyFatStatus === 'Obese' ? 'text-rose-500' : 'text-blue-500'}`}>{bioData.bodyFatStatus}</span>
+
+                   {/* BMI */}
+                   <div className="flex flex-col">
+                       <span className={`text-[10px] ${t.textMuted} mb-0.5 font-bold`}>BMI ({biometricStandard === 'western' ? 'Western' : 'Asia'})</span>
+                       <div className="flex items-baseline space-x-1.5">
+                           <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.bmi, language) || '-'}</span>
+                           <span className={`text-[10px] font-bold ${bioData.bmiStatus === 'Normal' ? 'text-emerald-500' : bioData.bmiStatus === 'Overweight' ? 'text-amber-400' : bioData.bmiStatus === 'Obese' ? 'text-rose-500' : 'text-blue-400'}`}>{bioData.bmiStatus}</span>
                        </div>
+                   </div>
+
+                   {/* Body Fat */}
+                   <div className="flex flex-col">
+                       <span className={`text-[10px] ${t.textMuted} mb-0.5 font-bold`}>Body Fat</span>
+                       <div className="flex items-baseline space-x-1.5">
+                           <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.bodyFat, language) || '-'} <span className="text-[9px] font-normal text-zinc-500">%</span></span>
+                           <span className={`text-[10px] font-bold ${bioData.bodyFatStatus === 'Normal' ? 'text-emerald-500' : bioData.bodyFatStatus === 'Overfat' ? 'text-amber-400' : bioData.bodyFatStatus === 'Obese' ? 'text-rose-500' : 'text-blue-400'}`}>{bioData.bodyFatStatus}</span>
+                       </div>
+                   </div>
+
+                   {/* BMR */}
+                   <div className="flex flex-col">
+                       <span className={`text-[10px] ${t.textMuted} mb-0.5 font-bold`}>BMR</span>
+                       <div>
+                           <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.bmr, language) || '-'} <span className="text-[9px] font-normal text-zinc-500">kcal</span></span>
+                       </div>
+                   </div>
+               </div>
+
+               <div className="flex flex-col justify-end items-end pb-1 pr-1">
+                   <div className={`w-16 h-16 shrink-0 rounded-full flex flex-col items-center justify-center border-[3px] ${scoreStyle} shadow-sm backdrop-blur-sm`}>
+                      <span className="text-2xl font-black leading-none">{formatNumber(bioData.bodyScore, language) || '-'}</span>
+                      <span className="text-[9px] mt-0 opacity-70 font-bold leading-tight">SCORE</span>
                    </div>
                </div>
            </div>
   
-           <div className="grid grid-cols-4 gap-2 relative z-10 pt-4 border-t border-dashed border-slate-500/20">
-               <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.bmr, language) || '-'}</span><span className={`h3 ${t.textMuted} mt-0.5`}>BMR</span></div>
-               <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{dispMainMuscle} <span className="caption font-normal text-zinc-500">{isImp ? 'lbs' : 'kg'}</span></span><span className={`h3 ${t.textMuted} mt-0.5`}>Massa Otot</span></div>
-               <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.musclePercent, language) || '-'} <span className="caption font-normal text-zinc-500">%</span></span><span className={`h3 ${t.textMuted} mt-0.5`}>Kadar Otot</span></div>
-               <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.visceralFat, language) || '-'}</span><span className={`h3 ${t.textMuted} mt-0.5`}>Visceral</span></div>
-               <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.waterPercent, language) || '-'} <span className="caption font-normal text-zinc-500">%</span></span><span className={`h3 ${t.textMuted} mt-0.5`}>Kadar Air</span></div>
-               <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.proteinPercent, language) || '-'} <span className="caption font-normal text-zinc-500">%</span></span><span className={`h3 ${t.textMuted} mt-0.5`}>Protein</span></div>
-               <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{dispMainWaist} <span className="caption font-normal text-zinc-500">{isImp ? 'in' : 'cm'}</span></span><span className={`h3 ${t.textMuted} mt-0.5`}>L. Perut</span></div>
-               <div className="p-2 rounded-xl bg-black/5 dark:bg-white/5 flex flex-col items-center justify-center text-center"><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.bodyAge, language) || '-'} <span className="caption font-normal text-zinc-500">th</span></span><span className={`h3 ${t.textMuted} mt-0.5`}>Usia Tubuh</span></div>
+           <div className={`grid grid-cols-4 gap-2 relative z-10 mt-1`}>
+               <div className={`p-1.5 rounded-xl ${t.bgBox} flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{dispMainMuscle} <span className="text-[10px] font-normal text-zinc-500">{isImp ? 'lbs' : 'kg'}</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Massa<br/>Otot</span></div>
+               <div className={`p-1.5 rounded-xl ${t.bgBox} flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.musclePercent, language) || '-'} <span className="text-[10px] font-normal text-zinc-500">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Otot</span></div>
+               <div className={`p-1.5 rounded-xl ${t.bgBox} flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.proteinPercent, language) || '-'} <span className="text-[10px] font-normal text-zinc-500">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Protein</span></div>
+               <div className={`p-1.5 rounded-xl ${t.bgBox} flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.waterPercent, language) || '-'} <span className="text-[10px] font-normal text-zinc-500">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Air</span></div>
+               
+               <div className={`p-1.5 rounded-xl ${t.bgBox} flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.visceralFat, language) || '-'}</span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Lemak<br/>Visceral</span></div>
+               <div className={`p-1.5 rounded-xl ${t.bgBox} flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{dispMainWaist} <span className="text-[10px] font-normal text-zinc-500">{isImp ? 'in' : 'cm'}</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Lingkar<br/>Perut</span></div>
+               <div className={`p-1.5 rounded-xl ${t.bgBox} flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.boneMass, language) || '-'} <span className="text-[10px] font-normal text-zinc-500">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Mineral<br/>Tulang</span></div>
+               <div className={`p-1.5 rounded-xl ${t.bgBox} flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.bodyAge, language) || '-'} <span className="text-[10px] font-normal text-zinc-500">th</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Usia<br/>Tubuh</span></div>
            </div>
            
            <button 
                onClick={() => { playSoundEffect('click', soundEnabled); setIsKomposisiExpanded(!isKomposisiExpanded); }}
-               className="w-full flex items-center justify-center pt-2 pb-3 -mb-5 mt-4 text-zinc-500 hover:text-emerald-500 transition-colors"
+               className="w-full flex items-center justify-center pt-2 pb-1 text-zinc-500 hover:text-emerald-500 transition-colors"
            >
                {isKomposisiExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
            </button>
@@ -396,7 +591,6 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                  t={t} theme={theme} history={history} 
                  soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
                  onPointClick={handleChartPointClick}
-                 isSubCard={true}
                  unitSystem={unitSystem}
               />
               </div>
@@ -405,21 +599,21 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
         </div>
 
       {/* 2. KARTU AKTIVITAS HARIAN & MINGGUAN */}
-      <div className={`p-5 rounded-2xl border ${t.border} ${t.bgCard} shadow-sm relative overflow-hidden`}>
+      <div className={`p-5 rounded-3xl border ${t.border} ${t.bgCard} shadow-sm relative overflow-hidden flex flex-col aspect-[4/5]`}>
          {/* --- Background Image Layer --- */}
          <div 
            className="absolute inset-0 z-0 opacity-70 dark:opacity-40 pointer-events-none"
              style={{
                backgroundImage: "url('/bg-activity.png')",
                backgroundSize: '150%',
-               backgroundPosition: '60% 15px',
+               backgroundPosition: '65% 10%',
                backgroundRepeat: 'no-repeat',
-               maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 100%)',
-             WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 100%)'
+               maskImage: 'radial-gradient(ellipse at 50% 10%, rgba(0,0,0,1) 30%, rgba(0,0,0,0) 85%)',
+             WebkitMaskImage: 'radial-gradient(ellipse at 50% 10%, rgba(0,0,0,1) 30%, rgba(0,0,0,0) 85%)'
            }}
          />
          {/* ------------------------------ */}
-         <div className="flex justify-between items-center mb-4 relative z-10">
+         <div className="flex justify-between items-center relative z-10 shrink-0">
              <h3 className={`h3 ${t.textMain}`}>Aktivitas Harian</h3>
              <div className="flex space-x-2">
                  <button onClick={() => { playSoundEffect('click', soundEnabled); setShowTargetModal(true); }} className={`p-1.5 rounded-full ${t.btnBg} ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Settings size={14}/></button>
@@ -427,82 +621,134 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
              </div>
          </div>
 
-         <div className="flex flex-col space-y-4 mb-4 relative z-10">
-             {/* Row 1: Langkah Kaki & Detak Jantung */}
-             <div className="flex justify-between items-center border-b border-dashed border-slate-500/20 pb-3">
-                 <div className="flex flex-col w-[45%]">
+         <div className="flex flex-col flex-1 justify-between relative z-10 pt-6 pb-2">
+             <div className="grid grid-cols-2 gap-x-4 h-full content-between">
+                 {/* Langkah Kaki */}
+                 <div className="flex flex-col h-full">
                      <div className="flex items-center space-x-1.5 mb-1 text-emerald-500"><Footprints size={14}/> <span className={`caption ${t.textMuted} capitalize`}>Langkah Kaki</span></div>
-                     <div className="flex items-baseline space-x-1">
-                         <span className={`h1 ${t.textMain}`}>{formatNumber(bioData.steps, language) || '0'}</span>
-                         <span className="caption text-zinc-500 font-bold">/ {formatNumber(activityTargets?.steps || 10000, language)}</span>
+                     <div className="flex flex-col flex-1 justify-end">
+                         <div className="flex items-baseline space-x-1 mb-2">
+                             <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{formatNumber(bioData.steps, language) || '0'}</span>
+                             <span className="text-[10px] text-zinc-500 font-bold whitespace-nowrap">/ {formatNumber(activityTargets?.steps || 10000, language)}</span>
+                         </div>
+                         <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full mb-1 overflow-hidden shrink-0">
+                             <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Number(bioData.steps || 0) / (activityTargets?.steps || 10000)) * 100)}%` }}></div>
+                         </div>
+                         <span className="text-[9px] invisible whitespace-nowrap">{formatNumber(mergedWeeklySessions, language)} Sesi ({formatNumber(mergedWeeklyWorkoutDuration, language)} menit)</span>
                      </div>
-                     <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full my-1.5 overflow-hidden">
-                         <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Number(bioData.steps || 0) / (activityTargets?.steps || 10000)) * 100)}%` }}></div>
-                     </div>
-                     <span className="caption text-zinc-500">{formatNumber(bioData.activeMinutes, language) || '0'} Menit Aktif • {formatNumber(bioData.activityCalories, language) || '0'} kcal</span>
                  </div>
-                 <div className="flex flex-col text-right items-end">
-                     <div className="flex items-center space-x-1.5 mb-1 text-rose-500"><span className={`caption ${t.textMuted} capitalize`}>Detak Jantung</span> <HeartPulse size={14}/></div>
-                     <span className={`h1 ${t.textMain}`}>{formatNumber(bioData.heartRate, language) || '-'} <span className="caption font-normal text-zinc-500">bpm</span></span>
-                     <span className="caption text-zinc-500 mt-0.5">Min {formatNumber(bioData.minHeartRate, language) || '-'} • Max {formatNumber(bioData.maxHeartRate, language) || '-'}</span>
-                 </div>
-             </div>
-             
-             {/* Row 2: Tidur & Tekanan Darah */}
-             <div className="flex justify-between items-center border-b border-dashed border-slate-500/20 pb-3">
-                 <div className="flex flex-col w-[45%]">
-                     <div className="flex items-center space-x-1.5 mb-1 text-indigo-400"><Moon size={14}/> <span className={`caption ${t.textMuted} capitalize`}>Tidur & Energi</span></div>
-                     <div className="flex items-baseline space-x-1">
-                         <span className={`h1 ${t.textMain}`}>{bioData.sleep || '0h 0m'}</span>
+                 
+                 {/* Durasi Aktif Mingguan */}
+                 {(() => {
+                     const weeklyDur = mergedWeeklyActiveMinutes;
+                     const targetDur = activityTargets?.weeklyDuration || 150;
+                     const weeklyProgress = Math.min(100, (weeklyDur / targetDur) * 100);
+                     return (
+                         <div className="flex flex-col h-full text-right items-end">
+                             <div className={`flex items-center justify-end space-x-1.5 mb-1 text-blue-400`}><span className={`caption ${t.textMuted} capitalize`}>Durasi Aktif Mingguan</span> <Clock size={14}/></div>
+                             <div className="flex flex-col flex-1 justify-end w-full">
+                                 <div className="flex items-baseline justify-end space-x-1 mb-2">
+                                     <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{formatNumber(weeklyDur, language) || '0'}</span>
+                                     <span className="text-[10px] text-zinc-500 font-bold whitespace-nowrap">/ {formatNumber(targetDur, language)} mnt</span>
+                                 </div>
+                                 <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full mb-1 overflow-hidden shrink-0 flex justify-end">
+                                     <div className={`h-full bg-blue-400 rounded-full transition-all duration-500`} style={{ width: `${weeklyProgress}%` }}></div>
+                                 </div>
+                                 <span className="text-[9px] text-zinc-500 whitespace-nowrap">{formatNumber(mergedWeeklySessions, language)} Sesi ({formatNumber(mergedWeeklyWorkoutDuration, language)} menit)</span>
+                             </div>
+                         </div>
+                     );
+                 })()}
+
+                 {/* Kalori Makanan */}
+                 <div className="flex flex-col h-full">
+                     <div className="flex items-center space-x-1.5 mb-1 text-orange-400"><Utensils size={14}/> <span className={`caption ${t.textMuted} capitalize`}>Kalori Makanan</span></div>
+                     <div className="flex flex-col flex-1 justify-end">
+                         <div className="flex items-baseline space-x-1 mb-2">
+                             <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{formatNumber(bioData.nutritionCalories, language) || '0'}</span>
+                             <span className="text-[10px] text-zinc-500 font-bold whitespace-nowrap">/ {formatNumber(activityTargets?.nutritionCalories || 2000, language)}</span>
+                         </div>
+                         <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full mb-1 overflow-hidden shrink-0">
+                             <div className="h-full bg-orange-400 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Number(bioData.nutritionCalories || 0) / (activityTargets?.nutritionCalories || 2000)) * 100)}%` }}></div>
+                         </div>
+                         <span className="text-[9px] opacity-0 select-none hidden sm:block">Spacer</span>
                      </div>
-                     <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full my-1.5 overflow-hidden">
-                         <div className="h-full bg-indigo-400 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (parseSleepHours(bioData.sleep) / (activityTargets?.sleep || 8)) * 100)}%` }}></div>
-                     </div>
-                     <span className="caption text-zinc-500">Score: <span className="text-amber-500">{formatNumber(bioData.energyScore, language) || '-'}</span> / 100</span>
                  </div>
-                 <div className="flex flex-col text-right items-end">
-                     <div className="flex items-center space-x-1.5 mb-1 text-blue-400"><span className={`caption ${t.textMuted} capitalize`}>Tekanan Darah</span> <Activity size={14}/></div>
-                     <span className={`h1 ${t.textMain}`}>{bioData.bloodPressure || '-'}</span>
-                     <span className="caption text-zinc-500 mt-0.5">Sistolik / Diastolik</span>
+
+                 {/* Kalori Dibakar */}
+                 <div className="flex flex-col h-full text-right items-end">
+                     <div className="flex items-center justify-end space-x-1.5 mb-1 text-rose-500"><Flame size={14}/> <span className={`caption ${t.textMuted} capitalize`}>Kalori Dibakar</span></div>
+                     <div className="flex flex-col flex-1 justify-end w-full">
+                         <div className="flex items-baseline justify-end space-x-1 mb-2">
+                             <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{formatNumber(mergedDailyCalories, language) || '0'}</span>
+                             <span className="text-[10px] text-zinc-500 font-bold whitespace-nowrap">/ {formatNumber(activityTargets?.activityCalories || 500, language)}</span>
+                         </div>
+                         <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full mb-1 overflow-hidden shrink-0 flex justify-end">
+                             <div className="h-full bg-rose-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Number(mergedDailyCalories || 0) / (activityTargets?.activityCalories || 500)) * 100)}%` }}></div>
+                         </div>
+                         <span className="text-[9px] opacity-0 select-none hidden sm:block">Spacer</span>
+                     </div>
+                 </div>
+
+                 {/* Tidur */}
+                 <div className="flex flex-col h-full">
+                     <div className="flex items-center space-x-1.5 mb-1 text-indigo-400"><Moon size={14}/> <span className={`caption ${t.textMuted} capitalize`}>Tidur</span></div>
+                     <div className="flex flex-col flex-1 justify-end">
+                         <div className="flex items-baseline space-x-1 mb-2">
+                             <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{bioData.sleep || '0h 0m'}</span>
+                         </div>
+                         <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden shrink-0">
+                             <div className="h-full bg-indigo-400 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (parseSleepHours(bioData.sleep) / (activityTargets?.sleep || 8)) * 100)}%` }}></div>
+                         </div>
+                     </div>
+                 </div>
+
+                 {/* Skor Energi */}
+                 <div className="flex flex-col h-full text-right items-end">
+                     <div className="flex items-center justify-end space-x-1.5 mb-1 text-amber-400"><Zap size={14}/> <span className={`caption ${t.textMuted} capitalize`}>Skor Energi</span></div>
+                     <div className="flex flex-col flex-1 justify-end w-full">
+                         <div className="flex items-baseline justify-end space-x-1 mb-2">
+                             <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{formatNumber(bioData.energyScore, language) || '-'}</span>
+                             <span className="text-[10px] text-zinc-500 font-bold">/ 100</span>
+                         </div>
+                         <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden shrink-0 flex justify-end">
+                             <div className="h-full bg-amber-400 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, Number(bioData.energyScore || 0))}%` }}></div>
+                         </div>
+                     </div>
+                 </div>
+                 
+                 {/* ROW 4: Tekanan Darah, Detak Jantung, SpO2 (Sebaris bertiga) */}
+                 <div className={`col-span-2 grid grid-cols-3 gap-x-2 pt-2 mt-2 border-t border-dashed ${t.borderDashed}`}>
+                     {/* Tekanan Darah */}
+                     <div className="flex flex-col">
+                         <div className="flex items-center space-x-1 mb-1 text-sky-400"><Activity size={12}/> <span className={`text-[10px] ${t.textMuted}`}>Tensi</span></div>
+                         <span className={`text-lg font-black ${t.textMain} leading-none`}>{bioData.bloodPressure || '-'}</span>
+                     </div>
+                     
+                     {/* Detak Jantung */}
+                     <div className="flex flex-col items-center">
+                         <div className="flex items-center space-x-1 mb-1 text-sky-400"><HeartPulse size={12}/> <span className={`text-[10px] ${t.textMuted}`}>Detak</span></div>
+                         <div className="flex flex-col items-center">
+                             <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.heartRate, language) || '-'} <span className="text-[9px] font-normal text-zinc-500">bpm</span></span>
+                             <span className="text-[8px] text-zinc-500 whitespace-nowrap mt-0.5">Min {formatNumber(bioData.minHeartRate, language) || '-'} &bull; Max {formatNumber(bioData.maxHeartRate, language) || '-'}</span>
+                         </div>
+                     </div>
+                     
+                     {/* SpO2 */}
+                     <div className="flex flex-col items-end text-right">
+                         <div className="flex items-center space-x-1 mb-1 text-sky-400"><Wind size={12}/> <span className={`text-[10px] ${t.textMuted}`}>SpO2</span></div>
+                         <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.oxygenSaturation, language) || '-'} <span className="text-[9px] font-normal text-zinc-500">%</span></span>
+                     </div>
                  </div>
              </div>
          </div>
-
-         {(() => {
-             const weeklyDur = Number(bioData.weeklyDuration || 0);
-             const targetDur = activityTargets?.weeklyDuration || 150;
-             const weeklyProgress = Math.min(100, (weeklyDur / targetDur) * 100);
-             const isGoalReached = weeklyDur >= targetDur;
-             
-             return (
-                 <div className={`relative z-10 p-4 rounded-2xl border ${isGoalReached ? t.borderAccent : t.border} overflow-hidden flex justify-between items-center shadow-sm`}>
-                     {/* Background progress bar */}
-                     <div className="absolute inset-0 bg-black/5 dark:bg-white/5"></div>
-                     <div className={`absolute top-0 bottom-0 left-0 ${t.bgAccent} transition-all duration-1000 opacity-15 dark:opacity-25`} style={{ width: `${weeklyProgress}%` }}></div>
-                     
-                     <div className="flex items-center space-x-3 relative z-10">
-                         <div className={`p-2 rounded-xl transition-colors duration-500 ${isGoalReached ? t.bgAccent : 'bg-black/10 dark:bg-white/10'}`}>
-                             <Trophy size={20} className={isGoalReached ? 'text-white dark:text-black' : t.textMuted} fill={isGoalReached ? 'currentColor' : 'none'}/>
-                         </div>
-                         <div className="flex flex-col">
-                             <span className={`body-lg font-black ${t.textMain}`}>Total Olahraga Mingguan</span>
-                             <span className={`caption ${t.textMuted}`}>{formatNumber(bioData.weeklySessions, language) || '0'} Sesi • {formatNumber(bioData.weeklyCalories, language) || '0'} kcal</span>
-                         </div>
-                     </div>
-                     <div className="flex items-baseline space-x-1 relative z-10">
-                         <span className={`h1 ${isGoalReached ? t.textAccent : t.textMain}`}>{formatNumber(weeklyDur, language) || '0'}</span>
-                         <span className="caption text-zinc-500 font-bold">/ {formatNumber(targetDur, language)}</span>
-                     </div>
-                 </div>
-             );
-         })()}
       </div>
       </div>
 
       {/* --- GRUP PROGRESS --- */}
       <div className="flex flex-col w-full min-w-0">
         {/* SECTION: PROGRESS TAB — Main card */}
-        <div className={`border ${t.border} ${t.bgCard} shadow-sm relative z-10 flex flex-col transition-all duration-300 ${isProgressExpanded ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'} overflow-hidden`}>
+        <div className={`border ${t.border} ${t.bgCard} shadow-sm relative z-10 flex flex-col transition-all duration-300 pb-4 ${isProgressExpanded ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'} overflow-hidden`}>
           {/* --- Background Image Layer --- */}
           <div 
             className="absolute inset-0 z-0 opacity-70 dark:opacity-40 pointer-events-none"
@@ -528,7 +774,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
             />
             <button 
                  onClick={() => { playSoundEffect('click', soundEnabled); setIsProgressExpanded(!isProgressExpanded); }}
-                 className="w-full flex items-center justify-center pt-2 pb-3 mt-2 text-zinc-500 hover:text-emerald-500 transition-colors"
+                 className="w-full flex items-center justify-center pt-2 pb-1 text-zinc-500 hover:text-emerald-500 transition-colors"
              >
                  {isProgressExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
              </button>
@@ -575,7 +821,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                            </div>
                        </div>
                    </div>
-                   <button onClick={() => setShowDetailsModal(false)} className={`p-2 rounded-full bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors ${t.textMain}`}><X size={16}/></button>
+                   <button onClick={() => setShowDetailsModal(false)} className={`p-2 rounded-full bg-[#41759b]/20 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors ${t.textMain}`}><X size={16}/></button>
                </div>
 
                <div className="flex-1 overflow-y-auto px-4 pb-10 hide-scrollbar space-y-3">
@@ -731,7 +977,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                       </div>
                   </div>
 
-                  <div className="flex space-x-3 mt-6 border-t border-slate-500/20 pt-5">
+                  <div className={`flex space-x-3 mt-6 border-t ${t.borderDashed} pt-5`}>
                       <button 
                           onClick={() => { playSoundEffect('click', soundEnabled); setShowTargetModal(false); }}
                           className={`w-1/3 py-3 rounded-xl font-bold body-lg ${t.textMuted} ${t.btnBg} active:scale-[0.98] transition-all`}

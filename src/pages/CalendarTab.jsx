@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Info, CheckCircle, CalendarDays, Edit2, PlayCircle, X, Copy, Repeat, Plus, Clock, Bell, CalendarPlus, CalendarCheck, BellOff, BellRing, ToggleLeft, ToggleRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Info, CheckCircle, CalendarDays, Edit2, PlayCircle, X, Copy, Repeat, Plus, Clock, Bell, CalendarPlus, CalendarCheck, BellOff, BellRing, ToggleLeft, ToggleRight, Flame } from 'lucide-react';
 import SwipeInput from '../components/SwipeInput';
 import { getLocalYMD } from '../data/constants';
 import { formatNumber } from '../utils/numberFormat';
@@ -15,7 +15,13 @@ const CalendarTab = ({
   unitSystem, setConfirmModal, activePlanIds = []
 }) => {
   const isImp = unitSystem === 'imperial';
-  const [calendarDate, setCalendarDate] = useState(new Date());
+  const [calendarDate, setCalendarDate] = useState(() => {
+    if (selectedDate) {
+      const [y, m, d] = selectedDate.split('-');
+      return new Date(y, parseInt(m)-1, d);
+    }
+    return new Date();
+  });
   
   const [isTablet, setIsTablet] = useState(window.innerWidth >= 640);
   const [calendarMode, setCalendarMode] = useState('monthly');
@@ -165,7 +171,6 @@ const CalendarTab = ({
 
   const getDayWorkouts = (dateStr) => {
     const historical = history[dateStr]?.workouts || [];
-    const todayStr = getLocalYMD(new Date());
     
     // Filter history: Hanya tampilkan workout yang sesuai dengan activePlanIds (sejarah maupun rencana)
     const validHistorical = historical.filter(w => {
@@ -178,32 +183,34 @@ const CalendarTab = ({
       return true;
     });
 
-    if (validHistorical.length > 0) return validHistorical;
+    let result = [...validHistorical];
+    const todayStr = getLocalYMD(new Date());
 
-    // Jika belum ada, dan ini adalah activePlanIds yang memiliki assignedDays, kita proyeksikan!
-    if (dateStr < todayStr) return []; // Jangan proyeksikan masa lalu
-
-    if (activePlanIds.length === 0) return [];
-
-    const planRoutines = programs.filter(p => activePlanIds.includes(p.planId || 'custom'));
-    if (planRoutines.length === 0) return [];
+    if (dateStr >= todayStr && activePlanIds.length > 0) {
+        const planRoutines = programs.filter(p => activePlanIds.includes(p.planId || 'custom'));
+        if (planRoutines.length > 0) {
+            const dateObj = new Date(dateStr);
+            const dayName = DAY_MAP[dateObj.getDay()];
+            const projectedRoutines = planRoutines.filter(r => r.assignedDays && r.assignedDays.includes(dayName));
+            
+            projectedRoutines.forEach(pr => {
+                if (!validHistorical.some(w => w.programId === pr.id)) {
+                    result.push({
+                        id: `projected_${pr.id}_${dateStr}`,
+                        programId: pr.id,
+                        programName: pr.name,
+                        status: 'planned',
+                        isProjected: true,
+                        log: {}
+                    });
+                }
+            });
+        }
+    }
     
-    const dateObj = new Date(dateStr);
-    const dayName = DAY_MAP[dateObj.getDay()];
-    
-    // Find all routines that are explicitly assigned to this day
-    const projectedRoutines = planRoutines.filter(r => r.assignedDays && r.assignedDays.includes(dayName));
-    
-    if (projectedRoutines.length === 0) return [];
+    return result;
 
-    return projectedRoutines.map(pr => ({
-      id: `projected_${pr.id}_${dateStr}`, // include date to ensure unique key across dates if needed
-      programId: pr.id,
-      programName: pr.name,
-      status: 'planned',
-      isProjected: true,
-      log: {}
-    }));
+
   };
 
   const scheduleWorkoutNotification = async (workoutId, programName, dateStr, timeStr) => {
@@ -709,7 +716,7 @@ const CalendarTab = ({
           </div>
         
         {calendarMode === 'yearPicker' ? (
-          <div className="grid grid-cols-3 gap-2 px-1 py-1 animate-in fade-in zoom-in-95 duration-200">
+          <div className="grid grid-cols-3 gap-2 px-1 py-1 animate-in fade-in zoom-in-95 duration-300 ease-out">
             {Array.from({ length: 12 }, (_, i) => year - 5 + i).map(y => (
               <button
                 key={y}
@@ -721,7 +728,7 @@ const CalendarTab = ({
             ))}
           </div>
         ) : calendarMode === 'monthPicker' ? (
-          <div className="grid grid-cols-3 gap-2 px-1 py-1 animate-in fade-in zoom-in-95 duration-200">
+          <div className="grid grid-cols-3 gap-2 px-1 py-1 animate-in fade-in zoom-in-95 duration-300 ease-out">
             {(lang === 'id' 
               ? ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
               : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -917,7 +924,7 @@ const CalendarTab = ({
                          )}
 
                          {showActionMenu === 'copyMove' && targetDateStr === selectedDate && (
-                            <div className={`p-4 rounded-xl bg-black/10 dark:bg-white/5 border border-dashed ${t.border} animate-in zoom-in-95`}>
+                            <div className={`p-4 rounded-xl bg-black/10 dark:bg-white/5 border border-dashed ${t.border} animate-in zoom-in-95 duration-300 ease-out`}>
                                 <label className="body-md mb-2 block">Pilih Tanggal Tujuan:</label>
                                 <input type="date" value={targetDateInput} onChange={(e) => setTargetDateInput(e.target.value)} className={`w-full ${t.inputBg} ${t.textMain} px-3 py-2 rounded-lg body-lg mb-3 outline-none focus:ring-1 focus:${t.ringAccent}`} />
                                 <div className="flex gap-2">
@@ -928,7 +935,7 @@ const CalendarTab = ({
                          )}
 
                          {showActionMenu === 'repeat' && targetDateStr === selectedDate && (
-                            <div className={`p-4 rounded-xl bg-black/10 dark:bg-white/5 border border-dashed ${t.border} animate-in zoom-in-95`}>
+                            <div className={`p-4 rounded-xl bg-black/10 dark:bg-white/5 border border-dashed ${t.border} animate-in zoom-in-95 duration-300 ease-out`}>
                                 <div className="flex justify-between items-center mb-3">
                                     <span className="caption">Ulangi setiap</span>
                                     <div className="flex items-center space-x-2">
@@ -936,7 +943,7 @@ const CalendarTab = ({
                                        <span className="caption w-6">Hari</span>
                                     </div>
                                 </div>
-                                <div className="flex justify-between items-center bg-black/5 dark:bg-white/5 p-3 rounded-lg border border-dashed border-slate-500/20 mb-4">
+                                <div className="flex justify-between items-center bg-[#41759b]/10 dark:bg-white/5 p-3 rounded-lg border border-dashed border-slate-400/50 dark:border-slate-500/20 mb-4">
                                     <span className="caption">Sebanyak</span>
                                     <div className="flex items-center space-x-2">
                                        <input type="number" value={repeatCount} onChange={(e) => setRepeatCount(Number(e.target.value))} className={`w-16 ${t.inputBg} ${t.textMain} px-2 py-1 rounded-lg body-lg text-center outline-none`} min="1" />
@@ -1016,6 +1023,18 @@ const CalendarTab = ({
                                       const effectiveTime = w.reminderTime || defaultReminderTime || "15:00";
                                       const isNotifOn = w.hasOwnProperty('reminderEnabled') ? w.reminderEnabled : (w.reminderTime ? true : reminderEnabled);
                                       const estDuration = Math.round((w.overriddenExercises || prog?.exercises || []).reduce((acc, ex) => acc + (parseInt(ex.sets) || 3), 0) * (45 + (parseInt(w.restTime) || parseInt(prog?.restTime) || 90)) / 60) || 0;
+                                      
+                                      const getMins = (durStr) => {
+                                        if (!durStr) return 0;
+                                        let m = 0;
+                                        const parts = String(durStr).split(':').map(Number);
+                                        if (parts.length === 3) m = (parts[0]*60) + parts[1] + (parts[2]>30?1:0);
+                                        else if (parts.length === 2) m = parts[0] + (parts[1]>30?1:0);
+                                        return m;
+                                      };
+                                      const actualMins = getMins(w.duration);
+                                      const calBurned = (actualMins * 5) + 50;
+                                      const estCal = (estDuration * 5) + 50;
 
                                              return (
                                          <div id={`workout-card-${w.programId}`} key={w.id} className={`p-4 rounded-2xl ${isCompleted ? 'border ' + t.borderAccentSoft + ' ' + t.bgAccentSoft : 'border-2 border-dashed ' + t.borderAccentSoft + ' bg-black/5 dark:bg-white/5'} flex flex-col relative transition-all ${isExpanded ? 'ring-2 ' + t.ringAccent : 'hover:scale-[1.02] cursor-pointer'}`} onClick={() => { if(!isExpanded) { playSoundEffect('click', soundEnabled); setExpandedWorkoutId(w.id); setCalendarDate(new Date(targetDateStr)); setCalendarMode('weekly'); } }}>
@@ -1032,19 +1051,23 @@ const CalendarTab = ({
                                            </div>
                                            <div className="flex flex-col ml-[32px]">
                                              {isCompleted ? (
-                                               <div className="caption opacity-60 flex flex-wrap items-center gap-2">
+                                               <div className="caption opacity-60 flex flex-wrap items-center gap-2 mt-1">
                                                  <span>Selesai: {w.timestamp}</span>
                                                  <span className="w-1 h-1 rounded-full bg-current opacity-50"></span>
                                                  <span>{formatDurationHuman(w.duration || '00:00')}</span>
+                                                 <span className="w-1 h-1 rounded-full bg-current opacity-50"></span>
+                                                 <span>{calBurned} kcal</span>
                                                </div>
                                              ) : (
-                                               <div className="flex items-center gap-2 relative z-10">
+                                               <div className="flex items-center gap-2 relative z-10 mt-1">
                                                  <div className="caption opacity-70 flex items-center gap-1.5 flex-wrap">
                                                    <span>Direncanakan</span>
                                                    {estDuration > 0 && (
                                                      <>
                                                        <span className="opacity-50 text-[10px]">•</span>
                                                        <span>~{estDuration} mnt</span>
+                                                       <span className="opacity-50 text-[10px]">•</span>
+                                                       <span>~{estCal} kcal</span>
                                                      </>
                                                    )}
                                                    <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-1.5">
@@ -1059,7 +1082,7 @@ const CalendarTab = ({
                                              )}
                                            </div>
                                            {isExpanded && (
-                                             <div className="mt-4 animate-in slide-in-from-top-2 fade-in duration-200">
+                                             <div className="mt-4 animate-in slide-in-from-top-2 fade-in duration-300 ease-out">
                                                <div className="space-y-1.5 mb-4">
                                                  {(w.overriddenExercises || prog?.exercises)?.map((ex, idx) => {
                                                     const exLogKey = `${ex.id}-${w.id}`;
@@ -1146,9 +1169,9 @@ const CalendarTab = ({
       {/* JADWALKAN SESI DIALOG */}
       {showProgramSelect && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center px-6" onClick={() => setShowProgramSelect(false)}>
-          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm animate-in fade-in duration-200" />
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm animate-in fade-in duration-300 ease-out" />
           <div 
-            className={`relative w-full max-w-xs rounded-3xl p-5 shadow-2xl border ${t.border} animate-in zoom-in-95 fade-in duration-300`}
+            className={`relative w-full max-w-xs rounded-3xl p-5 shadow-2xl border ${t.border} animate-in zoom-in-95 fade-in duration-300 ease-out`}
             style={{ 
               background: (t.bgCard?.includes('0a1f32') || t.bgCard?.includes('040f1a')) 
                 ? 'rgba(15, 40, 60, 0.65)' 
@@ -1259,9 +1282,9 @@ const NotificationModal = ({ t, target, defaultReminderTime, soundEnabled, remin
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center px-6" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm animate-in fade-in duration-200" />
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm animate-in fade-in duration-300 ease-out" />
       <div 
-        className={`relative w-full max-w-xs rounded-3xl p-5 shadow-2xl border ${t.border} animate-in zoom-in-95 fade-in duration-300`}
+        className={`relative w-full max-w-xs rounded-3xl p-5 shadow-2xl border ${t.border} animate-in zoom-in-95 fade-in duration-300 ease-out`}
         style={{ 
           background: isDark 
             ? 'rgba(15, 40, 60, 0.65)' 
@@ -1302,7 +1325,7 @@ const NotificationModal = ({ t, target, defaultReminderTime, soundEnabled, remin
         </div>
         
         {/* Time Picker - HH : MM */}
-        <div className="flex flex-col items-center justify-center py-4 mb-2 animate-in zoom-in-95 duration-200">
+        <div className="flex flex-col items-center justify-center py-4 mb-2 animate-in zoom-in-95 duration-300 ease-out">
           <p className="caption opacity-50 mb-3 text-center">Jam Rencana Latihan (Jam : Menit)</p>
           <div className="flex items-center justify-center gap-3">
               <input 

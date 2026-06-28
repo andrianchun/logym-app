@@ -132,10 +132,9 @@ const AuthPage = ({ t, theme, soundEnabled, onLogin }) => {
 
         <div className="relative z-10">
             <div className="text-center mb-8 flex flex-col items-center">
-               {/* SUNTIKAN LOGO PREMIUM: Menjawab keluhan logo kosong */}
-               <img src="/icon-512.png" alt="LyFit Logo" className="w-24 h-24 mb-4 object-contain drop-shadow-2xl" />
+               {/* SUNTIKAN LOGO PREMIUM: Menggunakan logo vertikal (620x600) */}
+               <img src={theme === 'dark' ? '/logo-dark.png' : '/logo-light.png'} alt="LyFit Logo" className="w-32 h-32 mb-4 object-contain drop-shadow-2xl" />
 
-               <h1 className={`h1 bg-gradient-to-r ${t.gradientText} text-transparent bg-clip-text mb-2 tracking-tight`}>LyFit</h1>
                <p className={`body-lg font-bold ${t.textMuted}`}>
                   {isLoginMode ? 'Your Fitness Tracker Buddy (by Andrian Chun)' : 'Mulai perjalanan fitness-mu hari ini.'}
                </p>

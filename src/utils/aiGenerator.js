@@ -78,6 +78,39 @@ export const generateDynamicWorkout = (userProfile, gymProfile, exerciseLibrary)
     targetSets = 3; targetReps = 12; targetRest = 90; targetRpe = 7;
   }
 
+  // --- Biometric Adjustments ---
+  let age = 30; // default
+  if (userProfile.dob) {
+      const birth = new Date(userProfile.dob);
+      const now = new Date();
+      age = now.getFullYear() - birth.getFullYear();
+      if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) age--;
+  }
+
+  // Older adults need more recovery and slightly less intensity
+  if (age >= 50) {
+      targetRpe -= 1;
+      targetRest += 30;
+      targetSets = Math.max(2, targetSets - 1);
+  } else if (age < 25 && experience !== 'beginner') {
+      targetRpe += 0.5; // Younger people can push slightly harder
+  }
+
+  // Gender-based adjustments (Females generally recover faster between sets and handle higher reps well)
+  if (userProfile.gender === 'female') {
+      targetReps += 2;
+      targetRest = Math.max(45, targetRest - 15);
+  }
+
+  // Overweight fat_loss focus (if current weight > target weight significantly)
+  if (goal === 'fat_loss' && userProfile.weight && userProfile.targetWeight) {
+      if (Number(userProfile.weight) - Number(userProfile.targetWeight) > 10) {
+          // Significant weight to lose, prioritize slightly more sets to increase calorie burn if not already high
+          if (targetSets < 4) targetSets += 1;
+      }
+  }
+  // -----------------------------
+
   // 4. Memory Slate
   const usedExercises = new Set();
   

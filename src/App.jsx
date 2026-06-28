@@ -30,6 +30,7 @@ import ExerciseDetailModal from './components/ExerciseDetailModal';
 import ConfirmModal from './modals/ConfirmModal';
 import AddExerciseModal from './modals/AddExerciseModal';
 import SettingsModal from './modals/SettingsModal';
+import ProfileModal from './modals/ProfileModal';
 import HelpModal from './modals/HelpModal';
 import ProgramQuestionnaireModal from './modals/ProgramQuestionnaireModal';
 
@@ -122,6 +123,7 @@ export default function App() {
     const [focusWorkoutId, setFocusWorkoutId] = useState(null);
 
   const [showSettings, setShowSettings] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showQuestionnaire, setShowQuestionnaire] = useState(false);
   const [globalDetailExercise, setGlobalDetailExercise] = useState(null);
@@ -137,6 +139,23 @@ export default function App() {
   const [showExitToast, setShowExitToast] = useState(false);
   const [showSupersetToast, setShowSupersetToast] = useState(false);
   const backPressedOnce = useRef(false);
+  const scrollPositions = useRef({});
+  const prevTab = useRef(activeTab);
+
+  useEffect(() => {
+    if (prevTab.current !== activeTab) {
+      setTimeout(() => {
+        window.scrollTo(0, scrollPositions.current[activeTab] || 0);
+      }, 10);
+      prevTab.current = activeTab;
+    }
+    
+    const handleScroll = () => {
+      scrollPositions.current[activeTab] = window.scrollY;
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [activeTab]);
 
   // ==========================================
   // 0. CAPACITOR & NOTIFICATION INIT
@@ -184,24 +203,29 @@ export default function App() {
 
   // --- EFEK ONBOARDING AI ---
   useEffect(() => {
-    if (isDataLoaded) {
-      const isFirstTime = localStorage.getItem('lyfit_onboarding_completed') !== 'true';
-      if (isFirstTime) {
+    if (isDataLoaded && user) {
+      const hasCompleted = userProfile?.hasCompletedOnboarding;
+      if (!hasCompleted && programs.length === 0) {
         setShowQuestionnaire(true);
       }
     }
-  }, [isDataLoaded]);
+  }, [isDataLoaded, user, userProfile, programs.length]);
 
   const handleApplyRecommendedPlan = (plan) => {
     playSoundEffect('success', soundEnabled);
     const newPlanId = plan.id || `plan-${Date.now()}`;
     const userExperience = plan.userExperience || 'beginner';
     
-    if (plan.userGoal || plan.userExperience) {
+    if (plan.userGoal || plan.userExperience || plan.biometrics) {
       setUserProfile(prev => ({
+        ...prev,
         goal: plan.userGoal || prev.goal,
-        experience: plan.userExperience || prev.experience
+        experience: plan.userExperience || prev.experience,
+        hasCompletedOnboarding: true,
+        ...(plan.biometrics || {})
       }));
+    } else {
+      setUserProfile(prev => ({ ...prev, hasCompletedOnboarding: true }));
     }
 
     if (plan.gymProfileId && plan.gymProfileId !== 'ADD_NEW_GYM') {
@@ -476,6 +500,18 @@ export default function App() {
               if (parsedSettings.userProfile) setUserProfile(parsedSettings.userProfile);
               if (parsedSettings.userGeminiApiKey) setUserGeminiApiKey(parsedSettings.userGeminiApiKey);
             }
+            setUser(prev => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    ...(data.lastPhotoUpdate !== undefined && { lastPhotoUpdate: data.lastPhotoUpdate }),
+                    ...(data.customCardBg !== undefined && { customCardBg: data.customCardBg }),
+                    ...(data.customCardSettings !== undefined && { customCardSettings: data.customCardSettings }),
+                    ...(data.uploadedPhotos !== undefined && { uploadedPhotos: data.uploadedPhotos }),
+                    ...(data.uploadedBackgrounds !== undefined && { uploadedBackgrounds: data.uploadedBackgrounds }),
+                    ...(data.cardBgUploads !== undefined && { cardBgUploads: data.cardBgUploads }),
+                };
+            });
           } catch (err) {
             console.error("Parse Error saat load data utama (MENCEGAH AUTO-SAVE UNTUK MENGHINDARI DATA HILANG):", err);
             setHasParseError(true);
@@ -517,7 +553,7 @@ export default function App() {
       if (unsubscribeMain) unsubscribeMain();
       if (unsubscribeHistory) unsubscribeHistory();
     };
-  }, [user]);
+  }, [user?.uid]);
 
   // ==========================================
   // 3. SISTEM AUTO-SAVE KE CLOUD (DEBOUNCE)
@@ -602,6 +638,7 @@ export default function App() {
 
       // Prioritas 1: Tutup modal/dialog yang terbuka
       if (globalDetailExercise) { setGlobalDetailExercise(null); window.history.pushState({ lyfit: true }, ''); return; }
+      if (showProfileModal) { setShowProfileModal(false); window.history.pushState({ lyfit: true }, ''); return; }
       if (showSettings) { setShowSettings(false); window.history.pushState({ lyfit: true }, ''); return; }
       if (showHelp) { setShowHelp(false); window.history.pushState({ lyfit: true }, ''); return; }
       if (confirmModal.isOpen) { setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null }); window.history.pushState({ lyfit: true }, ''); return; }
@@ -623,7 +660,7 @@ export default function App() {
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [globalDetailExercise, showSettings, showHelp, confirmModal.isOpen, activeAddModalTarget, activeTab]);
+  }, [globalDetailExercise, showProfileModal, showSettings, showHelp, confirmModal.isOpen, activeAddModalTarget, activeTab]);
 
   // ==========================================
   // 5. MESIN AUTOSAVE LOG LATIHAN KE KALENDER
@@ -709,8 +746,10 @@ export default function App() {
   const handleLogout = async () => {
     playSoundEffect('click', soundEnabled);
     try {
-      await signOut(auth);
+      setActiveAddModalTarget(null);
+      setShowProfileModal(false);
       setShowSettings(false);
+      await signOut(auth);
     } catch (error) {
       console.error("Gagal logout:", error);
     }
@@ -747,7 +786,7 @@ export default function App() {
     bgCard: theme === 'dark' ? 'bg-[#0a1f32]' : 'bg-white',
     textMain: theme === 'dark' ? 'text-slate-100' : 'text-slate-900', 
     textMuted: theme === 'dark' ? 'text-[#93a6b2]' : 'text-slate-500',
-    border: theme === 'dark' ? 'border-[#294c65]/50' : 'border-slate-300', 
+    border: theme === 'dark' ? 'border-[#294c65]/50' : 'border-black/20', 
     textAccent: theme === 'dark' ? 'text-[#93a6b2]' : 'text-[#41759b]',
     bgAccent: theme === 'dark' ? 'bg-[#41759b] text-white' : 'bg-[#41759b] text-white', 
     bgAccentSoft: theme === 'dark' ? 'bg-[#294c65]/30' : 'bg-[#41759b]/10',
@@ -762,7 +801,9 @@ export default function App() {
     navBg: theme === 'dark' ? 'bg-[#040f1a]/80 backdrop-blur-md' : 'bg-white/90 backdrop-blur-md',
     navIconActive: theme === 'dark' ? 'text-[#93a6b2]' : 'text-[#41759b]', 
     navIconInactive: theme === 'dark' ? 'text-[#294c65]' : 'text-slate-400',
-    placeholderAccent: theme === 'dark' ? 'placeholder-[#93a6b2]/40' : 'placeholder-[#41759b]/40'
+    placeholderAccent: theme === 'dark' ? 'placeholder-[#93a6b2]/40' : 'placeholder-[#41759b]/40',
+    borderDashed: theme === 'dark' ? 'border-slate-500/20' : 'border-black/30',
+    bgBox: theme === 'dark' ? 'bg-white/5' : 'bg-[#41759b]/15'
   };
 
   const navigateToWorkoutDate = (dateStr, progId) => { 
@@ -1101,8 +1142,8 @@ export default function App() {
     setWorkoutStartTime(null);
     setRestTargetTime(null);
     setRestTimer(0);
-    setExerciseLogs({});
-    setSkippedExercises({});
+    // setExerciseLogs({});
+    // setSkippedExercises({});
     setExtraExercises([]);
     setSessionSnapshot(null);
 
@@ -1393,7 +1434,7 @@ export default function App() {
 
   // JIKA USER SUDAH LOGIN
   return (
-    <div className={`min-h-screen ${t.bgApp} ${t.textMain} font-sans ${(activeTab === 'calendar' || activeTab === 'database') ? 'h-screen overflow-hidden' : 'pb-24'} transition-colors duration-300`}>
+    <div className={`min-h-screen ${t.bgApp} ${t.textMain} font-sans ${activeTab === 'calendar' ? 'h-screen overflow-hidden' : 'pb-24'} transition-colors duration-300`}>
       <ConfirmModal confirmModal={confirmModal} setConfirmModal={setConfirmModal} t={t} lang={lang} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} />
       <AddExerciseModal t={t} lang={lang} activeAddModalTarget={activeAddModalTarget} setActiveAddModalTarget={setActiveAddModalTarget} exerciseLibrary={exerciseLibrary} onAddExerciseTarget={addExerciseTarget} setActiveTab={setActiveTab} />
       <HelpModal showHelp={showHelp} setShowHelp={setShowHelp} t={t} lang={lang} />
@@ -1427,6 +1468,13 @@ export default function App() {
          exerciseLibrary={exerciseLibrary}
       />
       
+        <ProfileModal 
+           showProfileModal={showProfileModal} setShowProfileModal={setShowProfileModal} 
+           user={user} setUser={setUser} t={t} theme={theme} handleLogout={handleLogout} history={history}
+           activityTargets={activityTargets} programs={programs} exerciseLibrary={exerciseLibrary}
+           lang={lang} language={language} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} selectedDate={selectedDate} unitSystem={unitSystem} activePlanIds={activePlanIds}
+        />
+
         <SettingsModal 
            showSettings={showSettings} setShowSettings={setShowSettings} t={t} lang={lang} 
            theme={theme} setTheme={setTheme} language={language} setLanguage={setLanguage} 
@@ -1444,9 +1492,9 @@ export default function App() {
          user={user} handleLogout={handleLogout}
       />
 
-      <Header setConfirmModal={setConfirmModal} t={t} theme={theme} user={user} showSettings={showSettings} setShowSettings={setShowSettings} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} activeTab={activeTab} setActiveTab={setActiveTab} isOffline={isOffline} />
+      <Header setConfirmModal={setConfirmModal} t={t} theme={theme} user={user} showSettings={showSettings} setShowSettings={setShowSettings} setShowProfileModal={setShowProfileModal} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} activeTab={activeTab} setActiveTab={setActiveTab} isOffline={isOffline} />
       
-      <main className={`${(activeTab === 'calendar' || activeTab === 'database') ? 'px-4 pb-4 pt-0 h-[calc(100vh-140px)] flex flex-col' : 'p-4'} max-w-5xl mx-auto w-full min-h-[70vh]`}>
+      <main className={`${activeTab === 'calendar' ? 'px-4 pb-4 pt-0 h-[calc(100vh-140px)] flex flex-col' : activeTab === 'database' ? 'px-4 pb-4 pt-0 min-h-[70vh]' : 'p-4 min-h-[70vh]'} max-w-5xl mx-auto w-full`}>
          {activeTab === 'dashboard' && (
              <DashboardTab setConfirmModal={setConfirmModal} 
                t={t} lang={lang} language={language} user={user} history={history} setHistory={setHistory} programs={programs}
@@ -1455,7 +1503,6 @@ export default function App() {
                biometricStandard={biometricStandard} unitSystem={unitSystem}
                activityTargets={activityTargets} setActivityTargets={setActivityTargets}
                gymProfiles={gymProfiles} activeGymId={activeGymId}
-               activePlanIds={activePlanIds}
                userGeminiApiKey={userGeminiApiKey}
              />
          )}

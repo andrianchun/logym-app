@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Target, Activity, Calendar, Dumbbell, Clock, ChevronRight, ChevronLeft, Sparkles, X, CheckCircle2 } from 'lucide-react';
+import { Target, Activity, Calendar, Dumbbell, Clock, ChevronRight, ChevronLeft, Sparkles, X, CheckCircle2, User, Ruler, Smartphone, Heart } from 'lucide-react';
 import { PROGRAM_PLANS } from '../data/programTemplates';
 import { playSoundEffect } from '../utils/audio';
 import GymManagerModal from '../components/GymManagerModal';
@@ -8,6 +8,11 @@ import { generateDynamicWorkout } from '../utils/aiGenerator';
 const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, soundEnabled, gymProfiles, setGymProfiles, activeGymId, setActiveGymId, exerciseLibrary }) => {
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState({
+    gender: null,
+    dob: '',
+    height: '',
+    weight: '',
+    targetWeight: '',
     goal: null,
     experience: null,
     days: [], // Now an array of selected days
@@ -24,7 +29,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
   useEffect(() => {
     if (isOpen) {
       setStep(0);
-      setAnswers({ goal: null, experience: null, days: [], equipment: null, duration: null });
+      setAnswers({ gender: null, dob: '', height: '', weight: '', targetWeight: '', goal: null, experience: null, days: [], equipment: null, duration: null });
       setIsGenerating(false);
       setRecommendedPlan(null);
     }
@@ -41,7 +46,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
 
     setAnswers(prev => ({ ...prev, [key]: value }));
     
-    if (step < 4) {
+    if (step < 7) {
       setStep(step + 1);
     } else {
       generateProgram({ ...answers, [key]: value });
@@ -55,7 +60,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
 
   const generateProgram = (finalAnswers) => {
     setIsGenerating(true);
-    setStep(5);
+    setStep(8);
     playSoundEffect('success', soundEnabled);
     
     setTimeout(() => {
@@ -75,18 +80,46 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
         desc: `Disusun dinamis berdasarkan profil, target otot, level, dan ketersediaan alat kamu.`,
       });
       setIsGenerating(false);
-      setStep(6);
+      setStep(9);
     }, 2000);
   };
 
   const handleAccept = () => {
     playSoundEffect('success', soundEnabled);
-    onComplete({ ...recommendedPlan, gymProfileId: answers.equipment });
+    onComplete({ 
+        ...recommendedPlan, 
+        gymProfileId: answers.equipment,
+        biometrics: {
+            gender: answers.gender,
+            dob: answers.dob,
+            height: answers.height,
+            weight: answers.weight,
+            targetWeight: answers.targetWeight
+        }
+    });
     onClose();
   };
 
   // --- STEPS CONFIGURATION ---
   const steps = [
+    {
+      // Step 0: Sync Option
+      title: "Sinkronisasi Data Kesehatan",
+      key: 'sync',
+      icon: <Smartphone className={`${t.textAccent} mb-4`} size={40} />
+    },
+    {
+      // Step 1: Gender & DOB
+      title: "Identitas Diri",
+      key: 'identity',
+      icon: <User className={`${t.textAccent} mb-4`} size={40} />
+    },
+    {
+      // Step 2: Biometrics
+      title: "Data Fisik",
+      key: 'biometrics',
+      icon: <Ruler className={`${t.textAccent} mb-4`} size={40} />
+    },
     {
       title: "Apa tujuan utama kamu?",
       key: 'goal',
@@ -109,7 +142,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
       ]
     },
     {
-      // Step 2 is custom (Days Selection)
+      // Step 5 is custom (Days Selection)
       title: "Di hari apa saja kamu bisa latihan?",
       key: 'days',
       icon: <Calendar className={`${t.textAccent} mb-4`} size={40} />
@@ -222,7 +255,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
         <div className="flex-1 overflow-y-auto p-6 pt-0 hide-scrollbar relative z-10">
           
           {/* QUESTION STEPS */}
-          {step < 5 && (
+          {step < 8 && (
             <div className="animate-in slide-in-from-right-4 fade-in duration-300 flex flex-col h-full max-w-lg mx-auto w-full">
               {/* Spacer untuk menampilkan wajah coach */}
               <div className="h-40 sm:h-56 shrink-0"></div>
@@ -232,21 +265,86 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
                 <h2 className={`text-2xl font-black ${!isDark ? 'text-black' : t.textMain} leading-tight`}>
                   {steps[step].title}
                 </h2>
-                {step === 2 && <p className={`text-sm font-medium mt-2 ${!isDark ? 'text-black/80' : 'text-slate-300'}`}>Pilih hari sesuai jadwal luang kamu.</p>}
+                {step === 5 && <p className={`text-sm font-medium mt-2 ${!isDark ? 'text-black/80' : 'text-slate-300'}`}>Pilih hari sesuai jadwal luang kamu.</p>}
+                {step === 0 && <p className={`text-sm font-medium mt-2 ${!isDark ? 'text-black/80' : 'text-slate-300'}`}>Koneksikan data kesehatan dari HP-mu.</p>}
               </div>
 
               {/* PROGRESS BAR */}
-              <div className={`w-full ${step === 2 ? 'mb-4' : 'mb-8'}`}>
+              <div className={`w-full ${step === 5 ? 'mb-4' : 'mb-8'}`}>
                 <div className={`h-1.5 w-full ${t.inputBg} rounded-full overflow-hidden flex`}>
                   <div 
                     className={`h-full ${t.bgAccent} transition-all duration-500 ease-out`}
-                    style={{ width: `${((step) / 5) * 100}%` }}
+                    style={{ width: `${((step) / 8) * 100}%` }}
                   />
                 </div>
-                <p className={`text-center text-xs mt-2 font-bold ${!isDark ? 'text-black' : t.textMuted}`}>Langkah {step + 1} dari 5</p>
+                <p className={`text-center text-xs mt-2 font-bold ${!isDark ? 'text-black' : t.textMuted}`}>Langkah {step + 1} dari 8</p>
               </div>
 
-              {step !== 2 ? (
+              {step === 0 ? (
+                // CUSTOM SYNC SELECTOR
+                <div className="flex flex-col pb-2 space-y-4">
+                  <button
+                    onClick={() => {
+                        playSoundEffect('click', soundEnabled);
+                        setStep(step + 1);
+                    }}
+                    className={`w-full p-4 rounded-2xl border-2 backdrop-blur-md transition-all duration-200 active:scale-[0.98] group flex flex-col items-center justify-center border-sky-500/50 bg-sky-500/10 hover:bg-sky-500/20`}
+                  >
+                    <Heart size={32} className="text-sky-500 mb-2" />
+                    <h4 className={`font-bold text-base text-sky-500 mb-1`}>Connect Health Connect / Apple Health</h4>
+                    <p className={`text-xs font-medium text-sky-400/80 text-center`}>Sync otomatis data tinggi & berat badanmu (Segera Hadir di Native App).</p>
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                        playSoundEffect('click', soundEnabled);
+                        setStep(step + 1);
+                    }}
+                    className={`w-full text-center p-4 rounded-2xl border-2 backdrop-blur-md transition-all duration-200 active:scale-[0.98] ${isDark ? 'border-transparent bg-white/5 shadow-none' : 'border-white/50 bg-white/60 shadow-sm'} hover:${t.bgAccentSoft}`}
+                  >
+                    <h4 className={`font-bold text-base ${!isDark ? 'text-black' : t.textMain}`}>Isi Manual</h4>
+                  </button>
+                </div>
+              ) : step === 1 ? (
+                // CUSTOM GENDER & DOB
+                <div className="flex flex-col pb-2 space-y-4">
+                  <div>
+                      <label className={`text-sm font-bold ${!isDark ? 'text-black' : t.textMain} mb-2 block`}>Jenis Kelamin</label>
+                      <div className="grid grid-cols-2 gap-3">
+                          <button onClick={() => setAnswers(prev => ({...prev, gender: 'male'}))} className={`p-4 rounded-xl border-2 font-bold transition-all ${answers.gender === 'male' ? `${t.borderAccent} ${t.bgAccent} text-white` : `border-transparent ${t.inputBg} ${t.textMuted}`}`}>Laki-laki</button>
+                          <button onClick={() => setAnswers(prev => ({...prev, gender: 'female'}))} className={`p-4 rounded-xl border-2 font-bold transition-all ${answers.gender === 'female' ? `${t.borderAccent} ${t.bgAccent} text-white` : `border-transparent ${t.inputBg} ${t.textMuted}`}`}>Perempuan</button>
+                      </div>
+                  </div>
+                  <div>
+                      <label className={`text-sm font-bold ${!isDark ? 'text-black' : t.textMain} mb-2 block`}>Tanggal Lahir</label>
+                      <input type="date" value={answers.dob} onChange={(e) => setAnswers(prev => ({...prev, dob: e.target.value}))} className={`w-full p-4 rounded-xl font-bold ${t.inputBg} ${t.textMain} border-none outline-none focus:ring-2 focus:ring-sky-500`} />
+                  </div>
+                  <button onClick={() => { if(answers.gender && answers.dob) setStep(step + 1); }} disabled={!answers.gender || !answers.dob} className={`w-full mt-4 py-3 rounded-2xl font-black text-lg transition-all flex items-center justify-center gap-2 ${answers.gender && answers.dob ? `${t.bgAccent} text-white hover:opacity-90` : `${t.inputBg} ${t.textMuted} opacity-50 cursor-not-allowed`}`}>
+                    Lanjut <ChevronRight size={20} />
+                  </button>
+                </div>
+              ) : step === 2 ? (
+                // CUSTOM BIOMETRICS
+                <div className="flex flex-col pb-2 space-y-4">
+                  <div>
+                      <label className={`text-sm font-bold ${!isDark ? 'text-black' : t.textMain} mb-2 block`}>Tinggi Badan (cm)</label>
+                      <input type="number" placeholder="170" value={answers.height} onChange={(e) => setAnswers(prev => ({...prev, height: e.target.value}))} className={`w-full p-4 rounded-xl font-bold ${t.inputBg} ${t.textMain} border-none outline-none focus:ring-2 focus:ring-sky-500`} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                      <div>
+                          <label className={`text-sm font-bold ${!isDark ? 'text-black' : t.textMain} mb-2 block`}>Berat (kg)</label>
+                          <input type="number" placeholder="70" value={answers.weight} onChange={(e) => setAnswers(prev => ({...prev, weight: e.target.value}))} className={`w-full p-4 rounded-xl font-bold ${t.inputBg} ${t.textMain} border-none outline-none focus:ring-2 focus:ring-sky-500`} />
+                      </div>
+                      <div>
+                          <label className={`text-sm font-bold ${!isDark ? 'text-black' : t.textMain} mb-2 block`}>Target (kg)</label>
+                          <input type="number" placeholder="65" value={answers.targetWeight} onChange={(e) => setAnswers(prev => ({...prev, targetWeight: e.target.value}))} className={`w-full p-4 rounded-xl font-bold ${t.inputBg} ${t.textMain} border-none outline-none focus:ring-2 focus:ring-sky-500`} />
+                      </div>
+                  </div>
+                  <button onClick={() => { if(answers.height && answers.weight && answers.targetWeight) setStep(step + 1); }} disabled={!answers.height || !answers.weight || !answers.targetWeight} className={`w-full mt-4 py-3 rounded-2xl font-black text-lg transition-all flex items-center justify-center gap-2 ${answers.height && answers.weight && answers.targetWeight ? `${t.bgAccent} text-white hover:opacity-90` : `${t.inputBg} ${t.textMuted} opacity-50 cursor-not-allowed`}`}>
+                    Lanjut <ChevronRight size={20} />
+                  </button>
+                </div>
+              ) : step !== 5 ? (
                 // STANDARD OPTIONS (Step 0, 1, 3, 4)
                 <div className="space-y-3 pb-4">
                     {steps[step].options.map((opt) => (
@@ -266,7 +364,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
                     ))}
                 </div>
               ) : (
-                // CUSTOM DAYS SELECTOR (Step 2)
+                // CUSTOM DAYS SELECTOR (Step 5)
                 <div className="flex flex-col pb-2">
                   <div className="flex flex-wrap gap-2 justify-center mb-3">
                     {DAYS_OF_WEEK.map(day => {
@@ -313,7 +411,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
           )}
 
           {/* FINAL STEP (LOADING / RESULTS) */}
-          {step === 5 && (
+          {step === 8 && (
             <div className="flex flex-col h-full justify-center items-center text-center animate-in slide-in-from-bottom-8 duration-500 max-w-lg mx-auto w-full">
               <div className="relative">
                 <div className={`absolute inset-0 ${t.bgAccent} blur-xl opacity-30 animate-pulse rounded-full`}></div>
@@ -329,7 +427,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
           )}
 
           {/* RESULT STEP */}
-          {step === 6 && recommendedPlan && (
+          {step === 9 && recommendedPlan && (
             <div className="animate-in slide-in-from-bottom-8 fade-in duration-500 pb-4">
               <div className="flex flex-col items-center text-center mb-6">
                 <div className={`w-16 h-16 ${t.bgAccentSoft} ${t.textAccent} rounded-full flex items-center justify-center mb-4`}>

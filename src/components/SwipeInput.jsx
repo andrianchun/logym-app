@@ -66,6 +66,11 @@ const SwipeInput = ({ value, onChange, disabled, step = 1, className, min = 0, s
         let val = e.target.value;
         val = val.replace(/^0+(?=\d)/, ''); // Remove leading zeros before digits
         
+        // Intercept numpad dot to comma for ID language
+        if (language === 'ID' && val.endsWith('.')) {
+            if (!val.slice(0, -1).includes(',')) val = val.slice(0, -1) + ',';
+        }
+
         if (isFocused) {
             // Parse to raw string (standard JS float format: 10000.5)
             const parsed = parseFormattedNumber(val, language);
@@ -142,12 +147,16 @@ const SwipeInput = ({ value, onChange, disabled, step = 1, className, min = 0, s
                 onFocus={() => setIsFocused(true)}
                 onBlur={() => {
                     setIsFocused(false);
-                    // On blur, clean up formatting/parsing and sync back
-                    const parsed = parseFormattedNumber(localValue, language);
-                    const finalVal = parsed === '' ? '' : parseFloat(parsed);
-                    if (finalVal !== '') {
-                        setLocalValue(finalVal);
-                        onChange(finalVal);
+                    // On blur, sync back
+                    if (localValue === '' || localValue === '.') {
+                        setLocalValue('');
+                        onChange('');
+                    } else {
+                        const finalVal = parseFloat(localValue);
+                        if (!isNaN(finalVal)) {
+                            setLocalValue(finalVal);
+                            onChange(finalVal);
+                        }
                     }
                 }}
                 disabled={disabled}
