@@ -13,7 +13,7 @@ import { shareWorkoutToFeed } from '../utils/communityApi';
 import CreatePostModal from './CreatePostModal';
 let globalTemplateIndex = 0; // default to bodycomp
 
-export default function ShareCardGenerator({ user, setUser, t, theme, history, activityTargets, programs, exerciseLibrary, lang, language, soundEnabled, playSoundEffect, selectedDate, units, activePlanIds }) {
+export default function ShareCardGenerator({ user, setUser, t, theme, history, activityTargets, programs, exerciseLibrary, lang, language, soundEnabled, playSoundEffect, selectedDate, units, activePlanIds, userProfile }) {
     const cardRef = useRef(null);
     const fileInputRef = useRef(null);
     const galleryInputRef = useRef(null);
@@ -217,6 +217,14 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
 
     // Calculate Latest BioData
     const getLatestBioData = () => {
+        const emptyBio = {
+            bodyScore: null, weight: null, height: null, bmi: null, bmiStatus: '-', bodyFat: null, bodyFatStatus: '-',
+            muscleMass: null, musclePercent: null, boneMass: null, waterPercent: null, visceralFat: null, bmr: null, bodyAge: null, 
+            waist: null, waistToHip: null, proteinPercent: null, bodyType: '-', weightSuggestion: '-',
+            steps: 0, activeMinutes: 0, activityCalories: 0, sleep: '', energyScore: null, 
+            heartRate: null, minHeartRate: null, maxHeartRate: null, bloodPressure: '', waterIntake: 0,
+            weeklyDuration: 0, weeklySessions: 0, weeklyCalories: 0
+        };
         let latestBodyData = null;
         let bodyDataDate = null;
         const activeDate = selectedDate || getLocalYMD(new Date());
@@ -233,17 +241,18 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
         }
 
         const mergedData = {
-            height: 170, 
-            weight: 70,
+            ...emptyBio,
+            height: userProfile?.height || 170, 
+            weight: userProfile?.weight || 70,
             ...(latestBodyData || {}),
             steps: todayDailyData.steps !== undefined ? todayDailyData.steps : 0,
             activeMinutes: todayDailyData.activeMinutes !== undefined ? todayDailyData.activeMinutes : 0,
             activityCalories: todayDailyData.activityCalories !== undefined ? todayDailyData.activityCalories : 0,
             sleep: todayDailyData.sleep !== undefined ? todayDailyData.sleep : '',
-            energyScore: todayDailyData.energyScore !== undefined ? todayDailyData.energyScore : 0,
-            heartRate: todayDailyData.heartRate !== undefined ? todayDailyData.heartRate : 0,
-            minHeartRate: todayDailyData.minHeartRate !== undefined ? todayDailyData.minHeartRate : 0,
-            maxHeartRate: todayDailyData.maxHeartRate !== undefined ? todayDailyData.maxHeartRate : 0,
+            energyScore: todayDailyData.energyScore !== undefined ? todayDailyData.energyScore : null,
+            heartRate: todayDailyData.heartRate !== undefined ? todayDailyData.heartRate : null,
+            minHeartRate: todayDailyData.minHeartRate !== undefined ? todayDailyData.minHeartRate : null,
+            maxHeartRate: todayDailyData.maxHeartRate !== undefined ? todayDailyData.maxHeartRate : null,
             bloodPressure: todayDailyData.bloodPressure !== undefined ? todayDailyData.bloodPressure : '',
             waterIntake: todayDailyData.waterIntake !== undefined ? todayDailyData.waterIntake : 0,
             weeklyDuration: todayDailyData.weeklyDuration !== undefined ? todayDailyData.weeklyDuration : 0,
@@ -251,6 +260,17 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
             weeklyCalories: todayDailyData.weeklyCalories !== undefined ? todayDailyData.weeklyCalories : 0,
         };
         
+        // Auto-calculate BMI if weight and height exist
+        if (mergedData.height > 0 && mergedData.weight > 0 && !mergedData.bmi) {
+            const hMeter = mergedData.height / 100;
+            mergedData.bmi = Number((mergedData.weight / (hMeter * hMeter)).toFixed(1));
+            
+            if (mergedData.bmi < 18.5) mergedData.bmiStatus = 'Underweight';
+            else if (mergedData.bmi <= 22.9) mergedData.bmiStatus = 'Normal';
+            else if (mergedData.bmi <= 24.9) mergedData.bmiStatus = 'Overweight';
+            else mergedData.bmiStatus = 'Obese';
+        }
+
         return { bioData: mergedData, bioDataDate: bodyDataDate };
     };
     const { bioData, bioDataDate } = getLatestBioData();

@@ -6,7 +6,7 @@ export const ACHIEVEMENTS = [
   {
     id: 'first_workout',
     title: 'Langkah Pertama',
-    description: 'Menyelesaikan sesi latihan pertamamu.',
+    description: 'Menyelesaikan kuesioner profil pertamamu.',
     icon: (props) => <Target {...props} />,
     color: 'text-emerald-500',
     bg: 'bg-emerald-500/10',
@@ -93,7 +93,6 @@ export const checkAchievements = (history, currentAchievements = [], newlyFinish
     }
   };
 
-  if (totalWorkouts >= 1) unlock('first_workout');
   if (totalWorkouts >= 10) unlock('workout_10');
   if (totalWorkouts >= 50) unlock('workout_50');
 

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Camera, Edit2, Award, Trophy, Users, LogOut, Check, Loader2, Activity, AlertTriangle, Share2 } from 'lucide-react';
+import { X, Camera, Edit2, Award, Trophy, Users, LogOut, Check, Loader2, Activity, AlertTriangle, Share2, ShieldAlert } from 'lucide-react';
 import { updateProfile } from 'firebase/auth';
 import { doc, updateDoc, setDoc } from 'firebase/firestore';
 import { auth, storage, db } from '../firebase';
@@ -11,6 +11,10 @@ import { ACHIEVEMENTS } from '../data/achievements';
 import { getFollowerCount, getFollowingCount } from '../utils/followApi';
 import { updateUserProfileInFeed, shareAchievementToFeed } from '../utils/communityApi';
 import FollowListModal from '../components/FollowListModal';
+import ModerationPanel from '../components/ModerationPanel';
+import UserProfileModal from '../components/UserProfileModal';
+import UnifiedBadge from '../components/UnifiedBadge';
+import useDialog from '../hooks/useDialog';
 
 let globalProfileScrolls = {};
 let globalProfileLastTab = 'beranda';
@@ -38,17 +42,33 @@ export default function ProfileModal({
     userAchievements,
     highlightPostId = null,
     onClearHighlight = null,
+    forceTab = null,
+    onAchievementShareComplete = null,
+    userProfile
 }) {
     // NOTE: early return moved AFTER all hooks to comply with Rules of Hooks
 
     const [isEditingName, setIsEditingName] = useState(false);
     const [newName, setNewName] = useState(user?.name || '');
     const [isUploading, setIsUploading] = useState(false);
+    const [showModPanel, setShowModPanel] = useState(false);
+    const [localHighlight, setLocalHighlight] = useState(null);
+    const [viewingUserId, setViewingUserId] = useState(null);
     const fileInputRef = useRef(null);
     const [activeTab, setActiveTab] = useState(globalProfileLastTab);
     const scrollPositions = useRef(globalProfileScrolls);
     const prevTab = useRef(activeTab);
     const scrollContainerRef = useRef(null);
+    const { dialog, showAlert } = useDialog(theme === 'dark');
+
+    // If a forceTab is specified (e.g., navigate to beranda after share), switch to it
+    useEffect(() => {
+        if (forceTab && showProfileModal) {
+            setActiveTab(forceTab);
+        }
+    }, [forceTab, showProfileModal]);
+
+    const isAdmin = user?.email === 'untheryan@gmail.com';
 
     useEffect(() => {
         globalProfileLastTab = activeTab;
@@ -340,6 +360,7 @@ export default function ProfileModal({
                             selectedDate={selectedDate}
                             units={units}
                             activePlanIds={activePlanIds}
+                            userProfile={userProfile}
                         />
                     )}
 
@@ -406,7 +427,7 @@ export default function ProfileModal({
                                             </button>
                                         </div>
                                         <button 
-                                            onClick={() => {
+                                            onClick={async () => {
                                                 if (navigator.share) {
                                                     navigator.share({
                                                         title: `Profil LyFit - ${user?.name}`,
@@ -415,7 +436,7 @@ export default function ProfileModal({
                                                     }).catch(console.error);
                                                 } else {
                                                     navigator.clipboard.writeText(`Profil LyFit - ${user?.name}`);
-                                                    alert("Tautan profil berhasil disalin!");
+                                                    await showAlert('Tautan profil berhasil disalin!', { type: 'success', title: 'Tersalin!' });
                                                 }
                                             }}
                                             className={`p-2.5 rounded-full ${t.bgAccent} shadow-sm active:scale-95 transition-transform flex items-center justify-center shrink-0 ml-auto`}
@@ -438,17 +459,26 @@ export default function ProfileModal({
                                         <button 
                                             key={ach.id} 
                                             onClick={() => setSelectedAchievement(ach)}
-                                            className={`flex flex-col items-center p-3 rounded-2xl ${t.bgBox} hover:opacity-80 active:scale-95 transition-all ${!isUnlocked ? 'opacity-40 grayscale' : ''}`}
+                                            className="hover:opacity-80 active:scale-95 transition-all text-left"
                                         >
-                                            <div className={`w-12 h-12 rounded-full ${ach.bg} ${ach.color} flex items-center justify-center mb-2 shadow-sm ${ach.borderColor ? `border ${ach.borderColor}` : ''}`}>
-                                                {ach.icon({ size: 24, strokeWidth: isUnlocked ? 2 : 1.5 })}
-                                            </div>
-                                            <span className={`text-[10px] font-bold ${t.textMain} text-center leading-tight`}>{ach.title}</span>
+                                            <UnifiedBadge achievementId={ach.id} isUnlocked={isUnlocked} isDark={isDark} t={t} />
                                         </button>
                                         );
                                     })}
                                 </div>
                             </div>
+                            
+                            {/* ADMIN BUTTON (If Admin) */}
+                            {isAdmin && (
+                                <div className={`mt-6 p-4 rounded-2xl border border-rose-500/20 bg-rose-500/5 space-y-3`}>
+                                    <p className={`text-sm font-black text-rose-500 uppercase tracking-wider flex items-center gap-2`}>
+                                        <ShieldAlert size={16} /> Mode Admin Aktif
+                                    </p>
+                                    <button onClick={() => setShowModPanel(true)} className={`w-full py-3 rounded-xl font-bold bg-rose-500 text-white shadow-lg shadow-rose-500/30 active:scale-95 transition-all`}>
+                                        Buka Panel Moderasi
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -464,8 +494,11 @@ export default function ProfileModal({
                                 soundEnabled={soundEnabled} 
                                 playSoundEffect={playSoundEffect}
                                 activeFilter={activeFilter}
-                                highlightPostId={highlightPostId}
-                                onClearHighlight={onClearHighlight}
+                                highlightPostId={localHighlight || highlightPostId}
+                                onClearHighlight={() => {
+                                    setLocalHighlight(null);
+                                    if (onClearHighlight) onClearHighlight();
+                                }}
                             />
                         </div>
                     )}
@@ -522,18 +555,50 @@ export default function ProfileModal({
                         {userAchievements?.includes(selectedAchievement.id) && (
                             <button 
                                 onClick={async () => {
-                                    await shareAchievementToFeed(user.uid, user.name || user.email?.split('@')[0], user.photoURL, selectedAchievement);
-                                    alert("Pencapaian berhasil dibagikan ke komunitas!");
+                                    const postId = await shareAchievementToFeed(user.uid, user.name || user.email?.split('@')[0], user.photoURL, selectedAchievement);
                                     setSelectedAchievement(null);
+                                    // Switch to community feed and highlight the post
+                                    setActiveTab('beranda');
+                                    if (onAchievementShareComplete) {
+                                        onAchievementShareComplete(postId);
+                                    }
                                 }}
                                 className={`w-full py-3.5 rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition-all active:scale-95 ${t.bgAccent} shadow-md ${t.textAccent === 'text-white' ? 'text-white' : 'text-slate-900'}`}
                             >
-                                <Share2 size={18} /> Bagikan Pencapaian
+                                <Share2 size={18} /> Bagikan ke Feed Komunitas
                             </button>
                         )}
                     </div>
                 </div>
             </div>
         )}
+        
+        {showModPanel && (
+            <ModerationPanel 
+                isDark={theme === 'dark'} 
+                t={t} 
+                onClose={() => setShowModPanel(false)}
+                onNavigateToPost={(postId) => {
+                    setShowModPanel(false);
+                    setActiveTab('beranda');
+                    setLocalHighlight(postId);
+                }}
+                onNavigateToUser={(userId) => {
+                    setShowModPanel(false);
+                    setViewingUserId(userId);
+                }}
+            />
+        )}
+
+        {viewingUserId && (
+            <UserProfileModal 
+                profileUserId={viewingUserId}
+                currentUser={user}
+                isDark={theme === 'dark'}
+                t={t}
+                onClose={() => setViewingUserId(null)}
+            />
+        )}
+        {dialog}
     </>);
 }

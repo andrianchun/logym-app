@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Moon, Sun, Globe, Volume2, VolumeX, Timer, Download, Upload, CalendarDays, Bell, BellOff, Clock, Activity, Scale, Ruler, Thermometer } from 'lucide-react';
+import { X, Moon, Sun, Globe, Volume2, VolumeX, Timer, Download, Upload, CalendarDays, Bell, BellOff, Clock, Activity, Scale, Ruler, Thermometer, Database } from 'lucide-react';
 import SwipeInput from '../components/SwipeInput';
 
 export default function SettingsModal({
@@ -13,14 +13,23 @@ export default function SettingsModal({
   undoStack, redoStack, handleUndo, handleRedo,
   setShowLibManager, setShowHelp,
   exportData, handleImportFile,
-  user, handleLogout,
+  user, handleLogout, handleDeleteAccount,
   biometricStandard, setBiometricStandard,
   units, setUnits,
-  userGeminiApiKey, setUserGeminiApiKey
+  userGeminiApiKey, setUserGeminiApiKey,
+  connectedApps, setConnectedApps
 }) {
   const [activeTab, setActiveTab] = useState('preferensi');
 
   if (!showSettings) return null;
+
+  const handleToggleApp = (appKey) => {
+     setConnectedApps(prev => {
+         const next = { ...prev, [appKey]: !prev[appKey] };
+         localStorage.setItem('lyfit_connectedApps', JSON.stringify(next));
+         return next;
+     });
+  };
 
   return (
     <div className={`fixed inset-0 z-[100] ${t.bgApp} flex flex-col animate-in slide-in-from-bottom-full duration-300`}>
@@ -218,6 +227,32 @@ export default function SettingsModal({
                 </div>
             </div>
 
+            {/* INTEGRASI KESEHATAN */}
+            <div className={`p-4 rounded-2xl border ${t.border} ${t.bgCard} space-y-3`}>
+                <p className={`body-md ${t.textMuted} uppercase tracking-wider mb-2 flex items-center gap-2`}><Activity size={16}/> Koneksi Data Kesehatan</p>
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                        <span className={`font-bold ${t.textMain}`}>Health Connect</span>
+                        <button 
+                            onClick={() => handleToggleApp('healthconnect')}
+                            className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${connectedApps?.healthconnect ? t.bgAccent + ' text-white shadow-sm' : t.btnBg + ' ' + t.textMuted}`}
+                        >
+                            {connectedApps?.healthconnect ? 'Terhubung' : 'Hubungkan'}
+                        </button>
+                    </div>
+                    
+                    <div className="flex items-center justify-between border-t border-black/5 dark:border-white/5 pt-3">
+                        <span className={`font-bold ${t.textMain}`}>Apple Health</span>
+                        <button 
+                            onClick={() => handleToggleApp('applehealth')}
+                            className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${connectedApps?.applehealth ? t.bgAccent + ' text-white shadow-sm' : t.btnBg + ' ' + t.textMuted}`}
+                        >
+                            {connectedApps?.applehealth ? 'Terhubung' : 'Hubungkan'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             {/* AI SCANNER SETTINGS */}
             <div className={`p-4 rounded-2xl border ${t.border} ${t.bgCard} space-y-3`}>
                 <p className={`body-md ${t.textMuted} uppercase tracking-wider mb-2 flex items-center gap-2`}>
@@ -250,8 +285,38 @@ export default function SettingsModal({
                 </label>
                 </div>
             </div>
+
+            {/* ZONA BERBAHAYA */}
+            <div className={`p-4 rounded-2xl border border-rose-500/30 bg-rose-500/5 space-y-3 mt-8`}>
+                <p className={`body-md text-rose-500 font-bold uppercase tracking-wider mb-2 flex items-center gap-2`}>
+                   Zona Berbahaya
+                </p>
+                <div className="space-y-2">
+                   <p className={`text-[10px] ${t.textMuted} leading-tight`}>
+                     Tindakan ini tidak bisa dibatalkan. Semua data riwayat latihan, program, dan pengaturan Anda akan dihapus secara permanen dari server.
+                   </p>
+                   <button 
+                     onClick={() => {
+                        if (window.confirm("PERINGATAN: Apakah Anda yakin ingin menghapus akun ini secara permanen? Semua data Anda akan hilang tak bersisa.")) {
+                            if (window.confirm("Ini adalah konfirmasi terakhir. Hapus akun sekarang?")) {
+                                handleDeleteAccount();
+                            }
+                        }
+                     }}
+                     className="w-full py-3 rounded-xl font-bold bg-rose-500/10 text-rose-500 border border-rose-500/20 text-sm shadow-md active:scale-95 transition-all mt-4"
+                   >
+                     Hapus Akun Permanen
+                   </button>
+                </div>
+            </div>
           </div>
         )}
+        
+        {/* APP VERSION */}
+        <div className="py-6 text-center">
+            <p className={`text-[10px] font-bold ${t.textMuted} uppercase tracking-widest`}>LyFit App v1.2.0</p>
+            <p className={`text-[9px] opacity-40 mt-1 ${t.textMuted}`}>Dibangun dengan ♥️ oleh Andrian Chun &copy; 2026</p>
+        </div>
       </div>
     </div>
   );

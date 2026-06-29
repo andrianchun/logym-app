@@ -518,7 +518,9 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                 </LineChart>
                </div>
             ) : ( 
-              <div className="w-full h-72 flex items-center justify-center body-lg opacity-50">Tidak ada data</div> 
+              <div className="w-full h-72 flex flex-col items-center justify-center body-md opacity-60 text-center px-4">
+                 <span>Tidak ada data, atur program dan rekam latihanmu sekarang.</span>
+              </div> 
             )}
           </div>
         </div>
@@ -534,7 +536,6 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
              </div>
         ) : (
             <div key={chartType} className="grid grid-rows-2 grid-flow-col gap-2 overflow-x-auto pb-2 hide-scrollbar auto-cols-max" style={{ WebkitOverflowScrolling: 'touch' }}>
-              {chartDataObj.items.length === 0 && <span className={`body-md ${t.textMuted} italic`}>Belum ada data.</span>}
               {chartDataObj.items.map((item, idx) => {
                  const isActive = activeChartLines.includes(item);
                  return (

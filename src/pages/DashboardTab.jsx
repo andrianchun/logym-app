@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Activity, Zap, Brain, Footprints, HeartPulse, Moon, Droplets, Droplet, Dumbbell, Scale, RefreshCw, Trophy, Link2, Pencil, Settings, Info, X, ChevronDown, ChevronUp, Wind, Utensils, Flame, Clock } from 'lucide-react';
 import { getLocalYMD } from '../data/constants';
 import { HealthConnect } from 'capacitor-health-connect';
+import { Capacitor } from '@capacitor/core';
 import DashboardModals from '../components/DashboardModals';
 import DashboardChart from '../components/DashboardChart';
 import ProgressTab from './ProgressTab';
@@ -33,19 +34,14 @@ const MiniBox = ({ label, value, unit, t, theme }) => (
     </div>
 );
 
-const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, exerciseLibrary, navigateToWorkoutDate, soundEnabled, playSoundEffect, theme, selectedDate, biometricStandard, units, setConfirmModal, activityTargets, setActivityTargets, gymProfiles, activeGymId, activePlanIds, userGeminiApiKey, userAchievements }) => {
+const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, exerciseLibrary, navigateToWorkoutDate, soundEnabled, playSoundEffect, theme, selectedDate, biometricStandard, units, setConfirmModal, activityTargets, setActivityTargets, gymProfiles, activeGymId, activePlanIds, userGeminiApiKey, userAchievements, connectedApps, userProfile }) => {
   const todayStr = getLocalYMD(new Date());
-  const activeDate = todayStr; // Selalu tampilkan hari ini, terlepas dari kalender latihan
+  const activeDate = todayStr;
 
   // ==========================================
   // STATE KONEKSI & SINKRONISASI
   // ==========================================
-  const [showSyncModal, setShowSyncModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [connectedApps, setConnectedApps] = useState(() => {
-      const saved = localStorage.getItem('lyfit_connectedApps');
-      return saved ? JSON.parse(saved) : { healthconnect: false, lyfeat: false };
-  });
   const [isSyncing, setIsSyncing] = useState(false);
 
   // ==========================================
@@ -58,7 +54,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   
   // TARGET SETTINGS
   const [showTargetModal, setShowTargetModal] = useState(false);
-  const [targetForm, setTargetForm] = useState(activityTargets || { steps: 10000, weeklyDuration: 150, sleep: 8 });
+  const [targetForm, setTargetForm] = useState(activityTargets || { steps: 10000, weeklyDuration: 30, sleep: 8, activityCalories: 2500, calorieDelta: 0 });
 
   useEffect(() => {
      if (activityTargets) {
@@ -80,12 +76,12 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   const [isKomposisiExpanded, setIsKomposisiExpanded] = useState(true);
 
   const emptyBio = {
-    bodyScore: 0, weight: 0, height: 0, bmi: 0, bmiStatus: '-', bodyFat: 0, bodyFatStatus: '-',
-    muscleMass: 0, musclePercent: 0, boneMass: 0, waterPercent: 0, visceralFat: 0, bmr: 0, bodyAge: 0, 
-    waist: 0, waistToHip: 0, proteinPercent: 0, bodyType: '-', weightSuggestion: '-',
-    steps: 0, activeMinutes: 0, activityCalories: 0, sleep: '', energyScore: 0, 
-    heartRate: 0, minHeartRate: 0, maxHeartRate: 0, bloodPressure: '', waterIntake: 0,
-    weeklyDuration: 0, weeklySessions: 0, weeklyCalories: 0
+    bodyScore: null, weight: null, height: null, bmi: null, bmiStatus: '-', bodyFat: null, bodyFatStatus: '-',
+    muscleMass: null, musclePercent: null, boneMass: null, waterPercent: null, visceralFat: null, bmr: null, bodyAge: null, 
+    waist: null, waistToHip: null, proteinPercent: null, bodyType: '-', weightSuggestion: '-',
+    steps: '', activeMinutes: '', activityCalories: '', nutritionCalories: '', sleep: '', energyScore: null, 
+    heartRate: null, minHeartRate: null, maxHeartRate: null, bloodPressure: '', waterIntake: '',
+    weeklyDuration: '', weeklySessions: '', weeklyCalories: ''
   };
 
   const [formBio, setFormBio] = useState({ ...emptyBio });
@@ -107,8 +103,8 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      
      const mergedData = {
          ...emptyBio,
-         height: 170, 
-         weight: 70,
+         height: userProfile?.height || 170, 
+         weight: userProfile?.weight || 70,
          ...(latestBodyData || {}),
          steps: todayDailyData.steps !== undefined ? todayDailyData.steps : (emptyBio.steps || 0),
          activeMinutes: todayDailyData.activeMinutes !== undefined ? todayDailyData.activeMinutes : (emptyBio.activeMinutes || 0),
@@ -125,6 +121,31 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          weeklyCalories: todayDailyData.weeklyCalories !== undefined ? todayDailyData.weeklyCalories : emptyBio.weeklyCalories,
      };
      
+     // Auto-calculate BMI for dashboard display if weight and height exist
+     if (mergedData.height > 0 && mergedData.weight > 0 && !mergedData.bmi) {
+         const hMeter = mergedData.height / 100;
+         mergedData.bmi = Number((mergedData.weight / (hMeter * hMeter)).toFixed(1));
+         
+         if (biometricStandard === 'western') {
+             if (mergedData.bmi < 18.5) mergedData.bmiStatus = 'Underweight';
+             else if (mergedData.bmi <= 24.9) mergedData.bmiStatus = 'Normal';
+             else if (mergedData.bmi <= 29.9) mergedData.bmiStatus = 'Overweight';
+             else mergedData.bmiStatus = 'Obese';
+         } else {
+             if (mergedData.bmi < 18.5) mergedData.bmiStatus = 'Underweight';
+             else if (mergedData.bmi <= 22.9) mergedData.bmiStatus = 'Normal';
+             else if (mergedData.bmi <= 24.9) mergedData.bmiStatus = 'Overweight';
+             else mergedData.bmiStatus = 'Obese';
+         }
+     }
+     
+     // Auto-calculate BMR for dashboard display if not exist
+     if (mergedData.height > 0 && mergedData.weight > 0 && !mergedData.bmr && userProfile?.gender && userProfile?.dob) {
+         const age = new Date().getFullYear() - new Date(userProfile.dob).getFullYear() || 25;
+         let bmr = 10 * mergedData.weight + 6.25 * mergedData.height - 5 * age;
+         mergedData.bmr = Math.round(userProfile.gender === 'female' ? bmr - 161 : bmr + 5);
+     }
+     
      return { 
          bioData: mergedData,
          bioDataDate: bodyDataDate
@@ -134,18 +155,16 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   // ==========================================
   // FUNGSI AKSI (TOMBOL & FORM)
   // ==========================================
-  const handleToggleApp = (appKey) => {
-     setConnectedApps(prev => {
-         const next = { ...prev, [appKey]: !prev[appKey] };
-         localStorage.setItem('lyfit_connectedApps', JSON.stringify(next));
-         return next;
-     });
-  };
 
   const runAutoSync = async () => {
-     if (!connectedApps.healthconnect) return;
+     if (!connectedApps?.healthconnect) return;
      setIsSyncing(true);
      try {
+         if (!Capacitor.isNativePlatform()) {
+             setTimeout(() => setIsSyncing(false), 800);
+             return;
+         }
+         
          const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
          const endOfDay = new Date(); endOfDay.setHours(23, 59, 59, 999);
          
@@ -364,7 +383,6 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
 
 
 
-  const isAnyAppConnected = connectedApps.healthconnect || connectedApps.lyfeat;
   const scoreStyle = getScoreColor(bioData.bodyScore);
   const isImp = units?.weight === 'lbs';
   const dispMainWeight = isImp && bioData.weight ? Number((bioData.weight * 2.20462).toFixed(1)) : bioData.weight || '-';
@@ -398,7 +416,13 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      });
      
      dailyActive = Math.max(dailyActive, intTodayDur);
-     dailyCals = Math.max(dailyCals, intTodayCals);
+
+     // Kalori Dibakar = BMR + Langkah Kaki + Workout
+     const bmrCalories = Math.round(currentWeight * 24); // ~24 kcal/kg/day (sederhana)
+     const stepsCalories = Math.round((Number(bioData.steps || 0) * 0.04)); // ~0.04 kcal per langkah
+     const workoutCalories = intTodayCals;
+     const totalDailyCals = bmrCalories + stepsCalories + workoutCalories;
+     dailyCals = dailyCals > 0 ? Math.max(dailyCals, totalDailyCals) : totalDailyCals;
      
      let weeklyDur = 0;
      let weeklyWorkoutDur = 0;
@@ -465,7 +489,8 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
       {/* HEADER & INTEGRASI APPS */}
       <div className="pt-2 flex justify-between items-center mb-2">
          <div>
-            <h1 className={`h1 ${t.textMain}`}>Halo, {user?.name?.split(' ')[0] || 'Kawan'} 👋</h1>
+            <h1 className={`h1 ${t.textMain}`}>Halo, {user?.name || 'Kawan'}</h1>
+            <p className={`body-base font-medium ${t.textMuted} mt-1 leading-snug`}>{t.greetingText}</p>
             <div className="flex items-center space-x-2 mt-1">
                <p className={`body-md ${t.textMuted}`}>{new Date().toLocaleDateString(lang.workout === 'Latihan' ? 'id-ID' : 'en-US', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
                <span className={`text-[10px] ${t.textMuted}`}>•</span>
@@ -477,9 +502,6 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          </div>
          
          <div className="flex flex-col space-y-2 items-end">
-             <button onClick={() => { playSoundEffect('click', soundEnabled); setShowSyncModal(true); }} className={`p-2 rounded-full border transition-all ${isAnyAppConnected ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.2)]' : t.btnBg + ' ' + t.border + ' ' + t.textMuted}`}>
-                <Link2 size={16} />
-             </button>
              {isSyncing && (
                  <div className="flex items-center space-x-1 mt-1">
                     <RefreshCw size={10} className={`animate-spin ${t.textMuted}`} />
@@ -541,20 +563,20 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                        </div>
                    </div>
 
+                   {/* BMR */}
+                   <div className="flex flex-col">
+                       <span className={`text-[10px] ${t.textMuted} mb-0.5 font-bold`}>BMR</span>
+                       <div>
+                           <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.bmr, language) || '-'} <span className="text-[9px] font-normal text-zinc-500">kcal</span></span>
+                       </div>
+                   </div>
+
                    {/* Body Fat */}
                    <div className="flex flex-col">
                        <span className={`text-[10px] ${t.textMuted} mb-0.5 font-bold`}>Body Fat</span>
                        <div className="flex items-baseline space-x-1.5">
                            <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.bodyFat, language) || '-'} <span className="text-[9px] font-normal text-zinc-500">%</span></span>
                            <span className={`text-[10px] font-bold ${bioData.bodyFatStatus === 'Normal' ? 'text-emerald-500' : bioData.bodyFatStatus === 'Overfat' ? 'text-amber-400' : bioData.bodyFatStatus === 'Obese' ? 'text-rose-500' : 'text-blue-400'}`}>{bioData.bodyFatStatus}</span>
-                       </div>
-                   </div>
-
-                   {/* BMR */}
-                   <div className="flex flex-col">
-                       <span className={`text-[10px] ${t.textMuted} mb-0.5 font-bold`}>BMR</span>
-                       <div>
-                           <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.bmr, language) || '-'} <span className="text-[9px] font-normal text-zinc-500">kcal</span></span>
                        </div>
                    </div>
                </div>
@@ -631,7 +653,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                      <div className="flex items-center space-x-1.5 mb-1 text-emerald-500"><Footprints size={14}/> <span className={`caption ${t.textMuted} capitalize`}>Langkah Kaki</span></div>
                      <div className="flex flex-col flex-1 justify-end">
                          <div className="flex items-baseline space-x-1 mb-2">
-                             <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{formatNumber(bioData.steps, language) || '0'}</span>
+                             <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{bioData.steps > 0 ? formatNumber(bioData.steps, language) : '-'}</span>
                              <span className="text-[10px] text-zinc-500 font-bold whitespace-nowrap">/ {formatNumber(activityTargets?.steps || 10000, language)}</span>
                          </div>
                          <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full mb-1 overflow-hidden shrink-0">
@@ -641,38 +663,38 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                      </div>
                  </div>
                  
-                 {/* Durasi Aktif Mingguan */}
-                 {(() => {
-                     const weeklyDur = mergedWeeklyActiveMinutes;
-                     const targetDur = activityTargets?.weeklyDuration || 150;
-                     const weeklyProgress = Math.min(100, (weeklyDur / targetDur) * 100);
-                     return (
-                         <div className="flex flex-col h-full text-right items-end">
-                             <div className={`flex items-center justify-end space-x-1.5 mb-1 text-blue-400`}><span className={`caption ${t.textMuted} capitalize`}>Durasi Aktif Mingguan</span> <Clock size={14}/></div>
-                             <div className="flex flex-col flex-1 justify-end w-full">
-                                 <div className="flex items-baseline justify-end space-x-1 mb-2">
-                                     <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{formatNumber(weeklyDur, language) || '0'}</span>
-                                     <span className="text-[10px] text-zinc-500 font-bold whitespace-nowrap">/ {formatNumber(targetDur, language)} mnt</span>
-                                 </div>
-                                 <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full mb-1 overflow-hidden shrink-0 flex justify-end">
-                                     <div className={`h-full bg-blue-400 rounded-full transition-all duration-500`} style={{ width: `${weeklyProgress}%` }}></div>
-                                 </div>
-                                 <span className="text-[9px] text-zinc-500 whitespace-nowrap">{formatNumber(mergedWeeklySessions, language)} Sesi ({formatNumber(mergedWeeklyWorkoutDuration, language)} menit)</span>
-                             </div>
-                         </div>
-                     );
-                 })()}
+                 {/* Durasi Aktif (Hari Ini) */}
+                  {(() => {
+                      const todayDur = mergedDailyActiveMinutes;
+                      const targetDur = activityTargets?.weeklyDuration || 30;
+                      const progress = Math.min(100, (todayDur / targetDur) * 100);
+                      return (
+                          <div className="flex flex-col h-full text-right items-end">
+                              <div className={`flex items-center justify-end space-x-1.5 mb-1 ${t.textAccent}`}><span className={`caption ${t.textMuted} capitalize`}>Durasi Aktif</span> <Clock size={14}/></div>
+                              <div className="flex flex-col flex-1 justify-end w-full">
+                                  <div className="flex items-baseline justify-end space-x-1 mb-2">
+                                      <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{todayDur > 0 ? formatNumber(todayDur, language) : '-'}</span>
+                                      <span className="text-[10px] text-zinc-500 font-bold whitespace-nowrap">/ {targetDur} mnt</span>
+                                  </div>
+                                  <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full mb-1 overflow-hidden shrink-0 flex justify-end">
+                                      <div className={`h-full ${t.bgAccent} rounded-full transition-all duration-500`} style={{ width: `${progress}%` }}></div>
+                                  </div>
+                                  <span className="text-[9px] text-zinc-500 whitespace-nowrap">Minggu ini: {formatNumber(mergedWeeklySessions, language)} sesi • {formatNumber(mergedWeeklyActiveMinutes, language)} mnt</span>
+                              </div>
+                          </div>
+                      );
+                  })()}
 
                  {/* Kalori Makanan */}
                  <div className="flex flex-col h-full">
                      <div className="flex items-center space-x-1.5 mb-1 text-orange-400"><Utensils size={14}/> <span className={`caption ${t.textMuted} capitalize`}>Kalori Makanan</span></div>
                      <div className="flex flex-col flex-1 justify-end">
                          <div className="flex items-baseline space-x-1 mb-2">
-                             <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{formatNumber(bioData.nutritionCalories, language) || '0'}</span>
-                             <span className="text-[10px] text-zinc-500 font-bold whitespace-nowrap">/ {formatNumber(activityTargets?.nutritionCalories || 2000, language)}</span>
+                             <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{formatNumber(bioData.nutritionCalories, language) || '-'}</span>
+                             <span className="text-[10px] text-zinc-500 font-bold whitespace-nowrap">/ {formatNumber(Math.max(0, mergedDailyCalories + (activityTargets?.calorieDelta || 0)), language)}</span>
                          </div>
                          <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full mb-1 overflow-hidden shrink-0">
-                             <div className="h-full bg-orange-400 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Number(bioData.nutritionCalories || 0) / (activityTargets?.nutritionCalories || 2000)) * 100)}%` }}></div>
+                             <div className="h-full bg-orange-400 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Number(bioData.nutritionCalories || 0) / Math.max(1, mergedDailyCalories + (activityTargets?.calorieDelta || 0))) * 100)}%` }}></div>
                          </div>
                          <span className="text-[9px] opacity-0 select-none hidden sm:block">Spacer</span>
                      </div>
@@ -683,11 +705,11 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                      <div className="flex items-center justify-end space-x-1.5 mb-1 text-rose-500"><Flame size={14}/> <span className={`caption ${t.textMuted} capitalize`}>Kalori Dibakar</span></div>
                      <div className="flex flex-col flex-1 justify-end w-full">
                          <div className="flex items-baseline justify-end space-x-1 mb-2">
-                             <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{formatNumber(mergedDailyCalories, language) || '0'}</span>
-                             <span className="text-[10px] text-zinc-500 font-bold whitespace-nowrap">/ {formatNumber(activityTargets?.activityCalories || 500, language)}</span>
-                         </div>
+                                      <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{mergedDailyCalories > 0 ? formatNumber(mergedDailyCalories, language) : '-'}</span>
+                                      <span className="text-[10px] text-zinc-500 font-bold whitespace-nowrap">/ {formatNumber(activityTargets?.activityCalories || 2500, language)}</span>
+                                  </div>
                          <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full mb-1 overflow-hidden shrink-0 flex justify-end">
-                             <div className="h-full bg-rose-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Number(mergedDailyCalories || 0) / (activityTargets?.activityCalories || 500)) * 100)}%` }}></div>
+                             <div className="h-full bg-rose-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Number(mergedDailyCalories || 0) / (activityTargets?.activityCalories || 2500)) * 100)}%` }}></div>
                          </div>
                          <span className="text-[9px] opacity-0 select-none hidden sm:block">Spacer</span>
                      </div>
@@ -698,7 +720,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                      <div className="flex items-center space-x-1.5 mb-1 text-indigo-400"><Moon size={14}/> <span className={`caption ${t.textMuted} capitalize`}>Tidur</span></div>
                      <div className="flex flex-col flex-1 justify-end">
                          <div className="flex items-baseline space-x-1 mb-2">
-                             <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{bioData.sleep || '0h 0m'}</span>
+                             <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{bioData.sleep || '-'}</span>
                          </div>
                          <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden shrink-0">
                              <div className="h-full bg-indigo-400 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (parseSleepHours(bioData.sleep) / (activityTargets?.sleep || 8)) * 100)}%` }}></div>
@@ -711,7 +733,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                      <div className="flex items-center justify-end space-x-1.5 mb-1 text-amber-400"><Zap size={14}/> <span className={`caption ${t.textMuted} capitalize`}>Skor Energi</span></div>
                      <div className="flex flex-col flex-1 justify-end w-full">
                          <div className="flex items-baseline justify-end space-x-1 mb-2">
-                             <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{formatNumber(bioData.energyScore, language) || '-'}</span>
+                              <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{bioData.energyScore > 0 ? formatNumber(bioData.energyScore, language) : '-'}</span>
                              <span className="text-[10px] text-zinc-500 font-bold">/ 100</span>
                          </div>
                          <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden shrink-0 flex justify-end">
@@ -732,8 +754,8 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                      <div className="flex flex-col items-center">
                          <div className="flex items-center space-x-1 mb-1 text-sky-400"><HeartPulse size={12}/> <span className={`text-[10px] ${t.textMuted}`}>Detak</span></div>
                          <div className="flex flex-col items-center">
-                             <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.heartRate, language) || '-'} <span className="text-[9px] font-normal text-zinc-500">bpm</span></span>
-                             <span className="text-[8px] text-zinc-500 whitespace-nowrap mt-0.5">Min {formatNumber(bioData.minHeartRate, language) || '-'} &bull; Max {formatNumber(bioData.maxHeartRate, language) || '-'}</span>
+                             <span className={`text-lg font-black ${t.textMain} leading-none`}>{bioData.heartRate > 0 ? <>{formatNumber(bioData.heartRate, language)} <span className="text-[9px] font-normal text-zinc-500">bpm</span></> : '-'}</span>
+                             <span className="text-[8px] text-zinc-500 whitespace-nowrap mt-0.5">Min {bioData.minHeartRate > 0 ? formatNumber(bioData.minHeartRate, language) : '-'} &bull; Max {bioData.maxHeartRate > 0 ? formatNumber(bioData.maxHeartRate, language) : '-'}</span>
                          </div>
                      </div>
                      
@@ -792,7 +814,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
               t={t} theme={theme} lang={lang}
               history={history} programs={programs} exerciseLibrary={exerciseLibrary}
               soundEnabled={soundEnabled} playSoundEffect={playSoundEffect}
-              isSubCard={true}
+              isSubCard={false}
             />
           </div>
         </div>
@@ -803,7 +825,6 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
       {/* MODULAR MODALS */}
       <DashboardModals 
         t={t} lang={lang} theme={theme}
-        showSyncModal={showSyncModal} setShowSyncModal={setShowSyncModal} connectedApps={connectedApps}
         showManualModal={showManualModal} setShowManualModal={setShowManualModal} manualTab={manualTab} setManualTab={setManualTab}
         modalDate={modalDate} setModalDate={setModalDate} formBio={formBio} setFormBio={setFormBio} bioData={bioData}
         handleSaveManualData={handleSaveManualData} handleDeleteBioData={handleDeleteBioData} soundEnabled={soundEnabled}
@@ -939,7 +960,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                   
                   <div className="space-y-4 mb-6">
                       <div>
-                          <label className={`caption font-bold ${t.textMuted} mb-1 block uppercase tracking-wider`}>Target Langkah Kaki</label>
+                          <label className={`caption font-bold ${t.textMuted} mb-1 block uppercase tracking-wider`}>Langkah Kaki</label>
                           <div className="relative">
                               <SwipeInput 
                                   value={targetForm.steps || ''} 
@@ -953,13 +974,13 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                           </div>
                       </div>
                       <div>
-                          <label className={`caption font-bold ${t.textMuted} mb-1 block uppercase tracking-wider`}>Target Olahraga Mingguan</label>
+                          <label className={`caption font-bold ${t.textMuted} mb-1 block uppercase tracking-wider`}>Durasi Aktif</label>
                           <div className="relative">
                               <SwipeInput 
                                   value={targetForm.weeklyDuration || ''} 
                                   onChange={(v) => setTargetForm(p => ({...p, weeklyDuration: v}))} 
-                                  min={0} max={1000} step={10} 
-                                  placeholder="150"
+                                  min={0} max={300} step={5} 
+                                  placeholder="30"
                                   language={language}
                                   className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-4 rounded-xl outline-none font-black text-center text-xl pr-16`}
                               />
@@ -967,17 +988,66 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                           </div>
                       </div>
                       <div>
-                          <label className={`caption font-bold ${t.textMuted} mb-1 block uppercase tracking-wider`}>Target Tidur</label>
-                          <div className="relative">
-                              <SwipeInput 
-                                  value={targetForm.sleep || ''} 
-                                  onChange={(v) => setTargetForm(p => ({...p, sleep: v}))} 
-                                  min={0} max={24} step={1} 
-                                  placeholder="8"
-                                  language={language}
-                                  className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-4 rounded-xl outline-none font-black text-center text-xl pr-16`}
-                              />
-                              <span className={`absolute right-4 top-1/2 -translate-y-1/2 caption font-bold ${t.textMuted}`}>Jam</span>
+                          <label className={`caption font-bold ${t.textMuted} mb-1 block uppercase tracking-wider`}>Tidur</label>
+                          <div className="flex gap-2">
+                              <div className="relative flex-1">
+                                  <SwipeInput 
+                                      value={Math.floor(targetForm.sleep || 0) || ''} 
+                                      onChange={(v) => {
+                                          const currentMins = Math.round(((targetForm.sleep || 0) % 1) * 60) || 0;
+                                          setTargetForm(p => ({...p, sleep: (Number(v) || 0) + (currentMins/60)}));
+                                      }} 
+                                      min={0} max={24} step={1} 
+                                      placeholder="8"
+                                      language={language}
+                                      className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-4 rounded-xl outline-none font-black text-center text-xl pr-14`}
+                                  />
+                                  <span className={`absolute right-4 top-1/2 -translate-y-1/2 caption font-bold ${t.textMuted}`}>Jam</span>
+                              </div>
+                              <div className="relative flex-1">
+                                  <SwipeInput 
+                                      value={Math.round(((targetForm.sleep || 0) % 1) * 60) || ''} 
+                                      onChange={(v) => {
+                                          const currentHrs = Math.floor(targetForm.sleep || 0) || 0;
+                                          setTargetForm(p => ({...p, sleep: currentHrs + ((Number(v) || 0)/60)}));
+                                      }} 
+                                      min={0} max={59} step={1} 
+                                      placeholder="0"
+                                      language={language}
+                                      className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-4 rounded-xl outline-none font-black text-center text-xl pr-14`}
+                                  />
+                                  <span className={`absolute right-4 top-1/2 -translate-y-1/2 caption font-bold ${t.textMuted}`}>Mnt</span>
+                              </div>
+                          </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 mt-3">
+                          <div>
+                              <label className={`caption font-bold ${t.textMuted} mb-1 block uppercase tracking-wider`}>Target Bakar</label>
+                              <div className="relative">
+                                  <SwipeInput 
+                                      value={targetForm.activityCalories || ''} 
+                                      onChange={(v) => setTargetForm(p => ({...p, activityCalories: v}))} 
+                                      min={1000} max={6000} step={100} 
+                                      placeholder="2500"
+                                      language={language}
+                                      className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-4 rounded-xl outline-none font-black text-center text-xl pr-14`}
+                                  />
+                                  <span className={`absolute right-4 top-1/2 -translate-y-1/2 caption font-bold ${t.textMuted}`}>Kcal</span>
+                              </div>
+                          </div>
+                          <div>
+                              <label className={`caption font-bold ${t.textMuted} mb-1 block uppercase tracking-wider`}>Defisit/Surplus</label>
+                              <div className="relative">
+                                  <SwipeInput 
+                                      value={targetForm.calorieDelta ?? ''} 
+                                      onChange={(v) => setTargetForm(p => ({...p, calorieDelta: v}))} 
+                                      min={-1500} max={1500} step={50} 
+                                      placeholder="0"
+                                      language={language}
+                                      className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-4 rounded-xl outline-none font-black text-center text-xl pr-14`}
+                                  />
+                                  <span className={`absolute right-4 top-1/2 -translate-y-1/2 caption font-bold ${t.textMuted}`}>Kcal</span>
+                              </div>
                           </div>
                       </div>
                   </div>

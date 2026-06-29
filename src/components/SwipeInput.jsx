@@ -136,7 +136,7 @@ const SwipeInput = ({ value, onChange, disabled, step = 1, className, min = 0, s
     }, []);
 
     return (
-        <div className="relative w-full flex items-center">
+        <div className="relative w-full h-full flex items-center">
             <input
                 ref={inputRef}
                 type="text"

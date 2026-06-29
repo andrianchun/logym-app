@@ -2,19 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { Target, Activity, Calendar, Dumbbell, Clock, ChevronRight, ChevronLeft, Sparkles, X, CheckCircle2, User, Ruler, Smartphone, Heart } from 'lucide-react';
 import { PROGRAM_PLANS } from '../data/programTemplates';
 import { playSoundEffect } from '../utils/audio';
-import GymManagerModal from '../components/GymManagerModal';
 import { generateDynamicWorkout } from '../utils/aiGenerator';
+import ScrollPicker from '../components/ScrollPicker';
+import useDialog from '../hooks/useDialog';
+import GymManagerModal from '../components/GymManagerModal';
 
 const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, soundEnabled, gymProfiles, setGymProfiles, activeGymId, setActiveGymId, exerciseLibrary, units }) => {
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState({
     gender: null,
     dob: '',
-    height: '',
-    weight: '',
-    targetWeight: '',
+    height: 170,
+    heightFt: 5,
+    heightIn: 7,
+    weight: 70,
+    targetWeight: 65,
     goal: null,
     experience: null,
+    activityLevel: null,
     days: [], // Now an array of selected days
     equipment: null,
     duration: null
@@ -24,6 +29,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
   const [showGymManager, setShowGymManager] = useState(false);
 
   const isDark = t.bgCard !== 'bg-white';
+  const { dialog, showConfirm } = useDialog(isDark, t.bgCard);
   const isImp = units?.weight === 'lbs';
   const isImpHeight = units?.height === 'ft';
 
@@ -31,11 +37,28 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
   useEffect(() => {
     if (isOpen) {
       setStep(0);
-      setAnswers({ gender: null, dob: '', height: '', weight: '', targetWeight: '', goal: null, experience: null, days: [], equipment: null, duration: null });
+      setAnswers({ gender: null, dob: '', height: 170, heightFt: 5, heightIn: 7, weight: isImp ? 150 : 70, targetWeight: isImp ? 140 : 65, goal: null, experience: null, activityLevel: null, days: [], equipment: null, duration: null });
       setIsGenerating(false);
       setRecommendedPlan(null);
     }
   }, [isOpen]);
+
+  const handleCloseClick = async () => {
+    playSoundEffect('click', soundEnabled);
+    if (step < 8) {
+      const confirm = await showConfirm('Apakah kamu yakin ingin melewati analisis sekarang?', {
+        title: 'Keluar Kuesioner',
+        confirmText: 'Lewati',
+        cancelText: 'Lanjutkan',
+        danger: true
+      });
+      if (confirm) {
+        onClose();
+      }
+    } else {
+      onClose(); // Allow closing without confirm if we are at the end
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -48,7 +71,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
 
     setAnswers(prev => ({ ...prev, [key]: value }));
     
-    if (step < 7) {
+    if (step < 8) {
       setStep(step + 1);
     } else {
       generateProgram({ ...answers, [key]: value });
@@ -62,7 +85,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
 
   const generateProgram = (finalAnswers) => {
     setIsGenerating(true);
-    setStep(8);
+    setStep(9);
     playSoundEffect('success', soundEnabled);
     
     setTimeout(() => {
@@ -71,10 +94,18 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
       if (finalAnswers.equipment && finalAnswers.equipment !== 'ADD_NEW_GYM') {
         targetGymProfileId = finalAnswers.equipment;
       }
-      const targetGym = gymProfiles.find(g => g.id === targetGymProfileId) || gymProfiles[0];
+      const targetGym = gymProfiles.find(g => g.id === targetGymProfileId) || gymProfiles[0] || { id: 'default', name: 'Lyfit Gym', equipment: 'all', config: {} };
+      
+      // Use the passed-in library or fall back gracefully
+      const library = exerciseLibrary && exerciseLibrary.length > 0 ? exerciseLibrary : [];
       
       // Generate the dynamic plan
-      const generatedPlan = generateDynamicWorkout(finalAnswers, targetGym, exerciseLibrary);
+      const generatedPlan = generateDynamicWorkout(finalAnswers, targetGym, library);
+
+      if (!generatedPlan || !generatedPlan.routines || generatedPlan.routines.length === 0) {
+        console.error('generateDynamicWorkout returned empty routines:', generatedPlan, 'library size:', library.length);
+        // Still set a plan but with empty routines so user can proceed
+      }
 
       setRecommendedPlan({
         ...generatedPlan,
@@ -82,7 +113,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
         desc: `Disusun dinamis berdasarkan profil, target otot, level, dan ketersediaan alat kamu.`,
       });
       setIsGenerating(false);
-      setStep(9);
+      setStep(10);
     }, 2000);
   };
 
@@ -91,6 +122,23 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
     const finalWeight = isImp ? Number((answers.weight / 2.20462).toFixed(1)) : Number(answers.weight);
     const finalTargetWeight = isImp ? Number((answers.targetWeight / 2.20462).toFixed(1)) : Number(answers.targetWeight);
     const finalHeight = isImpHeight ? Math.round((Number(answers.heightFt) * 12 + Number(answers.heightIn)) * 2.54) : Number(answers.height);
+    
+    // Hitung BMR & TDEE
+    const age = answers.dob ? (new Date().getFullYear() - new Date(answers.dob).getFullYear()) : 25;
+    let bmr = 10 * finalWeight + 6.25 * finalHeight - 5 * age;
+    bmr = answers.gender === 'female' ? bmr - 161 : bmr + 5;
+    
+    const activityMultipliers = {
+      sedentary: 1.2,
+      light: 1.375,
+      moderate: 1.55,
+      active: 1.725
+    };
+    const tdee = Math.round(bmr * (activityMultipliers[answers.activityLevel] || 1.2));
+    
+    let calorieDelta = 0;
+    if (answers.goal === 'fat_loss') calorieDelta = -500;
+    else if (answers.goal === 'muscle_gain') calorieDelta = 300;
 
     onComplete({ 
         ...recommendedPlan, 
@@ -100,7 +148,12 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
             dob: answers.dob,
             height: finalHeight,
             weight: finalWeight,
-            targetWeight: finalTargetWeight
+            targetWeight: finalTargetWeight,
+            activityLevel: answers.activityLevel
+        },
+        calculatedTargets: {
+            activityCalories: tdee,
+            calorieDelta: calorieDelta
         }
     });
     onClose();
@@ -125,6 +178,17 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
       title: "Data Fisik",
       key: 'biometrics',
       icon: <Ruler className={`${t.textAccent} mb-4`} size={40} />
+    },
+    {
+      title: "Bagaimana tingkat aktivitas harianmu di luar olahraga?",
+      key: 'activityLevel',
+      icon: <Activity className={`${t.textAccent} mb-4`} size={40} />,
+      options: [
+        { id: 'sedentary', label: 'Sangat Jarang Bergerak', desc: 'Pekerja kantoran, rebahan, banyak duduk.' },
+        { id: 'light', label: 'Jarang Bergerak', desc: 'Kasir, guru, banyak jalan/berdiri ringan.' },
+        { id: 'moderate', label: 'Cukup Aktif', desc: 'Sering angkat barang, kurir, olahraga ringan.' },
+        { id: 'active', label: 'Sangat Aktif', desc: 'Pekerja lapangan fisik, kuli bangunan, atlet.' }
+      ]
     },
     {
       title: "Apa tujuan utama kamu?",
@@ -252,7 +316,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
             </p>
           </div>
 
-          <button onClick={onClose} className={`p-2 rounded-full ${t.inputBg} hover:text-rose-500 transition-colors`}>
+          <button onClick={handleCloseClick} className={`p-2 rounded-full ${t.inputBg} hover:text-rose-500 transition-colors`}>
             <X size={20}/>
           </button>
         </div>
@@ -261,7 +325,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
         <div className="flex-1 overflow-y-auto p-6 pt-0 hide-scrollbar relative z-10">
           
           {/* QUESTION STEPS */}
-          {step < 8 && (
+          {step < 9 && (
             <div className="animate-in slide-in-from-right-4 fade-in duration-300 flex flex-col h-full max-w-lg mx-auto w-full">
               {/* Spacer untuk menampilkan wajah coach */}
               <div className="h-40 sm:h-56 shrink-0"></div>
@@ -271,19 +335,19 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
                 <h2 className={`text-2xl font-black ${!isDark ? 'text-black' : t.textMain} leading-tight`}>
                   {steps[step].title}
                 </h2>
-                {step === 5 && <p className={`text-sm font-medium mt-2 ${!isDark ? 'text-black/80' : 'text-slate-300'}`}>Pilih hari sesuai jadwal luang kamu.</p>}
+                {step === 6 && <p className={`text-sm font-medium mt-2 ${!isDark ? 'text-black/80' : 'text-slate-300'}`}>Pilih hari sesuai jadwal luang kamu.</p>}
                 {step === 0 && <p className={`text-sm font-medium mt-2 ${!isDark ? 'text-black/80' : 'text-slate-300'}`}>Koneksikan data kesehatan dengan akunmu.</p>}
               </div>
 
               {/* PROGRESS BAR */}
-              <div className={`w-full ${step === 5 ? 'mb-4' : 'mb-8'}`}>
+              <div className={`w-full ${step === 6 ? 'mb-4' : 'mb-8'}`}>
                 <div className={`h-1.5 w-full ${t.inputBg} rounded-full overflow-hidden flex`}>
                   <div 
                     className={`h-full ${t.bgAccent} transition-all duration-500 ease-out`}
-                    style={{ width: `${((step) / 8) * 100}%` }}
+                    style={{ width: `${((step) / 9) * 100}%` }}
                   />
                 </div>
-                <p className={`text-center text-xs mt-2 font-bold ${!isDark ? 'text-black' : t.textMuted}`}>Langkah {step + 1} dari 8</p>
+                <p className={`text-center text-xs mt-2 font-bold ${!isDark ? 'text-black' : t.textMuted}`}>Langkah {step + 1} dari 9</p>
               </div>
 
               {step === 0 ? (
@@ -297,7 +361,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
                     className={`w-full p-4 rounded-2xl border-2 transition-all duration-200 active:scale-[0.98] group flex flex-col items-center justify-center ${t.borderAccent} ${t.bgAccentSoft} hover:opacity-80`}
                   >
                     <h4 className={`font-bold text-base ${t.textAccent} mb-1`}>Health Connect</h4>
-                    <p className={`text-[11px] font-medium ${t.textMuted} text-center`}>Sync otomatis tinggi & berat badan (Segera Hadir).</p>
+                    <p className={`text-[11px] font-medium ${t.textMuted} opacity-50 text-center`}>Sync otomatis tinggi & berat badan (Segera Hadir).</p>
                   </button>
 
                   <button
@@ -308,7 +372,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
                     className={`w-full p-4 rounded-2xl border-2 transition-all duration-200 active:scale-[0.98] group flex flex-col items-center justify-center ${t.borderAccent} ${t.bgAccentSoft} hover:opacity-80`}
                   >
                     <h4 className={`font-bold text-base ${t.textAccent} mb-1`}>Apple Health</h4>
-                    <p className={`text-[11px] font-medium ${t.textMuted} text-center`}>Sync otomatis tinggi & berat badan (Segera Hadir).</p>
+                    <p className={`text-[11px] font-medium ${t.textMuted} opacity-50 text-center`}>Sync otomatis tinggi & berat badan (Segera Hadir).</p>
                   </button>
                   
                   <button
@@ -343,30 +407,56 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
                 // CUSTOM BIOMETRICS
                 <div className="flex flex-col pb-2 space-y-4">
                   <div>
-                      <label className={`text-sm font-bold ${!isDark ? 'text-black' : t.textMain} mb-2 block`}>Tinggi Badan ({units?.height || 'cm'})</label>
+                      <label className={`text-sm font-bold ${!isDark ? 'text-black' : t.textMain} mb-2 block text-center`}>Tinggi Badan ({units?.height || 'cm'})</label>
                       {isImpHeight ? (
-                          <div className="grid grid-cols-2 gap-3">
-                              <div className="relative">
-                                  <input type="number" placeholder="5" value={answers.heightFt || ''} onChange={(e) => setAnswers(prev => ({...prev, heightFt: e.target.value}))} className={`w-full p-4 rounded-xl font-bold ${t.inputBg} ${t.textMain} border-none outline-none focus:ring-2 focus:ring-sky-500`} />
-                                  <span className={`absolute right-4 top-4 font-bold ${t.textMuted}`}>ft</span>
+                          <div className="flex items-center justify-center gap-4">
+                              <div className="flex flex-col items-center gap-1">
+                                  <ScrollPicker 
+                                      value={answers.heightFt} 
+                                      onChange={(val) => setAnswers(prev => ({...prev, heightFt: val}))} 
+                                      min={3} max={8} step={1} theme={isDark ? 'dark' : 'light'} width="w-20"
+                                  />
+                                  <span className={`font-bold text-[10px] ${t.textMuted}`}>ft</span>
                               </div>
-                              <div className="relative">
-                                  <input type="number" placeholder="7" value={answers.heightIn || ''} onChange={(e) => setAnswers(prev => ({...prev, heightIn: e.target.value}))} className={`w-full p-4 rounded-xl font-bold ${t.inputBg} ${t.textMain} border-none outline-none focus:ring-2 focus:ring-sky-500`} />
-                                  <span className={`absolute right-4 top-4 font-bold ${t.textMuted}`}>in</span>
+                              <div className="flex flex-col items-center gap-1">
+                                  <ScrollPicker 
+                                      value={answers.heightIn} 
+                                      onChange={(val) => setAnswers(prev => ({...prev, heightIn: val}))} 
+                                      min={0} max={11} step={1} theme={isDark ? 'dark' : 'light'} width="w-20"
+                                  />
+                                  <span className={`font-bold text-[10px] ${t.textMuted}`}>in</span>
                               </div>
                           </div>
                       ) : (
-                          <input type="number" placeholder="170" value={answers.height || ''} onChange={(e) => setAnswers(prev => ({...prev, height: e.target.value}))} className={`w-full p-4 rounded-xl font-bold ${t.inputBg} ${t.textMain} border-none outline-none focus:ring-2 focus:ring-sky-500`} />
+                          <div className="flex justify-center">
+                              <ScrollPicker 
+                                  value={answers.height} 
+                                  onChange={(val) => setAnswers(prev => ({...prev, height: val}))} 
+                                  min={100} max={250} step={1} theme={isDark ? 'dark' : 'light'} width="w-full max-w-[120px]"
+                              />
+                          </div>
                       )}
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-4 mt-6">
                       <div>
-                          <label className={`text-sm font-bold ${!isDark ? 'text-black' : t.textMain} mb-2 block`}>Berat ({units?.weight || 'kg'})</label>
-                          <input type="number" placeholder={isImp ? "150" : "70"} value={answers.weight || ''} onChange={(e) => setAnswers(prev => ({...prev, weight: e.target.value}))} className={`w-full p-4 rounded-xl font-bold ${t.inputBg} ${t.textMain} border-none outline-none focus:ring-2 focus:ring-sky-500`} />
+                          <label className={`text-sm font-bold ${!isDark ? 'text-black' : t.textMain} mb-2 block text-center`}>Berat ({units?.weight || 'kg'})</label>
+                          <div className="flex justify-center">
+                              <ScrollPicker 
+                                  value={answers.weight} 
+                                  onChange={(val) => setAnswers(prev => ({...prev, weight: val}))} 
+                                  min={isImp ? 60 : 30} max={isImp ? 400 : 200} step={1} theme={isDark ? 'dark' : 'light'} width="w-full max-w-[100px]"
+                              />
+                          </div>
                       </div>
                       <div>
-                          <label className={`text-sm font-bold ${!isDark ? 'text-black' : t.textMain} mb-2 block`}>Target ({units?.weight || 'kg'})</label>
-                          <input type="number" placeholder={isImp ? "140" : "65"} value={answers.targetWeight || ''} onChange={(e) => setAnswers(prev => ({...prev, targetWeight: e.target.value}))} className={`w-full p-4 rounded-xl font-bold ${t.inputBg} ${t.textMain} border-none outline-none focus:ring-2 focus:ring-sky-500`} />
+                          <label className={`text-sm font-bold ${!isDark ? 'text-black' : t.textMain} mb-2 block text-center`}>Target ({units?.weight || 'kg'})</label>
+                          <div className="flex justify-center">
+                              <ScrollPicker 
+                                  value={answers.targetWeight} 
+                                  onChange={(val) => setAnswers(prev => ({...prev, targetWeight: val}))} 
+                                  min={isImp ? 60 : 30} max={isImp ? 400 : 200} step={1} theme={isDark ? 'dark' : 'light'} width="w-full max-w-[100px]"
+                              />
+                          </div>
                       </div>
                   </div>
                   <button onClick={() => { 
@@ -376,8 +466,8 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
                     Lanjut <ChevronRight size={20} />
                   </button>
                 </div>
-              ) : step !== 5 ? (
-                // STANDARD OPTIONS (Step 0, 1, 3, 4)
+              ) : step !== 6 ? (
+                // STANDARD OPTIONS
                 <div className="space-y-3 pb-4">
                     {steps[step].options.map((opt) => (
                       <button
@@ -443,7 +533,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
           )}
 
           {/* FINAL STEP (LOADING / RESULTS) */}
-          {step === 8 && (
+          {step === 9 && (
             <div className="flex flex-col h-full justify-center items-center text-center animate-in slide-in-from-bottom-8 duration-500 max-w-lg mx-auto w-full">
               <div className="relative">
                 <div className={`absolute inset-0 ${t.bgAccent} blur-xl opacity-30 animate-pulse rounded-full`}></div>
@@ -459,7 +549,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
           )}
 
           {/* RESULT STEP */}
-          {step === 9 && recommendedPlan && (
+          {step === 10 && recommendedPlan && (
             <div className="animate-in slide-in-from-bottom-8 fade-in duration-500 pb-4">
               <div className="flex flex-col items-center text-center mb-6">
                 <div className={`w-16 h-16 ${t.bgAccentSoft} ${t.textAccent} rounded-full flex items-center justify-center mb-4`}>
@@ -538,6 +628,8 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
           soundEnabled={soundEnabled} 
         />
       )}
+      
+      {dialog}
     </div>
   );
 };

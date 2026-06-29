@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
-import { X, Share2, Award } from 'lucide-react';
+import { X, Share2 } from 'lucide-react';
 import { shareAchievementToFeed } from '../utils/communityApi';
 
-const AchievementPopup = ({ achievements, onClose, soundEnabled, playSoundEffect, theme, user }) => {
+const AchievementPopup = ({ achievements, onClose, soundEnabled, playSoundEffect, theme, t, user, onShareComplete }) => {
   useEffect(() => {
     if (achievements && achievements.length > 0) {
       playSoundEffect('success', soundEnabled);
@@ -13,7 +13,30 @@ const AchievementPopup = ({ achievements, onClose, soundEnabled, playSoundEffect
 
   if (!achievements || achievements.length === 0) return null;
 
-  const ach = achievements[0]; // Show one at a time if multiple
+  const ach = achievements[0];
+
+  const handleShare = async () => {
+    playSoundEffect('click', soundEnabled);
+    if (user) {
+      const postId = await shareAchievementToFeed(
+        user.uid,
+        user.name || user.email?.split('@')[0],
+        user.photoURL,
+        ach
+      );
+      if (onShareComplete) onShareComplete(postId);
+    }
+    onClose(ach.id);
+  };
+
+  const handleClose = () => {
+    playSoundEffect('click', soundEnabled);
+    onClose(ach.id);
+  };
+
+  // Use theme accent color if available, fallback to a nice blue
+  const btnBg = t?.bgAccent || 'bg-[#41759b]';
+  const btnShadow = t?.bgAccent ? '' : 'shadow-[#41759b]/30';
 
   return (
     <div className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm flex flex-col justify-center p-4 animate-in fade-in slide-in-from-bottom-8 duration-500">
@@ -22,11 +45,8 @@ const AchievementPopup = ({ achievements, onClose, soundEnabled, playSoundEffect
         {/* Glow Background */}
         <div className={`absolute top-0 left-0 right-0 h-40 ${ach.bg} opacity-50 blur-3xl rounded-full translate-y-[-50%] pointer-events-none`} />
 
-        <button 
-          onClick={() => {
-            playSoundEffect('click', soundEnabled);
-            onClose(ach.id);
-          }} 
+        <button
+          onClick={handleClose}
           className="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-black/20 text-white hover:bg-black/40 transition-colors"
         >
           <X size={18} />
@@ -45,24 +65,15 @@ const AchievementPopup = ({ achievements, onClose, soundEnabled, playSoundEffect
           <p className={`text-sm font-medium ${isDark ? 'text-white/70' : 'text-black/60'} mb-8`}>{ach.description}</p>
 
           <div className="flex flex-col gap-2 w-full">
-            <button 
-              onClick={async () => {
-                playSoundEffect('click', soundEnabled);
-                if (user) {
-                  await shareAchievementToFeed(user.uid, user.name || user.email?.split('@')[0], user.photoURL, ach);
-                }
-                onClose(ach.id);
-              }}
-              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-2 font-black text-white bg-indigo-500 hover:bg-indigo-600 active:scale-[0.98] transition-all`}
+            <button
+              onClick={handleShare}
+              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-2 font-black text-white ${btnBg} shadow-lg ${btnShadow} hover:opacity-90 active:scale-[0.98] transition-all`}
             >
               <Share2 size={20} />
               Bagikan ke Komunitas
             </button>
-            <button 
-              onClick={() => {
-                playSoundEffect('click', soundEnabled);
-                onClose(ach.id);
-              }}
+            <button
+              onClick={handleClose}
               className={`w-full py-3 rounded-2xl flex items-center justify-center gap-2 font-bold ${isDark ? 'text-white/60 hover:text-white bg-white/5' : 'text-black/60 hover:text-black bg-black/5'} transition-colors`}
             >
               Nanti Saja

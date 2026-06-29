@@ -247,7 +247,23 @@ const WorkoutTab = ({
 
   // Fungsi untuk memanggil log per set dari App.jsx
   const getSetLogs = (ex) => {
+    // 1. Check live in-memory session logs first
     if (exerciseLogs[ex.id]) return exerciseLogs[ex.id];
+
+    // 2. For completed workouts, fall back to the saved log in history
+    if (ex.workoutId) {
+      const dayData = history[selectedDate];
+      if (dayData?.workouts) {
+        const workoutEntry = dayData.workouts.find(w => w.id === ex.workoutId);
+        if (workoutEntry?.log) {
+          // Saved log can be keyed by composite ID or original ID
+          const savedLog = workoutEntry.log[ex.id] || workoutEntry.log[ex.originalId];
+          if (savedLog) return savedLog;
+        }
+      }
+    }
+
+    // 3. Default: empty template
     return Array.from({length: ex.sets || 3}).map(() => ({
         w: ex.defaultWeight || 0,
         r: ex.reps || 10,
@@ -520,42 +536,30 @@ const WorkoutTab = ({
                 const isExpanded = !!expandedSessions[prog.workoutId];
                 return (
                   <div id={`session-${prog.workoutId}`} key={prog.workoutId} className={`mb-4 rounded-2xl border ${prog.status === 'completed' ? 'border-emerald-500/30' : t.border} bg-black/5 dark:bg-white/5 overflow-hidden transition-all`}>
-                    <button 
-                      onClick={() => { playSoundEffect('click', soundEnabled); toggleSession(prog.workoutId); }}
+                    <div
                       className={`w-full p-4 flex items-start justify-between font-black text-left ${isExpanded ? t.bgAccentSoft + ' ' + t.textAccent : ''} transition-colors`}
                     >
-                      <div className="flex flex-col items-start gap-0.5 flex-1 min-w-0 pr-4">
+                      <div
+                        onClick={() => { playSoundEffect('click', soundEnabled); toggleSession(prog.workoutId); }}
+                        className="flex flex-col items-start gap-0.5 flex-1 min-w-0 pr-4 cursor-pointer"
+                      >
                         <div className="flex items-center gap-2">
-                          {isProgramCompleted(prog) && <CheckCircle size={16} className="text-emerald-500 shrink-0 mt-0.5" />}
+                          {isProgramCompleted(prog) && <CheckCircle size={16} className={`${t.textAccent} shrink-0 mt-0.5`} />}
                           <span className="body-lg uppercase tracking-widest break-words leading-tight flex-1">Sesi {pIdx + 1}: {prog.name}</span>
-                          {isProgramCompleted(prog) && (
-                            <button 
-                              onClick={(e) => { 
-                                e.stopPropagation();
-                                playSoundEffect('click', soundEnabled);
-                                // Call share to feed
-                                if (user) {
-                                  shareWorkoutToFeed(user.uid, user.email?.split('@')[0], {
-                                    programName: prog.name,
-                                    duration: prog.duration || '30:00',
-                                    totalVolume: 0
-                                  });
-                                  showAlert('Berhasil dibagikan ke komunitas!', { type: 'success', title: 'Dibagikan!' });
-                                }
-                              }}
-                              className={`p-1.5 rounded-full bg-indigo-500 text-white shrink-0 shadow-sm hover:scale-105 transition-transform`}
-                              title="Bagikan ke Feed"
-                            >
-                              <Share2 size={14} />
-                            </button>
-                          )}
                         </div>
                         {prog.planName && (
                           <span className={`text-xs ${t.textMuted} font-medium`}>Program: {prog.planName}</span>
                         )}
                       </div>
-                      <div className="flex items-center gap-1 caption opacity-60 font-bold shrink-0 mt-0.5"><span>{prog.exercises?.length || 0} Latihan</span>{isExpanded ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}</div>
-                    </button>
+                      <div className="flex items-center gap-1 shrink-0 mt-0.5">
+                        <div
+                          onClick={() => { playSoundEffect('click', soundEnabled); toggleSession(prog.workoutId); }}
+                          className="caption opacity-60 font-bold cursor-pointer flex items-center gap-1"
+                        >
+                          <span>{prog.exercises?.length || 0} Latihan</span>{isExpanded ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
+                        </div>
+                      </div>
+                    </div>
                     
                     {isExpanded && (
                       <div className="p-4 space-y-4 sm:space-y-0 sm:flex sm:flex-row sm:overflow-x-auto sm:snap-x sm:gap-4 sm:pb-6 hide-scrollbar animate-in slide-in-from-top-2 fade-in duration-200">
@@ -761,7 +765,7 @@ const WorkoutTab = ({
         if (isCompleted) {
           btnText = "SESI SELESAI";
           btnIcon = <CheckCircle size={20} />;
-          btnClass = "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20";
+          btnClass = `${t.bgAccent} text-white shadow-lg opacity-80`;
         } else if (!hasExercises) {
           btnText = "SESI KOSONG";
           btnIcon = <X size={20} />;

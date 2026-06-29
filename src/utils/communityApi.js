@@ -23,6 +23,50 @@ export const registerToCommunity = async (userId, userProfile) => {
   }
 };
 
+// ─── Leaderboard Engine (Weekly Atomic Increments) ─────────────────────────
+export const getCurrentWeekId = () => {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return `${d.getUTCFullYear()}_W${weekNo}`;
+};
+
+export const updateLeaderboardScore = async (userId, userName, userPhoto, scoreChange) => {
+  if (!userId) return;
+  try {
+    const weekId = getCurrentWeekId();
+    const lbRef = doc(db, 'leaderboards', weekId);
+    await setDoc(lbRef, {
+      [`scores.${userId}.score`]: increment(scoreChange),
+      [`scores.${userId}.name`]: userName || 'Pengguna',
+      [`scores.${userId}.photoUrl`]: userPhoto || null,
+    }, { merge: true });
+  } catch(e) { console.error("Update LB Error:", e); }
+};
+
+export const getWeeklyLeaderboard = async () => {
+  try {
+    const weekId = getCurrentWeekId();
+    const lbRef = doc(db, 'leaderboards', weekId);
+    const snap = await getDoc(lbRef);
+    if(!snap.exists()) return [];
+    const data = snap.data();
+    if(!data || !data.scores) return [];
+    
+    const arr = Object.entries(data.scores).map(([id, val]) => ({
+      id,
+      name: val.name,
+      photoUrl: val.photoUrl,
+      score: val.score || 0
+    }));
+    return arr.sort((a,b) => b.score - a.score).slice(0, 10);
+  } catch(e) {
+    console.error("Fetch LB Error:", e);
+    return [];
+  }
+};
+
 // ─── Share Workout to Feed ────────────────────────────────────────────────────
 export const shareWorkoutToFeed = async (userId, userName, userPhoto, workoutData) => {
   try {
@@ -40,9 +84,8 @@ export const shareWorkoutToFeed = async (userId, userName, userPhoto, workoutDat
       likedBy: [],
       commentCount: 0,
     });
-    if (postData.type === 'repost' && postData.originalUserId && postData.originalUserId !== userId) {
-      await sendNotification(postData.originalUserId, { type: 'repost', fromUserId: userId, fromUserName: userName, fromUserPhoto: userPhoto, postId: postData.originalPostId });
-    }
+    // Add +1 Leaderboard Score for posting a workout
+    await updateLeaderboardScore(userId, userName, userPhoto, 1);
   } catch (err) {
     console.error("Gagal share ke feed:", err);
   }
@@ -114,12 +157,19 @@ export const toggleLike = async (postId, userId, postOwnerId, fromUserName = nul
   const snap = await getDoc(postRef);
   if (!snap.exists()) return;
   const liked = (snap.data().likedBy || []).includes(userId);
+  const postOwnerName = snap.data().userName;
+  const postOwnerPhoto = snap.data().userPhoto;
+
   if (liked) {
     await updateDoc(postRef, { likes: increment(-1), likedBy: arrayRemove(userId) });
+    if (postOwnerId && postOwnerId !== userId) {
+      await updateLeaderboardScore(postOwnerId, postOwnerName, postOwnerPhoto, -1);
+    }
   } else {
     await updateDoc(postRef, { likes: increment(1), likedBy: arrayUnion(userId) });
     if (postOwnerId && postOwnerId !== userId) {
       await sendNotification(postOwnerId, { type: 'like', fromUserId: userId, fromUserName, fromUserPhoto, postId });
+      await updateLeaderboardScore(postOwnerId, postOwnerName, postOwnerPhoto, 1);
     }
   }
   return !liked;
@@ -285,15 +335,17 @@ export const shareTemplate = async (userId, userName, program) => {
 
 export const shareAchievementToFeed = async (userId, userName, userPhoto, achievement) => {
   try {
-    await addDoc(collection(db, 'community_posts'), {
+    const docRef = await addDoc(collection(db, 'community_posts'), {
       type: 'achievement', userId, userName: userName || 'Anonim',
       userPhoto: userPhoto || null,
       achievementId: achievement.id, achievementTitle: achievement.title,
       likes: 0, likedBy: [], commentCount: 0,
       timestamp: serverTimestamp()
     });
+    return docRef.id;
   } catch (err) {
     console.error("Gagal share achievement:", err);
+    return null;
   }
 };
 

@@ -130,6 +130,7 @@ const ProgramTab = ({ setConfirmModal, t, lang, programs, setPrograms, user, exe
   const isDark = t.bgCard !== 'bg-white';
   const { dialog, showAlert } = useDialog(isDark);
   const [expandedRoutineId, setExpandedRoutineId] = useState(null);
+  const [editingPlanId, setEditingPlanId] = useState(null);
 
   useEffect(() => {
     if (focusRoutineId) {
@@ -204,8 +205,7 @@ const ProgramTab = ({ setConfirmModal, t, lang, programs, setPrograms, user, exe
       title: 'Hapus Rutinitas',
       message: `Yakin ingin menghapus rutinitas "${routineName}"? Data latihan di dalamnya akan ikut terhapus.`,
       onConfirm: () => {
-        const remaining = programs.filter(p => p.id !== routineId);
-        setPrograms(remaining);
+        setPrograms(prevPrograms => prevPrograms.filter(p => p.id !== routineId));
         if (expandedRoutineId === routineId) setExpandedRoutineId(null);
       }
     });
@@ -241,16 +241,16 @@ const ProgramTab = ({ setConfirmModal, t, lang, programs, setPrograms, user, exe
   };
 
   const handleRenameRoutine = (routineId, newName) => {
-    setPrograms(programs.map(p => p.id === routineId ? { ...p, name: newName } : p));
+    setPrograms(prevPrograms => prevPrograms.map(p => p.id === routineId ? { ...p, name: newName } : p));
   };
 
   const restPresets = [60, 90, 120, 180];
   const handleRestTimeChange = (routineId, val) => {
-    setPrograms(programs.map(p => p.id === routineId ? { ...p, restTime: Number(val) } : p));
+    setPrograms(prevPrograms => prevPrograms.map(p => p.id === routineId ? { ...p, restTime: Number(val) } : p));
   };
 
   const handleToggleAssignedDay = (routineId, day) => {
-    setPrograms(programs.map(p => {
+    setPrograms(prevPrograms => prevPrograms.map(p => {
       if (p.id !== routineId) return p;
       const currentDays = p.assignedDays || [];
       const newDays = currentDays.includes(day) 
@@ -262,7 +262,7 @@ const ProgramTab = ({ setConfirmModal, t, lang, programs, setPrograms, user, exe
 
   const handleUpdateExercise = (routineId, exId, field, val) => {
     const numVal = val === '' ? '' : Number(val);
-    setPrograms(programs.map(p => {
+    setPrograms(prevPrograms => prevPrograms.map(p => {
       if (p.id !== routineId) return p;
       const targetEx = p.exercises.find(e => e.id === exId);
       const isSupersetSync = field === 'sets' && targetEx && targetEx.supersetId;
@@ -429,7 +429,7 @@ const ProgramTab = ({ setConfirmModal, t, lang, programs, setPrograms, user, exe
 
     const groupedPrograms = programs.reduce((acc, prog) => {
       const key = prog.planId || 'custom';
-      if (!acc[key]) acc[key] = { planId: key, planName: prog.planName || 'Program Custom', planLevel: prog.planLevel, routines: [], assignedDays: prog.assignedDays || [] };
+      if (!acc[key]) acc[key] = { planId: key, planName: prog.planName || 'Program Default', planLevel: prog.planLevel, routines: [], assignedDays: prog.assignedDays || [] };
       acc[key].routines.push(prog);
       return acc;
     }, {});
@@ -458,6 +458,7 @@ const ProgramTab = ({ setConfirmModal, t, lang, programs, setPrograms, user, exe
       setPrograms([...programs, newProg]);
       if (setActivePlanIds) setActivePlanIds([...activePlanIds, newPlanId]);
       setExpandedRoutineId(newProg.id);
+      setEditingPlanId(newPlanId);
       
       setTimeout(() => {
         const layout = window.innerWidth < 640 ? 'mobile' : 'desktop';
@@ -486,6 +487,9 @@ const ProgramTab = ({ setConfirmModal, t, lang, programs, setPrograms, user, exe
         <div className="mb-2">
           <div className="flex items-center gap-2 mb-3">
             <h4 className={`font-bold text-sm ${t.textMain}`}>Jadwal Hari</h4>
+            {(!routine.assignedDays || routine.assignedDays.length === 0) && (
+                <span className="text-[10px] font-black uppercase text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded-md">Wajib Diisi</span>
+            )}
           </div>
           <div className="flex justify-between w-full gap-1 sm:gap-2">
             {[
@@ -635,7 +639,7 @@ const ProgramTab = ({ setConfirmModal, t, lang, programs, setPrograms, user, exe
                 <div className="flex items-start justify-between gap-4 mb-3">
                   <div className="flex-1 min-w-0 mt-1 flex flex-col gap-1">
                     <div className="flex items-center gap-2 w-full">
-                      {planId.startsWith('custom') ? (
+                      {planId.startsWith('custom') && editingPlanId === planId ? (
                         <div className={`relative group inline-block w-full flex-1`}>
                           <PlanNameInput
                             initialValue={group.planName}
@@ -680,12 +684,14 @@ const ProgramTab = ({ setConfirmModal, t, lang, programs, setPrograms, user, exe
                       </span>
                     </div>
                   </div>
-                <button 
-                  onClick={() => handleDeletePlan(planId, group.planName)}
-                  className={`p-2 rounded-full hover:bg-rose-500/10 text-rose-500 transition-colors shrink-0`}
-                >
-                  <X size={18} />
-                </button>
+                {(!planId.startsWith('custom') || true) && (
+                  <button 
+                    onClick={() => handleDeletePlan(planId, group.planName)}
+                    className={`p-2 rounded-full hover:bg-rose-500/10 text-rose-500 transition-colors shrink-0`}
+                  >
+                    <X size={18} />
+                  </button>
+                )}
               </div>
 
               <div className="flex gap-2 relative z-10 w-full mt-3">
@@ -759,6 +765,11 @@ const ProgramTab = ({ setConfirmModal, t, lang, programs, setPrograms, user, exe
                               <h4 className={`font-bold text-lg ${t.textMain} truncate`}>{routine.name}</h4>
                             )}
                             <p className={`text-xs ${t.textMuted} mt-1`}>{routine.exercises.length} Latihan • {routine.restTime}s Istirahat • ~{estDuration} mnt</p>
+                            {routine.assignedDays && routine.assignedDays.length > 0 && (
+                              <p className={`text-[10px] font-bold ${t.textAccent} mt-1 uppercase`}>
+                                {routine.assignedDays.join(', ')}
+                              </p>
+                            )}
                           </div>
                           
                           <div className="flex items-center shrink-0 h-full mt-1">
@@ -787,12 +798,51 @@ const ProgramTab = ({ setConfirmModal, t, lang, programs, setPrograms, user, exe
                 {/* Add Custom Routine Button (only for custom plan) */}
                 {planId.startsWith('custom') && (
                   <div className={`px-5 py-4 border-t ${t.border}`}>
-                    <button 
-                      onClick={() => handleCreateRoutine(planId, group.planName)}
-                      className={`w-full py-3 rounded-xl font-bold text-sm border-2 border-dashed ${t.borderAccentSoft} ${t.textAccent} hover:${t.bgAccentSoft} transition-all active:scale-95 flex items-center justify-center gap-2`}
-                    >
-                      <Plus size={16} /> Rutinitas Baru
-                    </button>
+                    {editingPlanId === planId ? (
+                        <div className="flex flex-col gap-3">
+                            <button 
+                              onClick={() => handleCreateRoutine(planId, group.planName)}
+                              className={`w-full py-3 rounded-xl font-bold text-sm border-2 border-dashed ${t.borderAccentSoft} ${t.textAccent} hover:${t.bgAccentSoft} transition-all active:scale-95 flex items-center justify-center gap-2`}
+                            >
+                              <Plus size={16} /> Rutinitas Baru
+                            </button>
+                            <div className="flex gap-2">
+                                <button
+                                  onClick={() => {
+                                      playSoundEffect('click', soundEnabled);
+                                      setEditingPlanId(null);
+                                      setExpandedRoutineId(null);
+                                  }}
+                                  className={`flex-[0.4] py-3 rounded-xl font-bold text-sm ${t.inputBg} ${t.textMain} hover:opacity-80 transition-all active:scale-95`}
+                                >
+                                  Batal
+                                </button>
+                                <button
+                                  onClick={() => {
+                                      const invalidRoutine = group.routines.find(r => !r.assignedDays || r.assignedDays.length === 0);
+                                      if (invalidRoutine) {
+                                          showAlert(`Rutinitas "${invalidRoutine.name}" belum memiliki jadwal hari. Silakan pilih minimal 1 hari.`, { type: 'error' });
+                                          setExpandedRoutineId(invalidRoutine.id);
+                                      } else {
+                                          playSoundEffect('success', soundEnabled);
+                                          setEditingPlanId(null);
+                                          setExpandedRoutineId(null);
+                                      }
+                                  }}
+                                  className={`flex-1 py-3 rounded-xl font-black text-white ${t.bgAccent} hover:opacity-90 shadow-md transition-all active:scale-95 flex items-center justify-center gap-2`}
+                                >
+                                  Simpan Program
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <button
+                          onClick={() => { playSoundEffect('click', soundEnabled); setEditingPlanId(planId); }}
+                          className={`w-full py-3 rounded-xl font-bold text-sm border-2 border-dashed ${t.borderAccentSoft} ${t.textAccent} hover:${t.bgAccentSoft} transition-all active:scale-95 flex items-center justify-center gap-2`}
+                        >
+                          <Edit2 size={16} /> Edit Program Custom
+                        </button>
+                    )}
                   </div>
                 )}
               </div>

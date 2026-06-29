@@ -7,8 +7,8 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 
 // --- IMPORT MESIN FIREBASE ---
 import { auth, db } from './firebase';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, setDoc, onSnapshot, deleteField } from 'firebase/firestore';
+import { onAuthStateChanged, signOut, deleteUser } from 'firebase/auth';
+import { doc, setDoc, onSnapshot, deleteField, deleteDoc } from 'firebase/firestore';
 
 // --- IMPORT KOMPONEN UI ---
 import Header from './components/Header';
@@ -34,7 +34,7 @@ import ProfileModal from './modals/ProfileModal';
 import HelpModal from './modals/HelpModal';
 import ProgramQuestionnaireModal from './modals/ProgramQuestionnaireModal';
 import AchievementPopup from './components/AchievementPopup';
-import { checkAchievements } from './data/achievements';
+import { checkAchievements, ACHIEVEMENTS } from './data/achievements';
 
 // --- IMPORT DATA & MESIN ---
 import { playSoundEffect } from './utils/audio';
@@ -46,6 +46,14 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [isSplashMinTimeReached, setIsSplashMinTimeReached] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsSplashMinTimeReached(true);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
   // --- STATE UTAMA ---
@@ -81,7 +89,9 @@ export default function App() {
 
     const emptyCustomPrograms = programs.filter(p => {
         const isCustom = p.planId === 'custom' || (p.planId && p.planId.startsWith('custom-'));
-        return isCustom && (!p.exercises || p.exercises.length === 0);
+        const hasNoExercises = (!p.exercises || p.exercises.length === 0);
+        const hasNoAssignedDays = (!p.assignedDays || p.assignedDays.length === 0);
+        return isCustom && hasNoExercises && hasNoAssignedDays;
     });
 
     if (emptyCustomPrograms.length > 0) {
@@ -129,12 +139,19 @@ export default function App() {
 
   const [showSettings, setShowSettings] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [profileForceTab, setProfileForceTab] = useState(null);
   const [highlightPostId, setHighlightPostId] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
   const [showQuestionnaire, setShowQuestionnaire] = useState(false);
   const [globalDetailExercise, setGlobalDetailExercise] = useState(null);
+  const [isFreshAccount, setIsFreshAccount] = useState(false);
+  const [showGymManager, setShowGymManager] = useState(false);
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
   const [activeAddModalTarget, setActiveAddModalTarget] = useState(null); 
+  const [connectedApps, setConnectedApps] = useState(() => {
+      const saved = localStorage.getItem('lyfit_connectedApps');
+      return saved ? JSON.parse(saved) : { healthconnect: false, applehealth: false };
+  });
 
   const [exerciseLogs, setExerciseLogs] = useState({});
   const [skippedExercises, setSkippedExercises] = useState({});
@@ -209,13 +226,14 @@ export default function App() {
 
   // --- EFEK ONBOARDING AI ---
   useEffect(() => {
-    if (isDataLoaded && user) {
-      const hasCompleted = userProfile?.hasCompletedOnboarding;
-      if (!hasCompleted && programs.length === 0) {
-        setShowQuestionnaire(true);
-      }
+    const alreadyDone = user?.uid ? localStorage.getItem(`lyfit_onboarding_completed_${user.uid}`) === 'true' : false;
+    if (isDataLoaded && user && isFreshAccount && !alreadyDone) {
+      setShowQuestionnaire(true);
+      setIsFreshAccount(false); // Only trigger once
+    } else if (isFreshAccount) {
+      setIsFreshAccount(false); // reset even if we don't show questionnaire
     }
-  }, [isDataLoaded, user, userProfile, programs.length]);
+  }, [isDataLoaded, user, isFreshAccount]);
 
   const handleApplyRecommendedPlan = (plan) => {
     playSoundEffect('success', soundEnabled);
@@ -225,13 +243,30 @@ export default function App() {
     if (plan.userGoal || plan.userExperience || plan.biometrics) {
       setUserProfile(prev => ({
         ...prev,
-        goal: plan.userGoal || prev.goal,
-        experience: plan.userExperience || prev.experience,
+        goal: plan.userGoal || prev?.goal,
+        experience: plan.userExperience || prev?.experience,
         hasCompletedOnboarding: true,
         ...(plan.biometrics || {})
       }));
     } else {
       setUserProfile(prev => ({ ...prev, hasCompletedOnboarding: true }));
+    }
+
+    if (plan.calculatedTargets) {
+      setActivityTargets(prev => ({
+        ...prev,
+        activityCalories: plan.calculatedTargets.activityCalories,
+        calorieDelta: plan.calculatedTargets.calorieDelta
+      }));
+    }
+
+    // Unlocked "Langkah Pertama" achievement after completing questionnaire
+    if (!userAchievements.includes('first_workout')) {
+      const newBadge = ACHIEVEMENTS.find(a => a.id === 'first_workout');
+      if (newBadge) {
+        setUnlockedAchievementsPopup(prev => [...prev, newBadge]);
+        setUserAchievements(prev => [...prev, 'first_workout']);
+      }
     }
 
     if (plan.gymProfileId && plan.gymProfileId !== 'ADD_NEW_GYM') {
@@ -244,6 +279,15 @@ export default function App() {
     while (programs.some(p => p.planName === uniqueName)) {
       uniqueName = `${baseName} (${counter})`;
       counter++;
+    }
+
+    if (!plan || !plan.routines || plan.routines.length === 0) {
+      console.error('handleApplyRecommendedPlan: plan.routines is empty or missing', plan);
+      // Close modal and navigate to program tab even if generation failed
+      localStorage.setItem('lyfit_onboarding_completed', 'true');
+      setShowQuestionnaire(false);
+      setActiveTab('program');
+      return;
     }
 
     const newPrograms = plan.routines.map((routine, idx) => {
@@ -270,8 +314,15 @@ export default function App() {
     setActivePlanIds([newPlanId]);
     setActiveProgramId(newPrograms[0].id);
     setActiveTab('program');
-    localStorage.setItem('lyfit_onboarding_completed', 'true');
+    if (user?.uid) {
+      localStorage.setItem(`lyfit_onboarding_completed_${user.uid}`, 'true');
+    }
     setShowQuestionnaire(false);
+
+    // Immediately write onboardingCompleted flag to Firebase so it syncs across devices
+    if (user?.uid) {
+      setDoc(doc(db, 'userData', user.uid), { onboardingCompleted: true }, { merge: true }).catch(() => {});
+    }
 
     setTimeout(() => {
       const layout = window.innerWidth < 640 ? 'mobile' : 'desktop';
@@ -390,7 +441,7 @@ export default function App() {
         setSoundEnabled(true);
         setDefaultRestTime(60);
         setUnits({ weight: 'kg', height: 'cm', distance: 'km', temp: 'c' });
-        setGymProfiles([{ id: 'default', name: 'Gym Utama', equipment: [] }]);
+        setGymProfiles([{ id: 'default', name: 'Lyfit Gym', equipment: 'all', config: {} }]);
         setActiveGymId('default');
         setActivityTargets({ workouts: 3, calories: 1500, volume: 10000, activeTime: 120 });
         setActivePlanIds([]);
@@ -412,7 +463,7 @@ export default function App() {
     let unsubscribeHistory = null;
     
     if (user) {
-      isUpdatingFromServer.current = true;
+
       const currentYear = new Date().getFullYear().toString();
       const mainDocRef = doc(db, "users", user.uid);
       const historyDocRef = doc(db, "users", user.uid, "history_years", currentYear);
@@ -422,6 +473,13 @@ export default function App() {
           try {
             const data = docSnap.data();
             
+            // --- Cek Global Ban ---
+            if (data.isBanned) {
+              localStorage.setItem('lyfit_banned_msg', 'Akun Anda telah dinonaktifkan secara permanen karena melanggar panduan komunitas kami.');
+              signOut(auth);
+              return;
+            }
+
             // --- AUTOMATIC MIGRATION: Jika history masih ada di dokumen utama, pindahkan! ---
             if (data.history) {
               const parsedHistory = typeof data.history === 'string' ? JSON.parse(data.history) : data.history;
@@ -479,7 +537,7 @@ export default function App() {
                   (ex.id === 101 && ex.name === 'Incline Smith Machine Press') ? { ...ex, name: 'Smith Machine Incline Bench Press' } : ex
                 ) : []
               }));
-              setPrograms(migratedPrograms);
+              setPrograms(prev => JSON.stringify(prev) === JSON.stringify(migratedPrograms) ? prev : migratedPrograms);
             }
             if (data.exerciseLibrary) {
               const parsedLib = typeof data.exerciseLibrary === 'string' ? JSON.parse(data.exerciseLibrary) : data.exerciseLibrary;
@@ -495,7 +553,7 @@ export default function App() {
                   }
               });
 
-              setExerciseLibrary(migratedLib);
+              setExerciseLibrary(prev => JSON.stringify(prev) === JSON.stringify(migratedLib) ? prev : migratedLib);
             }
             if (data.settings) {
               const parsedSettings = typeof data.settings === 'string' ? JSON.parse(data.settings) : data.settings;
@@ -543,6 +601,10 @@ export default function App() {
                     ...(data.cardBgUploads !== undefined && { cardBgUploads: data.cardBgUploads }),
                 };
             });
+            // Sync onboarding flag from Firebase to localStorage
+            if (data.onboardingCompleted && user.uid) {
+              localStorage.setItem(`lyfit_onboarding_completed_${user.uid}`, 'true');
+            }
           } catch (err) {
             console.error("Parse Error saat load data utama (MENCEGAH AUTO-SAVE UNTUK MENGHINDARI DATA HILANG):", err);
             setHasParseError(true);
@@ -550,8 +612,13 @@ export default function App() {
 
           isUpdatingFromServer.current = true;
           setIsDataLoaded(true);
-          setTimeout(() => { isUpdatingFromServer.current = false; }, 1000);
+          setTimeout(() => { isUpdatingFromServer.current = false; }, 1500);
         } else {
+          // No Firebase data yet — only show questionnaire if not already completed
+          const alreadyDone = user?.uid ? localStorage.getItem(`lyfit_onboarding_completed_${user.uid}`) === 'true' : false;
+          if (!alreadyDone) {
+            setIsFreshAccount(true);
+          }
           setIsDataLoaded(true);
         }
       }, (error) => {
@@ -565,8 +632,11 @@ export default function App() {
            try {
              const data = docSnap.data();
              isUpdatingFromServer.current = true;
-             setHistory(prev => ({ ...prev, ...data }));
-             setTimeout(() => { isUpdatingFromServer.current = false; }, 1000);
+             setHistory(prev => {
+                const newState = { ...prev, ...data };
+                return JSON.stringify(prev) === JSON.stringify(newState) ? prev : newState;
+             });
+             setTimeout(() => { isUpdatingFromServer.current = false; }, 1500);
            } catch (err) {
              console.error("Parse Error saat load history tahun ini:", err);
              setHasParseError(true);
@@ -592,6 +662,7 @@ export default function App() {
   useEffect(() => {
     if (user && isDataLoaded && !isUpdatingFromServer.current && !hasParseError) {
       const timer = setTimeout(() => {
+        if (isUpdatingFromServer.current) return; // double-check before firing
         const mainDocRef = doc(db, "users", user.uid);
         
         // Simpan Profil & Program ke Dokumen Utama
@@ -622,11 +693,12 @@ export default function App() {
            setDoc(yearRef, historyByYear[year], { merge: true }).catch(err => console.error(`Auto-save History ${year} gagal:`, err));
         }
 
-      }, 1500); 
+      }, 2000); 
       
       return () => clearTimeout(timer);
     }
   }, [history, programs, exerciseLibrary, theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, user, isDataLoaded, userAchievements]);
+
 
   // --- CEK ACHIEVEMENTS ---
   const historyRef = useRef(history);
@@ -813,6 +885,35 @@ export default function App() {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    playSoundEffect('click', soundEnabled);
+    if (!user) return;
+    try {
+      // 1. Delete user data from firestore
+      const docRef = doc(db, 'userData', user.uid);
+      await deleteDoc(docRef);
+
+      // 2. Delete user from auth
+      await deleteUser(user);
+
+      // 3. Clear local storage
+      localStorage.clear();
+
+      // 4. Reset UI state & refresh
+      setActiveAddModalTarget(null);
+      setShowProfileModal(false);
+      setShowSettings(false);
+      window.location.reload();
+    } catch (error) {
+      console.error("Gagal menghapus akun:", error);
+      if (error.code === 'auth/requires-recent-login') {
+        alert("Demi keamanan, sistem mewajibkan Anda untuk logout dan login ulang sebelum menghapus akun ini.");
+      } else {
+        alert("Terjadi kesalahan saat menghapus akun: " + error.message);
+      }
+    }
+  };
+
   const dict = {
     ID: { 
       workout: 'Latihan', calendar: 'Kalender', progress: 'Progres', cancel: 'Batal',
@@ -887,7 +988,7 @@ export default function App() {
     // GUARD: Mencegah circular dependency (flickering).
     // Jangan overwrite exerciseLogs jika kita hanya merespon autosave buatan sendiri.
     // Tetap load jika tanggal berubah (loadedDate !== selectedDate) atau server memberi data baru.
-    if (loadedDate === selectedDate && !isUpdatingFromServer.current) return;
+    if (loadedDate === selectedDate) return;
 
     const dayData = getDayHistory(selectedDate);
     if (dayData) {
@@ -1362,7 +1463,7 @@ export default function App() {
     playSoundEffect('click', soundEnabled);
     setSelectedDate(dateStr);
     setActiveProgramId(w.programId);
-    setFocusWorkoutId(w.programId === 'adhoc' ? 'extra' : w.programId);
+    setFocusWorkoutId(w.programId === 'adhoc' ? 'extra' : w.id);
     
     // Parse previous duration to seconds
     let prevSecs = 0;
@@ -1441,7 +1542,7 @@ export default function App() {
 
     if (activeAddModalTarget.type === 'program') {
       const progId = activeAddModalTarget.progId;
-      setPrograms(programs.map(p => p.id === progId ? { ...p, exercises: [...p.exercises, { ...ex, id: Date.now(), sets: defaultSets, reps: defaultReps, duration: defaultDuration }] } : p));
+      setPrograms(prev => prev.map(p => p.id === progId ? { ...p, exercises: [...p.exercises, { ...ex, id: crypto.randomUUID(), sets: defaultSets, reps: defaultReps, duration: defaultDuration }] } : p));
     } else if (activeAddModalTarget.type === 'adhoc') { 
       setExtraExercises(prev => [...prev, { ...ex, id: `${ex.id}-${Date.now()}`, sets: defaultSets, reps: defaultReps, duration: defaultDuration }]); 
       setLastActionTime(Date.now()); // Trigger Autosave
@@ -1452,7 +1553,7 @@ export default function App() {
         if (hasEx) {
            return {
              ...p,
-             exercises: p.exercises.map(e => e.id === exToReplaceId ? { ...ex, id: Date.now(), sets: e.sets || defaultSets, reps: e.reps || defaultReps, duration: e.duration || defaultDuration } : e)
+             exercises: p.exercises.map(e => e.id === exToReplaceId ? { ...ex, id: crypto.randomUUID(), sets: e.sets || defaultSets, reps: e.reps || defaultReps, duration: e.duration || defaultDuration } : e)
            }
         }
         return p;
@@ -1476,11 +1577,10 @@ export default function App() {
   // ==========================================
   // RENDER PENGHALANG SAAT LOADING / CEK AUTH
   // ==========================================
-  if (isAuthChecking || (user && !isDataLoaded)) {
+  if (isAuthChecking || (user && !isDataLoaded) || !isSplashMinTimeReached) {
     return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4">
-         <Loader2 size={48} className="text-sky-500 animate-spin mb-6" />
-         <h2 className="text-white body-lg font-black animate-pulse tracking-wider uppercase">Menyiapkan Ruang Latihan...</h2>
+      <div className={`min-h-screen flex flex-col items-center justify-center p-4 transition-colors duration-300 ${theme === 'dark' ? 'bg-[#0f1115]' : 'bg-white'}`}>
+         <img src={theme === 'dark' ? '/logo-dark.png' : '/logo-light.png'} alt="LyFit Logo" className="w-40 h-40 object-contain animate-pulse drop-shadow-2xl" />
       </div>
     );
   }
@@ -1513,7 +1613,13 @@ export default function App() {
          isOpen={showQuestionnaire}
          onClose={() => {
            setShowQuestionnaire(false);
-           localStorage.setItem('lyfit_onboarding_completed', 'true');
+           if (user?.uid) {
+             localStorage.setItem(`lyfit_onboarding_completed_${user.uid}`, 'true');
+           }
+           // Persist to Firebase so it syncs across all devices
+           if (user?.uid) {
+             setDoc(doc(db, 'userData', user.uid), { onboardingCompleted: true }, { merge: true }).catch(() => {});
+           }
          }}
          onComplete={handleApplyRecommendedPlan}
          t={t}
@@ -1524,6 +1630,7 @@ export default function App() {
          activeGymId={activeGymId}
          setActiveGymId={setActiveGymId}
          exerciseLibrary={exerciseLibrary}
+         units={units}
       />
       
         <ProfileModal 
@@ -1531,9 +1638,14 @@ export default function App() {
            user={user} setUser={setUser} t={t} theme={theme} handleLogout={handleLogout} history={history}
            activityTargets={activityTargets} programs={programs} setPrograms={setPrograms} exerciseLibrary={exerciseLibrary}
            lang={lang} language={language} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} selectedDate={selectedDate} units={units} activePlanIds={activePlanIds}
-           userAchievements={userAchievements}
+           userAchievements={userAchievements} userProfile={userProfile}
            highlightPostId={highlightPostId}
            onClearHighlight={() => setHighlightPostId(null)}
+           forceTab={profileForceTab}
+           onAchievementShareComplete={(postId) => {
+             // Highlight the newly shared post in the community feed
+             if (postId) setHighlightPostId(postId);
+           }}
         />
 
         <SettingsModal 
@@ -1550,7 +1662,8 @@ export default function App() {
          undoStack={undoStack} redoStack={redoStack} handleUndo={handleUndo} handleRedo={handleRedo}
          setShowHelp={setShowHelp}
          exportData={exportData} handleImportFile={handleImportFile}
-         user={user} handleLogout={handleLogout}
+         user={user} handleLogout={handleLogout} handleDeleteAccount={handleDeleteAccount}
+         connectedApps={connectedApps} setConnectedApps={setConnectedApps}
       />
 
       <Header 
@@ -1583,7 +1696,8 @@ export default function App() {
                gymProfiles={gymProfiles} activeGymId={activeGymId}
                activePlanIds={activePlanIds}
                userGeminiApiKey={userGeminiApiKey}
-               userAchievements={userAchievements}
+               userAchievements={userAchievements} connectedApps={connectedApps}
+               userProfile={userProfile}
              />
          )}
          
@@ -1695,8 +1809,15 @@ export default function App() {
         }} 
         soundEnabled={soundEnabled} 
         playSoundEffect={playSoundEffect} 
-        theme={theme} 
+        theme={theme}
+        t={t}
         user={user}
+        onShareComplete={(postId) => {
+          setUnlockedAchievementsPopup([]);
+          // Open ProfileModal on the community feed tab
+          setProfileForceTab('beranda');
+          setShowProfileModal(true);
+        }}
       />
 
       <BottomNav t={t} lang={lang} activeTab={activeTab} setActiveTab={setActiveTab} setIsEditingMode={setIsEditingMode} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} />

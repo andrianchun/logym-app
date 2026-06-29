@@ -956,8 +956,20 @@ const CalendarTab = ({
                          
                          <div className="space-y-4">
                            {panelWorkouts.length === 0 ? (
-                              <div className="p-4 text-center caption opacity-50">
-                                {(!activePlanIds || activePlanIds.length === 0) ? "Tidak ada program aktif. Silakan pilih program di tab Program." : "Tidak ada jadwal"}
+                              <div className="p-4 text-center flex flex-col items-center">
+                                {(!activePlanIds || activePlanIds.length === 0) ? (
+                                    <>
+                                        <p className="caption opacity-50 mb-4">Tidak ada program aktif. Silakan pilih program di tab Program.</p>
+                                        <button 
+                                            onClick={() => { playSoundEffect('click', soundEnabled); setActiveTab('program'); }} 
+                                            className={`w-full py-3 rounded-xl body-lg font-bold ${t.bgAccentSoft} ${t.textAccent} border ${t.borderAccentSoft} hover:opacity-80 transition-opacity`}
+                                        >
+                                            Buka Tab Program
+                                        </button>
+                                    </>
+                                ) : (
+                                    <p className="caption opacity-50">Tidak ada jadwal</p>
+                                )}
                               </div>
                            ) : (
                               (() => {
@@ -1059,17 +1071,9 @@ const CalendarTab = ({
                                                  <span>{calBurned} kcal</span>
                                                </div>
                                              ) : (
-                                               <div className="flex items-center gap-2 relative z-10 mt-1">
-                                                 <div className="caption opacity-70 flex items-center gap-1.5 flex-wrap">
+                                               <div className="flex flex-col gap-0.5 relative z-10 mt-1">
+                                                 <div className="caption opacity-70 flex items-center gap-1.5">
                                                    <span>Direncanakan</span>
-                                                   {estDuration > 0 && (
-                                                     <>
-                                                       <span className="opacity-50 text-[10px]">•</span>
-                                                       <span>~{estDuration} mnt</span>
-                                                       <span className="opacity-50 text-[10px]">•</span>
-                                                       <span>~{estCal} kcal</span>
-                                                     </>
-                                                   )}
                                                    <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-1.5">
                                                      <span className="opacity-50 text-[10px] ml-0.5">•</span>
                                                      <button onClick={() => { setNotificationModalTarget({ workoutId: w.id, programName: w.programName, dateStr: targetDateStr, existingNotifId: w.reminderNotifId, currentTime: effectiveTime, currentEnabled: isNotifOn }); }} className={`flex items-center gap-1 px-1.5 py-0.5 -ml-1 rounded-md hover:bg-black/10 dark:hover:bg-white/10 transition-colors ${isNotifOn ? t.textAccent : 'opacity-60 hover:opacity-100'}`} title="Pengingat">
@@ -1078,6 +1082,13 @@ const CalendarTab = ({
                                                      </button>
                                                    </div>
                                                  </div>
+                                                 {estDuration > 0 && (
+                                                     <div className="caption opacity-50 flex items-center gap-1.5">
+                                                       <span>~{estDuration} mnt</span>
+                                                       <span className="opacity-50 text-[10px]">•</span>
+                                                       <span>~{estCal} kcal</span>
+                                                     </div>
+                                                 )}
                                                </div>
                                              )}
                                            </div>

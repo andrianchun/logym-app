@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { X, ImagePlus, Loader2 } from 'lucide-react';
 import { uploadToCloudinary } from '../utils/cloudinary';
 import { createCommunityPost } from '../utils/communityApi';
+import { containsBadWords } from '../utils/moderationApi';
 import ProgramCard from './ProgramCard';
 import useDialog from '../hooks/useDialog';
 
@@ -36,6 +37,12 @@ export default function CreatePostModal({ user, onClose, theme, t, initialFiles 
 
   const handleSubmit = async () => {
     if (!canPost) return;
+
+    if (containsBadWords(text)) {
+      await showAlert('Pesan mengandung kata-kata yang tidak pantas atau melanggar standar komunitas.', { type: 'error', title: 'Peringatan' });
+      return;
+    }
+
     setIsUploading(true);
     
     try {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Mail, Lock, User, ArrowRight, Loader2, Activity } from 'lucide-react';
 import { playSoundEffect } from '../utils/audio';
 
@@ -21,6 +21,14 @@ const AuthPage = ({ t, theme, soundEnabled, onLogin }) => {
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  useEffect(() => {
+    const bannedMsg = localStorage.getItem('lyfit_banned_msg');
+    if (bannedMsg) {
+      setErrorMsg(bannedMsg);
+      localStorage.removeItem('lyfit_banned_msg');
+    }
+  }, []);
 
   // 1. FUNGSI LOGIN & REGISTER MANUAL
   const handleSubmit = async (e) => {

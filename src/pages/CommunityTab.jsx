@@ -5,15 +5,18 @@ import {
 } from 'lucide-react';
 import {
   getGlobalFeed, getUserPosts, toggleLike, deletePost, updatePost,
-  addComment, getComments, repostPost, getNotifications, sendNotification
+  addComment, getComments, repostPost, getNotifications, sendNotification,
+  getWeeklyLeaderboard
 } from '../utils/communityApi';
-import { getFollowingIds, getBlockedList } from '../utils/followApi';
+import { getFollowingIds, getBlockedList, blockUser } from '../utils/followApi';
+import { containsBadWords, reportPost, reportUser, getLocalHiddenPosts, getLocalBlockedUsers } from '../utils/moderationApi';
 import { formatNumber } from '../utils/numberFormat';
 import { ACHIEVEMENTS } from '../data/achievements';
 import ImageModal from '../components/ImageModal';
 import CreatePostModal from '../components/CreatePostModal';
 import ProgramCard from '../components/ProgramCard';
 import UserProfileModal from '../components/UserProfileModal';
+import UnifiedBadge from '../components/UnifiedBadge';
 import { uploadToCloudinary } from '../utils/cloudinary';
 import useDialog from '../hooks/useDialog';
 
@@ -27,7 +30,8 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
   const [followingIds, setFollowingIds] = useState([]);
   const [blockedIds, setBlockedIds] = useState([]);
   const [viewingProfile, setViewingProfile] = useState(null); // {userId, userName, userPhoto}
-
+  const [leaderboard, setLeaderboard] = useState([]);
+  
   // per-post state
   const [likedPosts, setLikedPosts] = useState({});
   const [expandedComments, setExpandedComments] = useState({});
@@ -70,27 +74,24 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      let data = [];
-      if (activeFilter === 'Saya' && user?.uid) {
-        data = await getUserPosts(user.uid, 30);
-      } else {
-        // Ensure blocked list is loaded before filtering
-        let currentBlocked = blockedIds;
-        if (user?.uid && currentBlocked.length === 0) {
-          currentBlocked = await getBlockedList(user.uid);
-          setBlockedIds(currentBlocked);
-        }
+      let data = activeFilter === 'Saya' && user?.uid
+        ? await getUserPosts(user?.uid, 30) 
+        : await getGlobalFeed(50);
+      
+      const hiddenPosts = getLocalHiddenPosts();
+      const blockedUsersLocal = getLocalBlockedUsers();
+      
+      // Filter out blocked users (from DB and Local) and hidden posts
+      data = data.filter(p => 
+        !blockedIds.includes(p.userId) && 
+        !blockedUsersLocal.includes(p.userId) &&
+        !hiddenPosts.includes(p.id) &&
+        p.isHidden !== true // Server-side Auto-Takedown
+      );
 
-        data = await getGlobalFeed(50);
-        // Filter out blocked users
-        if (currentBlocked.length > 0) {
-          data = data.filter(p => !currentBlocked.includes(p.userId));
-        }
-        
-        if (activeFilter === 'Diikuti' && user?.uid) {
-          const ids = followingIds.length ? followingIds : await getFollowingIds(user.uid);
-          data = data.filter(p => ids.includes(p.userId));
-        }
+      // if filter is 'Diikuti'
+      if (activeFilter === 'Diikuti' && user?.uid) {
+        data = data.filter(p => followingIds.includes(p.userId) || p.userId === user.uid);
       }
       setFeed(data);
 
@@ -100,11 +101,19 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
         data.forEach(p => { liked[p.id] = (p.likedBy || []).includes(user.uid); });
         setLikedPosts(liked);
       }
+      
+      // Load Leaderboard only if on 'Semua' filter (global feed)
+      if (activeFilter === 'Semua') {
+        const lb = await getWeeklyLeaderboard();
+        setLeaderboard(lb);
+      } else {
+        setLeaderboard([]);
+      }
     } catch (e) { console.error(e); }
     setIsLoading(false);
-  }, [activeFilter, user?.uid, followingIds]);
+  }, [activeFilter, user?.uid, followingIds, blockedIds]);
 
-  useEffect(() => { loadData(); }, [activeFilter]);
+  useEffect(() => { loadData(); }, [activeFilter, loadData]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -145,6 +154,44 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
     ));
   };
 
+  const handleReportPost = async (post) => {
+    setMenuOpen(null);
+    const reason = prompt("Mengapa Anda melaporkan postingan ini? (Misal: Spam, Kata Kotor, Tidak Senonoh)");
+    if (!reason) return;
+    
+    const success = await reportPost(post.id, user?.uid, reason);
+    if (success) {
+      await showAlert("Laporan berhasil dikirim. Postingan telah disembunyikan dari beranda Anda.", { type: 'success' });
+      // Hapus dari state lokal
+      setFeed(prev => prev.filter(p => p.id !== post.id));
+    }
+  };
+
+  const handleBlockUser = async (targetUserId) => {
+    setMenuOpen(null);
+    const confirm = await showConfirm(
+      "Blokir Pengguna?",
+      "Anda tidak akan lagi melihat postingan maupun komentar dari pengguna ini. Lanjutkan?",
+      "Ya, Blokir", "Batal"
+    );
+    if (!confirm) return;
+
+    try {
+      await blockUser(user?.uid, targetUserId);
+      const localBlocked = getLocalBlockedUsers();
+      if (!localBlocked.includes(targetUserId)) {
+        localBlocked.push(targetUserId);
+        localStorage.setItem('lyfit_blocked_users_local', JSON.stringify(localBlocked));
+      }
+      setBlockedIds(prev => [...prev, targetUserId]);
+      await showAlert("Pengguna berhasil diblokir.", { type: 'success' });
+      // Bersihkan feed lokal
+      setFeed(prev => prev.filter(p => p.userId !== targetUserId));
+    } catch (err) {
+      await showAlert("Gagal memblokir pengguna.", { type: 'error' });
+    }
+  };
+
   const handleDelete = async (postId) => {
     const ok = await showConfirm('Hapus postingan ini?', { title: 'Hapus Postingan', confirmText: 'Hapus', danger: true });
     if (!ok) return;
@@ -176,6 +223,12 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
   const handleSendComment = async (post) => {
     const text = (commentInput[post.id] || '').trim();
     if (!text || !user?.uid) return;
+
+    if (containsBadWords(text)) {
+      await showAlert('Komentar mengandung kata-kata yang tidak pantas.', { type: 'error', title: 'Peringatan' });
+      return;
+    }
+
     const newComment = {
       id: 'temp-' + Date.now(),
       userId: user.uid,
@@ -215,23 +268,32 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
     }
   };
 
-  const renderAvatar = (userName, userPhoto, userId) => (
-    <button
-      onClick={() => setViewingProfile({ userId, userName, userPhoto })}
-      className="shrink-0"
-    >
-      {userPhoto ? (
-        <img src={userPhoto} alt={userName} className={`w-9 h-9 rounded-full object-cover ring-2 ${t.ringAccent} ring-opacity-20 hover:ring-opacity-50 transition-all`} />
-      ) : (
-        <div className={`w-9 h-9 rounded-full ${t.bgAccentSoft} ${t.textAccent} flex items-center justify-center font-black text-sm transition-all`}>
-          {(userName || '?').charAt(0).toUpperCase()}
+  const renderAvatar = (userName, userPhoto, userId) => {
+    const isTopTen = leaderboard.some(u => u.id === userId);
+    return (
+      <button
+        onClick={() => setViewingProfile({ userId, userName, userPhoto })}
+        className="shrink-0 relative group"
+      >
+        {isTopTen && (
+          <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-cyan-300 via-blue-500 to-indigo-600 animate-pulse-slow opacity-80 blur-[2px]" />
+        )}
+        <div className={`relative ${isTopTen ? 'ring-2 ring-blue-400 p-[2px]' : ''} rounded-full bg-${isDark ? 'slate-800' : 'white'} z-10`}>
+          {userPhoto ? (
+            <img src={userPhoto} alt={userName} className={`w-9 h-9 rounded-full object-cover ${!isTopTen ? `ring-2 ${t.ringAccent} ring-opacity-20 hover:ring-opacity-50` : ''} transition-all`} />
+          ) : (
+            <div className={`w-9 h-9 rounded-full ${!isTopTen ? t.bgAccentSoft : 'bg-blue-100'} ${!isTopTen ? t.textAccent : 'text-blue-600'} flex items-center justify-center font-black text-sm transition-all`}>
+              {(userName || '?').charAt(0).toUpperCase()}
+            </div>
+          )}
         </div>
-      )}
-    </button>
-  );
+      </button>
+    );
+  };
 
   const renderPostCard = (post, idx) => {
     const isOwn = user?.uid === post.userId;
+    const isAdmin = user?.email === 'untheryan@gmail.com';
     const liked = likedPosts[post.id] || false;
     const commentsOpen = expandedComments[post.id] || false;
     const postComments = comments[post.id] || [];
@@ -247,7 +309,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
           flashingPostId === post.id
             ? 'border-[#41759b] shadow-[0_0_0_3px_rgba(65,117,155,0.3)]'
             : isDark ? 'border-white/10' : 'border-white/40'
-        } shadow-[0_8px_30px_rgb(0,0,0,0.04)]`}
+        } shadow-[0_8px_30px_rgb(0,0,0,0.04)] ${menuOpen === post.id ? 'relative z-50' : 'relative z-10'}`}
       >
 
         {/* Post header */}
@@ -275,36 +337,61 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
             </div>
           </div>
 
-          {/* ⋯ menu (own posts only) */}
-          {isOwn && (
-            <div className="relative shrink-0">
-              <button
-                onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === post.id ? null : post.id); }}
-                className={`p-1.5 rounded-full ${isDark ? 'hover:bg-white/10 text-white/40' : 'hover:bg-black/5 text-black/40'} transition-colors`}
+          {/* ⋯ menu */}
+          <div className="relative shrink-0">
+            <button
+              onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === post.id ? null : post.id); }}
+              className={`p-1.5 rounded-full ${isDark ? 'hover:bg-white/10 text-white/40' : 'hover:bg-black/5 text-black/40'} transition-colors`}
+            >
+              <MoreHorizontal size={16} />
+            </button>
+            {menuOpen === post.id && (
+              <div 
+                onClick={(e) => e.stopPropagation()}
+                className={`absolute right-0 top-8 z-50 ${isDark ? 'bg-slate-800 border-white/10' : 'bg-white border-black/10'} border rounded-2xl shadow-xl overflow-hidden w-max`}
               >
-                <MoreHorizontal size={16} />
-              </button>
-              {menuOpen === post.id && (
-                <div 
-                  onClick={(e) => e.stopPropagation()}
-                  className={`absolute right-0 top-8 z-50 ${isDark ? 'bg-slate-800 border-white/10' : 'bg-white border-black/10'} border rounded-2xl shadow-xl overflow-hidden min-w-[130px]`}
-                >
-                  <button
-                    onClick={() => { setEditingPost({ id: post.id, text: post.text || '', imageUrls: post.imageUrls || [] }); setMenuOpen(null); }}
-                    className={`w-full flex items-center gap-2 px-3 py-2.5 text-sm font-bold ${isDark ? 'text-white hover:bg-white/5' : 'text-black hover:bg-black/5'} transition-colors`}
-                  >
-                    <Edit3 size={14} /> Edit
-                  </button>
-                  <button
-                    onClick={() => handleDelete(post.id)}
-                    className="w-full flex items-center gap-2 px-3 py-2.5 text-sm font-bold text-rose-500 hover:bg-rose-500/10 transition-colors"
-                  >
-                    <Trash2 size={14} /> Hapus
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+                {isOwn ? (
+                  <>
+                    <button
+                      onClick={() => { setEditingPost({ id: post.id, text: post.text || '', imageUrls: post.imageUrls || [] }); setMenuOpen(null); }}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold whitespace-nowrap ${isDark ? 'text-white hover:bg-white/5' : 'text-black hover:bg-black/5'} transition-colors`}
+                    >
+                      <Edit3 size={16} /> Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(post.id)}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold whitespace-nowrap text-rose-500 hover:bg-rose-500/10 transition-colors"
+                    >
+                      <Trash2 size={16} /> Hapus
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => handleReportPost(post)}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold whitespace-nowrap ${isDark ? 'text-white hover:bg-white/5' : 'text-black hover:bg-black/5'} transition-colors`}
+                    >
+                      <ClipboardList size={16} /> Laporkan
+                    </button>
+                    <button
+                      onClick={() => handleBlockUser(post.userId)}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold whitespace-nowrap text-rose-500 hover:bg-rose-500/10 transition-colors"
+                    >
+                      <X size={16} /> Blokir Pengguna
+                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleDelete(post.id)}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold whitespace-nowrap text-rose-600 hover:bg-rose-600/10 transition-colors border-t border-rose-500/10"
+                      >
+                        <Trash2 size={16} /> Force Delete
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Edit mode */}
@@ -450,13 +537,17 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
 
             {/* ACHIEVEMENT */}
             {post.type === 'achievement' && (
-              <div className={`p-4 rounded-2xl ${isDark ? 'bg-amber-900/20' : 'bg-amber-50'} border border-amber-500/20 mb-3 flex items-center gap-4`}>
-                <div className="w-12 h-12 rounded-full bg-amber-500/20 text-amber-500 flex justify-center items-center">
-                  <Award size={24} />
-                </div>
+              <div className={`p-4 rounded-2xl ${isDark ? 'bg-amber-900/10' : 'bg-amber-50'} border ${isDark ? 'border-amber-500/10' : 'border-amber-500/20'} mb-3 flex items-center justify-between`}>
                 <div>
-                  <div className="text-[10px] font-bold text-amber-500 uppercase tracking-wider mb-0.5">Lencana Terbuka</div>
-                  <h5 className={`font-black text-sm ${t.textMain}`}>{post.achievementTitle}</h5>
+                  <div className={`text-[10px] font-bold ${isDark ? 'text-amber-500' : 'text-amber-600'} uppercase tracking-wider mb-1 flex items-center gap-1`}>
+                    <Award size={12} />
+                    Lencana Terbuka
+                  </div>
+                  <h5 className={`font-black text-sm ${t.textMain} leading-snug`}>{post.achievementTitle}</h5>
+                  <p className={`text-xs ${t.textMuted} mt-1`}>Berhasil membuka pencapaian baru!</p>
+                </div>
+                <div className="shrink-0 -mr-2">
+                  <UnifiedBadge achievementId={post.achievementId} achievementTitle={post.achievementTitle} isDark={isDark} t={t} />
                 </div>
               </div>
             )}
@@ -566,6 +657,64 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
           </div>
         ) : (
           <div className="flex flex-col space-y-4">
+            {/* Leaderboard Section */}
+            {activeFilter === 'Semua' && (
+              <div className={`p-4 rounded-3xl ${isDark ? 'bg-gradient-to-br from-blue-500/10 to-[#1e1c17] border border-blue-500/20' : 'bg-gradient-to-br from-blue-50 to-white border border-blue-200'} shadow-lg mb-2 relative overflow-hidden`}>
+                <div className="absolute top-0 right-0 p-3 opacity-10">
+                  <Trophy size={64} className={isDark ? 'text-blue-400' : 'text-blue-600'} />
+                </div>
+                <div className="flex items-start gap-3 mb-4 relative z-10">
+                  <div className={`p-2 rounded-xl ${isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600'}`}>
+                    <Trophy size={18} />
+                  </div>
+                  <div>
+                    <h3 className={`font-black text-sm tracking-wide ${isDark ? 'text-blue-300' : 'text-blue-700'}`}>
+                      10 Pengguna Teratas
+                    </h3>
+                    <p className={`text-[10px] font-bold ${isDark ? 'text-blue-300/60' : 'text-blue-600/70'}`}>
+                      share latihanmu ke sini dan jadilah juara!
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex gap-3 overflow-x-auto hide-scrollbar pt-2 pb-3 px-1 relative z-10 min-h-[80px]">
+                  {leaderboard.length === 0 ? (
+                    <div className={`w-full flex flex-col items-center justify-center py-4 text-center ${isDark ? 'text-blue-400/60' : 'text-blue-600/60'}`}>
+                      <Award size={24} className="mb-2 opacity-50" />
+                      <p className="text-xs font-bold">Jadilah yang pertama membagikan latihanmu sekarang!</p>
+                    </div>
+                  ) : (
+                    leaderboard.map((lbUser, idx) => (
+                      <button 
+                        key={lbUser.id}
+                        onClick={() => setViewingProfile({ userId: lbUser.id, userName: lbUser.name, userPhoto: lbUser.photoUrl })}
+                        className="flex flex-col items-center gap-1.5 shrink-0 group relative"
+                      >
+                        <div className="relative">
+                          <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-cyan-300 via-blue-500 to-indigo-600 opacity-60 blur-[2px] group-hover:opacity-100 transition-opacity" />
+                          <div className={`relative p-[2px] bg-${isDark ? 'slate-800' : 'white'} rounded-full z-10`}>
+                            {lbUser.photoUrl ? (
+                              <img src={lbUser.photoUrl} alt="" className="w-12 h-12 rounded-full object-cover" />
+                            ) : (
+                              <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-black text-lg">
+                                {(lbUser.name || '?').charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                          </div>
+                          <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center text-[10px] font-black z-20 border-2 border-white dark:border-slate-800">
+                            {idx + 1}
+                          </div>
+                        </div>
+                        <span className={`text-[10px] font-bold max-w-[60px] truncate ${isDark ? 'text-white/80' : 'text-black/80'}`}>
+                          {lbUser.name}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
             {feed.length === 0 ? (
               <p className={`text-center py-10 ${t.textMuted} text-sm font-bold`}>
                 {activeFilter === 'Diikuti' ? 'Ikuti seseorang untuk melihat postingan mereka.' : 'Belum ada post di komunitas.'}
@@ -611,6 +760,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
           currentUser={user}
           isDark={isDark}
           t={t}
+          leaderboardRank={leaderboard.findIndex(u => u.id === viewingProfile.userId) + 1}
           onClose={() => setViewingProfile(null)}
         />
       )}

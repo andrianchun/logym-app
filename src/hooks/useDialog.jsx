@@ -12,7 +12,7 @@ import { AlertCircle, CheckCircle2, Info } from 'lucide-react';
  * 
  * Render <>{dialog}</> somewhere in your JSX.
  */
-export default function useDialog(isDark = false) {
+export default function useDialog(isDark = false, customBgClass = null) {
   const [state, setState] = useState(null);
   const resolveRef = useRef(null);
 
@@ -51,7 +51,7 @@ export default function useDialog(isDark = false) {
     >
       <div
         className={`w-full max-w-xs rounded-3xl p-5 shadow-2xl border animate-in zoom-in-95 duration-200 ${
-          isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-black/8'
+          isDark ? `${customBgClass || 'bg-slate-900'} border-white/10` : 'bg-white border-black/8'
         }`}
         onClick={e => e.stopPropagation()}
       >

@@ -58,8 +58,8 @@ const ScrollPicker = ({ value, onChange, min = 0, max = 200, step = 1, width = '
         {options.map((opt) => (
           <div 
             key={opt}
-            className={`h-[40px] flex items-center justify-center snap-center h2 transition-opacity ${
-              opt === value ? (theme === 'dark' ? 'opacity-100 text-[#93a6b2]' : 'opacity-100 text-[#81571E]') : (theme === 'dark' ? 'opacity-40 text-slate-400' : 'opacity-40 text-slate-600')
+            className={`h-[40px] flex items-center justify-center snap-center font-bold text-lg transition-opacity ${
+              opt === value ? (theme === 'dark' ? 'opacity-100 text-[#93a6b2]' : 'opacity-100 text-[#81571E]') : (theme === 'dark' ? 'opacity-20 text-slate-400' : 'opacity-20 text-slate-600')
             }`}
           >
             {opt}

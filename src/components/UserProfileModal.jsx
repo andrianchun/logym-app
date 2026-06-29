@@ -1,33 +1,40 @@
 import React, { useState, useEffect } from 'react';
-import { X, UserCheck, UserPlus, Share2, Grid3X3, Award } from 'lucide-react';
+import { X, UserCheck, UserPlus, Share2, Grid3X3, Award, ClipboardList, AlertTriangle, Trophy } from 'lucide-react';
+import UnifiedBadge from './UnifiedBadge';
 import { getUserPosts } from '../utils/communityApi';
-import { followUser, unfollowUser, isFollowing, getFollowerCount, getFollowingCount } from '../utils/followApi';
+import { followUser, unfollowUser, isFollowing, getFollowerCount, getFollowingCount, blockUser, isBlocked, unblockUser } from '../utils/followApi';
+import { reportUser, getLocalBlockedUsers, banUserGlobal } from '../utils/moderationApi';
 import useDialog from '../hooks/useDialog';
 
-export default function UserProfileModal({ profileUserId, profileUserName, profileUserPhoto, currentUser, isDark, t, onClose }) {
-  const { dialog, showAlert } = useDialog(isDark);
+export default function UserProfileModal({ profileUserId, profileUserName, profileUserPhoto, currentUser, isDark, t, leaderboardRank, onClose }) {
+  const { dialog, showAlert, showConfirm } = useDialog(isDark);
+  const isTopTen = leaderboardRank > 0;
   const [posts, setPosts] = useState([]);
   const [isFollowingUser, setIsFollowingUser] = useState(false);
+  const [isUserBlocked, setIsUserBlocked] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [isLoadingFollow, setIsLoadingFollow] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const isOwnProfile = currentUser?.uid === profileUserId;
+  const isAdmin = currentUser?.email === 'untheryan@gmail.com';
 
   useEffect(() => {
     const load = async () => {
       setIsLoading(true);
-      const [userPosts, followers, following, followStatus] = await Promise.all([
+      const [userPosts, followers, following, followStatus, blockStatus] = await Promise.all([
         getUserPosts(profileUserId, 20),
         getFollowerCount(profileUserId),
         getFollowingCount(profileUserId),
         currentUser && !isOwnProfile ? isFollowing(currentUser.uid, profileUserId) : Promise.resolve(false),
+        currentUser && !isOwnProfile ? isBlocked(currentUser.uid, profileUserId) : Promise.resolve(false)
       ]);
       setPosts(userPosts);
       setFollowerCount(followers);
       setFollowingCount(following);
       setIsFollowingUser(followStatus);
+      setIsUserBlocked(blockStatus);
       setIsLoading(false);
     };
     load();
@@ -55,13 +62,82 @@ export default function UserProfileModal({ profileUserId, profileUserName, profi
     setIsLoadingFollow(false);
   };
 
+  const handleUnblock = async () => {
+    if (!currentUser) return;
+    setIsLoadingFollow(true);
+    try {
+      await unblockUser(currentUser.uid, profileUserId);
+      setIsUserBlocked(false);
+      showAlert("Blokir telah dibuka. Anda akan kembali melihat postingan pengguna ini.", { type: 'success' });
+    } catch (e) {
+      console.error(e);
+      showAlert("Gagal membuka blokir.", { type: 'error' });
+    }
+    setIsLoadingFollow(false);
+  };
+
+  const handleBanUser = async () => {
+    const confirm = await showConfirm(
+      `Anda akan melakukan GLOBAL BAN terhadap ${profileUserName}. Pengguna ini akan dikeluarkan secara paksa dan tidak bisa lagi mengakses aplikasi. Lanjutkan?`,
+      {
+        title: "Peringatan Keras!",
+        confirmText: "Ya, Banned Akun",
+        cancelText: "Batal",
+        danger: true
+      }
+    );
+
+    if (confirm) {
+      const success = await banUserGlobal(profileUserId);
+      if (success) {
+        showAlert("Akun berhasil di-banned secara permanen.", { type: 'success' });
+        onClose();
+      } else {
+        showAlert("Gagal melakukan Banned.", { type: 'error' });
+      }
+    }
+  };
+
   const handleShareProfile = async () => {
     const text = `Lihat profil ${profileUserName} di LyFit!`;
     if (navigator.share) {
       navigator.share({ title: profileUserName, text });
     } else {
       navigator.clipboard?.writeText(text);
-      await showAlert('Tautan profil disalin!', { type: 'success' });
+      await showAlert('Link profil disalin ke clipboard!', { type: 'success' });
+    }
+  };
+
+  const handleReportUser = async () => {
+    const reason = prompt(`Mengapa Anda melaporkan ${profileUserName}?`);
+    if (!reason) return;
+    const ok = await reportUser(profileUserId, currentUser?.uid, reason);
+    if (ok) {
+      await showAlert("Laporan berhasil dikirim. Pengguna telah diblokir.", { type: 'success' });
+      onClose();
+    }
+  };
+
+  const handleBlockUser = async () => {
+    const confirm = await dialog({
+      title: "Blokir Pengguna?",
+      message: `Anda tidak akan melihat postingan dari ${profileUserName} lagi.`,
+      confirmText: "Blokir",
+      cancelText: "Batal",
+      danger: true
+    });
+    if (!confirm) return;
+    try {
+      await blockUser(currentUser?.uid, profileUserId);
+      const localBlocked = getLocalBlockedUsers();
+      if (!localBlocked.includes(profileUserId)) {
+        localBlocked.push(profileUserId);
+        localStorage.setItem('lyfit_blocked_users_local', JSON.stringify(localBlocked));
+      }
+      await showAlert("Pengguna berhasil diblokir.", { type: 'success' });
+      onClose();
+    } catch {
+      await showAlert("Gagal memblokir pengguna.", { type: 'error' });
     }
   };
 
@@ -70,8 +146,8 @@ export default function UserProfileModal({ profileUserId, profileUserName, profi
   const imageUrls = regularPosts.flatMap(p => p.imageUrls || (p.imageUrl ? [p.imageUrl] : []));
 
   return (
-    <div className="fixed inset-0 z-[1000] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center animate-in fade-in duration-200">
-      <div className={`w-full sm:max-w-sm ${isDark ? 'bg-slate-900' : 'bg-white'} rounded-t-3xl sm:rounded-3xl flex flex-col max-h-[90vh] shadow-2xl animate-in slide-in-from-bottom-8`}>
+    <div className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-md flex items-end sm:items-center justify-center animate-in fade-in duration-200">
+      <div className={`w-full sm:max-w-md ${isDark ? 'bg-slate-900/80 backdrop-blur-xl border border-white/10' : 'bg-white/90 backdrop-blur-xl border border-black/5'} rounded-t-3xl sm:rounded-3xl flex flex-col max-h-[90vh] shadow-2xl animate-in slide-in-from-bottom-8`}>
 
         {/* Header */}
         <div className={`px-4 pt-4 pb-3 flex items-center justify-between border-b ${isDark ? 'border-white/10' : 'border-black/8'}`}>
@@ -87,14 +163,29 @@ export default function UserProfileModal({ profileUserId, profileUserName, profi
         <div className="flex-1 overflow-y-auto">
           {/* Profile info */}
           <div className="px-6 pt-5 pb-4 flex flex-col items-center text-center">
-            {profileUserPhoto ? (
-              <img src={profileUserPhoto} alt={profileUserName} className={`w-20 h-20 rounded-full object-cover ring-4 ${t?.ringAccent || 'ring-[#41759b]'} ring-opacity-30 mb-3`} />
-            ) : (
-              <div className={`w-20 h-20 rounded-full ${t?.bgAccentSoft || 'bg-[#41759b]/20'} ${t?.textAccent || 'text-[#41759b]'} flex items-center justify-center font-black text-2xl mb-3`}>
-                {(profileUserName || '?').charAt(0).toUpperCase()}
+            <div className="relative group mb-3">
+              {isTopTen && (
+                <div className="absolute -inset-2 rounded-full bg-gradient-to-r from-cyan-300 via-blue-500 to-indigo-600 animate-pulse-slow opacity-80 blur-[3px]" />
+              )}
+              <div className={`relative ${isTopTen ? 'p-1 bg-' + (isDark ? 'slate-900' : 'white') : ''} rounded-full z-10`}>
+                {profileUserPhoto ? (
+                  <img src={profileUserPhoto} alt={profileUserName} className={`w-20 h-20 rounded-full object-cover ${isTopTen ? 'ring-2 ring-blue-400' : `ring-4 ${t?.ringAccent || 'ring-[#41759b]'} ring-opacity-30`}`} />
+                ) : (
+                  <div className={`w-20 h-20 rounded-full ${isTopTen ? 'bg-blue-100 text-blue-600 ring-2 ring-blue-400' : `${t?.bgAccentSoft || 'bg-[#41759b]/20'} ${t?.textAccent || 'text-[#41759b]'}`} flex items-center justify-center font-black text-2xl`}>
+                    {(profileUserName || '?').charAt(0).toUpperCase()}
+                  </div>
+                )}
               </div>
-            )}
-            <h2 className={`font-black text-xl mb-1 ${isDark ? 'text-white' : 'text-black'}`}>{profileUserName || 'Pengguna'}</h2>
+            </div>
+            <h2 className={`font-black text-xl mb-1 flex items-center justify-center gap-2 ${isDark ? 'text-white' : 'text-black'}`}>
+              {profileUserName || 'Pengguna'}
+              {isTopTen && (
+                <span className="flex items-center gap-1 text-[10px] font-black bg-blue-500 text-white px-2 py-0.5 rounded-full shadow-lg border border-blue-400">
+                  <Trophy size={10} />
+                  {leaderboardRank}
+                </span>
+              )}
+            </h2>
 
             {/* Stats */}
             <div className="flex gap-8 mt-3 mb-4">
@@ -114,54 +205,104 @@ export default function UserProfileModal({ profileUserId, profileUserName, profi
 
             {/* Follow Button */}
             {!isOwnProfile && (
-              <button
-                onClick={handleFollow}
-                disabled={isLoadingFollow}
-                className={`flex items-center gap-2 px-6 py-2 rounded-2xl font-black text-sm transition-all active:scale-95 disabled:opacity-60 ${
-                  isFollowingUser
-                    ? isDark ? 'bg-white/10 text-white hover:bg-white/15' : 'bg-black/8 text-black hover:bg-black/12'
-                    : `${t?.bgAccent || 'bg-[#41759b] text-white'} hover:opacity-90 shadow-lg ${t?.shadowAccent || 'shadow-[#41759b]/30'}`
-                }`}
-              >
-                {isFollowingUser ? <UserCheck size={16}/> : <UserPlus size={16}/>}
-                {isFollowingUser ? 'Mengikuti' : 'Ikuti'}
-              </button>
+              <div className="flex gap-2 w-full mt-2">
+                <button 
+                  onClick={handleShareProfile}
+                  className={`flex-1 py-3 rounded-2xl ${t.bgBox} font-bold text-sm flex items-center justify-center gap-2 transition-transform active:scale-95`}
+                >
+                  <Share2 size={16} /> Share
+                </button>
+                {isUserBlocked ? (
+                  <button 
+                    onClick={handleUnblock}
+                    disabled={isLoadingFollow}
+                    className="flex-[2] py-3 rounded-2xl bg-slate-500 text-white font-black shadow-lg shadow-slate-500/30 transition-transform active:scale-95 disabled:opacity-50"
+                  >
+                    {isLoadingFollow ? 'Memproses...' : 'Buka Blokir (Unblock)'}
+                  </button>
+                ) : (
+                  <button 
+                    onClick={handleFollow}
+                    disabled={isLoadingFollow}
+                    className={`flex-[2] py-3 rounded-2xl ${isFollowingUser ? t.bgBox : t.bgAccent} ${isFollowingUser ? t.textMain : (t.textAccent === 'text-white' ? 'text-white' : 'text-slate-900')} font-black shadow-lg ${!isFollowingUser ? 'shadow-[#41759b]/30' : ''} transition-transform active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50`}
+                  >
+                    {isLoadingFollow ? 'Memproses...' : (
+                      isFollowingUser ? <><UserCheck size={16}/> Mengikuti</> : <><UserPlus size={16}/> Ikuti</>
+                    )}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Admin Controls */}
+            {isAdmin && !isOwnProfile && (
+              <div className="mt-4 pt-4 border-t border-rose-500/10">
+                <button
+                  onClick={handleBanUser}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-rose-500/10 text-rose-500 font-bold text-sm hover:bg-rose-500 hover:text-white transition-all active:scale-95 border border-rose-500/30"
+                >
+                  <AlertTriangle size={18} className="shrink-0" />
+                  <span>Hapus Akses Pengguna ke Komunitas</span>
+                </button>
+              </div>
             )}
           </div>
 
           {/* Achievements strip */}
           {achievements.length > 0 && (
-            <div className={`mx-4 mb-3 p-3 rounded-2xl flex gap-2 overflow-x-auto hide-scrollbar ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
+            <div className={`mx-4 mb-4 p-4 rounded-3xl flex flex-wrap gap-4 ${isDark ? 'bg-[#1e1c17] border border-amber-500/10' : 'bg-amber-50 border border-amber-200'} shadow-inner`}>
               {achievements.map((p, i) => (
-                <div key={i} className="flex flex-col items-center shrink-0 gap-1">
-                  <div className="w-9 h-9 rounded-full bg-amber-500/20 flex items-center justify-center">
-                    <Award size={18} className="text-amber-500" />
-                  </div>
-                  <span className={`text-[9px] font-bold text-center leading-tight max-w-[60px] ${isDark ? 'text-amber-300/70' : 'text-amber-700'}`}>{p.achievementTitle}</span>
-                </div>
+                <UnifiedBadge key={i} achievementId={p.achievementId} achievementTitle={p.achievementTitle} isDark={isDark} />
               ))}
             </div>
           )}
 
-          {/* Photo grid */}
+          {/* Inline posts */}
           {isLoading ? (
             <div className={`text-center py-8 text-sm font-bold ${isDark ? 'text-white/40' : 'text-black/40'}`}>Memuat postingan...</div>
-          ) : imageUrls.length > 0 ? (
-            <div className="px-4 pb-6">
-              <div className={`flex items-center gap-1.5 mb-2 ${isDark ? 'text-white/50' : 'text-black/40'}`}>
-                <Grid3X3 size={13} />
-                <span className="text-[11px] font-bold uppercase tracking-wider">Postingan</span>
+          ) : regularPosts.length > 0 ? (
+            <div className="px-4 pb-6 space-y-4">
+              <div className={`flex items-center gap-1.5 mb-3 ${isDark ? 'text-white/50' : 'text-black/40'}`}>
+                <ClipboardList size={13} />
+                <span className="text-[11px] font-bold uppercase tracking-wider">Postingan ({regularPosts.length})</span>
               </div>
-              <div className="grid grid-cols-3 gap-1 rounded-2xl overflow-hidden">
-                {imageUrls.slice(0, 9).map((url, i) => (
-                  <div key={i} className="aspect-square bg-black/10">
-                    <img src={url} alt="" className="w-full h-full object-cover" loading="lazy" />
+              {regularPosts.map((post, i) => {
+                const images = post.imageUrls || (post.imageUrl ? [post.imageUrl] : []);
+                return (
+                  <div key={post.id || i} className={`p-4 rounded-2xl ${isDark ? 'bg-white/5 border border-white/10' : 'bg-black/5 border border-black/5'}`}>
+                    {post.text && <p className="text-sm font-medium mb-3 whitespace-pre-wrap">{post.text}</p>}
+                    
+                    {images.length > 0 && (
+                      <div className={`grid gap-1 rounded-xl overflow-hidden ${images.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                        {images.map((url, j) => (
+                          <img key={j} src={url} alt="" className="w-full aspect-square object-cover" loading="lazy" />
+                        ))}
+                      </div>
+                    )}
+                    
+                    {post.timestamp && (
+                      <p className={`text-[10px] mt-3 font-bold ${isDark ? 'text-white/30' : 'text-black/30'}`}>
+                        {post.timestamp?.toDate ? post.timestamp.toDate().toLocaleString('id-ID', {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}) : ''}
+                      </p>
+                    )}
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
           ) : (
             <div className={`text-center py-8 text-sm font-bold ${isDark ? 'text-white/30' : 'text-black/30'}`}>Belum ada postingan</div>
+          )}
+
+          {/* Moderation actions */}
+          {!isOwnProfile && currentUser && (
+            <div className={`mx-4 mt-2 mb-8 pt-4 border-t flex flex-col gap-2 ${isDark ? 'border-white/10' : 'border-black/5'}`}>
+              <button onClick={handleReportUser} className={`flex items-center gap-2 text-xs font-bold ${isDark ? 'text-white/50 hover:text-white' : 'text-black/50 hover:text-black'} transition-colors`}>
+                <ClipboardList size={14} /> Laporkan Akun Ini
+              </button>
+              <button onClick={handleBlockUser} className={`flex items-center gap-2 text-xs font-bold text-rose-500/70 hover:text-rose-500 transition-colors`}>
+                <AlertTriangle size={14} /> Blokir Pengguna
+              </button>
+            </div>
           )}
         </div>
       </div>

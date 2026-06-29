@@ -1,6 +1,4 @@
 import React from 'react';
-import { Moon, Plus, X } from 'lucide-react';
-
 const EmptyWorkoutState = ({
   t,
   showProgramSelect,
@@ -29,7 +27,6 @@ const EmptyWorkoutState = ({
       {/* ------------------------------ */}
       
       <div className="relative z-10">
-        <Moon size={48} className={`mx-auto mb-6 opacity-40 ${t.textAccent}`} />
       
       {(!activePlanIds || activePlanIds.length === 0) ? (
         <>
