@@ -133,7 +133,7 @@ export default function App() {
 
   const [selectedDate, setSelectedDate] = useState(getLocalYMD(new Date()));
   const [loadedDate, setLoadedDate] = useState(null);
-  const [activePlanIds, setActivePlanIds] = useState([]);
+  const [activePlanIds, setActivePlanIds] = useState(['custom']);
   const [activeProgramId, setActiveProgramId] = useState(defaultPrograms[0]?.id || null);
     const [focusWorkoutId, setFocusWorkoutId] = useState(null);
 
