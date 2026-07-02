@@ -1361,40 +1361,20 @@ const NotificationModal = ({ t, target, defaultReminderTime, soundEnabled, remin
           )}
         </div>
         
-        {/* Time Picker - Drum Style */}
-        <div className="flex flex-col items-center justify-center py-4 mb-2">
-          <p className="caption opacity-50 mb-4 text-center">Jam Rencana Latihan</p>
-          <div className="flex items-center justify-center gap-2">
-            
-            {/* JAM */}
-            <div className="flex flex-col items-center gap-1">
-              <button onPointerDown={(e) => { e.preventDefault(); setHh(h => String((parseInt(h)+1)%24).padStart(2,'0')); }} className="w-10 h-8 flex items-center justify-center opacity-40 hover:opacity-100 active:scale-90 transition-all"><ChevronUp size={18}/></button>
-              <SwipeInput
-                value={parseInt(hh) || 0}
-                onChange={(val) => setHh(String(Math.round(val)).padStart(2, '0'))}
-                min={0} max={23} step={1} wrap={true}
-                className={`w-16 h-14 rounded-2xl text-center font-black text-3xl bg-black/8 dark:bg-white/10 ${t.textMain} outline-none`}
-              />
-              <button onPointerDown={(e) => { e.preventDefault(); setHh(h => String((parseInt(h)-1+24)%24).padStart(2,'0')); }} className="w-10 h-8 flex items-center justify-center opacity-40 hover:opacity-100 active:scale-90 transition-all"><ChevronDown size={18}/></button>
-              <span className="caption opacity-40 mt-1">Jam</span>
-            </div>
-
-            <span className="font-black text-3xl opacity-30 pb-6">:</span>
-
-            {/* MENIT */}
-            <div className="flex flex-col items-center gap-1">
-              <button onPointerDown={(e) => { e.preventDefault(); setMm(m => String(((Math.round(parseInt(m)/5)*5)+5)%60).padStart(2,'0')); }} className="w-10 h-8 flex items-center justify-center opacity-40 hover:opacity-100 active:scale-90 transition-all"><ChevronUp size={18}/></button>
-              <SwipeInput
-                value={parseInt(mm) || 0}
-                onChange={(val) => setMm(String(Math.round(val/5)*5 % 60).padStart(2, '0'))}
-                min={0} max={55} step={5} wrap={true}
-                className={`w-16 h-14 rounded-2xl text-center font-black text-3xl bg-black/8 dark:bg-white/10 ${t.textMain} outline-none`}
-              />
-              <button onPointerDown={(e) => { e.preventDefault(); setMm(m => String(((Math.round(parseInt(m)/5)*5)-5+60)%60).padStart(2,'0')); }} className="w-10 h-8 flex items-center justify-center opacity-40 hover:opacity-100 active:scale-90 transition-all"><ChevronDown size={18}/></button>
-              <span className="caption opacity-40 mt-1">Menit</span>
-            </div>
-
-          </div>
+        {/* Time Picker */}
+        <div className="py-3 mb-2">
+          <p className="caption opacity-50 mb-2">Jam Rencana Latihan</p>
+          <input
+            type="time"
+            value={`${hh}:${mm}`}
+            onChange={(e) => {
+              const [h, m] = e.target.value.split(':');
+              setHh(h || '00');
+              setMm(m || '00');
+            }}
+            className={`w-full p-3 rounded-2xl font-black text-2xl text-center ${isDark ? 'bg-white/10 text-white' : 'bg-black/5 text-black'} border-0 outline-none`}
+            style={{ colorScheme: isDark ? 'dark' : 'light' }}
+          />
         </div>
 
         {/* Calendar Sync */}
