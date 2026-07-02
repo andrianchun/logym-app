@@ -1079,30 +1079,14 @@ const CalendarTab = ({
                                                      <button 
                                                         onClick={(e) => { 
                                                           e.stopPropagation();
-                                                          // Quick toggle: flip reminderEnabled for this workout
-                                                          const newEnabled = !isNotifOn;
-                                                          if (newEnabled) {
-                                                            // Open modal to also set the time
-                                                            setNotificationModalTarget({ workoutId: w.id, programName: w.programName, dateStr: targetDateStr, existingNotifId: w.reminderNotifId, currentTime: effectiveTime, currentEnabled: newEnabled });
-                                                          } else {
-                                                            // Quick-disable: cancel notif and save
-                                                            if (w.reminderNotifId) cancelWorkoutNotification(w.reminderNotifId);
-                                                            setHistory(prev => {
-                                                              const h = { ...prev };
-                                                              const d = h[targetDateStr];
-                                                              if (d && d.workouts) {
-                                                                h[targetDateStr] = { ...d, workouts: d.workouts.map(wx => wx.id === w.id ? { ...wx, reminderEnabled: false } : wx) };
-                                                              }
-                                                              return h;
-                                                            });
-                                                          }
+                                                          playSoundEffect('click', soundEnabled);
+                                                          setNotificationModalTarget({ workoutId: w.id, programName: w.programName, dateStr: targetDateStr, existingNotifId: w.reminderNotifId, currentTime: effectiveTime, currentEnabled: isNotifOn });
                                                         }} 
-                                                        className={`flex items-center gap-1 px-1.5 py-0.5 -ml-1 rounded-md hover:bg-black/10 dark:hover:bg-white/10 transition-colors ${isNotifOn ? t.textAccent : 'opacity-60 hover:opacity-100'}`} 
-                                                        title={isNotifOn ? 'Notifikasi aktif — klik untuk matikan' : 'Notifikasi mati — klik untuk aktifkan'}
+                                                        className={`flex items-center gap-1.5 px-2 py-1 -ml-1 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors active:scale-95 ${isNotifOn ? t.textAccent : 'opacity-60 hover:opacity-100'}`} 
+                                                        title="Atur Notifikasi"
                                                       >
-                                                        {isNotifOn ? <Bell size={13} /> : <BellOff size={13} />}
-                                                        <span className="font-bold">{effectiveTime}</span>
-                                                        <span className="text-[9px] opacity-50 ml-0.5">{isNotifOn ? '✓' : '✗'}</span>
+                                                        {isNotifOn ? <Bell size={14} /> : <BellOff size={14} />}
+                                                        <span className="font-bold text-xs">{effectiveTime}</span>
                                                       </button>
                                                    </div>
                                                  </div>
