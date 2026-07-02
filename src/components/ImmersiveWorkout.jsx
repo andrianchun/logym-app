@@ -238,6 +238,8 @@ const ImmersiveWorkout = ({
 
   const handleNextEx = () => {
     playSoundEffect('click', soundEnabled);
+    setRestTimer(0); // Reset rest timer — jangan bawa timer dari exercise sebelumnya
+    setRestTargetTime(null);
     if (currentIndex < validExercises.length - 1) {
       setCurrentIndex(currentIndex + 1);
     } else {
