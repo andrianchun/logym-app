@@ -290,16 +290,34 @@ const CalendarTab = ({
      
      setHistory(prev => {
         const h = { ...prev };
-        const d = h[dateStr];
-        if (d && d.workouts) {
-          const updatedWorkouts = d.workouts.map(w => {
-            if (w.id === workoutId) {
-              return { ...w, reminderTime: newTimeStr, reminderEnabled: enabled, reminderNotifId: notifId };
-            }
-            return w;
+        const d = h[dateStr] || { workouts: [], bioData: {} };
+        const workouts = d.workouts || [];
+        
+        let found = false;
+        const updatedWorkouts = workouts.map(w => {
+          if (w.id === workoutId) {
+            found = true;
+            return { ...w, reminderTime: newTimeStr, reminderEnabled: enabled, reminderNotifId: notifId };
+          }
+          return w;
+        });
+
+        if (!found && workoutId.startsWith('projected_')) {
+          const { programId, programName } = notificationModalTarget;
+          updatedWorkouts.push({
+            id: workoutId,
+            programId,
+            programName,
+            status: 'planned',
+            isProjected: true,
+            log: {},
+            reminderTime: newTimeStr,
+            reminderEnabled: enabled,
+            reminderNotifId: notifId
           });
-          h[dateStr] = { ...d, workouts: updatedWorkouts };
         }
+        
+        h[dateStr] = { ...d, workouts: updatedWorkouts };
         return h;
      });
      setNotificationModalTarget(null);
@@ -1080,7 +1098,7 @@ const CalendarTab = ({
                                                         onClick={(e) => { 
                                                           e.stopPropagation();
                                                           playSoundEffect('click', soundEnabled);
-                                                          setNotificationModalTarget({ workoutId: w.id, programName: w.programName, dateStr: targetDateStr, existingNotifId: w.reminderNotifId, currentTime: effectiveTime, currentEnabled: isNotifOn });
+                                                          setNotificationModalTarget({ workoutId: w.id, programId: w.programId, programName: w.programName, dateStr: targetDateStr, existingNotifId: w.reminderNotifId, currentTime: effectiveTime, currentEnabled: isNotifOn });
                                                         }} 
                                                         className={`flex items-center gap-1.5 px-2 py-1 -ml-1 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors active:scale-95 ${isNotifOn ? t.textAccent : 'opacity-60 hover:opacity-100'}`} 
                                                         title="Atur Notifikasi"
