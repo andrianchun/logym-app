@@ -666,7 +666,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                  {/* Durasi Aktif (Hari Ini) */}
                   {(() => {
                       const todayDur = mergedDailyActiveMinutes;
-                      const targetDur = activityTargets?.weeklyDuration || 30;
+                      const targetDur = activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 5) : 30;
                       const progress = Math.min(100, (todayDur / targetDur) * 100);
                       return (
                           <div className="flex flex-col h-full text-right items-end">
@@ -691,10 +691,10 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                      <div className="flex flex-col flex-1 justify-end">
                          <div className="flex items-baseline space-x-1 mb-2">
                              <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{formatNumber(bioData.nutritionCalories, language) || '-'}</span>
-                             <span className="text-[10px] text-zinc-500 font-bold whitespace-nowrap">/ {formatNumber(Math.max(0, mergedDailyCalories + (activityTargets?.calorieDelta || 0)), language)}</span>
+                             <span className="text-[10px] text-zinc-500 font-bold whitespace-nowrap">/ {formatNumber(Math.max(0, (activityTargets?.activityCalories || 2000) + (activityTargets?.calorieDelta || 0)), language)}</span>
                          </div>
                          <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full mb-1 overflow-hidden shrink-0">
-                             <div className="h-full bg-orange-400 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Number(bioData.nutritionCalories || 0) / Math.max(1, mergedDailyCalories + (activityTargets?.calorieDelta || 0))) * 100)}%` }}></div>
+                             <div className="h-full bg-orange-400 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Number(bioData.nutritionCalories || 0) / Math.max(1, (activityTargets?.activityCalories || 2000) + (activityTargets?.calorieDelta || 0))) * 100)}%` }}></div>
                          </div>
                          <span className="text-[9px] opacity-0 select-none hidden sm:block">Spacer</span>
                      </div>

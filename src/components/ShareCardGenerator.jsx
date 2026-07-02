@@ -814,11 +814,11 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                                             <div className="flex items-center justify-end space-x-1 mb-0 text-blue-400"><span className="text-[9px] text-white/70 font-bold uppercase tracking-widest">Durasi</span> <Clock size={12}/></div>
                                             <div className="flex flex-col flex-1 justify-end w-full">
                                                 <div className="flex items-baseline justify-end space-x-1 mb-1">
-                                                    <span className="text-2xl font-black text-white leading-tight">{formatNumber(mergedWeeklyActiveMinutes) || '0'}</span>
-                                                    <span className="text-[9px] text-white/50 font-bold">/ {formatNumber(activityTargets?.weeklyDuration || 150)}</span>
+                                                    <span className="text-2xl font-black text-white leading-tight">{formatNumber(mergedDailyActiveMinutes) || '0'}</span>
+                                                    <span className="text-[9px] text-white/50 font-bold">/ {formatNumber(activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 5) : 30)}</span>
                                                 </div>
                                                 <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden flex justify-end">
-                                                    <div className="h-full bg-blue-400 rounded-full" style={{ width: `${Math.min(100, (mergedWeeklyActiveMinutes / (activityTargets?.weeklyDuration || 150)) * 100)}%` }}></div>
+                                                    <div className="h-full bg-blue-400 rounded-full" style={{ width: `${Math.min(100, (mergedDailyActiveMinutes / (activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 5) : 30)) * 100)}%` }}></div>
                                                 </div>
                                             </div>
                                         </div>
@@ -828,10 +828,10 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                                             <div className="flex flex-col flex-1 justify-end">
                                                 <div className="flex items-baseline space-x-1 mb-1">
                                                     <span className="text-2xl font-black text-white leading-tight">{formatNumber(bioData.nutritionCalories) || '0'}</span>
-                                                    <span className="text-[9px] text-white/50 font-bold">/ {formatNumber(activityTargets?.nutritionCalories || 2000)}</span>
+                                                    <span className="text-[9px] text-white/50 font-bold">/ {formatNumber(Math.max(0, (activityTargets?.activityCalories || 2000) + (activityTargets?.calorieDelta || 0)))}</span>
                                                 </div>
                                                 <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
-                                                    <div className="h-full bg-orange-400 rounded-full" style={{ width: `${Math.min(100, (Number(bioData.nutritionCalories || 0) / (activityTargets?.nutritionCalories || 2000)) * 100)}%` }}></div>
+                                                    <div className="h-full bg-orange-400 rounded-full" style={{ width: `${Math.min(100, (Number(bioData.nutritionCalories || 0) / Math.max(1, (activityTargets?.activityCalories || 2000) + (activityTargets?.calorieDelta || 0))) * 100)}%` }}></div>
                                                 </div>
                                             </div>
                                         </div>
@@ -841,10 +841,10 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                                             <div className="flex flex-col flex-1 justify-end w-full">
                                                 <div className="flex items-baseline justify-end space-x-1 mb-1">
                                                     <span className="text-2xl font-black text-white leading-tight">{formatNumber(mergedDailyCalories) || '0'}</span>
-                                                    <span className="text-[9px] text-white/50 font-bold">/ {formatNumber(activityTargets?.activityCalories || 500)}</span>
+                                                    <span className="text-[9px] text-white/50 font-bold">/ {formatNumber(activityTargets?.activityCalories || 2000)}</span>
                                                 </div>
                                                 <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden flex justify-end">
-                                                    <div className="h-full bg-rose-500 rounded-full" style={{ width: `${Math.min(100, (Number(mergedDailyCalories || 0) / (activityTargets?.activityCalories || 500)) * 100)}%` }}></div>
+                                                    <div className="h-full bg-rose-500 rounded-full" style={{ width: `${Math.min(100, (Number(mergedDailyCalories || 0) / (activityTargets?.activityCalories || 2000)) * 100)}%` }}></div>
                                                 </div>
                                             </div>
                                         </div>
