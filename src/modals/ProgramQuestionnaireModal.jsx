@@ -307,7 +307,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
 
         {/* HEADER */}
         <div className="flex justify-between items-center p-5 pb-2 shrink-0 relative z-10 max-w-lg mx-auto w-full">
-          {step > 0 && step < 5 ? (
+          {step > 0 && step < 9 ? (
             <button onClick={handleBack} className={`p-2 rounded-full ${t.inputBg} hover:${t.bgAccentSoft} transition-colors`}>
               <ChevronLeft size={20} className={t.textMain} />
             </button>
@@ -401,9 +401,16 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
                           <button onClick={() => setAnswers(prev => ({...prev, gender: 'female'}))} className={`p-4 rounded-xl border-2 font-bold transition-all ${answers.gender === 'female' ? `${t.borderAccent} ${t.bgAccent} text-white` : `border-transparent ${t.inputBg} ${t.textMuted}`}`}>Perempuan</button>
                       </div>
                   </div>
-                  <div>
+                  <div className="mt-4">
                       <label className={`text-sm font-bold ${!isDark ? 'text-black' : t.textMain} mb-2 block`}>Tanggal Lahir</label>
-                      <input type="date" value={answers.dob} onChange={(e) => setAnswers(prev => ({...prev, dob: e.target.value}))} className={`w-full p-4 rounded-xl font-bold ${t.inputBg} ${t.textMain} border-none outline-none focus:ring-2 focus:ring-sky-500`} />
+                      <input 
+                          type="date" 
+                          max={new Date(new Date().setFullYear(new Date().getFullYear() - 13)).toISOString().split('T')[0]}
+                          value={answers.dob} 
+                          onChange={(e) => setAnswers(prev => ({...prev, dob: e.target.value}))} 
+                          className={`w-full p-4 rounded-xl border-2 font-bold ${answers.dob ? t.borderAccent : 'border-transparent'} ${t.inputBg} ${t.textMain}`}
+                      />
+                      <p className={`text-[10px] mt-1 text-center font-bold ${!isDark ? 'text-black/60' : 'text-slate-400'}`}>Minimal usia 13 tahun.</p>
                   </div>
                   <button onClick={() => { if(answers.gender && answers.dob) setStep(step + 1); }} disabled={!answers.gender || !answers.dob} className={`w-full mt-4 py-3 rounded-2xl font-black text-lg transition-all flex items-center justify-center gap-2 ${answers.gender && answers.dob ? `${t.bgAccent} text-white hover:opacity-90` : `${t.inputBg} ${t.textMuted} opacity-50 cursor-not-allowed`}`}>
                     Lanjut <ChevronRight size={20} />

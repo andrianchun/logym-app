@@ -1660,7 +1660,7 @@ export default function App() {
            user={user} setUser={setUser} t={t} theme={theme} handleLogout={handleLogout} history={history}
            activityTargets={activityTargets} programs={programs} setPrograms={setPrograms} exerciseLibrary={exerciseLibrary}
            lang={lang} language={language} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} selectedDate={selectedDate} units={units} activePlanIds={activePlanIds}
-           userAchievements={userAchievements} userProfile={userProfile}
+           userAchievements={userAchievements} userProfile={userProfile} setUserProfile={setUserProfile}
            highlightPostId={highlightPostId}
            onClearHighlight={() => setHighlightPostId(null)}
            forceTab={profileForceTab}

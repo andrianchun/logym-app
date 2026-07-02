@@ -44,7 +44,8 @@ export default function ProfileModal({
     onClearHighlight = null,
     forceTab = null,
     onAchievementShareComplete = null,
-    userProfile
+    userProfile,
+    setUserProfile
 }) {
     // NOTE: early return moved AFTER all hooks to comply with Rules of Hooks
 
@@ -60,6 +61,11 @@ export default function ProfileModal({
     const prevTab = useRef(activeTab);
     const scrollContainerRef = useRef(null);
     const { dialog, showAlert } = useDialog(theme === 'dark');
+
+    // Edit Gender & DOB State
+    const [showEditPersonal, setShowEditPersonal] = useState(false);
+    const [editGender, setEditGender] = useState(userProfile?.gender || '');
+    const [editDob, setEditDob] = useState(userProfile?.dob || '');
 
     // If a forceTab is specified (e.g., navigate to beranda after share), switch to it
     useEffect(() => {
@@ -448,6 +454,34 @@ export default function ProfileModal({
                                 </div>
                             </div>
                             
+                            {/* Personal Details Row */}
+                            <div className={`p-4 rounded-2xl ${t.bgBox} border ${t.border} flex items-center justify-between`}>
+                                <div className="flex flex-col">
+                                    <div className="flex space-x-4">
+                                        <div>
+                                            <p className={`text-[10px] uppercase font-bold ${t.textMuted} tracking-wider`}>Jenis Kelamin</p>
+                                            <p className={`text-sm font-black ${t.textMain}`}>{userProfile?.gender === 'male' ? 'Laki-laki' : userProfile?.gender === 'female' ? 'Perempuan' : '-'}</p>
+                                        </div>
+                                        <div>
+                                            <p className={`text-[10px] uppercase font-bold ${t.textMuted} tracking-wider`}>Usia</p>
+                                            <p className={`text-sm font-black ${t.textMain}`}>
+                                                {userProfile?.dob ? `${new Date().getFullYear() - new Date(userProfile.dob).getFullYear()} th` : '-'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={() => {
+                                        setEditGender(userProfile?.gender || '');
+                                        setEditDob(userProfile?.dob || '');
+                                        setShowEditPersonal(true);
+                                    }}
+                                    className={`p-2 rounded-xl ${t.inputBg} hover:${t.bgAccentSoft} transition-colors`}
+                                >
+                                    <Edit2 size={16} className={t.textMuted} />
+                                </button>
+                            </div>
+                            
                             <hr className={`border-t ${t.borderDashed} border-dashed my-2`} />
 
                             <div>
@@ -525,6 +559,50 @@ export default function ProfileModal({
                     refreshCounts(); // refresh after any follow/unfollow/block action
                 }}
             />
+        )}
+
+        {/* Edit Personal Details Modal */}
+        {showEditPersonal && (
+            <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+                <div className={`w-full max-w-xs p-6 rounded-3xl ${t.bgCard} border ${t.border} shadow-2xl animate-in zoom-in-95`}>
+                    <h3 className={`text-xl font-black ${t.textMain} mb-4`}>Data Personal</h3>
+                    
+                    <div className="space-y-4 mb-6">
+                        <div>
+                            <label className={`text-xs font-bold ${t.textMuted} mb-2 block`}>Jenis Kelamin</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button onClick={() => setEditGender('male')} className={`py-2.5 rounded-xl font-bold border-2 transition-all text-sm ${editGender === 'male' ? `${t.borderAccent} ${t.bgAccent} text-white` : `border-transparent ${t.inputBg} ${t.textMuted}`}`}>Laki-laki</button>
+                                <button onClick={() => setEditGender('female')} className={`py-2.5 rounded-xl font-bold border-2 transition-all text-sm ${editGender === 'female' ? `${t.borderAccent} ${t.bgAccent} text-white` : `border-transparent ${t.inputBg} ${t.textMuted}`}`}>Perempuan</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label className={`text-xs font-bold ${t.textMuted} mb-2 block`}>Tanggal Lahir</label>
+                            <input 
+                                type="date" 
+                                max={new Date(new Date().setFullYear(new Date().getFullYear() - 13)).toISOString().split('T')[0]}
+                                value={editDob} 
+                                onChange={(e) => setEditDob(e.target.value)} 
+                                className={`w-full px-3 py-2.5 rounded-xl border-2 font-bold text-sm ${editDob ? t.borderAccent : 'border-transparent'} ${t.inputBg} ${t.textMain} focus:outline-none`}
+                            />
+                        </div>
+                    </div>
+                    
+                    <div className="flex space-x-2">
+                        <button onClick={() => setShowEditPersonal(false)} className={`flex-1 py-3 rounded-xl font-bold ${t.bgBox} ${t.textMain} text-sm`}>Batal</button>
+                        <button 
+                            onClick={() => {
+                                if (setUserProfile) {
+                                    setUserProfile(prev => ({ ...prev, gender: editGender, dob: editDob }));
+                                }
+                                setShowEditPersonal(false);
+                            }}
+                            className={`flex-1 py-3 rounded-xl font-bold ${t.bgAccent} text-white text-sm hover:opacity-90 transition-opacity`}
+                        >
+                            Simpan
+                        </button>
+                    </div>
+                </div>
+            </div>
         )}
 
         {/* Achievement Details Modal */}
