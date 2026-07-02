@@ -1348,14 +1348,14 @@ const NotificationModal = ({ t, target, defaultReminderTime, soundEnabled, remin
           <div className="flex items-center justify-between">
             <span className="font-bold body-lg">Notifikasi</span>
             <button 
-              onClick={() => { if(reminderEnabled) setEnabled(!enabled); }}
-              className={`relative w-14 h-8 rounded-full transition-colors duration-300 ${enabled ? t.bgAccent : isDark ? 'bg-white/15' : 'bg-black/15'} ${!reminderEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+              onClick={() => setEnabled(!enabled)}
+              className={`relative w-14 h-8 rounded-full transition-colors duration-300 ${enabled ? t.bgAccent : isDark ? 'bg-white/15' : 'bg-black/15'} ${!reminderEnabled ? 'opacity-80' : ''}`}
             >
               <div className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-md transition-transform duration-300 ${enabled ? 'translate-x-7' : 'translate-x-1'}`} />
             </button>
           </div>
           {!reminderEnabled && (
-            <span className="text-xs text-rose-500 mt-1">Notifikasi global sedang dimatikan di Pengaturan</span>
+            <span className="text-xs text-rose-500 mt-1">Notifikasi global dimatikan, tapi jadwal ini tetap bisa menyala.</span>
           )}
         </div>
         
@@ -1367,16 +1367,14 @@ const NotificationModal = ({ t, target, defaultReminderTime, soundEnabled, remin
                 value={parseInt(hh) || 0}
                 onChange={(val) => setHh(String(val).padStart(2, '0'))}
                 min={0} max={23} step={1}
-                theme={isDark ? 'dark' : 'light'}
-                width="w-16"
+                className={`w-16 h-12 rounded-xl text-center font-black text-2xl bg-black/5 dark:bg-white/10 ${t.textMain} border border-transparent focus:border-blue-500 transition-colors`}
               />
               <span className="font-black text-2xl opacity-30">:</span>
               <SwipeInput
                 value={parseInt(mm) || 0}
                 onChange={(val) => setMm(String(val).padStart(2, '0'))}
                 min={0} max={59} step={5}
-                theme={isDark ? 'dark' : 'light'}
-                width="w-16"
+                className={`w-16 h-12 rounded-xl text-center font-black text-2xl bg-black/5 dark:bg-white/10 ${t.textMain} border border-transparent focus:border-blue-500 transition-colors`}
               />
             </div>
           </div>
