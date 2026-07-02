@@ -916,7 +916,7 @@ export default function App() {
       await deleteDoc(docRef);
 
       // 2. Delete user from auth
-      await deleteUser(user);
+      await deleteUser(auth.currentUser);
 
       // 3. Clear local storage
       localStorage.clear();
@@ -1685,6 +1685,7 @@ export default function App() {
          setShowHelp={setShowHelp}
          exportData={exportData} handleImportFile={handleImportFile}
          user={user} handleLogout={handleLogout} handleDeleteAccount={handleDeleteAccount}
+         setConfirmModal={setConfirmModal}
          connectedApps={connectedApps} setConnectedApps={setConnectedApps}
       />
 

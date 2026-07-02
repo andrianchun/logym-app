@@ -14,6 +14,7 @@ export default function SettingsModal({
   setShowLibManager, setShowHelp,
   exportData, handleImportFile,
   user, handleLogout, handleDeleteAccount,
+  setConfirmModal,
   biometricStandard, setBiometricStandard,
   units, setUnits,
   userGeminiApiKey, setUserGeminiApiKey,
@@ -297,12 +298,20 @@ export default function SettingsModal({
                    </p>
                    <button 
                      onClick={() => {
-                        if (window.confirm("PERINGATAN: Apakah Anda yakin ingin menghapus akun ini secara permanen? Semua data Anda akan hilang tak bersisa.")) {
-                            if (window.confirm("Ini adalah konfirmasi terakhir. Hapus akun sekarang?")) {
-                                handleDeleteAccount();
-                            }
-                        }
-                     }}
+                         setConfirmModal({
+                             isOpen: true,
+                             title: '⚠️ Hapus Akun Permanen',
+                             message: 'Semua data latihan, program, dan riwayatmu akan dihapus selamanya. Tindakan ini tidak bisa dibatalkan.',
+                             onConfirm: () => {
+                                 setConfirmModal({
+                                     isOpen: true,
+                                     title: 'Konfirmasi Terakhir',
+                                     message: 'Ini adalah langkah terakhir. Akun dan semua datamu akan dihapus permanen sekarang?',
+                                     onConfirm: () => handleDeleteAccount(),
+                                 });
+                             },
+                         });
+                      }}
                      className="w-full py-3 rounded-xl font-bold bg-rose-500/10 text-rose-500 border border-rose-500/20 text-sm shadow-md active:scale-95 transition-all mt-4"
                    >
                      Hapus Akun Permanen
