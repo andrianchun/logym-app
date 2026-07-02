@@ -174,22 +174,22 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                     }
                 });
                 
-                // Selalu ekstrak otot dari program yang direncanakan (baik sudah ada progres maupun belum)
+                // Ekstrak dari program yang direncanakan — pakai overriddenExercises kalau ada (exercise alternatif)
                 if (w.programId && w.programId !== 'adhoc') {
                    const prog = programs.find(p => p.id === w.programId);
-                   if (prog && prog.exercises) {
-                       prog.exercises.forEach(exObj => {
-                           const ex = exLookup[exObj.id];
-                           if (ex) {
-                              if (isMusc) {
-                                 const exTargets = Array.isArray(ex.target) ? ex.target : [ex.target || 'Lainnya'];
-                                 exTargets.forEach(t => recentItems.add(normalizeMuscleKey(t)));
-                              } else {
-                                 recentItems.add(ex.name);
-                              }
-                           }
-                       });
-                   }
+                   // Prefer overridden (alternative) exercises, fall back to original program exercises
+                   const exercisesToUse = w.overriddenExercises || (prog?.exercises) || [];
+                   exercisesToUse.forEach(exObj => {
+                       const ex = exLookup[exObj.id] || exObj;
+                       if (ex) {
+                          if (isMusc) {
+                             const exTargets = Array.isArray(ex.target) ? ex.target : [ex.target || 'Lainnya'];
+                             exTargets.forEach(t => recentItems.add(normalizeMuscleKey(t)));
+                          } else {
+                             if (ex.name) recentItems.add(ex.name);
+                          }
+                       }
+                   });
                 }
             }
         });
@@ -272,7 +272,42 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
     if (isSubCard) return;
     
     let activeItems = [];
-    if (activePlanIds && activePlanIds.length > 0) {
+    const todayStr = selectedDate || getLocalYMD(new Date());
+
+    // Priority 1: Look at today's actual workouts in history, 
+    // including overriddenExercises (alternative exercise swaps)
+    const todayWorkouts = history[todayStr]?.workouts || [];
+    const relevantTodayWorkouts = todayWorkouts.filter(w => {
+      if (!activePlanIds || activePlanIds.length === 0) return true;
+      const prog = programs.find(p => p.id === w.programId);
+      const wPlanId = (prog ? prog.planId : null) || 'custom';
+      return activePlanIds.includes(wPlanId) || w.programId === 'adhoc';
+    });
+
+    if (relevantTodayWorkouts.length > 0) {
+      relevantTodayWorkouts.forEach(w => {
+        const prog = programs.find(p => p.id === w.programId);
+        // Use overriddenExercises first (alternative swaps), fall back to program exercises
+        const exercises = w.overriddenExercises || prog?.exercises || [];
+        exercises.forEach(ex => {
+          if (chartType === 'exercise') {
+            const libEx = exerciseLibrary.find(e => e.id === ex.id) || ex;
+            if (libEx?.name) activeItems.push(libEx.name);
+          } else if (chartType === 'muscle') {
+            const libEx = exerciseLibrary.find(e => e.id === ex.id) || ex;
+            if (libEx?.target) {
+              const targets = Array.isArray(libEx.target) ? libEx.target : [libEx.target];
+              targets.forEach(muscle => {
+                if (typeof muscle === 'string' && muscle) {
+                  activeItems.push(normalizeMuscleKey(muscle));
+                }
+              });
+            }
+          }
+        });
+      });
+    } else if (activePlanIds && activePlanIds.length > 0) {
+      // Fallback: use exercises from active plan programs
       const activeProgs = programs.filter(p => activePlanIds.includes(p.planId || 'custom'));
       activeProgs.forEach(prog => {
         prog.exercises?.forEach(ex => {
@@ -284,8 +319,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
               const targets = Array.isArray(libEx.target) ? libEx.target : [libEx.target];
               targets.forEach(muscle => {
                 if (typeof muscle === 'string' && muscle) {
-                  const mKey = normalizeMuscleKey(muscle);
-                  activeItems.push(formatTarget(mKey, lang.progress));
+                  activeItems.push(normalizeMuscleKey(muscle));
                 }
               });
             }
@@ -306,7 +340,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
         // Fallback to top 6 most frequent/recent items
         setActiveChartLines(chartDataObj.items.slice(0, 6)); 
     }
-  }, [chartType, chartDataObj, activePlanIds, programs, exerciseLibrary, lang.progress]);
+  }, [chartType, chartDataObj, activePlanIds, programs, exerciseLibrary, history, selectedDate, lang.progress]);
 
   // Pinch-to-zoom logic
   const [pointWidth, setPointWidth] = useState(() => {
