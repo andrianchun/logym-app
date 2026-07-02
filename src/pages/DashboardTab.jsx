@@ -42,7 +42,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   // STATE KONEKSI & SINKRONISASI
   // ==========================================
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
+
 
   // ==========================================
   // STATE MODAL INPUT MANUAL & TANGGAL
@@ -156,53 +156,6 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   // FUNGSI AKSI (TOMBOL & FORM)
   // ==========================================
 
-  const runAutoSync = async () => {
-     if (!connectedApps?.healthconnect) return;
-     setIsSyncing(true);
-     try {
-         if (!Capacitor.isNativePlatform()) {
-             setTimeout(() => setIsSyncing(false), 800);
-             return;
-         }
-         
-         const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
-         const endOfDay = new Date(); endOfDay.setHours(23, 59, 59, 999);
-         
-         const result = await HealthConnect.readRecords({
-             type: 'Steps',
-             timeRangeFilter: { startTime: startOfDay.toISOString(), endTime: endOfDay.toISOString() }
-         });
-         
-         let totalSteps = 0;
-         if (result && result.records) {
-             result.records.forEach(record => totalSteps += (record.count || 0));
-         }
-         
-         if (totalSteps > 0) {
-             setHistory(prev => {
-                 const currentSteps = prev[todayStr]?.bioData?.steps || 0;
-                 if (totalSteps > currentSteps) {
-                     return {
-                         ...prev,
-                         [todayStr]: {
-                             ...(prev[todayStr] || {}),
-                             bioData: { ...(prev[todayStr]?.bioData || emptyBio), steps: totalSteps }
-                         }
-                     };
-                 }
-                 return prev;
-             });
-         }
-     } catch (err) {
-         console.error("Auto-sync Health Connect error:", err);
-     }
-     setTimeout(() => setIsSyncing(false), 800); 
-  };
-
-  useEffect(() => {
-     runAutoSync();
-     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connectedApps.healthconnect]);
 
   useEffect(() => {
      if (showManualModal) {
@@ -502,12 +455,6 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          </div>
          
          <div className="flex flex-col space-y-2 items-end">
-             {isSyncing && (
-                 <div className="flex items-center space-x-1 mt-1">
-                    <RefreshCw size={10} className={`animate-spin ${t.textMuted}`} />
-                    <span className={`caption ${t.textMuted}`}>Syncing...</span>
-                 </div>
-             )}
          </div>
       </div>
 
