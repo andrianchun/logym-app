@@ -9,6 +9,19 @@ import GymManagerModal from '../components/GymManagerModal';
 
 const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, soundEnabled, gymProfiles, setGymProfiles, activeGymId, setActiveGymId, exerciseLibrary, units }) => {
   const [step, setStep] = useState(0);
+  
+  const isValidAge = (dob) => {
+      if (!dob) return false;
+      const birthDate = new Date(dob);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const m = today.getMonth() - birthDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+          age--;
+      }
+      return age >= 13;
+  };
+
   const [answers, setAnswers] = useState({
     gender: null,
     dob: '',
@@ -408,11 +421,15 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
                           max={new Date(new Date().setFullYear(new Date().getFullYear() - 13)).toISOString().split('T')[0]}
                           value={answers.dob} 
                           onChange={(e) => setAnswers(prev => ({...prev, dob: e.target.value}))} 
-                          className={`w-full p-4 rounded-xl border-2 font-bold ${answers.dob ? t.borderAccent : 'border-transparent'} ${t.inputBg} ${t.textMain}`}
+                          className={`w-full p-4 rounded-xl border-2 font-bold ${answers.dob ? (isValidAge(answers.dob) ? t.borderAccent : 'border-rose-500 text-rose-500') : 'border-transparent'} ${t.inputBg} ${answers.dob && !isValidAge(answers.dob) ? '' : t.textMain}`}
                       />
-                      <p className={`text-[10px] mt-1 text-center font-bold ${!isDark ? 'text-black/60' : 'text-slate-400'}`}>Minimal usia 13 tahun.</p>
+                      {answers.dob && !isValidAge(answers.dob) ? (
+                          <p className={`text-[11px] mt-2 text-center font-bold text-rose-500 animate-in fade-in slide-in-from-top-1`}>Usia kamu harus di atas 13 tahun untuk menggunakan LyFit.</p>
+                      ) : (
+                          <p className={`text-[10px] mt-1 text-center font-bold ${!isDark ? 'text-black/60' : 'text-slate-400'}`}>Minimal usia 13 tahun.</p>
+                      )}
                   </div>
-                  <button onClick={() => { if(answers.gender && answers.dob) setStep(step + 1); }} disabled={!answers.gender || !answers.dob} className={`w-full mt-4 py-3 rounded-2xl font-black text-lg transition-all flex items-center justify-center gap-2 ${answers.gender && answers.dob ? `${t.bgAccent} text-white hover:opacity-90` : `${t.inputBg} ${t.textMuted} opacity-50 cursor-not-allowed`}`}>
+                  <button onClick={() => { if(answers.gender && isValidAge(answers.dob)) setStep(step + 1); }} disabled={!answers.gender || !isValidAge(answers.dob)} className={`w-full mt-4 py-3 rounded-2xl font-black text-lg transition-all flex items-center justify-center gap-2 ${answers.gender && isValidAge(answers.dob) ? `${t.bgAccent} text-white hover:opacity-90` : `${t.inputBg} ${t.textMuted} opacity-50 cursor-not-allowed`}`}>
                     Lanjut <ChevronRight size={20} />
                   </button>
                 </div>

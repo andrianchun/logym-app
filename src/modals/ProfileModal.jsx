@@ -67,6 +67,18 @@ export default function ProfileModal({
     const [editGender, setEditGender] = useState(userProfile?.gender || '');
     const [editDob, setEditDob] = useState(userProfile?.dob || '');
 
+    const isValidAge = (dob) => {
+        if (!dob) return false;
+        const birthDate = new Date(dob);
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+        }
+        return age >= 13;
+    };
+
     // If a forceTab is specified (e.g., navigate to beranda after share), switch to it
     useEffect(() => {
         if (forceTab && showProfileModal) {
@@ -582,21 +594,25 @@ export default function ProfileModal({
                                 max={new Date(new Date().setFullYear(new Date().getFullYear() - 13)).toISOString().split('T')[0]}
                                 value={editDob} 
                                 onChange={(e) => setEditDob(e.target.value)} 
-                                className={`w-full px-3 py-2.5 rounded-xl border-2 font-bold text-sm ${editDob ? t.borderAccent : 'border-transparent'} ${t.inputBg} ${t.textMain} focus:outline-none`}
+                                className={`w-full px-3 py-2.5 rounded-xl border-2 font-bold text-sm ${editDob ? (isValidAge(editDob) ? t.borderAccent : 'border-rose-500 text-rose-500') : 'border-transparent'} ${t.inputBg} ${editDob && !isValidAge(editDob) ? '' : t.textMain} focus:outline-none`}
                             />
+                            {editDob && !isValidAge(editDob) ? (
+                                <p className={`text-[10px] mt-1.5 font-bold text-rose-500 animate-in fade-in`}>Usia harus di atas 13 tahun.</p>
+                            ) : null}
                         </div>
                     </div>
                     
                     <div className="flex space-x-2">
                         <button onClick={() => setShowEditPersonal(false)} className={`flex-1 py-3 rounded-xl font-bold ${t.bgBox} ${t.textMain} text-sm`}>Batal</button>
                         <button 
+                            disabled={!editGender || !isValidAge(editDob)}
                             onClick={() => {
-                                if (setUserProfile) {
+                                if (setUserProfile && editGender && isValidAge(editDob)) {
                                     setUserProfile(prev => ({ ...prev, gender: editGender, dob: editDob }));
                                 }
                                 setShowEditPersonal(false);
                             }}
-                            className={`flex-1 py-3 rounded-xl font-bold ${t.bgAccent} text-white text-sm hover:opacity-90 transition-opacity`}
+                            className={`flex-1 py-3 rounded-xl font-bold transition-all text-sm ${editGender && isValidAge(editDob) ? `${t.bgAccent} text-white hover:opacity-90` : `${t.inputBg} ${t.textMuted} opacity-50 cursor-not-allowed`}`}
                         >
                             Simpan
                         </button>
