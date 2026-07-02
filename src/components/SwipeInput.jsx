@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { playSoundEffect } from '../utils/audio';
 import { formatNumber, parseFormattedNumber } from '../utils/numberFormat';
 
-const SwipeInput = ({ value, onChange, disabled, step = 1, className, min = 0, soundEnabled, placeholder, language = 'ID' }) => {
+const SwipeInput = ({ value, onChange, disabled, step = 1, className, min = 0, max, wrap = false, soundEnabled, placeholder, language = 'ID' }) => {
     const inputRef = useRef(null);
     const dragRef = useRef({ isDragging: false, startY: 0, startVal: 0, lastCalculatedValue: undefined });
     const [isFocused, setIsFocused] = useState(false);
@@ -43,7 +43,16 @@ const SwipeInput = ({ value, onChange, disabled, step = 1, className, min = 0, s
         
         let newValue = validStartVal + (steps * validStep);
         const validMin = isNaN(Number(min)) ? 0 : Number(min);
-        newValue = Math.max(validMin, Number(newValue.toFixed(2))); 
+        const validMax = max !== undefined && !isNaN(Number(max)) ? Number(max) : undefined;
+
+        if (wrap && validMax !== undefined) {
+            // Wrap-around mode: untuk time picker (jam: 23→0, menit: 59→0)
+            const range = validMax - validMin + validStep;
+            newValue = ((newValue - validMin) % range + range) % range + validMin;
+        } else {
+            newValue = Math.max(validMin, validMax !== undefined ? Math.min(validMax, newValue) : newValue);
+        }
+        newValue = Number(newValue.toFixed(2));
         
         if (newValue !== Number(localValue)) {
             dragRef.current.lastCalculatedValue = newValue;
