@@ -144,7 +144,7 @@ const AuthPage = ({ t, theme, soundEnabled, onLogin }) => {
                <img src={theme === 'dark' ? '/logo-dark.png' : '/logo-light.png'} alt="LyFit Logo" className="w-32 h-32 mb-4 object-contain drop-shadow-2xl" />
 
                <p className={`body-lg font-bold ${t.textMuted}`}>
-                  {isLoginMode ? 'Your Fitness Tracker Buddy (by Andrian Chun)' : 'Mulai perjalanan fitness-mu hari ini.'}
+                  {isLoginMode ? 'All Rounder Fitness Tracker Buddy' : 'Mulai perjalanan fitness-mu hari ini.'}
                </p>
             </div>
 

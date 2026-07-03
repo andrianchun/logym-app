@@ -80,7 +80,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
     muscleMass: null, musclePercent: null, boneMass: null, waterPercent: null, visceralFat: null, bmr: null, bodyAge: null, 
     waist: null, waistToHip: null, proteinPercent: null, bodyType: '-', weightSuggestion: '-',
     steps: '', activeMinutes: '', activityCalories: '', nutritionCalories: '', sleep: '', energyScore: null, 
-    heartRate: null, minHeartRate: null, maxHeartRate: null, bloodPressure: '', waterIntake: '',
+    heartRate: null, minHeartRate: null, maxHeartRate: null, bloodPressure: '', oxygenSaturation: null, waterIntake: '',
     weeklyDuration: '', weeklySessions: '', weeklyCalories: ''
   };
 
