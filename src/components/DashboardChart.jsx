@@ -6,17 +6,15 @@ import { formatNumber } from '../utils/numberFormat';
 const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPointClick, unitSystem, language, isSubCard = false }) => {
   const isImp = unitSystem === 'imperial';
   const chartMetricsList = [
-      { key: 'weight', label: 'Berat Badan', color: theme === 'dark' ? '#41759b' : '#2563eb' },
-      { key: 'bodyFat', label: 'Body Fat %', color: theme === 'dark' ? '#B79347' : '#d97706' },
-      { key: 'musclePercent', label: 'Otot %', color: theme === 'dark' ? '#93a6b2' : '#0284c7' },
-      { key: 'visceralFat', label: 'Visceral', color: theme === 'dark' ? '#A7967D' : '#475569' },
-      { key: 'bmr', label: 'BMR', color: theme === 'dark' ? '#81571E' : '#b45309' },
-      { key: 'waist', label: 'Lkr Perut', color: theme === 'dark' ? '#294c65' : '#1e3a8a' },
-      { key: 'bpSys', label: 'Tensi (Sistolik)', color: theme === 'dark' ? '#CBB989' : '#0891b2' },
-      { key: 'heartRate', label: 'Nadi (bpm)', color: theme === 'dark' ? '#738a98' : '#4f46e5' },
-      { key: 'steps', label: 'Langkah (x100)', color: theme === 'dark' ? '#957c4c' : '#334155' },
-      { key: 'activeMinutes', label: 'Wkt Aktif (m)', color: theme === 'dark' ? '#5b829e' : '#1d4ed8' },
-      { key: 'weeklyDuration', label: 'Workout (m)', color: theme === 'dark' ? '#c3a870' : '#854d0e' },
+      { key: 'weight', label: 'Berat Badan', color: theme === 'dark' ? '#38bdf8' : '#0284c7' }, // Sky Blue
+      { key: 'bodyFat', label: 'Kadar Lemak', color: theme === 'dark' ? '#60a5fa' : '#2563eb' }, // Lighter Blue
+      { key: 'musclePercent', label: 'Kadar Otot', color: theme === 'dark' ? '#818cf8' : '#4f46e5' }, // Soft Indigo
+      { key: 'visceralFat', label: 'Lemak Visceral', color: theme === 'dark' ? '#2dd4bf' : '#0d9488' }, // Teal
+      { key: 'bmr', label: 'BMR', color: theme === 'dark' ? '#94a3b8' : '#64748b' }, // Slate
+      { key: 'waist', label: 'Lingkar Perut', color: theme === 'dark' ? '#3b82f6' : '#1d4ed8' }, // Blue
+      { key: 'bpSys', label: 'Tensi', color: theme === 'dark' ? '#a78bfa' : '#7c3aed' }, // Soft Purple
+      { key: 'heartRate', label: 'Nadi', color: theme === 'dark' ? '#06b6d4' : '#0891b2' }, // Cyan
+      { key: 'oxygenSaturation', label: 'SpO2', color: theme === 'dark' ? '#93c5fd' : '#1e3a8a' }, // Very Light Blue
   ];
 
   const [activeChartMetrics, setActiveChartMetrics] = useState(() => {
@@ -68,9 +66,7 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
               waist: histBio?.waist ? Number((isImp ? Number(histBio.waist) * 0.393701 : Number(histBio.waist)).toFixed(1)) : null,
               bpSys: bpSys,
               heartRate: histBio?.heartRate ? Number(histBio.heartRate) : null,
-              steps: histBio?.steps ? Math.round(Number(histBio.steps) / 100) : null,
-              activeMinutes: histBio?.activeMinutes ? Number(histBio.activeMinutes) : null,
-              weeklyDuration: histBio?.weeklyDuration ? Number(histBio.weeklyDuration) : null,
+              oxygenSaturation: histBio?.oxygenSaturation ? Number(histBio.oxygenSaturation) : null,
           });
       });
       return data;
@@ -284,6 +280,15 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
                         }
                     }}
                  >
+                    <defs>
+                        <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                            <feGaussianBlur stdDeviation="4" result="blur" />
+                            <feMerge>
+                                <feMergeNode in="blur" />
+                                <feMergeNode in="SourceGraphic" />
+                            </feMerge>
+                        </filter>
+                    </defs>
                     <Tooltip 
                        formatter={(value, name, props) => {
                            let unit = '';
@@ -310,7 +315,7 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
                     })}
                     {chartMetricsList.map(metric => (
                         activeChartMetrics.includes(metric.key) && 
-                        <Line key={metric.key} yAxisId={metric.key} type="monotone" name={metric.label} dataKey={metric.key} stroke={metric.color} strokeWidth={2} dot={{ r: 2, strokeWidth: 0, fill: metric.color }} activeDot={{ r: 4, strokeWidth: 0, fill: metric.color }} connectNulls={true} isAnimationActive={false} />
+                        <Line key={metric.key} yAxisId={metric.key} type="monotone" name={metric.label} dataKey={metric.key} stroke={metric.color} strokeWidth={2} dot={{ r: 2, strokeWidth: 0, fill: metric.color }} activeDot={{ r: 5, strokeWidth: 0, fill: metric.color }} connectNulls={true} isAnimationActive={false} />
                     ))}
                  </LineChart>
              </div>

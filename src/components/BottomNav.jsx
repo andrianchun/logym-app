@@ -3,7 +3,7 @@ import { Dumbbell, Calendar, LineChart, ClipboardList, Database, LayoutDashboard
 
 const BottomNav = ({ t, lang, activeTab, setActiveTab, setIsEditingMode, soundEnabled, playSoundEffect }) => {
   const tabs = [
-    { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { id: 'dashboard', icon: LayoutDashboard, label: lang.id === 'EN' ? 'Dashboard' : 'Dasbor' },
     { id: 'workout', icon: Dumbbell, label: lang.workout || 'Latihan' },
     { id: 'calendar', icon: Calendar, label: lang.calendar || 'Kalender' },
     { id: 'program', icon: ClipboardList, label: 'Program' },
@@ -17,18 +17,26 @@ const BottomNav = ({ t, lang, activeTab, setActiveTab, setIsEditingMode, soundEn
   };
 
   return (
-    <div className={`fixed bottom-0 left-0 right-0 ${t.navBg} border-t ${t.border} pb-safe z-40 transition-colors duration-300`}>
-      <div className="flex justify-around items-center max-w-2xl mx-auto px-1 py-2.5">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => handleTabClick(tab.id)}
-            className={`flex flex-col items-center justify-center w-full space-y-0.5 transition-all duration-300 ${activeTab === tab.id ? t.navIconActive + ' scale-110' : t.navIconInactive + ' hover:' + t.textMain}`}
-          >
-            <tab.icon size={20} strokeWidth={activeTab === tab.id ? 2.5 : 2} />
-            <span className="text-[8px] font-bold uppercase tracking-wider">{tab.label}</span>
-          </button>
-        ))}
+    <div className="fixed bottom-0 left-0 right-0 z-40 pb-safe px-3 pointer-events-none">
+      <div className={`pointer-events-auto flex justify-around items-center max-w-2xl mx-auto mb-3 px-1 py-2 rounded-[28px] border ${t.border} ${t.navBg} ${t.glow} transition-colors duration-300`}>
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => handleTabClick(tab.id)}
+              className="relative flex flex-col items-center justify-center w-full py-1.5 space-y-0.5 group"
+            >
+              {isActive && (
+                <span className={`absolute inset-x-0 inset-y-0.5 rounded-2xl ${t.bgAccentSoft} border ${t.borderAccentSoft}`} />
+              )}
+              <span className={`relative flex flex-col items-center space-y-0.5 transition-all duration-300 ${isActive ? t.navIconActive + ' scale-105' : t.navIconInactive + ' group-hover:' + t.textMuted}`}>
+                <tab.icon size={19} strokeWidth={isActive ? 2.5 : 2} />
+                <span className="text-[8px] font-bold uppercase tracking-wider">{tab.label}</span>
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

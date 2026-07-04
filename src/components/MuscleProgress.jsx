@@ -250,7 +250,7 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
                                 data={bodyData}
                                 style={{ width: '100%' }}
                                 bodyColor={theme === 'dark' ? '#27272a' : '#cbd5e1'}
-                                highlightedColors={theme === 'dark' ? ['#315975', '#41759b', '#528cb8', '#629bc4', '#84c2ed'] : ['#7eb6d9', '#629bc4', '#41759b', '#315975', '#1e384c']}
+                                highlightedColors={theme === 'dark' ? ['#1e3a8a', '#1d4ed8', '#2563eb', '#3b82f6', '#60a5fa'] : ['#93c5fd', '#60a5fa', '#3b82f6', '#2563eb', '#1d4ed8']}
                                 type="anterior"
                                 onMouseOver={(data, e) => {
                                     const rect = e.target.getBoundingClientRect();
@@ -266,7 +266,7 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
                                 data={bodyData}
                                 style={{ width: '100%' }}
                                 bodyColor={theme === 'dark' ? '#27272a' : '#cbd5e1'}
-                                highlightedColors={theme === 'dark' ? ['#315975', '#41759b', '#528cb8', '#629bc4', '#84c2ed'] : ['#7eb6d9', '#629bc4', '#41759b', '#315975', '#1e384c']}
+                                highlightedColors={theme === 'dark' ? ['#1e3a8a', '#1d4ed8', '#2563eb', '#3b82f6', '#60a5fa'] : ['#93c5fd', '#60a5fa', '#3b82f6', '#2563eb', '#1d4ed8']}
                                 type="posterior"
                                 onMouseOver={(data, e) => {
                                     const rect = e.target.getBoundingClientRect();
@@ -282,12 +282,21 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
                         {radarData.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
                                 <RadarChart cx="50%" cy="50%" outerRadius={isSubCard ? "55%" : (isMobile ? "55%" : "70%")} data={radarData}>
+                                    <defs>
+                                        <filter id="glowRadar" x="-20%" y="-20%" width="140%" height="140%">
+                                            <feGaussianBlur stdDeviation="4" result="blur" />
+                                            <feMerge>
+                                                <feMergeNode in="blur" />
+                                                <feMergeNode in="SourceGraphic" />
+                                            </feMerge>
+                                        </filter>
+                                    </defs>
                                     <PolarGrid stroke={theme === 'dark' ? '#3f3f46' : '#cbd5e1'} />
                                     <PolarAngleAxis dataKey="muscle" tick={{ fill: theme === 'dark' ? '#a1a1aa' : '#64748b', fontSize: 10, fontWeight: 700 }} />
-                                    <Radar name="Skor Otot" dataKey="score" stroke={theme === 'dark' ? '#629bc4' : '#41759b'} fill={theme === 'dark' ? '#41759b' : '#41759b'} fillOpacity={0.6} />
+                                    <Radar name="Skor Otot" dataKey="score" stroke={theme === 'dark' ? '#06b6d4' : '#0891b2'} strokeWidth={2} fill={theme === 'dark' ? '#3b82f6' : '#2563eb'} fillOpacity={0.5} />
                                     <Tooltip 
                                         contentStyle={{ backgroundColor: theme === 'dark' ? '#18181b' : '#ffffff', border: 'none', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-                                        itemStyle={{ color: theme === 'dark' ? '#a6e8ff' : '#41759b', fontWeight: 900 }}
+                                        itemStyle={{ color: theme === 'dark' ? '#a6e8ff' : '#3b82f6', fontWeight: 900 }}
                                     />
                                 </RadarChart>
                             </ResponsiveContainer>
@@ -318,13 +327,13 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
                                 <span style={{ color: theme === 'dark' ? '#a1a1aa' : '#71717a', fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
                                     {lang?.id === 'EN' ? 'Lateral Delt' : 'Bahu Samping'}
                                 </span>
-                                <span style={{ color: theme === 'dark' ? '#a6e8ff' : '#41759b', fontSize: '11px', fontWeight: 900, marginBottom: '6px' }}>
+                                <span style={{ color: theme === 'dark' ? '#a6e8ff' : '#3b82f6', fontSize: '11px', fontWeight: 900, marginBottom: '6px' }}>
                                     Skor Otot : {Math.round(muscleStats['deltoid_lateral'] || 0)}
                                 </span>
                                 <span style={{ color: theme === 'dark' ? '#a1a1aa' : '#71717a', fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
                                     {lang?.id === 'EN' ? 'Rear Delt' : 'Bahu Blk'}
                                 </span>
-                                <span style={{ color: theme === 'dark' ? '#a6e8ff' : '#41759b', fontSize: '11px', fontWeight: 900 }}>
+                                <span style={{ color: theme === 'dark' ? '#a6e8ff' : '#3b82f6', fontSize: '11px', fontWeight: 900 }}>
                                     Skor Otot : {Math.round(muscleStats['deltoid_rear'] || 0)}
                                 </span>
                             </>
@@ -333,13 +342,13 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
                                 <span style={{ color: theme === 'dark' ? '#a1a1aa' : '#71717a', fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
                                     {lang?.id === 'EN' ? 'Adductors' : 'Paha Dlm'}
                                 </span>
-                                <span style={{ color: theme === 'dark' ? '#a6e8ff' : '#41759b', fontSize: '11px', fontWeight: 900, marginBottom: '6px' }}>
+                                <span style={{ color: theme === 'dark' ? '#a6e8ff' : '#3b82f6', fontSize: '11px', fontWeight: 900, marginBottom: '6px' }}>
                                     Skor Otot : {Math.round(muscleStats['adductors'] || 0)}
                                 </span>
                                 <span style={{ color: theme === 'dark' ? '#a1a1aa' : '#71717a', fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
                                     {lang?.id === 'EN' ? 'Abductors' : 'Paha Luar'}
                                 </span>
-                                <span style={{ color: theme === 'dark' ? '#a6e8ff' : '#41759b', fontSize: '11px', fontWeight: 900 }}>
+                                <span style={{ color: theme === 'dark' ? '#a6e8ff' : '#3b82f6', fontSize: '11px', fontWeight: 900 }}>
                                     Skor Otot : {Math.round(muscleStats['abductors'] || 0)}
                                 </span>
                             </>
@@ -348,7 +357,7 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
                                 <span style={{ color: theme === 'dark' ? '#a1a1aa' : '#71717a', fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
                                     {radarLabels[selectedMuscle.muscle]?.[lang?.id || 'ID'] || selectedMuscle.muscle}
                                 </span>
-                                <span style={{ color: theme === 'dark' ? '#a6e8ff' : '#41759b', fontSize: '11px', fontWeight: 900 }}>
+                                <span style={{ color: theme === 'dark' ? '#a6e8ff' : '#3b82f6', fontSize: '11px', fontWeight: 900 }}>
                                     Skor Otot : {Math.round(bodyData.find(d => d.name === selectedMuscle.muscle)?.score || 0)}
                                 </span>
                             </>

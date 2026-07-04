@@ -22,10 +22,11 @@ const Header = ({ t, theme, user, showSettings, setShowSettings, setShowProfileM
   const isDark = theme === 'dark';
 
   return (
-    <header 
-      className={`sticky top-0 z-40 ${t?.navBg || 'bg-white'} border-b ${t?.border || 'border-gray-200'} px-4 flex justify-between items-center transition-colors duration-300`}
+    <header
+      className={`sticky top-0 z-40 ${t?.navBg || 'bg-white'} border-b ${t?.border || 'border-gray-200'} px-4 flex justify-between items-center transition-colors duration-300 relative`}
       style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))', paddingBottom: '0.75rem' }}
     >
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-sky-400/40 to-transparent" />
       
       {/* BAGIAN KIRI: LOGO */}
       <div className="flex items-center">

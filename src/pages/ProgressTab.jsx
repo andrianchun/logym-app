@@ -29,8 +29,8 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
   }, [activeChartLines]);
 
   const chartColors = theme === 'dark' 
-    ? ['#41759b', '#B79347', '#93a6b2', '#A7967D', '#81571E', '#294c65', '#CBB989', '#738a98', '#957c4c', '#5b829e', '#c3a870']
-    : ['#2563eb', '#1e3a8a', '#0891b2', '#4f46e5', '#334155', '#d97706', '#0284c7', '#475569', '#1d4ed8', '#0f172a', '#b45309'];
+    ? ['#38bdf8', '#60a5fa', '#818cf8', '#2dd4bf', '#94a3b8', '#3b82f6', '#a78bfa', '#06b6d4', '#93c5fd']
+    : ['#0284c7', '#2563eb', '#4f46e5', '#0d9488', '#64748b', '#1d4ed8', '#7c3aed', '#0891b2', '#1e3a8a'];
 
   // ==========================================
   // MESIN PERHITUNGAN GRAFIK (DIROMBAK UNTUK DETAIL PER SET)
@@ -478,7 +478,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
   const isImp = units?.weight === 'lbs';
 
   return (
-    <div className={`${!isSubCard ? 'px-5 pt-5 pb-1' : ''} animate-in fade-in duration-300`}>
+    <div className={`${!isSubCard ? 'px-4 pt-4 pb-1' : ''} animate-in fade-in duration-300`}>
         {!isSubCard && (
         <div className="flex justify-between items-center mb-5">
            <h3 className={`h3 ${t.textMain}`}>Progres Latihan</h3>
@@ -496,7 +496,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
         </div>
         )}
         
-        <div className={`flex ${isSubCard ? 'mb-1' : 'mb-5'} bg-black/5 rounded-2xl relative`}>
+        <div className={`flex ${isSubCard ? 'mb-1' : 'mb-5'} ${theme === 'dark' ? 'bg-black/40' : 'bg-black/5'} backdrop-blur-md rounded-2xl relative`}>
           
           {chartDataObj.data.length > 0 && (
               <div className={`w-12 shrink-0 pointer-events-none flex items-center border-r border-slate-500/10 z-10 bg-transparent py-3`}>
@@ -516,6 +516,15 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
             {chartDataObj.data.length > 0 ? (
                <div style={{ width: `${chartWidth}px`, height: isSubCard ? '250px' : '288px' }}>
                 <LineChart width={chartWidth} height={isSubCard ? 250 : 288} data={chartDataObj.data} style={{ outline: 'none' }}>
+                  <defs>
+                      <filter id="glowProgress" x="-20%" y="-20%" width="140%" height="140%">
+                          <feGaussianBlur stdDeviation="4" result="blur" />
+                          <feMerge>
+                              <feMergeNode in="blur" />
+                              <feMergeNode in="SourceGraphic" />
+                          </feMerge>
+                      </filter>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#3f3f46' : '#cbd5e1'} vertical={false} />
                   <Tooltip 
                      formatter={(value, name, props) => {
@@ -548,7 +557,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                   />
                   <XAxis dataKey="date" stroke={theme === 'dark' ? '#a1a1aa' : '#64748b'} fontSize={10} tickLine={false} axisLine={false} padding={{ left: 20, right: 20 }} />
                   <YAxis hide={true} domain={yDomain} allowDataOverflow={true} />
-                  {chartDataObj.items.map((item, idx) => ( activeChartLines.includes(item) && <Line key={item} type="monotone" name={chartType === 'muscle' ? formatTarget(item, lang?.id) : item} dataKey={item} stroke={chartColors[idx % chartColors.length]} strokeWidth={2} dot={{ r: 2, strokeWidth: 0, fill: chartColors[idx % chartColors.length] }} activeDot={{ r: 4, strokeWidth: 0, fill: chartColors[idx % chartColors.length] }} connectNulls={true} isAnimationActive={false} /> ))}
+                  {chartDataObj.items.map((item, idx) => ( activeChartLines.includes(item) && <Line key={item} type="monotone" name={chartType === 'muscle' ? formatTarget(item, lang?.id) : item} dataKey={item} stroke={chartColors[idx % chartColors.length]} strokeWidth={2} dot={{ r: 2, strokeWidth: 0, fill: chartColors[idx % chartColors.length] }} activeDot={{ r: 5, strokeWidth: 0, fill: chartColors[idx % chartColors.length] }} connectNulls={true} isAnimationActive={false} /> ))}
                 </LineChart>
                </div>
             ) : ( 

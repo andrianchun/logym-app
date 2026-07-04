@@ -22,6 +22,7 @@ const ImmersiveWorkout = ({
   onCancelWorkout,
   soundEnabled,
   onOpenDetail,
+  isClosing,
   workoutStartTime,
   restTimer,
   setRestTimer,
@@ -316,14 +317,14 @@ const ImmersiveWorkout = ({
 
   const isImp = units?.weight === 'lbs';
 
-  const theme = t?.bgApp?.includes('040f1a') ? 'dark' : 'light';
+  const theme = t?.bgApp?.includes('05070d') ? 'dark' : 'light';
 
   const handleIframeLoad = (e) => {
     e.target.contentWindow.postMessage(JSON.stringify({event: "listening"}), "*");
   };
 
   return (
-    <div className={`fixed inset-0 z-[100] flex flex-col ${t.bgApp} ${t.textMain} overflow-hidden animate-in slide-in-from-bottom-full duration-300`}>
+    <div className={`fixed inset-0 z-[100] flex flex-col ${t.bgApp} ${t.textMain} overflow-hidden duration-300 ${isClosing ? 'animate-out slide-out-to-bottom-full' : 'animate-in slide-in-from-bottom-full'}`}>
       
       {/* HEADER (UNIFIED BAR) */}
       <div className={`flex items-center justify-between p-4 absolute top-0 w-full z-10`}>
@@ -347,7 +348,7 @@ const ImmersiveWorkout = ({
           <button onClick={() => { playSoundEffect('click', soundEnabled); onCancelWorkout(); }} className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400' : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-500'} flex items-center justify-center transition shadow-sm`} title="Batalkan Workout">
             <X size={18} strokeWidth={2.5} />
           </button>
-          <button onClick={() => { playSoundEffect('click', soundEnabled); setShowFinishConfirm(true); }} className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-white/5 hover:bg-white/10 text-emerald-400' : 'bg-black/5 hover:bg-black/10 text-[#41759b]'} flex items-center justify-center transition shadow-sm`} title="Selesai Workout">
+          <button onClick={() => { playSoundEffect('click', soundEnabled); setShowFinishConfirm(true); }} className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-white/5 hover:bg-white/10 text-emerald-400' : 'bg-black/5 hover:bg-black/10 text-[#3b82f6]'} flex items-center justify-center transition shadow-sm`} title="Selesai Workout">
             <Check size={20} strokeWidth={3} />
           </button>
         </div>
@@ -393,7 +394,7 @@ const ImmersiveWorkout = ({
                       return (
                         <>
                           {!ytLoaded && idx === activeMediaIndex && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-[#040f1a] z-10">
+                            <div className="absolute inset-0 flex items-center justify-center bg-[#05070d] z-10">
                               <Clock className="animate-spin text-white/50" size={32} />
                             </div>
                           )}

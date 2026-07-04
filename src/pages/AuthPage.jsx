@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Mail, Lock, User, ArrowRight, Loader2, Activity } from 'lucide-react';
 import { playSoundEffect } from '../utils/audio';
 
@@ -21,6 +21,43 @@ const AuthPage = ({ t, theme, soundEnabled, onLogin }) => {
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [isFormExpanded, setIsFormExpanded] = useState(false);
+
+  // --- DRAG STATE UNTUK BOTTOM SHEET ---
+  const sheetRef = useRef(null);
+  const headerRef = useRef(null);
+  const dragStartRef = useRef({ y: 0, translate: 0, collapsedTranslate: 0 });
+  const [dragY, setDragY] = useState(null); // null = tidak sedang di-drag
+  const [peekPx, setPeekPx] = useState(260); // tinggi bagian "peek" (handle+judul+tombol), diukur otomatis
+
+  useEffect(() => {
+    if (headerRef.current) setPeekPx(headerRef.current.offsetHeight);
+  }, []);
+
+  const handleSheetPointerDown = (e) => {
+    const H = sheetRef.current?.offsetHeight || 0;
+    const collapsedTranslate = Math.max(0, H - peekPx);
+    const startTranslate = isFormExpanded ? 0 : collapsedTranslate;
+    dragStartRef.current = { y: e.clientY, translate: startTranslate, collapsedTranslate };
+    setDragY(startTranslate);
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handleSheetPointerMove = (e) => {
+    if (dragY === null) return;
+    const { y, translate, collapsedTranslate } = dragStartRef.current;
+    const delta = e.clientY - y;
+    setDragY(Math.min(collapsedTranslate, Math.max(0, translate + delta)));
+  };
+
+  const handleSheetPointerUp = () => {
+    if (dragY === null) return;
+    const { translate: startTranslate, collapsedTranslate } = dragStartRef.current;
+    const moved = Math.abs(dragY - startTranslate);
+    const nextExpanded = moved < 8 ? !isFormExpanded : dragY < collapsedTranslate / 2;
+    setIsFormExpanded(nextExpanded);
+    setDragY(null);
+  };
 
   useEffect(() => {
     const bannedMsg = localStorage.getItem('lyfit_banned_msg');
@@ -130,24 +167,85 @@ const AuthPage = ({ t, theme, soundEnabled, onLogin }) => {
     }
   };
 
+  const sheetTransform = dragY !== null
+    ? `translateY(${dragY}px)`
+    : `translateY(${isFormExpanded ? '0px' : `calc(100% - ${peekPx}px)`})`;
+
   return (
-    <div className={`min-h-screen flex items-center justify-center p-4 ${t.bgApp} transition-colors duration-300`}>
-      <div className={`w-full max-w-md p-8 sm:p-10 rounded-[2rem] border ${t.border} ${t.bgCard} shadow-2xl animate-in zoom-in-95 fade-in duration-500 relative overflow-hidden`}>
-        
-        {/* Dekorasi Cahaya Latar */}
-        <div className={`absolute -top-32 -right-32 w-64 h-64 rounded-full blur-3xl opacity-20 bg-gradient-to-br ${t.gradientBg} pointer-events-none`}></div>
-        <div className={`absolute -bottom-32 -left-32 w-64 h-64 rounded-full blur-3xl opacity-20 bg-gradient-to-tr ${t.gradientBg} pointer-events-none`}></div>
+    <div className={`fixed inset-0 overflow-hidden ${t.bgApp} transition-colors duration-300`}>
 
-        <div className="relative z-10">
-            <div className="text-center mb-8 flex flex-col items-center">
-               {/* SUNTIKAN LOGO PREMIUM: Menggunakan logo vertikal (620x600) */}
-               <img src={theme === 'dark' ? '/logo-dark.png' : '/logo-light.png'} alt="LyFit Logo" className="w-32 h-32 mb-4 object-contain drop-shadow-2xl" />
+      {/* --- HERO PHOTO: layer fixed penuh layar, jangkar tetap, tidak ikut scroll --- */}
+      <div className="absolute inset-0 flex justify-center">
+        <div className={`relative w-full max-w-md h-full overflow-hidden bg-gradient-to-br ${t.gradientBg}`}>
+          <img
+            src="/bg-auth.webp"
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover object-top"
+            onError={(e) => { e.currentTarget.style.opacity = '0'; }}
+          />
+          {/* Aksen cahaya biru */}
+          <div className="absolute inset-0 bg-gradient-to-t from-transparent via-transparent to-sky-400/10 mix-blend-screen pointer-events-none" />
+          {/* Transisi halus ke background app di bagian bawah */}
+          <div className={`absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent ${theme === 'dark' ? 'to-[#05070d]' : 'to-[#eef3fb]'} pointer-events-none`} />
 
-               <p className={`body-lg font-bold ${t.textMuted}`}>
-                  {isLoginMode ? 'All Rounder Fitness Tracker Buddy' : 'Mulai perjalanan fitness-mu hari ini.'}
-               </p>
-            </div>
+          {/* Logo */}
+          <div className="absolute top-0 left-0 right-0 p-6" style={{ paddingTop: 'max(1.5rem, env(safe-area-inset-top))' }}>
+            <img src={theme === 'dark' ? '/banner-dark.png' : '/banner-light.png'} alt="LyFit" className="h-7 w-auto object-contain drop-shadow-lg" />
+          </div>
+        </div>
+      </div>
 
+      {/* --- BOTTOM SHEET: drawer yang bisa ditarik naik/turun --- */}
+      <div className="absolute inset-x-0 bottom-0 flex justify-center">
+        <div
+          ref={sheetRef}
+          className={`w-full max-w-md rounded-t-[2.5rem] ${theme === 'dark' ? 'bg-black/40 backdrop-blur-3xl' : 'bg-white/70 backdrop-blur-3xl'} border-x border-t ${t.border} shadow-glow-lg flex flex-col overflow-hidden ${dragY === null ? 'transition-transform duration-300 ease-out' : ''}`}
+          style={{ height: 'min(88vh, 700px)', transform: sheetTransform }}
+        >
+          {/* Header: area drag — tarik atau ketuk handle untuk buka/tutup */}
+          <div
+            ref={headerRef}
+            className="shrink-0 px-6 sm:px-8 pt-4 cursor-grab active:cursor-grabbing"
+            style={{ touchAction: 'none' }}
+            onPointerDown={handleSheetPointerDown}
+            onPointerMove={handleSheetPointerMove}
+            onPointerUp={handleSheetPointerUp}
+            onPointerCancel={handleSheetPointerUp}
+          >
+            <div className="mx-auto w-10 h-1.5 rounded-full bg-white/20 mb-4" />
+
+            <h1 className="h1 leading-tight mb-4">
+              <span className={t.textMain}>{isLoginMode ? 'Masuk untuk' : 'Daftar untuk'}</span><br />
+              <span className={`bg-gradient-to-r ${t.gradientText} bg-clip-text text-transparent`}>Wujudkan Tubuh Impianmu</span>
+            </h1>
+
+            {/* Tombol ringkas: pencet untuk buka form */}
+            {!isFormExpanded && (
+              <div className="flex items-center gap-4 pb-6" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
+                 <button
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() => { playSoundEffect('click', soundEnabled); setIsFormExpanded(true); }}
+                    className={`flex-1 pl-6 pr-2 py-2 rounded-full bg-gradient-to-r ${t.gradientBg} text-white font-black body-lg flex items-center justify-between shadow-lg ${t.shadowAccent} active:scale-[0.98] transition-all`}
+                 >
+                    <span className="uppercase tracking-wide">{isLoginMode ? 'Masuk' : 'Daftar'}</span>
+                    <span className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                       <ArrowRight size={18} />
+                    </span>
+                 </button>
+                 <button
+                    type="button"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() => { playSoundEffect('click', soundEnabled); setIsLoginMode(!isLoginMode); setIsFormExpanded(true); setErrorMsg(''); }}
+                    className={`body-lg font-bold ${t.textMuted} hover:${t.textMain} transition-colors whitespace-nowrap`}
+                 >
+                    atau {isLoginMode ? 'Daftar' : 'Masuk'}
+                 </button>
+              </div>
+            )}
+          </div>
+
+          {/* Konten form: scrollable di dalam sheet, muncul penuh saat sheet ditarik naik */}
+          <div className="flex-1 overflow-y-auto px-6 sm:px-8 pb-10" style={{ paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
             {/* Kotak Pesan Error */}
             {errorMsg && (
                <div className="mb-6 p-3 bg-rose-500/10 border border-rose-500/30 text-rose-500 body-md rounded-xl text-center animate-in fade-in">
@@ -178,12 +276,12 @@ const AuthPage = ({ t, theme, soundEnabled, onLogin }) => {
                     <input type="text" placeholder="Nama Panggilan" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className={`ml-3 bg-transparent w-full outline-none ${t.textMain} font-medium`} disabled={isLoading}/>
                  </div>
                )}
-               
+
                <div className={`flex items-center ${t.inputBg} rounded-2xl px-4 py-3 border border-transparent focus-within:${t.borderAccentSoft} transition-colors`}>
                   <Mail size={20} className={t.textMuted} />
                   <input type="email" placeholder="Email Address" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} required className={`ml-3 bg-transparent w-full outline-none ${t.textMain} font-medium`} disabled={isLoading}/>
                </div>
-               
+
                <div className={`flex items-center ${t.inputBg} rounded-2xl px-4 py-3 border border-transparent focus-within:${t.borderAccentSoft} transition-colors`}>
                   <Lock size={20} className={t.textMuted} />
                   <input type="password" placeholder="Password" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} required className={`ml-3 bg-transparent w-full outline-none ${t.textMain} font-medium`} disabled={isLoading}/>
@@ -198,7 +296,7 @@ const AuthPage = ({ t, theme, soundEnabled, onLogin }) => {
                )}
 
                <button type="submit" disabled={isLoading} className={`w-full py-4 mt-2 rounded-2xl bg-gradient-to-r ${t.gradientBg} text-white font-black body-lg flex items-center justify-center shadow-lg ${t.shadowAccent} active:scale-[0.98] transition-all disabled:opacity-70`}>
-                  {isLoading ? <Loader2 size={24} className="animate-spin" /> : (isLoginMode ? 'Masuk Sekarang' : 'Buat Akun')} 
+                  {isLoading ? <Loader2 size={24} className="animate-spin" /> : (isLoginMode ? 'Masuk Sekarang' : 'Buat Akun')}
                   {!isLoading && <ArrowRight size={20} className="ml-2"/>}
                </button>
             </form>
@@ -209,6 +307,7 @@ const AuthPage = ({ t, theme, soundEnabled, onLogin }) => {
                     <span className={t.textAccent}>{isLoginMode ? "Daftar Gratis" : "Masuk"}</span>
                 </button>
             </div>
+          </div>
         </div>
       </div>
     </div>

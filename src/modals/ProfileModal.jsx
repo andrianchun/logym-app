@@ -389,7 +389,7 @@ export default function ProfileModal({
                             <div className="flex items-center gap-4 sm:gap-6">
                                 {/* Photo */}
                                 <div className="relative shrink-0 group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                                    <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-[#41759b]/50 shadow-md bg-gray-200">
+                                    <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-[#3b82f6]/50 shadow-md bg-gray-200">
                                         {user?.photoURL ? (
                                             <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover" />
                                         ) : (
@@ -415,7 +415,7 @@ export default function ProfileModal({
                                                 onChange={(e) => setNewName(e.target.value)} 
                                                 onBlur={() => setTimeout(() => setIsEditingName(false), 200)}
                                                 maxLength={15}
-                                                className={`flex-1 px-1 py-0.5 bg-transparent ${t.textMain} text-2xl font-black tracking-tight focus:outline-none border-b-2 border-[#41759b] w-full min-w-0`}
+                                                className={`flex-1 px-1 py-0.5 bg-transparent ${t.textMain} text-2xl font-black tracking-tight focus:outline-none border-b-2 border-[#3b82f6] w-full min-w-0`}
                                                 autoFocus
                                             />
                                             <button 
@@ -552,9 +552,9 @@ export default function ProfileModal({
 
                 {/* Tabs at the bottom */}
                 <div className={`flex border-t ${t.border} px-2 pb-safe shrink-0`}>
-                    <button onClick={() => setActiveTab('beranda')} className={`flex-1 py-3 text-sm font-bold border-t-2 transition-colors ${activeTab === 'beranda' ? `border-[#41759b] ${t.textMain}` : `border-transparent ${t.textMuted}`}`}>Komunitas</button>
-                    <button onClick={() => setActiveTab('bagikan')} className={`flex-1 py-3 text-sm font-bold border-t-2 transition-colors ${activeTab === 'bagikan' ? `border-[#41759b] ${t.textMain}` : `border-transparent ${t.textMuted}`}`}>Share</button>
-                    <button onClick={() => setActiveTab('pencapaian')} className={`flex-1 py-3 text-sm font-bold border-t-2 transition-colors ${activeTab === 'pencapaian' ? `border-[#41759b] ${t.textMain}` : `border-transparent ${t.textMuted}`}`}>Profil</button>
+                    <button onClick={() => setActiveTab('beranda')} className={`flex-1 py-3 text-sm font-bold border-t-2 transition-colors ${activeTab === 'beranda' ? `border-[#3b82f6] ${t.textMain}` : `border-transparent ${t.textMuted}`}`}>Komunitas</button>
+                    <button onClick={() => setActiveTab('bagikan')} className={`flex-1 py-3 text-sm font-bold border-t-2 transition-colors ${activeTab === 'bagikan' ? `border-[#3b82f6] ${t.textMain}` : `border-transparent ${t.textMuted}`}`}>Share</button>
+                    <button onClick={() => setActiveTab('pencapaian')} className={`flex-1 py-3 text-sm font-bold border-t-2 transition-colors ${activeTab === 'pencapaian' ? `border-[#3b82f6] ${t.textMain}` : `border-transparent ${t.textMuted}`}`}>Profil</button>
                 </div>
             </div>
         </div>

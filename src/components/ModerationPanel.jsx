@@ -145,13 +145,13 @@ export default function ModerationPanel({ isDark, t, onClose, onNavigateToPost, 
         <div className="flex border-b border-white/10 mb-4 px-4 pt-4">
           <button 
             onClick={() => setActiveTab('reports')} 
-            className={`flex-1 py-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'reports' ? 'border-[#41759b] text-[#41759b]' : 'border-transparent text-white/50 hover:text-white/80'}`}
+            className={`flex-1 py-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'reports' ? 'border-[#3b82f6] text-[#3b82f6]' : 'border-transparent text-white/50 hover:text-white/80'}`}
           >
             Laporan Masuk
           </button>
           <button 
             onClick={() => setActiveTab('banned')} 
-            className={`flex-1 py-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'banned' ? 'border-[#41759b] text-[#41759b]' : 'border-transparent text-white/50 hover:text-white/80'}`}
+            className={`flex-1 py-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'banned' ? 'border-[#3b82f6] text-[#3b82f6]' : 'border-transparent text-white/50 hover:text-white/80'}`}
           >
             Daftar Blacklist
           </button>
@@ -192,7 +192,7 @@ export default function ModerationPanel({ isDark, t, onClose, onNavigateToPost, 
                         </button>
                         {report.type === 'post' && (
                           <>
-                            <button onClick={() => onNavigateToPost?.(report.targetId)} className="flex-1 py-2 rounded-xl bg-[#41759b] text-white font-bold text-xs shadow-lg shadow-[#41759b]/30 hover:opacity-90">
+                            <button onClick={() => onNavigateToPost?.(report.targetId)} className="flex-1 py-2 rounded-xl bg-[#3b82f6] text-white font-bold text-xs shadow-lg shadow-[#3b82f6]/30 hover:opacity-90">
                               Lihat Post
                             </button>
                             <button onClick={() => handleDeletePost(report.id, report.targetId)} className="flex-1 py-2 rounded-xl bg-rose-500 text-white font-bold text-xs shadow-lg shadow-rose-500/30 hover:opacity-90">
@@ -201,7 +201,7 @@ export default function ModerationPanel({ isDark, t, onClose, onNavigateToPost, 
                           </>
                         )}
                         {report.type === 'user' && (
-                          <button onClick={() => onNavigateToUser?.(report.targetId)} className="flex-1 py-2 rounded-xl bg-[#41759b] text-white font-bold text-xs shadow-lg shadow-[#41759b]/30 hover:opacity-90">
+                          <button onClick={() => onNavigateToUser?.(report.targetId)} className="flex-1 py-2 rounded-xl bg-[#3b82f6] text-white font-bold text-xs shadow-lg shadow-[#3b82f6]/30 hover:opacity-90">
                             Lihat Profil
                           </button>
                         )}

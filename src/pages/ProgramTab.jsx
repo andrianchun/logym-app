@@ -644,7 +644,7 @@ const ProgramTab = ({
                 <div className="flex items-start justify-between gap-4 mb-3">
                   <div className="flex-1 min-w-0 mt-1 flex flex-col gap-1">
                     <div className="flex items-center gap-2 w-full">
-                      {planId.startsWith('custom') && editingPlanId === planId ? (
+                      {editingPlanId === planId ? (
                         <div className={`relative group inline-block w-full flex-1`}>
                           <PlanNameInput
                             initialValue={group.planName}
@@ -694,7 +694,7 @@ const ProgramTab = ({
                       </span>
                     </div>
                   </div>
-                {(!planId.startsWith('custom') || true) && (
+                {true && (
                   <button 
                     onClick={() => handleDeletePlan(planId, group.planName)}
                     className={`p-2 rounded-full hover:bg-rose-500/10 text-rose-500 transition-colors shrink-0`}
@@ -725,7 +725,7 @@ const ProgramTab = ({
                 >
                   {isActive ? <><CheckCircle2 size={18} /> Program Aktif</> : 'Aktifkan'}
                 </button>
-                {planId.startsWith('custom') && (
+                {true && (
                   <button 
                     onClick={async () => {
                       playSoundEffect('click', soundEnabled);
@@ -805,8 +805,8 @@ const ProgramTab = ({
                   );
                 })}
 
-                {/* Add Custom Routine Button (only for custom plan) */}
-                {planId.startsWith('custom') && (
+                {/* Add Custom Routine Button */}
+                {true && (
                   <div className={`px-5 py-4 border-t ${t.border}`}>
                     {editingPlanId === planId ? (
                         <div className="flex flex-col gap-3">
@@ -850,7 +850,7 @@ const ProgramTab = ({
                           onClick={() => { playSoundEffect('click', soundEnabled); setEditingPlanId(planId); }}
                           className={`w-full py-3 rounded-xl font-bold text-sm border-2 border-dashed ${t.borderAccentSoft} ${t.textAccent} hover:${t.bgAccentSoft} transition-all active:scale-95 flex items-center justify-center gap-2`}
                         >
-                          <Edit2 size={16} /> Edit Program Custom
+                          <Edit2 size={16} /> Edit Program
                         </button>
                     )}
                   </div>

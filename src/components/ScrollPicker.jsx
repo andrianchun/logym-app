@@ -44,7 +44,7 @@ const ScrollPicker = ({ value, onChange, min = 0, max = 200, step = 1, width = '
       style={{ touchAction: 'pan-y', scrollSnapType: 'y mandatory' }}
     >
       {/* Active selection overlay */}
-      <div className={`absolute top-1/2 left-0 w-full h-[40px] -translate-y-1/2 border-y-2 pointer-events-none z-10 ${theme === 'dark' ? 'bg-[#41759b]/20 border-[#41759b]' : 'bg-[#B79347]/20 border-[#B79347]'}`} />
+      <div className={`absolute top-1/2 left-0 w-full h-[40px] -translate-y-1/2 border-y-2 pointer-events-none z-10 ${theme === 'dark' ? 'bg-[#3b82f6]/20 border-[#3b82f6]' : 'bg-[#B79347]/20 border-[#B79347]'}`} />
       
       <div 
         ref={containerRef}
@@ -59,7 +59,7 @@ const ScrollPicker = ({ value, onChange, min = 0, max = 200, step = 1, width = '
           <div 
             key={opt}
             className={`h-[40px] flex items-center justify-center snap-center font-bold text-lg transition-opacity ${
-              opt === value ? (theme === 'dark' ? 'opacity-100 text-[#93a6b2]' : 'opacity-100 text-[#81571E]') : (theme === 'dark' ? 'opacity-20 text-slate-400' : 'opacity-20 text-slate-600')
+              opt === value ? (theme === 'dark' ? 'opacity-100 text-[#9db8d6]' : 'opacity-100 text-[#81571E]') : (theme === 'dark' ? 'opacity-20 text-slate-400' : 'opacity-20 text-slate-600')
             }`}
           >
             {opt}

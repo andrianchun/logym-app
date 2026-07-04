@@ -243,8 +243,8 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
 
         const mergedData = {
             ...emptyBio,
-            height: userProfile?.height || 170, 
-            weight: userProfile?.weight || 70,
+            height: userProfile?.height || null, 
+            weight: userProfile?.weight || null,
             ...(latestBodyData || {}),
             steps: todayDailyData.steps !== undefined ? todayDailyData.steps : 0,
             activeMinutes: todayDailyData.activeMinutes !== undefined ? todayDailyData.activeMinutes : 0,
@@ -776,9 +776,9 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                                     </div>
 
                                     <div className="w-[40%] flex justify-end items-center mt-4">
-                                        <div className="relative w-[75px] h-[75px] rounded-full border-[5px] border-[#41759b]/30 flex flex-col items-center justify-center bg-[#061626]/80 shadow-[0_0_15px_rgba(65,117,155,0.3)]">
+                                        <div className="relative w-[75px] h-[75px] rounded-full border-[5px] border-[#3b82f6]/30 flex flex-col items-center justify-center bg-[#061626]/80 shadow-[0_0_15px_rgba(65,117,155,0.3)]">
                                             <span className={`text-2xl font-black leading-tight ${scoreStyle.replace('border-', 'text-')}`}>{formatNumber(bioData.bodyScore) || '-'}</span>
-                                            <span className="text-[7px] font-black tracking-widest text-[#41759b] mt-[-2px]">SCORE</span>
+                                            <span className="text-[7px] font-black tracking-widest text-[#3b82f6] mt-[-2px]">SCORE</span>
                                             {/* decorative arc */}
                                             <div className={`absolute inset-[-5px] rounded-full border-[5px] border-transparent ${scoreStyle.replace('border-', 'border-t-').replace('border-', 'border-r-')} transform rotate-45`}></div>
                                         </div>
@@ -1104,7 +1104,7 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                 <button 
                     onClick={handleShareToCommunity}
                     disabled={isGenerating || isSharing}
-                    className="flex shrink-0 items-center justify-center p-3 rounded-2xl bg-[#41759b] text-white font-black shadow-xl hover:shadow-[#41759b]/30 transition-all active:scale-95 disabled:opacity-50"
+                    className="flex shrink-0 items-center justify-center p-3 rounded-2xl bg-[#3b82f6] text-white font-black shadow-xl hover:shadow-[#3b82f6]/30 transition-all active:scale-95 disabled:opacity-50"
                     title="Bagikan ke Komunitas Lyfit"
                 >
                     {isSharing ? <Loader2 className="animate-spin" size={20}/> : <img src="/logo-white.webp" alt="Lyfit" className="w-6 h-6 object-contain" />}

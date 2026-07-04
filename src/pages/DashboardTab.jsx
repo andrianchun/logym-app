@@ -6,6 +6,7 @@ import { HealthConnect } from 'capacitor-health-connect';
 import { Capacitor } from '@capacitor/core';
 import DashboardModals from '../components/DashboardModals';
 import DashboardChart from '../components/DashboardChart';
+import ActivityChart from '../components/ActivityChart';
 import ProgressTab from './ProgressTab';
 import { MuscleProgress } from '../components/MuscleProgress';
 import SwipeInput from '../components/SwipeInput';
@@ -13,7 +14,7 @@ import { formatNumber } from '../utils/numberFormat';
 
 
 const MetricBox = ({ label, value, unit, icon, color, t, theme }) => (
-    <div className={`p-4 rounded-2xl flex flex-col justify-between ${theme === 'dark' ? 'bg-[#0f172a]' : 'bg-slate-50'} border ${t.border}`}>
+    <div className={`p-4 rounded-2xl flex flex-col justify-between ${t.bgCardSoft} border ${t.border} transition-transform duration-300 active:scale-[0.98]`}>
         <div className="flex justify-between items-start mb-2">
             <div className={`w-6 h-6 rounded-full flex items-center justify-center bg-${color}-500/20 text-${color}-500`}>
                 {icon}
@@ -28,7 +29,7 @@ const MetricBox = ({ label, value, unit, icon, color, t, theme }) => (
 );
 
 const MiniBox = ({ label, value, unit, t, theme }) => (
-    <div className={`p-3 rounded-xl flex flex-col items-center justify-center text-center ${theme === 'dark' ? 'bg-[#0f172a]' : 'bg-slate-50'} border ${t.border}`}>
+    <div className={`p-3 rounded-xl flex flex-col items-center justify-center text-center ${t.bgCardSoft} border ${t.border} transition-transform duration-300 active:scale-[0.98]`}>
         <span className={`h2 ${t.textMain}`}>{value || '-'}</span>
         <span className={`text-[9px] font-bold ${t.textMuted} mt-1 uppercase tracking-wider`}>{label}</span>
     </div>
@@ -50,7 +51,17 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   const [showManualModal, setShowManualModal] = useState(false);
   const [manualTab, setManualTab] = useState('komposisi');
   const [modalDate, setModalDate] = useState(activeDate);
-  const [isProgressExpanded, setIsProgressExpanded] = useState(true);
+  const [isProgressExpanded, setIsProgressExpanded] = useState(() => {
+      try {
+          const saved = localStorage.getItem('lyfit_progress_expanded');
+          if (saved !== null) return JSON.parse(saved);
+      } catch(e) {}
+      return false;
+  });
+  
+  useEffect(() => {
+      localStorage.setItem('lyfit_progress_expanded', JSON.stringify(isProgressExpanded));
+  }, [isProgressExpanded]);
   
   // TARGET SETTINGS
   const [showTargetModal, setShowTargetModal] = useState(false);
@@ -73,7 +84,29 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
       if (parts) return parseInt(parts[1]) + (parseInt(parts[2]) / 60);
       return 0;
   };
-  const [isKomposisiExpanded, setIsKomposisiExpanded] = useState(true);
+  const [isKomposisiExpanded, setIsKomposisiExpanded] = useState(() => {
+      try {
+          const saved = localStorage.getItem('lyfit_komposisi_expanded');
+          if (saved !== null) return JSON.parse(saved);
+      } catch(e) {}
+      return false;
+  });
+
+  useEffect(() => {
+      localStorage.setItem('lyfit_komposisi_expanded', JSON.stringify(isKomposisiExpanded));
+  }, [isKomposisiExpanded]);
+
+  const [isAktivitasExpanded, setIsAktivitasExpanded] = useState(() => {
+      try {
+          const saved = localStorage.getItem('lyfit_aktivitas_expanded');
+          if (saved !== null) return JSON.parse(saved);
+      } catch(e) {}
+      return false;
+  });
+
+  useEffect(() => {
+      localStorage.setItem('lyfit_aktivitas_expanded', JSON.stringify(isAktivitasExpanded));
+  }, [isAktivitasExpanded]);
 
   const emptyBio = {
     bodyScore: null, weight: null, height: null, bmi: null, bmiStatus: '-', bodyFat: null, bodyFatStatus: '-',
@@ -103,18 +136,20 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      
      const mergedData = {
          ...emptyBio,
-         height: userProfile?.height || 170, 
-         weight: userProfile?.weight || 70,
+         height: userProfile?.height || null, 
+         weight: userProfile?.weight || null,
          ...(latestBodyData || {}),
          steps: todayDailyData.steps !== undefined ? todayDailyData.steps : (emptyBio.steps || 0),
          activeMinutes: todayDailyData.activeMinutes !== undefined ? todayDailyData.activeMinutes : (emptyBio.activeMinutes || 0),
          activityCalories: todayDailyData.activityCalories !== undefined ? todayDailyData.activityCalories : (emptyBio.activityCalories || 0),
+         nutritionCalories: todayDailyData.nutritionCalories !== undefined ? todayDailyData.nutritionCalories : (emptyBio.nutritionCalories || 0),
          sleep: todayDailyData.sleep !== undefined ? todayDailyData.sleep : (emptyBio.sleep || ''),
          energyScore: todayDailyData.energyScore !== undefined ? todayDailyData.energyScore : (emptyBio.energyScore || 0),
          heartRate: todayDailyData.heartRate !== undefined ? todayDailyData.heartRate : (emptyBio.heartRate || 0),
          minHeartRate: todayDailyData.minHeartRate !== undefined ? todayDailyData.minHeartRate : (emptyBio.minHeartRate || 0),
          maxHeartRate: todayDailyData.maxHeartRate !== undefined ? todayDailyData.maxHeartRate : (emptyBio.maxHeartRate || 0),
          bloodPressure: todayDailyData.bloodPressure !== undefined ? todayDailyData.bloodPressure : (emptyBio.bloodPressure || ''),
+         oxygenSaturation: todayDailyData.oxygenSaturation !== undefined ? todayDailyData.oxygenSaturation : (emptyBio.oxygenSaturation || 0),
          waterIntake: todayDailyData.waterIntake !== undefined ? todayDailyData.waterIntake : (emptyBio.waterIntake || 0),
          weeklyDuration: todayDailyData.weeklyDuration !== undefined ? todayDailyData.weeklyDuration : emptyBio.weeklyDuration,
          weeklySessions: todayDailyData.weeklySessions !== undefined ? todayDailyData.weeklySessions : emptyBio.weeklySessions,
@@ -243,13 +278,6 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      return newData;
   };
 
-  const getScoreColor = (score) => {
-      const isDark = theme === 'dark';
-      if (!score) return isDark ? 'text-zinc-500 border-zinc-500/30 bg-black/40' : 'text-zinc-500 border-zinc-300 bg-white/50';
-      if (score >= 80) return isDark ? 'text-[#10b981] border-[#10b981]/50 bg-black/40' : 'text-[#059669] border-[#059669] bg-white/50';
-      if (score >= 60) return isDark ? 'text-[#f59e0b] border-[#f59e0b]/50 bg-black/40' : 'text-[#d97706] border-[#d97706] bg-white/50';
-      return isDark ? 'text-[#f43f5e] border-[#f43f5e]/50 bg-black/40' : 'text-[#e11d48] border-[#e11d48] bg-white/50';
-  };
 
   const handleSaveManualData = () => {
      playSoundEffect('click', soundEnabled);
@@ -336,7 +364,11 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
 
 
 
-  const scoreStyle = getScoreColor(bioData.bodyScore);
+  const scoreArcColor = !bioData.bodyScore ? (theme === 'dark' ? '#71717a' : '#a1a1aa') : bioData.bodyScore >= 80 ? '#10b981' : bioData.bodyScore >= 60 ? '#f59e0b' : '#f43f5e';
+  const scoreRadius = 40;
+  const scoreCircumference = 2 * Math.PI * scoreRadius;
+  const scoreProgress = Math.min(100, Math.max(0, Number(bioData.bodyScore) || 0));
+  const scoreDashOffset = scoreCircumference * (1 - scoreProgress / 100);
   const isImp = units?.weight === 'lbs';
   const dispMainWeight = isImp && bioData.weight ? Number((bioData.weight * 2.20462).toFixed(1)) : bioData.weight || '-';
   const dispMainHeight = isImp && bioData.height ? Number((bioData.height * 0.393701).toFixed(1)) : bioData.height || '-';
@@ -440,9 +472,9 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
     <div className="space-y-4 animate-in fade-in duration-300 pb-6">
       
       {/* HEADER & INTEGRASI APPS */}
-      <div className="pt-2 flex justify-between items-center mb-2">
+      <div className="pt-2 px-4 flex justify-between items-center mb-2 anim-rise">
          <div>
-            <h1 className={`h1 ${t.textMain}`}>Halo, {user?.name || 'Kawan'}</h1>
+            <h1 className="h1"><span className={t.textMain}>Halo, </span><span className={`bg-gradient-to-r ${t.gradientText} bg-clip-text text-transparent`}>{user?.name || 'Kawan'}</span></h1>
             <p className={`body-base font-medium ${t.textMuted} mt-1 leading-snug`}>{t.greetingText}</p>
             <div className="flex items-center space-x-2 mt-1">
                <p className={`body-md ${t.textMuted}`}>{new Date().toLocaleDateString(lang.workout === 'Latihan' ? 'id-ID' : 'en-US', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
@@ -451,31 +483,32 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                  <Dumbbell size={12} />
                  <span className="body-md font-bold text-[13px]">{gymProfiles?.find(g => g.id === activeGymId)?.name || 'Lyfit Gym'}</span>
                </div>
-            </div>
-         </div>
-         
-         <div className="flex flex-col space-y-2 items-end">
-         </div>
-      </div>
-
+               </div>
+             </div>
+          </div>
+       
       <div className="flex flex-col sm:grid sm:grid-cols-2 sm:gap-6 sm:items-start space-y-4 sm:space-y-0">
       {/* --- GRUP KOMPOSISI & BIOMETRIK --- */}
-      <div className="flex flex-col space-y-4">
+      <div className="flex flex-col space-y-4 anim-rise" style={{ animationDelay: '60ms' }}>
         {/* 1. KARTU BODY COMPOSITION & EXPANDED CHART */}
-        <div className="flex flex-col w-full min-w-0">
-          <div className={`p-4 border ${t.border} ${t.bgCard} shadow-sm relative overflow-hidden z-10 transition-all duration-300 flex flex-col justify-between ${isKomposisiExpanded ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'}`}>
-           {/* --- Background Image Layer --- */}
-           <div 
-             className="absolute inset-0 z-0 opacity-70 dark:opacity-40 pointer-events-none"
+        <div className="relative flex flex-col w-full min-w-0">
+           {/* Foto: kepala nongol di atas kartu (tajam), badan di dalam kartu (kena blur kaca) */}
+           {/* Latar Belakang Kartu (Glassmorphism untuk background app) */}
+           <div className={`absolute top-10 inset-x-0 bottom-0 border ${t.border} ${theme === 'dark' ? 'bg-black/40 backdrop-blur-md' : 'bg-white/45 backdrop-blur-md'} shadow-sm transition-all duration-300 ${isKomposisiExpanded ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'} z-0`}></div>
+
+           {/* Coach: Tajam di atas latar belakang kartu */}
+           <div
+             className="absolute right-0 -top-12 bottom-0 w-72 z-10 pointer-events-none overflow-hidden"
              style={{
-               backgroundImage: "url('/bg-dashboard.webp')",
-               backgroundSize: '200%',
-               backgroundPosition: '38% 10%',
-               maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 100%)',
-               WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 100%)'
+               maskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)',
+               WebkitMaskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)'
              }}
-           />
-           {/* ------------------------------ */}
+           >
+             <img src="/bg-dashboard.webp" alt="" className="w-full h-full object-cover object-top drop-shadow-xl scale-110 origin-top" />
+           </div>
+
+          {/* Konten Kartu: Berada di atas coach */}
+          <div id="komposisi-accordion" className={`mt-10 p-4 relative z-20 flex flex-col justify-between`}>
            <div className="flex justify-between items-center mb-5 relative z-10">
                <div>
                    <h3 className={`h3 ${t.textMain}`}>Komposisi Tubuh</h3>
@@ -484,20 +517,20 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                    )}
                </div>
                <div className="flex items-center space-x-2">
-                   <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(bioDataDate || activeDate); setShowDetailsModal(true); }} className={`p-1.5 rounded-full ${t.btnBg} ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Info size={14}/></button>
-                   <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(activeDate); setManualTab('komposisi'); setShowManualModal(true); }} className={`p-1.5 rounded-full ${t.btnBg} ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Pencil size={14}/></button>
+                   <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(bioDataDate || activeDate); setShowDetailsModal(true); }} className={`p-2 rounded-full ${t.bgBox} backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Info size={16}/></button>
+                   <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(activeDate); setManualTab('komposisi'); setShowManualModal(true); }} className={`p-2 rounded-full ${t.bgBox} backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Pencil size={16}/></button>
                </div>
            </div>
            
            <div className="flex justify-between items-end w-full relative z-10 mb-1 flex-1">
-               <div className="w-[55%] flex flex-col space-y-1 justify-end h-full">
+                <div className={`w-[calc(50%-4px)] flex flex-col space-y-1 justify-end h-full p-3 rounded-2xl ${t.bgBox} backdrop-blur-md`}>
                    {/* Fisik */}
                    <div className="flex flex-col">
                        <span className={`text-[10px] ${t.textMuted} mb-0.5 font-bold`}>Fisik</span>
                        <div className="flex items-baseline space-x-1.5">
-                           <span className={`text-lg font-black ${t.textMain} leading-none`}>{isImp && bioData.weight ? Number((bioData.weight * 2.20462).toFixed(1)) : bioData.weight || '-'} <span className="text-[9px] font-normal text-zinc-500">{isImp ? 'lbs' : 'kg'}</span></span>
+                           <span className={`text-lg font-black ${t.textMain} leading-none`}>{isImp && bioData.weight ? Number((bioData.weight * 2.20462).toFixed(1)) : bioData.weight || '-'} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">{isImp ? 'lbs' : 'kg'}</span></span>
                            <span className="text-zinc-300 dark:text-zinc-600 text-[10px]">|</span>
-                           <span className={`text-lg font-black ${t.textMain} leading-none`}>{isImp && bioData.height ? Number((bioData.height * 0.393701).toFixed(1)) : bioData.height || '-'} <span className="text-[9px] font-normal text-zinc-500">{isImp ? 'in' : 'cm'}</span></span>
+                           <span className={`text-lg font-black ${t.textMain} leading-none`}>{isImp && bioData.height ? Number((bioData.height * 0.393701).toFixed(1)) : bioData.height || '-'} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">{isImp ? 'in' : 'cm'}</span></span>
                        </div>
                    </div>
 
@@ -514,51 +547,71 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                    <div className="flex flex-col">
                        <span className={`text-[10px] ${t.textMuted} mb-0.5 font-bold`}>BMR</span>
                        <div>
-                           <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.bmr, language) || '-'} <span className="text-[9px] font-normal text-zinc-500">kcal</span></span>
+                           <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.bmr, language) || '-'} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">kcal</span></span>
                        </div>
                    </div>
 
                    {/* Body Fat */}
                    <div className="flex flex-col">
-                       <span className={`text-[10px] ${t.textMuted} mb-0.5 font-bold`}>Body Fat</span>
+                       <span className={`text-[10px] ${t.textMuted} mb-0.5 font-bold`}>Kadar Lemak</span>
                        <div className="flex items-baseline space-x-1.5">
-                           <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.bodyFat, language) || '-'} <span className="text-[9px] font-normal text-zinc-500">%</span></span>
+                           <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.bodyFat, language) || '-'} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span>
                            <span className={`text-[10px] font-bold ${bioData.bodyFatStatus === 'Normal' ? 'text-emerald-500' : bioData.bodyFatStatus === 'Overfat' ? 'text-amber-400' : bioData.bodyFatStatus === 'Obese' ? 'text-rose-500' : 'text-blue-400'}`}>{bioData.bodyFatStatus}</span>
                        </div>
                    </div>
                </div>
 
                <div className="flex flex-col justify-end items-end pb-1 pr-1">
-                   <div className={`w-16 h-16 shrink-0 rounded-full flex flex-col items-center justify-center border-[3px] ${scoreStyle} shadow-sm backdrop-blur-sm`}>
-                      <span className="text-2xl font-black leading-none">{formatNumber(bioData.bodyScore, language) || '-'}</span>
-                      <span className="text-[9px] mt-0 opacity-70 font-bold leading-tight">SCORE</span>
+                    <div className="relative w-24 h-24 shrink-0 flex items-center justify-center">
+                       <div className={`absolute inset-1 rounded-full ${theme === 'dark' ? 'bg-black/60' : 'bg-white/60'} backdrop-blur-md border ${t.border} z-0`} />
+                      <svg className="absolute inset-0 -rotate-90 z-10" viewBox="0 0 96 96">
+                         <circle cx="48" cy="48" r={scoreRadius} fill="none" strokeWidth="5" strokeLinecap="round" strokeDasharray="1.5 6.2" className={theme === 'dark' ? 'stroke-white/15' : 'stroke-black/10'} />
+                         <circle cx="48" cy="48" r={scoreRadius} fill="none" stroke={scoreArcColor} strokeWidth="5" strokeLinecap="round" strokeDasharray={scoreCircumference} strokeDashoffset={scoreDashOffset} style={{ transition: 'stroke-dashoffset 0.6s ease' }} />
+                      </svg>
+                      <div className="flex flex-col items-center justify-center relative z-10">
+                         <span className="text-3xl font-black leading-none" style={{ color: scoreArcColor }}>{formatNumber(bioData.bodyScore, language) || '-'}</span>
+                         <span className={`text-[10px] mt-0.5 font-bold leading-tight ${t.textMuted}`}>SCORE</span>
+                      </div>
                    </div>
                </div>
            </div>
   
            <div className={`grid grid-cols-4 gap-2 relative z-10 mt-1`}>
-               <div className={`p-1.5 rounded-xl ${t.bgBox} flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{dispMainMuscle} <span className="text-[10px] font-normal text-zinc-500">{isImp ? 'lbs' : 'kg'}</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Massa<br/>Otot</span></div>
-               <div className={`p-1.5 rounded-xl ${t.bgBox} flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.musclePercent, language) || '-'} <span className="text-[10px] font-normal text-zinc-500">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Otot</span></div>
-               <div className={`p-1.5 rounded-xl ${t.bgBox} flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.proteinPercent, language) || '-'} <span className="text-[10px] font-normal text-zinc-500">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Protein</span></div>
-               <div className={`p-1.5 rounded-xl ${t.bgBox} flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.waterPercent, language) || '-'} <span className="text-[10px] font-normal text-zinc-500">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Air</span></div>
-               
-               <div className={`p-1.5 rounded-xl ${t.bgBox} flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.visceralFat, language) || '-'}</span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Lemak<br/>Visceral</span></div>
-               <div className={`p-1.5 rounded-xl ${t.bgBox} flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{dispMainWaist} <span className="text-[10px] font-normal text-zinc-500">{isImp ? 'in' : 'cm'}</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Lingkar<br/>Perut</span></div>
-               <div className={`p-1.5 rounded-xl ${t.bgBox} flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.boneMass, language) || '-'} <span className="text-[10px] font-normal text-zinc-500">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Mineral<br/>Tulang</span></div>
-               <div className={`p-1.5 rounded-xl ${t.bgBox} flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.bodyAge, language) || '-'} <span className="text-[10px] font-normal text-zinc-500">th</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Usia<br/>Tubuh</span></div>
-           </div>
+                <div className={`p-1.5 rounded-xl ${t.bgBox} backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{dispMainMuscle} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">{isImp ? 'lbs' : 'kg'}</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Massa<br/>Otot</span></div>
+                <div className={`p-1.5 rounded-xl ${t.bgBox} backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.musclePercent, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Otot</span></div>
+                <div className={`p-1.5 rounded-xl ${t.bgBox} backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.proteinPercent, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Protein</span></div>
+                <div className={`p-1.5 rounded-xl ${t.bgBox} backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.waterPercent, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Air</span></div>
+                
+                <div className={`p-1.5 rounded-xl ${t.bgBox} backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.visceralFat, language) || '-'}</span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Lemak<br/>Visceral</span></div>
+                <div className={`p-1.5 rounded-xl ${t.bgBox} backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{dispMainWaist} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">{isImp ? 'in' : 'cm'}</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Lingkar<br/>Perut</span></div>
+                <div className={`p-1.5 rounded-xl ${t.bgBox} backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.boneMass, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Mineral<br/>Tulang</span></div>
+                <div className={`p-1.5 rounded-xl ${t.bgBox} backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.bodyAge, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">th</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Usia<br/>Tubuh</span></div>
+            </div>
            
            <button 
-               onClick={() => { playSoundEffect('click', soundEnabled); setIsKomposisiExpanded(!isKomposisiExpanded); }}
-               className="w-full flex items-center justify-center pt-2 pb-1 text-zinc-500 hover:text-emerald-500 transition-colors"
+               onClick={() => {
+                   playSoundEffect('click', soundEnabled);
+                   const willExpand = !isKomposisiExpanded;
+                   setIsKomposisiExpanded(willExpand);
+                   if (willExpand) {
+                       setTimeout(() => {
+                           const el = document.getElementById('komposisi-accordion');
+                           if (el) {
+                               const y = el.getBoundingClientRect().top + window.scrollY - 80;
+                               window.scrollTo({ top: y, behavior: 'smooth' });
+                           }
+                       }, 150);
+                   }
+               }}
+               className={`self-center mt-3 p-2 rounded-full ${t.bgBox} backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border} transition-all relative z-20`}
            >
                {isKomposisiExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
            </button>
           </div>
-  
-          <div className={`grid transition-all duration-300 ease-in-out ${isKomposisiExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
+
+          <div className={`grid relative z-10 transition-all duration-300 ease-in-out ${isKomposisiExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
             <div className="overflow-hidden">
-              <div className={`rounded-b-3xl border border-t-0 ${t.border} ${theme === 'dark' ? 'bg-[#061626]' : 'bg-[#f0f2f5]'} shadow-inner -mt-12 pt-12 relative z-0`}>
+              <div className={`rounded-b-3xl border border-t-0 ${t.border} ${t.bgSunken} shadow-inner -mt-12 pt-12 relative z-10`}>
               <DashboardChart 
                  t={t} theme={theme} history={history} 
                  soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
@@ -571,43 +624,47 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
         </div>
 
       {/* 2. KARTU AKTIVITAS HARIAN & MINGGUAN */}
-      <div className={`p-5 rounded-3xl border ${t.border} ${t.bgCard} shadow-sm relative overflow-hidden flex flex-col aspect-[4/5]`}>
-         {/* --- Background Image Layer --- */}
-         <div 
-           className="absolute inset-0 z-0 opacity-70 dark:opacity-40 pointer-events-none"
+      <div className="relative flex flex-col mt-6 w-full min-w-0 anim-rise" style={{ animationDelay: '90ms' }}>
+         {/* Card Background Layer */}
+         <div className={`absolute top-10 inset-x-0 bottom-0 border ${t.border} ${theme === 'dark' ? 'bg-black/40 backdrop-blur-md' : 'bg-white/45 backdrop-blur-md'} shadow-sm ${isAktivitasExpanded ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'} z-0 transition-all duration-300`}></div>
+
+         {/* Extracted Image */}
+         <div
+             className="absolute right-0 -top-10 bottom-0 w-[26rem] z-10 pointer-events-none overflow-hidden"
              style={{
-               backgroundImage: "url('/bg-activity.webp')",
-               backgroundSize: '150%',
-               backgroundPosition: '65% 10%',
-               backgroundRepeat: 'no-repeat',
-               maskImage: 'radial-gradient(ellipse at 50% 10%, rgba(0,0,0,1) 30%, rgba(0,0,0,0) 85%)',
-             WebkitMaskImage: 'radial-gradient(ellipse at 50% 10%, rgba(0,0,0,1) 30%, rgba(0,0,0,0) 85%)'
-           }}
-         />
-         {/* ------------------------------ */}
-         <div className="flex justify-between items-center relative z-10 shrink-0">
-             <div>
-                 <h3 className={`h3 ${t.textMain}`}>Aktivitas Harian</h3>
-                 <p className={`caption ${t.textMuted} mt-0.5`} style={{fontSize: '0.65rem'}}>Hari ini: {new Date(activeDate).toLocaleDateString(language==='ID'?'id-ID':'en-US', { day: 'numeric', month: 'short' })}</p>
-             </div>
-             <div className="flex space-x-2">
-                 <button onClick={() => { playSoundEffect('click', soundEnabled); setShowTargetModal(true); }} className={`p-1.5 rounded-full ${t.btnBg} ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Settings size={14}/></button>
-                 <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(activeDate); setManualTab('harian'); setShowManualModal(true); }} className={`p-1.5 rounded-full ${t.btnBg} ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Pencil size={14}/></button>
-             </div>
+               maskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)',
+               WebkitMaskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)'
+             }}
+         >
+             <img src="/bg-activity.webp" alt="" className="w-full h-full object-cover object-top drop-shadow-xl origin-top transform translate-x-4" />
          </div>
 
-         <div className="flex flex-col flex-1 justify-between relative z-10 pt-6 pb-2">
-             <div className="grid grid-cols-2 gap-x-4 h-full content-between">
-                 {/* Langkah Kaki */}
-                 <div className="flex flex-col h-full">
-                     <div className="flex items-center space-x-1.5 mb-1 text-emerald-500"><Footprints size={14}/> <span className={`caption ${t.textMuted} capitalize`}>Langkah Kaki</span></div>
+         {/* Content Layer */}
+         <div id="aktivitas-accordion" className={`mt-10 p-4 relative z-20 flex flex-col h-full justify-between`}>
+             <div className="flex justify-between items-center shrink-0">
+                 <div>
+                     <h3 className={`h3 ${t.textMain}`}>Aktivitas Harian</h3>
+                     <p className={`caption ${t.textMuted} mt-0.5`} style={{fontSize: '0.65rem'}}>Hari ini: {new Date(activeDate).toLocaleDateString(language==='ID'?'id-ID':'en-US', { day: 'numeric', month: 'short' })}</p>
+                 </div>
+                 <div className="flex space-x-2">
+                     <button onClick={() => { playSoundEffect('click', soundEnabled); setShowTargetModal(true); }} className={`p-2 rounded-full ${t.bgBox} backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Settings size={16}/></button>
+                     <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(activeDate); setManualTab('harian'); setShowManualModal(true); }} className={`p-2 rounded-full ${t.bgBox} backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Pencil size={16}/></button>
+                 </div>
+             </div>
+
+             <div className="flex flex-col flex-1 justify-between pt-6 pb-2">
+                 <div className={`p-4 rounded-2xl ${t.bgBox} backdrop-blur-md border ${t.border}`}>
+                     <div className="grid grid-cols-2 gap-x-4 gap-y-4 h-full content-between">
+                         {/* Langkah Kaki */}
+                         <div className="flex flex-col h-full">
+                     <div className="flex items-center space-x-1.5 mb-1"><span className="w-5 h-5 rounded-full bg-sky-500/15 text-sky-500 flex items-center justify-center shrink-0"><Footprints size={11}/></span> <span className={`caption ${t.textMuted} capitalize`}>Langkah Kaki</span></div>
                      <div className="flex flex-col flex-1 justify-end">
                          <div className="flex items-baseline space-x-1 mb-2">
                              <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{bioData.steps > 0 ? formatNumber(bioData.steps, language) : '-'}</span>
-                             <span className="text-[10px] text-zinc-500 font-bold whitespace-nowrap">/ {formatNumber(activityTargets?.steps || 10000, language)}</span>
+                             <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold whitespace-nowrap">/ {formatNumber(activityTargets?.steps || 10000, language)}</span>
                          </div>
                          <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full mb-1 overflow-hidden shrink-0">
-                             <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Number(bioData.steps || 0) / (activityTargets?.steps || 10000)) * 100)}%` }}></div>
+                             <div className="h-full bg-sky-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Number(bioData.steps || 0) / (activityTargets?.steps || 10000)) * 100)}%` }}></div>
                          </div>
                          <span className="text-[9px] invisible whitespace-nowrap">{formatNumber(mergedWeeklySessions, language)} Sesi ({formatNumber(mergedWeeklyWorkoutDuration, language)} menit)</span>
                      </div>
@@ -620,16 +677,16 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                       const progress = Math.min(100, (todayDur / targetDur) * 100);
                       return (
                           <div className="flex flex-col h-full text-right items-end">
-                              <div className={`flex items-center justify-end space-x-1.5 mb-1 ${t.textAccent}`}><span className={`caption ${t.textMuted} capitalize`}>Durasi Aktif</span> <Clock size={14}/></div>
+                              <div className="flex items-center justify-end space-x-1.5 mb-1"><span className={`caption ${t.textMuted} capitalize`}>Durasi Aktif</span> <span className={`w-5 h-5 rounded-full ${t.bgAccentSoft} ${t.textAccent} flex items-center justify-center shrink-0`}><Clock size={11}/></span></div>
                               <div className="flex flex-col flex-1 justify-end w-full">
                                   <div className="flex items-baseline justify-end space-x-1 mb-2">
                                       <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{todayDur > 0 ? formatNumber(todayDur, language) : '-'}</span>
-                                      <span className="text-[10px] text-zinc-500 font-bold whitespace-nowrap">/ {targetDur} mnt</span>
+                                      <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold whitespace-nowrap">/ {targetDur} mnt</span>
                                   </div>
                                   <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full mb-1 overflow-hidden shrink-0 flex justify-end">
                                       <div className={`h-full ${t.bgAccent} rounded-full transition-all duration-500`} style={{ width: `${progress}%` }}></div>
                                   </div>
-                                  <span className="text-[9px] text-zinc-500 whitespace-nowrap">Minggu ini: {formatNumber(mergedWeeklySessions, language)} sesi • {formatNumber(mergedWeeklyActiveMinutes, language)} mnt</span>
+                                  <span className="text-[9px] text-zinc-500 dark:text-zinc-400 whitespace-nowrap">Minggu ini: {formatNumber(mergedWeeklySessions, language)} sesi • {formatNumber(mergedWeeklyActiveMinutes, language)} mnt</span>
                               </div>
                           </div>
                       );
@@ -637,22 +694,22 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
 
                  {/* Kalori Makanan */}
                  <div className="flex flex-col h-full">
-                     <div className="flex items-center space-x-1.5 mb-1 text-orange-400"><Utensils size={14}/> <span className={`caption ${t.textMuted} capitalize`}>Kalori Makanan</span></div>
+                     <div className="flex items-center space-x-1.5 mb-1"><span className="w-5 h-5 rounded-full bg-blue-500/15 text-blue-500 flex items-center justify-center shrink-0"><Utensils size={11}/></span> <span className={`caption ${t.textMuted} capitalize`}>Kalori Makanan</span></div>
                      <div className="flex flex-col flex-1 justify-end">
                          <div className="flex items-baseline space-x-1 mb-2">
                              <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{formatNumber(bioData.nutritionCalories, language) || '-'}</span>
-                             <span className="text-[10px] text-zinc-500 font-bold whitespace-nowrap">/ {formatNumber(Math.max(0, (activityTargets?.activityCalories || 2000) + (activityTargets?.calorieDelta || 0)), language)}</span>
+                             <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold whitespace-nowrap">/ {formatNumber(Math.max(0, (activityTargets?.activityCalories || 2000) + (activityTargets?.calorieDelta || 0)), language)}</span>
                          </div>
                          <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full mb-1 overflow-hidden shrink-0">
-                             <div className="h-full bg-orange-400 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Number(bioData.nutritionCalories || 0) / Math.max(1, (activityTargets?.activityCalories || 2000) + (activityTargets?.calorieDelta || 0))) * 100)}%` }}></div>
+                             <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Number(bioData.nutritionCalories || 0) / Math.max(1, (activityTargets?.activityCalories || 2000) + (activityTargets?.calorieDelta || 0))) * 100)}%` }}></div>
                          </div>
                          <div className="flex items-center gap-1.5 mt-0.5 opacity-80">
                              {activityTargets?.nutritionGoal && activityTargets.nutritionGoal !== 'custom' && (
-                                 <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-sm ${activityTargets.nutritionGoal === 'cutting' ? 'bg-rose-500/15 text-rose-500' : (activityTargets.nutritionGoal === 'maintenance' ? 'bg-zinc-500/15 text-zinc-500' : 'bg-emerald-500/15 text-emerald-500')} uppercase tracking-wider`}>
+                                 <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-sm ${activityTargets.nutritionGoal === 'cutting' ? 'bg-rose-500/15 text-rose-500' : (activityTargets.nutritionGoal === 'maintenance' ? 'bg-zinc-500/15 text-zinc-500 dark:text-zinc-400' : 'bg-emerald-500/15 text-emerald-500')} uppercase tracking-wider`}>
                                      {activityTargets.nutritionGoal.replace('_', ' ')}
                                  </span>
                              )}
-                             <span className="text-[9px] text-zinc-500 font-bold whitespace-nowrap">
+                             <span className="text-[9px] text-zinc-500 dark:text-zinc-400 font-bold whitespace-nowrap">
                                  {activityTargets?.calorieDelta > 0 ? '+' : ''}{activityTargets?.calorieDelta || 0} kcal/hari
                              </span>
                          </div>
@@ -661,42 +718,47 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
 
                  {/* Kalori Dibakar */}
                  <div className="flex flex-col h-full text-right items-end">
-                     <div className="flex items-center justify-end space-x-1.5 mb-1 text-rose-500"><Flame size={14}/> <span className={`caption ${t.textMuted} capitalize`}>Kalori Dibakar</span></div>
+                     <div className="flex items-center justify-end space-x-1.5 mb-1"><span className={`caption ${t.textMuted} capitalize`}>Kalori Dibakar</span> <span className="w-5 h-5 rounded-full bg-teal-500/15 text-teal-500 flex items-center justify-center shrink-0"><Flame size={11}/></span></div>
                      <div className="flex flex-col flex-1 justify-end w-full">
                          <div className="flex items-baseline justify-end space-x-1 mb-2">
                                       <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{mergedDailyCalories > 0 ? formatNumber(mergedDailyCalories, language) : '-'}</span>
-                                      <span className="text-[10px] text-zinc-500 font-bold whitespace-nowrap">/ {formatNumber(activityTargets?.activityCalories || 2500, language)}</span>
+                                      <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold whitespace-nowrap">/ {formatNumber(activityTargets?.activityCalories || 2500, language)}</span>
                                   </div>
                          <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full mb-1 overflow-hidden shrink-0 flex justify-end">
-                             <div className="h-full bg-rose-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Number(mergedDailyCalories || 0) / (activityTargets?.activityCalories || 2500)) * 100)}%` }}></div>
+                             <div className="h-full bg-teal-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Number(mergedDailyCalories || 0) / (activityTargets?.activityCalories || 2500)) * 100)}%` }}></div>
                          </div>
-                         <span className="text-[9px] opacity-0 select-none hidden sm:block">Spacer</span>
+                         <div className="flex items-center justify-end gap-1.5 mt-0.5 opacity-0 pointer-events-none select-none">
+                             {activityTargets?.nutritionGoal && activityTargets.nutritionGoal !== 'custom' && (
+                                 <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wider">SPACER</span>
+                             )}
+                             <span className="text-[9px] font-bold whitespace-nowrap">spacer</span>
+                         </div>
                      </div>
                  </div>
 
                  {/* Tidur */}
                  <div className="flex flex-col h-full">
-                     <div className="flex items-center space-x-1.5 mb-1 text-indigo-400"><Moon size={14}/> <span className={`caption ${t.textMuted} capitalize`}>Tidur</span></div>
+                     <div className="flex items-center space-x-1.5 mb-1"><span className="w-5 h-5 rounded-full bg-violet-500/15 text-violet-500 flex items-center justify-center shrink-0"><Moon size={11}/></span> <span className={`caption ${t.textMuted} capitalize`}>Tidur</span></div>
                      <div className="flex flex-col flex-1 justify-end">
                          <div className="flex items-baseline space-x-1 mb-2">
                              <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{bioData.sleep || '-'}</span>
                          </div>
                          <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden shrink-0">
-                             <div className="h-full bg-indigo-400 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (parseSleepHours(bioData.sleep) / (activityTargets?.sleep || 8)) * 100)}%` }}></div>
+                             <div className="h-full bg-violet-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (parseSleepHours(bioData.sleep) / (activityTargets?.sleep || 8)) * 100)}%` }}></div>
                          </div>
                      </div>
                  </div>
 
                  {/* Skor Energi */}
                  <div className="flex flex-col h-full text-right items-end">
-                     <div className="flex items-center justify-end space-x-1.5 mb-1 text-amber-400"><Zap size={14}/> <span className={`caption ${t.textMuted} capitalize`}>Skor Energi</span></div>
+                     <div className="flex items-center justify-end space-x-1.5 mb-1"><span className={`caption ${t.textMuted} capitalize`}>Skor Energi</span> <span className="w-5 h-5 rounded-full bg-slate-400/15 text-slate-400 flex items-center justify-center shrink-0"><Zap size={11}/></span></div>
                      <div className="flex flex-col flex-1 justify-end w-full">
                          <div className="flex items-baseline justify-end space-x-1 mb-2">
                               <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{bioData.energyScore > 0 ? formatNumber(bioData.energyScore, language) : '-'}</span>
-                             <span className="text-[10px] text-zinc-500 font-bold">/ 100</span>
+                             <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold">/ 100</span>
                          </div>
                          <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden shrink-0 flex justify-end">
-                             <div className="h-full bg-amber-400 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, Number(bioData.energyScore || 0))}%` }}></div>
+                             <div className="h-full bg-slate-400 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, Number(bioData.energyScore || 0))}%` }}></div>
                          </div>
                      </div>
                  </div>
@@ -711,20 +773,55 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                      
                      {/* Detak Jantung */}
                      <div className="flex flex-col items-center">
-                         <div className="flex items-center space-x-1 mb-1 text-sky-400"><HeartPulse size={12}/> <span className={`text-[10px] ${t.textMuted}`}>Detak</span></div>
+                         <div className="flex items-center space-x-1 mb-1 text-sky-400"><HeartPulse size={12}/> <span className={`text-[10px] ${t.textMuted}`}>Nadi</span></div>
                          <div className="flex flex-col items-center">
-                             <span className={`text-lg font-black ${t.textMain} leading-none`}>{bioData.heartRate > 0 ? <>{formatNumber(bioData.heartRate, language)} <span className="text-[9px] font-normal text-zinc-500">bpm</span></> : '-'}</span>
-                             <span className="text-[8px] text-zinc-500 whitespace-nowrap mt-0.5">Min {bioData.minHeartRate > 0 ? formatNumber(bioData.minHeartRate, language) : '-'} &bull; Max {bioData.maxHeartRate > 0 ? formatNumber(bioData.maxHeartRate, language) : '-'}</span>
+                             <span className={`text-lg font-black ${t.textMain} leading-none`}>{bioData.heartRate > 0 ? <>{formatNumber(bioData.heartRate, language)} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">bpm</span></> : '-'}</span>
+                             <span className="text-[8px] text-zinc-500 dark:text-zinc-400 whitespace-nowrap mt-0.5">Min {bioData.minHeartRate > 0 ? formatNumber(bioData.minHeartRate, language) : '-'} &bull; Max {bioData.maxHeartRate > 0 ? formatNumber(bioData.maxHeartRate, language) : '-'}</span>
                          </div>
                      </div>
                      
                      {/* SpO2 */}
                      <div className="flex flex-col items-end text-right">
                          <div className="flex items-center space-x-1 mb-1 text-sky-400"><Wind size={12}/> <span className={`text-[10px] ${t.textMuted}`}>SpO2</span></div>
-                         <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.oxygenSaturation, language) || '-'} <span className="text-[9px] font-normal text-zinc-500">%</span></span>
+                         <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.oxygenSaturation, language) || '-'} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span>
                      </div>
                  </div>
              </div>
+             </div>
+             
+             <button 
+                 onClick={() => {
+                     playSoundEffect('click', soundEnabled);
+                     const willExpand = !isAktivitasExpanded;
+                     setIsAktivitasExpanded(willExpand);
+                     if (willExpand) {
+                         setTimeout(() => {
+                             const el = document.getElementById('aktivitas-accordion');
+                             if (el) {
+                                 const y = el.getBoundingClientRect().top + window.scrollY - 80;
+                                 window.scrollTo({ top: y, behavior: 'smooth' });
+                             }
+                         }, 150);
+                     }
+                 }}
+                 className={`self-center mt-4 p-2 rounded-full ${t.bgBox} backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border} transition-all relative z-20`}
+             >
+                 {isAktivitasExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+             </button>
+          </div>
+          
+          <div className={`grid relative z-10 transition-all duration-300 ease-in-out ${isAktivitasExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
+             <div className="overflow-hidden">
+               <div className={`rounded-b-3xl border border-t-0 ${t.border} ${t.bgSunken} shadow-inner -mt-8 pt-8 relative z-10`}>
+                 <ActivityChart 
+                    t={t} theme={theme} history={history} 
+                    soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
+                    onPointClick={navigateToWorkoutDate}
+                    language={language}
+                 />
+               </div>
+             </div>
+          </div>
          </div>
       </div>
       </div>
@@ -732,43 +829,47 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
 
 
       {/* --- GRUP PROGRESS --- */}
-      <div className="flex flex-col w-full min-w-0">
+      <div className="relative flex flex-col w-full min-w-0 anim-rise mt-6 transition-all duration-300" style={{ animationDelay: '120ms' }}>
         {/* SECTION: PROGRESS TAB — Main card */}
-        <div className={`border ${t.border} ${t.bgCard} shadow-sm relative z-10 flex flex-col transition-all duration-300 pb-4 ${isProgressExpanded ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'} overflow-hidden`}>
-          {/* --- Background Image Layer --- */}
-          <div 
-            className="absolute inset-0 z-0 opacity-70 dark:opacity-40 pointer-events-none"
-            style={{
-              backgroundImage: "url('/bg-progress.webp')",
-              backgroundSize: '160%',
-              backgroundPosition: '60% 15px',
-              backgroundRepeat: 'no-repeat',
-              maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 100%)',
-              WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 100%)'
-            }}
-          />
+          {/* Card Background Layer */}
+          <div className={`absolute top-10 inset-x-0 bottom-0 border ${t.border} ${theme === 'dark' ? 'bg-black/40 backdrop-blur-md' : 'bg-white/45 backdrop-blur-md'} shadow-sm z-0 ${isProgressExpanded ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'}`}></div>
+
+          {/* Extracted Image (Pop-out dari Kiri) */}
+          <div
+             className="absolute inset-x-0 -top-10 bottom-0 w-full z-10 pointer-events-none overflow-hidden"
+             style={{
+               maskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)',
+               WebkitMaskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)'
+             }}
+          >
+             <img src="/bg-progress.webp" alt="" className="w-full h-full object-cover object-[35%_top] drop-shadow-xl" />
+          </div>
+
           {/* ------------------------------ */}
-          <div className="relative z-10 flex-1 flex flex-col">
-            <ProgressTab 
-              t={t} lang={lang} language={language} theme={theme} 
-              history={history} programs={programs} exerciseLibrary={exerciseLibrary} 
-              soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
-              selectedDate={selectedDate}
-              isSubCard={false}
-              activePlanIds={activePlanIds}
-              units={units}
-            />
+          <div className="relative z-20 flex-1 flex flex-col mt-10 pb-4">
+             {/* Wrapper for ProgressTab without nested box styling */}
+             <div className="mt-3 flex-1 relative z-20">
+                <ProgressTab 
+                  t={t} lang={lang} language={language} theme={theme} 
+                  history={history} programs={programs} exerciseLibrary={exerciseLibrary} 
+                  soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
+                  selectedDate={selectedDate}
+                  isSubCard={false}
+                  activePlanIds={activePlanIds}
+                  units={units}
+                />
+             </div>
             <button 
                  onClick={() => { playSoundEffect('click', soundEnabled); setIsProgressExpanded(!isProgressExpanded); }}
-                 className="w-full flex items-center justify-center pt-2 pb-1 text-zinc-500 hover:text-emerald-500 transition-colors"
+                 className={`self-center mt-3 mb-2 p-2 rounded-full ${t.bgBox} backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border} transition-all relative z-20`}
              >
                  {isProgressExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
              </button>
           </div>
-      </div>
-      <div className={`grid transition-all duration-300 ease-in-out ${isProgressExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
+          
+      <div className={`grid relative z-10 transition-all duration-300 ease-in-out ${isProgressExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
         <div className="overflow-hidden">
-          <div className={`rounded-b-3xl border border-t-0 ${t.border} ${theme === 'dark' ? 'bg-[#061626]' : 'bg-[#f0f2f5]'} shadow-inner -mt-12 pt-12 relative z-0`}>
+          <div className={`rounded-b-3xl border border-t-0 ${t.border} ${t.bgSunken} shadow-inner -mt-12 pt-12 relative z-10`}>
             <MuscleProgress 
               t={t} theme={theme} lang={lang}
               history={history} programs={programs} exerciseLibrary={exerciseLibrary}
@@ -777,7 +878,6 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
             />
           </div>
         </div>
-      </div>
       </div>
       </div>
 
@@ -806,7 +906,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                            </div>
                        </div>
                    </div>
-                   <button onClick={() => setShowDetailsModal(false)} className={`p-2 rounded-full bg-[#41759b]/20 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors ${t.textMain}`}><X size={16}/></button>
+                   <button onClick={() => setShowDetailsModal(false)} className={`p-2 rounded-full bg-[#3b82f6]/20 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors ${t.textMain}`}><X size={16}/></button>
                </div>
 
                <div className="flex-1 overflow-y-auto px-4 pb-10 hide-scrollbar space-y-3">
@@ -1000,7 +1100,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                               <div className="grid grid-cols-2 gap-2 mb-3">
                                   {[
                                       { id: 'cutting', label: 'Cutting', delta: -500, icon: '🔥', color: 'text-rose-500' },
-                                      { id: 'maintenance', label: 'Maintenance', delta: 0, icon: '⚖️', color: 'text-zinc-500' },
+                                      { id: 'maintenance', label: 'Maintenance', delta: 0, icon: '⚖️', color: 'text-zinc-500 dark:text-zinc-400' },
                                       { id: 'clean_bulk', label: 'Clean Bulk', delta: 300, icon: '💪', color: 'text-emerald-500' },
                                       { id: 'aggressive_bulk', label: 'Aggressive', delta: 500, icon: '🚀', color: 'text-orange-500' },
                                   ].map(preset => (
@@ -1047,6 +1147,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
           document.body
       )}
 
+    </div>
     </div>
   );
 };

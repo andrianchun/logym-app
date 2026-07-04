@@ -131,7 +131,7 @@ export default function FollowListModal({ currentUser, type, isDark, t, onClose 
           {u.photo ? (
             <img src={u.photo} alt={u.name} className="w-10 h-10 rounded-full object-cover shrink-0 group-hover:opacity-80 transition-opacity" />
           ) : (
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-sm shrink-0 group-hover:opacity-80 transition-opacity ${t?.bgAccentSoft || 'bg-[#41759b]/10'} ${t?.textAccent || 'text-[#41759b]'}`}>
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-sm shrink-0 group-hover:opacity-80 transition-opacity ${t?.bgAccentSoft || 'bg-[#3b82f6]/10'} ${t?.textAccent || 'text-[#3b82f6]'}`}>
               {(u.name || '?').charAt(0).toUpperCase()}
             </div>
           )}
@@ -150,7 +150,7 @@ export default function FollowListModal({ currentUser, type, isDark, t, onClose 
               className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold transition-all disabled:opacity-50 ${
                 iAmFollowing
                   ? (isDark ? 'bg-white/10 text-white' : 'bg-black/10 text-black')
-                  : (t?.bgAccent || 'bg-[#41759b] text-white')
+                  : (t?.bgAccent || 'bg-[#3b82f6] text-white')
               }`}
             >
               {isActingFollow ? <Loader2 size={12} className="animate-spin" /> : (

@@ -119,8 +119,42 @@ const WorkoutTab = ({
 
   const hasAutoExpanded = React.useRef(false);
 
+  const [scrolledTargets, setScrolledTargets] = React.useState({});
+
+  const [isClosingImmersive, setIsClosingImmersive] = React.useState(false);
+
+  const scrollToFirstIncompleteExercise = (wId) => {
+    let targetExId = null;
+    let list = wId === 'extra' ? extraExercises : activeProgramsList.find(p => p.workoutId === wId || p.id === wId)?.exercises;
+    if (list) {
+      for (const ex of list) {
+         if (!skippedExercises[ex.id]) {
+            const logs = exerciseLogs[ex.id];
+            if (!logs || logs.some(s => !s.done)) {
+               targetExId = ex.id;
+               break;
+            }
+         }
+      }
+    }
+    if (targetExId) {
+      const el = document.getElementById(`exercise-card-${targetExId}`);
+      if (el) {
+         const y = el.getBoundingClientRect().top + window.scrollY - 100;
+         window.scrollTo({ top: y, behavior: 'smooth' });
+         return;
+      }
+    }
+    // fallback to session
+    const sel = document.getElementById(`session-${wId}`);
+    if (sel) {
+      const y = sel.getBoundingClientRect().top + window.scrollY - 80;
+      window.scrollTo({ top: y, behavior: 'smooth' });
+    }
+  };
+
   React.useEffect(() => {
-    if (focusWorkoutId) {
+    if (focusWorkoutId && !scrolledTargets[focusWorkoutId]) {
       let targetWorkoutId = focusWorkoutId;
       if (focusWorkoutId !== 'extra') {
          const found = activeProgramsList.find(p => p.id === focusWorkoutId || p.workoutId === focusWorkoutId);
@@ -128,21 +162,27 @@ const WorkoutTab = ({
       }
       setExpandedSessions({ [targetWorkoutId]: true });
       setTimeout(() => {
-        const el = document.getElementById(`session-${targetWorkoutId}`);
-        if (el) {
-          const y = el.getBoundingClientRect().top + window.scrollY - 80;
-          window.scrollTo({ top: y, behavior: 'smooth' });
-        }
-      }, 100);
-      setFocusWorkoutId(null);
+        scrollToFirstIncompleteExercise(targetWorkoutId);
+      }, 150);
+      setScrolledTargets(prev => ({ ...prev, [focusWorkoutId]: true }));
     } else if (activeProgramsList.length > 0 && Object.keys(expandedSessions).length === 0 && !hasAutoExpanded.current) {
       setExpandedSessions({ [activeProgramsList[0].workoutId]: true });
       hasAutoExpanded.current = true;
     }
-  }, [activeProgramsList, expandedSessions, focusWorkoutId, setFocusWorkoutId]);
+  }, [activeProgramsList, expandedSessions, focusWorkoutId, scrolledTargets, exerciseLogs, extraExercises, skippedExercises]);
 
   const toggleSession = (id) => {
+    const isNowExpanded = !expandedSessions[id];
     setExpandedSessions(prev => prev[id] ? {} : { [id]: true });
+    if (isNowExpanded) {
+      setTimeout(() => {
+        const el = document.getElementById(`session-${id}`);
+        if (el) {
+          const y = el.getBoundingClientRect().top + window.scrollY - 80;
+          window.scrollTo({ top: y, behavior: 'smooth' });
+        }
+      }, 150);
+    }
   };
 
   const groupExercises = (exercisesList) => {
@@ -454,8 +494,9 @@ const WorkoutTab = ({
 
   return (
     <>
-      {isImmersiveMode && (
+      {(isImmersiveMode || isClosingImmersive) && (
         <ImmersiveWorkout 
+          isClosing={isClosingImmersive}
           t={t}
           units={units}
           programs={programs}
@@ -467,7 +508,17 @@ const WorkoutTab = ({
           onSetChange={onSetChange}
           onToggleSet={onToggleSet}
           onSkipSet={onSkipSet}
-          onClose={() => setIsImmersiveMode(false)}
+          onClose={() => {
+            playSoundEffect('click', soundEnabled);
+            setIsClosingImmersive(true);
+            setTimeout(() => {
+              setIsClosingImmersive(false);
+              setIsImmersiveMode(false);
+              setTimeout(() => {
+                 scrollToFirstIncompleteExercise(sessionToRun);
+              }, 50);
+            }, 300);
+          }}
           onSaveWorkout={() => {
             setIsImmersiveMode(false);
             onSaveWorkout(sessionToRun);
@@ -576,8 +627,8 @@ const WorkoutTab = ({
                           <div key={`${prog.id}-group-${gIdx}`} className={`sm:w-[340px] sm:shrink-0 sm:snap-center sm:bg-black/5 sm:dark:bg-white/5 sm:rounded-3xl sm:border sm:border-black/5 sm:dark:border-white/5 sm:overflow-hidden relative flex flex-col mb-4 sm:mb-0 last:mb-0 ${group.isSuperset ? 'pr-3' : ''}`}>
                             {group.isSuperset && <div className={`absolute top-0 bottom-0 right-0 w-[6px] rounded-l-md z-20 ${t.bgAccent}`}></div>}
                             {group.items.map(({ex, idx}) => (
+                              <div id={`exercise-card-${ex.id}`} key={`${prog.id}-${ex.id}-${idx}`}>
                               <ExerciseCard 
-                                key={`${prog.id}-${ex.id}-${idx}`}
                                 ex={ex} idx={idx} isExtra={false}
                                 t={t} lang={lang} soundEnabled={soundEnabled}
                                 units={units}
@@ -599,7 +650,20 @@ const WorkoutTab = ({
                                     siblingIds = prog.exercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
                                   }
                                   onToggleSet(exId, setIdx, siblingIds);
-                                }} 
+                                  
+                                  // Auto-scroll ke latihan berikutnya jika latihan ini selesai
+                                  setTimeout(() => {
+                                      const logs = exerciseLogs[exId];
+                                      // Cek apakah dengan toggle ini, semua set sekarang completed (artinya yg sebelumnya belum done 1, sekarang jadi 0)
+                                      if (logs) {
+                                          const setsLainSelesai = logs.filter((s, i) => i !== setIdx).every(s => s.done);
+                                          const setIniJadiSelesai = !logs[setIdx].done; // karena belum terupdate di closure setTimeout
+                                          if (setsLainSelesai && setIniJadiSelesai) {
+                                              scrollToFirstIncompleteExercise(prog.workoutId);
+                                          }
+                                      }
+                                  }, 50);
+                                }}  
                                 onAddSet={(exId) => {
                                   setSessionToRun(prog.workoutId);
                                   if (ex.supersetId) {
@@ -629,6 +693,7 @@ const WorkoutTab = ({
                                 }}
                                 onReplaceExercise={() => { setDetailExercise(ex); setShowAlternativeModal(true); }}
                               />
+                            </div>
                             ))}
                           </div>
                         );})}
@@ -656,28 +721,39 @@ const WorkoutTab = ({
                           <div key={`extra-group-${gIdx}`} className={`sm:w-[340px] sm:shrink-0 sm:snap-center sm:bg-black/5 sm:dark:bg-white/5 sm:rounded-3xl sm:border sm:border-black/5 sm:dark:border-white/5 sm:overflow-hidden relative flex flex-col mb-4 sm:mb-0 last:mb-0 ${group.isSuperset ? 'pr-3' : ''}`}>
                             {group.isSuperset && <div className={`absolute top-0 bottom-0 right-0 w-[6px] rounded-l-md z-20 ${t.bgAccent}`}></div>}
                             {group.items.map(({ex, idx}) => (
-                            <ExerciseCard 
-                              key={ex.id}
-                              ex={ex} idx={activeProgram.exercises?.length + idx || idx} isExtra={true}
-                              t={t} lang={lang} soundEnabled={soundEnabled}
-                              units={units}
-                              isSkip={!!skippedExercises[ex.id]} 
-                              onToggleSkip={() => onToggleSkip(ex.id)} 
-                              onRemoveExtra={onRemoveExtra} 
-                              onOpenVideo={() => handleOpenDetail(ex)}
-                              sets={getSetLogs(ex)}
-                              onUpdateSet={(exId, setIdx, field, val) => {
-                                setSessionToRun('extra');
-                                onSetChange(exId, setIdx, field, val);
-                              }} 
-                              onToggleSet={(exId, setIdx) => {
-                                setSessionToRun('extra');
-                                let siblingIds = null;
-                                if (ex.supersetId) {
-                                  siblingIds = extraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
-                                }
-                                onToggleSet(exId, setIdx, siblingIds);
-                              }} 
+                            <div id={`exercise-card-${ex.id}`} key={`extra-${ex.id}-${idx}`}>
+                              <ExerciseCard 
+                                ex={ex} idx={activeProgram?.exercises?.length ? activeProgram.exercises.length + idx : idx} isExtra={true}
+                                t={t} lang={lang} soundEnabled={soundEnabled}
+                                units={units}
+                                isSkip={!!skippedExercises[ex.id]} 
+                                onToggleSkip={() => onToggleSkip(ex.id)} 
+                                onRemoveExtra={onRemoveExtra} 
+                                onOpenVideo={() => handleOpenDetail(ex)}
+                                sets={getSetLogs(ex)}
+                                onUpdateSet={(exId, setIdx, field, val) => {
+                                  setSessionToRun('extra');
+                                  onSetChange(exId, setIdx, field, val);
+                                }} 
+                                onToggleSet={(exId, setIdx) => {
+                                  setSessionToRun('extra');
+                                  let siblingIds = null;
+                                  if (ex.supersetId) {
+                                    siblingIds = extraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
+                                  }
+                                  onToggleSet(exId, setIdx, siblingIds);
+                                  
+                                  setTimeout(() => {
+                                      const logs = exerciseLogs[exId];
+                                      if (logs) {
+                                          const setsLainSelesai = logs.filter((s, i) => i !== setIdx).every(s => s.done);
+                                          const setIniJadiSelesai = !logs[setIdx].done; 
+                                          if (setsLainSelesai && setIniJadiSelesai) {
+                                              scrollToFirstIncompleteExercise('extra');
+                                          }
+                                      }
+                                  }, 50);
+                                }} 
                               onAddSet={(exId) => {
                                 setSessionToRun('extra');
                                 if (ex.supersetId) {
@@ -706,7 +782,8 @@ const WorkoutTab = ({
                                 }
                               }}
                               onReplaceExercise={() => { setDetailExercise(ex); setShowAlternativeModal(true); }}
-                            />
+                              />
+                            </div>
                           ))}
                         </div>
                       );})}

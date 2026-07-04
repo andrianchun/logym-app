@@ -83,7 +83,7 @@ export default function CreatePostModal({ user, onClose, theme, t, initialFiles 
           <button 
             onClick={handleSubmit}
             disabled={isUploading || !canPost}
-            className={`px-4 py-1.5 rounded-full font-bold text-sm ${t?.bgAccent || 'bg-[#41759b] text-white'} disabled:opacity-50`}
+            className={`px-4 py-1.5 rounded-full font-bold text-sm ${t?.bgAccent || 'bg-[#3b82f6] text-white'} disabled:opacity-50`}
           >
             {isUploading ? <Loader2 size={16} className="animate-spin" /> : 'Post'}
           </button>
@@ -164,7 +164,7 @@ export default function CreatePostModal({ user, onClose, theme, t, initialFiles 
             <button 
               onClick={() => fileInputRef.current?.click()}
               disabled={images.length >= 5}
-              className={`p-2 rounded-xl flex items-center gap-2 font-bold text-sm disabled:opacity-50 ${t?.textAccent || 'text-[#41759b]'} ${t?.bgAccentSoft || 'bg-[#41759b]/10'} hover:opacity-80`}
+              className={`p-2 rounded-xl flex items-center gap-2 font-bold text-sm disabled:opacity-50 ${t?.textAccent || 'text-[#3b82f6]'} ${t?.bgAccentSoft || 'bg-[#3b82f6]/10'} hover:opacity-80`}
             >
               <ImagePlus size={20} />
               <span>Tambah Foto ({images.length}/5)</span>

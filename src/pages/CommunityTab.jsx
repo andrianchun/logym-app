@@ -310,7 +310,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
           isDark ? 'bg-slate-800/40' : 'bg-white/60'
         } backdrop-blur-md rounded-3xl p-4 border transition-all duration-500 ${
           flashingPostId === post.id
-            ? 'border-[#41759b] shadow-[0_0_0_3px_rgba(65,117,155,0.3)]'
+            ? 'border-[#3b82f6] shadow-[0_0_0_3px_rgba(65,117,155,0.3)]'
             : isDark ? 'border-white/10' : 'border-white/40'
         } shadow-[0_8px_30px_rgb(0,0,0,0.04)] ${menuOpen === post.id ? 'relative z-50' : 'relative z-10'}`}
       >

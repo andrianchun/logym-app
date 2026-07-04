@@ -49,9 +49,9 @@ export default function SettingsModal({
 
       {/* Tabs */}
       <div className={`flex border-b ${t.border} px-2 shrink-0 overflow-x-auto no-scrollbar`}>
-          <button onClick={() => setActiveTab('preferensi')} className={`flex-1 py-3 text-sm font-bold border-b-2 whitespace-nowrap px-4 transition-colors ${activeTab === 'preferensi' ? `border-[#41759b] ${t.textMain}` : `border-transparent ${t.textMuted}`}`}>Preferensi</button>
-          <button onClick={() => setActiveTab('satuan')} className={`flex-1 py-3 text-sm font-bold border-b-2 whitespace-nowrap px-4 transition-colors ${activeTab === 'satuan' ? `border-[#41759b] ${t.textMain}` : `border-transparent ${t.textMuted}`}`}>Satuan Unit</button>
-          <button onClick={() => setActiveTab('lanjutan')} className={`flex-1 py-3 text-sm font-bold border-b-2 whitespace-nowrap px-4 transition-colors ${activeTab === 'lanjutan' ? `border-[#41759b] ${t.textMain}` : `border-transparent ${t.textMuted}`}`}>Lanjutan</button>
+          <button onClick={() => setActiveTab('preferensi')} className={`flex-1 py-3 text-sm font-bold border-b-2 whitespace-nowrap px-4 transition-colors ${activeTab === 'preferensi' ? `border-[#3b82f6] ${t.textMain}` : `border-transparent ${t.textMuted}`}`}>Preferensi</button>
+          <button onClick={() => setActiveTab('satuan')} className={`flex-1 py-3 text-sm font-bold border-b-2 whitespace-nowrap px-4 transition-colors ${activeTab === 'satuan' ? `border-[#3b82f6] ${t.textMain}` : `border-transparent ${t.textMuted}`}`}>Satuan Unit</button>
+          <button onClick={() => setActiveTab('lanjutan')} className={`flex-1 py-3 text-sm font-bold border-b-2 whitespace-nowrap px-4 transition-colors ${activeTab === 'lanjutan' ? `border-[#3b82f6] ${t.textMain}` : `border-transparent ${t.textMuted}`}`}>Lanjutan</button>
       </div>
 
       {/* BODY MODAL */}

@@ -35,8 +35,8 @@ const AchievementPopup = ({ achievements, onClose, soundEnabled, playSoundEffect
   };
 
   // Use theme accent color if available, fallback to a nice blue
-  const btnBg = t?.bgAccent || 'bg-[#41759b]';
-  const btnShadow = t?.bgAccent ? '' : 'shadow-[#41759b]/30';
+  const btnBg = t?.bgAccent || 'bg-[#3b82f6]';
+  const btnShadow = t?.bgAccent ? '' : 'shadow-[#3b82f6]/30';
 
   return (
     <div className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm flex flex-col justify-center p-4 animate-in fade-in slide-in-from-bottom-8 duration-500">

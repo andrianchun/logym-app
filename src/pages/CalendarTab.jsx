@@ -172,8 +172,10 @@ const CalendarTab = ({
   const getDayWorkouts = (dateStr) => {
     const historical = history[dateStr]?.workouts || [];
     
-    // Filter history: Hanya tampilkan workout yang sesuai dengan activePlanIds (sejarah maupun rencana)
+    // Filter history: Hanya tampilkan workout yang sesuai dengan activePlanIds, KECUALI yang sudah 'completed'
     const validHistorical = historical.filter(w => {
+      if (w.status === 'completed') return true; // Selalu tampilkan yang sudah selesai
+      
       const p = programs.find(prog => prog.id === w.programId);
       const wPlanId = (p ? p.planId : null) || 'custom';
       
@@ -961,7 +963,7 @@ const CalendarTab = ({
                                        <span className="caption w-6">Hari</span>
                                     </div>
                                 </div>
-                                <div className="flex justify-between items-center bg-[#41759b]/10 dark:bg-white/5 p-3 rounded-lg border border-dashed border-slate-400/50 dark:border-slate-500/20 mb-4">
+                                <div className="flex justify-between items-center bg-[#3b82f6]/10 dark:bg-white/5 p-3 rounded-lg border border-dashed border-slate-400/50 dark:border-slate-500/20 mb-4">
                                     <span className="caption">Sebanyak</span>
                                     <div className="flex items-center space-x-2">
                                        <input type="number" value={repeatCount} onChange={(e) => setRepeatCount(Number(e.target.value))} className={`w-16 ${t.inputBg} ${t.textMain} px-2 py-1 rounded-lg body-lg text-center outline-none`} min="1" />
@@ -1210,7 +1212,7 @@ const CalendarTab = ({
           <div 
             className={`relative w-full max-w-xs rounded-3xl p-5 shadow-2xl border ${t.border} animate-in zoom-in-95 fade-in duration-300 ease-out`}
             style={{ 
-              background: (t.bgCard?.includes('0a1f32') || t.bgCard?.includes('040f1a')) 
+              background: (t.bgCard?.includes('0d1526') || t.bgCard?.includes('05070d')) 
                 ? 'rgba(15, 40, 60, 0.65)' 
                 : 'rgba(255, 255, 255, 0.65)', 
               backdropFilter: 'blur(40px) saturate(180%)',
@@ -1230,7 +1232,7 @@ const CalendarTab = ({
               </button>
             </div>
 
-            <div className={`h-px mb-4 ${(t.bgCard?.includes('0a1f32') || t.bgCard?.includes('040f1a')) ? 'bg-white/10' : 'bg-black/10'}`} />
+            <div className={`h-px mb-4 ${(t.bgCard?.includes('0d1526') || t.bgCard?.includes('05070d')) ? 'bg-white/10' : 'bg-black/10'}`} />
 
             <div className="space-y-4 max-h-64 overflow-y-auto pr-1">
               {(() => {
@@ -1250,7 +1252,7 @@ const CalendarTab = ({
                           key={p.id} 
                           onClick={() => addWorkoutToDate(p)}
                           className={`w-full p-3 rounded-xl text-left body-lg font-bold transition-all flex justify-between items-center ${t.textMain}`}
-                          style={{ background: (t.bgCard?.includes('0a1f32') || t.bgCard?.includes('040f1a')) ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }}
+                          style={{ background: (t.bgCard?.includes('0d1526') || t.bgCard?.includes('05070d')) ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }}
                         >
                           {p.name}
                           <Plus size={16} className="opacity-40" />
@@ -1262,7 +1264,7 @@ const CalendarTab = ({
               })()}
             </div>
 
-            <div className={`h-px mt-4 mb-3 ${(t.bgCard?.includes('0a1f32') || t.bgCard?.includes('040f1a')) ? 'bg-white/10' : 'bg-black/10'}`} />
+            <div className={`h-px mt-4 mb-3 ${(t.bgCard?.includes('0d1526') || t.bgCard?.includes('05070d')) ? 'bg-white/10' : 'bg-black/10'}`} />
 
             <button 
               onClick={() => { playSoundEffect('click', soundEnabled); setShowProgramSelect(false); setActiveTab('program'); }}
@@ -1304,7 +1306,7 @@ const NotificationModal = ({ t, target, defaultReminderTime, soundEnabled, remin
   const [hh, setHh] = React.useState(init.h);
   const [mm, setMm] = React.useState(init.m);
 
-  const isDark = t.bgCard?.includes('0a1f32') || t.bgCard?.includes('040f1a');
+  const isDark = t.bgCard?.includes('0d1526') || t.bgCard?.includes('05070d');
 
   const clamp = (val, max) => {
     const n = parseInt(val) || 0;

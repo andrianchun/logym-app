@@ -64,9 +64,10 @@ const serializeDay = (val) => {
 
 export default function App() {
   // --- STATE AUTH & LOADING ---
-  const [user, setUser] = useState(null);
-  const [isAuthChecking, setIsAuthChecking] = useState(true);
-  const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const __previewUser = JSON.parse(localStorage.getItem('__PREVIEW_USER') || 'null');
+  const [user, setUser] = useState(__previewUser);
+  const [isAuthChecking, setIsAuthChecking] = useState(!__previewUser);
+  const [isDataLoaded, setIsDataLoaded] = useState(!!__previewUser);
   const [isSplashMinTimeReached, setIsSplashMinTimeReached] = useState(false);
 
   useEffect(() => {
@@ -510,6 +511,7 @@ export default function App() {
   }, [isWorkoutActive, workoutStartTime]);
 
   useEffect(() => {
+    if (localStorage.getItem('__PREVIEW_USER')) return;
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
         setUser({ 
@@ -557,6 +559,8 @@ export default function App() {
 
     // Baseline diff milik user sebelumnya tidak berlaku lagi
     lastSavedHistoryJson.current = null;
+
+    if (localStorage.getItem('__PREVIEW_USER')) { setIsDataLoaded(true); return; }
 
     if (user) {
 
@@ -1178,28 +1182,34 @@ export default function App() {
   const lang = { ...(dict[language] || dict['ID']), id: language };
 
   const t = {
-    bgApp: theme === 'dark' ? 'bg-[#040f1a]' : 'bg-slate-50', 
-    bgCard: theme === 'dark' ? 'bg-[#0a1f32]' : 'bg-white',
-    textMain: theme === 'dark' ? 'text-slate-100' : 'text-slate-900', 
-    textMuted: theme === 'dark' ? 'text-[#93a6b2]' : 'text-slate-500',
-    border: theme === 'dark' ? 'border-[#294c65]/50' : 'border-black/20', 
-    textAccent: theme === 'dark' ? 'text-[#93a6b2]' : 'text-[#41759b]',
-    bgAccent: theme === 'dark' ? 'bg-[#41759b] text-white' : 'bg-[#41759b] text-white', 
-    bgAccentSoft: theme === 'dark' ? 'bg-[#294c65]/30' : 'bg-[#41759b]/10',
-    borderAccent: theme === 'dark' ? 'border-[#41759b]' : 'border-[#41759b]', 
-    borderAccentSoft: theme === 'dark' ? 'border-[#41759b]/30' : 'border-[#41759b]/30',
-    ringAccent: theme === 'dark' ? 'ring-[#41759b]' : 'ring-[#41759b]', 
-    shadowAccent: theme === 'dark' ? 'shadow-[#41759b]/30' : 'shadow-[#41759b]/30',
-    gradientText: theme === 'dark' ? 'from-[#93a6b2] to-[#41759b]' : 'from-[#41759b] to-[#294c65]', 
-    gradientBg: theme === 'dark' ? 'from-[#41759b] to-[#294c65]' : 'from-[#41759b] to-[#294c65]',
-    inputBg: theme === 'dark' ? 'bg-[#040f1a]/50' : 'bg-slate-100', 
-    btnBg: theme === 'dark' ? 'bg-[#294c65]/30' : 'bg-[#41759b]/10',
-    navBg: theme === 'dark' ? 'bg-[#040f1a]/80 backdrop-blur-md' : 'bg-white/90 backdrop-blur-md',
-    navIconActive: theme === 'dark' ? 'text-[#93a6b2]' : 'text-[#41759b]', 
-    navIconInactive: theme === 'dark' ? 'text-[#294c65]' : 'text-slate-400',
-    placeholderAccent: theme === 'dark' ? 'placeholder-[#93a6b2]/40' : 'placeholder-[#41759b]/40',
-    borderDashed: theme === 'dark' ? 'border-slate-500/20' : 'border-black/30',
-    bgBox: theme === 'dark' ? 'bg-white/5' : 'bg-[#41759b]/15'
+    // App shell background — ambient blue glow over near-black / soft blue-white
+    bgApp: theme === 'dark' ? 'app-bg-dark' : 'app-bg-light',
+    // Primary glass surface used by every card across every tab
+    bgCard: theme === 'dark' ? 'bg-white/[0.045] glass-card' : 'bg-white/60 glass-card',
+    // Secondary/sunken glass surface (nested panels, expanded chart trays, etc.)
+    bgCardSoft: theme === 'dark' ? 'bg-white/[0.02] glass-card' : 'bg-black/[0.02] glass-card',
+    bgSunken: theme === 'dark' ? 'bg-black/25' : 'bg-black/5',
+    textMain: theme === 'dark' ? 'text-slate-100' : 'text-slate-900',
+    textMuted: theme === 'dark' ? 'text-slate-400' : 'text-slate-500',
+    border: theme === 'dark' ? 'border-white/10' : 'border-black/10',
+    textAccent: theme === 'dark' ? 'text-sky-400' : 'text-[#3b82f6]',
+    bgAccent: 'bg-gradient-to-br from-[#3b82f6] to-[#1d4ed8] text-white',
+    bgAccentSoft: theme === 'dark' ? 'bg-[#3b82f6]/15' : 'bg-[#3b82f6]/10',
+    borderAccent: theme === 'dark' ? 'border-sky-400' : 'border-[#3b82f6]',
+    borderAccentSoft: theme === 'dark' ? 'border-sky-400/30' : 'border-[#3b82f6]/30',
+    ringAccent: theme === 'dark' ? 'ring-sky-400' : 'ring-[#3b82f6]',
+    shadowAccent: theme === 'dark' ? 'shadow-sky-500/30' : 'shadow-[#3b82f6]/30',
+    gradientText: theme === 'dark' ? 'from-sky-300 to-[#3b82f6]' : 'from-[#3b82f6] to-[#1d4ed8]',
+    gradientBg: 'from-[#3b82f6] to-[#1d4ed8]',
+    inputBg: theme === 'dark' ? 'bg-white/5' : 'bg-black/[0.03]',
+    btnBg: theme === 'dark' ? 'bg-white/[0.06] hover:bg-white/10' : 'bg-black/5 hover:bg-black/10',
+    navBg: theme === 'dark' ? 'bg-white/[0.04] glass-nav' : 'bg-white/70 glass-nav',
+    navIconActive: theme === 'dark' ? 'text-sky-400' : 'text-[#3b82f6]',
+    navIconInactive: theme === 'dark' ? 'text-slate-500' : 'text-slate-400',
+    placeholderAccent: theme === 'dark' ? 'placeholder-sky-400/40' : 'placeholder-[#3b82f6]/40',
+    borderDashed: theme === 'dark' ? 'border-white/10' : 'border-black/10',
+    bgBox: theme === 'dark' ? 'bg-white/5' : 'bg-[#3b82f6]/10',
+    glow: theme === 'dark' ? 'shadow-[0_8px_32px_-10px_rgba(59,130,246,0.35)]' : 'shadow-[0_8px_32px_-14px_rgba(59,130,246,0.25)]'
   };
 
   const navigateToWorkoutDate = (dateStr, progId) => { 
@@ -1578,13 +1588,23 @@ export default function App() {
           const completedAdhocIdx = workouts.findIndex(w => w.id === focusWorkoutId && w.programId === 'adhoc');
           if (completedAdhocIdx >= 0) {
               const existingW = workouts[completedAdhocIdx];
+              let existingSecs = 0;
+              if (existingW.duration) {
+                if (typeof existingW.duration === 'number') existingSecs = existingW.duration * 60;
+                else if (typeof existingW.duration === 'string') {
+                  const parts = existingW.duration.split(':').map(Number);
+                  if (parts.length === 3) existingSecs = (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
+                  else if (parts.length === 2) existingSecs = (parts[0] || 0) * 60 + (parts[1] || 0);
+                }
+              }
+              const finalSecs = Math.max(durationSecs, existingSecs);
               workouts[completedAdhocIdx] = {
                 ...existingW,
                 status: 'completed',
                 log: cleanLogs,
                 exercises: extraExercises,
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                duration: formatDur(durationSecs)
+                duration: formatDur(finalSecs)
               };
           } else {
               workouts.push({
@@ -1613,13 +1633,30 @@ export default function App() {
             if (realProgramId && realProgramId.startsWith('projected_')) {
                 realProgramId = realProgramId.replace('projected_', '').split('_')[0];
             }
+            
+            // Proteksi agar durasi tidak kereset, bisanya cuma nambah
+            let existingSecs = 0;
+            if (w.duration) {
+              if (typeof w.duration === 'number') {
+                existingSecs = w.duration * 60;
+              } else if (typeof w.duration === 'string') {
+                const parts = w.duration.split(':').map(Number);
+                if (parts.length === 3) {
+                  existingSecs = (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
+                } else if (parts.length === 2) {
+                  existingSecs = (parts[0] || 0) * 60 + (parts[1] || 0);
+                }
+              }
+            }
+            const finalSecs = Math.max(durationSecs, existingSecs);
+            
             return {
               ...w,
               programId: realProgramId,
               status: 'completed',
               log: cleanLogs,
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              duration: formatDur(durationSecs)
+              duration: formatDur(finalSecs)
             };
           }
           return w;

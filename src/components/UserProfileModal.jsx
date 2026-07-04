@@ -169,9 +169,9 @@ export default function UserProfileModal({ profileUserId, profileUserName, profi
               )}
               <div className={`relative ${isTopTen ? 'p-1 bg-' + (isDark ? 'slate-900' : 'white') : ''} rounded-full z-10`}>
                 {profileUserPhoto ? (
-                  <img src={profileUserPhoto} alt={profileUserName} className={`w-20 h-20 rounded-full object-cover ${isTopTen ? 'ring-2 ring-blue-400' : `ring-4 ${t?.ringAccent || 'ring-[#41759b]'} ring-opacity-30`}`} />
+                  <img src={profileUserPhoto} alt={profileUserName} className={`w-20 h-20 rounded-full object-cover ${isTopTen ? 'ring-2 ring-blue-400' : `ring-4 ${t?.ringAccent || 'ring-[#3b82f6]'} ring-opacity-30`}`} />
                 ) : (
-                  <div className={`w-20 h-20 rounded-full ${isTopTen ? 'bg-blue-100 text-blue-600 ring-2 ring-blue-400' : `${t?.bgAccentSoft || 'bg-[#41759b]/20'} ${t?.textAccent || 'text-[#41759b]'}`} flex items-center justify-center font-black text-2xl`}>
+                  <div className={`w-20 h-20 rounded-full ${isTopTen ? 'bg-blue-100 text-blue-600 ring-2 ring-blue-400' : `${t?.bgAccentSoft || 'bg-[#3b82f6]/20'} ${t?.textAccent || 'text-[#3b82f6]'}`} flex items-center justify-center font-black text-2xl`}>
                     {(profileUserName || '?').charAt(0).toUpperCase()}
                   </div>
                 )}
@@ -224,7 +224,7 @@ export default function UserProfileModal({ profileUserId, profileUserName, profi
                   <button 
                     onClick={handleFollow}
                     disabled={isLoadingFollow}
-                    className={`flex-[2] py-3 rounded-2xl ${isFollowingUser ? t.bgBox : t.bgAccent} ${isFollowingUser ? t.textMain : (t.textAccent === 'text-white' ? 'text-white' : 'text-slate-900')} font-black shadow-lg ${!isFollowingUser ? 'shadow-[#41759b]/30' : ''} transition-transform active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50`}
+                    className={`flex-[2] py-3 rounded-2xl ${isFollowingUser ? t.bgBox : t.bgAccent} ${isFollowingUser ? t.textMain : (t.textAccent === 'text-white' ? 'text-white' : 'text-slate-900')} font-black shadow-lg ${!isFollowingUser ? 'shadow-[#3b82f6]/30' : ''} transition-transform active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50`}
                   >
                     {isLoadingFollow ? 'Memproses...' : (
                       isFollowingUser ? <><UserCheck size={16}/> Mengikuti</> : <><UserPlus size={16}/> Ikuti</>
