@@ -212,32 +212,40 @@ const WorkoutTab = ({
 
      if (workoutId) {
        setHistory(prev => {
-          const h = { ...prev };
-          const dayData = h[selectedDate];
-          if (!dayData) return h;
-          
-          const wIdx = dayData.workouts.findIndex(w => w.id === workoutId);
-          if (wIdx > -1) {
-             const w = dayData.workouts[wIdx];
-             if (w.programId === 'adhoc') {
-                const exIdx = w.exercises.findIndex(e => e.id === originalExId);
+          const dayData = prev[selectedDate];
+          if (!dayData) return prev;
+
+          const wIdx = (dayData.workouts || []).findIndex(w => w.id === workoutId);
+          if (wIdx === -1) return prev;
+
+          // Update secara immutable — jangan mutasi objek di dalam state React
+          const replacement = { ...newEx, sets: detailExercise.sets || 3, reps: detailExercise.reps || 10, duration: detailExercise.duration || 10, id: newEx.id };
+          const w = dayData.workouts[wIdx];
+          let newW = w;
+
+          if (w.programId === 'adhoc') {
+             const exIdx = (w.exercises || []).findIndex(e => e.id === originalExId);
+             if (exIdx > -1) {
+                const newExercises = [...w.exercises];
+                newExercises[exIdx] = replacement;
+                newW = { ...w, exercises: newExercises };
+             }
+          } else {
+             const p = programs.find(p => p.id === w.programId);
+             if (p) {
+                const overridden = w.overriddenExercises ? [...w.overriddenExercises] : JSON.parse(JSON.stringify(p.exercises));
+                const exIdx = overridden.findIndex(e => e.id === originalExId);
                 if (exIdx > -1) {
-                   w.exercises[exIdx] = { ...newEx, sets: detailExercise.sets || 3, reps: detailExercise.reps || 10, duration: detailExercise.duration || 10, id: newEx.id };
+                   overridden[exIdx] = replacement;
                 }
-             } else {
-                const p = programs.find(p => p.id === w.programId);
-                if (p) {
-                   if (!w.overriddenExercises) {
-                      w.overriddenExercises = JSON.parse(JSON.stringify(p.exercises));
-                   }
-                   const exIdx = w.overriddenExercises.findIndex(e => e.id === originalExId);
-                   if (exIdx > -1) {
-                      w.overriddenExercises[exIdx] = { ...newEx, sets: detailExercise.sets || 3, reps: detailExercise.reps || 10, duration: detailExercise.duration || 10, id: newEx.id };
-                   }
-                }
+                newW = { ...w, overriddenExercises: overridden };
              }
           }
-          return h;
+
+          if (newW === w) return prev;
+          const newWorkouts = [...dayData.workouts];
+          newWorkouts[wIdx] = newW;
+          return { ...prev, [selectedDate]: { ...dayData, workouts: newWorkouts } };
        });
      }
      

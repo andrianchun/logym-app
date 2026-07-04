@@ -17,7 +17,7 @@ const EmptyWorkoutState = ({
       <div 
         className="absolute inset-0 z-0 opacity-70 dark:opacity-40 pointer-events-none"
         style={{
-          backgroundImage: "url('/bg-empty.png')",
+          backgroundImage: "url('/bg-empty.webp')",
           backgroundSize: '160%',
           backgroundPosition: '50% 10%',
           maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 100%)',

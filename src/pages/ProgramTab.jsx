@@ -610,15 +610,15 @@ const ProgramTab = ({
   // ==========================================
 
   const getPlanBgConfig = (planName) => {
-    const defaultConfig = { url: '/bg-custom.png', position: 'right -140px top -50px' };
+    const defaultConfig = { url: '/bg-custom.webp', position: 'right -140px top -50px' };
     if (!planName) return defaultConfig;
     const lowerName = planName.toLowerCase();
-    if (lowerName.includes('full body')) return { url: '/bg-full-body.png', position: 'right -140px top -50px' };
-    if (lowerName.includes('ppl basic')) return { url: '/bg-ppl-basic.png', position: 'right -140px top -20px' };
-    if (lowerName.includes('up-low')) return { url: '/bg-up-low.png', position: 'right -140px top -50px' };
-    if (lowerName.includes('bro split')) return { url: '/bg-bro-split.png', position: 'right -140px top -50px' };
-    if (lowerName.includes('ppl advanced')) return { url: '/bg-ppl-advanced.png', position: 'right -140px top -110px' };
-    if (lowerName.includes('beast mode')) return { url: '/bg-beast-mode.png', position: 'right -140px top -50px' };
+    if (lowerName.includes('full body')) return { url: '/bg-full-body.webp', position: 'right -140px top -50px' };
+    if (lowerName.includes('ppl basic')) return { url: '/bg-ppl-basic.webp', position: 'right -140px top -20px' };
+    if (lowerName.includes('up-low')) return { url: '/bg-up-low.webp', position: 'right -140px top -50px' };
+    if (lowerName.includes('bro split')) return { url: '/bg-bro-split.webp', position: 'right -140px top -50px' };
+    if (lowerName.includes('ppl advanced')) return { url: '/bg-ppl-advanced.webp', position: 'right -140px top -110px' };
+    if (lowerName.includes('beast mode')) return { url: '/bg-beast-mode.webp', position: 'right -140px top -50px' };
     return defaultConfig;
   };
 

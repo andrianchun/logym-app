@@ -4,12 +4,9 @@
  * Free, no API key needed. Provides ~1500 exercises with GIFs.
  */
 
-import localExerciseDb from '../data/exercisedb.json';
-
-const API_BASE = 'https://oss.exercisedb.dev/api/v1/exercises?limit=1500';
-const CACHE_KEY = 'lyfit_exercisedb_cache';
-const CACHE_EXPIRY_KEY = 'lyfit_exercisedb_cache_expiry';
-const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 jam
+// Database latihan di-serve dari public/exercisedb.json dan di-fetch on-demand,
+// supaya JSON ~1MB tidak ikut membebani parse bundle JS utama saat startup.
+const LOCAL_DB_URL = '/exercisedb.json';
 
 const ytVideoMap = {
   'smith machine incline bench press': 'https://youtu.be/VXaBbUYMfIs?si=pOB-MkazqZiMP_KX',
@@ -197,33 +194,46 @@ export const mapToLyFitFormat = (apiEx) => {
 
 
 /**
- * Ambil semua exercises dari database lokal (yang sudah didownload).
+ * Ambil semua exercises dari database lokal (public/exercisedb.json).
  * Menggantikan panggilan API karena limitasi API gratis.
  * Returns array format LyFit.
  */
 export let cachedMappedExercises = null;
+let loadPromise = null;
 
+/**
+ * Akses sinkron ke cache. Mengembalikan [] jika belum termuat,
+ * sambil memicu load di background — komponen akan dapat data pada render berikutnya.
+ * (App.jsx juga melakukan prefetch saat idle agar cache hampir selalu siap.)
+ */
 export const getCachedExercises = () => {
   if (!cachedMappedExercises) {
-    try {
-      cachedMappedExercises = localExerciseDb.map(mapToLyFitFormat);
-    } catch (e) {
-      return [];
-    }
+    fetchExercisesFromApi();
+    return [];
   }
   return cachedMappedExercises;
 };
 
 export const fetchExercisesFromApi = async () => {
   if (cachedMappedExercises) return cachedMappedExercises;
-  
-  try {
-    cachedMappedExercises = localExerciseDb.map(mapToLyFitFormat);
-    return cachedMappedExercises;
-  } catch (error) {
-    console.error('Gagal meload ExerciseDB lokal:', error);
-    return [];
+
+  if (!loadPromise) {
+    loadPromise = fetch(LOCAL_DB_URL)
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then(raw => {
+        cachedMappedExercises = raw.map(mapToLyFitFormat);
+        return cachedMappedExercises;
+      })
+      .catch(error => {
+        console.error('Gagal meload ExerciseDB lokal:', error);
+        loadPromise = null; // izinkan retry pada panggilan berikutnya
+        return [];
+      });
   }
+  return loadPromise;
 };
 
 export const clearExerciseDbCache = () => {

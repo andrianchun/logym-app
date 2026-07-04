@@ -8,7 +8,7 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 // --- IMPORT MESIN FIREBASE ---
 import { auth, db } from './firebase';
 import { onAuthStateChanged, signOut, deleteUser } from 'firebase/auth';
-import { doc, setDoc, onSnapshot, deleteField, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, deleteField, deleteDoc, collection, getDocs, query, where, writeBatch } from 'firebase/firestore';
 
 // --- IMPORT KOMPONEN UI ---
 import Header from './components/Header';
@@ -30,16 +30,37 @@ import ExerciseDetailModal from './components/ExerciseDetailModal';
 import ConfirmModal from './modals/ConfirmModal';
 import AddExerciseModal from './modals/AddExerciseModal';
 import SettingsModal from './modals/SettingsModal';
-import ProfileModal from './modals/ProfileModal';
 import HelpModal from './modals/HelpModal';
-import ProgramQuestionnaireModal from './modals/ProgramQuestionnaireModal';
+// Lazy: modal berat ini (beserta CommunityTab, ShareCardGenerator, html2canvas, dsb.)
+// baru diunduh & di-mount saat pertama kali dibuka — mempercepat startup.
+const ProfileModal = React.lazy(() => import('./modals/ProfileModal'));
+const ProgramQuestionnaireModal = React.lazy(() => import('./modals/ProgramQuestionnaireModal'));
 import AchievementPopup from './components/AchievementPopup';
 import { checkAchievements, ACHIEVEMENTS } from './data/achievements';
 
 // --- IMPORT DATA & MESIN ---
 import { playSoundEffect } from './utils/audio';
+import { fetchExercisesFromApi } from './utils/exerciseDbApi';
 import { getLocalYMD, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos } from './data/constants';
 import { Loader2 } from 'lucide-react';
+
+// Serialisasi kanonik (key di-sort) supaya perbandingan tidak terpengaruh urutan key
+// antara objek buatan lokal vs hasil decode Firestore.
+const stableStringify = (val) => {
+  if (val === null || typeof val !== 'object') return JSON.stringify(val) ?? 'null';
+  if (Array.isArray(val)) return '[' + val.map(v => stableStringify(v === undefined ? null : v)).join(',') + ']';
+  const keys = Object.keys(val).filter(k => val[k] !== undefined).sort();
+  return '{' + keys.map(k => JSON.stringify(k) + ':' + stableStringify(val[k])).join(',') + '}';
+};
+
+// Serialisasi satu hari history untuk diff auto-save (tanpa _activeSession yang per-device)
+const serializeDay = (val) => {
+  if (val && typeof val === 'object') {
+    const { _activeSession, ...dayData } = val;
+    return stableStringify(dayData);
+  }
+  return stableStringify(val ?? null);
+};
 
 export default function App() {
   // --- STATE AUTH & LOADING ---
@@ -130,6 +151,9 @@ export default function App() {
   const [restTargetTime, setRestTargetTime] = useState(null);
   const [isImmersiveMode, setIsImmersiveMode] = useState(false);
   const [sessionToRun, setSessionToRun] = useState(null);
+  // Ref agar listener notifikasi (didaftarkan sekali saat mount) selalu membaca nilai terbaru
+  const sessionToRunRef = useRef(null);
+  useEffect(() => { sessionToRunRef.current = sessionToRun; }, [sessionToRun]);
 
   const [selectedDate, setSelectedDate] = useState(getLocalYMD(new Date()));
   const [loadedDate, setLoadedDate] = useState(null);
@@ -165,6 +189,13 @@ export default function App() {
   const scrollPositions = useRef({});
   const prevTab = useRef(activeTab);
 
+  // Gate lazy-mount: modal berat baru di-mount saat pertama kali dibuka,
+  // lalu tetap ter-mount (perilaku state internal sama seperti sebelumnya).
+  const profileModalOpened = useRef(false);
+  if (showProfileModal) profileModalOpened.current = true;
+  const questionnaireOpened = useRef(false);
+  if (showQuestionnaire) questionnaireOpened.current = true;
+
   useEffect(() => {
     if (prevTab.current !== activeTab) {
       setTimeout(() => {
@@ -190,12 +221,13 @@ export default function App() {
     }
 
     // Listener: Ketuk notifikasi workout → buka tab Workout
+    // Pakai _setActiveTab (setter stabil) & sessionToRunRef karena closure ini dibuat sekali saat mount
     if (Capacitor.isNativePlatform()) {
       LocalNotifications.addListener('localNotificationActionPerformed', (notification) => {
         if (notification.notification.id === 9999) {
-          setActiveTab('workout');
-          if (sessionToRun) {
-            setFocusWorkoutId(sessionToRun);
+          _setActiveTab('workout');
+          if (sessionToRunRef.current) {
+            setFocusWorkoutId(sessionToRunRef.current);
             setIsImmersiveMode(true);
           }
         }
@@ -211,6 +243,14 @@ export default function App() {
       });
     }
   }, [theme]);
+
+  // --- PREFETCH DATABASE LATIHAN SAAT IDLE ---
+  // JSON ~1MB sudah dikeluarkan dari bundle; muat di background setelah UI siap
+  // agar cache sudah hangat saat user membuka library/kartu latihan.
+  useEffect(() => {
+    const timer = setTimeout(() => { fetchExercisesFromApi(); }, 2500);
+    return () => clearTimeout(timer);
+  }, []);
 
   // --- EFEK DETEKSI KONEKSI ---
   useEffect(() => {
@@ -374,7 +414,7 @@ export default function App() {
 
     // Immediately write onboardingCompleted flag to Firebase so it syncs across devices
     if (user?.uid) {
-      setDoc(doc(db, 'userData', user.uid), { onboardingCompleted: true }, { merge: true }).catch(() => {});
+      setDoc(doc(db, 'users', user.uid), { onboardingCompleted: true }, { merge: true }).catch(() => {});
     }
 
     setTimeout(() => {
@@ -514,7 +554,10 @@ export default function App() {
   useEffect(() => {
     let unsubscribeMain = null;
     let unsubscribeHistory = null;
-    
+
+    // Baseline diff milik user sebelumnya tidak berlaku lagi
+    lastSavedHistoryJson.current = null;
+
     if (user) {
 
       const currentYear = new Date().getFullYear().toString();
@@ -562,7 +605,12 @@ export default function App() {
               });
               
               setHistory(migratedHistory);
-              
+
+              // Seed baseline diff dari hasil migrasi (jalur ini menulis year docs sendiri di bawah)
+              const migratedBase = {};
+              Object.keys(migratedHistory).forEach(d => { migratedBase[d] = serializeDay(migratedHistory[d]); });
+              lastSavedHistoryJson.current = migratedBase;
+
               const historyByYear = {};
               Object.keys(migratedHistory).forEach(dateStr => {
                  const year = dateStr.substring(0, 4);
@@ -691,6 +739,11 @@ export default function App() {
            try {
              const data = docSnap.data();
              isUpdatingFromServer.current = true;
+             // Seed baseline diff: tanggal yang datang dari server dianggap sudah tersimpan,
+             // sehingga auto-save berikutnya hanya mengirim tanggal yang benar-benar berubah.
+             const base = { ...(lastSavedHistoryJson.current || {}) };
+             Object.keys(data).forEach(d => { base[d] = serializeDay(data[d]); });
+             lastSavedHistoryJson.current = base;
              setHistory(prev => {
                 const newState = { ...prev, ...data };
                 return JSON.stringify(prev) === JSON.stringify(newState) ? prev : newState;
@@ -717,13 +770,16 @@ export default function App() {
 
   // ==========================================
   // 3. SISTEM AUTO-SAVE KE CLOUD (DEBOUNCE)
+  // Dipisah dua effect agar log latihan tidak ikut menulis ulang dokumen utama:
+  //  - 3a: dokumen utama (programs, library, settings) — hanya saat bagian itu berubah
+  //  - 3b: history — diff per tanggal, hanya tanggal yang berubah yang dikirim
   // ==========================================
   useEffect(() => {
     if (user && isDataLoaded && !isUpdatingFromServer.current && !hasParseError) {
       const timer = setTimeout(() => {
         if (isUpdatingFromServer.current) return; // double-check before firing
         const mainDocRef = doc(db, "users", user.uid);
-        
+
         // Simpan Profil & Program ke Dokumen Utama
         setDoc(mainDocRef, {
           programs,
@@ -732,31 +788,64 @@ export default function App() {
           userAchievements,
           updatedAt: new Date().toISOString()
         }, { merge: true }).catch(err => console.error("Auto-save Cloud gagal:", err));
+      }, 2000);
 
-        // Pisahkan riwayat berdasarkan Tahun ke sub-collection history_years
-        const historyByYear = {};
-        Object.keys(history).forEach(dateStr => {
-           const year = dateStr.substring(0, 4);
-           if (!historyByYear[year]) historyByYear[year] = {};
-           
-           if (history[dateStr] && history[dateStr]._delete) {
-               historyByYear[year][dateStr] = deleteField();
-           } else {
-               // Jangan masukkan bioData jika null (biarkan null tertimpa field delete jika dibutuhkan, tapi karena ini merge:true, null aman)
-               historyByYear[year][dateStr] = history[dateStr];
-           }
-        });
-        
-        for (const year of Object.keys(historyByYear)) {
-           const yearRef = doc(db, "users", user.uid, "history_years", year);
-           setDoc(yearRef, historyByYear[year], { merge: true }).catch(err => console.error(`Auto-save History ${year} gagal:`, err));
-        }
-
-      }, 2000); 
-      
       return () => clearTimeout(timer);
     }
-  }, [history, programs, exerciseLibrary, theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, user, isDataLoaded, userAchievements]);
+  }, [programs, exerciseLibrary, theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, user, isDataLoaded, userAchievements]);
+
+  // Baseline serialisasi per tanggal — merepresentasikan kondisi terakhir yang tersimpan di server.
+  // Tanggal yang serialisasinya sama dengan baseline tidak perlu dikirim ulang.
+  const lastSavedHistoryJson = useRef(null);
+
+  useEffect(() => {
+    if (user && isDataLoaded && !isUpdatingFromServer.current && !hasParseError) {
+      const timer = setTimeout(() => {
+        if (isUpdatingFromServer.current) return; // double-check before firing
+
+        const baseline = lastSavedHistoryJson.current || {};
+        const newBaseline = { ...baseline };
+        const dirtyByYear = {};
+
+        Object.keys(history).forEach(dateStr => {
+           const json = serializeDay(history[dateStr]);
+           if (baseline[dateStr] === json) return; // tidak berubah sejak save terakhir — skip
+
+           const year = dateStr.substring(0, 4);
+           if (!dirtyByYear[year]) dirtyByYear[year] = {};
+
+           if (history[dateStr] && history[dateStr]._delete) {
+               dirtyByYear[year][dateStr] = deleteField();
+           } else if (history[dateStr] && typeof history[dateStr] === 'object') {
+               // _activeSession adalah state sementara per-device — JANGAN sinkron ke cloud.
+               // deleteField() sekaligus membersihkan salinan lama yang terlanjur tersimpan di server.
+               const { _activeSession, ...dayData } = history[dateStr];
+               dirtyByYear[year][dateStr] = { ...dayData, _activeSession: deleteField() };
+           } else {
+               dirtyByYear[year][dateStr] = history[dateStr];
+           }
+           newBaseline[dateStr] = json;
+        });
+
+        const dirtyYears = Object.keys(dirtyByYear);
+        if (dirtyYears.length === 0) return; // tidak ada perubahan — jangan tulis apa pun
+
+        lastSavedHistoryJson.current = newBaseline;
+        for (const year of dirtyYears) {
+           const yearRef = doc(db, "users", user.uid, "history_years", year);
+           setDoc(yearRef, dirtyByYear[year], { merge: true }).catch(err => {
+              console.error(`Auto-save History ${year} gagal:`, err);
+              // Batalkan baseline tanggal yang gagal supaya dicoba lagi pada save berikutnya
+              if (lastSavedHistoryJson.current) {
+                 Object.keys(dirtyByYear[year]).forEach(d => { delete lastSavedHistoryJson.current[d]; });
+              }
+           });
+        }
+      }, 2000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [history, user, isDataLoaded]);
 
 
   // --- CEK ACHIEVEMENTS ---
@@ -802,6 +891,61 @@ export default function App() {
       });
     }
   }, [exerciseLogs, skippedExercises, extraExercises, activeTab, selectedDate]);
+
+  // ==========================================
+  // 3.6. PERSIST SESI AKTIF KE LOCALSTORAGE
+  // _activeSession tidak lagi disinkron ke Firestore (state per-device).
+  // localStorage menggantikannya agar sesi berjalan tetap pulih setelah reload/app restart.
+  // ==========================================
+  useEffect(() => {
+    if (!user?.uid || !isDataLoaded) return;
+    if (Object.keys(exerciseLogs).length === 0 && Object.keys(skippedExercises).length === 0 && extraExercises.length === 0) return;
+    try {
+      localStorage.setItem(`lyfit_active_session_${user.uid}`, JSON.stringify({
+        date: selectedDate,
+        savedAt: Date.now(),
+        exerciseLogs, skippedExercises, extraExercises
+      }));
+    } catch { /* storage penuh/diblokir — abaikan, sesi tetap jalan di memori */ }
+  }, [exerciseLogs, skippedExercises, extraExercises, selectedDate, user?.uid, isDataLoaded]);
+
+  const activeSessionRestored = useRef(false);
+  useEffect(() => { activeSessionRestored.current = false; }, [user?.uid]); // reset saat ganti akun
+  useEffect(() => {
+    if (!isDataLoaded || !user?.uid || activeSessionRestored.current) return;
+    try {
+      const raw = localStorage.getItem(`lyfit_active_session_${user.uid}`);
+      if (!raw) { activeSessionRestored.current = true; return; }
+      const saved = JSON.parse(raw);
+      // Sesi lebih dari 24 jam dianggap basi
+      if (!saved?.date || Date.now() - (saved.savedAt || 0) > 24 * 60 * 60 * 1000) {
+        localStorage.removeItem(`lyfit_active_session_${user.uid}`);
+        activeSessionRestored.current = true;
+        return;
+      }
+      // Tunggu sampai data hari tsb tersedia dari snapshot history (efek ini re-run tiap history berubah)
+      const dayData = history[saved.date];
+      if (!dayData || !dayData.workouts) return;
+      activeSessionRestored.current = true;
+      setHistory(prev => {
+        const day = prev[saved.date];
+        if (!day || !day.workouts) return prev;
+        return {
+          ...prev,
+          [saved.date]: {
+            ...day,
+            _activeSession: {
+              exerciseLogs: saved.exerciseLogs || {},
+              skippedExercises: saved.skippedExercises || {},
+              extraExercises: saved.extraExercises || []
+            }
+          }
+        };
+      });
+    } catch {
+      activeSessionRestored.current = true;
+    }
+  }, [isDataLoaded, user?.uid, history]);
 
   // ==========================================
   // 4. PENAHAN TOMBOL BACK (UNIVERSAL)
@@ -880,8 +1024,10 @@ export default function App() {
 
   // ==========================================
 
+  const MAX_UNDO_STEPS = 20; // Batasi kedalaman undo: tiap langkah menyimpan deep-copy seluruh history+programs (berat di RAM)
+
   const saveStateToHistory = () => {
-     setUndoStack([...undoStack, { history: JSON.parse(JSON.stringify(history)), programs: JSON.parse(JSON.stringify(programs)) }]);
+     setUndoStack(prev => [...prev.slice(-(MAX_UNDO_STEPS - 1)), { history: JSON.parse(JSON.stringify(history)), programs: JSON.parse(JSON.stringify(programs)) }]);
      setRedoStack([]);
   };
 
@@ -944,13 +1090,45 @@ export default function App() {
     }
   };
 
+  // Hapus semua jejak data user di Firestore (dokumen utama, history per tahun, dan data komunitas).
+  // Catatan: solusi jangka panjang yang lebih kuat adalah Cloud Function onUserDeleted dengan Admin SDK.
+  const deleteAllUserData = async (uid) => {
+    const refsToDelete = [];
+
+    const safeGetDocs = async (q) => {
+      try { return (await getDocs(q)).docs; } catch { return []; }
+    };
+
+    // Subkoleksi history per tahun
+    refsToDelete.push(...(await safeGetDocs(collection(db, 'users', uid, 'history_years'))).map(d => d.ref));
+    // Postingan komunitas milik user
+    refsToDelete.push(...(await safeGetDocs(query(collection(db, 'community_posts'), where('userId', '==', uid)))).map(d => d.ref));
+    // Notifikasi untuk user
+    refsToDelete.push(...(await safeGetDocs(query(collection(db, 'notifications'), where('toUserId', '==', uid)))).map(d => d.ref));
+    // Relasi follow & block dua arah
+    refsToDelete.push(...(await safeGetDocs(query(collection(db, 'follows'), where('followerId', '==', uid)))).map(d => d.ref));
+    refsToDelete.push(...(await safeGetDocs(query(collection(db, 'follows'), where('followingId', '==', uid)))).map(d => d.ref));
+    refsToDelete.push(...(await safeGetDocs(query(collection(db, 'blocks'), where('blockerId', '==', uid)))).map(d => d.ref));
+    refsToDelete.push(...(await safeGetDocs(query(collection(db, 'blocks'), where('blockedId', '==', uid)))).map(d => d.ref));
+    // Profil komunitas, dokumen utama, dan dokumen legacy 'userData'
+    refsToDelete.push(doc(db, 'community_users', uid));
+    refsToDelete.push(doc(db, 'users', uid));
+    refsToDelete.push(doc(db, 'userData', uid));
+
+    // WriteBatch maksimal 500 operasi — pecah per 450
+    for (let i = 0; i < refsToDelete.length; i += 450) {
+      const batch = writeBatch(db);
+      refsToDelete.slice(i, i + 450).forEach(r => batch.delete(r));
+      await batch.commit();
+    }
+  };
+
   const handleDeleteAccount = async () => {
     playSoundEffect('click', soundEnabled);
     if (!user) return;
     try {
-      // 1. Delete user data from firestore
-      const docRef = doc(db, 'userData', user.uid);
-      await deleteDoc(docRef);
+      // 1. Delete user data from firestore (dokumen utama + history + data komunitas)
+      await deleteAllUserData(user.uid);
 
       // 2. Delete user from auth
       await deleteUser(auth.currentUser);
@@ -1037,7 +1215,7 @@ export default function App() {
   const getDayHistory = (dateStr) => {
     const val = history[dateStr]; if (!val) return null;
     if (typeof val === 'string') { const p = programs.find(prog => prog.name === val); return { programId: p?.id, programName: val, status: 'completed', log: {} }; }
-    if (val.programId && !val.programName) { const p = programs.find(prog => prog.id === val.programId); val.programName = p ? p.name : 'Unknown'; }
+    if (val.programId && !val.programName) { const p = programs.find(prog => prog.id === val.programId); return { ...val, programName: p ? p.name : 'Unknown' }; }
     return val;
   };
 
@@ -1668,7 +1846,9 @@ export default function App() {
         />
       )}
       
-      <ProgramQuestionnaireModal 
+      {(showQuestionnaire || questionnaireOpened.current) && (
+      <React.Suspense fallback={null}>
+      <ProgramQuestionnaireModal
          isOpen={showQuestionnaire}
          onClose={() => {
            setShowQuestionnaire(false);
@@ -1677,7 +1857,7 @@ export default function App() {
            }
            // Persist to Firebase so it syncs across all devices
            if (user?.uid) {
-             setDoc(doc(db, 'userData', user.uid), { onboardingCompleted: true }, { merge: true }).catch(() => {});
+             setDoc(doc(db, 'users', user.uid), { onboardingCompleted: true }, { merge: true }).catch(() => {});
            }
          }}
          onComplete={handleApplyRecommendedPlan}
@@ -1691,8 +1871,12 @@ export default function App() {
          exerciseLibrary={exerciseLibrary}
          units={units}
       />
-      
-        <ProfileModal 
+      </React.Suspense>
+      )}
+
+      {(showProfileModal || profileModalOpened.current) && (
+      <React.Suspense fallback={null}>
+        <ProfileModal
            showProfileModal={showProfileModal} setShowProfileModal={setShowProfileModal} 
            user={user} setUser={setUser} t={t} theme={theme} handleLogout={handleLogout} history={history}
            activityTargets={activityTargets} programs={programs} setPrograms={setPrograms} exerciseLibrary={exerciseLibrary}
@@ -1706,8 +1890,10 @@ export default function App() {
              if (postId) setHighlightPostId(postId);
            }}
         />
+      </React.Suspense>
+      )}
 
-        <SettingsModal 
+        <SettingsModal
            showSettings={showSettings} setShowSettings={setShowSettings} t={t} lang={lang} 
            theme={theme} setTheme={setTheme} language={language} setLanguage={setLanguage} 
            soundEnabled={soundEnabled} setSoundEnabled={setSoundEnabled}

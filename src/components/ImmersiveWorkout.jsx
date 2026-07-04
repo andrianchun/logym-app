@@ -491,7 +491,7 @@ const ImmersiveWorkout = ({
                       <div 
                         className="absolute inset-0 z-0 opacity-80 dark:opacity-60 pointer-events-none mix-blend-multiply dark:mix-blend-normal"
                         style={{ 
-                           backgroundImage: `url('${getOverloadHint && getOverloadHint(ex)?.mode === 'praise' ? '/coach-praise.png' : getOverloadHint && getOverloadHint(ex)?.mode === 'push' ? '/coach-push.png' : '/bg-dashboard.png'}')`,
+                           backgroundImage: `url('${getOverloadHint && getOverloadHint(ex)?.mode === 'praise' ? '/coach-praise.webp' : getOverloadHint && getOverloadHint(ex)?.mode === 'push' ? '/coach-push.webp' : '/bg-dashboard.webp'}')`,
                            backgroundSize: '180%',
                                           backgroundPosition: 'center 40px',
                            backgroundRepeat: 'no-repeat',

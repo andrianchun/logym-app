@@ -688,7 +688,7 @@ const CalendarTab = ({
           <div 
             className="absolute inset-0 z-0 opacity-70 dark:opacity-40 pointer-events-none"
             style={{
-              backgroundImage: "url('/bg-calendar.png')",
+              backgroundImage: "url('/bg-calendar.webp')",
               backgroundSize: '160%',
               backgroundPosition: '50% 10px',
               backgroundRepeat: 'no-repeat',

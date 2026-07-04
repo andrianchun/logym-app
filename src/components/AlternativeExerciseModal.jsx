@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { X, Search, Filter, Dumbbell, Heart, ChevronDown } from 'lucide-react';
 import { formatTarget, getVideoId, muscleOptions, equipmentOptions, normalizeMuscleKey } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
-import { getCachedExercises } from '../utils/exerciseDbApi';
+import { fetchExercisesFromApi } from '../utils/exerciseDbApi';
 import EquipmentIcon from './EquipmentIcon';
 import FilterChips from './FilterChips';
 
@@ -27,7 +27,10 @@ const AlternativeExerciseModal = ({
   const [onlineExercises, setOnlineExercises] = useState([]);
   
   React.useEffect(() => {
-    setOnlineExercises(getCachedExercises());
+    let mounted = true;
+    // fetch async: data bisa belum ter-cache saat modal pertama kali dibuka
+    fetchExercisesFromApi().then(data => { if (mounted) setOnlineExercises(data || []); });
+    return () => { mounted = false; };
   }, []);
 
   const combinedLibrary = useMemo(() => {

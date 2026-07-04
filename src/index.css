@@ -96,7 +96,7 @@ body:has(.fixed.inset-0:not(.pointer-events-none)) {
 
 /* AI Coach Banner Background */
 .bg-coach {
-  background-image: url('/bg-program.png');
+  background-image: url('/bg-program.webp');
   background-repeat: no-repeat;
   mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 100%);
   -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 100%);

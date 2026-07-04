@@ -54,7 +54,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   
   // TARGET SETTINGS
   const [showTargetModal, setShowTargetModal] = useState(false);
-  const [targetForm, setTargetForm] = useState(activityTargets || { steps: 10000, weeklyDuration: 30, sleep: 8, activityCalories: 2500, calorieDelta: 0 });
+  const [targetForm, setTargetForm] = useState(activityTargets || { steps: 10000, weeklyDuration: 150, sleep: 8, activityCalories: 2500, calorieDelta: 0 });
 
   useEffect(() => {
      if (activityTargets) {
@@ -307,7 +307,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
              if (manualTab === 'komposisi') {
                  ['weight', 'height', 'waist', 'bmi', 'bmiStatus', 'bodyFat', 'bodyFatStatus', 'bmr', 'muscleMass', 'musclePercent', 'boneMass', 'visceralFat', 'waterPercent', 'proteinPercent', 'bodyAge', 'bodyScore'].forEach(k => newBio[k] = null);
              } else {
-                 ['steps', 'energyScore', 'activeMinutes', 'activityCalories', 'sleep', 'sleepLog', 'heartRate', 'minHeartRate', 'maxHeartRate', 'bloodPressure', 'waterIntake', 'weeklyDuration', 'weeklySessions', 'weeklyCalories'].forEach(k => newBio[k] = null);
+                 ['steps', 'energyScore', 'activeMinutes', 'activityCalories', 'nutritionCalories', 'sleep', 'sleepLog', 'heartRate', 'minHeartRate', 'maxHeartRate', 'bloodPressure', 'oxygenSaturation', 'waterIntake', 'weeklyDuration', 'weeklySessions', 'weeklyCalories'].forEach(k => newBio[k] = null);
              }
              
              const isCompletelyEmpty = Object.values(newBio).every(v => v === null || v === undefined || v === '');
@@ -468,7 +468,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
            <div 
              className="absolute inset-0 z-0 opacity-70 dark:opacity-40 pointer-events-none"
              style={{
-               backgroundImage: "url('/bg-dashboard.png')",
+               backgroundImage: "url('/bg-dashboard.webp')",
                backgroundSize: '200%',
                backgroundPosition: '38% 10%',
                maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 100%)',
@@ -576,7 +576,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          <div 
            className="absolute inset-0 z-0 opacity-70 dark:opacity-40 pointer-events-none"
              style={{
-               backgroundImage: "url('/bg-activity.png')",
+               backgroundImage: "url('/bg-activity.webp')",
                backgroundSize: '150%',
                backgroundPosition: '65% 10%',
                backgroundRepeat: 'no-repeat',
@@ -586,7 +586,10 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          />
          {/* ------------------------------ */}
          <div className="flex justify-between items-center relative z-10 shrink-0">
-             <h3 className={`h3 ${t.textMain}`}>Aktivitas Harian</h3>
+             <div>
+                 <h3 className={`h3 ${t.textMain}`}>Aktivitas Harian</h3>
+                 <p className={`caption ${t.textMuted} mt-0.5`} style={{fontSize: '0.65rem'}}>Hari ini: {new Date(activeDate).toLocaleDateString(language==='ID'?'id-ID':'en-US', { day: 'numeric', month: 'short' })}</p>
+             </div>
              <div className="flex space-x-2">
                  <button onClick={() => { playSoundEffect('click', soundEnabled); setShowTargetModal(true); }} className={`p-1.5 rounded-full ${t.btnBg} ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Settings size={14}/></button>
                  <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(activeDate); setManualTab('harian'); setShowManualModal(true); }} className={`p-1.5 rounded-full ${t.btnBg} ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Pencil size={14}/></button>
@@ -736,7 +739,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
           <div 
             className="absolute inset-0 z-0 opacity-70 dark:opacity-40 pointer-events-none"
             style={{
-              backgroundImage: "url('/bg-progress.png')",
+              backgroundImage: "url('/bg-progress.webp')",
               backgroundSize: '160%',
               backgroundPosition: '60% 15px',
               backgroundRepeat: 'no-repeat',
@@ -930,18 +933,19 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                           </div>
                       </div>
                       <div>
-                          <label className={`caption font-bold ${t.textMuted} mb-1 block uppercase tracking-wider`}>Durasi Aktif</label>
+                          <label className={`caption font-bold ${t.textMuted} mb-1 block uppercase tracking-wider`}>Durasi Aktif (Mingguan)</label>
                           <div className="relative">
-                              <SwipeInput 
-                                  value={targetForm.weeklyDuration || ''} 
-                                  onChange={(v) => setTargetForm(p => ({...p, weeklyDuration: v}))} 
-                                  min={0} max={300} step={5} 
-                                  placeholder="30"
+                              <SwipeInput
+                                  value={targetForm.weeklyDuration || ''}
+                                  onChange={(v) => setTargetForm(p => ({...p, weeklyDuration: v}))}
+                                  min={0} max={600} step={5}
+                                  placeholder="150"
                                   language={language}
                                   className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-4 rounded-xl outline-none font-black text-center text-xl pr-16`}
                               />
-                              <span className={`absolute right-4 top-1/2 -translate-y-1/2 caption font-bold ${t.textMuted}`}>Menit</span>
+                              <span className={`absolute right-4 top-1/2 -translate-y-1/2 caption font-bold ${t.textMuted}`}>Mnt/mgg</span>
                           </div>
+                          <p className={`caption ${t.textMuted} mt-1`} style={{fontSize: '0.65rem'}}>Total menit aktif per minggu. Rekomendasi WHO: 150 menit/minggu.</p>
                       </div>
                       <div>
                           <label className={`caption font-bold ${t.textMuted} mb-1 block uppercase tracking-wider`}>Tidur</label>

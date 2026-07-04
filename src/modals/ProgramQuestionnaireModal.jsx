@@ -311,7 +311,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
         <div 
           className={`absolute inset-0 z-0 pointer-events-none transition-all duration-300 ${isDark ? 'opacity-40' : 'opacity-70'} mix-blend-normal`}
           style={{
-            backgroundImage: "url('/bg-program.png')",
+            backgroundImage: "url('/bg-program.webp')",
             backgroundSize: 'cover',
             backgroundPosition: 'center 40px',
             maskImage: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 20%, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 80%)',

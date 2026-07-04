@@ -37,10 +37,17 @@ export const updateLeaderboardScore = async (userId, userName, userPhoto, scoreC
   try {
     const weekId = getCurrentWeekId();
     const lbRef = doc(db, 'leaderboards', weekId);
+    // PENTING: setDoc (walau dengan merge) TIDAK menafsirkan titik sebagai nested path —
+    // key "scores.uid.score" akan jadi nama field literal. Gunakan objek nested agar
+    // merge:true melakukan deep-merge dan getWeeklyLeaderboard bisa membaca data.scores.
     await setDoc(lbRef, {
-      [`scores.${userId}.score`]: increment(scoreChange),
-      [`scores.${userId}.name`]: userName || 'Pengguna',
-      [`scores.${userId}.photoUrl`]: userPhoto || null,
+      scores: {
+        [userId]: {
+          score: increment(scoreChange),
+          name: userName || 'Pengguna',
+          photoUrl: userPhoto || null,
+        }
+      }
     }, { merge: true });
   } catch(e) { console.error("Update LB Error:", e); }
 };
@@ -245,19 +252,24 @@ export const getGlobalFeed = async (limitCount = 30) => {
 
 export const getUserPosts = async (userId, limitCount = 30) => {
   try {
-    // No orderBy to avoid requiring a composite index; sort client-side
-    const q = query(collection(db, 'community_posts'), where('userId', '==', userId), limit(limitCount));
+    // Query ideal — butuh composite index (userId ASC, timestamp DESC), lihat firestore.indexes.json
+    const q = query(collection(db, 'community_posts'), where('userId', '==', userId), orderBy('timestamp', 'desc'), limit(limitCount));
     const snap = await getDocs(q);
-    return snap.docs
-      .map(d => ({ id: d.id, ...d.data() }))
-      .sort((a, b) => {
-        const ta = a.timestamp?.toMillis?.() ?? 0;
-        const tb = b.timestamp?.toMillis?.() ?? 0;
-        return tb - ta;
-      });
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
   } catch (err) {
-    console.error("Gagal fetch user posts:", err);
-    return [];
+    // Fallback saat index belum di-deploy: tanpa orderBy hasilnya berdasarkan urutan ID,
+    // jadi ambil lebih banyak lalu sort di client agar 30 teratas benar-benar terbaru.
+    try {
+      const q = query(collection(db, 'community_posts'), where('userId', '==', userId), limit(200));
+      const snap = await getDocs(q);
+      return snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (b.timestamp?.toMillis?.() ?? 0) - (a.timestamp?.toMillis?.() ?? 0))
+        .slice(0, limitCount);
+    } catch (err2) {
+      console.error("Gagal fetch user posts:", err2);
+      return [];
+    }
   }
 };
 
@@ -275,19 +287,23 @@ export const sendNotification = async (toUserId, { type, fromUserId, fromUserNam
 
 export const getNotifications = async (userId, limitCount = 30) => {
   try {
-    // No orderBy to avoid requiring a composite index; sort client-side
-    const q = query(collection(db, 'notifications'), where('toUserId', '==', userId), limit(limitCount));
+    // Query ideal — butuh composite index (toUserId ASC, createdAt DESC), lihat firestore.indexes.json
+    const q = query(collection(db, 'notifications'), where('toUserId', '==', userId), orderBy('createdAt', 'desc'), limit(limitCount));
     const snap = await getDocs(q);
-    return snap.docs
-      .map(d => ({ id: d.id, ...d.data() }))
-      .sort((a, b) => {
-        const ta = a.createdAt?.toMillis?.() ?? 0;
-        const tb = b.createdAt?.toMillis?.() ?? 0;
-        return tb - ta;
-      });
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
   } catch (err) {
-    console.error("Gagal fetch notifikasi:", err);
-    return [];
+    // Fallback saat index belum di-deploy: ambil lebih banyak lalu sort di client
+    try {
+      const q = query(collection(db, 'notifications'), where('toUserId', '==', userId), limit(200));
+      const snap = await getDocs(q);
+      return snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0))
+        .slice(0, limitCount);
+    } catch (err2) {
+      console.error("Gagal fetch notifikasi:", err2);
+      return [];
+    }
   }
 };
 
@@ -367,29 +383,28 @@ export const getSharedTemplates = async (limitCount = 20) => {
 export const updateUserProfileInFeed = async (userId, newName, newPhoto) => {
   if (!userId) return;
   try {
-    const batch = writeBatch(db);
-    
     // 1. Update community_users (Use set with merge because document might not exist)
     const userRef = doc(db, 'community_users', userId);
     const userUpdate = {};
     if (newName !== undefined) userUpdate.name = newName;
-    if (newPhoto !== undefined) userUpdate.photoUrl = newPhoto; 
+    if (newPhoto !== undefined) userUpdate.photoUrl = newPhoto;
     if (Object.keys(userUpdate).length > 0) {
-      batch.set(userRef, userUpdate, { merge: true });
+      await setDoc(userRef, userUpdate, { merge: true });
     }
 
-    // 2. Update all posts in community_posts
+    // 2. Update all posts in community_posts — WriteBatch maksimal 500 operasi, pecah per 450
     const postsQuery = query(collection(db, 'community_posts'), where('userId', '==', userId));
     const snap = await getDocs(postsQuery);
-    
-    snap.docs.forEach((d) => {
-      const postUpdate = {};
-      if (newName !== undefined) postUpdate.userName = newName;
-      if (newPhoto !== undefined) postUpdate.userPhoto = newPhoto;
-      batch.update(d.ref, postUpdate);
-    });
 
-    await batch.commit();
+    const postUpdate = {};
+    if (newName !== undefined) postUpdate.userName = newName;
+    if (newPhoto !== undefined) postUpdate.userPhoto = newPhoto;
+
+    for (let i = 0; i < snap.docs.length; i += 450) {
+      const batch = writeBatch(db);
+      snap.docs.slice(i, i + 450).forEach((d) => batch.update(d.ref, postUpdate));
+      await batch.commit();
+    }
   } catch (err) {
     console.error('Gagal update user profile in feed:', err);
   }

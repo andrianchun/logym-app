@@ -1,6 +1,7 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Camera, Image, Download, Share2, Loader2, ChevronRight, ChevronLeft, Footprints, Clock, Utensils, Flame, Moon, Zap, Activity, HeartPulse, Wind, Dumbbell, Trash2, Globe } from 'lucide-react';
-import html2canvas from 'html2canvas';
+// html2canvas (~200KB) dimuat on-demand hanya saat user benar-benar membuat share card
+const loadHtml2canvas = async () => (await import('html2canvas')).default;
 import { doc, updateDoc } from 'firebase/firestore';
 import { db, storage } from '../firebase';
 import { ref, deleteObject } from 'firebase/storage';
@@ -221,8 +222,8 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
             bodyScore: null, weight: null, height: null, bmi: null, bmiStatus: '-', bodyFat: null, bodyFatStatus: '-',
             muscleMass: null, musclePercent: null, boneMass: null, waterPercent: null, visceralFat: null, bmr: null, bodyAge: null, 
             waist: null, waistToHip: null, proteinPercent: null, bodyType: '-', weightSuggestion: '-',
-            steps: 0, activeMinutes: 0, activityCalories: 0, sleep: '', energyScore: null, 
-            heartRate: null, minHeartRate: null, maxHeartRate: null, bloodPressure: '', waterIntake: 0,
+            steps: 0, activeMinutes: 0, activityCalories: 0, nutritionCalories: 0, sleep: '', energyScore: null,
+            heartRate: null, minHeartRate: null, maxHeartRate: null, bloodPressure: '', oxygenSaturation: null, waterIntake: 0,
             weeklyDuration: 0, weeklySessions: 0, weeklyCalories: 0
         };
         let latestBodyData = null;
@@ -248,12 +249,14 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
             steps: todayDailyData.steps !== undefined ? todayDailyData.steps : 0,
             activeMinutes: todayDailyData.activeMinutes !== undefined ? todayDailyData.activeMinutes : 0,
             activityCalories: todayDailyData.activityCalories !== undefined ? todayDailyData.activityCalories : 0,
+            nutritionCalories: todayDailyData.nutritionCalories !== undefined ? todayDailyData.nutritionCalories : 0,
             sleep: todayDailyData.sleep !== undefined ? todayDailyData.sleep : '',
             energyScore: todayDailyData.energyScore !== undefined ? todayDailyData.energyScore : null,
             heartRate: todayDailyData.heartRate !== undefined ? todayDailyData.heartRate : null,
             minHeartRate: todayDailyData.minHeartRate !== undefined ? todayDailyData.minHeartRate : null,
             maxHeartRate: todayDailyData.maxHeartRate !== undefined ? todayDailyData.maxHeartRate : null,
             bloodPressure: todayDailyData.bloodPressure !== undefined ? todayDailyData.bloodPressure : '',
+            oxygenSaturation: todayDailyData.oxygenSaturation !== undefined ? todayDailyData.oxygenSaturation : null,
             waterIntake: todayDailyData.waterIntake !== undefined ? todayDailyData.waterIntake : 0,
             weeklyDuration: todayDailyData.weeklyDuration !== undefined ? todayDailyData.weeklyDuration : 0,
             weeklySessions: todayDailyData.weeklySessions !== undefined ? todayDailyData.weeklySessions : 0,
@@ -514,13 +517,14 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
         const originalIndex = templateIndex;
         
         try {
+            const html2canvas = await loadHtml2canvas();
             for (let i = 0; i < templates.length; i++) {
                 setTemplateIndex(i);
                 setToastMsg(`Menyiapkan ${i + 1}/${templates.length}...`);
-                
+
                 // Wait for React to render the new template
                 await new Promise(resolve => setTimeout(resolve, 80));
-                
+
                 const canvas = await html2canvas(cardRef.current, {
                     scale: 1.5, // Reduced scale for faster generation 
                     useCORS: true,
@@ -562,8 +566,9 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
         if (!cardRef.current) return;
         setIsGenerating(true);
         try {
+            const html2canvas = await loadHtml2canvas();
             const canvas = await html2canvas(cardRef.current, {
-                scale: 5, 
+                scale: 5,
                 useCORS: true,
                 backgroundColor: null,
                 logging: false,
@@ -594,8 +599,9 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
 
         setIsSharing(true);
         try {
+            const html2canvas = await loadHtml2canvas();
             const canvas = await html2canvas(cardRef.current, {
-                scale: 5, 
+                scale: 5,
                 useCORS: true,
                 backgroundColor: null,
                 logging: false,
@@ -636,24 +642,24 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
     };
 
     const getPlanBgUrl = (planName) => {
-        const defaultBg = '/bg-custom.png';
+        const defaultBg = '/bg-custom.webp';
         if (!planName) return defaultBg;
         const lowerName = planName.toLowerCase();
-        if (lowerName.includes('full body')) return '/bg-full-body.png';
-        if (lowerName.includes('ppl basic')) return '/bg-ppl-basic.png';
-        if (lowerName.includes('up-low')) return '/bg-up-low.png';
-        if (lowerName.includes('bro split')) return '/bg-bro-split.png';
-        if (lowerName.includes('ppl advanced')) return '/bg-ppl-advanced.png';
-        if (lowerName.includes('beast mode')) return '/bg-beast-mode.png';
+        if (lowerName.includes('full body')) return '/bg-full-body.webp';
+        if (lowerName.includes('ppl basic')) return '/bg-ppl-basic.webp';
+        if (lowerName.includes('up-low')) return '/bg-up-low.webp';
+        if (lowerName.includes('bro split')) return '/bg-bro-split.webp';
+        if (lowerName.includes('ppl advanced')) return '/bg-ppl-advanced.webp';
+        if (lowerName.includes('beast mode')) return '/bg-beast-mode.webp';
         return defaultBg;
     };
 
     const getBgForTemplate = () => {
         if (bgImage) return bgImage;
-        if (activeTemplate === 'bodycomp') return '/bg-dashboard.png';
-        if (activeTemplate === 'activity') return '/bg-activity.png';
-        if (activeTemplate === 'progress') return '/bg-progress.png';
-        if (activeTemplate === 'radar') return '/bg-radar.png';
+        if (activeTemplate === 'bodycomp') return '/bg-dashboard.webp';
+        if (activeTemplate === 'activity') return '/bg-activity.webp';
+        if (activeTemplate === 'progress') return '/bg-progress.webp';
+        if (activeTemplate === 'radar') return '/bg-progress.webp'; // bg-radar tidak pernah ada — pakai bg progress
         if (activeTemplate.startsWith('workout_daily')) {
             const idx = parseInt(activeTemplate.replace('workout_daily_', ''), 10);
             const w = workoutsList[idx];
@@ -661,9 +667,9 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                 const prog = programs.find(p => p.id === w.programId);
                 if (prog && prog.planName) return getPlanBgUrl(prog.planName);
             }
-            return '/bg-custom.png';
+            return '/bg-custom.webp';
         }
-        return '/bg-progress.png';
+        return '/bg-progress.webp';
     };
 
     return (
@@ -719,7 +725,7 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
 
                     {/* Logo Overlay */}
                     <div className="absolute top-4 right-4 z-20">
-                        <img src="/logo-white.png" alt="LyFit" className="w-10 h-10 object-contain opacity-100 drop-shadow-lg" crossOrigin="anonymous"/>
+                        <img src="/logo-white.webp" alt="LyFit" className="w-10 h-10 object-contain opacity-100 drop-shadow-lg" crossOrigin="anonymous"/>
                     </div>
 
                     <div className="relative z-10 flex-1 flex flex-col text-white">
@@ -797,8 +803,11 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                         {/* ================= ACTIVITY ================= */}
                         {activeTemplate === 'activity' && (
                             <div className="flex flex-col h-full justify-between">
-                                <h3 className="text-lg font-black text-white uppercase tracking-wider mb-2">Aktivitas Harian</h3>
-                                
+                                <div className="mb-2">
+                                    <h3 className="text-lg font-black text-white uppercase tracking-wider mb-0.5">Aktivitas Harian</h3>
+                                    <p className="text-[9px] text-white/70 font-bold tracking-wide uppercase">Hari ini: {new Date(todayStr).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}</p>
+                                </div>
+
                                 <div className="flex flex-col flex-1 justify-between pt-0">
                                     <div className="grid grid-cols-2 gap-x-3 gap-y-2 h-full content-between">
                                         
@@ -1098,7 +1107,7 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                     className="flex shrink-0 items-center justify-center p-3 rounded-2xl bg-[#41759b] text-white font-black shadow-xl hover:shadow-[#41759b]/30 transition-all active:scale-95 disabled:opacity-50"
                     title="Bagikan ke Komunitas Lyfit"
                 >
-                    {isSharing ? <Loader2 className="animate-spin" size={20}/> : <img src="/logo-white.png" alt="Lyfit" className="w-6 h-6 object-contain" />}
+                    {isSharing ? <Loader2 className="animate-spin" size={20}/> : <img src="/logo-white.webp" alt="Lyfit" className="w-6 h-6 object-contain" />}
                 </button>
                 <button 
                     onClick={handleShare}

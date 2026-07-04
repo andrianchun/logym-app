@@ -1,0 +1,113 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+    // Marker collection: admins/{uid} exists = uid adalah admin.
+    // Koleksi ini sendiri tidak bisa dibaca/ditulis dari client (hanya dicek via exists()
+    // dari dalam rules). Tambahkan/ hapus admin manual lewat Firebase Console.
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    match /admins/{uid} {
+      allow read, write: if false;
+    }
+
+    // Dokumen utama tiap user (programs, exerciseLibrary, settings, dst) + flag ban.
+    // Admin butuh akses baca lintas-user untuk getBannedUsers() (query hasBeenBanned==true),
+    // dan tulis terbatas untuk banUserGlobal/unbanUserGlobal.
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow write: if isOwner(uid)
+        || (isAdmin() && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['isBanned', 'hasBeenBanned', 'bannedAt']));
+
+      match /history_years/{year} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+
+    // Dokumen legacy — tidak lagi ditulis kecuali saat proses hapus akun (oleh pemiliknya sendiri).
+    match /userData/{uid} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // Profil publik komunitas. followUser/unfollowUser perlu menaikkan/menurunkan
+    // followerCount milik ORANG LAIN — dibatasi hanya field itu.
+    match /community_users/{uid} {
+      allow read: if isSignedIn();
+      allow create, delete: if isOwner(uid);
+      allow update: if isOwner(uid)
+        || (isSignedIn() && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['followerCount', 'followingCount']));
+    }
+
+    match /community_posts/{postId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      // Pemilik boleh edit apa saja. Non-pemilik hanya boleh: (a) like/comment counter,
+      // atau (b) reportCount+isHidden (auto-hide setelah 3 laporan, atau admin ban mass-hide).
+      allow update: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likedBy', 'commentCount']) ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reportCount', 'isHidden'])
+      );
+
+      match /comments/{commentId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+        allow update, delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      }
+    }
+
+    // Notifikasi: penerima yang berhak baca/tandai-dibaca; pengirim (siapa saja yang login)
+    // boleh membuat notifikasi baru untuk orang lain.
+    match /notifications/{notifId} {
+      allow read, update, delete: if isSignedIn() && resource.data.toUserId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.fromUserId == request.auth.uid;
+    }
+
+    // Grafik follow bersifat publik-terbaca (untuk menampilkan follower/following siapa saja).
+    // Delete diizinkan dari sisi follower ATAU sisi yang di-follow, karena blockUser()
+    // membersihkan relasi follow dua arah — termasuk yang bukan dia followernya.
+    match /follows/{followId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.followerId == request.auth.uid;
+      allow delete: if isSignedIn() &&
+        (resource.data.followerId == request.auth.uid || resource.data.followingId == request.auth.uid);
+    }
+
+    match /blocks/{blockId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.blockerId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.blockerId == request.auth.uid;
+    }
+
+    // Leaderboard mingguan: tiap user hanya boleh mengubah entri skornya sendiri di dalam
+    // map `scores`. Admin dikecualikan untuk fitur seedLeaderboard (isi data dummy).
+    match /leaderboards/{weekId} {
+      allow read: if isSignedIn();
+      allow create: if isAdmin() ||
+        (isSignedIn() && request.resource.data.scores.keys().hasOnly([request.auth.uid]));
+      allow update: if isAdmin() || (
+        isSignedIn() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['scores']) &&
+        request.resource.data.scores.diff(resource.data.get('scores', {})).affectedKeys().hasOnly([request.auth.uid])
+      );
+    }
+
+    // Laporan post/user: siapa saja boleh membuat laporan atas namanya sendiri;
+    // hanya admin yang boleh membaca daftar laporan & menghapusnya (ModerationPanel).
+    match /community_reports/{reportId} {
+      allow create: if isSignedIn() && request.resource.data.reporterId == request.auth.uid;
+      allow read, delete: if isAdmin();
+    }
+  }
+}
