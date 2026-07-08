@@ -32,7 +32,7 @@ const Header = ({ t, theme, user, showSettings, setShowSettings, setShowProfileM
       <div className="flex items-center">
         <img 
           src={theme === 'dark' ? "/banner-dark.png" : "/banner-light.png"} 
-          alt="Logo LyFit" 
+          alt="Logo LOGYM" 
           className="h-8 w-auto object-contain drop-shadow-sm" 
         />
       </div>

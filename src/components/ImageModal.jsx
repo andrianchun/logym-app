@@ -66,7 +66,7 @@ export default function ImageModal({ imageUrl, onClose }) {
     <div className="fixed inset-0 z-[1000] bg-black/95 backdrop-blur-xl flex flex-col justify-center items-center animate-in fade-in duration-300">
       
       {/* Top Bar */}
-      <div className="absolute top-0 left-0 right-0 p-4 flex justify-end z-10 bg-gradient-to-b from-black/60 to-transparent">
+      <div className="absolute top-0 left-0 right-0 p-4 flex justify-end z-10 bg-gradient-to-b from-black/60 to-transparent" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
         <button 
           onClick={onClose}
           className="p-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors backdrop-blur-md"

@@ -323,7 +323,7 @@ export default function SettingsModal({
         
         {/* APP VERSION */}
         <div className="py-6 text-center">
-            <p className={`text-[10px] font-bold ${t.textMuted} uppercase tracking-widest`}>LyFit App v1.2.0</p>
+            <p className={`text-[10px] font-bold ${t.textMuted} uppercase tracking-widest`}>LOGYM App v1.2.0</p>
             <p className={`text-[9px] opacity-40 mt-1 ${t.textMuted}`}>Dibangun dengan ♥️ oleh Andrian Chun &copy; 2026</p>
         </div>
       </div>

@@ -42,7 +42,7 @@ import { checkAchievements, ACHIEVEMENTS } from './data/achievements';
 import { playSoundEffect } from './utils/audio';
 import { fetchExercisesFromApi } from './utils/exerciseDbApi';
 import { getLocalYMD, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos } from './data/constants';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Download } from 'lucide-react';
 
 // Serialisasi kanonik (key di-sort) supaya perbandingan tidak terpengaruh urutan key
 // antara objek buatan lokal vs hasil decode Firestore.
@@ -78,6 +78,34 @@ export default function App() {
   }, []);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
+  // --- PWA INSTALL PROMPT ---
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      const hasDismissed = localStorage.getItem('__PWA_PROMPT_DISMISSED');
+      if (!hasDismissed) {
+        setShowInstallPrompt(true);
+      }
+    };
+
+    const handleAppInstalled = () => {
+      setShowInstallPrompt(false);
+      setDeferredPrompt(null);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
   // --- STATE UTAMA ---
   const [theme, setTheme] = useState('dark');
   const [language, setLanguage] = useState('ID');
@@ -92,7 +120,7 @@ export default function App() {
   const [unitSystem, setUnitSystem] = useState('metric'); // deprecated, kept for safety during transition
   const [units, setUnits] = useState({ weight: 'kg', height: 'cm', distance: 'km', temp: 'c' });
   const [userProfile, setUserProfile] = useState({ goal: null, experience: null });
-  const [gymProfiles, setGymProfiles] = useState([{ id: 'default', name: 'Lyfit Gym', equipment: 'all', config: {} }]);
+  const [gymProfiles, setGymProfiles] = useState([{ id: 'default', name: 'LOGYM', equipment: 'all', config: {} }]);
   const [activeGymId, setActiveGymId] = useState('default');
   const [userGeminiApiKey, setUserGeminiApiKey] = useState('');
   const [activityTargets, setActivityTargets] = useState({ steps: 10000, weeklyDuration: 150, sleep: 8 });
@@ -104,10 +132,18 @@ export default function App() {
   const [history, setHistory] = useState({});
   
   const [activeTab, _setActiveTab] = useState('dashboard');
+  const [tabSlideDir, setTabSlideDir] = useState('');
 
   const setActiveTab = (newTab) => {
     if (typeof newTab === 'function') newTab = newTab(activeTab);
     if (newTab === activeTab) return;
+
+    const tabsList = ['dashboard', 'workout', 'calendar', 'program', 'database'];
+    const curIdx = tabsList.indexOf(activeTab);
+    const newIdx = tabsList.indexOf(newTab);
+    if (curIdx !== -1 && newIdx !== -1) {
+      setTabSlideDir(newIdx > curIdx ? 'right' : 'left');
+    }
 
     const emptyCustomPrograms = programs.filter(p => {
         const isCustom = p.planId === 'custom' || (p.planId && p.planId.startsWith('custom-'));
@@ -242,6 +278,18 @@ export default function App() {
           StatusBar.setOverlaysWebView({ overlay: true }).catch(err => console.log(err));
           StatusBar.setStyle({ style: theme === 'dark' ? Style.Dark : Style.Light }).catch(err => console.log(err));
       });
+    } else {
+      // Web/PWA: status bar (iOS) & address bar (Android Chrome) mengikuti <meta theme-color>,
+      // yang statis di index.html. Update di sini supaya ikut menyatu dengan tema aktif,
+      // menyamai efek transparent+overlay yang sudah berjalan di native.
+      const themeColor = theme === 'dark' ? '#040f1a' : '#f8fafc';
+      let meta = document.querySelector('meta[name="theme-color"]');
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.setAttribute('name', 'theme-color');
+        document.head.appendChild(meta);
+      }
+      meta.setAttribute('content', themeColor);
     }
   }, [theme]);
 
@@ -441,7 +489,7 @@ export default function App() {
     const timeout = setTimeout(() => {
       // Waktu istirahat habis!
       if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification("LyFit Workout", { 
+        new Notification("LOGYM Workout", { 
           body: "Waktu istirahat habis! Lanjut ke set berikutnya.",
           icon: "/lyfit-logo.png" // Fallback if logo doesn't exist
         });
@@ -477,7 +525,7 @@ export default function App() {
           notifications: [{
             id: NOTIF_ID,
             title: '🏋️ Workout Sedang Berjalan',
-            body: `Durasi: ${formatNotifTime(elapsed)} — Ketuk untuk kembali ke LyFit`,
+            body: `Durasi: ${formatNotifTime(elapsed)} — Ketuk untuk kembali ke LOGYM`,
             ongoing: true,
             autoCancel: false,
             smallIcon: 'ic_launcher',
@@ -517,7 +565,7 @@ export default function App() {
         setUser({ 
            uid: currentUser.uid, 
            email: currentUser.email, 
-           name: currentUser.displayName || 'Sobat LyFit',
+           name: currentUser.displayName || 'Sobat LOGYM',
            photoURL: currentUser.photoURL
         });
       } else {
@@ -532,11 +580,11 @@ export default function App() {
         setUserGeminiApiKey('');
         setUserProfile(null);
         setTheme('dark');
-        setLanguage('id');
+        setLanguage('ID');
         setSoundEnabled(true);
         setDefaultRestTime(60);
         setUnits({ weight: 'kg', height: 'cm', distance: 'km', temp: 'c' });
-        setGymProfiles([{ id: 'default', name: 'Lyfit Gym', equipment: 'all', config: {} }]);
+        setGymProfiles([{ id: 'default', name: 'LOGYM', equipment: 'all', config: {} }]);
         setActiveGymId('default');
         setActivityTargets({ steps: 10000, weeklyDuration: 150, sleep: 8 });
         setActivePlanIds(['custom']);
@@ -632,7 +680,7 @@ export default function App() {
             }
             // --- END MIGRATION ---
 
-            if (data.programs) {
+            if (data.programs && Array.isArray(data.programs) && data.programs.length > 0) {
               const parsedPrograms = typeof data.programs === 'string' ? JSON.parse(data.programs) : data.programs;
               // Default day assignments for the 4 built-in programs
               const DEFAULT_DAYS = { 'prog-1': ['Sel'], 'prog-2': ['Rab'], 'prog-3': ['Jum'], 'prog-4': ['Min'] };
@@ -669,7 +717,10 @@ export default function App() {
             if (data.settings) {
               const parsedSettings = typeof data.settings === 'string' ? JSON.parse(data.settings) : data.settings;
               if (parsedSettings.theme) setTheme(parsedSettings.theme);
-              if (parsedSettings.language) setLanguage(parsedSettings.language);
+              // .toUpperCase() untuk self-heal akun yang sempat kesimpan 'id' huruf kecil
+              // (lihat komentar di reset state saat logout) — tanpa ini, target otot tidak
+              // pernah ketemu di muscleDictionary (keys-nya 'EN'/'ID' uppercase).
+              if (parsedSettings.language) setLanguage(parsedSettings.language.toUpperCase());
               if (parsedSettings.soundEnabled !== undefined) setSoundEnabled(parsedSettings.soundEnabled);
               if (parsedSettings.defaultRestTime) setDefaultRestTime(parsedSettings.defaultRestTime);
               if (parsedSettings.warmupVideos) setWarmupVideos(parsedSettings.warmupVideos);
@@ -723,7 +774,7 @@ export default function App() {
 
           isUpdatingFromServer.current = true;
           setIsDataLoaded(true);
-          setTimeout(() => { isUpdatingFromServer.current = false; }, 1500);
+          setTimeout(() => { isUpdatingFromServer.current = false; }, 3000); // diperpanjang untuk cegah race condition auto-save
         } else {
           // No Firebase data yet — only show questionnaire if not already completed
           const alreadyDone = user?.uid ? localStorage.getItem(`lyfit_onboarding_completed_${user.uid}`) === 'true' : false;
@@ -752,7 +803,7 @@ export default function App() {
                 const newState = { ...prev, ...data };
                 return JSON.stringify(prev) === JSON.stringify(newState) ? prev : newState;
              });
-             setTimeout(() => { isUpdatingFromServer.current = false; }, 1500);
+             setTimeout(() => { isUpdatingFromServer.current = false; }, 3000); // diperpanjang dari 1500ms untuk cegah race condition auto-save
            } catch (err) {
              console.error("Parse Error saat load history tahun ini:", err);
              setHasParseError(true);
@@ -782,6 +833,13 @@ export default function App() {
     if (user && isDataLoaded && !isUpdatingFromServer.current && !hasParseError) {
       const timer = setTimeout(() => {
         if (isUpdatingFromServer.current) return; // double-check before firing
+        // SAFETY: Jangan simpan ke Firestore jika programs masih sama dengan defaultPrograms —
+        // ini indikasi data user belum selesai di-load dari server (race condition).
+        // Biarkan onSnapshot selesai dulu, baru auto-save boleh jalan.
+        if (JSON.stringify(programs) === JSON.stringify(defaultPrograms)) {
+          console.warn('[Auto-save] Programs masih default — skip save, tunggu load Firestore selesai.');
+          return;
+        }
         const mainDocRef = doc(db, "users", user.uid);
 
         // Simpan Profil & Program ke Dokumen Utama
@@ -952,6 +1010,44 @@ export default function App() {
   }, [isDataLoaded, user?.uid, history]);
 
   // ==========================================
+  // 3.7. BACKFILL: BEKUKAN EXERCISE KE RIWAYAT LAMA
+  // Sesi yang selesai sebelum fix ini belum punya overriddenExercises (snapshot beku),
+  // sehingga breakdown per-exercise-nya bergantung pada definisi LIVE program (prog?.exercises).
+  // Kalau rutinitasnya nanti diedit/dihapus, tampilan riwayat lama itu ikut rusak walau
+  // data log mentahnya aman. Jalan sekali per akun: bekukan riwayat lama SELAGI rutinitas
+  // aslinya masih ada, supaya nanti aman meski dihapus.
+  // ==========================================
+  const historyBackfillDone = useRef(false);
+  useEffect(() => { historyBackfillDone.current = false; }, [user?.uid]); // reset saat ganti akun
+  useEffect(() => {
+    if (!isDataLoaded || historyBackfillDone.current) return;
+    if (Object.keys(history).length === 0 || programs.length === 0) return;
+
+    historyBackfillDone.current = true;
+    setHistory(prev => {
+      let changed = false;
+      const next = { ...prev };
+      Object.keys(prev).forEach(dateStr => {
+        const day = prev[dateStr];
+        if (!day || !day.workouts || day.workouts.length === 0) return;
+        let dayChanged = false;
+        const newWorkouts = day.workouts.map(w => {
+          if (w.overriddenExercises?.length > 0 || w.programId === 'adhoc' || !w.programId || w.status !== 'completed') return w;
+          const srcProg = programs.find(pr => pr.id === w.programId);
+          if (!srcProg?.exercises?.length) return w;
+          dayChanged = true;
+          return { ...w, overriddenExercises: JSON.parse(JSON.stringify(srcProg.exercises)) };
+        });
+        if (dayChanged) {
+          changed = true;
+          next[dateStr] = { ...day, workouts: newWorkouts };
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [isDataLoaded, history, programs]);
+
+  // ==========================================
   // 4. PENAHAN TOMBOL BACK (UNIVERSAL)
   // ==========================================
   useEffect(() => {
@@ -1060,7 +1156,7 @@ export default function App() {
       const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url; a.download = `LyFit_Backup_${getLocalYMD(new Date())}.json`;
+      a.href = url; a.download = `LOGYM_Backup_${getLocalYMD(new Date())}.json`;
       a.click();
   };
 
@@ -1212,11 +1308,12 @@ export default function App() {
     glow: theme === 'dark' ? 'shadow-[0_8px_32px_-10px_rgba(59,130,246,0.35)]' : 'shadow-[0_8px_32px_-14px_rgba(59,130,246,0.25)]'
   };
 
-  const navigateToWorkoutDate = (dateStr, progId) => { 
-    playSoundEffect('click', soundEnabled); setSelectedDate(dateStr); 
+  const navigateToWorkoutDate = (dateStr, progId) => {
+    playSoundEffect('click', soundEnabled); setSelectedDate(dateStr);
     if(progId) {
        setActiveProgramId(progId);
        setFocusWorkoutId(progId === 'adhoc' ? 'extra' : progId);
+       setSessionToRun(progId === 'adhoc' ? 'extra' : progId);
     }
     setResumeDurationSecs(0);
     setActiveTab('workout'); setIsEditingMode(false); 
@@ -1633,7 +1730,17 @@ export default function App() {
             if (realProgramId && realProgramId.startsWith('projected_')) {
                 realProgramId = realProgramId.replace('projected_', '').split('_')[0];
             }
-            
+
+            // Bekukan daftar exercise yang benar-benar dikerjakan ke dalam riwayat ini.
+            // Tanpa ini, breakdown per-exercise selalu mengambil definisi LIVE dari programs
+            // (via prog?.exercises) — begitu rutinitasnya diedit/dihapus, riwayat lama ikut rusak
+            // tampilannya walau data log mentahnya masih ada.
+            let frozenExercises = w.overriddenExercises;
+            if (!frozenExercises || frozenExercises.length === 0) {
+              const srcProg = programs.find(pr => pr.id === realProgramId);
+              if (srcProg?.exercises?.length > 0) frozenExercises = JSON.parse(JSON.stringify(srcProg.exercises));
+            }
+
             // Proteksi agar durasi tidak kereset, bisanya cuma nambah
             let existingSecs = 0;
             if (w.duration) {
@@ -1649,14 +1756,15 @@ export default function App() {
               }
             }
             const finalSecs = Math.max(durationSecs, existingSecs);
-            
+
             return {
               ...w,
               programId: realProgramId,
               status: 'completed',
               log: cleanLogs,
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              duration: formatDur(finalSecs)
+              duration: formatDur(finalSecs),
+              ...(frozenExercises ? { overriddenExercises: frozenExercises } : {})
             };
           }
           return w;
@@ -1682,7 +1790,9 @@ export default function App() {
                status: 'completed',
                log: cleanLogs,
                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-               duration: durationSecs > 0 ? formatDur(durationSecs) : '00:00'
+               duration: durationSecs > 0 ? formatDur(durationSecs) : '00:00',
+               // Bekukan exercise saat ini juga, supaya riwayat tetap utuh walau rutinitas diedit/dihapus nanti
+               ...(p?.exercises?.length > 0 ? { overriddenExercises: JSON.parse(JSON.stringify(p.exercises)) } : {})
             });
         }
       }
@@ -1738,7 +1848,10 @@ export default function App() {
     setSelectedDate(dateStr);
     setActiveProgramId(w.programId);
     setFocusWorkoutId(w.programId === 'adhoc' ? 'extra' : w.id);
-    
+    // Tanpa ini, FloatingTimer tidak tahu sesi mana yang harus dibuka saat diklik
+    // (klik jadi tidak bereaksi) karena ia membaca sessionToRun, bukan focusWorkoutId.
+    setSessionToRun(w.programId === 'adhoc' ? 'extra' : w.id);
+
     // Parse previous duration to seconds
     let prevSecs = 0;
     if (w.duration) {
@@ -1848,13 +1961,59 @@ export default function App() {
   const activeDayData = getDayHistory(selectedDate);
   const isCurrentlyCompleted = activeDayData?.status === 'completed';
 
+
+  // --- GLOBAL SWIPE HANDLER ---
+  const globalTouchStartX = useRef(null);
+  const globalTouchStartY = useRef(null);
+
+  const handleGlobalTouchStart = (e) => {
+    // Ignore swipes on range sliders, dialogs, or explicit no-swipe elements
+    if (e.target.closest('input[type="range"]') || e.target.closest('[role="dialog"]') || e.target.closest('.no-swipe')) return;
+    globalTouchStartX.current = e.touches[0].clientX;
+    globalTouchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleGlobalTouchEnd = (e) => {
+    if (globalTouchStartX.current === null || globalTouchStartY.current === null) return;
+    if (e.target.closest('input[type="range"]') || e.target.closest('[role="dialog"]') || e.target.closest('.no-swipe')) return;
+    
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
+    
+    const distanceX = globalTouchStartX.current - touchEndX;
+    const distanceY = globalTouchStartY.current - touchEndY;
+    
+    globalTouchStartX.current = null;
+    globalTouchStartY.current = null;
+
+    // Trigger swipe if horizontal distance > 60px and mostly horizontal
+    if (Math.abs(distanceX) > 60 && Math.abs(distanceX) > Math.abs(distanceY) * 1.5) {
+      const tabs = ['dashboard', 'workout', 'calendar', 'program', 'database'];
+      const currentIndex = tabs.indexOf(activeTab);
+      
+      if (distanceX > 0) {
+        // Swipe Left -> Next Tab
+        if (currentIndex < tabs.length - 1) {
+          playSoundEffect('click', soundEnabled);
+          setActiveTab(tabs[currentIndex + 1]);
+        }
+      } else {
+        // Swipe Right -> Prev Tab
+        if (currentIndex > 0) {
+          playSoundEffect('click', soundEnabled);
+          setActiveTab(tabs[currentIndex - 1]);
+        }
+      }
+    }
+  };
+
   // ==========================================
   // RENDER PENGHALANG SAAT LOADING / CEK AUTH
   // ==========================================
   if (isAuthChecking || (user && !isDataLoaded) || !isSplashMinTimeReached) {
     return (
       <div className={`min-h-screen flex flex-col items-center justify-center p-4 transition-colors duration-300 ${theme === 'dark' ? 'bg-[#0f1115]' : 'bg-white'}`}>
-         <img src={theme === 'dark' ? '/logo-dark.png' : '/logo-light.png'} alt="LyFit Logo" className="w-40 h-40 object-contain animate-pulse drop-shadow-2xl" />
+         <img src={theme === 'dark' ? '/logo-dark.png' : '/logo-light.png'} alt="LOGYM Logo" className="w-40 h-40 object-contain animate-pulse drop-shadow-2xl" />
       </div>
     );
   }
@@ -1866,7 +2025,11 @@ export default function App() {
 
   // JIKA USER SUDAH LOGIN
   return (
-    <div className={`min-h-screen ${t.bgApp} ${t.textMain} font-sans ${activeTab === 'calendar' ? 'h-screen overflow-hidden' : 'pb-24'} transition-colors duration-300`}>
+    <div 
+      className={`min-h-screen flex flex-col ${t.bgApp} ${t.textMain} font-sans ${activeTab === 'calendar' ? 'h-[100dvh] overflow-hidden' : 'pb-32'} transition-colors duration-300`}
+      onTouchStart={handleGlobalTouchStart}
+      onTouchEnd={handleGlobalTouchEnd}
+    >
       <ConfirmModal confirmModal={confirmModal} setConfirmModal={setConfirmModal} t={t} lang={lang} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} />
       <AddExerciseModal t={t} lang={lang} activeAddModalTarget={activeAddModalTarget} setActiveAddModalTarget={setActiveAddModalTarget} exerciseLibrary={exerciseLibrary} onAddExerciseTarget={addExerciseTarget} setActiveTab={setActiveTab} />
       <HelpModal showHelp={showHelp} setShowHelp={setShowHelp} t={t} lang={lang} />
@@ -1965,7 +2128,7 @@ export default function App() {
         }}
       />
       
-      <main className={`${activeTab === 'calendar' ? 'px-4 pb-4 pt-0 h-[calc(100vh-140px)] flex flex-col' : activeTab === 'database' ? 'px-4 pb-4 pt-0 min-h-[70vh]' : 'p-4 min-h-[70vh]'} max-w-5xl mx-auto w-full`}>
+      <main className={`${activeTab === 'calendar' ? 'p-0 flex-1 flex flex-col min-h-0 overflow-hidden' : activeTab === 'database' ? 'px-4 pb-4 pt-0 min-h-[70vh] max-w-5xl mx-auto w-full' : 'p-4 min-h-[70vh] max-w-5xl mx-auto w-full'}`}>
          {activeTab === 'dashboard' && (
              <DashboardTab setConfirmModal={setConfirmModal} 
                t={t} lang={lang} language={language} user={user} 
@@ -2025,6 +2188,7 @@ export default function App() {
                weekStartDay={weekStartDay} defaultReminderTime={defaultReminderTime} reminderEnabled={reminderEnabled}
                units={units}
                activePlanIds={activePlanIds}
+               userProfile={userProfile}
              />
          )}
 
@@ -2066,7 +2230,7 @@ export default function App() {
         setActiveTab={setActiveTab} workoutStartTime={workoutStartTime}
         isImmersiveMode={isImmersiveMode} setIsImmersiveMode={setIsImmersiveMode}
         sessionToRun={sessionToRun} setSessionToRun={setSessionToRun}
-        setFocusWorkoutId={setFocusWorkoutId}
+        focusWorkoutId={focusWorkoutId} setFocusWorkoutId={setFocusWorkoutId}
       />
       {/* Toast "Tekan Back Sekali Lagi" */}
       {showExitToast && (
@@ -2103,6 +2267,43 @@ export default function App() {
           setShowProfileModal(true);
         }}
       />
+
+      {/* PWA Install Prompt */}
+      {showInstallPrompt && (
+        <div className="fixed inset-0 z-[200] flex items-end justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className={`w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col items-center text-center animate-in slide-in-from-bottom-8 duration-300 ${t.bgCard} ${t.border} border`}>
+             <img src="/icon-192.png" className="w-20 h-20 rounded-2xl mb-4 shadow-xl border border-white/10" alt="LOGYM Logo" />
+             <h3 className={`text-xl font-black ${t.textMain} mb-2`}>Install LOGYM App</h3>
+             <p className={`text-sm ${t.textMuted} mb-6`}>Install aplikasi LOGYM di perangkatmu untuk akses lebih cepat, latihan offline, dan pengalaman yang lebih mulus.</p>
+             <div className="flex flex-col w-full gap-3">
+                <button 
+                  className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 text-white ${t.bgAccent} shadow-md`}
+                  onClick={async () => {
+                    if (deferredPrompt) {
+                      deferredPrompt.prompt();
+                      const { outcome } = await deferredPrompt.userChoice;
+                      if (outcome === 'accepted') {
+                        setDeferredPrompt(null);
+                        setShowInstallPrompt(false);
+                      }
+                    }
+                  }}
+                >
+                  <Download size={18} /> Instal Sekarang
+                </button>
+                <button 
+                  className={`w-full py-3.5 rounded-xl font-bold ${t.textMuted} hover:${t.textMain} bg-transparent border border-transparent transition-colors`}
+                  onClick={() => {
+                    localStorage.setItem('__PWA_PROMPT_DISMISSED', 'true');
+                    setShowInstallPrompt(false);
+                  }}
+                >
+                  Nanti Saja
+                </button>
+             </div>
+          </div>
+        </div>
+      )}
 
       <BottomNav t={t} lang={lang} activeTab={activeTab} setActiveTab={setActiveTab} setIsEditingMode={setIsEditingMode} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} />
     </div>

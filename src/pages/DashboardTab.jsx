@@ -11,6 +11,7 @@ import ProgressTab from './ProgressTab';
 import { MuscleProgress } from '../components/MuscleProgress';
 import SwipeInput from '../components/SwipeInput';
 import { formatNumber } from '../utils/numberFormat';
+import { parseWorkoutDurationMinutes, calculateWorkoutCalories } from '../utils/workoutCalc';
 
 
 const MetricBox = ({ label, value, unit, icon, color, t, theme }) => (
@@ -107,6 +108,8 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   useEffect(() => {
       localStorage.setItem('lyfit_aktivitas_expanded', JSON.stringify(isAktivitasExpanded));
   }, [isAktivitasExpanded]);
+
+  // Parallax removed for performance
 
   const emptyBio = {
     bodyScore: null, weight: null, height: null, bmi: null, bmiStatus: '-', bodyFat: null, bodyFatStatus: '-',
@@ -387,17 +390,9 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      let intTodayDur = 0;
      let intTodayCals = 0;
      todayCompletedWks.forEach(w => {
-         let wDuration = 0;
-         if (w.duration) {
-             if (typeof w.duration === 'number') wDuration = w.duration;
-             else if (typeof w.duration === 'string') {
-                 const parts = w.duration.split(':').map(Number);
-                 if (parts.length === 3) wDuration = Math.round(((parts[0]||0)*3600 + (parts[1]||0)*60 + (parts[2]||0)) / 60);
-                 else if (parts.length === 2) wDuration = Math.round(((parts[0]||0)*60 + (parts[1]||0)) / 60);
-             }
-         }
+         const wDuration = parseWorkoutDurationMinutes(w.duration);
          intTodayDur += wDuration;
-         intTodayCals += Math.round(currentWeight * 6.0 * (wDuration / 60));
+         intTodayCals += calculateWorkoutCalories(currentWeight, wDuration);
      });
      
      dailyActive = Math.max(dailyActive, intTodayDur);
@@ -433,17 +428,9 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          weeklySess += completedWks.length;
          
          completedWks.forEach(w => {
-             let wDuration = 0;
-             if (w.duration) {
-                 if (typeof w.duration === 'number') wDuration = w.duration;
-                 else if (typeof w.duration === 'string') {
-                     const parts = w.duration.split(':').map(Number);
-                     if (parts.length === 3) wDuration = Math.round(((parts[0]||0)*3600 + (parts[1]||0)*60 + (parts[2]||0)) / 60);
-                     else if (parts.length === 2) wDuration = Math.round(((parts[0]||0)*60 + (parts[1]||0)) / 60);
-                 }
-             }
+             const wDuration = parseWorkoutDurationMinutes(w.duration);
              intDur += wDuration;
-             intCal += Math.round(dayWeight * 6.0 * (wDuration / 60));
+             intCal += calculateWorkoutCalories(dayWeight, wDuration);
          });
          
          weeklyDur += Math.max(extDur, intDur);
@@ -481,7 +468,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                <span className={`text-[10px] ${t.textMuted}`}>•</span>
                <div className={`flex items-center gap-1 ${t.textMuted}`}>
                  <Dumbbell size={12} />
-                 <span className="body-md font-bold text-[13px]">{gymProfiles?.find(g => g.id === activeGymId)?.name || 'Lyfit Gym'}</span>
+                 <span className="body-md font-bold text-[13px]">{gymProfiles?.find(g => g.id === activeGymId)?.name || 'LOGYM'}</span>
                </div>
                </div>
              </div>
@@ -489,26 +476,26 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
        
       <div className="flex flex-col sm:grid sm:grid-cols-2 sm:gap-6 sm:items-start space-y-4 sm:space-y-0">
       {/* --- GRUP KOMPOSISI & BIOMETRIK --- */}
-      <div className="flex flex-col space-y-4 anim-rise" style={{ animationDelay: '60ms' }}>
+      <div className="relative z-20 flex flex-col space-y-4 anim-rise" style={{ animationDelay: '60ms' }}>
         {/* 1. KARTU BODY COMPOSITION & EXPANDED CHART */}
         <div className="relative flex flex-col w-full min-w-0">
-           {/* Foto: kepala nongol di atas kartu (tajam), badan di dalam kartu (kena blur kaca) */}
+           <div className="relative z-20">
            {/* Latar Belakang Kartu (Glassmorphism untuk background app) */}
-           <div className={`absolute top-10 inset-x-0 bottom-0 border ${t.border} ${theme === 'dark' ? 'bg-black/40 backdrop-blur-md' : 'bg-white/45 backdrop-blur-md'} shadow-sm transition-all duration-300 ${isKomposisiExpanded ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'} z-0`}></div>
+           <div className={`absolute top-14 inset-x-0 bottom-0 border ${t.border} ${theme === 'dark' ? 'bg-black/40 backdrop-blur-md' : 'bg-white/45 backdrop-blur-md'} shadow-sm transition-all duration-300 ${isKomposisiExpanded ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'} z-0`}></div>
 
            {/* Coach: Tajam di atas latar belakang kartu */}
            <div
-             className="absolute right-0 -top-12 bottom-0 w-72 z-10 pointer-events-none overflow-hidden"
+             className="absolute right-0 -top-12 bottom-0 w-72 z-10 pointer-events-none overflow-hidden parallax-container"
              style={{
-               maskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)',
-               WebkitMaskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)'
+               maskImage: 'linear-gradient(to bottom, black 60%, transparent 85%)',
+               WebkitMaskImage: 'linear-gradient(to bottom, black 60%, transparent 85%)'
              }}
            >
-             <img src="/bg-dashboard.webp" alt="" className="w-full h-full object-cover object-top drop-shadow-xl scale-110 origin-top" />
+             <img src="/bg-dashboard.webp" alt="" className={`w-full h-full object-cover object-top drop-shadow-xl origin-top transition-transform duration-500 ease-out ${isKomposisiExpanded ? 'scale-[1.60]' : 'scale-110'}`} />
            </div>
 
           {/* Konten Kartu: Berada di atas coach */}
-          <div id="komposisi-accordion" className={`mt-10 p-4 relative z-20 flex flex-col justify-between`}>
+          <div id="komposisi-accordion" className={`p-4 relative z-20 flex flex-col justify-between`}>
            <div className="flex justify-between items-center mb-5 relative z-10">
                <div>
                    <h3 className={`h3 ${t.textMain}`}>Komposisi Tubuh</h3>
@@ -588,30 +575,30 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                 <div className={`p-1.5 rounded-xl ${t.bgBox} backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.bodyAge, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">th</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Usia<br/>Tubuh</span></div>
             </div>
            
-           <button 
+           <button
                onClick={() => {
                    playSoundEffect('click', soundEnabled);
-                   const willExpand = !isKomposisiExpanded;
-                   setIsKomposisiExpanded(willExpand);
-                   if (willExpand) {
-                       setTimeout(() => {
-                           const el = document.getElementById('komposisi-accordion');
-                           if (el) {
-                               const y = el.getBoundingClientRect().top + window.scrollY - 80;
-                               window.scrollTo({ top: y, behavior: 'smooth' });
-                           }
-                       }, 150);
-                   }
+                   const isExpanding = !isKomposisiExpanded;
+                   setIsKomposisiExpanded(isExpanding);
+                   setTimeout(() => {
+                       const targetId = isExpanding ? 'komposisi-subcard' : 'komposisi-accordion';
+                       const el = document.getElementById(targetId);
+                       if (el) {
+                           const y = el.getBoundingClientRect().top + window.scrollY - (isExpanding ? 100 : 80);
+                           window.scrollTo({ top: y, behavior: 'smooth' });
+                       }
+                   }, 150);
                }}
                className={`self-center mt-3 p-2 rounded-full ${t.bgBox} backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border} transition-all relative z-20`}
            >
                {isKomposisiExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
            </button>
           </div>
+         </div>
 
-          <div className={`grid relative z-10 transition-all duration-300 ease-in-out ${isKomposisiExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
+          <div id="komposisi-subcard" className={`grid relative z-10 transition-all duration-300 ease-in-out ${isKomposisiExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
             <div className="overflow-hidden">
-              <div className={`rounded-b-3xl border border-t-0 ${t.border} ${t.bgSunken} shadow-inner -mt-12 pt-12 relative z-10`}>
+              <div className={`rounded-b-2xl border border-t-0 ${t.border} ${t.bgSunken} shadow-inner relative z-10`}>
               <DashboardChart 
                  t={t} theme={theme} history={history} 
                  soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
@@ -625,22 +612,23 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
 
       {/* 2. KARTU AKTIVITAS HARIAN & MINGGUAN */}
       <div className="relative flex flex-col mt-6 w-full min-w-0 anim-rise" style={{ animationDelay: '90ms' }}>
+         <div className="relative z-20">
          {/* Card Background Layer */}
-         <div className={`absolute top-10 inset-x-0 bottom-0 border ${t.border} ${theme === 'dark' ? 'bg-black/40 backdrop-blur-md' : 'bg-white/45 backdrop-blur-md'} shadow-sm ${isAktivitasExpanded ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'} z-0 transition-all duration-300`}></div>
+         <div className={`absolute top-14 inset-x-0 bottom-0 border ${t.border} ${theme === 'dark' ? 'bg-black/40 backdrop-blur-md' : 'bg-white/45 backdrop-blur-md'} shadow-sm ${isAktivitasExpanded ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'} z-0 transition-all duration-300`}></div>
 
          {/* Extracted Image */}
          <div
-             className="absolute right-0 -top-10 bottom-0 w-[26rem] z-10 pointer-events-none overflow-hidden"
+             className="absolute right-0 -top-10 bottom-0 w-[26rem] z-10 pointer-events-none overflow-hidden parallax-container"
              style={{
                maskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)',
                WebkitMaskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)'
              }}
          >
-             <img src="/bg-activity.webp" alt="" className="w-full h-full object-cover object-top drop-shadow-xl origin-top transform translate-x-4" />
+             <img src="/bg-activity.webp" alt="" className={`w-full h-full object-cover object-top drop-shadow-xl origin-top transform translate-x-4 transition-transform duration-500 ease-out ${isAktivitasExpanded ? 'scale-105' : 'scale-100'}`} />
          </div>
 
          {/* Content Layer */}
-         <div id="aktivitas-accordion" className={`mt-10 p-4 relative z-20 flex flex-col h-full justify-between`}>
+         <div id="aktivitas-accordion" className={`p-4 relative z-20 flex flex-col h-full justify-between`}>
              <div className="flex justify-between items-center shrink-0">
                  <div>
                      <h3 className={`h3 ${t.textMain}`}>Aktivitas Harian</h3>
@@ -789,30 +777,30 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
              </div>
              </div>
              
-             <button 
+             <button
                  onClick={() => {
                      playSoundEffect('click', soundEnabled);
-                     const willExpand = !isAktivitasExpanded;
-                     setIsAktivitasExpanded(willExpand);
-                     if (willExpand) {
-                         setTimeout(() => {
-                             const el = document.getElementById('aktivitas-accordion');
-                             if (el) {
-                                 const y = el.getBoundingClientRect().top + window.scrollY - 80;
-                                 window.scrollTo({ top: y, behavior: 'smooth' });
-                             }
-                         }, 150);
-                     }
+                     const isExpanding = !isAktivitasExpanded;
+                     setIsAktivitasExpanded(isExpanding);
+                     setTimeout(() => {
+                         const targetId = isExpanding ? 'aktivitas-subcard' : 'aktivitas-accordion';
+                         const el = document.getElementById(targetId);
+                         if (el) {
+                             const y = el.getBoundingClientRect().top + window.scrollY - (isExpanding ? 100 : 80);
+                             window.scrollTo({ top: y, behavior: 'smooth' });
+                         }
+                     }, 150);
                  }}
                  className={`self-center mt-4 p-2 rounded-full ${t.bgBox} backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border} transition-all relative z-20`}
              >
                  {isAktivitasExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
              </button>
           </div>
+         </div>
           
-          <div className={`grid relative z-10 transition-all duration-300 ease-in-out ${isAktivitasExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
+          <div id="aktivitas-subcard" className={`grid relative z-10 transition-all duration-300 ease-in-out ${isAktivitasExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
              <div className="overflow-hidden">
-               <div className={`rounded-b-3xl border border-t-0 ${t.border} ${t.bgSunken} shadow-inner -mt-8 pt-8 relative z-10`}>
+               <div className={`rounded-b-2xl border border-t-0 ${t.border} ${t.bgSunken} shadow-inner relative z-10`}>
                  <ActivityChart 
                     t={t} theme={theme} history={history} 
                     soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
@@ -829,20 +817,21 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
 
 
       {/* --- GRUP PROGRESS --- */}
-      <div className="relative flex flex-col w-full min-w-0 anim-rise mt-6 transition-all duration-300" style={{ animationDelay: '120ms' }}>
+      <div id="progress-accordion" className="relative z-10 flex flex-col w-full min-w-0 anim-rise mt-6 transition-all duration-300" style={{ animationDelay: '120ms' }}>
+        <div className="relative z-20">
         {/* SECTION: PROGRESS TAB — Main card */}
           {/* Card Background Layer */}
           <div className={`absolute top-10 inset-x-0 bottom-0 border ${t.border} ${theme === 'dark' ? 'bg-black/40 backdrop-blur-md' : 'bg-white/45 backdrop-blur-md'} shadow-sm z-0 ${isProgressExpanded ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'}`}></div>
 
           {/* Extracted Image (Pop-out dari Kiri) */}
           <div
-             className="absolute inset-x-0 -top-10 bottom-0 w-full z-10 pointer-events-none overflow-hidden"
+             className="absolute inset-x-0 -top-10 bottom-0 w-full z-10 pointer-events-none overflow-hidden parallax-container"
              style={{
                maskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)',
                WebkitMaskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)'
              }}
           >
-             <img src="/bg-progress.webp" alt="" className="w-full h-full object-cover object-[35%_top] drop-shadow-xl" />
+             <img src="/bg-progress.webp" alt="" className={`w-full h-full object-cover object-[35%_top] drop-shadow-xl transition-transform duration-500 ease-out ${isProgressExpanded ? 'scale-125' : 'scale-100'}`} />
           </div>
 
           {/* ------------------------------ */}
@@ -859,17 +848,30 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                   units={units}
                 />
              </div>
-            <button 
-                 onClick={() => { playSoundEffect('click', soundEnabled); setIsProgressExpanded(!isProgressExpanded); }}
+            <button
+                 onClick={() => {
+                     playSoundEffect('click', soundEnabled);
+                     const isExpanding = !isProgressExpanded;
+                     setIsProgressExpanded(isExpanding);
+                     setTimeout(() => {
+                         const targetId = isExpanding ? 'progress-subcard' : 'progress-accordion';
+                         const el = document.getElementById(targetId);
+                         if (el) {
+                             const y = el.getBoundingClientRect().top + window.scrollY - (isExpanding ? 100 : 80);
+                             window.scrollTo({ top: y, behavior: 'smooth' });
+                         }
+                     }, 150);
+                 }}
                  className={`self-center mt-3 mb-2 p-2 rounded-full ${t.bgBox} backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border} transition-all relative z-20`}
              >
                  {isProgressExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
              </button>
           </div>
+        </div>
           
-      <div className={`grid relative z-10 transition-all duration-300 ease-in-out ${isProgressExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
+      <div id="progress-subcard" className={`grid relative z-10 transition-all duration-300 ease-in-out ${isProgressExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
         <div className="overflow-hidden">
-          <div className={`rounded-b-3xl border border-t-0 ${t.border} ${t.bgSunken} shadow-inner -mt-12 pt-12 relative z-10`}>
+          <div className={`rounded-b-2xl border border-t-0 ${t.border} ${t.bgSunken} shadow-inner relative z-10`}>
             <MuscleProgress 
               t={t} theme={theme} lang={lang}
               history={history} programs={programs} exerciseLibrary={exerciseLibrary}

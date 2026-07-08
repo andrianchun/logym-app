@@ -327,7 +327,7 @@ const ImmersiveWorkout = ({
     <div className={`fixed inset-0 z-[100] flex flex-col ${t.bgApp} ${t.textMain} overflow-hidden duration-300 ${isClosing ? 'animate-out slide-out-to-bottom-full' : 'animate-in slide-in-from-bottom-full'}`}>
       
       {/* HEADER (UNIFIED BAR) */}
-      <div className={`flex items-center justify-between p-4 absolute top-0 w-full z-10`}>
+      <div className={`flex items-center justify-between p-4 absolute top-0 w-full z-10`} style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
         
         {/* Durasi Group */}
         <div className="flex items-center gap-4">
@@ -487,7 +487,7 @@ const ImmersiveWorkout = ({
               </button>
               {showHint && createPortal(
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                  <div className="absolute inset-0 bg-black/60 backdrop-blur-md animate-in fade-in" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); setShowHint(false); }} />
+                  <div className="absolute inset-0 bg-black/60 backdrop-blur-md animate-in fade-in" onClick={() => setShowHint(false)} />
                     <div className={`relative overflow-hidden w-[90%] max-w-[340px] min-h-[480px] p-6 flex flex-col justify-between rounded-[32px] ${t.bgCard} shadow-2xl ring-1 ring-black/5 dark:ring-white/10 z-10 text-center leading-snug animate-in fade-in zoom-in-95 duration-300`} onClick={e => e.stopPropagation()}>
                       <div 
                         className="absolute inset-0 z-0 opacity-80 dark:opacity-60 pointer-events-none mix-blend-multiply dark:mix-blend-normal"
@@ -506,7 +506,7 @@ const ImmersiveWorkout = ({
                               <div className={`w-8 h-8 rounded-full ${t.bgAccent} flex items-center justify-center shadow-lg`}>
                                 <Brain size={16} className="text-white" />
                               </div>
-                              <span className={`font-black text-[11px] tracking-widest uppercase ${t.textMain}`}>Lyfit Coach</span>
+                              <span className={`font-black text-[11px] tracking-widest uppercase ${t.textMain}`}>LOGYM Coach</span>
                             </div>
                           </div>
                           <div className="flex flex-col items-center mt-auto pt-32 pb-2">
@@ -556,7 +556,7 @@ const ImmersiveWorkout = ({
                         <ScrollPicker 
                         value={isImp ? Math.round(Number(itemSet?.w || 0) * 2.20462 * 10)/10 : (itemSet?.w || 0)} 
                         onChange={(val) => onSetChange(ex.id, activeSetIdx, 'w', isImp ? Number((val / 2.20462).toFixed(2)) : val)}
-                        min={0} max={isImp ? 440 : 200} step={isImp ? 5 : 2.5} width="w-full" theme={theme}
+                        min={0} max={isImp ? 440 : 200} step={isImp ? 5 : 2.5} width="w-full" theme={theme} t={t}
                       />
                     </div>
                   )}
@@ -567,7 +567,7 @@ const ImmersiveWorkout = ({
                       <ScrollPicker 
                         value={itemSet?.d || 15} 
                         onChange={(val) => onSetChange(ex.id, activeSetIdx, 'd', val)}
-                        min={5} max={300} step={5} width="w-full" theme={theme}
+                        min={5} max={300} step={5} width="w-full" theme={theme} t={t}
                       />
                     </div>
                   ) : (
@@ -576,7 +576,7 @@ const ImmersiveWorkout = ({
                       <ScrollPicker 
                         value={itemSet?.r || 10} 
                         onChange={(val) => onSetChange(ex.id, activeSetIdx, 'r', val)}
-                        min={1} max={50} step={1} width="w-full" theme={theme}
+                        min={1} max={50} step={1} width="w-full" theme={theme} t={t}
                       />
                     </div>
                   )}

@@ -335,11 +335,11 @@ var Model = /*#__PURE__*/memo(function Model(_ref) {
   var muscleData = fillMuscleData([].concat(data));
   var modelData = type === ModelType.ANTERIOR ? anteriorData : posteriorData;
 
-  var handleClick = function handleClick(muscle, callback) {
+  var handleClick = function handleClick(muscle, callback, e) {
     callback && callback({
       muscle: muscle,
       data: muscleData[muscle]
-    });
+    }, e);
   };
 
   return createElement("div", {
@@ -363,8 +363,8 @@ var Model = /*#__PURE__*/memo(function Model(_ref) {
         onMouseOut: function onMouseOut(e) {
           if (_ref.onMouseOut) _ref.onMouseOut(e);
         },
-        onClick: function onClick() {
-          return handleClick(exercise.muscle, _onClick);
+        onClick: function onClick(e) {
+          return handleClick(exercise.muscle, _onClick, e);
         },
         style: {
           cursor: 'pointer',

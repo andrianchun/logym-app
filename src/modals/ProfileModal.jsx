@@ -4,7 +4,7 @@ import { updateProfile } from 'firebase/auth';
 import { doc, updateDoc, setDoc } from 'firebase/firestore';
 import { auth, storage, db } from '../firebase';
 import { ref, deleteObject } from 'firebase/storage';
-import { uploadToCloudinary } from '../utils/cloudinary';
+import { uploadImageToFirebase } from '../utils/storage';
 import ShareCardGenerator from '../components/ShareCardGenerator';
 import CommunityTab from '../pages/CommunityTab';
 import { ACHIEVEMENTS } from '../data/achievements';
@@ -221,9 +221,8 @@ export default function ProfileModal({
                     } catch (e) { console.log("Old photo not found or already deleted"); }
                 }
 
-                // Cloudinary STRICTLY forbids overwriting on unsigned uploads.
-                // We MUST generate a unique public_id every time.
-                photoURL = await uploadToCloudinary(pendingPhotoFile, `profile_pic_${Date.now()}`, `lyfit_users/${user.uid}/profile`);
+                // Upload to Firebase Storage
+                photoURL = await uploadImageToFirebase(pendingPhotoFile, `lyfit_users/${user.uid}/profile/profile_pic_${Date.now()}`);
                 // Anti-cache is technically no longer needed since URL is unique, but kept for safety
                 photoURL = `${photoURL}?v=${Date.now()}`;
             }
@@ -266,7 +265,7 @@ export default function ProfileModal({
                                 <div className="w-14 h-14 rounded-full bg-red-500/10 flex items-center justify-center">
                                     <AlertTriangle size={28} className="text-red-500" />
                                 </div>
-                                <h3 className={`text-lg font-black ${t.textMain}`}>Keluar dari LyFit?</h3>
+                                <h3 className={`text-lg font-black ${t.textMain}`}>Keluar dari LOGYM?</h3>
                                 <p className={`text-sm ${t.textMuted}`}>Data latihanmu tetap tersimpan di cloud. Kamu bisa login kembali kapan saja.</p>
                                 <div className="flex w-full space-x-3 pt-2">
                                     <button 
@@ -448,12 +447,12 @@ export default function ProfileModal({
                                             onClick={async () => {
                                                 if (navigator.share) {
                                                     navigator.share({
-                                                        title: `Profil LyFit - ${user?.name}`,
-                                                        text: `Ayo berteman dengan ${user?.name} di LyFit!`,
+                                                        title: `Profil LOGYM - ${user?.name}`,
+                                                        text: `Ayo berteman dengan ${user?.name} di LOGYM!`,
                                                         url: window.location.href,
                                                     }).catch(console.error);
                                                 } else {
-                                                    navigator.clipboard.writeText(`Profil LyFit - ${user?.name}`);
+                                                    navigator.clipboard.writeText(`Profil LOGYM - ${user?.name}`);
                                                     await showAlert('Tautan profil berhasil disalin!', { type: 'success', title: 'Tersalin!' });
                                                 }
                                             }}

@@ -107,7 +107,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
       if (finalAnswers.equipment && finalAnswers.equipment !== 'ADD_NEW_GYM') {
         targetGymProfileId = finalAnswers.equipment;
       }
-      const targetGym = gymProfiles.find(g => g.id === targetGymProfileId) || gymProfiles[0] || { id: 'default', name: 'Lyfit Gym', equipment: 'all', config: {} };
+      const targetGym = gymProfiles.find(g => g.id === targetGymProfileId) || gymProfiles[0] || { id: 'default', name: 'LOGYM', equipment: 'all', config: {} };
       
       // Use the passed-in library or fall back gracefully
       const library = exerciseLibrary && exerciseLibrary.length > 0 ? exerciseLibrary : [];
@@ -330,7 +330,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
           
           <div className="flex-1 text-center">
             <h3 className={`font-black text-lg ${!isDark ? 'text-black' : t.textMain} flex items-center justify-center gap-2`}>
-              Lyfit Coach
+              LOGYM Coach
             </h3>
             <p className={`text-[13px] ${!isDark ? 'text-black font-semibold' : `${t.textMuted} font-medium`} mt-1 leading-snug max-w-[280px] mx-auto`}>
               Halo, Coach Raiga di sini. Aku siap bantu kamu menuju badan impian yang sehat dan kuat!
@@ -426,7 +426,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
                           className={`w-full p-4 rounded-xl border-2 font-bold ${answers.dob ? (isValidAge(answers.dob) ? t.borderAccent : 'border-rose-500 text-rose-500') : 'border-transparent'} ${t.inputBg} ${answers.dob && !isValidAge(answers.dob) ? '' : t.textMain}`}
                       />
                       {answers.dob && !isValidAge(answers.dob) ? (
-                          <p className={`text-[11px] mt-2 text-center font-bold text-rose-500 animate-in fade-in slide-in-from-top-1`}>Usia kamu harus di atas 13 tahun untuk menggunakan LyFit.</p>
+                          <p className={`text-[11px] mt-2 text-center font-bold text-rose-500 animate-in fade-in slide-in-from-top-1`}>Usia kamu harus di atas 13 tahun untuk menggunakan LOGYM.</p>
                       ) : (
                           <p className={`text-[10px] mt-1 text-center font-bold ${!isDark ? 'text-black/60' : 'text-slate-400'}`}>Minimal usia 13 tahun.</p>
                       )}
@@ -446,7 +446,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
                                   <ScrollPicker 
                                       value={answers.heightFt} 
                                       onChange={(val) => setAnswers(prev => ({...prev, heightFt: val}))} 
-                                      min={3} max={8} step={1} theme={isDark ? 'dark' : 'light'} width="w-20"
+                                      min={3} max={8} step={1} theme={isDark ? 'dark' : 'light'} width="w-20" t={t}
                                   />
                                   <span className={`font-bold text-[10px] ${t.textMuted}`}>ft</span>
                               </div>
@@ -454,7 +454,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
                                   <ScrollPicker 
                                       value={answers.heightIn} 
                                       onChange={(val) => setAnswers(prev => ({...prev, heightIn: val}))} 
-                                      min={0} max={11} step={1} theme={isDark ? 'dark' : 'light'} width="w-20"
+                                      min={0} max={11} step={1} theme={isDark ? 'dark' : 'light'} width="w-20" t={t}
                                   />
                                   <span className={`font-bold text-[10px] ${t.textMuted}`}>in</span>
                               </div>
@@ -464,7 +464,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
                               <ScrollPicker 
                                   value={answers.height} 
                                   onChange={(val) => setAnswers(prev => ({...prev, height: val}))} 
-                                  min={100} max={250} step={1} theme={isDark ? 'dark' : 'light'} width="w-full max-w-[120px]"
+                                  min={100} max={250} step={1} theme={isDark ? 'dark' : 'light'} width="w-full max-w-[120px]" t={t}
                               />
                           </div>
                       )}
@@ -476,7 +476,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
                               <ScrollPicker 
                                   value={answers.weight} 
                                   onChange={(val) => setAnswers(prev => ({...prev, weight: val}))} 
-                                  min={isImp ? 60 : 30} max={isImp ? 400 : 200} step={1} theme={isDark ? 'dark' : 'light'} width="w-full max-w-[100px]"
+                                  min={isImp ? 60 : 30} max={isImp ? 400 : 200} step={1} theme={isDark ? 'dark' : 'light'} width="w-full max-w-[100px]" t={t}
                               />
                           </div>
                       </div>
@@ -486,7 +486,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
                               <ScrollPicker 
                                   value={answers.targetWeight} 
                                   onChange={(val) => setAnswers(prev => ({...prev, targetWeight: val}))} 
-                                  min={isImp ? 60 : 30} max={isImp ? 400 : 200} step={1} theme={isDark ? 'dark' : 'light'} width="w-full max-w-[100px]"
+                                  min={isImp ? 60 : 30} max={isImp ? 400 : 200} step={1} theme={isDark ? 'dark' : 'light'} width="w-full max-w-[100px]" t={t}
                               />
                           </div>
                       </div>

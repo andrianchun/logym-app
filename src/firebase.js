@@ -7,12 +7,12 @@ import { getStorage } from "firebase/storage";
 // TODO: Nanti kamu harus mengganti teks "KODE_RAHASIA_..." ini 
 // dengan kode asli dari akun Firebase Console milikmu.
 const firebaseConfig = {
-  apiKey: "AIzaSyCHyEzi6EH9gxJnnUgCSagCWwQKtIQfMKU",
-  authDomain: "lyfit-andrian.firebaseapp.com",
-  projectId: "lyfit-andrian",
-  storageBucket: "lyfit-andrian.firebasestorage.app",
-  messagingSenderId: "594058185444",
-  appId: "1:594058185444:web:fd2aa6eabcf878dd9cbaf1"
+  apiKey: "AIzaSyAYCQIrZXFB_J7zp4CkiUQ4OYljw5qaGWo",
+  authDomain: "logym-id.firebaseapp.com",
+  projectId: "logym-id",
+  storageBucket: "logym-id.firebasestorage.app",
+  messagingSenderId: "883134437221",
+  appId: "1:883134437221:web:8a6579be8747a78b62b38c"
 };
 
 // Menyalakan Mesin

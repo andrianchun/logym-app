@@ -99,7 +99,7 @@ export default function UserProfileModal({ profileUserId, profileUserName, profi
   };
 
   const handleShareProfile = async () => {
-    const text = `Lihat profil ${profileUserName} di LyFit!`;
+    const text = `Lihat profil ${profileUserName} di LOGYM!`;
     if (navigator.share) {
       navigator.share({ title: profileUserName, text });
     } else {

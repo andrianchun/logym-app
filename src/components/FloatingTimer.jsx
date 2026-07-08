@@ -2,10 +2,10 @@ import React, { useEffect } from 'react';
 import { Clock, X } from 'lucide-react';
 import { playSoundEffect } from '../utils/audio';
 
-const FloatingTimer = ({ 
+const FloatingTimer = ({
   restTimer, setRestTimer, defaultRestTime, t, soundEnabled,
   isWorkoutActive, activeTab, setActiveTab, workoutStartTime,
-  isImmersiveMode, setIsImmersiveMode, sessionToRun, setFocusWorkoutId
+  isImmersiveMode, setIsImmersiveMode, sessionToRun, focusWorkoutId, setFocusWorkoutId
 }) => {
   
   const [workoutSeconds, setWorkoutSeconds] = React.useState(0);
@@ -46,8 +46,11 @@ const FloatingTimer = ({
 
   const handleClick = () => {
     setActiveTab('workout');
-    if (sessionToRun) {
-      setFocusWorkoutId(sessionToRun);
+    // Fallback ke focusWorkoutId jika sessionToRun belum sempat di-set oleh titik masuk tertentu
+    // (mis. resume dari Kalender) — supaya klik selalu masuk immersive selama ada workout aktif.
+    const targetId = sessionToRun || focusWorkoutId;
+    if (targetId) {
+      setFocusWorkoutId(targetId);
       setIsImmersiveMode(true);
     }
   };
@@ -60,7 +63,7 @@ const FloatingTimer = ({
   };
 
   return (
-    <div className="fixed bottom-20 left-0 right-0 px-4 z-40 pointer-events-none flex justify-center animate-in slide-in-from-bottom-8 fade-in duration-300">
+    <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 pointer-events-none flex justify-center animate-in slide-in-from-bottom-8 fade-in duration-300">
       <div 
         className={`pointer-events-auto w-full max-w-2xl mx-auto flex items-center justify-between p-4 rounded-2xl ${t.bgAccent} text-white shadow-xl shadow-[color:var(--tw-shadow-color)] cursor-pointer active:scale-95 transition-all border border-white/20`} 
         style={{ shadowColor: 'rgba(0,0,0,0.3)' }}

@@ -277,6 +277,33 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
                     onClick={(e) => {
                         if(e && e.activePayload && e.activePayload.length > 0) {
                             onPointClick(e.activePayload[0].payload.dateFull);
+
+                            // Chart ini di dalam container yang scroll horizontal (bisa jauh lebih
+                            // lebar dari layar). Tooltip Recharts diposisikan dekat titik yang diklik,
+                            // jadi kalau titiknya dekat tepi kiri/kanan area yang terlihat, tooltip-nya
+                            // ikut kepotong. Ukur posisi tooltip asli setelah render, lalu geser scroll
+                            // horizontal seperlunya supaya tooltip-nya tetap utuh kelihatan.
+                            // Dicoba beberapa kali (bukan sekali di 50ms) karena Recharts memposisikan
+                            // ulang tooltip lewat efek internal yang bisa telat beberapa frame,
+                            // terutama di device yang lebih lambat.
+                            const adjustScrollForTooltip = () => {
+                                const container = scrollRef.current;
+                                const tooltipEl = container?.querySelector('.recharts-tooltip-wrapper');
+                                if (!container || !tooltipEl) return;
+                                const tooltipRect = tooltipEl.getBoundingClientRect();
+                                if (tooltipRect.width === 0) return; // belum benar-benar diposisikan
+                                const containerRect = container.getBoundingClientRect();
+                                let delta = 0;
+                                if (tooltipRect.left < containerRect.left) {
+                                    delta = tooltipRect.left - containerRect.left - 12;
+                                } else if (tooltipRect.right > containerRect.right) {
+                                    delta = tooltipRect.right - containerRect.right + 12;
+                                }
+                                if (delta !== 0) {
+                                    container.scrollTo({ left: container.scrollLeft + delta, behavior: 'smooth' });
+                                }
+                            };
+                            [50, 150, 300].forEach(delay => setTimeout(adjustScrollForTooltip, delay));
                         }
                     }}
                  >

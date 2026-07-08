@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { X, ImagePlus, Loader2 } from 'lucide-react';
-import { uploadToCloudinary } from '../utils/cloudinary';
+import { uploadImageToFirebase } from '../utils/storage';
 import { createCommunityPost } from '../utils/communityApi';
 import { containsBadWords } from '../utils/moderationApi';
 import ProgramCard from './ProgramCard';
@@ -47,8 +47,9 @@ export default function CreatePostModal({ user, onClose, theme, t, initialFiles 
     
     try {
       const imageUrls = [];
-      for (const file of images) {
-        const url = await uploadToCloudinary(file);
+      for (let i = 0; i < images.length; i++) {
+        const file = images[i];
+        const url = await uploadImageToFirebase(file, `community_posts/${user?.uid || 'guest'}/post_${Date.now()}_${i}`);
         if (url) imageUrls.push(url);
       }
 

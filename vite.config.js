@@ -1,9 +1,45 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    VitePWA({
+      // autoUpdate: versi baru langsung aktif begitu online lagi, user tidak pernah
+      // nyangkut di build lama (dan tidak perlu prompt "reload?" yang gampang diabaikan).
+      registerType: 'autoUpdate',
+      injectRegister: 'auto',
+      manifest: {
+        name: 'LOGYM Tracker',
+        short_name: 'LOGYM',
+        description: 'Aplikasi pelacak progres fitness harian',
+        start_url: '/',
+        display: 'standalone',
+        background_color: '#000000',
+        theme_color: '#0ea5e9',
+        icons: [
+          { src: '/icon-48.png', type: 'image/png', sizes: '48x48', purpose: 'any maskable' },
+          { src: '/icon-72.png', type: 'image/png', sizes: '72x72', purpose: 'any maskable' },
+          { src: '/icon-96.png', type: 'image/png', sizes: '96x96', purpose: 'any maskable' },
+          { src: '/icon-128.png', type: 'image/png', sizes: '128x128', purpose: 'any maskable' },
+          { src: '/icon-192.png', type: 'image/png', sizes: '192x192', purpose: 'any maskable' },
+          { src: '/icon-256.png', type: 'image/png', sizes: '256x256', purpose: 'any maskable' },
+          { src: '/icon-512.png', type: 'image/png', sizes: '512x512', purpose: 'any maskable' },
+        ],
+      },
+      workbox: {
+        // Default glob Workbox tidak mencakup .webp/.json — tanpa ini, background gambar
+        // dan exercisedb.json (dipakai utk nambah exercise ke rutinitas) gagal saat offline.
+        globPatterns: ['**/*.{js,css,html,ico,png,webp,svg,json,woff2}'],
+        // exercisedb.json (~1MB) & beberapa bg-*.webp melebihi limit default Workbox (2MB aman,
+        // tapi dinaikkan sedikit untuk jaga-jaga total payload gabungan).
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+        cleanupOutdatedCaches: true,
+      },
+    }),
+  ],
   server: {
     port: Number(process.env.PORT) || 5173,
   },

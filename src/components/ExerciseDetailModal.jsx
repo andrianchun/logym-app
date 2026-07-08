@@ -171,14 +171,14 @@ const ExerciseDetailModal = ({
 
     return createPortal(
       <div className={`fixed inset-0 z-[100] flex flex-col ${t.bgApp}`}>
-        <div className="p-4 flex justify-between items-center bg-black/80 absolute top-0 w-full z-20">
+        <div className="p-4 flex justify-between items-center bg-black/80 absolute top-0 w-full z-20" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
           <h2 className="h2 text-white drop-shadow-md">{ex.name}</h2>
           <button onClick={onClose} className="p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition">
             <X size={20} strokeWidth={2.5} />
           </button>
         </div>
 
-        <div className="flex-1 w-full mt-[72px] overflow-y-auto hide-scrollbar pb-10">
+        <div className="flex-1 w-full overflow-y-auto hide-scrollbar pb-10" style={{ marginTop: 'calc(56px + max(1rem, env(safe-area-inset-top, 0px)))' }}>
           {videos.length === 0 ? (
             <div className="p-10 flex flex-col items-center text-center opacity-50 mt-20">
               <Video size={64} className={`mb-4 ${t.textMuted}`} />
@@ -595,7 +595,7 @@ const ExerciseDetailModal = ({
                              <p>Kalkulator RM (Repetition Maximum) digunakan untuk mengestimasi beban maksimal yang bisa kamu angkat berdasarkan set terbaikmu.</p>
                              <p>Jika kamu sudah tahu kapasitas bebanmu (misal: "saya biasa angkat 50kg, 8 repetisi"), masukkan angkanya di bawah lalu <b>Simpan</b> sebagai baseline 10RM.</p>
                              <p>Jika kamu belum tahu kapasitas beban, silakan dicoba dengan beban ringan terlebih dahulu, naikkan bebannya bertahap sampai cukup untuk 10 repetisi.</p>
-                             <p>Aplikasi LyFit mencatat rekor 10RM otomatis selama kamu latihan, jadi kamu tidak wajib input manual di sini.</p>
+                             <p>Aplikasi LOGYM mencatat rekor 10RM otomatis selama kamu latihan, jadi kamu tidak wajib input manual di sini.</p>
                           </div>
                        )}
 

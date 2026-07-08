@@ -5,13 +5,14 @@ const loadHtml2canvas = async () => (await import('html2canvas')).default;
 import { doc, updateDoc } from 'firebase/firestore';
 import { db, storage } from '../firebase';
 import { ref, deleteObject } from 'firebase/storage';
-import { uploadToCloudinary } from '../utils/cloudinary';
+import { uploadImageToFirebase } from '../utils/storage';
 import { getLocalYMD } from '../data/constants';
 import DashboardChart from './DashboardChart';
 import ProgressTab from '../pages/ProgressTab';
 import { MuscleProgress } from './MuscleProgress';
 import { shareWorkoutToFeed } from '../utils/communityApi';
 import CreatePostModal from './CreatePostModal';
+import { parseWorkoutDurationMinutes, calculateWorkoutCalories } from '../utils/workoutCalc';
 let globalTemplateIndex = 0; // default to bodycomp
 
 export default function ShareCardGenerator({ user, setUser, t, theme, history, activityTargets, programs, exerciseLibrary, lang, language, soundEnabled, playSoundEffect, selectedDate, units, activePlanIds, userProfile }) {
@@ -296,7 +297,7 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
         const wks = dayData.workouts || [];
         weeklySess += wks.length;
         wks.forEach(w => {
-            if (typeof w.duration === 'number') intDur += w.duration;
+            intDur += parseWorkoutDurationMinutes(w.duration);
         });
         weeklyDur += Math.max(extDur, intDur);
     }
@@ -308,8 +309,9 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
     let dailyIntDur = 0;
     if (todayActivity.workouts?.length) {
        todayActivity.workouts.forEach(w => {
-           workoutCal += ((Number(w.duration) || 0) * 5);
-           if (typeof w.duration === 'number') dailyIntDur += w.duration;
+           const wMins = parseWorkoutDurationMinutes(w.duration);
+           workoutCal += calculateWorkoutCalories(bioData.weight, wMins);
+           dailyIntDur += wMins;
        });
     }
     const mergedDailyCalories = (Number(bioData.activityCalories) || 0) + workoutCal;
@@ -324,18 +326,8 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
 
     const getWorkoutDurationMins = (w) => {
         if (!w) return 0;
-        let mins = 0;
-        if (w.duration) {
-            if (typeof w.duration === 'number') {
-                mins = Math.round(w.duration / 60);
-            } else {
-                const parts = w.duration.toString().split(':').map(Number);
-                if (parts.length === 3) mins = parts[0] * 60 + parts[1];
-                else if (parts.length === 2) mins = parts[0];
-                else mins = Number(w.duration) || 0;
-            }
-        }
-        
+        let mins = parseWorkoutDurationMinutes(w.duration);
+
         // Fallback for manually checked off workouts without timer
         if (mins === 0 && w.log) {
             let setsCount = 0;
@@ -457,8 +449,8 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                     } catch (e) { console.log("Old bg not found or already deleted"); }
                 }
 
-                // Cloudinary upload
-                downloadUrl = await uploadToCloudinary(file, `card_background_${Date.now()}`, `lyfit_users/${user.uid}/backgrounds`);
+                // Upload to Firebase Storage
+                downloadUrl = await uploadImageToFirebase(file, `lyfit_users/${user.uid}/backgrounds/card_background_${Date.now()}`);
                 downloadUrl = `${downloadUrl}?v=${Date.now()}`;
                 isNewUpload = true;
             }
@@ -488,12 +480,11 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
         if (!bgImage) return;
         setIsUploadingBg(true);
         try {
-            if (user?.customCardBg?.includes('firebasestorage')) {
+            if (bgImage.includes('firebasestorage')) {
                 try {
-                    await deleteObject(ref(storage, user.customCardBg));
-                } catch (e) { console.log("Old bg not found or already deleted"); }
+                    await deleteObject(ref(storage, bgImage));
+                } catch(e) { console.log("Failed to delete bg object", e); }
             }
-            // Cannot easily delete Cloudinary image from client-side without signature, so we just remove the reference from db
             setBgImage(null);
             setBgZoom(100);
             setBgRotate(0);
@@ -518,6 +509,9 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
         
         try {
             const html2canvas = await loadHtml2canvas();
+            // Tunggu font selesai dimuat sebelum mulai capture — kalau belum, html2canvas menangkap
+            // layout yang masih pakai font fallback (metrik beda), teks jadi geser dari posisi aslinya.
+            if (document.fonts?.ready) await document.fonts.ready;
             for (let i = 0; i < templates.length; i++) {
                 setTemplateIndex(i);
                 setToastMsg(`Menyiapkan ${i + 1}/${templates.length}...`);
@@ -538,7 +532,7 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                 
                 const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
                 if (blob) {
-                    files.push(new File([blob], `LyFit-${templates[i]}-${Date.now()}.jpg`, { type: 'image/jpeg' }));
+                    files.push(new File([blob], `LOGYM-${templates[i]}-${Date.now()}.jpg`, { type: 'image/jpeg' }));
                 }
             }
             
@@ -567,6 +561,7 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
         setIsGenerating(true);
         try {
             const html2canvas = await loadHtml2canvas();
+            if (document.fonts?.ready) await document.fonts.ready;
             const canvas = await html2canvas(cardRef.current, {
                 scale: 5,
                 useCORS: true,
@@ -580,7 +575,7 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
             const image = canvas.toDataURL("image/png");
             const link = document.createElement('a');
             link.href = image;
-            link.download = `LyFit-${activeTemplate}-${Date.now()}.png`;
+            link.download = `LOGYM-${activeTemplate}-${Date.now()}.png`;
             link.click();
         } catch (err) {
             console.error("Error generating image:", err);
@@ -600,6 +595,7 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
         setIsSharing(true);
         try {
             const html2canvas = await loadHtml2canvas();
+            if (document.fonts?.ready) await document.fonts.ready;
             const canvas = await html2canvas(cardRef.current, {
                 scale: 5,
                 useCORS: true,
@@ -617,13 +613,13 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                     setIsSharing(false);
                     return;
                 }
-                const file = new File([blob], `LyFit-${activeTemplate}-${Date.now()}.png`, { type: 'image/png' });
+                const file = new File([blob], `LOGYM-${activeTemplate}-${Date.now()}.png`, { type: 'image/png' });
                 
                 if (navigator.canShare({ files: [file] })) {
                     try {
                         await navigator.share({
-                            title: 'Status LyFit Saya',
-                            text: 'Cek progres latihanku di LyFit!',
+                            title: 'Status LOGYM Saya',
+                            text: 'Cek progres latihanku di LOGYM!',
                             files: [file]
                         });
                     } catch (e) {
@@ -725,7 +721,7 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
 
                     {/* Logo Overlay */}
                     <div className="absolute top-4 right-4 z-20">
-                        <img src="/logo-white.webp" alt="LyFit" className="w-10 h-10 object-contain opacity-100 drop-shadow-lg" crossOrigin="anonymous"/>
+                        <img src="/logo-white.webp" alt="LOGYM" className="w-10 h-10 object-contain opacity-100 drop-shadow-lg" crossOrigin="anonymous"/>
                     </div>
 
                     <div className="relative z-10 flex-1 flex flex-col text-white">
@@ -966,7 +962,7 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                                                 </div>
                                                 <div className="flex items-center gap-1.5 bg-white/10 px-2 py-1 rounded border border-white/10">
                                                     <Flame size={12} className="text-orange-400" />
-                                                    <span className="text-[9px] font-black text-white">{(getWorkoutDurationMins(latestWorkout) * 5) + 50} kcal</span>
+                                                    <span className="text-[9px] font-black text-white">{calculateWorkoutCalories(bioData.weight, getWorkoutDurationMins(latestWorkout))} kcal</span>
                                                 </div>
                                                 <div className="flex items-center gap-1.5 bg-white/10 px-2 py-1 rounded border border-white/10">
                                                     <Dumbbell size={12} className="text-amber-400" />
@@ -998,6 +994,7 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                                                         playSoundEffect={playSoundEffect}
                                                         isSubCard={true}
                                                         forceViewMode="radar"
+                                                        disableChartAnimation={true}
                                                     />
                                                 </div>
                                             </div>
@@ -1105,9 +1102,9 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                     onClick={handleShareToCommunity}
                     disabled={isGenerating || isSharing}
                     className="flex shrink-0 items-center justify-center p-3 rounded-2xl bg-[#3b82f6] text-white font-black shadow-xl hover:shadow-[#3b82f6]/30 transition-all active:scale-95 disabled:opacity-50"
-                    title="Bagikan ke Komunitas Lyfit"
+                    title="Bagikan ke Komunitas LOGYM"
                 >
-                    {isSharing ? <Loader2 className="animate-spin" size={20}/> : <img src="/logo-white.webp" alt="Lyfit" className="w-6 h-6 object-contain" />}
+                    {isSharing ? <Loader2 className="animate-spin" size={20}/> : <img src="/logo-white.webp" alt="LOGYM" className="w-6 h-6 object-contain" />}
                 </button>
                 <button 
                     onClick={handleShare}

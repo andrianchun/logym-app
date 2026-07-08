@@ -80,7 +80,7 @@ const AuthPage = ({ t, theme, soundEnabled, onLogin }) => {
         onLogin({ 
             uid: userCredential.user.uid, 
             email: userCredential.user.email, 
-            name: userCredential.user.displayName || 'Sobat LyFit',
+            name: userCredential.user.displayName || 'Sobat LOGYM',
             photoURL: userCredential.user.photoURL
         });
       } else {
@@ -89,7 +89,7 @@ const AuthPage = ({ t, theme, soundEnabled, onLogin }) => {
         onLogin({ 
             uid: userCredential.user.uid, 
             email: userCredential.user.email, 
-            name: formData.name || 'Sobat LyFit',
+            name: formData.name || 'Sobat LOGYM',
             photoURL: userCredential.user.photoURL
         });
       }
@@ -125,7 +125,7 @@ const AuthPage = ({ t, theme, soundEnabled, onLogin }) => {
         onLogin({
           uid: userCredential.user.uid,
           email: userCredential.user.email,
-          name: userCredential.user.displayName || 'Sobat LyFit',
+          name: userCredential.user.displayName || 'Sobat LOGYM',
           photoURL: userCredential.user.photoURL
         });
       } else {
@@ -134,7 +134,7 @@ const AuthPage = ({ t, theme, soundEnabled, onLogin }) => {
         onLogin({ 
           uid: result.user.uid, 
           email: result.user.email, 
-          name: result.user.displayName || 'Sobat LyFit',
+          name: result.user.displayName || 'Sobat LOGYM',
           photoURL: result.user.photoURL
         });
       }
@@ -190,7 +190,7 @@ const AuthPage = ({ t, theme, soundEnabled, onLogin }) => {
 
           {/* Logo */}
           <div className="absolute top-0 left-0 right-0 p-6" style={{ paddingTop: 'max(1.5rem, env(safe-area-inset-top))' }}>
-            <img src={theme === 'dark' ? '/banner-dark.png' : '/banner-light.png'} alt="LyFit" className="h-7 w-auto object-contain drop-shadow-lg" />
+            <img src={theme === 'dark' ? '/banner-dark.png' : '/banner-light.png'} alt="LOGYM" className="h-7 w-auto object-contain drop-shadow-lg" />
           </div>
         </div>
       </div>

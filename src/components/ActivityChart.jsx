@@ -224,7 +224,7 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
   const activeObj = chartMetricsList.find(m => m.key === activeMetric);
 
   return (
-    <div>
+    <div className="p-5">
          <div ref={scrollRef} 
               onScroll={handleScroll}
               onTouchStartCapture={handleTouchStart} 
@@ -308,7 +308,7 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
              </div>
          </div>
          
-         <div className="flex gap-2 overflow-x-auto pb-4 hide-scrollbar snap-x px-4" style={{ WebkitOverflowScrolling: 'touch' }}>
+         <div className="flex gap-2 overflow-x-auto pb-4 hide-scrollbar snap-x" style={{ WebkitOverflowScrolling: 'touch' }}>
             {chartMetricsList.map(metric => {
                 const isActive = activeMetric === metric.key;
                 return (

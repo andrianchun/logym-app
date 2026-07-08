@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import { Plus, Moon, Play, CalendarDays, X, CheckCircle, ChevronDown, ChevronUp, Dumbbell, Share2 } from 'lucide-react';
+import { Plus, Wind, Play, CalendarDays, X, CheckCircle, ChevronDown, ChevronUp, Dumbbell, Share2 } from 'lucide-react';
 import { fetchExercisesFromApi } from '../utils/exerciseDbApi';
 import { shareWorkoutToFeed } from '../utils/communityApi';
 
 // Import Komponen Pecahan
 import WorkoutHeader from '../components/WorkoutHeader';
 import ExerciseCard from '../components/ExerciseCard';
-import WorkoutFooter from '../components/WorkoutFooter';
 import ImmersiveWorkout from '../components/ImmersiveWorkout';
 import ExerciseDetailModal from '../components/ExerciseDetailModal';
 import AlternativeExerciseModal from '../components/AlternativeExerciseModal';
@@ -101,7 +100,17 @@ const WorkoutTab = ({
       if (w.programId === 'adhoc') {
          return { id: 'adhoc', name: w.programName || 'Ekstra', exercises: w.exercises || [], workoutId: w.id, status: w.status, log: w.log };
       }
-      const p = programs.find(p => p.id === w.programId);
+      let p = programs.find(p => p.id === w.programId);
+      
+      // Fallback untuk program yang sudah dihapus tapi ada di history
+      if (!p && w.status === 'completed') {
+        p = {
+          id: w.programId,
+          name: w.programName || 'Sesi Terdahulu',
+          exercises: w.overriddenExercises || w.exercises || []
+        };
+      }
+
       return p ? { 
           ...p, 
           workoutId: w.id, 
@@ -165,6 +174,11 @@ const WorkoutTab = ({
         scrollToFirstIncompleteExercise(targetWorkoutId);
       }, 150);
       setScrolledTargets(prev => ({ ...prev, [focusWorkoutId]: true }));
+      // Tandai juga di sini — kalau tidak, saat user collapse manual sesi ini nanti,
+      // effect ini re-run (expandedSessions ada di deps) dan jatuh ke cabang else-if
+      // di bawah yang masih pikir "belum pernah auto-expand", lalu maksa buka lagi
+      // sesi yang baru saja user tutup (butuh 2x klik baru benar-benar collapse).
+      hasAutoExpanded.current = true;
     } else if (activeProgramsList.length > 0 && Object.keys(expandedSessions).length === 0 && !hasAutoExpanded.current) {
       setExpandedSessions({ [activeProgramsList[0].workoutId]: true });
       hasAutoExpanded.current = true;
@@ -492,6 +506,17 @@ const WorkoutTab = ({
 
   const isCompletelyEmpty = (activeProgramsList.length === 0 || activeProgramsList.every(p => !p.exercises || p.exercises.length === 0)) && extraExercises.length === 0;
 
+  // Dipakai untuk kasih jarak ekstra di bawah supaya "Tambah Latihan Ekstra"/"Pendinginan"
+  // tidak ketutup tombol floating "Mulai Sesi Latihan" saat sebuah sesi sedang diexpand.
+  const hasExpandedSessionWithExercises = (() => {
+    const activeExpandedId = Object.keys(expandedSessions).find(k => expandedSessions[k]);
+    if (!activeExpandedId) return false;
+    if (activeExpandedId === 'extra') return extraExercises.length > 0;
+    const sessionData = activeProgramsList.find(p => p.workoutId === activeExpandedId);
+    return !!(sessionData?.exercises?.length > 0);
+  })();
+  const showsFloatingStartButton = hasExpandedSessionWithExercises && !isImmersiveMode && !isWorkoutActive;
+
   return (
     <>
       {(isImmersiveMode || isClosingImmersive) && (
@@ -556,7 +581,7 @@ const WorkoutTab = ({
 
       <AlternativeExerciseModal
         isOpen={showAlternativeModal}
-        onClose={() => setShowAlternativeModal(false)}
+        onClose={() => { setShowAlternativeModal(false); setDetailExercise(null); }}
         originalEx={detailExercise}
         exerciseLibrary={exerciseLibrary}
         onSelectAlternative={handleSelectAlternative}
@@ -564,7 +589,10 @@ const WorkoutTab = ({
         gymProfiles={gymProfiles} activeGymId={activeGymId}
       />
 
-      <div className={`space-y-4 animate-in fade-in pb-8 ${isImmersiveMode ? 'hidden' : ''}`}>
+      <div
+        className={`space-y-4 animate-in fade-in ${isImmersiveMode ? 'hidden' : ''}`}
+        style={{ paddingBottom: showsFloatingStartButton ? 'calc(9.5rem + env(safe-area-inset-bottom, 20px))' : '2rem' }}
+      >
         
         {isCompletelyEmpty ? (
           <EmptyWorkoutState 
@@ -581,12 +609,12 @@ const WorkoutTab = ({
           />
         ) : (
           <>
-            <WorkoutHeader 
-              t={t} lang={lang} language={language}
-              selectedDate={selectedDate} setSelectedDate={setSelectedDate}
+            <WorkoutHeader
+              t={t} language={language}
+              selectedDate={selectedDate}
               soundEnabled={soundEnabled} playSoundEffect={playSoundEffect}
-              warmupVideos={warmupVideos} onOpenVideo={(url) => setDetailExercise({ name: 'Pemanasan', ytVideo: url, type: 'warmup' })}
-              activeProgram={activeProgram}
+              warmupVideos={activeProgram?.warmupVideoUrls?.length > 0 ? activeProgram.warmupVideoUrls.join(' ') : warmupVideos}
+              onOpenWarmup={() => setDetailExercise({ name: 'Pemanasan', ytVideo: activeProgram?.warmupVideoUrls?.length > 0 ? activeProgram.warmupVideoUrls.join(' ') : warmupVideos, type: 'warmup' })}
             />
 
             <div className="space-y-4 mt-4">
@@ -615,7 +643,7 @@ const WorkoutTab = ({
                           onClick={() => { playSoundEffect('click', soundEnabled); toggleSession(prog.workoutId); }}
                           className="caption opacity-60 font-bold cursor-pointer flex items-center gap-1"
                         >
-                          <span>{prog.exercises?.length || 0} Latihan</span>{isExpanded ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
+                          {isExpanded ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
                         </div>
                       </div>
                     </div>
@@ -792,20 +820,25 @@ const WorkoutTab = ({
                 </div>
               )}
 
-              {/* TOMBOL TAMBAH LATIHAN EKSTRA */}
-              <button 
-                onClick={() => { playSoundEffect('click', soundEnabled); onAddExtraClick(); }}
-                className={`w-full py-4 rounded-2xl border-2 border-dashed ${t.borderAccentSoft} ${t.textAccent} font-black hover:${t.bgAccentSoft} transition-colors flex items-center justify-center gap-2`}
-              >
-                <Plus size={20} /> {lang.addExtra || 'Tambah Latihan Ekstra'}
-              </button>
+              {/* TOMBOL TAMBAH LATIHAN EKSTRA + PENDINGINAN (global, sejajar) */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => { playSoundEffect('click', soundEnabled); onAddExtraClick(); }}
+                  className={`flex-1 py-4 rounded-2xl border-2 border-dashed ${t.borderAccentSoft} ${t.textAccent} font-black hover:${t.bgAccentSoft} transition-colors flex items-center justify-center gap-2`}
+                >
+                  <Plus size={20} /> {lang.addExtra || 'Tambah Latihan Ekstra'}
+                </button>
+                {cooldownVideos && (
+                  <button
+                    onClick={() => { playSoundEffect('click', soundEnabled); setDetailExercise({ name: 'Pendinginan', ytVideo: cooldownVideos, type: 'cooldown' }); }}
+                    className={`shrink-0 flex items-center justify-center w-14 h-14 rounded-full transition-all active:scale-95 ${t.btnBg} ${t.textMuted} hover:${t.textAccent}`}
+                    title="Pendinginan"
+                  >
+                    <Wind size={20} strokeWidth={2} />
+                  </button>
+                )}
+              </div>
             </div>
-
-            <WorkoutFooter 
-              t={t} lang={lang} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect}
-              cooldownVideos={cooldownVideos} onOpenVideo={(url) => setDetailExercise({ name: 'Pendinginan', ytVideo: url, type: 'cooldown' })}
-              isCurrentlyCompleted={isCurrentlyCompleted} onSaveWorkout={onSaveWorkout}
-            />
           </>
         )}
       </div>
@@ -862,7 +895,7 @@ const WorkoutTab = ({
         }
 
         return (
-          <div className="fixed bottom-20 left-0 right-0 px-4 z-40 pointer-events-none flex justify-center animate-in slide-in-from-bottom-8 fade-in duration-300">
+          <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 pointer-events-none flex justify-center animate-in slide-in-from-bottom-8 fade-in duration-300">
             <button 
               onClick={() => handleStartWorkout(sessionData.workoutId)}
               disabled={isDisabled}

@@ -112,14 +112,18 @@ export const normalizeMuscleKey = (str) => {
 };
 
 export const formatTarget = (t, language = 'ID') => {
+  // muscleDictionary keys-nya 'EN'/'ID' uppercase — normalisasi di sini supaya kalau ada
+  // state bahasa kesimpan lowercase (pernah kejadian saat reset logout), badge target otot
+  // tidak diam-diam kosong lagi.
+  const langKey = (language || 'ID').toUpperCase();
   if (Array.isArray(t)) {
     return t.map(m => {
         const key = normalizeMuscleKey(m);
-        return muscleDictionary[key] ? muscleDictionary[key][language] : m;
+        return muscleDictionary[key] ? muscleDictionary[key][langKey] : m;
     }).join(', ');
   }
   const key = normalizeMuscleKey(t);
-  return muscleDictionary[key] ? muscleDictionary[key][language] : (t || 'Lainnya');
+  return muscleDictionary[key] ? muscleDictionary[key][langKey] : (t || 'Lainnya');
 };
 
 export const getLocalYMD = (date) => {

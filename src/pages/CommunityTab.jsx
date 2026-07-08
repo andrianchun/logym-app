@@ -17,7 +17,7 @@ import CreatePostModal from '../components/CreatePostModal';
 import ProgramCard from '../components/ProgramCard';
 import UserProfileModal from '../components/UserProfileModal';
 import UnifiedBadge from '../components/UnifiedBadge';
-import { uploadToCloudinary } from '../utils/cloudinary';
+
 import useDialog from '../hooks/useDialog';
 
 const FILTERS = ['Semua', 'Diikuti', 'Saya'];
@@ -262,7 +262,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
   };
 
   const handleNativeShare = async (post) => {
-    const text = post.text || `Postingan dari ${post.userName} di LyFit`;
+    const text = post.text || `Postingan dari ${post.userName} di LOGYM`;
     if (navigator.share) {
       navigator.share({ title: post.userName, text });
     } else {

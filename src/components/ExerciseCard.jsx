@@ -172,6 +172,11 @@ const ExerciseCard = ({
                          <button onClick={() => { playSoundEffect('click', soundEnabled); onOpenVideo(ex); }} className={`${t.textMuted} p-2 ${t.inputBg} border ${t.border} rounded-xl hover:${t.textAccent} hover:${t.borderAccentSoft} transition-colors`}>
                              <Info size={16} />
                          </button>
+                         {onAddWarmupSets && exType === 'weight' && (
+                             <button onClick={() => { playSoundEffect('click', soundEnabled); onAddWarmupSets(ex.id); }} className={`${t.textMuted} p-2 ${t.inputBg} border ${t.border} rounded-xl hover:text-orange-500 hover:border-orange-500/50 transition-colors`} title="Buat Set Pemanasan Otomatis">
+                                 <Flame size={16} />
+                             </button>
+                         )}
                          {/* COACH BUTTON */}
                          {exType === 'weight' && !isSkip && (
                              <div className="relative">
@@ -180,7 +185,10 @@ const ExerciseCard = ({
                                </button>
                                {showHint && createPortal(
                                  <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                                   <div className="absolute inset-0 bg-black/60 backdrop-blur-md animate-in fade-in" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); setShowHint(false); }} />
+                                   {/* onClick (bukan onPointerDown) — pointerdown menghapus modal ini dari DOM
+                                       SEBELUM event click dari gesture yang sama sempat selesai, sehingga klik
+                                       "tembus" ke tombol yang baru tersingkap di baliknya (mis. Selesai Set/Mulai Latihan) */}
+                                   <div className="absolute inset-0 bg-black/60 backdrop-blur-md animate-in fade-in" onClick={() => setShowHint(false)} />
                                    <div className={`relative overflow-hidden w-[90%] max-w-[340px] min-h-[480px] p-6 flex flex-col justify-between rounded-[32px] ${t.bgCard} shadow-2xl ring-1 ring-black/5 dark:ring-white/10 z-10 text-center leading-snug animate-in fade-in zoom-in-95 duration-300`} onClick={e => e.stopPropagation()}>
                                      <div 
                                        className="absolute inset-0 z-0 opacity-80 dark:opacity-60 pointer-events-none mix-blend-multiply dark:mix-blend-normal"
@@ -199,7 +207,7 @@ const ExerciseCard = ({
                                              <div className={`w-8 h-8 rounded-full ${t.bgAccent} flex items-center justify-center shadow-lg`}>
                                                <Brain size={16} className={t.textWhite} />
                                              </div>
-                                             <span className={`font-black text-[11px] tracking-widest uppercase ${t.textMain}`}>Lyfit Coach</span>
+                                             <span className={`font-black text-[11px] tracking-widest uppercase ${t.textMain}`}>LOGYM Coach</span>
                                            </div>
                                          </div>
                                          <div className="flex flex-col items-center mt-auto pt-32 pb-2">
@@ -254,18 +262,8 @@ const ExerciseCard = ({
               )}
             {exType === 'time' && <div>Menit</div>}
             {exType !== 'time' && <div>Reps</div>}
-            {onAddWarmupSets && exType === 'weight' ? (
-              <div className="col-span-2 flex justify-center w-full pr-1">
-                <button onClick={() => { playSoundEffect('click', soundEnabled); onAddWarmupSets(ex.id); }} className={`w-full max-w-[76px] py-1 caption border ${t.borderAccentSoft} bg-black/5 dark:bg-white/5 rounded-lg ${t.textAccent} hover:${t.bgAccentSoft} transition-colors flex items-center justify-center font-bold whitespace-nowrap`} title="Buat Set Pemanasan Otomatis">
-                  Pemanasan
-                </button>
-              </div>
-            ) : (
-              <>
-                <div></div>
-                <div></div>
-              </>
-            )}
+            <div></div>
+            <div></div>
           </div>
 
             {sets.map((s, setIdx) => (
@@ -427,15 +425,24 @@ const ExerciseCard = ({
                 <label className="text-sm font-bold mb-2 block">Catatan Tambahan</label>
                 <div className="flex flex-wrap gap-2 mb-3">
                   {["Terlalu Ringan", "Cukup Menantang", "Berat Banget", "Gagal Angkat", "Form Rusak"].map(tag => (
-                    <button 
-                      key={tag} 
+                    <button
+                      key={tag}
                       onClick={(e) => {
                         e.preventDefault();
                         playSoundEffect('click', soundEnabled);
                         const currentNotes = activeSetDetail.notes ? activeSetDetail.notes + (activeSetDetail.notes.endsWith(' ') ? '' : ', ') : '';
-                        if(!currentNotes.includes(tag)) {
-                          setActiveSetDetail({...activeSetDetail, notes: currentNotes + tag});
-                        }
+                        // Tag intensitas otomatis geser slider RPE/RIR, bukan cuma nambah teks catatan
+                        const rpeAdjust = {
+                          'Terlalu Ringan': { rpe: 4, rir: 6 },
+                          'Cukup Menantang': { rpe: 7, rir: 3 },
+                          'Berat Banget': { rpe: 9, rir: 1 },
+                          'Gagal Angkat': { rpe: 10, rir: 0 },
+                        }[tag];
+                        setActiveSetDetail({
+                          ...activeSetDetail,
+                          notes: currentNotes.includes(tag) ? activeSetDetail.notes : currentNotes + tag,
+                          ...(rpeAdjust || {})
+                        });
                       }}
                       className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors`}
                     >
@@ -443,7 +450,19 @@ const ExerciseCard = ({
                     </button>
                   ))}
                 </div>
-                <textarea rows="3" placeholder="Bagaimana rasanya set ini?" value={activeSetDetail.notes} onChange={e => setActiveSetDetail({...activeSetDetail, notes: e.target.value})} className={`w-full p-3 rounded-xl ${t.inputBg} ${t.textMain} placeholder-black/30 dark:placeholder-white/30 body-lg resize-none outline-none focus:ring-1 focus:${t.ringAccent}`}></textarea>
+                <div className="relative">
+                  <textarea rows="3" placeholder="Bagaimana rasanya set ini?" value={activeSetDetail.notes} onChange={e => setActiveSetDetail({...activeSetDetail, notes: e.target.value})} className={`w-full p-3 pr-9 rounded-xl ${t.inputBg} ${t.textMain} placeholder-black/30 dark:placeholder-white/30 body-lg resize-none outline-none focus:ring-1 focus:${t.ringAccent}`}></textarea>
+                  {activeSetDetail.notes && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); playSoundEffect('click', soundEnabled); setActiveSetDetail({...activeSetDetail, notes: ''}); }}
+                      className={`absolute top-2 right-2 p-1 rounded-full ${t.textMuted} hover:text-rose-500 hover:bg-rose-500/10 transition-colors`}
+                      title="Hapus catatan"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="flex gap-3 mt-2">

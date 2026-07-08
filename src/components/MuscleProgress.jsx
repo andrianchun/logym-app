@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import Model from './react-body-highlighter/index.js';
 import { ChevronDown } from 'lucide-react';
@@ -28,7 +29,7 @@ const muscleMapping = {
     'abductors': ['adductor', 'abductors']
 };
 
-export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, theme, soundEnabled, playSoundEffect, isSubCard = false, forceViewMode = null }) => {
+export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, theme, soundEnabled, playSoundEffect, isSubCard = false, forceViewMode = null, disableChartAnimation = false }) => {
     const [timeFilter, setTimeFilter] = useState('1m'); // '1m', '3m', 'all'
     const [viewMode, setViewMode] = useState(forceViewMode || 'image'); // 'image' or 'radar'
     const [selectedMuscle, setSelectedMuscle] = useState(null);
@@ -46,6 +47,29 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
+
+    // Tooltip Visual Otot: tutup begitu klik di luar area otot, atau begitu discroll —
+    // sebelumnya tooltip "fixed" ini tetap menempel di posisi layar yang sama walau
+    // konten sudah bergeser karena scroll, jadi kelihatan seperti "ngikutin". Behavior-nya
+    // disamakan dengan tooltip grafik radar (Recharts) yang otomatis hilang begitu tidak
+    // lagi disentuh/di-hover.
+    useEffect(() => {
+        if (!selectedMuscle) return;
+        const closeTooltip = (event) => {
+            // Klik di atas bagian tubuh dibiarkan — itu sudah ditangani onClick masing-masing
+            // polygon sendiri (bisa langsung ganti ke otot lain atau toggle tutup).
+            if (event?.target?.closest && event.target.closest('[data-muscle]')) return;
+            setSelectedMuscle(null);
+        };
+        document.addEventListener("mousedown", closeTooltip);
+        document.addEventListener("touchstart", closeTooltip);
+        window.addEventListener("scroll", closeTooltip, true);
+        return () => {
+            document.removeEventListener("mousedown", closeTooltip);
+            document.removeEventListener("touchstart", closeTooltip);
+            window.removeEventListener("scroll", closeTooltip, true);
+        };
+    }, [selectedMuscle]);
 
     const radarLabels = useMemo(() => ({
         "chest": { EN: "Chest", ID: "Dada" },
@@ -193,6 +217,20 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
             }));
     }, [bodyData, lang]);
 
+    // onMouseOver (dipakai sebelumnya) tidak konsisten disintesis browser dari sentuhan layar,
+    // jadi di HP tooltip bisa tidak muncul atau posisinya salah. onClick jauh lebih andal untuk
+    // tap karena selalu terjadi sinkron dengan sentuhan asli — pakai e.currentTarget (bukan
+    // e.target) supaya rect yang diambil pasti milik polygon otot yang benar-benar disentuh.
+    const handleMuscleTap = (data, e) => {
+        if (selectedMuscle && selectedMuscle.muscle === data.muscle) {
+            setSelectedMuscle(null);
+            return;
+        }
+        const rect = e.currentTarget.getBoundingClientRect();
+        setTooltipPos({ left: rect.left + rect.width / 2, top: rect.top });
+        setSelectedMuscle(data);
+    };
+
     return (
         <div className={!isSubCard ? "p-5" : ""}>
             {!isSubCard && (
@@ -245,36 +283,46 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
                 {viewMode === 'image' ? (
                     <div className="flex flex-row gap-2 sm:gap-8 justify-center items-start w-full">
                         <div className="flex flex-col items-center w-1/2 max-w-[180px]">
-                            <h3 className={`body-md mb-4 uppercase text-center ${t.textMuted}`}>Anterior (Depan)</h3>
-                            <Model
-                                data={bodyData}
-                                style={{ width: '100%' }}
-                                bodyColor={theme === 'dark' ? '#27272a' : '#cbd5e1'}
-                                highlightedColors={theme === 'dark' ? ['#1e3a8a', '#1d4ed8', '#2563eb', '#3b82f6', '#60a5fa'] : ['#93c5fd', '#60a5fa', '#3b82f6', '#2563eb', '#1d4ed8']}
-                                type="anterior"
-                                onMouseOver={(data, e) => {
-                                    const rect = e.target.getBoundingClientRect();
-                                    setTooltipPos({ left: rect.left + rect.width / 2, top: rect.top });
-                                    setSelectedMuscle(data);
-                                }}
-                                onMouseOut={() => setSelectedMuscle(null)}
-                            />
+                            <div className="relative w-full">
+                                <img src="/coach-front.webp" alt="Coach Depan" className="absolute inset-0 w-full h-full object-contain pointer-events-none z-0 mix-blend-luminosity opacity-90 dark:opacity-75 transform scale-[1.18] -translate-x-1.5 -translate-y-2" />
+                                <div className="relative z-10 mix-blend-screen dark:mix-blend-color-dodge">
+                                    <Model
+                                        data={bodyData}
+                                        style={{ width: '100%' }}
+                                        bodyColor="transparent"
+                                        highlightedColors={theme === 'dark' ? ['rgba(30,58,138,0.85)', 'rgba(29,78,216,0.85)', 'rgba(37,99,235,0.85)', 'rgba(59,130,246,0.85)', 'rgba(96,165,250,0.85)'] : ['rgba(147,197,253,0.85)', 'rgba(96,165,250,0.85)', 'rgba(59,130,246,0.85)', 'rgba(37,99,235,0.85)', 'rgba(29,78,216,0.85)']}
+                                        type="anterior"
+                                        onClick={handleMuscleTap}
+                                        onMouseOver={(data, e) => {
+                                            const rect = e.currentTarget.getBoundingClientRect();
+                                            setTooltipPos({ left: rect.left + rect.width / 2, top: rect.top });
+                                            setSelectedMuscle(data);
+                                        }}
+                                        onMouseOut={() => setSelectedMuscle(null)}
+                                    />
+                                </div>
+                            </div>
                         </div>
                         <div className="flex flex-col items-center w-1/2 max-w-[180px]">
-                            <h3 className={`body-md mb-4 uppercase text-center ${t.textMuted}`}>Posterior (Belakang)</h3>
-                            <Model
-                                data={bodyData}
-                                style={{ width: '100%' }}
-                                bodyColor={theme === 'dark' ? '#27272a' : '#cbd5e1'}
-                                highlightedColors={theme === 'dark' ? ['#1e3a8a', '#1d4ed8', '#2563eb', '#3b82f6', '#60a5fa'] : ['#93c5fd', '#60a5fa', '#3b82f6', '#2563eb', '#1d4ed8']}
-                                type="posterior"
-                                onMouseOver={(data, e) => {
-                                    const rect = e.target.getBoundingClientRect();
-                                    setTooltipPos({ left: rect.left + rect.width / 2, top: rect.top });
-                                    setSelectedMuscle(data);
-                                }}
-                                onMouseOut={() => setSelectedMuscle(null)}
-                            />
+                            <div className="relative w-full">
+                                <img src="/coach-back.webp" alt="Coach Belakang" className="absolute inset-0 w-full h-full object-contain pointer-events-none z-0 mix-blend-luminosity opacity-90 dark:opacity-75 transform scale-[1.25]" />
+                                <div className="relative z-10 mix-blend-screen dark:mix-blend-color-dodge">
+                                    <Model
+                                        data={bodyData}
+                                        style={{ width: '100%' }}
+                                        bodyColor="transparent"
+                                        highlightedColors={theme === 'dark' ? ['rgba(30,58,138,0.85)', 'rgba(29,78,216,0.85)', 'rgba(37,99,235,0.85)', 'rgba(59,130,246,0.85)', 'rgba(96,165,250,0.85)'] : ['rgba(147,197,253,0.85)', 'rgba(96,165,250,0.85)', 'rgba(59,130,246,0.85)', 'rgba(37,99,235,0.85)', 'rgba(29,78,216,0.85)']}
+                                        type="posterior"
+                                        onClick={handleMuscleTap}
+                                        onMouseOver={(data, e) => {
+                                            const rect = e.currentTarget.getBoundingClientRect();
+                                            setTooltipPos({ left: rect.left + rect.width / 2, top: rect.top });
+                                            setSelectedMuscle(data);
+                                        }}
+                                        onMouseOut={() => setSelectedMuscle(null)}
+                                    />
+                                </div>
+                            </div>
                         </div>
                     </div>
                 ) : (
@@ -293,7 +341,7 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
                                     </defs>
                                     <PolarGrid stroke={theme === 'dark' ? '#3f3f46' : '#cbd5e1'} />
                                     <PolarAngleAxis dataKey="muscle" tick={{ fill: theme === 'dark' ? '#a1a1aa' : '#64748b', fontSize: 10, fontWeight: 700 }} />
-                                    <Radar name="Skor Otot" dataKey="score" stroke={theme === 'dark' ? '#06b6d4' : '#0891b2'} strokeWidth={2} fill={theme === 'dark' ? '#3b82f6' : '#2563eb'} fillOpacity={0.5} />
+                                    <Radar name="Skor Otot" dataKey="score" stroke={theme === 'dark' ? '#06b6d4' : '#0891b2'} strokeWidth={2} fill={theme === 'dark' ? '#3b82f6' : '#2563eb'} fillOpacity={0.5} isAnimationActive={!disableChartAnimation} />
                                     <Tooltip 
                                         contentStyle={{ backgroundColor: theme === 'dark' ? '#18181b' : '#ffffff', border: 'none', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
                                         itemStyle={{ color: theme === 'dark' ? '#a6e8ff' : '#3b82f6', fontWeight: 900 }}
@@ -307,11 +355,16 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
                 )}
             </div>
 
-            {selectedMuscle && viewMode === 'image' && (
-                <div 
+            {selectedMuscle && viewMode === 'image' && createPortal(
+                <div
+                    // Di-portal ke document.body — kartu-kartu Dashboard pakai class "anim-rise"
+                    // (animation: ... both), yang MENINGGALKAN transform: translateY(0) permanen
+                    // setelah animasi selesai. Ancestor dengan transform apa pun (walau translateY(0))
+                    // membuat descendant position:fixed jadi relatif ke ancestor itu, BUKAN ke viewport
+                    // sungguhan — makanya posisi tooltip selalu meleset. Render di body menghindari itu.
                     className="fixed z-[100] pointer-events-none transition-opacity duration-200"
-                    style={{ 
-                        left: tooltipPos.left, 
+                    style={{
+                        left: tooltipPos.left,
                         top: tooltipPos.top - 10,
                         transform: 'translate(-50%, -100%)',
                         backgroundColor: theme === 'dark' ? '#18181b' : '#ffffff',
@@ -363,7 +416,8 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
                             </>
                         )}
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

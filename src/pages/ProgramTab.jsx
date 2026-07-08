@@ -208,7 +208,7 @@ const ProgramTab = ({
     setConfirmModal({
       isOpen: true,
       title: 'Hapus Rutinitas',
-      message: `Yakin ingin menghapus rutinitas "${routineName}"? Data latihan di dalamnya akan ikut terhapus.`,
+      message: `Yakin ingin menghapus rutinitas "${routineName}"? Daftar latihannya akan hilang, tapi riwayat sesi yang sudah pernah kamu selesaikan tetap aman tersimpan di Kalender.`,
       onConfirm: () => {
         setPrograms(prevPrograms => prevPrograms.filter(p => p.id !== routineId));
         if (expandedRoutineId === routineId) setExpandedRoutineId(null);
@@ -221,7 +221,7 @@ const ProgramTab = ({
     setConfirmModal({
       isOpen: true,
       title: 'Hapus Seluruh Program',
-      message: `PERINGATAN KERAS: Yakin ingin menghapus seluruh program "${planName}" beserta semua rutinitas di dalamnya? Tindakan ini tidak bisa dibatalkan!`,
+      message: `Yakin ingin menghapus seluruh program "${planName}" beserta semua rutinitas di dalamnya? Tindakan ini tidak bisa dibatalkan — tapi tenang, riwayat sesi latihan yang sudah pernah kamu selesaikan tetap aman tersimpan di Kalender.`,
       onConfirm: () => {
         const remaining = programs.filter(p => (p.planId || 'custom') !== planId);
         setPrograms(remaining);
@@ -475,10 +475,20 @@ const ProgramTab = ({
     };
 
     const handleRenamePlan = (planId, newName) => {
+      let baseName = newName.trim() || 'Program Tanpa Nama';
+      let uniqueName = baseName;
+      let counter = 2;
+      
+      // Pastikan nama baru belum dipakai oleh program/plan LAIN
+      while (programs.some(p => (p.planId || 'custom') !== planId && (p.planName || 'Program Default') === uniqueName)) {
+        uniqueName = `${baseName} (${counter})`;
+        counter++;
+      }
+
       const updated = programs.map(p => {
         const pId = p.planId || 'custom';
         if (pId === planId) {
-          return { ...p, planName: newName };
+          return { ...p, planName: uniqueName };
         }
         return p;
       });
@@ -885,7 +895,7 @@ const ProgramTab = ({
             onClick={() => { playSoundEffect('click', soundEnabled); openQuestionnaire(); }}
             className={`w-full py-3 rounded-xl font-black text-white bg-gradient-to-r ${t.gradientBg} shadow-md active:scale-95 transition-all flex items-center justify-center text-sm`}
           >
-            Lyfit Coach
+            LOGYM Coach
           </button>
             <button 
               onClick={() => { 
@@ -920,7 +930,7 @@ const ProgramTab = ({
       
       <AlternativeExerciseModal
         isOpen={showAlternativeModal}
-        onClose={() => setShowAlternativeModal(false)}
+        onClose={() => { setShowAlternativeModal(false); setDetailExercise(null); }}
         originalEx={detailExercise}
         exerciseLibrary={exerciseLibrary}
         onSelectAlternative={handleSelectAlternative}

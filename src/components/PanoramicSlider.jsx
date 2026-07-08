@@ -1,167 +1,189 @@
-import React, { useRef, useState, useEffect, useImperativeHandle, forwardRef } from 'react';
+import React, { useRef, useImperativeHandle, forwardRef } from 'react';
 
-const PanoramicSlider = forwardRef(({ onSwipeLeft, onSwipeRight, renderPanel, swipeThreshold = 0.25, onUpSwipe, onDownSwipe, className = '' }, ref) => {
+/**
+ * PanoramicSlider — horizontal swipe carousel with smooth vertical scroll coexistence.
+ *
+ * Perbaikan utama vs versi lama:
+ * - Semua drag state pakai ref, BUKAN useState → tidak ada re-render selama drag berlangsung
+ *   sehingga posisi tidak pernah tiba-tiba reset di tengah gesture.
+ * - Transform ditulis langsung ke DOM node (trackRef.current.style.transform) via rAF,
+ *   sama seperti AuthPage — ini jauh lebih smooth daripada setState → render → CSS.
+ * - Direction lock dilakukan setelah 6px movement, setelah itu arah terkunci hingga touchend.
+ *   Tidak ada lagi kasus "nyangkut di tengah" karena arah yang ambigu.
+ * - isAnimating pakai ref, bukan state, sehingga tidak bisa "tertinggal" karena batching render.
+ * - touchAction='pan-y' di container → browser langsung tahu boleh scroll vertikal tanpa
+ *   menunggu JS, tapi horizontal masih bisa dicegah via preventDefault setelah lock.
+ */
+const PanoramicSlider = forwardRef(({
+  onSwipeLeft,
+  onSwipeRight,
+  renderPanel,
+  swipeThreshold = 0.25,
+  onUpSwipe,
+  onDownSwipe,
+  className = '',
+  fillHeight = false,
+}, ref) => {
   const containerRef = useRef(null);
-  const [offsetX, setOffsetX] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const [isAnimating, setIsAnimating] = useState(false);
-  
-  const touchStartY = useRef(null);
-  const touchStartX = useRef(null);
-  const isHorizontalDrag = useRef(false);
-  const lastTouchTime = useRef(0);
+  const trackRef    = useRef(null);   // div yang di-translate
+  const animating   = useRef(false);  // true saat snap/swipe animation berjalan
 
-  useImperativeHandle(ref, () => ({
-    slideLeft: () => {
-      if (isAnimating) return;
-      setIsAnimating(true);
-      const cw = containerRef.current?.clientWidth || window.innerWidth;
-      setOffsetX(-cw);
-      setTimeout(() => {
-        if(onSwipeLeft) onSwipeLeft();
-        setIsDragging(true);
-        setOffsetX(0);
-        setTimeout(() => { setIsDragging(false); setIsAnimating(false); }, 50);
-      }, 300);
-    },
-    slideRight: () => {
-      if (isAnimating) return;
-      setIsAnimating(true);
-      const cw = containerRef.current?.clientWidth || window.innerWidth;
-      setOffsetX(cw);
-      setTimeout(() => {
-        if(onSwipeRight) onSwipeRight();
-        setIsDragging(true);
-        setOffsetX(0);
-        setTimeout(() => { setIsDragging(false); setIsAnimating(false); }, 50);
-      }, 300);
-    }
-  }));
+  // Semua drag state dalam satu ref object — zero re-renders
+  const drag = useRef({
+    active:    false,
+    startX:    0,
+    startY:    0,
+    startTime: 0,
+    dir:       null,   // null = belum ditentukan, 'h' = horizontal, 'v' = vertical
+    offsetX:   0,      // offset aktual saat ini
+  });
 
+  // ── Helper: set transform tanpa React re-render ──
+  const setTransform = (x, withTransition) => {
+    if (!trackRef.current) return;
+    trackRef.current.style.transition = withTransition
+      ? 'transform 0.28s cubic-bezier(0.25, 1, 0.5, 1)'
+      : 'none';
+    trackRef.current.style.transform = `translate3d(${x}px, 0, 0)`;
+    drag.current.offsetX = x;
+  };
+
+  // ── Selesaikan swipe: animasi ke tepi, panggil callback, snap balik ke 0 ──
+  const commitSwipe = (direction) => {
+    animating.current = true;
+    const cw = containerRef.current?.clientWidth || window.innerWidth;
+    const target = direction === 'left' ? -cw : cw;
+
+    setTransform(target, true);
+
+    setTimeout(() => {
+      // Nonaktifkan transisi dulu, reset ke 0, lalu panggil callback
+      setTransform(0, false);
+      if (direction === 'left') onSwipeLeft?.();
+      else                      onSwipeRight?.();
+      // Sedikit delay kecil sebelum buka kembali input baru
+      setTimeout(() => { animating.current = false; }, 50);
+    }, 280);
+  };
+
+  // ── Snap balik ke tengah ──
+  const snapBack = () => {
+    setTransform(0, true);
+    // Beri waktu transisi selesai baru buka lagi
+    setTimeout(() => { animating.current = false; }, 290);
+  };
+
+  // ── Touch Handlers ──
   const handleTouchStart = (e) => {
-    if (isAnimating) return; // Block touches while snapping
-    touchStartY.current = e.touches[0].clientY;
-    touchStartX.current = e.touches[0].clientX;
-    lastTouchTime.current = Date.now();
-    setIsDragging(true);
-    isHorizontalDrag.current = null; // null means undetermined
+    if (animating.current) return;
+    const t = e.touches[0];
+    drag.current = {
+      active:    true,
+      startX:    t.clientX,
+      startY:    t.clientY,
+      startTime: Date.now(),
+      dir:       null,
+      offsetX:   0,
+    };
+    // Matikan transisi agar drag terasa instan
+    setTransform(0, false);
   };
 
   const handleTouchMove = (e) => {
-    if (!isDragging || isAnimating) return;
-    
-    const currentY = e.touches[0].clientY;
-    const currentX = e.touches[0].clientX;
-    const distanceY = touchStartY.current - currentY;
-    const distanceX = touchStartX.current - currentX;
+    const d = drag.current;
+    if (!d.active || animating.current) return;
 
-    // Determine swipe direction on first move
-    if (isHorizontalDrag.current === null) {
-      if (Math.abs(distanceX) > Math.abs(distanceY)) {
-        isHorizontalDrag.current = true;
-      } else {
-        isHorizontalDrag.current = false;
+    const t  = e.touches[0];
+    const dx = t.clientX - d.startX;
+    const dy = t.clientY - d.startY;
+
+    // Lock direction setelah 6px — sekali terkunci, tidak bisa berubah
+    if (d.dir === null) {
+      if (Math.abs(dx) > 6 || Math.abs(dy) > 6) {
+        d.dir = Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v';
       }
+      return; // tunggu lock dulu sebelum mulai gerak
     }
 
-    if (!isHorizontalDrag.current) {
-      // It's a vertical scroll, let browser handle it normally
-      return; 
-    }
+    if (d.dir === 'v') return; // biarkan browser scroll vertikal
 
-    // It's a horizontal scroll, prevent default to stop page scrolling
-    if (e.cancelable) {
-      e.preventDefault();
-    }
-    
-    // Add resistance at the edges if we wanted, but we have infinite loop so no edges
-    setOffsetX(-distanceX);
+    // Horizontal — cegah scroll browser
+    if (e.cancelable) e.preventDefault();
+    setTransform(dx, false);
   };
 
   const handleTouchEnd = (e) => {
-    if (!isDragging || isAnimating) return;
-    setIsDragging(false);
-    
-    if (touchStartY.current === null || touchStartX.current === null) return;
-    const touchEndY = e.changedTouches[0].clientY;
-    const touchEndX = e.changedTouches[0].clientX;
-    const distanceY = touchStartY.current - touchEndY;
-    const distanceX = touchStartX.current - touchEndX;
-    const timeElapsed = Date.now() - lastTouchTime.current;
+    const d = drag.current;
+    if (!d.active) return;
+    d.active = false;
 
-    // Handle vertical swipe detection (for changing calendar mode)
-    if (isHorizontalDrag.current === false) {
-      if (Math.abs(distanceY) > 40) {
-        if (distanceY > 0 && onUpSwipe) onUpSwipe();
-        if (distanceY < 0 && onDownSwipe) onDownSwipe();
+    const t  = e.changedTouches[0];
+    const dx = t.clientX - d.startX;
+    const dy = t.clientY - d.startY;
+    const dt = Date.now() - d.startTime;
+
+    // Arah belum terkunci = tap biasa, tidak ada swipe
+    if (d.dir === null) return;
+
+    // Swipe vertikal
+    if (d.dir === 'v') {
+      if (Math.abs(dy) > 40) {
+        if (dy < 0 && onUpSwipe)   onUpSwipe();
+        if (dy > 0 && onDownSwipe) onDownSwipe();
       }
-      setOffsetX(0);
       return;
     }
 
-    const cw = containerRef.current?.clientWidth || window.innerWidth;
-    const threshold = cw * swipeThreshold;
-    const isFastSwipe = timeElapsed < 300 && Math.abs(distanceX) > 30;
+    // Swipe horizontal — evaluasi threshold & kecepatan
+    const cw       = containerRef.current?.clientWidth || window.innerWidth;
+    const absDx    = Math.abs(dx);
+    const isFast   = dt < 280 && absDx > 25;
+    const isPast   = absDx > cw * swipeThreshold;
 
-    setIsAnimating(true);
-
-    if (distanceX > threshold || (isFastSwipe && distanceX > 0)) {
-      // Swiped Left -> go to Next
-      setOffsetX(-cw);
-      setTimeout(() => {
-        onSwipeLeft();
-        // Instantly reset position without animation
-        setIsDragging(true); // Temporarily trick the style to disable transition
-        setOffsetX(0);
-        setTimeout(() => {
-           setIsDragging(false);
-           setIsAnimating(false);
-        }, 50);
-      }, 300); // Wait for CSS transition (0.3s)
-    } else if (distanceX < -threshold || (isFastSwipe && distanceX < 0)) {
-      // Swiped Right -> go to Prev
-      setOffsetX(cw);
-      setTimeout(() => {
-        onSwipeRight();
-        setIsDragging(true);
-        setOffsetX(0);
-        setTimeout(() => {
-           setIsDragging(false);
-           setIsAnimating(false);
-        }, 50);
-      }, 300);
+    if (isPast || isFast) {
+      commitSwipe(dx < 0 ? 'left' : 'right');
     } else {
-      // Snap back to center (didn't pass threshold)
-      setOffsetX(0);
-      setTimeout(() => {
-         setIsAnimating(false);
-      }, 300);
+      snapBack();
     }
   };
 
+  // ── Expose imperative API (untuk swipe programatik dari kalender) ──
+  useImperativeHandle(ref, () => ({
+    slideLeft:  () => commitSwipe('left'),
+    slideRight: () => commitSwipe('right'),
+  }));
+
+  const hClass = fillHeight ? 'h-full' : '';
+
   return (
-    <div 
+    <div
       ref={containerRef}
-      className={`w-full overflow-hidden relative touch-pan-y ${className}`}
+      className={`w-full relative ${hClass} ${className}`}
+      style={{
+        overflow:    fillHeight ? 'hidden' : 'visible',
+        touchAction: 'pan-y',    // browser handles vertical scroll natively
+      }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
     >
-      <div 
-        className="w-full relative"
-        style={{ 
-          transform: `translate3d(${offsetX}px, 0, 0)`,
-          transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)' 
-        }}
+      {/* Track — ini yang bergerak horizontal */}
+      <div
+        ref={trackRef}
+        className={`w-full relative flex-1 ${hClass}`}
+        style={{ willChange: 'transform' }}
       >
-        <div className="w-full absolute top-0 -left-full flex flex-col justify-start">
+        {/* Panel kiri (prev) */}
+        <div className={`w-full absolute top-0 -left-full flex flex-col min-h-full`}>
           {renderPanel('prev')}
         </div>
-        <div className="w-full relative flex flex-col justify-start">
+        {/* Panel tengah (curr) — ini yang terlihat */}
+        <div className={`w-full relative flex flex-col min-h-full`}>
           {renderPanel('curr')}
         </div>
-        <div className="w-full absolute top-0 left-full flex flex-col justify-start">
+        {/* Panel kanan (next) */}
+        <div className={`w-full absolute top-0 left-full flex flex-col min-h-full`}>
           {renderPanel('next')}
         </div>
       </div>
