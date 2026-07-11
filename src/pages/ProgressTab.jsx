@@ -486,7 +486,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
         )}
         
         {!isSubCard && (
-        <div className={`mb-5 border-b border-dashed ${t.border} pb-5`}>
+        <div className={`mb-5 border-b border-dashed ${t.border} pb-5 no-swipe`} onTouchStart={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
            <div className={`relative flex w-full p-1.5 rounded-full ${t.btnBg}`}>
                <div className={`absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] rounded-full transition-transform duration-300 ease-out ${t.bgAccent} shadow-sm`} style={{ transform: chartType === 'exercise' ? 'translateX(0)' : 'translateX(100%)', left: '6px' }}></div>
                
@@ -496,7 +496,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
         </div>
         )}
         
-        <div className={`flex ${isSubCard ? 'mb-1' : 'mb-5'} ${theme === 'dark' ? 'bg-black/40' : 'bg-black/5'} backdrop-blur-md rounded-2xl relative`}>
+        <div className={`flex ${isSubCard ? 'mb-1' : 'mb-5'} ${theme === 'dark' ? 'bg-black/40' : 'bg-black/5'} backdrop-blur-md rounded-2xl relative no-swipe`} onTouchStart={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
           
           {chartDataObj.data.length > 0 && (
               <div className={`w-12 shrink-0 pointer-events-none flex items-center border-r border-slate-500/10 z-10 bg-transparent py-3`}>
@@ -578,7 +578,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                  ))}
              </div>
         ) : (
-            <div key={chartType} className="grid grid-rows-2 grid-flow-col gap-2 overflow-x-auto pb-2 hide-scrollbar auto-cols-max" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <div key={chartType} className="grid grid-rows-2 grid-flow-col gap-2 overflow-x-auto pb-2 hide-scrollbar auto-cols-max no-swipe" style={{ WebkitOverflowScrolling: 'touch' }} onTouchStart={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
               {chartDataObj.items.map((item, idx) => {
                  const isActive = activeChartLines.includes(item);
                  return (

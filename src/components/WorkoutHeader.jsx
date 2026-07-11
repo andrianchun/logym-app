@@ -7,12 +7,16 @@ const WorkoutHeader = ({ t, language, selectedDate, soundEnabled, playSoundEffec
   const dateName = dateObj.toLocaleDateString(language === 'ID' ? 'id-ID' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' });
 
   return (
-    <div className="mb-6 mt-2">
-      {/* JUDUL KEREN — pemanasan bersifat global (bukan per program), jadi cukup satu tombol di sini */}
-      <div className="px-2 mb-4 flex items-center justify-between gap-3">
-        <h1 className={`h2 ${t.textAccent} uppercase tracking-widest`}>
-          {dayName}, {dateName}
-        </h1>
+    <div className="mb-8 mt-6">
+      <div className="px-3 flex items-start justify-between gap-4">
+        <div className="flex flex-col">
+          <h1 className="text-4xl sm:text-5xl font-black tracking-tight leading-none text-zinc-900 dark:text-white capitalize mb-1">
+            {dayName}.
+          </h1>
+          <h2 className={`text-3xl sm:text-4xl font-black tracking-tight leading-none ${t.textAccent}`}>
+            {dateName}.
+          </h2>
+        </div>
         {warmupVideos && (
           <button
             onClick={() => { playSoundEffect('click', soundEnabled); onOpenWarmup(); }}

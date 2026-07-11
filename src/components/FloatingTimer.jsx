@@ -1,11 +1,13 @@
 import React, { useEffect } from 'react';
-import { Clock, X } from 'lucide-react';
+import { Clock, X, Flame } from 'lucide-react';
 import { playSoundEffect } from '../utils/audio';
+import { calculateWorkoutCalories } from '../utils/workoutCalc';
 
 const FloatingTimer = ({
   restTimer, setRestTimer, defaultRestTime, t, soundEnabled,
   isWorkoutActive, activeTab, setActiveTab, workoutStartTime,
-  isImmersiveMode, setIsImmersiveMode, sessionToRun, focusWorkoutId, setFocusWorkoutId
+  isImmersiveMode, setIsImmersiveMode, sessionToRun, focusWorkoutId, setFocusWorkoutId,
+  userProfile
 }) => {
   
   const [workoutSeconds, setWorkoutSeconds] = React.useState(0);
@@ -58,23 +60,31 @@ const FloatingTimer = ({
   const formatTime = (seconds) => {
     const isNegative = seconds < 0;
     const abs = Math.abs(seconds);
-    const text = `${Math.floor(abs / 60)}:${(abs % 60).toString().padStart(2, '0')}`;
+    const hrs = Math.floor(abs / 3600);
+    const mins = Math.floor((abs % 3600) / 60);
+    const secs = abs % 60;
+    const text = hrs > 0 
+      ? `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+      : `${mins}:${secs.toString().padStart(2, '0')}`;
     return isNegative ? `-${text}` : text;
   };
+
+  const caloriesBurned = calculateWorkoutCalories(userProfile?.weight || 70, Math.floor(workoutSeconds / 60));
 
   return (
     <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 pointer-events-none flex justify-center animate-in slide-in-from-bottom-8 fade-in duration-300">
       <div 
-        className={`pointer-events-auto w-full max-w-2xl mx-auto flex items-center justify-between p-4 rounded-2xl ${t.bgAccent} text-white shadow-xl shadow-[color:var(--tw-shadow-color)] cursor-pointer active:scale-95 transition-all border border-white/20`} 
+        className={`pointer-events-auto w-full max-w-2xl mx-auto flex items-center justify-between px-6 py-4 rounded-full ${t.bgAccent} text-white shadow-xl shadow-[color:var(--tw-shadow-color)] cursor-pointer active:scale-95 transition-all border border-white/20`} 
         style={{ shadowColor: 'rgba(0,0,0,0.3)' }}
         onClick={handleClick}
       >
       <div className="flex flex-col">
         <span className="text-[10px] font-black uppercase text-white/70 tracking-widest">
-           Workout Berjalan
+           Workout Berjalan 
         </span>
-        <span className="h2 text-white leading-tight">
-           {formatTime(workoutSeconds)}
+        <span className="h2 text-white leading-tight flex items-baseline gap-1.5">
+           <span className="tabular-nums tracking-tight">{formatTime(workoutSeconds)}</span>
+           {caloriesBurned > 0 && <span className="text-white/80 text-[11px] font-semibold flex items-center gap-0.5"><Flame size={12} className="text-white/80" strokeWidth={2.5} /> {caloriesBurned} kcal</span>}
         </span>
       </div>
 
@@ -92,7 +102,7 @@ const FloatingTimer = ({
         )}
         
         {!showTimer && (
-          <div className="bg-black/20 px-4 py-2 rounded-lg text-white font-black body-md uppercase tracking-wider">
+          <div className="bg-black/20 px-5 py-2 rounded-full text-white font-black body-md uppercase tracking-wider">
              Lanjutkan
           </div>
         )}

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Play, Pause, ChevronRight, ChevronLeft, Dumbbell, Check, Info, Clock, Minimize2, SkipForward, ClipboardEdit, Brain } from 'lucide-react';
+import { X, Play, Pause, ChevronRight, ChevronLeft, Dumbbell, Check, Info, Clock, Minimize2, SkipForward, ClipboardEdit, Brain, Flame } from 'lucide-react';
 import ScrollPicker from './ScrollPicker';
 import { exerciseTypeLabels } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
+import { calculateWorkoutCalories } from '../utils/workoutCalc';
 
 const ImmersiveWorkout = ({
   t,
@@ -30,7 +31,8 @@ const ImmersiveWorkout = ({
   activeGymId,
   setRestTargetTime,
   showSupersetToast,
-  getOverloadHint
+  getOverloadHint,
+  userProfile
 }) => {
   // 1. Gather all active exercise groups
   const validExercises = useMemo(() => {
@@ -84,10 +86,14 @@ const ImmersiveWorkout = ({
   const formatTime = (totalSeconds) => {
     const isNegative = totalSeconds < 0;
     const absSeconds = Math.abs(totalSeconds);
-    const m = Math.floor(absSeconds / 60).toString().padStart(2, '0');
+    const hrs = Math.floor(absSeconds / 3600);
+    const m = Math.floor((absSeconds % 3600) / 60).toString().padStart(2, '0');
     const s = (absSeconds % 60).toString().padStart(2, '0');
+    if (hrs > 0) return `${isNegative ? '-' : ''}${hrs}:${m}:${s}`;
     return `${isNegative ? '-' : ''}${m}:${s}`;
   };
+
+  const caloriesBurned = calculateWorkoutCalories(userProfile?.weight || 70, Math.floor(workoutSeconds / 60));
 
   const [maxRestTimer, setMaxRestTimer] = useState(0);
   useEffect(() => {
@@ -203,6 +209,28 @@ const ImmersiveWorkout = ({
     }
   };
 
+  // Root swipe logic for minimizing (swipe down)
+  const [rootTouchStart, setRootTouchStart] = React.useState(null);
+  const [rootTouchEnd, setRootTouchEnd] = React.useState(null);
+
+  const onRootTouchStart = (e) => {
+    if (activeSetDetail !== null || showFinishConfirm) return;
+    setRootTouchEnd(null);
+    setRootTouchStart(e.targetTouches[0].clientY);
+  };
+  const onRootTouchMove = (e) => {
+    if (activeSetDetail !== null || showFinishConfirm) return;
+    setRootTouchEnd(e.targetTouches[0].clientY);
+  }
+  const onRootTouchEnd = () => {
+    if (activeSetDetail !== null || showFinishConfirm || !rootTouchStart || !rootTouchEnd) return;
+    const distance = rootTouchStart - rootTouchEnd;
+    if (distance < -100) { // Swipe down
+      playSoundEffect('click', soundEnabled);
+      onClose();
+    }
+  };
+
   // Listen to YouTube player state to hide initial loading UI and handle seamless looping
   React.useEffect(() => {
     const handleMessage = (e) => {
@@ -239,8 +267,6 @@ const ImmersiveWorkout = ({
 
   const handleNextEx = () => {
     playSoundEffect('click', soundEnabled);
-    setRestTimer(0); // Reset rest timer — jangan bawa timer dari exercise sebelumnya
-    setRestTargetTime(null);
     if (currentIndex < validExercises.length - 1) {
       setCurrentIndex(currentIndex + 1);
     } else {
@@ -324,7 +350,12 @@ const ImmersiveWorkout = ({
   };
 
   return (
-    <div className={`fixed inset-0 z-[100] flex flex-col ${t.bgApp} ${t.textMain} overflow-hidden duration-300 ${isClosing ? 'animate-out slide-out-to-bottom-full' : 'animate-in slide-in-from-bottom-full'}`}>
+    <div 
+      className={`fixed inset-0 z-[100] flex flex-col ${t.bgApp} ${t.textMain} overflow-hidden duration-300 ${isClosing ? 'animate-out slide-out-to-bottom-full' : 'animate-in slide-in-from-bottom-full'} no-swipe`}
+      onTouchStart={onRootTouchStart}
+      onTouchMove={onRootTouchMove}
+      onTouchEnd={onRootTouchEnd}
+    >
       
       {/* HEADER (UNIFIED BAR) */}
       <div className={`flex items-center justify-between p-4 absolute top-0 w-full z-10`} style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
@@ -332,8 +363,13 @@ const ImmersiveWorkout = ({
         {/* Durasi Group */}
         <div className="flex items-center gap-4">
           <div className="flex flex-col">
-            <span className="text-[10px] font-black uppercase ${t.textMuted} tracking-widest">Durasi Latihan</span>
-            <span className="h2 ${t.textAccent}">{formatTime(workoutSeconds)}</span>
+            <span className="text-[10px] font-black uppercase ${t.textMuted} tracking-widest">
+              Durasi Latihan
+            </span>
+            <span className="h2 ${t.textAccent} flex items-baseline gap-1.5">
+              <span className="tabular-nums tracking-tight">{formatTime(workoutSeconds)}</span>
+              {caloriesBurned > 0 && <span className="opacity-80 text-[11px] font-semibold flex items-center gap-0.5"><Flame size={12} className={`${t.textAccent}`} strokeWidth={2.5} /> {caloriesBurned} kcal</span>}
+            </span>
           </div>
         </div>
 
@@ -342,7 +378,7 @@ const ImmersiveWorkout = ({
           <button onClick={() => { playSoundEffect('click', soundEnabled); setIsPaused(!isPaused); }} className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-white/5 hover:bg-white/10' : 'bg-black/5 hover:bg-black/10'} flex items-center justify-center transition shadow-sm`} title="Play/Pause">
             {isPaused ? <Play size={18} className={`${t.textAccent}`} /> : <Pause size={18} />}
           </button>
-          <button onClick={() => { playSoundEffect('click', soundEnabled); onClose(); }} className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-white/5 hover:bg-white/10' : 'bg-black/5 hover:bg-black/10'} flex items-center justify-center transition shadow-sm`} title="Minimize">
+          <button data-close-modal="true" onClick={() => { playSoundEffect('click', soundEnabled); onClose(); }} className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-white/5 hover:bg-white/10' : 'bg-black/5 hover:bg-black/10'} flex items-center justify-center transition shadow-sm`} title="Minimize">
             <Minimize2 size={18} />
           </button>
           <button onClick={() => { playSoundEffect('click', soundEnabled); onCancelWorkout(); }} className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400' : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-500'} flex items-center justify-center transition shadow-sm`} title="Batalkan Workout">
@@ -469,7 +505,7 @@ const ImmersiveWorkout = ({
               </p>
               {ex.supersetId && (
                 <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${t.bgAccent} text-white shadow-[0_0_12px_rgba(255,255,255,0.3)] border border-white/20 shrink-0`}>
-                  SUPERSET {ex.supersetId}
+                  SUPERSET
                 </span>
               )}
             </div>
@@ -490,7 +526,7 @@ const ImmersiveWorkout = ({
                   <div className="absolute inset-0 bg-black/60 backdrop-blur-md animate-in fade-in" onClick={() => setShowHint(false)} />
                     <div className={`relative overflow-hidden w-[90%] max-w-[340px] min-h-[480px] p-6 flex flex-col justify-between rounded-[32px] ${t.bgCard} shadow-2xl ring-1 ring-black/5 dark:ring-white/10 z-10 text-center leading-snug animate-in fade-in zoom-in-95 duration-300`} onClick={e => e.stopPropagation()}>
                       <div 
-                        className="absolute inset-0 z-0 opacity-80 dark:opacity-60 pointer-events-none mix-blend-multiply dark:mix-blend-normal"
+                        className="absolute inset-0 z-0 pointer-events-none"
                         style={{ 
                            backgroundImage: `url('${getOverloadHint && getOverloadHint(ex)?.mode === 'praise' ? '/coach-praise.webp' : getOverloadHint && getOverloadHint(ex)?.mode === 'push' ? '/coach-push.webp' : '/bg-dashboard.webp'}')`,
                            backgroundSize: '180%',
@@ -506,7 +542,7 @@ const ImmersiveWorkout = ({
                               <div className={`w-8 h-8 rounded-full ${t.bgAccent} flex items-center justify-center shadow-lg`}>
                                 <Brain size={16} className="text-white" />
                               </div>
-                              <span className={`font-black text-[11px] tracking-widest uppercase ${t.textMain}`}>LOGYM Coach</span>
+                              <span className={`font-black text-[11px] tracking-widest uppercase ${t.textMain}`}>Coach Raiga</span>
                             </div>
                           </div>
                           <div className="flex flex-col items-center mt-auto pt-32 pb-2">

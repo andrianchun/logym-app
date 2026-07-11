@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, GripVertical, ArrowUp, ArrowDown, Clock, Link as LinkIcon, X, Dumbbell, ChevronRight, ChevronDown, ChevronUp, Copy, Sparkles, FolderOpen, Trash2, CheckCircle2, Calendar, Edit2, ArrowLeftRight, Share2 } from 'lucide-react';
+import { Plus, GripVertical, ArrowUp, ArrowDown, Clock, Link as LinkIcon, X, Dumbbell, ChevronRight, ChevronDown, ChevronUp, Copy, Sparkles, FolderOpen, Trash2, CheckCircle2, Calendar, Edit2, ArrowLeftRight, Share2, Check, Brain } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -9,6 +9,8 @@ import SwipeInput from '../components/SwipeInput';
 import AlternativeExerciseModal from '../components/AlternativeExerciseModal';
 import CreatePostModal from '../components/CreatePostModal';
 import useDialog from '../hooks/useDialog';
+import { getPlanBgConfig } from '../utils/planBg';
+import GymAIChat from '../components/GymAIChat';
 
 const PlanNameInput = ({ initialValue, onSave, className, placeholder }) => {
   const [val, setVal] = useState(initialValue);
@@ -74,21 +76,21 @@ const SortableExerciseItem = ({ ex, prevEx, idx, routineId, t, lang, soundEnable
               <div className="flex items-center gap-1.5">
                 <span className={`text-[11px] font-bold ${t.textMuted} uppercase`}>Sets</span>
                 <div className={`w-12 h-8 rounded-xl ${t.inputBg} ${t.textMain} font-bold text-base focus-within:ring-2 focus-within:${t.ringAccent} transition-all overflow-hidden`}>
-                  <SwipeInput value={ex.sets === 0 ? '' : ex.sets} onChange={(val) => handleUpdateExercise(routineId, ex.id, 'sets', val)} placeholder="0" className="w-full h-full bg-transparent outline-none border-none" language={lang?.id || 'ID'} />
+                  <input type="number" min="0" value={ex.sets === 0 ? '' : ex.sets} onChange={(e) => handleUpdateExercise(routineId, ex.id, 'sets', parseInt(e.target.value) || 0)} placeholder="0" className="w-full h-full bg-transparent outline-none border-none text-center" />
                 </div>
               </div>
               {isTime ? (
                 <div className="flex items-center gap-1.5">
                   <span className={`text-[11px] font-bold ${t.textMuted} uppercase`}>Min</span>
                   <div className={`w-12 h-8 rounded-xl ${t.inputBg} ${t.textMain} font-bold text-base focus-within:ring-2 focus-within:${t.ringAccent} transition-all overflow-hidden`}>
-                    <SwipeInput value={ex.duration === 0 ? '' : ex.duration} onChange={(val) => handleUpdateExercise(routineId, ex.id, 'duration', val)} placeholder="0" className="w-full h-full bg-transparent outline-none border-none" language={lang?.id || 'ID'} />
+                    <input type="number" min="0" value={ex.duration === 0 ? '' : ex.duration} onChange={(e) => handleUpdateExercise(routineId, ex.id, 'duration', parseInt(e.target.value) || 0)} placeholder="0" className="w-full h-full bg-transparent outline-none border-none text-center" />
                   </div>
                 </div>
               ) : (
                 <div className="flex items-center gap-1.5">
                   <span className={`text-[11px] font-bold ${t.textMuted} uppercase`}>Reps</span>
                   <div className={`w-12 h-8 rounded-xl ${t.inputBg} ${t.textMain} font-bold text-base focus-within:ring-2 focus-within:${t.ringAccent} transition-all overflow-hidden`}>
-                    <SwipeInput value={ex.reps === 0 ? '' : ex.reps} onChange={(val) => handleUpdateExercise(routineId, ex.id, 'reps', val)} placeholder="0" className="w-full h-full bg-transparent outline-none border-none" language={lang?.id || 'ID'} />
+                    <input type="number" min="0" value={ex.reps === 0 ? '' : ex.reps} onChange={(e) => handleUpdateExercise(routineId, ex.id, 'reps', parseInt(e.target.value) || 0)} placeholder="0" className="w-full h-full bg-transparent outline-none border-none text-center" />
                   </div>
                 </div>
               )}
@@ -129,13 +131,16 @@ const ProgramTab = ({
   t, lang, programs, setPrograms, user, exerciseLibrary, soundEnabled, 
   setActiveAddModalTarget, saveStateToHistory, openQuestionnaire,
   activePlanIds, setActivePlanIds, gymProfiles,
-  focusRoutineId, setFocusRoutineId, setConfirmModal, activityTargets
+  focusRoutineId, setFocusRoutineId, setConfirmModal, activityTargets,
+  userApiKeys, aiProvider, aiModel, userProfile, history,
+  keyStatuses, setKeyStatuses, setAiProvider, setAiModel, setShowSettings
 }) => {
   
   const isDark = t.bgCard !== 'bg-white';
   const { dialog, showAlert } = useDialog(isDark);
   const [expandedRoutineId, setExpandedRoutineId] = useState(null);
   const [editingPlanId, setEditingPlanId] = useState(null);
+  // showAiChat now managed by parent App.jsx (hoisted for global floating button)
 
   useEffect(() => {
     if (focusRoutineId) {
@@ -238,7 +243,10 @@ const ProgramTab = ({
       ...routine,
       id: 'prog-' + Date.now(),
       name: routine.name + ' (Copy)',
-      exercises: routine.exercises.map(ex => ({ ...ex })),
+      exercises: routine.exercises.map(ex => ({ 
+        ...ex,
+        id: 'ex-' + Date.now() + Math.random().toString(36).substr(2, 5) 
+      })),
       warmupVideoUrls: [...(routine.warmupVideoUrls || [])]
     };
     setPrograms([...programs, dupe]);
@@ -434,7 +442,8 @@ const ProgramTab = ({
 
     const groupedPrograms = programs.reduce((acc, prog) => {
       const key = prog.planId || 'custom';
-      if (!acc[key]) acc[key] = { planId: key, planName: prog.planName || 'Program Default', planLevel: prog.planLevel, planGoal: prog.planGoal || 'maintenance', routines: [], assignedDays: prog.assignedDays || [] };
+      if (!acc[key]) acc[key] = { planId: key, planName: prog.planName || 'Program Default', planLevel: prog.planLevel, planGoal: prog.planGoal || 'maintenance', routines: [], assignedDays: prog.assignedDays || [], isAI: false };
+      if (prog.source === 'ai' || key.startsWith('plan_ai_')) acc[key].isAI = true;
       acc[key].routines.push(prog);
       return acc;
     }, {});
@@ -567,7 +576,7 @@ const ProgramTab = ({
           {routine.exercises.length === 0 ? (
             <div className={`flex flex-col items-center justify-center py-6 rounded-2xl border-2 border-dashed ${t.borderAccentSoft}`}>
               <p className={`text-sm ${t.textMuted} mb-3`}>Belum ada latihan di rutinitas ini.</p>
-              <button onClick={() => handleAddExercise(routine.id)} className={`flex items-center px-4 py-2 rounded-xl text-white font-bold text-xs ${t.bgAccent} shadow-md hover:opacity-90 transition-all active:scale-95`}><Plus size={14} className="mr-1" /> Tambah Latihan</button>
+              <button onClick={() => handleAddExercise(routine.id)} className={`flex items-center px-4 py-2 rounded-full text-white font-bold text-xs ${t.bgAccent} shadow-md hover:opacity-90 transition-all active:scale-95`}><Plus size={14} className="mr-1" /> Tambah Latihan</button>
             </div>
           ) : (
             <div className="-mx-5 bg-black/5 dark:bg-white/5">
@@ -604,7 +613,7 @@ const ProgramTab = ({
 
           {routine.exercises.length > 0 && (
             <div className="flex gap-2 mt-3">
-              <button onClick={() => handleAddExercise(routine.id)} className={`flex-1 py-3 border-2 border-dashed ${t.borderAccentSoft} hover:${t.borderAccent} hover:${t.bgAccentSoft} rounded-xl ${t.textAccent} font-bold text-sm flex justify-center items-center transition-all duration-200 active:scale-[0.98]`}>
+              <button onClick={() => handleAddExercise(routine.id)} className={`flex-1 py-3 border-2 border-dashed ${t.borderAccentSoft} hover:${t.borderAccent} hover:${t.bgAccentSoft} rounded-full ${t.textAccent} font-bold text-sm flex justify-center items-center transition-all duration-200 active:scale-[0.98]`}>
                 <Plus size={16} className="mr-1.5" /> Latihan
               </button>
             </div>
@@ -619,102 +628,180 @@ const ProgramTab = ({
   // RENDER MAIN
   // ==========================================
 
-  const getPlanBgConfig = (planName) => {
-    const defaultConfig = { url: '/bg-custom.webp', position: 'right -140px top -50px' };
-    if (!planName) return defaultConfig;
-    const lowerName = planName.toLowerCase();
-    if (lowerName.includes('full body')) return { url: '/bg-full-body.webp', position: 'right -140px top -50px' };
-    if (lowerName.includes('ppl basic')) return { url: '/bg-ppl-basic.webp', position: 'right -140px top -20px' };
-    if (lowerName.includes('up-low')) return { url: '/bg-up-low.webp', position: 'right -140px top -50px' };
-    if (lowerName.includes('bro split')) return { url: '/bg-bro-split.webp', position: 'right -140px top -50px' };
-    if (lowerName.includes('ppl advanced')) return { url: '/bg-ppl-advanced.webp', position: 'right -140px top -110px' };
-    if (lowerName.includes('beast mode')) return { url: '/bg-beast-mode.webp', position: 'right -140px top -50px' };
-    return defaultConfig;
+  const closeEditAndScrollToPlan = (pId) => {
+      const el = document.getElementById(`plan-mobile-${pId}`);
+      if (el) {
+          const endY = el.getBoundingClientRect().top + window.scrollY - 80;
+          const startY = window.scrollY;
+          const distance = endY - startY;
+          const duration = 500; // Match CSS duration exactly
+          const startTime = performance.now();
+          
+          const easeInOutQuad = (t, b, c, d) => {
+            let time = t / (d / 2);
+            if (time < 1) return c / 2 * time * time + b;
+            time--;
+            return -c / 2 * (time * (time - 2) - 1) + b;
+          };
+
+          const animation = (currentTime) => {
+            const elapsed = currentTime - startTime;
+            if (elapsed < duration) {
+              window.scrollTo(0, easeInOutQuad(elapsed, startY, distance, duration));
+              requestAnimationFrame(animation);
+            } else {
+              window.scrollTo(0, endY);
+            }
+          };
+          requestAnimationFrame(animation);
+      }
+      setTimeout(() => {
+          setEditingPlanId(null);
+          // Prevent double layout calculation lag by resetting inner accordion after outer closes
+          setTimeout(() => {
+              setExpandedRoutineId(null);
+          }, 550);
+      }, 0); // start immediately, but in next tick so requestAnimationFrame registers first
   };
 
   const renderPlanCard = (planId, group, isActive, layout = 'mobile') => {
-    return (
-      <div id={`plan-${layout}-${planId}`} key={planId} className={`scroll-mt-24 rounded-3xl border-2 ${isActive ? t.borderAccent : t.border} ${t.bgCard} shadow-sm overflow-hidden transition-colors h-fit relative`}>
+    const bgConfig = group.isAI 
+        ? { url: '/bg-calendar.webp', position: 'center', bgSize: 'cover' } 
+        : getPlanBgConfig(group.planName);
+
+    return (      <div id={`plan-${layout}-${planId}`} key={planId} className={`scroll-mt-24 rounded-[2rem] border ${isActive ? t.borderAccent : 'border-white/10'} shadow-[0_8px_30px_rgb(0,0,0,0.12)] overflow-hidden transition-all flex flex-col relative min-h-[350px] group/card ${t.bgCard}`}>
               
-              {/* BACKGROUND IMAGE LAYER */}
+        {/* Split Header (Left empty, Right glassmorphism) */}
+        <div className="flex-none flex flex-row relative z-10 w-full min-h-[350px]">
+          
+          {/* HEADER BACKGROUND IMAGE (Restricted to header) */}
+          <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+            {/* Base Layer for Glassmorphism */}
+            <div 
+              className={`absolute inset-0 transition-all duration-700 ${group.isAI ? 'opacity-20 blur-2xl scale-110' : 'opacity-60'}`}
+              style={{
+                backgroundImage: `url('${bgConfig.url}')`,
+                backgroundSize: bgConfig.bgSize || 'cover',
+                backgroundPosition: bgConfig.position || 'center',
+                backgroundRepeat: 'no-repeat',
+              }}
+            />
+            {/* Focal Layer for Left Panel */}
+            <div 
+              className={`absolute top-0 bottom-0 left-0 w-[55%] transition-all duration-700 opacity-100`}
+              style={{
+                WebkitMaskImage: 'linear-gradient(to right, black 80%, transparent 100%)',
+                maskImage: 'linear-gradient(to right, black 80%, transparent 100%)'
+              }}
+            >
               <div 
-                className={`absolute inset-0 z-0 pointer-events-none transition-all duration-300 opacity-90 ${isDark ? 'mix-blend-screen' : 'mix-blend-multiply'}`}
+                className="absolute inset-0 transition-all duration-700"
                 style={{
-                  backgroundImage: `url('${getPlanBgConfig(group.planName).url}')`,
-                  backgroundSize: 'auto 450px',
-                  backgroundPosition: getPlanBgConfig(group.planName).position,
+                  backgroundImage: `url('${bgConfig.url}')`,
+                  backgroundSize: bgConfig.bgSize || 'cover',
+                  backgroundPosition: bgConfig.position || 'center',
                   backgroundRepeat: 'no-repeat',
-                  maskImage: 'linear-gradient(to right, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 50%, rgba(0,0,0,1) 100%)',
-                  WebkitMaskImage: 'linear-gradient(to right, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 50%, rgba(0,0,0,1) 100%)'
+                  transform: bgConfig.scale ? `scale(${bgConfig.scale})` : 'none',
+                  transformOrigin: bgConfig.position || 'center'
                 }}
               />
+            </div>
+          </div>
 
-              {/* PLAN HEADER */}
-              <div className={`p-4 sm:p-5 relative z-10`}>
-                <div className="flex items-start justify-between gap-4 mb-3">
-                  <div className="flex-1 min-w-0 mt-1 flex flex-col gap-1">
-                    <div className="flex items-center gap-2 w-full">
-                      {editingPlanId === planId ? (
-                        <div className={`relative group inline-block w-full flex-1`}>
-                          <PlanNameInput
-                            initialValue={group.planName}
-                            onSave={(newName) => handleRenamePlan(planId, newName)}
-                            className={`w-full bg-transparent font-black text-xl ${isActive ? t.textAccent : t.textMain} outline-none border-b-2 border-transparent focus:border-blue-500/50 dark:focus:border-blue-400/50 transition-colors pr-8`}
-                            placeholder="Nama Program..."
-                          />
-                          <div className={`absolute right-2 top-1/2 -translate-y-1/2 ${t.textMuted} transition-opacity pointer-events-none opacity-0 group-hover:opacity-100 group-focus-within:opacity-100`}>
-                            <Edit2 size={16} />
-                          </div>
-                        </div>
-                      ) : (
-                        <h2 className={`font-black text-xl flex-1 flex items-center gap-2 ${isActive ? t.textAccent : t.textMain}`}>
-                          {group.planName}
-                        </h2>
-                      )}
+          {/* Left Side: Empty space so image shows */}
+          <div className="w-[45%] relative">
+             <div className={`absolute inset-0 bg-gradient-to-r ${isDark ? 'from-transparent via-transparent to-[#05070d]/70' : 'from-transparent via-transparent to-black/30'} z-10`} />
+          </div>
+          
+          {/* Right Side: Content */}
+          <div className={`w-[55%] flex flex-col p-4 sm:p-5 border-l ${isDark ? 'bg-black/60 backdrop-blur-xl border-white/5' : 'bg-black/30 backdrop-blur-xl border-white/10'} shadow-[-10px_0_30px_rgba(0,0,0,0.3)]`}>
+            
+            {/* PLAN HEADER */}
+            <div className="flex items-start justify-between gap-2 mb-3">
+              <div className="flex-1 min-w-0 flex flex-col gap-1">
+                <div className="flex items-center gap-2 w-full">
+                  {editingPlanId === planId ? (
+                    <div className={`relative group inline-block w-full flex-1`}>
+                      <PlanNameInput
+                        initialValue={group.planName}
+                        onSave={(newName) => handleRenamePlan(planId, newName)}
+                        className={`w-full bg-transparent font-black text-lg text-white outline-none border-b-2 border-transparent focus:border-white/50 transition-colors pr-2`}
+                        placeholder="Nama Program..."
+                      />
                     </div>
-                    <div className="flex flex-wrap gap-1.5 items-center mt-2">
-                      {activityTargets?.nutritionGoal && activityTargets.nutritionGoal !== 'custom' && group.planGoal && group.planGoal !== 'maintenance' && group.planGoal !== activityTargets.nutritionGoal && (
-                        <div className="flex items-center gap-1.5 bg-rose-500/10 text-rose-500 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide">
-                          ⚠️ Program {group.planGoal.replace('_', ' ')} (Targetmu: {activityTargets.nutritionGoal.replace('_', ' ')})
-                        </div>
-                      )}
-                      {group.planLevel && (
-                        <span className={`px-2 py-0.5 text-[10px] font-black uppercase rounded-md ${t.bgAccentSoft} ${t.textAccent}`}>
-                          Level: {group.planLevel === 'beginner' ? 'Pemula' : group.planLevel === 'intermediate' ? 'Menengah' : group.planLevel === 'advanced' ? 'Mahir' : group.planLevel}
-                        </span>
-                      )}
-                      {group.targetGym && group.targetGym !== 'global' && (
-                        <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-md ${t.inputBg} ${t.textMuted}`}>
-                          Gym: {gymProfiles?.find(g => g.id === group.targetGym)?.name || group.targetGym}
-                        </span>
-                      )}
-                      {planId.startsWith('custom') && (
-                        <span className={`px-2 py-0.5 text-[10px] font-black uppercase rounded-md ${t.bgAccentSoft} ${t.textAccent}`}>
-                          Custom
-                        </span>
-                      )}
-                      {group.source === 'community' && group.sharedBy && (
-                        <span className={`px-2 py-0.5 text-[10px] font-bold rounded-md flex items-center gap-1 ${isDark ? 'bg-purple-500/15 text-purple-400' : 'bg-purple-50 text-purple-600'}`}>
-                          <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                          dari @{group.sharedBy}
-                        </span>
-                      )}
-                      <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-md ${t.inputBg} ${t.textMuted}`}>
-                        {group.routines.length} Hari
-                      </span>
+                  ) : (
+                    <h2 className={`font-black text-xl flex-1 flex items-center gap-2 text-white drop-shadow-md leading-tight`}>
+                      {group.planName}
+                    </h2>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1.5 items-center mt-1">
+                  {activityTargets?.nutritionGoal && activityTargets.nutritionGoal !== 'custom' && group.planGoal && group.planGoal !== 'maintenance' && group.planGoal !== activityTargets.nutritionGoal && (
+                    <div className="flex items-center gap-1.5 bg-rose-500/20 text-rose-200 border border-rose-500/30 px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wide backdrop-blur-md">
+                      ⚠️ {group.planGoal.replace('_', ' ')}
                     </div>
-                  </div>
-                {true && (
+                  )}
+                  {group.planLevel && (
+                    <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded-md bg-white/20 text-white backdrop-blur-md border border-white/10 shadow-sm`}>
+                      {group.planLevel === 'beginner' ? 'Pemula' : group.planLevel === 'intermediate' ? 'Menengah' : group.planLevel === 'advanced' ? 'Mahir' : group.planLevel}
+                    </span>
+                  )}
+                  {planId.startsWith('custom') && (
+                    <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded-md bg-white/20 text-white backdrop-blur-md border border-white/10 shadow-sm`}>
+                      Custom
+                    </span>
+                  )}
+                  {group.isAI && (
+                    <span className={`flex items-center gap-1 px-2 py-0.5 text-[9px] font-black uppercase rounded-md bg-blue-500/30 text-blue-100 backdrop-blur-md border border-blue-400/40 shadow-sm shadow-blue-500/20`}>
+                      <Brain size={10} /> Coach Raiga
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-1 shrink-0">
+                {editingPlanId === planId ? (
+                  <>
+                    <button 
+                      onClick={() => handleDeletePlan(planId, group.planName)}
+                      className={`p-1.5 rounded-full bg-rose-500/20 text-rose-300 hover:bg-rose-500/40 transition-colors`}
+                    >
+                      <X size={16} />
+                    </button>
+                  </>
+                ) : (
                   <button 
-                    onClick={() => handleDeletePlan(planId, group.planName)}
-                    className={`p-2 rounded-full hover:bg-rose-500/10 text-rose-500 transition-colors shrink-0`}
+                    onClick={() => {
+                      setEditingPlanId(planId);
+                      if (!expandedRoutineId && group.routines.length > 0) {
+                        setExpandedRoutineId(group.routines[0].id);
+                      }
+                      setTimeout(() => {
+                        const el = document.getElementById(`plan-${layout}-${planId}`);
+                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }, 150);
+                    }}
+                    className={`p-1.5 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition-colors`}
                   >
-                    <X size={18} />
+                    <Edit2 size={16} />
                   </button>
                 )}
               </div>
+            </div>
 
-              <div className="flex gap-2 relative z-10 w-full mt-3">
+            {/* SIMPLE SCHEDULE LIST */}
+            <div className="flex-1 overflow-y-auto mb-3 border-t border-white/10 pt-3">
+                 <div className="flex flex-col gap-2">
+                     {group.routines.map(r => (
+                         <div key={r.id} className="flex items-start gap-2">
+                             <div className={`w-1.5 h-1.5 shrink-0 rounded-full mt-1.5 ${t.bgAccent}`} />
+                             <span className="text-[11px] font-bold text-white/90 drop-shadow-sm leading-tight line-clamp-2">{r.name}</span>
+                         </div>
+                     ))}
+                 </div>
+            </div>
+
+            {/* ACTION BUTTONS */}
+            <div className="mt-auto flex gap-2 relative z-10 w-full pt-1">
                 <button 
                   onClick={() => { 
                     playSoundEffect('success', soundEnabled); 
@@ -731,9 +818,9 @@ const ProgramTab = ({
                       }, 100);
                     }
                   }}
-                  className={`flex-1 py-3 rounded-xl font-black text-sm transition-all active:scale-95 flex items-center justify-center gap-2 ${isActive ? `${t.bgAccent} text-white shadow-md border border-transparent` : `backdrop-blur-md border ${isDark ? 'bg-white/10 hover:bg-white/20 border-white/10 text-white/70 hover:text-white' : 'bg-white/60 hover:bg-white/80 border-white/50 shadow-sm text-gray-500 hover:text-gray-900'}`}`}
+                  className={`flex-1 py-3.5 rounded-full font-black text-sm transition-all active:scale-95 flex items-center justify-center gap-2 ${isActive ? `${t.bgAccent} text-white shadow-lg border border-transparent` : `bg-white/10 hover:bg-white/20 border border-white/20 text-white shadow-sm`}`}
                 >
-                  {isActive ? <><CheckCircle2 size={18} /> Program Aktif</> : 'Aktifkan'}
+                  {isActive ? 'Aktif' : 'Aktifkan'}
                 </button>
                 {true && (
                   <button 
@@ -745,7 +832,7 @@ const ProgramTab = ({
                         await showAlert('Kamu harus login untuk membagikan program.', { type: 'info' });
                       }
                     }}
-                    className={`px-4 py-3 rounded-xl transition-all flex items-center justify-center backdrop-blur-md border ${isDark ? 'bg-white/10 hover:bg-white/20 border-white/10 text-white/70 hover:text-white' : 'bg-white/60 hover:bg-white/80 border-white/50 shadow-sm text-gray-500 hover:text-gray-900'}`}
+                    className={`w-[48px] h-[48px] p-0 rounded-full transition-all flex items-center justify-center bg-white/10 hover:bg-white/20 border border-white/20 text-white shadow-sm shrink-0`}
                     title="Bagikan ke Komunitas"
                   >
                     <Share2 size={18} />
@@ -753,10 +840,12 @@ const ProgramTab = ({
                 )}
               </div>
             </div>
+          </div>
 
-            {/* ACCORDION CONTENT */}
-            <div className={`relative z-10 transition-all duration-300 ${isActive ? `pb-5 backdrop-blur-sm ${isDark ? 'bg-black/10' : 'bg-white/20'}` : 'h-0 overflow-hidden'}`}>
-              <div className="flex flex-col">
+          {/* ACCORDION CONTENT */}
+          <div className={`grid relative z-10 transition-all duration-500 ease-in-out w-full ${editingPlanId === planId ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
+              <div className="overflow-hidden">
+                  <div className={`flex flex-col mt-3 rounded-[2rem] overflow-hidden border ${isDark ? 'border-white/5 bg-black/20' : 'border-black/5 bg-black/5'} shadow-inner`}>
                 {group.routines.map((routine, idx) => {
                   const isExpanded = expandedRoutineId === routine.id;
                   const estDuration = Math.round(routine.exercises.reduce((acc, ex) => acc + (parseInt(ex.sets) || 3), 0) * (45 + (parseInt(routine.restTime) || 90)) / 60);
@@ -784,12 +873,12 @@ const ProgramTab = ({
                             ) : (
                               <h4 className={`font-bold text-lg ${t.textMain} truncate`}>{routine.name}</h4>
                             )}
-                            <p className={`text-xs ${t.textMuted} mt-1`}>{routine.exercises.length} Latihan • {routine.restTime}s Istirahat • ~{estDuration} mnt</p>
-                            {routine.assignedDays && routine.assignedDays.length > 0 && (
-                              <p className={`text-[10px] font-bold ${t.textAccent} mt-1 uppercase`}>
-                                {routine.assignedDays.join(', ')}
-                              </p>
-                            )}
+                            <p className={`text-xs ${t.textMuted} mt-1`}>
+                              {routine.assignedDays && routine.assignedDays.length > 0 && (
+                                <span className={`font-bold ${t.textAccent} uppercase`}>{routine.assignedDays.join(', ')} &bull; </span>
+                              )}
+                              {routine.exercises.length} Latihan &bull; {routine.restTime}s Istirahat &bull; ~{estDuration} mnt
+                            </p>
                           </div>
                           
                           <div className="flex items-center shrink-0 h-full mt-1">
@@ -822,7 +911,7 @@ const ProgramTab = ({
                         <div className="flex flex-col gap-3">
                             <button 
                               onClick={() => handleCreateRoutine(planId, group.planName)}
-                              className={`w-full py-3 rounded-xl font-bold text-sm border-2 border-dashed ${t.borderAccentSoft} ${t.textAccent} hover:${t.bgAccentSoft} transition-all active:scale-95 flex items-center justify-center gap-2`}
+                              className={`w-full py-3 rounded-full font-bold text-sm border-2 border-dashed ${t.borderAccentSoft} ${t.textAccent} hover:${t.bgAccentSoft} transition-all active:scale-95 flex items-center justify-center gap-2`}
                             >
                               <Plus size={16} /> Rutinitas Baru
                             </button>
@@ -830,10 +919,9 @@ const ProgramTab = ({
                                 <button
                                   onClick={() => {
                                       playSoundEffect('click', soundEnabled);
-                                      setEditingPlanId(null);
-                                      setExpandedRoutineId(null);
+                                      closeEditAndScrollToPlan(planId);
                                   }}
-                                  className={`flex-[0.4] py-3 rounded-xl font-bold text-sm ${t.inputBg} ${t.textMain} hover:opacity-80 transition-all active:scale-95`}
+                                  className={`flex-[0.4] py-3 rounded-full font-bold text-sm ${t.inputBg} ${t.textMain} hover:opacity-80 transition-all active:scale-95`}
                                 >
                                   Batal
                                 </button>
@@ -845,11 +933,10 @@ const ProgramTab = ({
                                           setExpandedRoutineId(invalidRoutine.id);
                                       } else {
                                           playSoundEffect('success', soundEnabled);
-                                          setEditingPlanId(null);
-                                          setExpandedRoutineId(null);
+                                          closeEditAndScrollToPlan(planId);
                                       }
                                   }}
-                                  className={`flex-1 py-3 rounded-xl font-black text-white ${t.bgAccent} hover:opacity-90 shadow-md transition-all active:scale-95 flex items-center justify-center gap-2`}
+                                  className={`flex-1 py-3 rounded-full font-black text-white ${t.bgAccent} hover:opacity-90 shadow-md transition-all active:scale-95 flex items-center justify-center gap-2`}
                                 >
                                   Simpan Program
                                 </button>
@@ -866,8 +953,9 @@ const ProgramTab = ({
                   </div>
                 )}
               </div>
-            </div>  
-                  </div>
+            </div>
+          </div>  
+      </div>
     );
   };
   return (
@@ -875,36 +963,51 @@ const ProgramTab = ({
   
       {/* AI Generator Banner - REDESIGNED */}
       <div 
-        className={`w-full text-left px-5 py-8 sm:py-12 rounded-3xl ${t.bgAccentSoft} border ${t.borderAccentSoft} shadow-sm relative overflow-hidden transition-all`}
+        className={`w-full rounded-[2rem] border-0 shadow-[0_8px_30px_rgb(0,0,0,0.12)] overflow-hidden transition-all flex flex-col relative min-h-[300px] sm:min-h-[360px]`}
       >
         {/* --- Background Image Layer --- */}
         <div 
-            className={`absolute inset-0 z-0 pointer-events-none transition-all duration-300 bg-coach ${isDark ? 'opacity-30 mix-blend-normal' : 'opacity-40 mix-blend-multiply'}`}
-          />
+          className={`absolute inset-0 z-0 pointer-events-none transition-all duration-700 opacity-100`}
+          style={{
+            backgroundImage: `url('/bg-program.webp')`,
+            backgroundSize: '130%',
+            backgroundPosition: 'center 10%',
+            backgroundRepeat: 'no-repeat',
+          }}
+        />
+        <div className={`absolute inset-0 z-0 bg-gradient-to-t ${isDark ? 'from-[#05070d]/90 via-[#05070d]/50 to-transparent' : 'from-black/80 via-black/40 to-transparent'} pointer-events-none`} />
         {/* ------------------------------ */}
-          <div className="relative z-10 w-[70%] sm:w-3/4">
+        
+        <div className="mt-auto relative z-10 w-full flex flex-col">
+          {/* TEXT HEADER (NO BLUR) */}
+          <div className="w-full sm:w-3/4 p-5 pb-4 sm:p-6 sm:pb-5">
             <div className="flex items-center gap-2 mb-2">
-              <h3 className={`font-black text-lg ${t.textAccent}`}>Buat Program</h3>
+              <h3 className={`font-black text-3xl text-white drop-shadow-lg`}>Buat Program</h3>
             </div>
-            <p className={`text-xs sm:text-sm font-medium mb-4 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+            <p className={`text-sm font-medium text-white/90 drop-shadow-md leading-relaxed`}>
               Jawab beberapa pertanyaan untuk mendapatkan program latihan terbaik yang dipersonalisasi untuk Anda.
             </p>
           </div>
-        <div className="grid grid-cols-2 gap-2 relative z-10">
-          <button 
-            onClick={() => { playSoundEffect('click', soundEnabled); openQuestionnaire(); }}
-            className={`w-full py-3 rounded-xl font-black text-white bg-gradient-to-r ${t.gradientBg} shadow-md active:scale-95 transition-all flex items-center justify-center text-sm`}
-          >
-            LOGYM Coach
-          </button>
-            <button 
-              onClick={() => { 
-                handleCreateCustomPlan(); 
-              }}
-              className={`w-full py-3 rounded-xl font-bold ${t.textAccent} transition-all active:scale-95 flex items-center justify-center text-sm backdrop-blur-md border ${isDark ? 'bg-white/10 hover:bg-white/20 border-transparent shadow-none' : 'bg-white/60 hover:bg-white/80 border-white/50 shadow-sm'}`}
-            >
-            Buat Custom
-          </button>
+
+          {/* GLASSMORPHISM BUTTONS OVERLAY */}
+          <div className={`w-full ${isDark ? 'bg-black/10 backdrop-blur-sm border-t border-white/10' : 'bg-black/5 backdrop-blur-sm border-t border-white/20'} p-5 pt-4 sm:p-6 sm:pt-4 transition-all duration-300`}>
+            <div className="grid grid-cols-2 gap-3">
+              <button 
+                onClick={() => { playSoundEffect('click', soundEnabled); openQuestionnaire(); }}
+                className={`w-full py-3.5 rounded-[14px] font-black text-black bg-white shadow-[0_0_20px_rgba(255,255,255,0.3)] active:scale-95 transition-all flex items-center justify-center text-sm`}
+              >
+                Coach Raiga
+              </button>
+              <button 
+                onClick={() => { 
+                  handleCreateCustomPlan(); 
+                }}
+                className={`w-full py-3.5 rounded-[14px] font-bold text-white transition-all active:scale-95 flex items-center justify-center text-sm bg-white/10 hover:bg-white/20 border border-white/20 shadow-sm`}
+              >
+                Buat Custom
+              </button>
+            </div>
+          </div>
         </div>
       </div>
   
@@ -964,6 +1067,11 @@ const ProgramTab = ({
           }}
         />
       )}
+      
+      {/* Floating Coach Raiga button moved to App.jsx for global visibility */}
+
+      {/* GymAIChat is now rendered globally in App.jsx; onAcceptProgram is passed down via prop */}
+      
       {dialog}
     </div>
   );

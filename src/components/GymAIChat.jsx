@@ -1,0 +1,658 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Send, X, Check, Loader2, Dumbbell, Menu, Plus, MessageSquare, Trash2, Bookmark } from 'lucide-react';
+import { buildSystemPrompt, summarizeWorkoutLogs, summarizeBiometrics, summarizeActivePrograms, isTrivialMessage, chatWithAI, AI_MODELS, getAvailableModels, getProviderStatus } from '../utils/aiAgent';
+import renderMiniMarkdown from '../utils/miniMarkdown';
+
+const THINKING_PHASES = ['Membaca riwayat latihanmu...', 'Menganalisis progress mingguan...', 'Menyusun jawaban...'];
+
+export default function GymAIChat({
+    isOpen,
+    onClose,
+    userApiKeys,
+    aiProvider,
+    aiModel,
+    userProfile,
+    history,
+    exerciseLibrary,
+    programs,
+    activePlanIds,
+    plateauInsights = [],
+    raigaPersona = 'santai',
+    raigaCustomInstruction = '',
+    raigaMemory = [],
+    setRaigaMemory,
+    onUnreadChange,
+    onAcceptProgram,
+    user,
+    keyStatuses,
+    setKeyStatuses,
+    setAiProvider,
+    setAiModel,
+    setShowSettings,
+    setConfirmModal,
+    avatarOrigin = null,  // { x, y } posisi tengah avatar di layar
+}) {
+    const [messages, setMessages] = useState([]);
+    const [input, setInput] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [thinkingPhaseIdx, setThinkingPhaseIdx] = useState(0);
+    const messagesEndRef = useRef(null);
+    const inputRef = useRef(null);
+
+    // Refs mirror isOpen/activeSessionId so the async handleSend closure always reads
+    // the CURRENT value (not what it was when the request started) — needed to detect
+    // "user closed the chat / switched sessions while a reply was still generating".
+    const isOpenRef = useRef(isOpen);
+    useEffect(() => { isOpenRef.current = isOpen; }, [isOpen]);
+
+    // Phase state machine — guarantees both open AND close animations fire reliably
+    // closed → opening (mount, scale=0) → open (scale=1) → closing (scale=0) → closed (unmount)
+    const [phase, setPhase] = useState('closed');
+    const phaseTimer = useRef(null);
+
+    useEffect(() => {
+        clearTimeout(phaseTimer.current);
+        if (isOpen) {
+            setPhase('opening');                                    // mount dulu (scale=0)
+            phaseTimer.current = setTimeout(() => setPhase('open'), 20); // beri 1 frame lalu animate ke scale(1)
+        } else {
+            setPhase('closing');                                    // animate ke scale(0)
+            phaseTimer.current = setTimeout(() => setPhase('closed'), 360); // unmount setelah animasi selesai
+        }
+        return () => clearTimeout(phaseTimer.current);
+    }, [isOpen]);
+
+    const [sessions, setSessions] = useState([]);
+    const [activeSessionId, setActiveSessionId] = useState(null);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const activeSessionIdRef = useRef(activeSessionId);
+    useEffect(() => { activeSessionIdRef.current = activeSessionId; }, [activeSessionId]);
+
+    useEffect(() => {
+        const uid = user?.uid || 'guest';
+        const sessionsKey = `lyfit_ai_sessions_${uid}`;
+        const oldChatKey = `lyfit_ai_chat_${uid}`;
+        const savedSessions = localStorage.getItem(sessionsKey);
+        let loadedSessions = [];
+        if (savedSessions) {
+            try { loadedSessions = JSON.parse(savedSessions); } catch (e) {}
+        }
+        const oldChat = localStorage.getItem(oldChatKey);
+        if (loadedSessions.length === 0 && oldChat) {
+            try {
+                const oldMessages = JSON.parse(oldChat);
+                if (oldMessages && oldMessages.length > 0) {
+                    loadedSessions = [{ id: 'migrated-session', title: 'Obrolan Sebelumnya', messages: oldMessages, updatedAt: Date.now() }];
+                    localStorage.removeItem(oldChatKey);
+                }
+            } catch (e) {}
+        }
+        setSessions(loadedSessions);
+        if (loadedSessions.length > 0) {
+            setActiveSessionId(loadedSessions[0].id);
+            setMessages(loadedSessions[0].messages);
+        }
+    }, [user?.uid]);
+
+    const isInitialMount = useRef(true);
+
+    useEffect(() => {
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+        }
+        const uid = user?.uid || 'guest';
+        const sessionsKey = `lyfit_ai_sessions_${uid}`;
+        if (sessions.length > 0) {
+            localStorage.setItem(sessionsKey, JSON.stringify(sessions));
+        } else {
+             localStorage.removeItem(sessionsKey);
+        }
+    }, [sessions, user?.uid]);
+
+    // Lift "is there anything unread" up to App.jsx so the floating avatar can badge itself,
+    // even while this whole panel is scaled to 0 / not visibly open.
+    useEffect(() => {
+        onUnreadChange?.(sessions.some(s => s.unread));
+    }, [sessions, onUnreadChange]);
+
+    // Proactive plateau insights (rule-based, from App.jsx) get delivered into ONE dedicated,
+    // color-coded session — reused for every future insight until the user deletes it, at
+    // which point the next insight starts a fresh one. Delivery happens independent of whether
+    // this panel is open, so the badge is accurate even if the user never opens the floating bubble.
+    const lastDeliveredInsightKeyRef = useRef(null);
+    useEffect(() => {
+        const top = plateauInsights?.[0];
+        if (!top) return;
+        const insightKey = `${top.name}_${top.weeks}_${top.maxWeight}`;
+        if (lastDeliveredInsightKeyRef.current === insightKey) return;
+        lastDeliveredInsightKeyRef.current = insightKey;
+
+        const text = `Bro, **${top.name}** lu udah flat **${top.weeks} minggu** (top: ${top.maxWeight}kg). Kayaknya waktunya deload atau ganti variasi, gue bisa bantu!`;
+        const aiMsg = { role: 'model', content: text, timestamp: Date.now() };
+
+        setSessions(prev => {
+            const existing = prev.find(s => s.origin === 'raiga');
+            if (existing) {
+                const updated = { ...existing, messages: [...existing.messages, aiMsg], unread: true, updatedAt: Date.now() };
+                if (isOpenRef.current && activeSessionIdRef.current === existing.id) {
+                    setMessages(m => [...m, aiMsg]);
+                    updated.unread = false;
+                }
+                return prev.map(s => s.id === existing.id ? updated : s);
+            }
+            const newSession = { id: 'raiga_' + Date.now(), title: 'Coach Raiga', origin: 'raiga', unread: true, messages: [aiMsg], updatedAt: Date.now() };
+            return [newSession, ...prev];
+        });
+    }, [plateauInsights]);
+
+    // When the panel opens (any trigger — avatar tap, CTA, elsewhere), route straight into
+    // the dedicated Raiga session if it has something unread; otherwise leave whatever was
+    // already active alone.
+    const prevIsOpenRef = useRef(false);
+    useEffect(() => {
+        if (isOpen && !prevIsOpenRef.current) {
+            const raigaSession = sessions.find(s => s.origin === 'raiga');
+            if (raigaSession?.unread) {
+                setActiveSessionId(raigaSession.id);
+                setMessages(raigaSession.messages);
+                setSessions(prev => prev.map(s => s.id === raigaSession.id ? { ...s, unread: false } : s));
+                setIsSidebarOpen(false);
+            }
+        }
+        prevIsOpenRef.current = isOpen;
+    }, [isOpen, sessions]);
+
+    // Rotating "what am I doing" phrase while waiting for the first token, replacing the
+    // old separate "Coach sedang mengetik..." pill with something more informative.
+    useEffect(() => {
+        if (!isLoading) { setThinkingPhaseIdx(0); return; }
+        const iv = setInterval(() => setThinkingPhaseIdx(i => Math.min(i + 1, THINKING_PHASES.length - 1)), 900);
+        return () => clearInterval(iv);
+    }, [isLoading]);
+
+    const handleNewChat = () => {
+        setActiveSessionId(null);
+        setMessages([]);
+        setIsSidebarOpen(false);
+    };
+
+    const doDeleteChat = (id) => {
+        const deletingSession = sessions.find(s => s.id === id);
+        if (deletingSession?.origin === 'raiga') lastDeliveredInsightKeyRef.current = null;
+        const updated = sessions.filter(s => s.id !== id);
+        setSessions(updated);
+        if (activeSessionId === id) {
+            if (updated.length > 0) {
+                setActiveSessionId(updated[0].id);
+                setMessages(updated[0].messages);
+            } else {
+                handleNewChat();
+            }
+        }
+    };
+
+    const handleDeleteChat = (e, id) => {
+        e.stopPropagation();
+
+        if (setConfirmModal) {
+            setConfirmModal({
+                isOpen: true,
+                title: 'Hapus Chat?',
+                message: 'Apakah Anda yakin ingin menghapus obrolan ini? Tindakan ini tidak dapat dibatalkan.',
+                confirmText: 'Ya, Hapus',
+                cancelText: 'Batal',
+                onConfirm: () => {
+                    doDeleteChat(id);
+                    setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                }
+            });
+        } else {
+            doDeleteChat(id);
+        }
+    };
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    };
+
+    useEffect(() => {
+        scrollToBottom();
+    }, [messages, isLoading]);
+
+    const handleSend = async () => {
+        if (!input.trim() || isLoading) return;
+
+        const currentProvider = AI_MODELS.find(m => m.id === aiModel)?.provider || aiProvider;
+        const status = getProviderStatus(currentProvider, userApiKeys, keyStatuses);
+
+        if (status === 'missing' || status === 'exhausted') {
+            const warningMsg = {
+                role: 'model',
+                content: `API Key untuk **${currentProvider}** ${status === 'missing' ? 'tidak ditemukan' : 'telah mencapai limit/habis'}. Silakan perbarui di Pengaturan.`,
+                isSystemWarning: true,
+                timestamp: Date.now()
+            };
+            setMessages(prev => [...prev, { role: 'user', content: input, timestamp: Date.now() }, warningMsg]);
+            setInput('');
+            return;
+        }
+
+        const userMsg = { role: 'user', content: input.trim(), timestamp: Date.now() };
+
+        let currentSessionId = activeSessionId;
+        if (!currentSessionId) {
+            const words = input.trim().split(' ');
+            const title = words.slice(0, 4).join(' ') + (words.length > 4 ? '...' : '');
+            currentSessionId = 'session_' + Date.now();
+            const newSession = { id: currentSessionId, title: title || 'Sesi Baru', messages: [userMsg], updatedAt: Date.now() };
+            setSessions(prev => [newSession, ...prev]);
+            setActiveSessionId(currentSessionId);
+        } else {
+            setSessions(prev => prev.map(s => s.id === currentSessionId ? { ...s, messages: [...s.messages, userMsg], updatedAt: Date.now() } : s));
+        }
+
+        setMessages(prev => [...prev, userMsg]);
+        setInput('');
+        if (inputRef.current) inputRef.current.style.height = 'auto';
+        setIsLoading(true);
+
+        // Declared outside try/catch so the catch block can still clean up the placeholder
+        const tempId = 'temp_' + Date.now();
+
+        try {
+            // Trim exercise library: only names, max 150 exercises
+            const exLibStr = exerciseLibrary
+                .slice(0, 150)
+                .map(ex => ex.name)
+                .join(', ');
+
+            // Purely social/filler messages ("hai", "makasih") skip the heavy data blocks —
+            // narrow whitelist, defaults to full context whenever there's any doubt.
+            const trivial = isTrivialMessage(userMsg.content);
+            const logsSummary = trivial ? '' : summarizeWorkoutLogs(history, exerciseLibrary, programs);
+            const bioSummary = trivial ? '' : summarizeBiometrics(history, userProfile);
+            const activeProgramsSummary = trivial ? '' : summarizeActivePrograms(programs, activePlanIds);
+            const systemContent = buildSystemPrompt(userProfile, exLibStr, logsSummary, bioSummary, activeProgramsSummary, raigaPersona, raigaCustomInstruction, raigaMemory);
+
+            // Keep only last 10 real messages; local error/warning bubbles never go to the API
+            const recentHistory = messages.filter(m => !m.isError && !m.isSystemWarning).slice(-10);
+
+            // Construct full API messages
+            const apiMessages = [
+                { role: 'system', content: systemContent },
+                ...recentHistory.map(m => ({ role: m.role, content: m.content })),
+                { role: 'user', content: userMsg.content }
+            ];
+
+            // Buat placeholder sementara untuk efek mengetik (streaming)
+            setMessages(prev => [...prev, { id: tempId, role: 'model', content: '', timestamp: Date.now() }]);
+
+            // "Still viewing" is re-checked live (via refs) at every chunk and at completion —
+            // if the user closes the panel or switches sessions mid-generation, we stop touching
+            // the visible `messages` state and just deliver silently into `sessions` + flag unread.
+            const isStillViewing = () => isOpenRef.current && activeSessionIdRef.current === currentSessionId;
+
+            let streamedText = '';
+            const reply = await chatWithAI(apiMessages, currentProvider, aiModel, userApiKeys, setKeyStatuses, (chunk) => {
+                streamedText += chunk;
+                if (isStillViewing()) {
+                    setMessages(prev => prev.map(m => m.id === tempId ? { ...m, content: streamedText } : m));
+                }
+            });
+
+            const aiMsg = { role: 'model', content: reply, timestamp: Date.now() };
+            const stillViewing = isStillViewing();
+            if (stillViewing) {
+                setMessages(prev => prev.map(m => m.id === tempId ? aiMsg : m));
+            }
+            setSessions(prev => prev.map(s => s.id === currentSessionId ? { ...s, messages: [...s.messages, aiMsg], updatedAt: Date.now(), unread: !stillViewing } : s));
+        } catch (err) {
+            console.error(err);
+            if (isOpenRef.current && activeSessionIdRef.current === currentSessionId) {
+                // Drop the empty thinking placeholder instead of leaving it dangling next to the error bubble
+                setMessages(prev => [...prev.filter(m => m.id !== tempId), { role: 'model', content: `Error: ${err.message}`, timestamp: Date.now(), isError: true }]);
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleSaveMemory = (text) => {
+        if (!setRaigaMemory) return;
+        const trimmed = text.trim().slice(0, 160);
+        setRaigaMemory(prev => (prev || []).includes(trimmed) ? prev : [...(prev || []), trimmed]);
+    };
+
+    const autoResizeInput = () => {
+        const el = inputRef.current;
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = Math.min(el.scrollHeight, 128) + 'px';
+    };
+
+    // WhatsApp/Notion-style: Shift+Enter on a "- "/"* "/"1. " line continues the marker on
+    // the next line (auto-incrementing numbers); Shift+Enter on an EMPTY marker line clears
+    // it instead, ending the list. Plain Enter still sends (handled separately).
+    const handleListContinuation = () => {
+        const el = inputRef.current;
+        if (!el) return false;
+        const pos = el.selectionStart;
+        const value = el.value;
+        const lineStart = value.lastIndexOf('\n', pos - 1) + 1;
+        const currentLine = value.slice(lineStart, pos);
+        const ul = currentLine.match(/^(\s*)([-*])\s+(.*)$/);
+        const ol = currentLine.match(/^(\s*)(\d+)\.\s+(.*)$/);
+
+        if (ul) {
+            const next = ul[3].trim() === ''
+                ? value.slice(0, lineStart) + value.slice(pos)
+                : value.slice(0, pos) + `\n${ul[1]}${ul[2]} ` + value.slice(pos);
+            const caret = ul[3].trim() === '' ? lineStart : pos + `\n${ul[1]}${ul[2]} `.length;
+            setInput(next);
+            requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = caret; autoResizeInput(); });
+            return true;
+        }
+        if (ol) {
+            const marker = ol[3].trim() === '' ? '' : `\n${ol[1]}${parseInt(ol[2], 10) + 1}. `;
+            const next = ol[3].trim() === ''
+                ? value.slice(0, lineStart) + value.slice(pos)
+                : value.slice(0, pos) + marker + value.slice(pos);
+            const caret = ol[3].trim() === '' ? lineStart : pos + marker.length;
+            setInput(next);
+            requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = caret; autoResizeInput(); });
+            return true;
+        }
+        return false;
+    };
+
+    const handleInputKeyDown = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSend();
+            return;
+        }
+        if (e.key === 'Enter' && e.shiftKey) {
+            if (handleListContinuation()) e.preventDefault();
+        }
+    };
+
+    const renderMessageContent = (msg) => {
+        if (msg.isError) {
+            return <div className="text-red-400 text-sm">{msg.content}</div>;
+        }
+
+        if (msg.isSystemWarning) {
+            return (
+                <div className="flex flex-col gap-3">
+                    <p className="text-sm">{msg.content}</p>
+                    <button 
+                        onClick={() => {
+                            if (setShowSettings) setShowSettings('lanjutan');
+                        }}
+                        className="bg-blue-500 text-white font-bold text-xs py-2 px-4 rounded-xl self-start hover:bg-blue-600 active:scale-95 cursor-pointer relative z-50 pointer-events-auto"
+                    >
+                        Buka Pengaturan API
+                    </button>
+                </div>
+            );
+        }
+
+        // Check for program proposal tags
+        const tagStart = '<program_proposal>';
+        const tagEnd = '</program_proposal>';
+        
+        let textPart = msg.content;
+        let jsonPart = null;
+
+        if (msg.content.includes(tagStart) && msg.content.includes(tagEnd)) {
+            const startIndex = msg.content.indexOf(tagStart);
+            const endIndex = msg.content.indexOf(tagEnd) + tagEnd.length;
+            textPart = msg.content.substring(0, startIndex).trim();
+            const jsonStr = msg.content.substring(startIndex + tagStart.length, msg.content.indexOf(tagEnd)).trim();
+            
+            try {
+                jsonPart = JSON.parse(jsonStr);
+            } catch (e) {
+                console.error("Failed to parse program proposal JSON:", e);
+                textPart += "\n\n[Error: Received invalid program format from AI]";
+            }
+        }
+
+        return (
+            <div className="space-y-3">
+                {textPart && <div className="text-sm">{renderMiniMarkdown(textPart)}</div>}
+                {jsonPart && (
+                    <div className="bg-neutral-800/50 backdrop-blur-md border border-blue-500/30 rounded-xl p-4 space-y-3 mt-2 shadow-lg shadow-blue-500/10">
+                        <div className="flex items-center gap-2 text-blue-400">
+                            <Dumbbell size={18} />
+                            <h4 className="font-bold text-sm">{jsonPart.action === 'update' ? 'Program Update' : 'Program Proposal'}</h4>
+                        </div>
+                        <div>
+                            <p className="font-bold text-white text-base">{jsonPart.planName}</p>
+                            <p className="text-xs text-neutral-400 mt-1">{jsonPart.description}</p>
+                        </div>
+                        <div className="space-y-1">
+                            {jsonPart.routines?.map((r, i) => (
+                                <div key={i} className="text-xs text-neutral-300 flex justify-between items-center bg-neutral-900 p-2 rounded-lg">
+                                    <span className="font-semibold text-blue-300">{r.name}{r.assignedDays?.length ? ` (${r.assignedDays.join(', ')})` : ''}</span>
+                                    <span>{r.exercises?.length || 0} Exercises</span>
+                                </div>
+                            ))}
+                        </div>
+                        <button
+                            onClick={() => {
+                                onAcceptProgram(jsonPart);
+                                onClose();
+                            }}
+                            className="w-full mt-2 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 rounded-xl text-sm transition-colors flex items-center justify-center gap-2"
+                        >
+                            <Check size={16} /> {jsonPart.action === 'update' ? 'Terapkan Perubahan' : 'Accept & Save Program'}
+                        </button>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    if (phase === 'closed') return null;
+
+    // transform-origin = posisi tengah avatar, supaya scale expand/collapse dari sana
+    const ox = avatarOrigin?.x ?? window.innerWidth / 2;
+    const oy = avatarOrigin?.y ?? window.innerHeight;
+
+    const isAnimatingIn  = phase === 'open';
+    const isAnimatingOut = phase === 'closing';
+
+    // Scale: 0 saat opening/closing, 1 saat open
+    const scaleVal = isAnimatingIn ? 'scale(1)' : 'scale(0)';
+
+    return (
+        <>
+        {/* Backdrop terpisah — hanya fade, tidak di-scale supaya tidak ganggu transform */}
+        <div
+            className="fixed inset-0 z-[99] bg-black/70 backdrop-blur-sm"
+            style={{
+                opacity: isAnimatingIn ? 1 : 0,
+                transition: isAnimatingIn
+                    ? 'opacity 0.3s ease'
+                    : 'opacity 0.28s ease',
+                pointerEvents: isAnimatingIn ? 'auto' : 'none',
+            }}
+            onClick={onClose}
+        />
+
+        {/* Panel chat — di-scale dari titik avatar */}
+        <div
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 pointer-events-none"
+            style={{
+                transform: scaleVal,
+                transformOrigin: `${ox}px ${oy}px`,
+                // Buka: spring ringan. Tutup: ease-in cepat
+                transition: isAnimatingOut
+                    ? 'transform 0.3s cubic-bezier(0.4,0,1,1)'
+                    : 'transform 0.38s cubic-bezier(0.34,1.15,0.64,1)',
+            }}
+        >
+            <div className="pointer-events-auto flex flex-col w-full max-w-md h-[85vh] max-h-[800px] bg-neutral-900/80 backdrop-blur-3xl border border-white/10 rounded-[2rem] shadow-[0_0_40px_rgba(0,0,0,0.5)] overflow-hidden relative">
+            {isSidebarOpen && <div className="absolute inset-0 bg-black/60 z-[110] transition-opacity cursor-pointer" onClick={() => setIsSidebarOpen(false)} />}
+
+            <div className={`absolute inset-y-0 left-0 w-64 bg-neutral-900 border-r border-white/10 z-[120] transform transition-transform duration-300 flex flex-col ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+                <div className="p-4 border-b border-white/10">
+                    <button onClick={handleNewChat} className="w-full bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/30 font-bold py-2 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors">
+                        <Plus size={18} /> Chat Baru
+                    </button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                    {sessions.sort((a, b) => b.updatedAt - a.updatedAt).map(session => (
+                        <div
+                            key={session.id}
+                            onClick={() => {
+                                setActiveSessionId(session.id);
+                                setMessages(session.messages);
+                                setIsSidebarOpen(false);
+                                if (session.unread) setSessions(prev => prev.map(s => s.id === session.id ? { ...s, unread: false } : s));
+                            }}
+                            className={`w-full text-left p-3 rounded-xl flex items-center justify-between group cursor-pointer transition-colors ${activeSessionId === session.id ? 'bg-white/10 text-white' : session.origin === 'raiga' ? 'bg-blue-500/10 hover:bg-blue-500/15 text-blue-100' : 'hover:bg-white/5 text-neutral-400 hover:text-white'}`}
+                        >
+                            <div className="flex items-center gap-2 truncate pr-2">
+                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${session.origin === 'raiga' ? 'bg-blue-400' : 'bg-neutral-600'}`} />
+                                <span className="truncate text-sm font-medium">{session.title}</span>
+                                {session.unread && <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />}
+                            </div>
+                            <button onClick={(e) => { e.stopPropagation(); handleDeleteChat(e, session.id); }} className="text-neutral-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" title="Hapus">
+                                <Trash2 size={16} />
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <div className="flex-1 flex flex-col w-full h-full relative">
+
+                {/* HEADER */}
+                <div className="p-4 border-b border-white/10 flex items-center justify-between bg-black/40 backdrop-blur-md z-10">
+                    <div className="flex items-center gap-3">
+                        <div
+                            className="w-10 h-10 rounded-full border-2 border-blue-400 shadow-md bg-zinc-900 shrink-0"
+                            style={{ backgroundImage: 'url(/bg-program.webp)', backgroundSize: '450%', backgroundPosition: '52% 7%' }}
+                        />
+                        <div>
+                            <h3 className="font-bold text-white leading-tight">Coach Raiga</h3>
+                            <div className="flex items-center gap-1 mt-1">
+                                <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${getProviderStatus(AI_MODELS.find(m => m.id === aiModel)?.provider, userApiKeys, keyStatuses) === 'ready' ? 'bg-blue-500' : getProviderStatus(AI_MODELS.find(m => m.id === aiModel)?.provider, userApiKeys, keyStatuses) === 'warning' ? 'bg-yellow-500' : 'bg-red-500'}`}></span>
+                                <select 
+                                    value={aiModel}
+                                    onChange={(e) => {
+                                        const selectedModelId = e.target.value;
+                                        const selectedModel = AI_MODELS.find(m => m.id === selectedModelId);
+                                        if (selectedModel) {
+                                            setAiProvider(selectedModel.provider);
+                                            setAiModel(selectedModel.id);
+                                        }
+                                    }}
+                                    className="bg-transparent text-blue-400 text-[10px] font-mono outline-none cursor-pointer appearance-none"
+                                >
+                                    {getAvailableModels(userApiKeys).map(m => {
+                                        return <option key={m.id} value={m.id} className="bg-neutral-900 text-white">{m.name}</option>;
+                                    })}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="p-2 text-neutral-400 hover:text-white rounded-full bg-white/5 hover:bg-white/10 transition-colors">
+                        <X size={20} />
+                    </button>
+                </div>
+
+                {/* CHAT AREA */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 z-10">
+                    {messages.length === 0 && (
+                        <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-50">
+                            <div 
+                                className="w-16 h-16 rounded-full border-2 border-blue-500 shadow-lg bg-zinc-900 shrink-0"
+                                style={{ backgroundImage: 'url(/bg-program.webp)', backgroundSize: '450%', backgroundPosition: '52% 7%' }}
+                            />
+                            <div>
+                                <p className="text-white font-bold">Tanya Apapun!</p>
+                                <p className="text-xs text-neutral-400 max-w-xs mx-auto mt-1">Saya bisa menganalisa riwayat latihanmu, dan membuatkan program latihan baru khusus untukmu.</p>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {messages.map((msg, idx) => {
+                        const isThinkingPlaceholder = msg.role !== 'user' && msg.content === '' && isLoading && idx === messages.length - 1;
+                        return (
+                        <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} gap-2 items-end mb-2`}>
+                            {msg.role !== 'user' && (
+                                <div
+                                    className="w-8 h-8 rounded-full border border-white/20 shadow-md shrink-0 mb-1"
+                                    style={{ backgroundImage: 'url(/bg-program.webp)', backgroundSize: '450%', backgroundPosition: '52% 7%' }}
+                                />
+                            )}
+                            {msg.role === 'user' && setRaigaMemory && (
+                                <button
+                                    onClick={() => handleSaveMemory(msg.content)}
+                                    title="Simpan sebagai memori"
+                                    className={`p-1.5 rounded-full transition-colors mb-1 shrink-0 ${(raigaMemory || []).includes(msg.content.trim().slice(0, 160)) ? 'text-blue-400' : 'text-neutral-600 hover:text-blue-400'}`}
+                                >
+                                    <Bookmark size={14} fill={(raigaMemory || []).includes(msg.content.trim().slice(0, 160)) ? 'currentColor' : 'none'} />
+                                </button>
+                            )}
+                            <div className={`max-w-[85%] rounded-2xl p-4 ${msg.role === 'user' ? 'bg-blue-500/20 backdrop-blur-md border border-blue-500/30 shadow-lg text-white rounded-tr-sm' : 'bg-white/5 backdrop-blur-md text-neutral-100 border border-white/10 rounded-tl-sm shadow-lg'}`}>
+                                {isThinkingPlaceholder ? (
+                                    <div className="flex items-center gap-2">
+                                        <Loader2 size={16} className="text-blue-400 animate-spin shrink-0" />
+                                        <span className="text-xs text-blue-300">{THINKING_PHASES[thinkingPhaseIdx]}</span>
+                                    </div>
+                                ) : (
+                                    <>
+                                        {renderMessageContent(msg)}
+                                        <div className={`text-[10px] mt-2 opacity-50 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
+                                            {new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                        );
+                    })}
+                    <div ref={messagesEndRef} />
+                </div>
+
+                {/* INPUT AREA */}
+                <div className="p-4 pb-8 sm:pb-4 border-t border-white/10 bg-black/40 backdrop-blur-md z-10">
+                    <div className="flex items-center gap-2">
+                        <button 
+                            onClick={() => setIsSidebarOpen(true)} 
+                            className="p-3 text-neutral-400 hover:text-white bg-white/5 border border-white/10 rounded-xl transition-colors shrink-0"
+                            title="Menu Sesi Chat"
+                        >
+                            <Menu size={20} />
+                        </button>
+                        <textarea
+                            ref={inputRef}
+                            value={input}
+                            onChange={(e) => { setInput(e.target.value); autoResizeInput(); }}
+                            onKeyDown={handleInputKeyDown}
+                            placeholder="Tanya Raiga"
+                            className="flex-1 bg-white/[0.04] backdrop-blur-sm text-white text-sm rounded-xl px-4 py-3 outline-none border border-white/5 focus:border-blue-500/50 resize-none max-h-32"
+                            rows={1}
+                            style={{ minHeight: '44px' }}
+                        />
+                        <button 
+                            onClick={handleSend}
+                            disabled={!input.trim() || isLoading}
+                            className="p-3 bg-blue-500/80 hover:bg-blue-600 backdrop-blur-md border border-blue-400/30 disabled:opacity-50 disabled:hover:bg-blue-500 text-white rounded-xl transition-colors shrink-0 flex items-center justify-center"
+                        >
+                            <Send size={20} />
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+            </div> {/* inner rounded box */}
+        </div>
+        </>
+    );
+}

@@ -334,7 +334,7 @@ export const getLeaderboard = async (limitCount = 50) => {
 export const shareTemplate = async (userId, userName, program) => {
   try {
     const docRef = await addDoc(collection(db, 'community_posts'), {
-      type: 'template', userId, userName: userName || 'LOGYM Coach',
+      type: 'template', userId, userName: userName || 'Coach Raiga',
       programName: program.name || 'My Custom Program',
       planName: program.planName || 'Custom Plan',
       exercises: program.exercises || [],

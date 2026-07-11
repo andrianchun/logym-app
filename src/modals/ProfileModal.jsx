@@ -191,16 +191,7 @@ export default function ProfileModal({
         const fileSignature = file.name.replace(/[^a-zA-Z0-9]/g, '_') + '_' + file.size;
         const isAlreadyUploaded = !!(user?.uploadedPhotos?.[fileSignature]);
 
-        // Limit frequency to once a week for NEW photos
-        if (!isAlreadyUploaded && user?.lastPhotoUpdate) {
-            const ONE_WEEK = 7 * 24 * 60 * 60 * 1000;
-            const now = Date.now();
-            if (now - user.lastPhotoUpdate < ONE_WEEK) {
-                setUploadStatus({ show: true, success: false, message: 'Maaf kamu hanya bisa mengganti user profile setiap 1 minggu sekali.' });
-                if (e.target) e.target.value = '';
-                return;
-            }
-        }
+
 
         setPendingPhotoFile(file);
         if (e.target) e.target.value = '';
@@ -224,7 +215,7 @@ export default function ProfileModal({
                 // Upload to Firebase Storage
                 photoURL = await uploadImageToFirebase(pendingPhotoFile, `lyfit_users/${user.uid}/profile/profile_pic_${Date.now()}`);
                 // Anti-cache is technically no longer needed since URL is unique, but kept for safety
-                photoURL = `${photoURL}?v=${Date.now()}`;
+                photoURL = photoURL.includes('?') ? `${photoURL}&v=${Date.now()}` : `${photoURL}?v=${Date.now()}`;
             }
 
             await updateProfile(auth.currentUser, { photoURL });
@@ -291,7 +282,7 @@ export default function ProfileModal({
                                 <h3 className="text-xl font-black">Yakin Ganti Foto?</h3>
                             </div>
                             <p className={`${t.textMuted} mb-6 leading-relaxed text-sm`}>
-                                Yakin akan mengganti foto profil ini? Foto profil hanya bisa diganti setiap 1 minggu sekali lho.
+                                Yakin akan mengganti foto profil ini?
                             </p>
                             <div className="flex w-full space-x-3">
                                 <button onClick={() => setPendingPhotoFile(null)} className={`flex-1 py-3 rounded-xl font-bold ${t.bgBox} ${t.textMain} transition-all text-sm hover:opacity-80`}>Batal</button>

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Info, CheckCircle, CalendarDays, Edit2, PlayCircle, X, Copy, Repeat, Plus, Clock, Bell, CalendarPlus, CalendarCheck, BellOff, BellRing, ToggleLeft, ToggleRight, Flame, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Info, CheckCircle, CalendarDays, Edit2, PlayCircle, X, Copy, Repeat, Plus, Clock, Bell, CalendarPlus, CalendarCheck, BellOff, BellRing, ToggleLeft, ToggleRight, Flame, Check, Activity } from 'lucide-react';
 import SwipeInput from '../components/SwipeInput';
 import { getLocalYMD } from '../data/constants';
 import { formatNumber } from '../utils/numberFormat';
@@ -27,6 +27,7 @@ const CalendarTab = ({
   const [isTablet, setIsTablet] = useState(window.innerWidth >= 640);
   const [calendarMode, setCalendarMode] = useState('monthly');
   const [showBottomSheet, setShowBottomSheet] = useState(false);
+  const [showMonthlyStats, setShowMonthlyStats] = useState(false);
 
   // Mode Bulanan: daftar bulan yang bisa di-scroll vertikal terus-menerus (bukan swipe per-bulan).
   // Rentang awal 24 bulan ke belakang, 12 ke depan — cukup luas untuk "puluhan bulan" tanpa
@@ -189,19 +190,16 @@ const CalendarTab = ({
   const calendarModeRef = useRef(calendarMode);
   calendarModeRef.current = calendarMode;
 
-  // Ukur konten sheet (heading + tombol Tambah Sesi / Mulai Latihan) tiap kali tanggal terpilih
-  // atau isinya berubah, supaya peek di mode bulanan pas sampai bawah tombol — bukan cuma
-  // menampilkan drag handle-nya seperti sebelumnya. Peek di-cap ke weeklyBlockHeight, TIDAK
-  // pernah memaksa ganti mode (biar toggle/drag manual user selalu dituruti).
+  // Ubah peek height agar di mode bulanan hanya tersisa sedikit handle di atas bottom nav
   useEffect(() => {
     if (calendarMode !== 'monthly') return;
     const timer = setTimeout(() => {
-      const contentH = sheetContentRef.current?.scrollHeight || 0;
-      const handleH = 40; // area drag handle (pt-4 + bar + pb-2)
-      setPeekHeight(handleH + Math.min(contentH, weeklyBlockHeight) + bottomNavClearance);
+      const handleH = 140; // area drag handle + sedikit isi konten (biar nggak terlalu tenggelam)
+      // Hanya menampilkan drag handle dan sedikit border di atas navigasi bawah
+      setPeekHeight(handleH + bottomNavClearance);
     }, 50);
     return () => clearTimeout(timer);
-  }, [calendarMode, selectedDate, history, programs, activePlanIds, weeklyBlockHeight, bottomNavClearance]);
+  }, [calendarMode, bottomNavClearance]);
 
   // Note: auto-switch ke weekly dihapus — mode hanya berubah lewat gesture user (toggle / drag handle).
 
@@ -406,14 +404,17 @@ const CalendarTab = ({
             
             projectedRoutines.forEach(pr => {
                 if (!validHistorical.some(w => w.programId === pr.id)) {
-                    result.push({
-                        id: `projected_${pr.id}_${dateStr}`,
-                        programId: pr.id,
-                        programName: pr.name,
-                        status: 'planned',
-                        isProjected: true,
-                        log: {}
-                    });
+                    const dData = history[dateStr] || {};
+                    if (!dData.deletedProjected?.includes(pr.id)) {
+                        result.push({
+                            id: `projected_${pr.id}_${dateStr}`,
+                            programId: pr.id,
+                            programName: pr.name,
+                            status: 'planned',
+                            isProjected: true,
+                            log: {}
+                        });
+                    }
                 }
             });
         }
@@ -725,11 +726,15 @@ const CalendarTab = ({
 
         setHistory(prev => {
           const h = { ...prev };
-          const d = h[selectedDate];
-          if (d) {
-            if (workoutId === 'virtual_adhoc') {
-              h[selectedDate] = { ...d, _activeSession: { ...(d._activeSession || {}), extraExercises: [] } };
-            } else if (d.workouts) {
+          const d = h[selectedDate] || {};
+          
+          if (workoutId.startsWith('projected_')) {
+              const progId = workoutId.split('_')[1];
+              h[selectedDate] = { 
+                  ...d, 
+                  deletedProjected: [...(d.deletedProjected || []), progId] 
+              };
+          } else if (d.workouts) {
               const workoutToRemove = d.workouts.find(w => w.id === workoutId);
               let newActiveSession = { ...(d._activeSession || {}) };
               
@@ -748,8 +753,10 @@ const CalendarTab = ({
               }
 
               h[selectedDate] = { ...d, workouts: d.workouts.filter(w => w.id !== workoutId), _activeSession: newActiveSession };
-            }
+          } else if (workoutId === 'virtual_adhoc') {
+              h[selectedDate] = { ...d, _activeSession: { ...(d._activeSession || {}), extraExercises: [] } };
           }
+          
           return h;
         });
       }
@@ -920,6 +927,61 @@ const CalendarTab = ({
               cellStyle = `w-full h-full max-w-[44px] max-h-[44px] mx-auto relative flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer border-2 ${t.borderAccentSoft} ${t.textAccent} font-bold hover:bg-black/5 dark:hover:bg-white/5`;
             }
 
+            let ringRender = null;
+            if (showMonthlyStats && workouts.length > 0) {
+               const completedWorkouts = workouts.filter(w => checkIsCompletedStrict(w, dateKey));
+               let totalDuration = 0;
+               let totalCalories = 0;
+               completedWorkouts.forEach(w => {
+                 const dur = parseWorkoutDurationMinutes(w.duration) || 0;
+                 totalDuration += dur;
+                 totalCalories += calculateWorkoutCalories(userProfile?.weight, dur) || 0;
+               });
+               
+               // Target harian (bisa disesuaikan nanti, saat ini 60 min & 500 kcal)
+               const targetDuration = 60;
+               const targetCalories = 500;
+               
+               const progressDuration = Math.min(totalDuration / targetDuration, 1);
+               const progressCalories = Math.min(totalCalories / targetCalories, 1);
+               
+               const rOuter = 18;
+               const rInner = 14;
+               const circOuter = 2 * Math.PI * rOuter;
+               const circInner = 2 * Math.PI * rInner;
+               
+               const offsetOuter = circOuter - (progressDuration * circOuter);
+               const offsetInner = circInner - (progressCalories * circInner);
+               
+               ringRender = (
+                 <svg width="44" height="44" className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none transform -rotate-90">
+                   {/* Background Rings */}
+                   <circle cx="22" cy="22" r={rOuter} fill="none" className="stroke-black/5 dark:stroke-white/5" strokeWidth="2.5" />
+                   <circle cx="22" cy="22" r={rInner} fill="none" className="stroke-black/5 dark:stroke-white/5" strokeWidth="2.5" />
+                   
+                   {/* Progress Outer Ring (Durasi - Biru) */}
+                   <circle 
+                     cx="22" cy="22" r={rOuter} fill="none" 
+                     className="stroke-sky-500 transition-all duration-1000 ease-out" 
+                     strokeWidth="2.5" 
+                     strokeLinecap="round"
+                     strokeDasharray={circOuter} 
+                     strokeDashoffset={totalDuration === 0 ? circOuter : offsetOuter} 
+                   />
+                   
+                   {/* Progress Inner Ring (Kalori - Oranye) */}
+                   <circle 
+                     cx="22" cy="22" r={rInner} fill="none" 
+                     className="stroke-orange-500 transition-all duration-1000 ease-out" 
+                     strokeWidth="2.5" 
+                     strokeLinecap="round"
+                     strokeDasharray={circInner} 
+                     strokeDashoffset={totalCalories === 0 ? circInner : offsetInner} 
+                   />
+                 </svg>
+               );
+            }
+
             return (
               <div
                 key={dateKey}
@@ -932,8 +994,9 @@ const CalendarTab = ({
                 className="flex items-center justify-center p-0.5 min-h-0"
               >
                 <div className={cellStyle}>
-                  <span className="body-md font-bold mb-1">{day}</span>
-                  {workouts.length > 0 && (
+                  {ringRender}
+                  <span className={`body-md font-bold ${showMonthlyStats ? 'z-10' : 'mb-1'}`}>{day}</span>
+                  {!showMonthlyStats && workouts.length > 0 && (
                     <div className="absolute bottom-1 flex gap-0.5 items-center">
                       {workouts.slice(0, workouts.length > 3 ? 2 : 3).map(w => {
                         const isDone = checkIsCompletedStrict(w, dateKey);
@@ -966,7 +1029,7 @@ const CalendarTab = ({
         {/* --- FIXED HEADER: Mode toggle + Year label + Today btn --- */}
         <div ref={fixedHeaderRef} className="shrink-0 relative z-[50] px-2">
           <div className="flex justify-between items-center mb-4 px-1">
-            <div className="w-[75px] flex justify-start">
+            <div className="w-[90px] flex justify-start gap-1">
               <button 
                 onClick={() => {
                   playSoundEffect('click', soundEnabled);
@@ -987,6 +1050,19 @@ const CalendarTab = ({
                   <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="18" x2="20" y2="18"></line></svg>
                 )}
               </button>
+              
+              {calendarMode === 'monthly' && (
+                <button
+                  onClick={() => {
+                    playSoundEffect('click', soundEnabled);
+                    setShowMonthlyStats(!showMonthlyStats);
+                  }}
+                  className={`p-2 transition-colors ${showMonthlyStats ? t.textAccent : 'text-zinc-400 dark:text-zinc-500 hover:' + t.textAccent}`}
+                  title="Tampilkan Statistik Aktivitas"
+                >
+                  <Activity size={20} strokeWidth={2.5} />
+                </button>
+              )}
             </div>
             <button 
               onClick={() => {
@@ -1060,7 +1136,7 @@ const CalendarTab = ({
             ))}
           </div>
         ) : calendarMode === 'weekly' ? (
-          <div className="animate-in fade-in slide-in-from-top-2 duration-300 ease-out">
+          <div className="animate-in fade-in slide-in-from-top-2 duration-300 ease-out no-swipe" onTouchStart={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
             <div className="grid grid-cols-7 gap-1 mb-1 px-2 py-1">
               {(weekStartDay === 1 ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'] : ['S', 'M', 'T', 'W', 'T', 'F', 'S']).map((day, i) => (
                 <div key={i} className={`text-center text-[9px] font-medium uppercase text-zinc-500 tracking-wider`}>{day}</div>
@@ -1068,6 +1144,7 @@ const CalendarTab = ({
             </div>
             <PanoramicSlider
               ref={calendarSliderRef}
+              className="no-swipe"
               onSwipeLeft={() => {
                 playSoundEffect('click', soundEnabled);
                 setSlideDirection('right');
@@ -1168,20 +1245,16 @@ const CalendarTab = ({
       {/* SCROLLABLE INLINE WORKOUT DETAILS — posisi dikontrol translateY, absolute saat monthly agar tidak mencuri space */}
       <div
         ref={sheetRef}
-        className={`no-swipe absolute inset-x-0 bottom-0 flex flex-col z-20${sheetDragY === null ? ' transition-transform duration-300 ease-out' : ''}`}
+        className={`no-swipe absolute inset-x-0 bottom-0 flex flex-col z-20${sheetDragY === null ? ' transition-all duration-300 ease-out' : ''}`}
         style={{
-          height: '70vh',
-          // Selalu pakai translateY dalam px murni untuk kedua mode (bukan campur '%'/calc() di
-          // monthly dengan '0%' polos di weekly) — browser gagal meng-interpolasi transisi antar
-          // dua representasi beda itu, jadi macet di posisi lama. Representasi konsisten (px vs px)
-          // bikin transisinya jalan mulus.
+          height: calendarMode === 'weekly' ? `calc(100% - ${(fixedHeaderRef.current?.offsetHeight || 0) + (weeklyRulerRef.current?.offsetHeight || 0) + 20}px)` : '70vh',
           transform: sheetDragY !== null
             ? `translateY(${sheetDragY}px)`
             : `translateY(${calendarMode === 'monthly' ? ((sheetRef.current?.offsetHeight || 0) - peekHeight) : 0}px)`
         }}
       >
          {/* Fixed Glassmorphism Background Container */}
-         <div className={`absolute inset-0 rounded-t-[2.5rem] border-t ${t.border} ${theme === 'dark' ? 'bg-black/40' : 'bg-white/60'} backdrop-blur-xl shadow-[0_-10px_40px_rgba(0,0,0,0.15)] pointer-events-none`}></div>
+         <div className={`absolute inset-0 rounded-t-[2.5rem] border-t ${t.border} ${theme === 'dark' ? 'bg-[#121a2f]/95' : 'bg-white/95'} backdrop-blur-xl shadow-[0_-10px_40px_rgba(0,0,0,0.15)] pointer-events-none`}></div>
 
          {/* DRAG HANDLE — area tarik naik/turun */}
          <div
@@ -1269,7 +1342,7 @@ const CalendarTab = ({
                                         <p className="caption opacity-50 mb-4">Tidak ada program aktif. Silakan pilih program di tab Program.</p>
                                         <button 
                                             onClick={() => { playSoundEffect('click', soundEnabled); setActiveTab('program'); }} 
-                                            className={`w-full py-3 rounded-xl body-lg font-bold ${t.bgAccentSoft} ${t.textAccent} border ${t.borderAccentSoft} hover:opacity-80 transition-opacity`}
+                                            className={`w-full py-3 rounded-full body-lg font-bold ${t.bgAccentSoft} ${t.textAccent} border ${t.borderAccentSoft} hover:opacity-80 transition-opacity`}
                                         >
                                             Buka Tab Program
                                         </button>
@@ -1473,7 +1546,7 @@ const CalendarTab = ({
                          {activePlanIds.length > 0 && (
                              <button 
                                 onClick={() => setShowProgramSelect(true)}
-                                className={`w-full py-4 rounded-2xl border-2 border-dashed ${t.borderAccentSoft} ${t.textAccent} font-bold body-lg flex items-center justify-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors`}
+                                className={`w-full py-4 rounded-full border-2 border-dashed ${t.borderAccentSoft} ${t.textAccent} font-bold body-lg flex items-center justify-center gap-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors`}
                              >
                                 <Plus size={18} /> Tambah Sesi
                              </button>
@@ -1482,7 +1555,7 @@ const CalendarTab = ({
                          {panelWorkouts.some(w => !checkIsCompletedStrict(w, targetDateStr)) && targetDateStr === todayStr && (
                            <button 
                              onClick={() => { playSoundEffect('click', soundEnabled); navigateToWorkoutDate(targetDateStr); }} 
-                             className={`w-full p-4 rounded-xl font-bold text-white transition-colors bg-gradient-to-r ${t.gradientBg} shadow-lg flex justify-center items-center`}
+                             className={`w-full p-4 rounded-full font-bold text-white transition-colors bg-gradient-to-r ${t.gradientBg} shadow-lg flex justify-center items-center`}
                            >
                              <PlayCircle size={18} className="mr-2"/> Mulai Latihan Sekarang
                            </button>

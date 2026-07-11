@@ -1,8 +1,18 @@
-export async function extractBiometricsFromImage(base64Image, mimeType, userApiKey = null) {
-    try {
-        if (userApiKey && userApiKey.trim() !== '') {
-            // Client-side fallback: direct to Google Gemini API
-            const prompt = `You are a highly advanced medical and fitness data extractor. Analyze the provided image, which may be a screenshot of a health app, a smart scale app (like Zepp Life, Mi Fit, Garmin, Huawei Health, Renpho), a smartwatch screen, or a medical document.
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../firebase';
+
+// Shared API keys sekarang hidup di backend (functions/.env), bukan di bundle client.
+// Alur: key pribadi user dipanggil langsung dari browser; tanpa key -> proxy Cloud Functions.
+
+export async function extractBiometricsFromImage(base64Image, mimeType, userApiKeys = [], aiProvider = 'google', aiModel = 'gemini-3.5-flash', setKeyStatuses = null) {
+    const keys = Array.isArray(userApiKeys) ? userApiKeys : [userApiKeys];
+    const validKeys = keys.filter(k => k && typeof k === 'string' && k.trim() !== '');
+
+    let providerKeys = [];
+    if (aiProvider === 'google') providerKeys = validKeys.filter(k => !k.trim().startsWith('sk-'));
+    else if (aiProvider === 'openai') providerKeys = validKeys.filter(k => k.trim().startsWith('sk-') && !k.trim().startsWith('sk-ant'));
+
+    const prompt = `You are a highly advanced medical and fitness data extractor. Analyze the provided image, which may be a screenshot of a health app, a smart scale app (like Zepp Life, Mi Fit, Garmin, Huawei Health, Renpho), a smartwatch screen, or a medical document.
 Extract all numerical biometric data and fitness metrics you can find.
 Pay close attention to all available fields like Body Score, BMR, Visceral Fat, Body Water, Protein, Body Age, etc.
 Format your response STRICTLY as a valid JSON object matching this schema. Use null if a field is completely missing or cannot be inferred.
@@ -36,103 +46,149 @@ For sleep, use "Hh Mm" format (e.g., "7h 30m").
   "weeklyDuration": number,
   "bloodPressure": string
 }`;
-            const payload = {
-                contents: [{
-                    parts: [
-                        { text: prompt },
-                        {
-                            inline_data: {
-                                mime_type: mimeType || 'image/jpeg',
-                                data: base64Image
-                            }
+
+    if (providerKeys.length > 0) {
+        let lastError = null;
+
+        for (let i = 0; i < providerKeys.length; i++) {
+            const key = providerKeys[i].trim();
+            try {
+                let res = null;
+                let rawText = '';
+                let errorMsg = 'Unknown server error';
+                
+                if (aiProvider === 'google') {
+                    const payload = {
+                        contents: [{
+                            parts: [
+                                { text: prompt },
+                                { inline_data: { mime_type: mimeType || 'image/jpeg', data: base64Image } }
+                            ]
+                        }]
+                    };
+                    const googleModels = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-flash-lite-latest'];
+                    const preferredModel = googleModels.includes(aiModel) ? aiModel : 'gemini-3.5-flash';
+                    const modelFallbackChain = [preferredModel, ...googleModels.filter(m => m !== preferredModel)];
+
+                    let visionResult = null;
+                    for (let mIdx = 0; mIdx < modelFallbackChain.length; mIdx++) {
+                        const model = modelFallbackChain[mIdx];
+                        res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        const isLastModel = mIdx === modelFallbackChain.length - 1;
+                        if ((res.status === 404 || res.status === 403 || res.status === 400 || res.status === 429 || res.status === 503) && !isLastModel) {
+                            continue; // Try next model for this key
                         }
-                    ]
-                }]
-            };
-
-            const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest'];
-            let res = null;
-            let rawText = '';
-            let errorMsg = 'Unknown server error';
-
-            for (const model of modelsToTry) {
-                try {
-                    res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${userApiKey.trim()}`, {
+                        if (!res.ok) {
+                            if (res.status === 429) throw new Error('RATE_LIMIT_EXCEEDED');
+                            rawText = await res.text();
+                            throw new Error(`Google API Error (${res.status}): ${rawText.substring(0, 50)}`);
+                        }
+                        visionResult = res;
+                        break;
+                    }
+                    if (!visionResult) throw new Error('All Gemini models failed for this key.');
+                    res = visionResult;
+                } else if (aiProvider === 'openai') {
+                    const validModels = ['gpt-4o-mini', 'gpt-4o', 'gpt-4', 'gpt-3.5-turbo'];
+                    const model = validModels.includes(aiModel) ? aiModel : 'gpt-4o-mini';
+                    const payload = {
+                        model: model,
+                        messages: [
+                            {
+                                role: 'user',
+                                content: [
+                                    { type: 'text', text: prompt },
+                                    { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Image}` } }
+                                ]
+                            }
+                        ],
+                        response_format: { type: 'json_object' }
+                    };
+                    res = await fetch('https://api.openai.com/v1/chat/completions', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
                         body: JSON.stringify(payload)
                     });
-
-                    if (res.ok) {
-                        break; // Berhasil! Keluar dari loop
-                    }
-
-                    if (res.status === 429) {
-                        throw new Error('RATE_LIMIT_EXCEEDED');
-                    }
-
-                    rawText = await res.text();
-                    errorMsg = `Server Error (${res.status}) on ${model}: ${rawText.substring(0, 50)}...`;
-                    
-                    try {
-                        const errData = JSON.parse(rawText);
-                        if (errData && errData.error) errorMsg = errData.error.message || errData.error;
-                    } catch (e) {}
-
-                    // Jika error 503 (Unavailable) atau 404 (Not Found), biarkan loop mencoba model berikutnya
-                    if (res.status !== 503 && res.status !== 404) {
-                        throw new Error(errorMsg); // Error fatal lain, langsung berhenti
-                    }
-                } catch (err) {
-                    if (err.message === 'RATE_LIMIT_EXCEEDED' || (errorMsg && err.message !== errorMsg && err.message !== 'RATE_LIMIT_EXCEEDED')) {
-                        throw err; // Lempar error network atau rate limit
-                    }
+                } else if (aiProvider === 'anthropic') {
+                    const validModels = ['claude-opus-4-5', 'claude-sonnet-4-5', 'claude-haiku-4-5'];
+                    const model = validModels.includes(aiModel) ? aiModel : 'claude-haiku-4-5';
+                    const payload = {
+                        model: model,
+                        max_tokens: 1024,
+                        messages: [
+                            {
+                                role: 'user',
+                                content: [
+                                    { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64Image } },
+                                    { type: 'text', text: prompt }
+                                ]
+                            }
+                        ]
+                    };
+                    res = await fetch('https://api.anthropic.com/v1/messages', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+                        body: JSON.stringify(payload)
+                    });
                 }
-            }
 
-            if (!res || !res.ok) {
-                throw new Error(errorMsg);
-            }
-
-            const data = await res.json();
-            let extractedText = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-            extractedText = extractedText.replace(/```json\n?/gi, '').replace(/```\n?/g, '').trim();
-            return JSON.parse(extractedText);
-
-        } else {
-            // Server-side default: use Netlify Function proxy
-            const res = await fetch('/.netlify/functions/scanBiometrics', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    imageBase64: base64Image,
-                    mimeType: mimeType || 'image/jpeg'
-                })
-            });
-
-            if (!res.ok) {
-                if (res.status === 429) {
-                    throw new Error('RATE_LIMIT_EXCEEDED');
+                if (!res || !res.ok) {
+                    if (res && !rawText) rawText = await res.text();
+                    throw new Error(errorMsg + " " + rawText.substring(0, 50));
                 }
+
+                const data = await res.json();
+                let extractedText = '';
+                if (aiProvider === 'google') extractedText = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+                else if (aiProvider === 'openai') extractedText = data.choices?.[0]?.message?.content || '{}';
+                else if (aiProvider === 'anthropic') extractedText = data.content?.[0]?.text || '{}';
                 
-                // Baca sebagai text sekali saja (mencegah 'body stream already read' error)
-                const rawText = await res.text();
-                let errorMsg = `Server Error (${res.status}): ${rawText.substring(0, 50)}...`;
-                
-                try {
-                    // Coba parse jadi JSON, kalau valid dan ada error message, pakai itu
-                    const errData = JSON.parse(rawText);
-                    if (errData && errData.error) errorMsg = errData.error;
-                } catch (parseErr) {
-                    // Biarkan errorMsg sebagai plain text jika bukan JSON
-                }
-                throw new Error(errorMsg);
-            }
+                extractedText = extractedText.replace(/```json\n?/gi, '').replace(/```\n?/g, '').trim();
+                return JSON.parse(extractedText);
 
-            return await res.json();
+            } catch (err) {
+                console.error(`AI Vision Error (Key ${i + 1}/${providerKeys.length}):`, err);
+                lastError = err;
+                
+                const errMsg = err.message || '';
+                const statusMatch = errMsg.match(/\((\d{3})\)/);
+                const statusCode = statusMatch ? parseInt(statusMatch[1], 10) : null;
+                const isFallbackable =
+                    (statusCode !== null && (statusCode === 401 || statusCode === 403 || statusCode === 429 || statusCode >= 500)) ||
+                    errMsg.includes('RATE_LIMIT_EXCEEDED') || errMsg.includes('Failed to fetch') ||
+                    errMsg.includes('All Gemini models failed');
+
+                if (isFallbackable && setKeyStatuses) {
+                    setKeyStatuses(prev => ({ ...prev, [key]: Date.now() }));
+                }
+
+                if (!isFallbackable) {
+                    throw err;
+                }
+            }
         }
-    } catch (error) {
-        console.error("AI Vision Error:", error);
-        throw error;
+
+    }
+
+    // Tanpa key pribadi, atau semua key pribadi gagal: pakai backend proxy (shared keys di server)
+    try {
+        const call = httpsCallable(functions, 'aiVision', { timeout: 120000 });
+        const res = await call({
+            imageBase64: base64Image,
+            mimeType: mimeType || 'image/jpeg',
+            prompt,
+            provider: aiProvider,
+            model: aiModel
+        });
+        let extractedText = res.data?.text || '{}';
+        extractedText = extractedText.replace(/```json\n?/gi, '').replace(/```\n?/g, '').trim();
+        return JSON.parse(extractedText);
+    } catch (backendErr) {
+        console.error('AI Vision backend proxy error:', backendErr);
+        throw new Error(backendErr.message || 'Ekstraksi AI gagal. Coba lagi nanti.');
     }
 }

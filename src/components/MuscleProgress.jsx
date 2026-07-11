@@ -38,6 +38,43 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef(null);
 
+    const touchStartX = useRef(0);
+    const touchStartY = useRef(0);
+    const touchEndX = useRef(0);
+    const touchEndY = useRef(0);
+
+    const handleTouchStart = (e) => {
+        touchStartX.current = e.targetTouches[0].clientX;
+        touchStartY.current = e.targetTouches[0].clientY;
+        touchEndX.current = 0;
+        touchEndY.current = 0;
+    };
+
+    const handleTouchMove = (e) => {
+        touchEndX.current = e.targetTouches[0].clientX;
+        touchEndY.current = e.targetTouches[0].clientY;
+    };
+
+    const handleTouchEnd = () => {
+        if (!touchStartX.current || !touchEndX.current) return;
+        const diffX = touchStartX.current - touchEndX.current;
+        const diffY = touchStartY.current - touchEndY.current;
+        
+        if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 40) {
+            if (diffX > 0 && viewMode === 'image') {
+                playSoundEffect('swipe', soundEnabled);
+                setViewMode('radar');
+            } else if (diffX < 0 && viewMode === 'radar') {
+                playSoundEffect('swipe', soundEnabled);
+                setViewMode('image');
+            }
+        }
+        touchStartX.current = 0;
+        touchEndX.current = 0;
+        touchStartY.current = 0;
+        touchEndY.current = 0;
+    };
+
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -234,19 +271,19 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
     return (
         <div className={!isSubCard ? "p-5" : ""}>
             {!isSubCard && (
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex justify-between items-center mb-4 relative" style={{ zIndex: 50 }}>
                 <h3 className={`${t.textMain} font-black body-md uppercase tracking-wider`}>Progres Otot</h3>
                 
-                <div className="relative z-[100]" ref={dropdownRef}>
+                <div className="relative" style={{ zIndex: 60 }} ref={dropdownRef}>
                     <button 
                         onClick={() => { playSoundEffect('click', soundEnabled); setIsDropdownOpen(!isDropdownOpen); }}
-                        className={`w-[135px] relative z-[60] text-[11px] font-black py-1.5 pl-3 pr-2 flex items-center justify-between space-x-1 ${t.inputBg} ${t.textMain} border ${t.border} ${isDropdownOpen ? 'rounded-t-xl border-b-transparent' : 'rounded-xl'} transition-colors`}
+                        className={`w-[135px] relative z-[60] text-[11px] font-black py-1.5 pl-3 pr-2 flex items-center justify-between space-x-1 ${theme === 'dark' ? 'bg-zinc-900' : 'bg-white'} ${t.textMain} border ${t.border} ${isDropdownOpen ? 'rounded-t-xl border-b-transparent' : 'rounded-xl'} transition-colors`}
                     >
                         <span>{timeFilter === '1m' ? '1 Bulan Terakhir' : timeFilter === '3m' ? '3 Bulan Terakhir' : 'Keseluruhan'}</span>
                         <ChevronDown size={14} className={`transition-transform duration-200 flex-shrink-0 ${isDropdownOpen ? 'rotate-180' : ''}`} />
                     </button>
                     {isDropdownOpen && (
-                        <div className={`absolute top-full left-0 w-full -mt-1 pt-1 pb-1 rounded-b-xl border ${t.border} border-t-0 ${t.bgCard} shadow-xl z-[100] animate-in slide-in-from-top-2 origin-top overflow-hidden`}>
+                        <div className={`absolute top-full left-0 w-full -mt-1 pt-1 pb-1 rounded-b-xl border ${t.border} border-t-0 ${theme === 'dark' ? 'bg-zinc-900' : 'bg-white'} shadow-xl animate-in slide-in-from-top-2 origin-top overflow-hidden`} style={{ zIndex: 70 }}>
                             {[
                                 { val: '1m', label: '1 Bulan Terakhir' },
                                 { val: '3m', label: '3 Bulan Terakhir' },
@@ -271,20 +308,25 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
             )}
 
             {!isSubCard && (
-            <div className={`relative flex w-full p-1.5 rounded-full ${t.btnBg} mb-6`}>
-               <div className={`absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] rounded-full transition-transform duration-300 ease-out ${t.bgAccent} shadow-sm`} style={{ transform: viewMode === 'image' ? 'translateX(0)' : 'translateX(100%)', left: '6px' }}></div>
+            <div className={`relative flex w-full p-1.5 rounded-full ${t.btnBg} mb-6`} style={{ zIndex: 10 }}>
+               <div className={`absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] rounded-full transition-transform duration-300 ease-out ${t.bgAccent} shadow-sm`} style={{ transform: viewMode === 'image' ? 'translateX(0)' : 'translateX(100%)', left: '6px', zIndex: 1 }}></div>
                
-               <button onClick={() => { playSoundEffect('click', soundEnabled); setViewMode('image');}} className={`flex-1 py-2.5 rounded-full body-md font-black relative z-10 transition-colors duration-300 ${viewMode === 'image' ? 'text-white' : t.textMuted}`}>Visual Otot</button>
-               <button onClick={() => { playSoundEffect('click', soundEnabled); setViewMode('radar');}} className={`flex-1 py-2.5 rounded-full body-md font-black relative z-10 transition-colors duration-300 ${viewMode === 'radar' ? 'text-white' : t.textMuted}`}>Grafik Radar</button>
+               <button onClick={() => { playSoundEffect('click', soundEnabled); setViewMode('image');}} className={`flex-1 py-2.5 rounded-full body-md font-black relative transition-colors duration-300 ${viewMode === 'image' ? 'text-white' : t.textMuted}`} style={{ zIndex: 2 }}>Visual Otot</button>
+               <button onClick={() => { playSoundEffect('click', soundEnabled); setViewMode('radar');}} className={`flex-1 py-2.5 rounded-full body-md font-black relative transition-colors duration-300 ${viewMode === 'radar' ? 'text-white' : t.textMuted}`} style={{ zIndex: 2 }}>Grafik Radar</button>
             </div>
             )}
 
-            <div className={`relative ${isSubCard ? 'min-h-[250px]' : 'min-h-[350px]'} flex justify-center items-center`}>
+            <div 
+                className={`relative ${isSubCard ? 'min-h-[250px]' : 'min-h-[350px]'} flex justify-center items-center no-swipe`}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+            >
                 {viewMode === 'image' ? (
                     <div className="flex flex-row gap-2 sm:gap-8 justify-center items-start w-full">
                         <div className="flex flex-col items-center w-1/2 max-w-[180px]">
                             <div className="relative w-full">
-                                <img src="/coach-front.webp" alt="Coach Depan" className="absolute inset-0 w-full h-full object-contain pointer-events-none z-0 mix-blend-luminosity opacity-90 dark:opacity-75 transform scale-[1.18] -translate-x-1.5 -translate-y-2" />
+                                <img src="/coach-front.webp" alt="Coach Depan" className="absolute inset-0 w-full h-full object-contain pointer-events-none z-0 mix-blend-luminosity opacity-90 dark:opacity-75 transform scale-[1.25] -translate-x-1.5 -translate-y-2" />
                                 <div className="relative z-10 mix-blend-screen dark:mix-blend-color-dodge">
                                     <Model
                                         data={bodyData}
@@ -328,7 +370,7 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
                 ) : (
                     <div className={`w-full ${isSubCard ? 'h-[250px]' : 'h-[350px]'}`}>
                         {radarData.length > 0 ? (
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer width="99%" height="99%" minWidth={1} minHeight={1}>
                                 <RadarChart cx="50%" cy="50%" outerRadius={isSubCard ? "55%" : (isMobile ? "55%" : "70%")} data={radarData}>
                                     <defs>
                                         <filter id="glowRadar" x="-20%" y="-20%" width="140%" height="140%">

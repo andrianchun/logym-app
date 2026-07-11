@@ -153,7 +153,10 @@ const SwipeInput = ({ value, onChange, disabled, step = 1, className, min = 0, m
                 style={{ touchAction: 'none' }}
                 value={getDisplayValue()} 
                 onChange={handleManualChange}
-                onFocus={() => setIsFocused(true)}
+                onFocus={(e) => {
+                    setIsFocused(true);
+                    e.target.select();
+                }}
                 onBlur={() => {
                     setIsFocused(false);
                     // On blur, sync back

@@ -3,6 +3,7 @@ import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { getFunctions } from "firebase/functions";
 
 // TODO: Nanti kamu harus mengganti teks "KODE_RAHASIA_..." ini 
 // dengan kode asli dari akun Firebase Console milikmu.
@@ -28,3 +29,6 @@ export const db = initializeFirestore(app, {
 });
 
 export const storage = getStorage(app);
+
+// Backend proxy AI (Cloud Functions region Jakarta)
+export const functions = getFunctions(app, "asia-southeast2");

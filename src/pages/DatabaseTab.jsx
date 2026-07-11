@@ -331,7 +331,7 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
     touchEndX.current = e.targetTouches[0].clientX;
   };
 
-  const onTouchEnd = () => {
+  const onTouchEnd = (e) => {
     if (!touchStartX.current || !touchEndX.current) return;
     const distance = touchStartX.current - touchEndX.current;
     const isLeftSwipe = distance > minSwipeDistance;
@@ -340,10 +340,11 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
     if (isLeftSwipe && viewMode === 'all') {
       setViewMode('custom');
       playSoundEffect('swipe', soundEnabled);
-    }
-    if (isRightSwipe && viewMode === 'custom') {
+      e.stopPropagation(); // Prevent global swipe
+    } else if (isRightSwipe && viewMode === 'custom') {
       setViewMode('all');
       playSoundEffect('swipe', soundEnabled);
+      e.stopPropagation(); // Prevent global swipe
     }
   };
 

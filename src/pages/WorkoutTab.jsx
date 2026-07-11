@@ -132,12 +132,12 @@ const WorkoutTab = ({
 
   const [isClosingImmersive, setIsClosingImmersive] = React.useState(false);
 
-  const scrollToFirstIncompleteExercise = (wId) => {
+  const scrollToFirstIncompleteExercise = (wId, ignoreExId = null) => {
     let targetExId = null;
     let list = wId === 'extra' ? extraExercises : activeProgramsList.find(p => p.workoutId === wId || p.id === wId)?.exercises;
     if (list) {
       for (const ex of list) {
-         if (!skippedExercises[ex.id]) {
+         if (!skippedExercises[ex.id] && ex.id !== ignoreExId) {
             const logs = exerciseLogs[ex.id];
             if (!logs || logs.some(s => !s.done)) {
                targetExId = ex.id;
@@ -517,8 +517,47 @@ const WorkoutTab = ({
   })();
   const showsFloatingStartButton = hasExpandedSessionWithExercises && !isImmersiveMode && !isWorkoutActive;
 
+  // Fungsi untuk mendapatkan background lokal (harus sinkron dengan ProgramTab)
+  const getBackgroundForProgram = (prog) => {
+    if (!prog) return '/bg-activity.webp';
+    const lowerName = (prog.planName || prog.name || '').toLowerCase();
+    
+    if (lowerName.includes('full body')) return '/bg-full-body.webp';
+    if (lowerName.includes('ppl basic')) return '/bg-ppl-basic.webp';
+    if (lowerName.includes('up-low')) return '/bg-up-low.webp';
+    if (lowerName.includes('bro split')) return '/bg-bro-split.webp';
+    if (lowerName.includes('ppl advanced')) return '/bg-ppl-advanced.webp';
+    if (lowerName.includes('beast mode')) return '/bg-beast-mode.webp';
+    
+    return '/bg-custom.webp';
+  };
+
+  // Tentukan program mana yang menjadi acuan background
+  let bgSourceProgram = activeProgram;
+  const activeExpandedId = Object.keys(expandedSessions).find(k => expandedSessions[k]);
+  
+  if (activeExpandedId === 'extra') {
+    bgSourceProgram = { planId: 'custom', name: 'Latihan Ekstra' };
+  } else if (activeExpandedId) {
+    const expandedProg = activeProgramsList.find(p => p.workoutId === activeExpandedId);
+    if (expandedProg) bgSourceProgram = expandedProg;
+  }
+
+  const bgImageSrc = getBackgroundForProgram(bgSourceProgram);
+
   return (
     <>
+      {/* BACKGROUND IMAGE UNTUK GLASSMORPHISM */}
+      <div className="fixed inset-0 z-0 pointer-events-none transition-all duration-700">
+         <img 
+            key={bgImageSrc}
+            src={bgImageSrc} 
+            className="w-full h-full object-cover opacity-80 dark:opacity-60 animate-in fade-in duration-700" 
+            alt="Workout Background" 
+         />
+         <div className="absolute inset-0 bg-gradient-to-b from-white/60 via-white/60 to-white/90 dark:from-black/60 dark:via-black/60 dark:to-black/90"></div>
+      </div>
+      
       {(isImmersiveMode || isClosingImmersive) && (
         <ImmersiveWorkout 
           isClosing={isClosingImmersive}
@@ -533,6 +572,7 @@ const WorkoutTab = ({
           onSetChange={onSetChange}
           onToggleSet={onToggleSet}
           onSkipSet={onSkipSet}
+          userProfile={userProfile}
           onClose={() => {
             playSoundEffect('click', soundEnabled);
             setIsClosingImmersive(true);
@@ -564,6 +604,9 @@ const WorkoutTab = ({
           getOverloadHint={getOverloadHint}
         />
       )}
+
+      {/* KONTEN UTAMA WORKOUT TAB */}
+      <div className="relative z-10">
 
       {detailExercise && !showAlternativeModal && (
         <ExerciseDetailModal 
@@ -622,17 +665,17 @@ const WorkoutTab = ({
               {activeProgramsList.map((prog, pIdx) => {
                 const isExpanded = !!expandedSessions[prog.workoutId];
                 return (
-                  <div id={`session-${prog.workoutId}`} key={prog.workoutId} className={`mb-4 rounded-2xl border ${prog.status === 'completed' ? 'border-emerald-500/30' : t.border} bg-black/5 dark:bg-white/5 overflow-hidden transition-all`}>
+                  <div id={`session-${prog.workoutId}`} key={prog.workoutId} className={`mb-6 rounded-[2rem] border ${prog.status === 'completed' ? 'border-emerald-500/30' : 'border-white/20 dark:border-white/10'} bg-white/60 dark:bg-black/50 backdrop-blur-xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.4)] overflow-hidden transition-all`}>
                     <div
-                      className={`w-full p-4 flex items-start justify-between font-black text-left ${isExpanded ? t.bgAccentSoft + ' ' + t.textAccent : ''} transition-colors`}
+                      className={`w-full p-5 sm:p-6 flex items-start justify-between font-black text-left transition-colors`}
                     >
                       <div
                         onClick={() => { playSoundEffect('click', soundEnabled); toggleSession(prog.workoutId); }}
                         className="flex flex-col items-start gap-0.5 flex-1 min-w-0 pr-4 cursor-pointer"
                       >
-                        <div className="flex items-center gap-2">
-                          {isProgramCompleted(prog) && <CheckCircle size={16} className={`${t.textAccent} shrink-0 mt-0.5`} />}
-                          <span className="body-lg uppercase tracking-widest break-words leading-tight flex-1">Sesi {pIdx + 1}: {prog.name}</span>
+                        <div className="flex items-center gap-2 mb-1">
+                          {isProgramCompleted(prog) && <CheckCircle size={20} className={`${t.textAccent} shrink-0`} />}
+                          <span className="text-xl sm:text-2xl uppercase tracking-widest break-words leading-tight flex-1">Sesi {pIdx + 1}: {prog.name}</span>
                         </div>
                         {prog.planName && (
                           <span className={`text-xs ${t.textMuted} font-medium`}>Program: {prog.planName}</span>
@@ -649,10 +692,10 @@ const WorkoutTab = ({
                     </div>
                     
                     {isExpanded && (
-                      <div className="p-4 space-y-4 sm:space-y-0 sm:flex sm:flex-row sm:overflow-x-auto sm:snap-x sm:gap-4 sm:pb-6 hide-scrollbar animate-in slide-in-from-top-2 fade-in duration-200">
+                      <div className="pb-4 sm:p-6 sm:pt-0 space-y-4 sm:space-y-0 sm:flex sm:flex-row sm:overflow-x-auto sm:snap-x sm:gap-6 hide-scrollbar animate-in slide-in-from-top-2 fade-in duration-200">
                         {groupExercises(prog.exercises).map((group, gIdx) => {
                           return (
-                          <div key={`${prog.id}-group-${gIdx}`} className={`sm:w-[340px] sm:shrink-0 sm:snap-center sm:bg-black/5 sm:dark:bg-white/5 sm:rounded-3xl sm:border sm:border-black/5 sm:dark:border-white/5 sm:overflow-hidden relative flex flex-col mb-4 sm:mb-0 last:mb-0 ${group.isSuperset ? 'pr-3' : ''}`}>
+                          <div key={`${prog.id}-group-${gIdx}`} className={`sm:w-[340px] sm:shrink-0 sm:snap-center sm:bg-black/5 sm:dark:bg-white/5 sm:rounded-3xl sm:border sm:border-black/5 sm:dark:border-white/5 sm:overflow-hidden relative flex flex-col mb-4 sm:mb-0 last:mb-0 ${group.isSuperset ? 'pr-0' : ''}`}>
                             {group.isSuperset && <div className={`absolute top-0 bottom-0 right-0 w-[6px] rounded-l-md z-20 ${t.bgAccent}`}></div>}
                             {group.items.map(({ex, idx}) => (
                               <div id={`exercise-card-${ex.id}`} key={`${prog.id}-${ex.id}-${idx}`}>
@@ -687,7 +730,7 @@ const WorkoutTab = ({
                                           const setsLainSelesai = logs.filter((s, i) => i !== setIdx).every(s => s.done);
                                           const setIniJadiSelesai = !logs[setIdx].done; // karena belum terupdate di closure setTimeout
                                           if (setsLainSelesai && setIniJadiSelesai) {
-                                              scrollToFirstIncompleteExercise(prog.workoutId);
+                                              scrollToFirstIncompleteExercise(prog.workoutId, exId);
                                           }
                                       }
                                   }, 50);
@@ -733,17 +776,17 @@ const WorkoutTab = ({
 
               {/* LATIHAN TAMBAHAN (EKSTRA) */}
               {extraExercises.length > 0 && (
-                <div className={`mb-4 rounded-2xl border ${t.border} border-dashed bg-black/5 dark:bg-white/5 overflow-hidden transition-all`}>
+                <div className={`mb-6 rounded-[2rem] border border-dashed border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-md overflow-hidden transition-all`}>
                   <button 
                     onClick={() => { playSoundEffect('click', soundEnabled); toggleSession('extra'); }}
-                    className={`w-full p-4 flex items-center justify-between font-black text-left ${expandedSessions['extra'] ? t.bgAccentSoft + ' ' + t.textAccent : ''} transition-colors`}
+                    className={`w-full p-5 sm:p-6 flex items-center justify-between font-black text-left transition-colors`}
                   >
-                    <span className="body-lg uppercase tracking-widest">Ekstra</span>
-                    <div className="flex items-center gap-1 caption opacity-60 font-bold"><span>{extraExercises.length} Latihan</span>{expandedSessions['extra'] ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}</div>
+                    <span className="text-xl sm:text-2xl uppercase tracking-widest">Ekstra</span>
+                    <div className="flex items-center gap-1 text-sm opacity-60 font-bold bg-black/10 dark:bg-white/10 px-3 py-1.5 rounded-full"><span>{extraExercises.length} Latihan</span>{expandedSessions['extra'] ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}</div>
                   </button>
                   
                   {expandedSessions['extra'] && (
-                    <div className="p-4 space-y-4 sm:space-y-0 sm:flex sm:flex-row sm:overflow-x-auto sm:snap-x sm:gap-4 sm:pb-6 hide-scrollbar animate-in slide-in-from-top-2 fade-in duration-200">
+                    <div className="p-2 sm:p-6 pt-0 space-y-4 sm:space-y-0 sm:flex sm:flex-row sm:overflow-x-auto sm:snap-x sm:gap-6 hide-scrollbar animate-in slide-in-from-top-2 fade-in duration-200">
                         {groupExercises(extraExercises).map((group, gIdx) => {
                           return (
                           <div key={`extra-group-${gIdx}`} className={`sm:w-[340px] sm:shrink-0 sm:snap-center sm:bg-black/5 sm:dark:bg-white/5 sm:rounded-3xl sm:border sm:border-black/5 sm:dark:border-white/5 sm:overflow-hidden relative flex flex-col mb-4 sm:mb-0 last:mb-0 ${group.isSuperset ? 'pr-3' : ''}`}>
@@ -777,7 +820,7 @@ const WorkoutTab = ({
                                           const setsLainSelesai = logs.filter((s, i) => i !== setIdx).every(s => s.done);
                                           const setIniJadiSelesai = !logs[setIdx].done; 
                                           if (setsLainSelesai && setIniJadiSelesai) {
-                                              scrollToFirstIncompleteExercise('extra');
+                                              scrollToFirstIncompleteExercise('extra', exId);
                                           }
                                       }
                                   }, 50);
@@ -821,20 +864,20 @@ const WorkoutTab = ({
               )}
 
               {/* TOMBOL TAMBAH LATIHAN EKSTRA + PENDINGINAN (global, sejajar) */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3 mt-8">
                 <button
                   onClick={() => { playSoundEffect('click', soundEnabled); onAddExtraClick(); }}
-                  className={`flex-1 py-4 rounded-2xl border-2 border-dashed ${t.borderAccentSoft} ${t.textAccent} font-black hover:${t.bgAccentSoft} transition-colors flex items-center justify-center gap-2`}
+                  className={`flex-1 py-5 rounded-[2rem] border-2 border-dashed ${t.borderAccentSoft} ${t.textAccent} font-black hover:${t.bgAccentSoft} transition-colors flex items-center justify-center gap-2`}
                 >
-                  <Plus size={20} /> {lang.addExtra || 'Tambah Latihan Ekstra'}
+                  <Plus size={24} /> <span className="text-sm tracking-widest uppercase">{lang.addExtra || 'Tambah Latihan Ekstra'}</span>
                 </button>
                 {cooldownVideos && (
                   <button
                     onClick={() => { playSoundEffect('click', soundEnabled); setDetailExercise({ name: 'Pendinginan', ytVideo: cooldownVideos, type: 'cooldown' }); }}
-                    className={`shrink-0 flex items-center justify-center w-14 h-14 rounded-full transition-all active:scale-95 ${t.btnBg} ${t.textMuted} hover:${t.textAccent}`}
+                    className={`shrink-0 flex items-center justify-center w-16 h-16 rounded-[2rem] transition-all active:scale-95 ${t.btnBg} ${t.textMuted} hover:${t.textAccent}`}
                     title="Pendinginan"
                   >
-                    <Wind size={20} strokeWidth={2} />
+                    <Wind size={24} strokeWidth={2} />
                   </button>
                 )}
               </div>
@@ -876,21 +919,21 @@ const WorkoutTab = ({
         const isCompleted = isAllSetsDone;
         const isDisabled = !hasExercises || allSkipped || isCompleted;
 
-        let btnText = isExtra ? "MULAI EKSTRA" : "MULAI SESI LATIHAN";
-        let btnIcon = <Play size={20} />;
-        let btnClass = t.bgAccent + " shadow-xl shadow-[color:var(--tw-shadow-color)] disabled:opacity-50 text-white border border-white/20";
+        let btnText = isExtra ? "MULAI EKSTRA" : "MULAI LATIHAN";
+        let btnIcon = <Play size={24} className="ml-1" />;
+        let btnClass = `${t.bgAccent} shadow-[0_8px_30px_rgb(0,0,0,0.15)] disabled:opacity-50 text-white`;
 
         if (isCompleted) {
           btnText = "SESI SELESAI";
-          btnIcon = <CheckCircle size={20} />;
+          btnIcon = <CheckCircle size={24} />;
           btnClass = `${t.bgAccent} text-white shadow-lg opacity-80`;
         } else if (!hasExercises) {
           btnText = "SESI KOSONG";
-          btnIcon = <X size={20} />;
+          btnIcon = <X size={24} />;
           btnClass = "bg-zinc-800 text-white shadow-none";
         } else if (allSkipped) {
           btnText = "SEMUA DISKIP";
-          btnIcon = <X size={20} />;
+          btnIcon = <X size={24} />;
           btnClass = "bg-zinc-800 text-white shadow-none";
         }
 
@@ -899,8 +942,7 @@ const WorkoutTab = ({
             <button 
               onClick={() => handleStartWorkout(sessionData.workoutId)}
               disabled={isDisabled}
-              className={`pointer-events-auto w-full max-w-2xl mx-auto py-4 rounded-2xl h2 flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-95 disabled:hover:scale-100 ${btnClass}`}
-              style={{ shadowColor: 'rgba(0,0,0,0.3)' }}
+              className={`pointer-events-auto w-full max-w-2xl mx-auto py-5 rounded-full text-xl font-black flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-95 disabled:hover:scale-100 ${btnClass}`}
             >
               {btnIcon} {btnText}
             </button>
@@ -908,6 +950,8 @@ const WorkoutTab = ({
         );
       })()}
       {dialog}
+      
+      </div> {/* END OF KONTEN UTAMA WORKOUT TAB */}
     </>
   );
 };

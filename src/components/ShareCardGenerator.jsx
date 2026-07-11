@@ -1,7 +1,7 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Camera, Image, Download, Share2, Loader2, ChevronRight, ChevronLeft, Footprints, Clock, Utensils, Flame, Moon, Zap, Activity, HeartPulse, Wind, Dumbbell, Trash2, Globe } from 'lucide-react';
-// html2canvas (~200KB) dimuat on-demand hanya saat user benar-benar membuat share card
-const loadHtml2canvas = async () => (await import('html2canvas')).default;
+// html-to-image: lebih ringan, pixel-perfect, support CSS modern (blur, gradient, dll)
+const loadToPng = async () => (await import('html-to-image')).toPng;
 import { doc, updateDoc } from 'firebase/firestore';
 import { db, storage } from '../firebase';
 import { ref, deleteObject } from 'firebase/storage';
@@ -451,7 +451,6 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
 
                 // Upload to Firebase Storage
                 downloadUrl = await uploadImageToFirebase(file, `lyfit_users/${user.uid}/backgrounds/card_background_${Date.now()}`);
-                downloadUrl = `${downloadUrl}?v=${Date.now()}`;
                 isNewUpload = true;
             }
 
@@ -508,31 +507,23 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
         const originalIndex = templateIndex;
         
         try {
-            const html2canvas = await loadHtml2canvas();
-            // Tunggu font selesai dimuat sebelum mulai capture — kalau belum, html2canvas menangkap
-            // layout yang masih pakai font fallback (metrik beda), teks jadi geser dari posisi aslinya.
+            const toPng = await loadToPng();
+            // Tunggu font selesai dimuat sebelum mulai capture
             if (document.fonts?.ready) await document.fonts.ready;
             for (let i = 0; i < templates.length; i++) {
                 setTemplateIndex(i);
                 setToastMsg(`Menyiapkan ${i + 1}/${templates.length}...`);
 
                 // Wait for React to render the new template
-                await new Promise(resolve => setTimeout(resolve, 80));
+                await new Promise(resolve => setTimeout(resolve, 150));
 
-                const canvas = await html2canvas(cardRef.current, {
-                    scale: 1.5, // Reduced scale for faster generation 
-                    useCORS: true,
-                    backgroundColor: null,
-                    logging: false,
-                    scrollY: -window.scrollY,
-                    windowWidth: document.documentElement.offsetWidth,
-                    windowHeight: document.documentElement.offsetHeight,
-                    ignoreElements: (element) => element.classList.contains('ignore-download')
-                });
-                
-                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+                // Render dua kali: pertama untuk 'warming up' font/image cache, kedua yang aktual
+                await toPng(cardRef.current, { pixelRatio: 2, skipAutoScale: true, cacheBust: false, filter: el => !el.classList?.contains('ignore-download') });
+                const dataUrl = await toPng(cardRef.current, { pixelRatio: 2, skipAutoScale: true, cacheBust: false, filter: el => !el.classList?.contains('ignore-download') });
+
+                const blob = await (await fetch(dataUrl)).blob();
                 if (blob) {
-                    files.push(new File([blob], `LOGYM-${templates[i]}-${Date.now()}.jpg`, { type: 'image/jpeg' }));
+                    files.push(new File([blob], `LOGYM-${templates[i]}-${Date.now()}.png`, { type: 'image/png' }));
                 }
             }
             
@@ -560,19 +551,11 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
         if (!cardRef.current) return;
         setIsGenerating(true);
         try {
-            const html2canvas = await loadHtml2canvas();
+            const toPng = await loadToPng();
             if (document.fonts?.ready) await document.fonts.ready;
-            const canvas = await html2canvas(cardRef.current, {
-                scale: 5,
-                useCORS: true,
-                backgroundColor: null,
-                logging: false,
-                scrollY: -window.scrollY,
-                windowWidth: document.documentElement.offsetWidth,
-                windowHeight: document.documentElement.offsetHeight,
-                ignoreElements: (element) => element.classList.contains('ignore-download')
-            });
-            const image = canvas.toDataURL("image/png");
+            // Render dua kali: pertama untuk 'warming up' font/image cache, kedua yang aktual
+            await toPng(cardRef.current, { pixelRatio: 3, skipAutoScale: true, cacheBust: false, filter: el => !el.classList?.contains('ignore-download') });
+            const image = await toPng(cardRef.current, { pixelRatio: 3, skipAutoScale: true, cacheBust: false, filter: el => !el.classList?.contains('ignore-download') });
             const link = document.createElement('a');
             link.href = image;
             link.download = `LOGYM-${activeTemplate}-${Date.now()}.png`;
@@ -594,20 +577,14 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
 
         setIsSharing(true);
         try {
-            const html2canvas = await loadHtml2canvas();
+            const toPng = await loadToPng();
             if (document.fonts?.ready) await document.fonts.ready;
-            const canvas = await html2canvas(cardRef.current, {
-                scale: 5,
-                useCORS: true,
-                backgroundColor: null,
-                logging: false,
-                scrollY: -window.scrollY,
-                windowWidth: document.documentElement.offsetWidth,
-                windowHeight: document.documentElement.offsetHeight,
-                ignoreElements: (element) => element.classList.contains('ignore-download')
-            });
+            // Render dua kali: pertama untuk 'warming up' font/image cache, kedua yang aktual
+            await toPng(cardRef.current, { pixelRatio: 3, skipAutoScale: true, cacheBust: false, filter: el => !el.classList?.contains('ignore-download') });
+            const dataUrl = await toPng(cardRef.current, { pixelRatio: 3, skipAutoScale: true, cacheBust: false, filter: el => !el.classList?.contains('ignore-download') });
+            const blob = await (await fetch(dataUrl)).blob();
             
-            canvas.toBlob(async (blob) => {
+            {
                 if (!blob) {
                     showToast("Gagal memproses gambar.");
                     setIsSharing(false);
@@ -629,7 +606,7 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                     showToast("Browser tidak mendukung share gambar langsung.");
                 }
                 setIsSharing(false);
-            }, 'image/png');
+            }
         } catch (err) {
             console.error("Error generating image for share:", err);
             showToast("Terjadi kesalahan saat memproses gambar.");
@@ -651,7 +628,16 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
     };
 
     const getBgForTemplate = () => {
-        if (bgImage) return bgImage;
+        if (bgImage) {
+            let cleanUrl = bgImage;
+            if (bgImage.includes('firebasestorage.googleapis.com')) {
+                if (bgImage.includes('?v=')) {
+                    cleanUrl = bgImage.split('?v=')[0];
+                }
+                return cleanUrl;
+            }
+            return cleanUrl;
+        }
         if (activeTemplate === 'bodycomp') return '/bg-dashboard.webp';
         if (activeTemplate === 'activity') return '/bg-activity.webp';
         if (activeTemplate === 'progress') return '/bg-progress.webp';
@@ -694,7 +680,7 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                         {bgImage ? (
                             <div className="absolute inset-0 flex items-center justify-center">
                                 <img 
-                                    src={bgImage}
+                                    src={getBgForTemplate()}
                                     alt="Background"
                                     crossOrigin="anonymous"
                                     className="max-w-full max-h-full opacity-70 origin-center transition-transform"

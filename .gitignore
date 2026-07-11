@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# API keys milik backend — jangan pernah di-commit
+functions/.env
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

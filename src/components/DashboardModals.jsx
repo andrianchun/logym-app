@@ -4,6 +4,7 @@ import { X, Check, CalendarDays, Loader2, ShieldAlert, HeartPulse, Camera, Image
 import { playSoundEffect } from '../utils/audio';
 import SwipeInput from './SwipeInput';
 import { extractBiometricsFromImage } from '../utils/aiVision';
+import { AI_MODELS, getProviderStatus } from '../utils/aiAgent';
 
 // --- IMPORT CAPACITOR & HEALTH CONNECT BARU ---
 import { Capacitor } from '@capacitor/core';
@@ -14,7 +15,7 @@ const DashboardModals = ({
   showManualModal, setShowManualModal, manualTab, setManualTab, 
   modalDate, setModalDate, formBio, setFormBio, bioData,
   handleSaveManualData, handleDeleteBioData, soundEnabled, units, setConfirmModal,
-  userGeminiApiKey
+  userApiKeys, aiProvider, aiModel, setKeyStatuses, setShowSettings, keyStatuses
 }) => {
   const isImp = units?.weight === 'lbs';
 
@@ -66,8 +67,17 @@ const DashboardModals = ({
               const base64Data = dataUrl.split(',')[1];
               const mimeType = 'image/jpeg';
 
+              const currentProvider = AI_MODELS.find(m => m.id === aiModel)?.provider || aiProvider;
+              const status = getProviderStatus(currentProvider, userApiKeys, keyStatuses || {});
+              
+              if (status === 'missing' || status === 'exhausted') {
+                  alert(`API Key untuk ${currentProvider} ${status === 'missing' ? 'tidak ditemukan' : 'telah mencapai limit'}. Silakan perbarui di menu Pengaturan (Settings).`);
+                  if (setShowSettings) setShowSettings('lanjutan');
+                  return;
+              }
+
               try {
-                  const aiData = await extractBiometricsFromImage(base64Data, mimeType, userGeminiApiKey);
+                  const aiData = await extractBiometricsFromImage(base64Data, mimeType, userApiKeys, currentProvider, aiModel, setKeyStatuses);
                   setFormBio(prev => {
                       const newBio = { ...prev };
                       // Basic Metrics

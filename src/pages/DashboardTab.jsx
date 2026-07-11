@@ -36,7 +36,7 @@ const MiniBox = ({ label, value, unit, t, theme }) => (
     </div>
 );
 
-const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, exerciseLibrary, navigateToWorkoutDate, soundEnabled, playSoundEffect, theme, selectedDate, biometricStandard, units, setConfirmModal, activityTargets, setActivityTargets, gymProfiles, activeGymId, activePlanIds, userGeminiApiKey, userAchievements, connectedApps, userProfile }) => {
+const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, exerciseLibrary, navigateToWorkoutDate, soundEnabled, playSoundEffect, theme, selectedDate, biometricStandard, units, setConfirmModal, activityTargets, setActivityTargets, gymProfiles, activeGymId, activePlanIds, userApiKeys, aiProvider, aiModel, userAchievements, connectedApps, userProfile, keyStatuses, setKeyStatuses, setShowSettings }) => {
   const todayStr = getLocalYMD(new Date());
   const activeDate = todayStr;
 
@@ -598,7 +598,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
 
           <div id="komposisi-subcard" className={`grid relative z-10 transition-all duration-300 ease-in-out ${isKomposisiExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
             <div className="overflow-hidden">
-              <div className={`rounded-b-2xl border border-t-0 ${t.border} ${t.bgSunken} shadow-inner relative z-10`}>
+              <div className={`rounded-b-2xl border border-t-0 ${t.border} ${t.bgSunken} shadow-inner relative z-10 no-swipe`} onTouchStart={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
               <DashboardChart 
                  t={t} theme={theme} history={history} 
                  soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
@@ -618,7 +618,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
 
          {/* Extracted Image */}
          <div
-             className="absolute right-0 -top-10 bottom-0 w-[26rem] z-10 pointer-events-none overflow-hidden parallax-container"
+             className="absolute right-0 -top-20 bottom-0 w-[26rem] z-10 pointer-events-none overflow-hidden parallax-container"
              style={{
                maskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)',
                WebkitMaskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)'
@@ -800,7 +800,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
           
           <div id="aktivitas-subcard" className={`grid relative z-10 transition-all duration-300 ease-in-out ${isAktivitasExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
              <div className="overflow-hidden">
-               <div className={`rounded-b-2xl border border-t-0 ${t.border} ${t.bgSunken} shadow-inner relative z-10`}>
+               <div className={`rounded-b-2xl border border-t-0 ${t.border} ${t.bgSunken} shadow-inner relative z-10 no-swipe`} onTouchStart={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
                  <ActivityChart 
                     t={t} theme={theme} history={history} 
                     soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
@@ -889,7 +889,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
         showManualModal={showManualModal} setShowManualModal={setShowManualModal} manualTab={manualTab} setManualTab={setManualTab}
         modalDate={modalDate} setModalDate={setModalDate} formBio={formBio} setFormBio={setFormBio} bioData={bioData}
         handleSaveManualData={handleSaveManualData} handleDeleteBioData={handleDeleteBioData} soundEnabled={soundEnabled}
-        units={units} setConfirmModal={setConfirmModal} userGeminiApiKey={userGeminiApiKey}
+        units={units} setConfirmModal={setConfirmModal} userApiKeys={userApiKeys} aiProvider={aiProvider} aiModel={aiModel} keyStatuses={keyStatuses} setKeyStatuses={setKeyStatuses} setShowSettings={setShowSettings}
       />
 
       {/* DETAIL BIOMETRIK MODAL */}
@@ -901,7 +901,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                    <div className="flex items-center space-x-2">
                        <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-500"><Activity size={12}/></div>
                        <div className="flex flex-col">
-                           <span className={`text-[10px] font-bold ${t.textMain}`}>Lyfit Analysis</span>
+                           <span className={`text-[10px] font-bold ${t.textMain}`}>LOGYM Analysis</span>
                            <div className="relative flex items-center w-max cursor-pointer">
                                <span className={`text-[8px] ${t.textAccent} underline decoration-dashed underline-offset-2 mt-0.5`}>{new Date(modalDate || Date.now()).toLocaleDateString(lang.workout === 'Latihan' ? 'id-ID' : 'en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</span>
                                <input type="date" value={modalDate} onChange={(e) => setModalDate(e.target.value)} onClick={(e) => { try { e.target.showPicker() } catch(err){} }} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />

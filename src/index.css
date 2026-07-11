@@ -151,3 +151,15 @@ body:has(.fixed.inset-0:not(.pointer-events-none)) {
     background-position: right -110px bottom -300px;
   }
 }
+
+/* Hide number input arrows for Safari/Chrome */
+input[type="number"]::-webkit-inner-spin-button, 
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none; 
+  margin: 0; 
+}
+
+/* Hide number input arrows for Firefox */
+input[type="number"] {
+  -moz-appearance: textfield;
+}

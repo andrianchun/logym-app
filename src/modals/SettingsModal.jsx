@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { X, Moon, Sun, Globe, Volume2, VolumeX, Timer, Download, Upload, CalendarDays, Bell, BellOff, Clock, Activity, Scale, Ruler, Thermometer, Database } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Moon, Sun, Globe, Volume2, VolumeX, Timer, Download, Upload, CalendarDays, Bell, BellOff, Clock, Activity, Scale, Ruler, Thermometer, Database, Trash2, Plus, MessageCircle, Brain } from 'lucide-react';
 import SwipeInput from '../components/SwipeInput';
+import { AI_MODELS, PERSONA_PRESETS } from '../utils/aiAgent';
 
 export default function SettingsModal({
   showSettings, setShowSettings, t, lang,
@@ -17,10 +18,28 @@ export default function SettingsModal({
   setConfirmModal,
   biometricStandard, setBiometricStandard,
   units, setUnits,
-  userGeminiApiKey, setUserGeminiApiKey,
+  userApiKeys, setUserApiKeys, aiProvider, setAiProvider, aiModel, setAiModel,
+  raigaPersona, setRaigaPersona, raigaCustomInstruction, setRaigaCustomInstruction,
+  raigaMemory, setRaigaMemory,
   connectedApps, setConnectedApps
 }) {
   const [activeTab, setActiveTab] = useState('preferensi');
+  const [prevShowSettings, setPrevShowSettings] = useState(showSettings);
+
+  if (showSettings !== prevShowSettings) {
+      setPrevShowSettings(showSettings);
+      if (showSettings === 'lanjutan') {
+          setActiveTab('lanjutan');
+          setTimeout(() => {
+              const el = document.getElementById('ai-agent-settings');
+              if (el) el.scrollIntoView({ behavior: 'smooth' });
+          }, 300);
+      } else if (showSettings === 'satuan') {
+          setActiveTab('satuan');
+      } else if (showSettings === true) {
+          setActiveTab('preferensi');
+      }
+  }
 
   if (!showSettings) return null;
 
@@ -33,7 +52,7 @@ export default function SettingsModal({
   };
 
   return (
-    <div className={`fixed inset-0 z-[100] ${t.bgApp} flex flex-col animate-in slide-in-from-bottom-full duration-300`}>
+    <div className={`fixed inset-0 z-[999] ${t.bgApp} flex flex-col animate-in slide-in-from-bottom-full duration-300`}>
       {/* HEADER MODAL */}
       <div className={`relative px-4 pt-4 pb-4 border-b ${t.border} shrink-0`}>
         <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: `url('/banner-${theme}.png')`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
@@ -197,6 +216,118 @@ export default function SettingsModal({
         {/* TAB 3: LANJUTAN */}
         {activeTab === 'lanjutan' && (
           <div className="space-y-4 animate-in fade-in duration-300">
+            {/* AI AGENT SETTINGS */}
+            <div id="ai-agent-settings" className={`p-4 rounded-2xl border ${t.border} ${t.bgCard} space-y-3`}>
+                <p className={`body-md ${t.textMuted} uppercase tracking-wider mb-2 flex items-center gap-2`}>
+                <Activity size={16} /> Agentic AI & Coach Settings
+                </p>
+                
+                <div className="space-y-3">
+                    <div className="space-y-2">
+                        {(userApiKeys || []).map((key, index) => (
+                            <div key={index} className="flex items-center gap-2">
+                                <input 
+                                    type="password"
+                                    value={key}
+                                    onChange={(e) => {
+                                        const newKeys = [...(userApiKeys || [])];
+                                        newKeys[index] = e.target.value;
+                                        setUserApiKeys(newKeys);
+                                    }}
+                                    placeholder="Paste your API Key here..."
+                                    autoComplete="new-password"
+                                    data-lpignore="true"
+                                    data-1p-ignore="true"
+                                    className={`flex-1 font-mono text-sm px-4 py-2.5 rounded-xl outline-none border ${t.border} focus:ring-2 ${t.ringAccent} ${t.inputBg} ${t.textMain}`}
+                                />
+                                <button 
+                                    onClick={() => {
+                                        const newKeys = [...(userApiKeys || [])];
+                                        newKeys.splice(index, 1);
+                                        setUserApiKeys(newKeys);
+                                    }}
+                                    className={`p-2.5 rounded-xl ${t.btnBg} text-rose-500 hover:text-rose-600 transition-colors shrink-0`}
+                                >
+                                    <Trash2 size={18} />
+                                </button>
+                            </div>
+                        ))}
+                        <button 
+                            onClick={() => setUserApiKeys([...(userApiKeys || []), ''])}
+                            className={`w-full py-2.5 rounded-xl border border-dashed ${t.borderDashed} ${t.btnBg} ${t.textMain} font-bold text-sm flex items-center justify-center gap-2 transition-colors`}
+                        >
+                            <Plus size={16} /> Tambah API Key
+                        </button>
+                    </div>
+                    <p className={`text-[10px] ${t.textMuted} leading-tight mt-2`}>
+                        API Key wajib diisi agar fitur AI Coach berfungsi penuh secara gratis. Anda bebas memasukkan sebanyak mungkin API key campuran (Gemini, ChatGPT, Claude), sistem akan otomatis mendeteksinya. <br/><br/>
+                        Daftar API Gratis:<br/>
+                        - <a href="https://aistudio.google.com" target="_blank" rel="noreferrer" className="text-blue-500 underline font-bold">Google AI Studio</a> (Gemini)<br/>
+                        - <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" className="text-blue-500 underline font-bold">OpenAI Platform</a> (ChatGPT)<br/>
+                        - <a href="https://console.anthropic.com/" target="_blank" rel="noreferrer" className="text-blue-500 underline font-bold">Anthropic Console</a> (Claude)
+                    </p>
+                </div>
+            </div>
+
+            {/* KEPRIBADIAN COACH RAIGA */}
+            <div className={`p-4 rounded-2xl border ${t.border} ${t.bgCard} space-y-3`}>
+                <p className={`body-md ${t.textMuted} uppercase tracking-wider mb-2 flex items-center gap-2`}>
+                  <MessageCircle size={16} /> Kepribadian Coach Raiga
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                    {Object.entries(PERSONA_PRESETS).map(([key, preset]) => (
+                        <button
+                            key={key}
+                            onClick={() => setRaigaPersona(key)}
+                            className={`py-2.5 px-3 rounded-xl text-sm font-bold transition-all text-left ${raigaPersona === key ? `${t.bgAccent} text-white shadow-sm` : `${t.btnBg} ${t.textMuted}`}`}
+                        >
+                            {preset.label}
+                        </button>
+                    ))}
+                    <button
+                        onClick={() => setRaigaPersona('custom')}
+                        className={`py-2.5 px-3 rounded-xl text-sm font-bold transition-all text-left ${raigaPersona === 'custom' ? `${t.bgAccent} text-white shadow-sm` : `${t.btnBg} ${t.textMuted}`}`}
+                    >
+                        Custom
+                    </button>
+                </div>
+                {raigaPersona === 'custom' && (
+                    <textarea
+                        value={raigaCustomInstruction}
+                        onChange={(e) => setRaigaCustomInstruction(e.target.value)}
+                        placeholder="Contoh: Jadi pelatih militer yang strict, jangan basa-basi, langsung ke instruksi."
+                        rows={3}
+                        className={`w-full text-sm px-4 py-2.5 rounded-xl outline-none border ${t.border} focus:ring-2 ${t.ringAccent} ${t.inputBg} ${t.textMain} resize-none`}
+                    />
+                )}
+            </div>
+
+            {/* MEMORI COACH RAIGA */}
+            <div className={`p-4 rounded-2xl border ${t.border} ${t.bgCard} space-y-2`}>
+                <p className={`body-md ${t.textMuted} uppercase tracking-wider mb-2 flex items-center gap-2`}>
+                  <Brain size={16} /> Memori Coach Raiga
+                </p>
+                {(!raigaMemory || raigaMemory.length === 0) ? (
+                    <p className={`text-xs ${t.textMuted} leading-relaxed`}>
+                        Belum ada memori tersimpan. Tandai pesanmu sendiri di chat (ikon bookmark) untuk menyimpannya di sini — Raiga akan selalu mengingatnya di percakapan berikutnya.
+                    </p>
+                ) : (
+                    <div className="space-y-2">
+                        {raigaMemory.map((m, i) => (
+                            <div key={i} className={`flex items-start gap-2 p-2.5 rounded-xl ${t.inputBg} border ${t.border}`}>
+                                <p className={`flex-1 text-xs ${t.textMain} leading-relaxed`}>{m}</p>
+                                <button
+                                    onClick={() => setRaigaMemory(raigaMemory.filter((_, idx) => idx !== i))}
+                                    className="p-1 rounded-full text-neutral-500 hover:text-rose-500 transition-colors shrink-0"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
             <div className={`p-4 rounded-2xl border ${t.border} ${t.bgCard} space-y-2`}>
                 <p className={`body-md ${t.textMuted} uppercase tracking-wider mb-2 flex items-center gap-2`}>Rutinitas Latihan</p>
                 {/* Waktu Latihan */}
@@ -254,24 +385,6 @@ export default function SettingsModal({
                 </div>
             </div>
 
-            {/* AI SCANNER SETTINGS */}
-            <div className={`p-4 rounded-2xl border ${t.border} ${t.bgCard} space-y-3`}>
-                <p className={`body-md ${t.textMuted} uppercase tracking-wider mb-2 flex items-center gap-2`}>
-                <Activity size={16} /> Personal Gemini API Key
-                </p>
-                <div className="space-y-2">
-                <input 
-                    type="password"
-                    value={userGeminiApiKey || ''}
-                    onChange={(e) => setUserGeminiApiKey(e.target.value)}
-                    placeholder="AIzaSy..."
-                    className={`w-full font-mono text-sm px-4 py-2.5 rounded-xl outline-none border ${t.border} focus:ring-2 ${t.ringAccent} ${t.inputBg} ${t.textMain}`}
-                />
-                <p className={`text-[10px] ${t.textMuted} leading-tight`}>
-                    Biarkan kosong untuk memakai server bawaan. Jika server sedang sibuk, dan kamu tidak mau menunggu, masukkan API Key dari <a href="https://aistudio.google.com" target="_blank" rel="noreferrer" className="text-blue-500 underline">Google AI Studio</a> untuk tetap bisa menikmati layanan AI.
-                </p>
-                </div>
-            </div>
 
             {/* FITUR EXPORT / IMPORT JSON */}
             <div className={`p-4 rounded-2xl border ${t.border} ${t.bgCard} space-y-3`}>

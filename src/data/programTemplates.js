@@ -3,7 +3,7 @@ import { defaultMasterExercises } from './constants';
 const getEx = (id, sets, reps, supersetId = null) => {
   const ex = defaultMasterExercises.find(e => e.id === id);
   if (!ex) return null;
-  return { ...ex, id: Date.now() + Math.random(), originalId: id, sets, reps, ...(supersetId && { supersetId }) };
+  return { ...ex, id: 'ex-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7), originalId: id, sets, reps, ...(supersetId && { supersetId }) };
 };
 
 export const PROGRAM_PLANS = [
@@ -175,9 +175,11 @@ export const PROGRAM_PLANS = [
         name: 'Chest Day',
         restTime: 120,
         exercises: [
-          getEx(115, 4, 8),  // Flat Bench
+          getEx(135, 4, 8),  // Barbell Bench Press
           getEx(101, 4, 10), // Incline Bench
           getEx(103, 3, 12), // DB Flat Bench
+          getEx(104, 4, 15), // Lateral Raise
+          getEx(105, 3, 12), // Triceps Pushdown
         ].filter(Boolean)
       },
       {
@@ -186,6 +188,9 @@ export const PROGRAM_PLANS = [
         exercises: [
           getEx(113, 4, 10), // Lat Pulldown
           getEx(102, 4, 10), // Seated Row
+          getEx(116, 4, 15), // Rear Delt
+          getEx(124, 3, 12), // Shrugs
+          getEx(106, 3, 12), // Biceps Curl
         ].filter(Boolean)
       },
       {
@@ -194,7 +199,9 @@ export const PROGRAM_PLANS = [
         exercises: [
           getEx(108, 4, 8),  // Squat
           getEx(109, 4, 10), // RDL
+          getEx(119, 3, 12), // DB Split Squat
           getEx(111, 4, 15), // Calf Raise
+          getEx(122, 3, 15), // Seated Calf Raise
         ].filter(Boolean)
       },
       {
@@ -204,6 +211,8 @@ export const PROGRAM_PLANS = [
           getEx(114, 4, 10), // Shoulder Press
           getEx(104, 4, 15), // Lateral Raise
           getEx(116, 4, 15), // Rear Delt
+          getEx(124, 3, 15), // Shrugs
+          getEx(112, 4, 15), // Cable Crunch
         ].filter(Boolean)
       },
       {
@@ -212,7 +221,10 @@ export const PROGRAM_PLANS = [
         exercises: [
           getEx(106, 4, 12), // Biceps Curl
           getEx(105, 4, 12), // Triceps Pushdown
+          getEx(118, 3, 15), // Cable Biceps
+          getEx(117, 3, 15), // Overhead Triceps
           getEx(112, 4, 15), // Crunch
+          getEx(123, 3, 1),  // Plank
         ].filter(Boolean)
       }
     ]
@@ -229,11 +241,12 @@ export const PROGRAM_PLANS = [
         name: 'Push A',
         restTime: 120,
         exercises: [
-          getEx(115, 4, 8),  // Flat Bench
+          getEx(135, 4, 8),  // Barbell Bench
           getEx(101, 3, 10), // Incline Bench
           getEx(114, 3, 10), // Shoulder Press
           getEx(104, 4, 15), // Lateral Raise
           getEx(105, 3, 12), // Triceps Pushdown
+          getEx(117, 3, 15), // Overhead Triceps
         ].filter(Boolean)
       },
       {
@@ -242,9 +255,10 @@ export const PROGRAM_PLANS = [
         exercises: [
           getEx(113, 4, 10), // Lat Pulldown
           getEx(102, 3, 10), // Seated Row
-          getEx(116, 3, 15), // Rear Delt
+          getEx(116, 4, 15), // Rear Delt
           getEx(124, 3, 12), // Shrugs
           getEx(106, 4, 10), // Biceps Curl
+          getEx(118, 3, 12), // Cable Curl
         ].filter(Boolean)
       },
       {
@@ -255,6 +269,7 @@ export const PROGRAM_PLANS = [
           getEx(109, 3, 10), // RDL
           getEx(110, 3, 12), // Lunges
           getEx(111, 4, 15), // Calf Raise
+          getEx(112, 4, 15), // Cable Crunch
         ].filter(Boolean)
       },
       {
@@ -263,8 +278,10 @@ export const PROGRAM_PLANS = [
         exercises: [
           getEx(101, 4, 10), // Incline Bench
           getEx(103, 3, 10), // DB Bench
+          getEx(114, 3, 10), // Shoulder Press
           getEx(104, 4, 15), // Lateral Raise
           getEx(117, 3, 12), // Overhead Triceps
+          getEx(105, 3, 15), // Triceps Pushdown
         ].filter(Boolean)
       },
       {
@@ -273,8 +290,10 @@ export const PROGRAM_PLANS = [
         exercises: [
           getEx(102, 4, 10), // Seated Row
           getEx(113, 3, 10), // Lat Pulldown
-          getEx(116, 3, 15), // Rear Delt
+          getEx(116, 4, 15), // Rear Delt
+          getEx(124, 3, 12), // Shrugs
           getEx(118, 4, 12), // Cable Curl
+          getEx(106, 3, 12), // DB Curl
         ].filter(Boolean)
       },
       {
@@ -283,8 +302,10 @@ export const PROGRAM_PLANS = [
         exercises: [
           getEx(120, 4, 10), // SM RDL
           getEx(119, 3, 10), // Split Squat
+          getEx(134, 3, 12), // Goblet Squat
           getEx(122, 4, 15), // Seated Calf Raise
           getEx(112, 4, 15), // Crunch
+          getEx(123, 3, 1),  // Plank
         ].filter(Boolean)
       }
     ]
@@ -301,59 +322,76 @@ export const PROGRAM_PLANS = [
         name: 'Push Heavy',
         restTime: 120,
         exercises: [
-          getEx(115, 4, 8),  // Flat Bench
-          getEx(114, 4, 10), // Shoulder Press
+          getEx(135, 4, 5),  // Barbell Bench
+          getEx(114, 4, 6),  // Shoulder Press
+          getEx(101, 3, 8),  // Incline Bench
+          getEx(104, 4, 12), // Lateral Raise
+          getEx(117, 3, 10), // Overhead Triceps
         ].filter(Boolean)
       },
       {
         name: 'Pull Heavy',
         restTime: 120,
         exercises: [
-          getEx(113, 4, 10), // Lat Pulldown
-          getEx(102, 4, 10), // Seated Row
+          getEx(113, 4, 6),  // Lat Pulldown
+          getEx(102, 4, 6),  // Seated Row
+          getEx(124, 4, 10), // Shrugs
+          getEx(116, 3, 12), // Rear Delt
+          getEx(106, 3, 8),  // Biceps Curl
         ].filter(Boolean)
       },
       {
         name: 'Legs Heavy',
         restTime: 120,
         exercises: [
-          getEx(108, 4, 8),  // Squat
-          getEx(109, 4, 10), // RDL
+          getEx(108, 4, 5),  // Squat
+          getEx(109, 4, 6),  // RDL
+          getEx(119, 3, 8),  // DB Split Squat
+          getEx(111, 4, 12), // Calf Raise
+          getEx(112, 3, 15), // Crunch
         ].filter(Boolean)
       },
       {
         name: 'Push Hypertrophy',
         restTime: 90,
         exercises: [
-          getEx(101, 3, 12), // Incline Bench
-          getEx(104, 4, 15), // Lateral Raise
-          getEx(105, 3, 15), // Triceps
+          getEx(101, 4, 12), // Incline Bench
+          getEx(103, 3, 15), // DB Bench
+          getEx(104, 4, 20), // Lateral Raise
+          getEx(105, 4, 15), // Triceps Pushdown
+          getEx(117, 3, 15), // Overhead Triceps
         ].filter(Boolean)
       },
       {
         name: 'Pull Hypertrophy',
         restTime: 90,
         exercises: [
-          getEx(102, 3, 12), // Seated Row
-          getEx(116, 4, 15), // Rear Delt
-          getEx(106, 3, 15), // Biceps
+          getEx(102, 4, 12), // Seated Row
+          getEx(113, 3, 15), // Lat Pulldown
+          getEx(116, 4, 20), // Rear Delt
+          getEx(118, 4, 15), // Cable Curl
+          getEx(106, 3, 15), // Biceps Curl
         ].filter(Boolean)
       },
       {
         name: 'Legs Hypertrophy',
         restTime: 90,
         exercises: [
-          getEx(119, 3, 12), // Split Squat
-          getEx(111, 4, 20), // Calf Raise
-          getEx(112, 4, 15), // Crunch
+          getEx(134, 4, 12), // Goblet Squat
+          getEx(120, 4, 15), // SM RDL
+          getEx(110, 3, 20), // Lunges
+          getEx(122, 4, 20), // Seated Calf
+          getEx(112, 4, 20), // Crunch
         ].filter(Boolean)
       },
       {
         name: 'Active Recovery & Core',
         restTime: 60,
         exercises: [
-          getEx(123, 3, 1),  // Plank
-          getEx(112, 3, 20), // Crunch (Light)
+          getEx(128, 1, 0),  // Aerobic
+          getEx(131, 1, 0),  // Yoga
+          getEx(123, 4, 1),  // Plank
+          getEx(112, 4, 20), // Crunch (Light)
         ].filter(Boolean)
       }
     ]

@@ -173,7 +173,7 @@ const ExerciseDetailModal = ({
       <div className={`fixed inset-0 z-[100] flex flex-col ${t.bgApp}`}>
         <div className="p-4 flex justify-between items-center bg-black/80 absolute top-0 w-full z-20" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
           <h2 className="h2 text-white drop-shadow-md">{ex.name}</h2>
-          <button onClick={onClose} className="p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition">
+          <button data-close-modal="true" onClick={onClose} className="p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition">
             <X size={20} strokeWidth={2.5} />
           </button>
         </div>
@@ -315,11 +315,11 @@ const ExerciseDetailModal = ({
   };
 
   return createPortal(
-    <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in`} onClick={onClose}>
-      <div className={`w-full max-w-md sm:max-w-4xl mx-auto ${t.bgCard} rounded-3xl overflow-hidden flex flex-col sm:flex-row h-[85vh] sm:h-[80vh] animate-in zoom-in-95 duration-200 border ${t.border}`} onClick={e => e.stopPropagation()}>
+    <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in no-swipe`} onClick={onClose}>
+      <div className={`w-full max-w-md sm:max-w-4xl mx-auto ${t.bgCard} rounded-[2.5rem] overflow-hidden flex flex-col sm:flex-row h-[85vh] sm:h-[80vh] animate-in zoom-in-95 duration-200 shadow-2xl`} onClick={e => e.stopPropagation()}>
         
         {/* Kolom Kiri: Header with Video/Image */}
-        <div className="w-full sm:w-[45%] flex flex-col relative shrink-0 bg-black h-[45%] sm:h-auto">
+        <div className="w-full sm:w-[45%] flex flex-col relative shrink-0 bg-black h-[50%] sm:h-auto rounded-b-[2.5rem] sm:rounded-none z-10 shadow-[0_8px_30px_rgb(0,0,0,0.15)] overflow-hidden">
           <div 
             className="relative w-full h-full overflow-hidden group touch-pan-y"
             onTouchStart={onTouchStart}
@@ -461,31 +461,12 @@ const ExerciseDetailModal = ({
             <X size={20} />
           </button>
 
-          {/* Action Tabs - Disembunyikan untuk video Pemanasan/Pendinginan */}
-        {ex.type !== 'warmup' && ex.type !== 'cooldown' && (
-          <div className={`flex border-b ${t.border} flex-shrink-0`}>
-            <button 
-              onClick={() => setActiveTab('info')}
-              className={`flex-1 py-3 body-md flex flex-col items-center gap-1 transition-all ${activeTab === 'info' ? `${t.textAccent} border-b-2 ${t.borderAccent}` : t.textMuted}`}
-            >
-              <Info size={18} /> Instruksi
-            </button>
-            <button 
-              onClick={() => setActiveTab('history')}
-              className={`flex-1 py-3 body-md flex flex-col items-center gap-1 transition-all ${activeTab === 'history' ? `${t.textAccent} border-b-2 ${t.borderAccent}` : t.textMuted}`}
-            >
-              <History size={18} /> Riwayat
-            </button>
-            <button 
-              onClick={() => setActiveTab('calc')}
-              className={`flex-1 py-3 body-md flex flex-col items-center gap-1 transition-all ${activeTab === 'calc' ? `${t.textAccent} border-b-2 ${t.borderAccent}` : t.textMuted}`}
-            >
-              <Calculator size={18} /> RM Calc
-            </button>
-          </div>
-        )}
 
-          <div className="overflow-hidden flex-1 relative">
+
+          <div 
+            className="overflow-hidden flex-1 relative"
+            style={{ WebkitMaskImage: 'linear-gradient(to bottom, black 80%, transparent 100%)', maskImage: 'linear-gradient(to bottom, black 80%, transparent 100%)' }}
+          >
             {ex.type !== 'warmup' && ex.type !== 'cooldown' ? (
               <div 
                 className="flex h-full w-[300%] transition-transform duration-300 ease-in-out touch-pan-y"
@@ -495,7 +476,7 @@ const ExerciseDetailModal = ({
                 onTouchEnd={onTabTouchEnd}
               >
                 {/* Tab 1: Instruksi */}
-                <div className="w-1/3 h-full p-5 overflow-y-auto hide-scrollbar">
+                <div className="w-1/3 h-full p-6 pb-24 overflow-y-auto hide-scrollbar">
                   <div className="space-y-4">
                     <div>
                       <h3 className={`body-lg font-bold ${t.textMuted} mb-2`}>Peralatan</h3>
@@ -532,7 +513,7 @@ const ExerciseDetailModal = ({
                 </div>
 
                 {/* Tab 2: Riwayat */}
-                <div className="w-1/3 h-full p-3 overflow-y-auto hide-scrollbar">
+                <div className="w-1/3 h-full p-4 pb-24 overflow-y-auto hide-scrollbar">
                   <div className="space-y-0">
                      {(!historyData || historyData.length === 0) ? (
                        <div className={`text-center py-8 ${t.textMuted}`}>
@@ -581,7 +562,7 @@ const ExerciseDetailModal = ({
                 </div>
 
                 {/* Tab 3: 1RM Calc */}
-                <div className="w-1/3 h-full p-4 overflow-y-auto hide-scrollbar relative">
+                <div className="w-1/3 h-full p-5 pb-24 overflow-y-auto hide-scrollbar relative">
                     <div className="space-y-4 text-center pb-5">
                        <div className="flex items-center justify-center gap-2">
                           <h3 className={`h3 ${t.textMain}`}>Kalkulator RM</h3>
@@ -654,6 +635,33 @@ const ExerciseDetailModal = ({
               </div>
             )}
           </div>
+          
+          {/* Floating Action Tabs */}
+          {ex.type !== 'warmup' && ex.type !== 'cooldown' && (
+            <div className="absolute bottom-6 left-0 right-0 flex justify-between gap-3 px-5 z-20 pointer-events-none w-full max-w-md mx-auto">
+              <button 
+                onClick={() => setActiveTab('info')}
+                className={`h-14 rounded-full flex items-center justify-center transition-all duration-300 shadow-xl pointer-events-auto backdrop-blur-xl border border-black/10 dark:border-white/10 ${activeTab === 'info' ? `flex-1 ${t.bgAccent} text-white px-5` : 'w-14 bg-white/50 dark:bg-white/10 ' + t.textMain}`}
+              >
+                <Info size={24} className="shrink-0" />
+                <span className={`font-black text-xs uppercase tracking-wider whitespace-nowrap transition-all duration-300 ${activeTab === 'info' ? 'max-w-xs opacity-100 ml-2.5' : 'max-w-0 opacity-0 overflow-hidden m-0'}`}>Instruksi</span>
+              </button>
+              <button 
+                onClick={() => setActiveTab('history')}
+                className={`h-14 rounded-full flex items-center justify-center transition-all duration-300 shadow-xl pointer-events-auto backdrop-blur-xl border border-black/10 dark:border-white/10 ${activeTab === 'history' ? `flex-1 ${t.bgAccent} text-white px-5` : 'w-14 bg-white/50 dark:bg-white/10 ' + t.textMain}`}
+              >
+                <History size={24} className="shrink-0" />
+                <span className={`font-black text-xs uppercase tracking-wider whitespace-nowrap transition-all duration-300 ${activeTab === 'history' ? 'max-w-xs opacity-100 ml-2.5' : 'max-w-0 opacity-0 overflow-hidden m-0'}`}>Riwayat</span>
+              </button>
+              <button 
+                onClick={() => setActiveTab('calc')}
+                className={`h-14 rounded-full flex items-center justify-center transition-all duration-300 shadow-xl pointer-events-auto backdrop-blur-xl border border-black/10 dark:border-white/10 ${activeTab === 'calc' ? `flex-1 ${t.bgAccent} text-white px-5` : 'w-14 bg-white/50 dark:bg-white/10 ' + t.textMain}`}
+              >
+                <Calculator size={24} className="shrink-0" />
+                <span className={`font-black text-xs uppercase tracking-wider whitespace-nowrap transition-all duration-300 ${activeTab === 'calc' ? 'max-w-xs opacity-100 ml-2.5' : 'max-w-0 opacity-0 overflow-hidden m-0'}`}>RM Calc</span>
+              </button>
+            </div>
+          )}
         </div>
 
       </div>

@@ -14,6 +14,8 @@ import { doc, setDoc, onSnapshot, deleteField, deleteDoc, collection, getDocs, q
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
 import FloatingTimer from './components/FloatingTimer';
+import CoachRaigaFloat from './components/CoachRaigaFloat';
+import GymAIChat from './components/GymAIChat';
 
 // --- IMPORT HALAMAN (PAGES) ---
 import AuthPage from './pages/AuthPage';
@@ -41,6 +43,8 @@ import { checkAchievements, ACHIEVEMENTS } from './data/achievements';
 // --- IMPORT DATA & MESIN ---
 import { playSoundEffect } from './utils/audio';
 import { fetchExercisesFromApi } from './utils/exerciseDbApi';
+import { AI_MODELS, detectPlateaus } from './utils/aiAgent';
+import useDialog from './hooks/useDialog';
 import { getLocalYMD, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos } from './data/constants';
 import { Loader2, Download } from 'lucide-react';
 
@@ -122,7 +126,14 @@ export default function App() {
   const [userProfile, setUserProfile] = useState({ goal: null, experience: null });
   const [gymProfiles, setGymProfiles] = useState([{ id: 'default', name: 'LOGYM', equipment: 'all', config: {} }]);
   const [activeGymId, setActiveGymId] = useState('default');
-  const [userGeminiApiKey, setUserGeminiApiKey] = useState('');
+  const [userApiKeys, setUserApiKeys] = useState([]);
+  const [aiProvider, setAiProvider] = useState('google');
+  const [aiModel, setAiModel] = useState('gemini-3.5-flash');
+  const [keyStatuses, setKeyStatuses] = useState({});
+  const [raigaPersona, setRaigaPersona] = useState('santai');
+  const [raigaCustomInstruction, setRaigaCustomInstruction] = useState('');
+  const [raigaMemory, setRaigaMemory] = useState([]);
+  const [hasUnreadChat, setHasUnreadChat] = useState(false);
   const [activityTargets, setActivityTargets] = useState({ steps: 10000, weeklyDuration: 150, sleep: 8 });
   const [userAchievements, setUserAchievements] = useState([]);
   const [unlockedAchievementsPopup, setUnlockedAchievementsPopup] = useState([]);
@@ -198,6 +209,37 @@ export default function App() {
   const [activeProgramId, setActiveProgramId] = useState(defaultPrograms[0]?.id || null);
     const [focusWorkoutId, setFocusWorkoutId] = useState(null);
 
+  // Self-healing: Hapus duplikat ID pada latihan (menghindari error DndKit dari state lama)
+  useEffect(() => {
+    if (!programs || programs.length === 0) return;
+    let changed = false;
+    const newProgs = programs.map(p => {
+      let pChanged = false;
+      const newRoutines = p.routines?.map(r => {
+         let rChanged = false;
+         const seen = new Set();
+         const newExs = r.exercises?.map(ex => {
+           if (seen.has(ex.id)) {
+             rChanged = true;
+             const newId = ex.id + '-' + Math.random().toString(36).substr(2, 5);
+             seen.add(newId);
+             return { ...ex, id: newId };
+           }
+           seen.add(ex.id);
+           return ex;
+         });
+         if (rChanged) { pChanged = true; return { ...r, exercises: newExs }; }
+         return r;
+      });
+      if (pChanged) { changed = true; return { ...p, routines: newRoutines }; }
+      return p;
+    });
+    if (changed) {
+      setPrograms(newProgs);
+    }
+  }, [programs]);
+
+
   const [showSettings, setShowSettings] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [profileForceTab, setProfileForceTab] = useState(null);
@@ -208,7 +250,74 @@ export default function App() {
   const [isFreshAccount, setIsFreshAccount] = useState(false);
   const [showGymManager, setShowGymManager] = useState(false);
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
-  const [activeAddModalTarget, setActiveAddModalTarget] = useState(null); 
+  const [activeAddModalTarget, setActiveAddModalTarget] = useState(null);
+
+  // --- GLOBAL COACH RAIGA STATE ---
+  const [showAiChat, setShowAiChat] = useState(false);
+  const [avatarPos, setAvatarPos] = useState(null); // {x,y} center of float avatar
+  const { dialog: aiDialog, showAlert: showAiAlert } = useDialog(theme === 'dark');
+
+  // Plateau detection — pure rule-based, no AI call
+  const plateauInsights = React.useMemo(
+    () => detectPlateaus(history, 3, 2),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [history]
+  );
+
+  // Global handleAcceptProgram hoisted here so GymAIChat can call it from any tab
+  const handleAcceptAiProgram = React.useCallback(async (programData) => {
+    const isUpdate = programData.action === 'update' && programData.targetPlanId;
+    const planId = isUpdate ? programData.targetPlanId : `plan_ai_${Date.now()}`;
+
+    const existingPlanName = isUpdate
+      ? programs.find(p => p.planId === planId)?.planName || programData.planName || 'AI Program'
+      : programData.planName || 'AI Program';
+
+    const ts = Date.now();
+    // We need exerciseLibrary — captured via closure (it's in App scope)
+    const routines = (programData.routines || []).map((r, i) => {
+      const exercises = (r.exercises || []).map((ex, j) => {
+        const matchedEx = exerciseLibrary.find(
+          e => e.name.toLowerCase() === ex.name.toLowerCase()
+        ) || exerciseLibrary[0];
+        return {
+          id: `${matchedEx.id}_r${i}_e${j}_${ts}`,
+          name: matchedEx.name,
+          sets: parseInt(ex.sets) || 3,
+          reps: parseInt(ex.reps) || 10,
+          target: matchedEx.target || [],
+          type: matchedEx.type || 'weight',
+          defaultWeight: matchedEx.defaultWeight || 0,
+          equipment: matchedEx.equipment || 'Body Weight',
+          ytVideo: matchedEx.ytVideo || ''
+        };
+      });
+      return {
+        id: `routine_ai_${ts}_${i}`,
+        planId,
+        planName: existingPlanName,
+        assignedDays: Array.isArray(r.assignedDays) ? r.assignedDays : [],
+        name: r.name || `Day ${i + 1}`,
+        exercises,
+        restTime: 90,
+        source: 'ai'
+      };
+    });
+
+    try {
+      if (isUpdate) {
+        setPrograms(prev => [...routines, ...prev.filter(p => p.planId !== planId)]);
+        await showAiAlert('Program berhasil diperbarui sesuai saran Coach Raiga!', { type: 'success' });
+      } else {
+        setPrograms(prev => [...routines, ...prev]);
+        setActivePlanIds(prev => [...prev.filter(id => id !== 'custom'), planId]);
+        await showAiAlert('Program AI berhasil disimpan dan diaktifkan! 🧠', { type: 'success' });
+      }
+    } catch (e) {
+      console.error(e);
+      await showAiAlert('Terjadi kesalahan saat memproses program AI.', { type: 'error' });
+    }
+  }, [exerciseLibrary, programs, showAiAlert, setPrograms, setActivePlanIds]);
   const [connectedApps, setConnectedApps] = useState(() => {
       const saved = localStorage.getItem('lyfit_connectedApps');
       return saved ? JSON.parse(saved) : { healthconnect: false, applehealth: false };
@@ -577,7 +686,9 @@ export default function App() {
         setExerciseLogs({});
         setExtraExercises([]);
         setSkippedExercises({});
-        setUserGeminiApiKey('');
+        setUserApiKey('');
+        setAiProvider('google');
+        setAiModel('gemini-3.5-flash');
         setUserProfile(null);
         setTheme('dark');
         setLanguage('ID');
@@ -738,7 +849,15 @@ export default function App() {
                   }
               }
               if (parsedSettings.units) setUnits(parsedSettings.units);
-              if (parsedSettings.gymProfiles) setGymProfiles(parsedSettings.gymProfiles);
+              if (parsedSettings.gymProfiles) {
+                  const migratedProfiles = parsedSettings.gymProfiles.map(g => {
+                      if (g.id === 'default' && g.name === 'Lyfit Gym') {
+                          return { ...g, name: 'LOGYM' };
+                      }
+                      return g;
+                  });
+                  setGymProfiles(migratedProfiles);
+              }
               if (parsedSettings.activeGymId) setActiveGymId(parsedSettings.activeGymId);
               if (parsedSettings.activityTargets) setActivityTargets(parsedSettings.activityTargets);
               if (parsedSettings.activePlanIds) setActivePlanIds(parsedSettings.activePlanIds);
@@ -748,7 +867,19 @@ export default function App() {
               if (parsedSettings.userProfile) setUserProfile(parsedSettings.userProfile);
               else setUserProfile(null);
               
-              setUserGeminiApiKey(parsedSettings.userGeminiApiKey || '');
+              // Migrate old single keys to the new array
+              let migratedKeys = parsedSettings.userApiKeys || [];
+              if (migratedKeys.length === 0) {
+                  if (parsedSettings.userApiKey) migratedKeys.push(parsedSettings.userApiKey);
+                  if (parsedSettings.userGeminiApiKey && parsedSettings.userGeminiApiKey !== parsedSettings.userApiKey) migratedKeys.push(parsedSettings.userGeminiApiKey);
+              }
+              setUserApiKeys(migratedKeys);
+              setAiProvider(parsedSettings.aiProvider || 'google');
+              // Saved model IDs from older versions may no longer exist on the APIs
+              setAiModel(AI_MODELS.some(m => m.id === parsedSettings.aiModel) ? parsedSettings.aiModel : 'gemini-3.5-flash');
+              setRaigaPersona(parsedSettings.raigaPersona || 'santai');
+              setRaigaCustomInstruction(parsedSettings.raigaCustomInstruction || '');
+              setRaigaMemory(Array.isArray(parsedSettings.raigaMemory) ? parsedSettings.raigaMemory : []);
             }
             if (data.userAchievements) setUserAchievements(data.userAchievements);
             setUser(prev => {
@@ -846,7 +977,7 @@ export default function App() {
         setDoc(mainDocRef, {
           programs,
           exerciseLibrary,
-          settings: { theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, userProfile, userGeminiApiKey },
+          settings: { theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, userProfile, userApiKeys, aiProvider, aiModel, raigaPersona, raigaCustomInstruction, raigaMemory },
           userAchievements,
           updatedAt: new Date().toISOString()
         }, { merge: true }).catch(err => console.error("Auto-save Cloud gagal:", err));
@@ -854,7 +985,7 @@ export default function App() {
 
       return () => clearTimeout(timer);
     }
-  }, [programs, exerciseLibrary, theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, user, isDataLoaded, userAchievements]);
+  }, [programs, exerciseLibrary, theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, user, isDataLoaded, userAchievements, userProfile, userApiKeys, aiProvider, aiModel, raigaPersona, raigaCustomInstruction, raigaMemory]);
 
   // Baseline serialisasi per tanggal — merepresentasikan kondisi terakhir yang tersimpan di server.
   // Tanggal yang serialisasinya sama dengan baseline tidak perlu dikirim ulang.
@@ -1058,12 +1189,16 @@ export default function App() {
       const activeModals = Array.from(document.querySelectorAll('.fixed.inset-0:not(.pointer-events-none)')).filter(el => window.getComputedStyle(el).display !== 'none');
       if (activeModals.length > 0) {
         const topModal = activeModals[activeModals.length - 1];
-        const closeBtn = Array.from(topModal.querySelectorAll('button')).find(b => ['batal', 'tutup'].includes((b.textContent||'').trim().toLowerCase()));
-        if (closeBtn) closeBtn.click();
+        const designatedCloseBtn = topModal.querySelector('[data-close-modal="true"]');
+        if (designatedCloseBtn) designatedCloseBtn.click();
         else {
-          const xIcon = topModal.querySelector('svg.lucide-x');
-          if (xIcon && xIcon.closest('button')) xIcon.closest('button').click();
-          else topModal.click();
+          const closeBtn = Array.from(topModal.querySelectorAll('button')).find(b => ['batal', 'tutup'].includes((b.textContent||'').trim().toLowerCase()));
+          if (closeBtn) closeBtn.click();
+          else {
+            const xIcon = topModal.querySelector('svg.lucide-x');
+            if (xIcon && xIcon.closest('button')) xIcon.closest('button').click();
+            else topModal.click();
+          }
         }
         window.history.pushState({ lyfit: true }, '');
         return;
@@ -1184,6 +1319,9 @@ export default function App() {
       setActiveAddModalTarget(null);
       setShowProfileModal(false);
       setShowSettings(false);
+      setUserApiKeys([]);
+      setAiProvider('google');
+      setAiModel('gemini-3.5-flash');
       await signOut(auth);
     } catch (error) {
       console.error("Gagal logout:", error);
@@ -1304,7 +1442,7 @@ export default function App() {
     navIconInactive: theme === 'dark' ? 'text-slate-500' : 'text-slate-400',
     placeholderAccent: theme === 'dark' ? 'placeholder-sky-400/40' : 'placeholder-[#3b82f6]/40',
     borderDashed: theme === 'dark' ? 'border-white/10' : 'border-black/10',
-    bgBox: theme === 'dark' ? 'bg-white/5' : 'bg-[#3b82f6]/10',
+    bgBox: theme === 'dark' ? 'bg-black/20' : 'bg-[#3b82f6]/10',
     glow: theme === 'dark' ? 'shadow-[0_8px_32px_-10px_rgba(59,130,246,0.35)]' : 'shadow-[0_8px_32px_-14px_rgba(59,130,246,0.25)]'
   };
 
@@ -2012,7 +2150,7 @@ export default function App() {
   // ==========================================
   if (isAuthChecking || (user && !isDataLoaded) || !isSplashMinTimeReached) {
     return (
-      <div className={`min-h-screen flex flex-col items-center justify-center p-4 transition-colors duration-300 ${theme === 'dark' ? 'bg-[#0f1115]' : 'bg-white'}`}>
+      <div className={`fixed inset-0 z-50 flex flex-col items-center justify-center p-4 transition-colors duration-300 ${theme === 'dark' ? 'bg-[#0f1115]' : 'bg-white'}`}>
          <img src={theme === 'dark' ? '/logo-dark.png' : '/logo-light.png'} alt="LOGYM Logo" className="w-40 h-40 object-contain animate-pulse drop-shadow-2xl" />
       </div>
     );
@@ -2050,6 +2188,7 @@ export default function App() {
       <React.Suspense fallback={null}>
       <ProgramQuestionnaireModal
          isOpen={showQuestionnaire}
+         user={user}
          onClose={() => {
            setShowQuestionnaire(false);
            if (user?.uid) {
@@ -2070,6 +2209,14 @@ export default function App() {
          setActiveGymId={setActiveGymId}
          exerciseLibrary={exerciseLibrary}
          units={units}
+         userApiKeys={userApiKeys}
+         aiProvider={aiProvider}
+         keyStatuses={keyStatuses}
+         setKeyStatuses={setKeyStatuses}
+         setAiProvider={setAiProvider}
+         setAiModel={setAiModel}
+         aiModel={aiModel}
+         setShowSettings={setShowSettings}
       />
       </React.Suspense>
       )}
@@ -2097,7 +2244,13 @@ export default function App() {
            showSettings={showSettings} setShowSettings={setShowSettings} t={t} lang={lang} 
            theme={theme} setTheme={setTheme} language={language} setLanguage={setLanguage} 
            soundEnabled={soundEnabled} setSoundEnabled={setSoundEnabled}
-           userGeminiApiKey={userGeminiApiKey} setUserGeminiApiKey={setUserGeminiApiKey}
+           userApiKeys={userApiKeys} setUserApiKeys={setUserApiKeys}
+           aiProvider={aiProvider} setAiProvider={setAiProvider}
+           aiModel={aiModel} setAiModel={setAiModel}
+           keyStatuses={keyStatuses}
+           raigaPersona={raigaPersona} setRaigaPersona={setRaigaPersona}
+           raigaCustomInstruction={raigaCustomInstruction} setRaigaCustomInstruction={setRaigaCustomInstruction}
+           raigaMemory={raigaMemory} setRaigaMemory={setRaigaMemory}
          defaultRestTime={defaultRestTime} setDefaultRestTime={setDefaultRestTime}
          weekStartDay={weekStartDay} setWeekStartDay={setWeekStartDay}
          defaultReminderTime={defaultReminderTime} setDefaultReminderTime={setDefaultReminderTime}
@@ -2141,7 +2294,10 @@ export default function App() {
                activityTargets={activityTargets} setActivityTargets={setActivityTargets}
                gymProfiles={gymProfiles} activeGymId={activeGymId}
                activePlanIds={activePlanIds}
-               userGeminiApiKey={userGeminiApiKey}
+               userApiKeys={userApiKeys} aiProvider={aiProvider} aiModel={aiModel}
+               keyStatuses={keyStatuses} setKeyStatuses={setKeyStatuses}
+               setAiProvider={setAiProvider} setAiModel={setAiModel}
+               setShowSettings={setShowSettings}
                userAchievements={userAchievements} connectedApps={connectedApps}
                userProfile={userProfile}
              />
@@ -2203,6 +2359,12 @@ export default function App() {
                gymProfiles={gymProfiles}
                focusRoutineId={focusRoutineId} setFocusRoutineId={setFocusRoutineId}
                activityTargets={activityTargets}
+               userApiKeys={userApiKeys} aiProvider={aiProvider} aiModel={aiModel}
+               keyStatuses={keyStatuses} setKeyStatuses={setKeyStatuses}
+               setAiProvider={setAiProvider} setAiModel={setAiModel}
+               userProfile={userProfile} history={history}
+               setShowSettings={setShowSettings}
+               onAcceptProgram={handleAcceptAiProgram}
              />
          )}
 
@@ -2230,8 +2392,51 @@ export default function App() {
         setActiveTab={setActiveTab} workoutStartTime={workoutStartTime}
         isImmersiveMode={isImmersiveMode} setIsImmersiveMode={setIsImmersiveMode}
         sessionToRun={sessionToRun} setSessionToRun={setSessionToRun}
+        userProfile={userProfile}
         focusWorkoutId={focusWorkoutId} setFocusWorkoutId={setFocusWorkoutId}
       />
+
+      {/* === GLOBAL COACH RAIGA FLOAT === */}
+      {user && (
+        <CoachRaigaFloat
+          onOpenChat={() => setShowAiChat(true)}
+          plateauInsights={plateauInsights}
+          hasUnreadChat={hasUnreadChat}
+          isWorkoutActive={isImmersiveMode}
+          activeTab={activeTab}
+          onPositionChange={setAvatarPos}
+        />
+      )}
+
+      {/* === GLOBAL GYMCHAT (accessible from any tab) === */}
+      <GymAIChat
+        isOpen={showAiChat}
+        onClose={() => setShowAiChat(false)}
+        userApiKeys={userApiKeys}
+        aiProvider={aiProvider}
+        aiModel={aiModel}
+        keyStatuses={keyStatuses}
+        setKeyStatuses={setKeyStatuses}
+        setAiProvider={setAiProvider}
+        setAiModel={setAiModel}
+        setShowSettings={setShowSettings}
+        userProfile={userProfile}
+        history={history}
+        exerciseLibrary={exerciseLibrary}
+        programs={programs}
+        activePlanIds={activePlanIds}
+        plateauInsights={plateauInsights}
+        raigaPersona={raigaPersona}
+        raigaCustomInstruction={raigaCustomInstruction}
+        raigaMemory={raigaMemory}
+        setRaigaMemory={setRaigaMemory}
+        onUnreadChange={setHasUnreadChat}
+        onAcceptProgram={handleAcceptAiProgram}
+        user={user}
+        setConfirmModal={setConfirmModal}
+        avatarOrigin={avatarPos}
+      />
+      {aiDialog}
       {/* Toast "Tekan Back Sekali Lagi" */}
       {showExitToast && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">

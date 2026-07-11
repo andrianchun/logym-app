@@ -249,11 +249,6 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
 
   return (
     <div className={!isSubCard ? "p-5" : ""}>
-         {!isSubCard && (
-         <div className="flex justify-between items-center mb-5 relative z-10">
-            <span className={`h3 ${t.textMuted}`}>Biometrik Klinis</span>
-         </div>
-         )}
 
          <div ref={scrollRef} 
               onScroll={!isSubCard ? handleScroll : undefined}
