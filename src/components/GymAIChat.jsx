@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { doc, setDoc, deleteDoc, getDocs, collection } from 'firebase/firestore';
 import { Send, X, Check, Loader2, Dumbbell, Menu, Plus, MessageSquare, Trash2, Bookmark } from 'lucide-react';
 import { buildSystemPrompt, summarizeWorkoutLogs, summarizeBiometrics, summarizeActivePrograms, isTrivialMessage, chatWithAI, AI_MODELS, getAvailableModels, getProviderStatus } from '../utils/aiAgent';
 import renderMiniMarkdown from '../utils/miniMarkdown';
+import { db } from '../firebase';
 
 const THINKING_PHASES = ['Membaca riwayat latihanmu...', 'Menganalisis progress mingguan...', 'Menyusun jawaban...'];
 
@@ -68,30 +70,75 @@ export default function GymAIChat({
     const activeSessionIdRef = useRef(activeSessionId);
     useEffect(() => { activeSessionIdRef.current = activeSessionId; }, [activeSessionId]);
 
+    // Baseline serialization per session id — what's currently believed to be saved in
+    // Firestore. Only sessions whose JSON differs from this get written, so editing one
+    // session never rewrites every other session, and re-loading never re-triggers a write.
+    const lastSavedSessionsRef = useRef({});
+
+    // Cloud is the source of truth (survives logout/reinstall/device switch); localStorage is
+    // just a fast local cache. Guests (no uid) never touch Firestore — local-only, as before.
     useEffect(() => {
-        const uid = user?.uid || 'guest';
+        const uid = user?.uid;
+        if (!uid) {
+            const saved = localStorage.getItem('lyfit_ai_sessions_guest');
+            let loaded = [];
+            if (saved) { try { loaded = JSON.parse(saved); } catch (e) {} }
+            lastSavedSessionsRef.current = {};
+            setSessions(loaded);
+            setActiveSessionId(loaded.length > 0 ? loaded[0].id : null);
+            setMessages(loaded.length > 0 ? loaded[0].messages : []);
+            return;
+        }
+
         const sessionsKey = `lyfit_ai_sessions_${uid}`;
         const oldChatKey = `lyfit_ai_chat_${uid}`;
-        const savedSessions = localStorage.getItem(sessionsKey);
-        let loadedSessions = [];
-        if (savedSessions) {
-            try { loadedSessions = JSON.parse(savedSessions); } catch (e) {}
-        }
-        const oldChat = localStorage.getItem(oldChatKey);
-        if (loadedSessions.length === 0 && oldChat) {
+        let cancelled = false;
+
+        (async () => {
+            let loadedSessions = [];
             try {
-                const oldMessages = JSON.parse(oldChat);
-                if (oldMessages && oldMessages.length > 0) {
-                    loadedSessions = [{ id: 'migrated-session', title: 'Obrolan Sebelumnya', messages: oldMessages, updatedAt: Date.now() }];
-                    localStorage.removeItem(oldChatKey);
+                const snap = await getDocs(collection(db, 'users', uid, 'ai_sessions'));
+                loadedSessions = snap.docs.map(d => d.data());
+            } catch (err) {
+                console.warn('Gagal memuat sesi chat dari cloud, pakai cache lokal:', err);
+            }
+            if (cancelled) return;
+
+            if (loadedSessions.length === 0) {
+                // Belum ada apa pun di cloud (belum pernah dipakai, atau baru pertama kali sejak
+                // fitur sync ini ada) — pakai cache lokal, lalu unggah sekali sebagai migrasi.
+                const savedSessions = localStorage.getItem(sessionsKey);
+                if (savedSessions) {
+                    try { loadedSessions = JSON.parse(savedSessions); } catch (e) {}
                 }
-            } catch (e) {}
-        }
-        setSessions(loadedSessions);
-        if (loadedSessions.length > 0) {
-            setActiveSessionId(loadedSessions[0].id);
-            setMessages(loadedSessions[0].messages);
-        }
+                if (loadedSessions.length === 0) {
+                    const oldChat = localStorage.getItem(oldChatKey);
+                    if (oldChat) {
+                        try {
+                            const oldMessages = JSON.parse(oldChat);
+                            if (oldMessages && oldMessages.length > 0) {
+                                loadedSessions = [{ id: 'migrated-session', title: 'Obrolan Sebelumnya', messages: oldMessages, updatedAt: Date.now() }];
+                                localStorage.removeItem(oldChatKey);
+                            }
+                        } catch (e) {}
+                    }
+                }
+                loadedSessions.forEach(s => {
+                    setDoc(doc(db, 'users', uid, 'ai_sessions', s.id), s).catch(err => console.warn('Migrasi sesi chat ke cloud gagal:', err));
+                });
+            }
+
+            const baseline = {};
+            loadedSessions.forEach(s => { baseline[s.id] = JSON.stringify(s); });
+            lastSavedSessionsRef.current = baseline;
+
+            setSessions(loadedSessions);
+            if (loadedSessions.length > 0) localStorage.setItem(sessionsKey, JSON.stringify(loadedSessions));
+            setActiveSessionId(loadedSessions.length > 0 ? loadedSessions[0].id : null);
+            setMessages(loadedSessions.length > 0 ? loadedSessions[0].messages : []);
+        })();
+
+        return () => { cancelled = true; };
     }, [user?.uid]);
 
     const isInitialMount = useRef(true);
@@ -108,6 +155,36 @@ export default function GymAIChat({
         } else {
              localStorage.removeItem(sessionsKey);
         }
+
+        if (!user?.uid) return; // guest sessions stay local-only
+
+        // Debounced + diffed, same shape as the rest of the app's Firestore sync — only turns
+        // into a write when a session actually changed since the last save, never on every
+        // streaming token (sessions[] is only touched at message-send/message-complete, not
+        // per-chunk — see handleSend).
+        const timer = setTimeout(() => {
+            const baseline = lastSavedSessionsRef.current || {};
+            const newBaseline = {};
+            const currentIds = new Set();
+
+            sessions.forEach(s => {
+                currentIds.add(s.id);
+                const json = JSON.stringify(s);
+                newBaseline[s.id] = json;
+                if (baseline[s.id] === json) return; // tidak berubah sejak save terakhir
+                setDoc(doc(db, 'users', user.uid, 'ai_sessions', s.id), s).catch(err => console.error('Sync sesi chat gagal:', err));
+            });
+
+            Object.keys(baseline).forEach(id => {
+                if (!currentIds.has(id)) {
+                    deleteDoc(doc(db, 'users', user.uid, 'ai_sessions', id)).catch(err => console.error('Hapus sesi chat cloud gagal:', err));
+                }
+            });
+
+            lastSavedSessionsRef.current = newBaseline;
+        }, 2000);
+
+        return () => clearTimeout(timer);
     }, [sessions, user?.uid]);
 
     // Lift "is there anything unread" up to App.jsx so the floating avatar can badge itself,

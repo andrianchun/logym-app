@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Camera, Edit2, Award, Trophy, Users, LogOut, Check, Loader2, Activity, AlertTriangle, Share2, ShieldAlert } from 'lucide-react';
 import { updateProfile } from 'firebase/auth';
-import { doc, updateDoc, setDoc } from 'firebase/firestore';
+import { doc, updateDoc, setDoc, getDoc, runTransaction } from 'firebase/firestore';
 import { auth, storage, db } from '../firebase';
 import { ref, deleteObject } from 'firebase/storage';
 import { uploadImageToFirebase } from '../utils/storage';
@@ -13,6 +13,7 @@ import { updateUserProfileInFeed, shareAchievementToFeed } from '../utils/commun
 import FollowListModal from '../components/FollowListModal';
 import ModerationPanel from '../components/ModerationPanel';
 import UserProfileModal from '../components/UserProfileModal';
+import SharedProfileView from '../components/SharedProfileView';
 import UnifiedBadge from '../components/UnifiedBadge';
 import useDialog from '../hooks/useDialog';
 
@@ -45,7 +46,8 @@ export default function ProfileModal({
     forceTab = null,
     onAchievementShareComplete = null,
     userProfile,
-    setUserProfile
+    setUserProfile,
+    initialViewingUserId = null
 }) {
     // NOTE: early return moved AFTER all hooks to comply with Rules of Hooks
 
@@ -54,7 +56,7 @@ export default function ProfileModal({
     const [isUploading, setIsUploading] = useState(false);
     const [showModPanel, setShowModPanel] = useState(false);
     const [localHighlight, setLocalHighlight] = useState(null);
-    const [viewingUserId, setViewingUserId] = useState(null);
+    const [viewingUserId, setViewingUserId] = useState(initialViewingUserId);
     const fileInputRef = useRef(null);
     const [activeTab, setActiveTab] = useState(globalProfileLastTab);
     const scrollPositions = useRef(globalProfileScrolls);
@@ -66,9 +68,11 @@ export default function ProfileModal({
     const [showEditPersonal, setShowEditPersonal] = useState(false);
     const [editGender, setEditGender] = useState(userProfile?.gender || '');
     const [editDob, setEditDob] = useState(userProfile?.dob || '');
+    const [editName, setEditName] = useState(user?.displayName || '');
+    const [editUsername, setEditUsername] = useState(userProfile?.username || '');
 
-    const isValidAge = (dob) => {
-        if (!dob) return false;
+    const calculateAge = (dob) => {
+        if (!dob) return null;
         const birthDate = new Date(dob);
         const today = new Date();
         let age = today.getFullYear() - birthDate.getFullYear();
@@ -76,6 +80,11 @@ export default function ProfileModal({
         if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
             age--;
         }
+        return age;
+    };
+    const isValidAge = (dob) => {
+        if (!dob) return false;
+        const age = calculateAge(dob);
         return age >= 13;
     };
 
@@ -159,23 +168,7 @@ export default function ProfileModal({
 
     const [pendingPhotoFile, setPendingPhotoFile] = useState(null);
 
-    const handleUpdateName = async () => {
-        if (!newName.trim()) {
-            setIsEditingName(false);
-            return;
-        }
-        try {
-            await updateProfile(auth.currentUser, { displayName: newName });
-            const userRef = doc(db, 'users', user.uid);
-            await setDoc(userRef, { name: newName }, { merge: true });
-            await updateUserProfileInFeed(user.uid, newName, undefined);
-            if (setUser) setUser(prev => ({ ...prev, name: newName }));
-            setIsEditingName(false);
-        } catch (err) {
-            console.error("Error updating name:", err);
-            setUploadStatus({ show: true, success: false, message: 'Gagal mengupdate nama.' });
-        }
-    };
+
 
     const handleFileChange = async (e) => {
         const file = e.target.files[0];
@@ -309,7 +302,7 @@ export default function ProfileModal({
                 {/* Header */}
                 <div className={`relative px-4 pt-3 pb-3 border-b ${t.border} shrink-0 min-h-[60px]`}>
                     <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: `url('/banner-${theme}.png')`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
-                    <div className="absolute top-3 right-3 z-20 flex items-center space-x-2 bg-gradient-to-l from-[#0f172a] via-[#0f172a] to-transparent pl-4 pr-1 py-1 rounded-l-full">
+                    <div className={`absolute top-3 right-3 z-20 flex items-center space-x-2 pl-4 pr-1 py-1 rounded-l-full ${theme === 'dark' ? 'bg-gradient-to-l from-[#0f172a] via-[#0f172a] to-transparent' : 'bg-gradient-to-l from-white via-white to-transparent'}`}>
                         <button onClick={() => setShowLogoutConfirm(true)} className="p-1.5 rounded-full bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors" title="Keluar">
                             <LogOut size={16} />
                         </button>
@@ -321,7 +314,7 @@ export default function ProfileModal({
                     <div className="relative z-10 flex items-center pr-2" style={{maxWidth: 'calc(100% - 80px)'}}>
                         {activeTab === 'beranda' ? (
                             <div className={`flex gap-1 p-1 rounded-full ${theme === 'dark' ? 'bg-white/5' : 'bg-black/5'} w-full`}>
-                                {['Semua', 'Diikuti', 'Saya'].map(f => (
+                                {['Semua', 'Diikuti', 'Teman'].map(f => (
                                     <button
                                         key={f}
                                         onClick={() => setActiveFilter(f)}
@@ -347,7 +340,7 @@ export default function ProfileModal({
                 <div 
                     ref={scrollContainerRef}
                     onScroll={handleScroll}
-                    className="flex-1 overflow-y-auto p-4 hide-scrollbar"
+                    className={`flex-1 overflow-y-auto hide-scrollbar ${activeTab !== 'pencapaian' ? 'p-4' : 'p-0'}`}
                 >
                     
                     {/* TAB: RECAP / SHARE */}
@@ -372,150 +365,35 @@ export default function ProfileModal({
                         />
                     )}
 
-                    {/* TAB: PROFIL (formerly BADGES) */}
+                    {/* TAB: PROFIL (Premium UI) */}
                     {activeTab === 'pencapaian' && (
-                        <div className="flex flex-col space-y-5">
-                            {/* Profile Info Row */}
-                            <div className="flex items-center gap-4 sm:gap-6">
-                                {/* Photo */}
-                                <div className="relative shrink-0 group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                                    <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-[#3b82f6]/50 shadow-md bg-gray-200">
-                                        {user?.photoURL ? (
-                                            <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover" />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center bg-gray-800 text-white"><Users size={32} /></div>
-                                        )}
-                                    </div>
-                                    <div className="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                                        {isUploading ? <Loader2 size={24} className="text-white animate-spin" /> : <Camera size={24} className="text-white" />}
-                                    </div>
-                                    <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
-                                </div>
-
-                                {/* Name & Stats */}
-                                <div className="flex-1 flex flex-col justify-center overflow-hidden">
-                                    {isEditingName ? (
-                                        <form 
-                                            onSubmit={(e) => { e.preventDefault(); handleUpdateName(); }} 
-                                            className="flex items-center space-x-2 mb-3 w-full max-w-[260px]"
-                                        >
-                                            <input 
-                                                type="text" 
-                                                value={newName} 
-                                                onChange={(e) => setNewName(e.target.value)} 
-                                                onBlur={() => setTimeout(() => setIsEditingName(false), 200)}
-                                                maxLength={15}
-                                                className={`flex-1 px-1 py-0.5 bg-transparent ${t.textMain} text-2xl font-black tracking-tight focus:outline-none border-b-2 border-[#3b82f6] w-full min-w-0`}
-                                                autoFocus
-                                            />
-                                            <button 
-                                                type="submit" 
-                                                className={`p-1.5 ${t.textMuted} hover:${t.textMain} transition-colors shrink-0`}
-                                            >
-                                                <Check size={20} />
-                                            </button>
-                                        </form>
-                                    ) : (
-                                        <div className="flex items-center space-x-2 cursor-pointer group w-fit mb-3" onClick={() => setIsEditingName(true)}>
-                                            <h1 className={`text-2xl font-black ${t.textMain} tracking-tight truncate`}>{user?.name || 'User'}</h1>
-                                            <Edit2 size={16} className={`${t.textMuted} opacity-50 group-hover:opacity-100 shrink-0`} />
-                                        </div>
-                                    )}
-
-                                    {/* Stats Row */}
-                                    <div className="flex items-center justify-between w-full">
-                                        <div className="flex items-center gap-6">
-                                            <button onClick={() => setFollowListType('followers')} className="flex flex-col items-center hover:opacity-70 transition-opacity">
-                                                <span className={`text-xl font-black ${t.textMain} leading-none`}>{followerCount}</span>
-                                                <span className={`text-[10px] ${t.textMuted} font-bold mt-1.5 uppercase tracking-wider`}>Followers</span>
-                                            </button>
-                                            <button onClick={() => setFollowListType('following')} className="flex flex-col items-center hover:opacity-70 transition-opacity">
-                                                <span className={`text-xl font-black ${t.textMain} leading-none`}>{followingCount}</span>
-                                                <span className={`text-[10px] ${t.textMuted} font-bold mt-1.5 uppercase tracking-wider`}>Following</span>
-                                            </button>
-                                        </div>
-                                        <button 
-                                            onClick={async () => {
-                                                if (navigator.share) {
-                                                    navigator.share({
-                                                        title: `Profil LOGYM - ${user?.name}`,
-                                                        text: `Ayo berteman dengan ${user?.name} di LOGYM!`,
-                                                        url: window.location.href,
-                                                    }).catch(console.error);
-                                                } else {
-                                                    navigator.clipboard.writeText(`Profil LOGYM - ${user?.name}`);
-                                                    await showAlert('Tautan profil berhasil disalin!', { type: 'success', title: 'Tersalin!' });
-                                                }
-                                            }}
-                                            className={`p-2.5 rounded-full ${t.bgAccent} shadow-sm active:scale-95 transition-transform flex items-center justify-center shrink-0 ml-auto`}
-                                            title="Bagikan Profil"
-                                        >
-                                            <Share2 size={16} className={t.textAccent === 'text-white' ? 'text-white' : 'text-current'} />
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            {/* Personal Details Row */}
-                            <div className={`p-4 rounded-2xl ${t.bgBox} border ${t.border} flex items-center justify-between`}>
-                                <div className="flex flex-col">
-                                    <div className="flex space-x-4">
-                                        <div>
-                                            <p className={`text-[10px] uppercase font-bold ${t.textMuted} tracking-wider`}>Jenis Kelamin</p>
-                                            <p className={`text-sm font-black ${t.textMain}`}>{userProfile?.gender === 'male' ? 'Laki-laki' : userProfile?.gender === 'female' ? 'Perempuan' : '-'}</p>
-                                        </div>
-                                        <div>
-                                            <p className={`text-[10px] uppercase font-bold ${t.textMuted} tracking-wider`}>Usia</p>
-                                            <p className={`text-sm font-black ${t.textMain}`}>
-                                                {userProfile?.dob ? `${new Date().getFullYear() - new Date(userProfile.dob).getFullYear()} th` : '-'}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <button 
-                                    onClick={() => {
-                                        setEditGender(userProfile?.gender || '');
-                                        setEditDob(userProfile?.dob || '');
-                                        setShowEditPersonal(true);
-                                    }}
-                                    className={`p-2 rounded-xl ${t.inputBg} hover:${t.bgAccentSoft} transition-colors`}
-                                >
-                                    <Edit2 size={16} className={t.textMuted} />
-                                </button>
-                            </div>
-                            
-                            <hr className={`border-t ${t.borderDashed} border-dashed my-2`} />
-
-                            <div>
-                                <h3 className={`text-sm font-black ${t.textMain} mb-4`}>Pencapaian</h3>
-                                <div className="grid grid-cols-3 md:grid-cols-4 gap-4">
-                                    {ACHIEVEMENTS.map((ach) => {
-                                        const isUnlocked = userAchievements?.includes(ach.id);
-                                        return (
-                                        <button 
-                                            key={ach.id} 
-                                            onClick={() => setSelectedAchievement(ach)}
-                                            className="hover:opacity-80 active:scale-95 transition-all text-left"
-                                        >
-                                            <UnifiedBadge achievementId={ach.id} isUnlocked={isUnlocked} isDark={isDark} t={t} />
-                                        </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                            
-                            {/* ADMIN BUTTON (If Admin) */}
-                            {isAdmin && (
-                                <div className={`mt-6 p-4 rounded-2xl border border-rose-500/20 bg-rose-500/5 space-y-3`}>
-                                    <p className={`text-sm font-black text-rose-500 uppercase tracking-wider flex items-center gap-2`}>
-                                        <ShieldAlert size={16} /> Mode Admin Aktif
-                                    </p>
-                                    <button onClick={() => setShowModPanel(true)} className={`w-full py-3 rounded-xl font-bold bg-rose-500 text-white shadow-lg shadow-rose-500/30 active:scale-95 transition-all`}>
-                                        Buka Panel Moderasi
-                                    </button>
-                                </div>
-                            )}
-                        </div>
+                        <SharedProfileView
+                            profileUserId={user?.uid}
+                            profileUserName={user?.name}
+                            profileUserPhoto={user?.photoURL}
+                            currentUser={user}
+                            isOwnProfile={true}
+                            isDark={theme === 'dark'}
+                            t={t}
+                            onClose={() => setShowProfileModal(false)}
+                            onLogout={() => setShowLogoutConfirm(true)}
+                            fileInputRef={fileInputRef}
+                            onFileChange={handleFileChange}
+                            isUploading={isUploading}
+                            onEditNameClick={() => setIsEditingName(true)}
+                            onEditPersonalClick={() => {
+                                setEditName(user?.displayName || '');
+                                setEditUsername(userProfile?.username || '');
+                                setEditGender(userProfile?.gender || '');
+                                setEditDob(userProfile?.dob || '');
+                                setShowEditPersonal(true);
+                            }}
+                            userProfileData={userProfile}
+                            onPostClick={(postId) => {
+                                setActiveTab('beranda');
+                                setLocalHighlight(postId);
+                            }}
+                        />
                     )}
 
                     {/* TAB: COMMUNITY */}
@@ -565,18 +443,78 @@ export default function ProfileModal({
 
         {/* Edit Personal Details Modal */}
         {showEditPersonal && (
-            <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-                <div className={`w-full max-w-xs p-6 rounded-3xl ${t.bgCard} border ${t.border} shadow-2xl animate-in zoom-in-95`}>
+            <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 overflow-y-auto">
+                <div className={`w-full max-w-sm p-6 rounded-3xl ${t.bgCard} border ${t.border} shadow-2xl animate-in zoom-in-95 my-auto max-h-[90vh] overflow-y-auto hide-scrollbar`}>
                     <h3 className={`text-xl font-black ${t.textMain} mb-4`}>Data Personal</h3>
                     
-                    <div className="space-y-4 mb-6">
+                    <div className="space-y-5 mb-6">
+                        {/* Foto Profil */}
+                        <div className="flex flex-col items-center mb-6">
+                            <div 
+                                onClick={() => fileInputRef?.current?.click()}
+                                className="w-24 h-24 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800 shrink-0 border-4 border-slate-300 dark:border-slate-700 relative cursor-pointer group"
+                            >
+                                {user?.photoURL ? (
+                                    <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover group-hover:opacity-75 transition-opacity" />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-700 to-slate-900 group-hover:opacity-75 transition-opacity">
+                                        <span className="text-3xl font-black text-white/50">{user?.displayName?.substring(0,2)?.toUpperCase()}</span>
+                                    </div>
+                                )}
+                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                                    <Camera size={28} className="text-white" />
+                                </div>
+                                {isUploading && (
+                                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                        <span className="animate-pulse text-white font-bold text-sm">...</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Nama */}
+                        <div>
+                            <label className={`text-xs font-bold ${t.textMuted} mb-2 block`}>Nama</label>
+                            <input 
+                                type="text"
+                                value={editName}
+                                onChange={(e) => setEditName(e.target.value)}
+                                maxLength={15}
+                                placeholder="Tulis namamu..."
+                                className={`w-full px-4 py-3 rounded-xl border-2 font-bold text-sm border-transparent ${t.inputBg} ${t.textMain} focus:outline-none focus:border-blue-500`}
+                            />
+                        </div>
+
+                        {/* Username */}
+                        <div>
+                            <label className={`text-xs font-bold ${t.textMuted} mb-2 block`}>Username</label>
+                            <div className="relative">
+                                <span className={`absolute left-4 top-1/2 -translate-y-1/2 font-bold text-sm ${t.textMuted}`}>@</span>
+                                <input 
+                                    type="text"
+                                    value={editUsername}
+                                    onChange={(e) => {
+                                        const val = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '');
+                                        setEditUsername(val);
+                                    }}
+                                    maxLength={20}
+                                    placeholder="username_kamu"
+                                    className={`w-full pl-8 pr-4 py-3 rounded-xl border-2 font-bold text-sm border-transparent ${t.inputBg} ${t.textMain} focus:outline-none focus:border-blue-500`}
+                                />
+                            </div>
+                            <p className={`text-[10px] mt-1 font-medium ${t.textMuted}`}>Hanya huruf kecil, angka, dan garis bawah (_).</p>
+                        </div>
+
+                        {/* Jenis Kelamin */}
                         <div>
                             <label className={`text-xs font-bold ${t.textMuted} mb-2 block`}>Jenis Kelamin</label>
                             <div className="grid grid-cols-2 gap-2">
-                                <button onClick={() => setEditGender('male')} className={`py-2.5 rounded-xl font-bold border-2 transition-all text-sm ${editGender === 'male' ? `${t.borderAccent} ${t.bgAccent} text-white` : `border-transparent ${t.inputBg} ${t.textMuted}`}`}>Laki-laki</button>
-                                <button onClick={() => setEditGender('female')} className={`py-2.5 rounded-xl font-bold border-2 transition-all text-sm ${editGender === 'female' ? `${t.borderAccent} ${t.bgAccent} text-white` : `border-transparent ${t.inputBg} ${t.textMuted}`}`}>Perempuan</button>
+                                <button onClick={() => setEditGender('male')} className={`py-3 rounded-xl font-bold border-2 transition-all text-sm ${editGender === 'male' ? `${t.borderAccent} ${t.bgAccent} text-white` : `border-transparent ${t.inputBg} ${t.textMuted}`}`}>Laki-laki</button>
+                                <button onClick={() => setEditGender('female')} className={`py-3 rounded-xl font-bold border-2 transition-all text-sm ${editGender === 'female' ? `${t.borderAccent} ${t.bgAccent} text-white` : `border-transparent ${t.inputBg} ${t.textMuted}`}`}>Perempuan</button>
                             </div>
                         </div>
+
+                        {/* Tanggal Lahir */}
                         <div>
                             <label className={`text-xs font-bold ${t.textMuted} mb-2 block`}>Tanggal Lahir</label>
                             <input 
@@ -584,7 +522,7 @@ export default function ProfileModal({
                                 max={new Date(new Date().setFullYear(new Date().getFullYear() - 13)).toISOString().split('T')[0]}
                                 value={editDob} 
                                 onChange={(e) => setEditDob(e.target.value)} 
-                                className={`w-full px-3 py-2.5 rounded-xl border-2 font-bold text-sm ${editDob ? (isValidAge(editDob) ? t.borderAccent : 'border-rose-500 text-rose-500') : 'border-transparent'} ${t.inputBg} ${editDob && !isValidAge(editDob) ? '' : t.textMain} focus:outline-none`}
+                                className={`w-full px-4 py-3 rounded-xl border-2 font-bold text-sm ${editDob ? (isValidAge(editDob) ? 'border-transparent focus:border-blue-500' : 'border-rose-500 text-rose-500') : 'border-transparent focus:border-blue-500'} ${t.inputBg} ${editDob && !isValidAge(editDob) ? '' : t.textMain} focus:outline-none`}
                             />
                             {editDob && !isValidAge(editDob) ? (
                                 <p className={`text-[10px] mt-1.5 font-bold text-rose-500 animate-in fade-in`}>Usia harus di atas 13 tahun.</p>
@@ -592,20 +530,89 @@ export default function ProfileModal({
                         </div>
                     </div>
                     
-                    <div className="flex space-x-2">
+                    <div className="flex space-x-2 pt-2">
                         <button onClick={() => setShowEditPersonal(false)} className={`flex-1 py-3 rounded-xl font-bold ${t.bgBox} ${t.textMain} text-sm`}>Batal</button>
                         <button 
-                            disabled={!editGender || !isValidAge(editDob)}
-                            onClick={() => {
-                                if (setUserProfile && editGender && isValidAge(editDob)) {
-                                    setUserProfile(prev => ({ ...prev, gender: editGender, dob: editDob }));
+                            disabled={!editName.trim() || !editUsername?.trim() || !editGender || !isValidAge(editDob)}
+                            onClick={async () => {
+                                if (setUserProfile && editGender && isValidAge(editDob) && editName.trim() && editUsername?.trim()) {
+                                    const safeName = editName.trim();
+                                    const newUsername = editUsername.trim();
+                                    
+                                    if (user?.uid) {
+                                        try {
+                                            // Handle Username logic
+                                            const oldUsername = userProfile?.username || null;
+                                            let isUsernameUpdated = false;
+
+                                            if (newUsername !== oldUsername) {
+                                                const usernameRef = doc(db, 'usernames', newUsername);
+                                                await runTransaction(db, async (transaction) => {
+                                                    const snap = await transaction.get(usernameRef);
+                                                    if (snap.exists() && snap.data().uid !== user.uid) {
+                                                        throw new Error("USERNAME_TAKEN");
+                                                    }
+                                                    transaction.set(usernameRef, { uid: user.uid });
+                                                });
+                                                isUsernameUpdated = true;
+                                            }
+
+                                            setUserProfile(prev => ({ ...prev, gender: editGender, dob: editDob, name: safeName, username: newUsername }));
+
+                                            const isNameUpdated = safeName !== user.displayName;
+                                            if (isNameUpdated) {
+                                                await updateProfile(auth.currentUser, { displayName: safeName });
+                                                if (setUser) setUser(prev => ({ ...prev, name: safeName, displayName: safeName }));
+                                            }
+                                            // Gender/usia selalu dikirim ulang (bukan cuma saat berubah) supaya profil
+                                            // yang gender/dob-nya sudah terisi dari sebelumnya (sebelum fitur publish
+                                            // ini ada) ikut ter-backfill ke community_users saat user menyimpan lagi.
+                                            await updateUserProfileInFeed(
+                                                user.uid,
+                                                isNameUpdated ? safeName : undefined,
+                                                undefined,
+                                                isUsernameUpdated ? newUsername : undefined,
+                                                editGender || undefined,
+                                                calculateAge(editDob) ?? undefined
+                                            );
+                                            
+                                            const userRef = doc(db, 'users', user.uid);
+                                            const updatedProfile = { ...(userProfile || {}), gender: editGender, dob: editDob, name: safeName, username: newUsername };
+                                            
+                                            const updatePayload = {
+                                                gender: editGender, 
+                                                dob: editDob, 
+                                                name: safeName,
+                                                username: newUsername,
+                                                "settings.userProfile": updatedProfile
+                                            };
+                                            
+                                            // setDoc({merge:true}) memperlakukan key "settings.userProfile" sebagai NAMA FIELD
+                                            // literal (mengandung titik), bukan path nested — beda dari updateDoc() yang
+                                            // memang mem-parsing dot-notation sebagai path. Field nested settings.userProfile
+                                            // yang asli jadi tidak pernah ke-update, dan echo onSnapshot balikin state lokal
+                                            // ke data lama (bug: username/nama/gender di profil sendiri "bandel" tidak berubah).
+                                            await updateDoc(userRef, updatePayload);
+                                        } catch(e) { 
+                                            if (e.message === "USERNAME_TAKEN") {
+                                                if (typeof showAlert === 'function') showAlert('Username sudah dipakai orang lain.', { type: 'error' });
+                                            } else {
+                                                console.error("Save profile error:", e);
+                                                if (typeof showAlert === 'function') showAlert('Gagal menyimpan profil. Coba lagi.', { type: 'error' });
+                                            }
+                                            return; // Do not close modal
+                                        }
+                                    } else {
+                                        setUserProfile(prev => ({ ...prev, gender: editGender, dob: editDob, name: safeName, username: newUsername }));
+                                    }
                                 }
                                 setShowEditPersonal(false);
                             }}
-                            className={`flex-1 py-3 rounded-xl font-bold transition-all text-sm ${editGender && isValidAge(editDob) ? `${t.bgAccent} text-white hover:opacity-90` : `${t.inputBg} ${t.textMuted} opacity-50 cursor-not-allowed`}`}
+                            className={`flex-1 py-3 rounded-xl font-bold transition-all text-sm ${(editName.trim() && editUsername?.trim() && editGender && isValidAge(editDob)) ? `${t.bgAccent} text-white hover:opacity-90` : `${t.inputBg} ${t.textMuted} opacity-50 cursor-not-allowed`}`}
                         >
                             Simpan
                         </button>
+
                     </div>
                 </div>
             </div>
@@ -681,6 +688,11 @@ export default function ProfileModal({
                 isDark={theme === 'dark'}
                 t={t}
                 onClose={() => setViewingUserId(null)}
+                onNavigateToPost={(postId) => {
+                    setViewingUserId(null);
+                    setActiveTab('beranda');
+                    setLocalHighlight(postId);
+                }}
             />
         )}
         {dialog}

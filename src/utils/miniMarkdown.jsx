@@ -1,13 +1,18 @@
 import React from 'react';
 
-// Parses **bold** inline within a single line into React nodes. No dangerouslySetInnerHTML —
-// everything is built as real React elements, so there's no HTML-injection surface even
-// though the source text comes from an LLM.
+// Parses **bold** and *italic* inline within a single line into React nodes. No
+// dangerouslySetInnerHTML — everything is built as real React elements, so there's no
+// HTML-injection surface even though the source text comes from an LLM.
+// Bold is tried before italic at each position (regex alternation order), so **x** never
+// gets misread as italic-wrapped-in-leftover-asterisks.
 function parseInline(line, keyPrefix) {
-    const parts = line.split(/(\*\*[^*]+\*\*)/g);
+    const parts = line.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
     return parts.map((part, i) => {
         if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
             return <strong key={`${keyPrefix}-${i}`} className="font-bold text-white">{part.slice(2, -2)}</strong>;
+        }
+        if (part.startsWith('*') && part.endsWith('*') && part.length > 2) {
+            return <em key={`${keyPrefix}-${i}`} className="italic">{part.slice(1, -1)}</em>;
         }
         return part ? <React.Fragment key={`${keyPrefix}-${i}`}>{part}</React.Fragment> : null;
     });

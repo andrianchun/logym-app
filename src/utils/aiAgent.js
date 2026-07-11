@@ -62,6 +62,71 @@ export const getAvailableModels = () => {
     return AI_MODELS;
 };
 
+// Canned, persona-flavored notification copy — deliberately NOT AI-generated per notification.
+// Local notifications are scheduled ahead of time (sometimes days out) with no guarantee the
+// device is online or the app is running when they fire, so the text has to be baked in up
+// front. Multiple variants per persona/type avoid the same line repeating every single day.
+// {placeholders} are filled in by getRaigaNotification().
+export const RAIGA_NOTIF_TEMPLATES = {
+    prep: {
+        santai: [
+            ['Bro, gas siap-siap!', '{program} lu tinggal 30 menit lagi. Cus ambil botol minum sama towel, kita gaspol bentar lagi.'],
+            ['{program} sebentar lagi!', 'Tinggal 30 menit sebelum {program}. Mulai pemanasan ringan yuk biar gak kaget pas mulai.'],
+        ],
+        galak: [
+            ['30 menit lagi. Jangan mager.', '{program} dimulai 30 menit lagi. Udah ganti baju belum? Jangan sampe gue cariin alasan lu.'],
+            ['Gak ada alasan.', '30 menit sebelum {program}. Siap-siap sekarang, jangan nunggu mepet.'],
+        ],
+        serius: [
+            ['Pengingat sesi latihan', 'Sesi {program} dimulai dalam 30 menit. Silakan siapkan peralatan dan mulai pemanasan ringan.'],
+        ],
+    },
+    start: {
+        santai: [
+            ['Waktunya gas, bro!', '{program} lu mulai sekarang. Buka LOGYM, kita rapihin set pertama bareng-bareng.'],
+            ['Cus mulai!', 'Ini waktunya {program}. Jangan ditunda-tunda ya, momentum penting bro.'],
+        ],
+        galak: [
+            ['Sekarang. Gerak.', '{program} lu mulai detik ini juga. Gak ada alasan nunda-nunda lagi, langsung buka app dan mulai.'],
+        ],
+        serius: [
+            ['Sesi latihan dimulai', '{program} dijadwalkan mulai sekarang. Silakan buka aplikasi untuk memulai sesi.'],
+        ],
+    },
+    missed: {
+        santai: [
+            ['Kangen sama beban lu gak?', 'Udah {days} hari nih lu absen, bro. Gapapa kalo capek, tapi jangan sampe momentum ilang ya. Balik yuk!'],
+        ],
+        galak: [
+            ['{days} hari. Cukup.', 'Udah {days} hari lu bolos tanpa kabar. Progress gak nunggu lu santai-santai. Balik sekarang, gak pake drama.'],
+        ],
+        serius: [
+            ['Konsistensi menurun', 'Sudah {days} hari sejak sesi latihan terakhir. Disarankan untuk kembali ke jadwal guna menjaga progres.'],
+        ],
+    },
+    insight: {
+        santai: [
+            ['Eh, {exName} lu stuck nih', '{exName} lu flat {weeks} minggu di {maxWeight}kg bro. Gue ada ide buat naikin lagi, cek chat yuk!'],
+        ],
+        galak: [
+            ['{exName} lu mandek. Perbaiki.', '{weeks} minggu {exName} lu gak naik-naik dari {maxWeight}kg. Ini bukan plateau biasa, ini lu yang kurang niat. Buka chat sekarang.'],
+        ],
+        serius: [
+            ['Plateau terdeteksi: {exName}', '{exName} stagnan selama {weeks} minggu di {maxWeight}kg. Rekomendasi penyesuaian program tersedia di chat.'],
+        ],
+    },
+};
+
+// 'custom' has no fixed voice (it's a freeform LLM instruction, not something we can render
+// without calling the API) — notifications fall back to 'santai' for that persona.
+export const getRaigaNotification = (type, persona, vars = {}) => {
+    const pool = RAIGA_NOTIF_TEMPLATES[type]?.[persona] || RAIGA_NOTIF_TEMPLATES[type]?.santai || [];
+    if (pool.length === 0) return null;
+    const [titleTpl, bodyTpl] = pool[Math.floor(Math.random() * pool.length)];
+    const fill = (s) => s.replace(/\{(\w+)\}/g, (_, k) => (vars[k] !== undefined ? vars[k] : ''));
+    return { title: fill(titleTpl), body: fill(bodyTpl) };
+};
+
 // A key that hit a rate limit / error is benched for a few minutes, not forever —
 // free-tier quotas reset per minute/day, so permanent "exhausted" was wrong.
 export const KEY_COOLDOWN_MS = 5 * 60 * 1000;
@@ -130,6 +195,10 @@ export const buildSystemPrompt = (userProfile, exerciseLibraryStr, workoutLogsSu
 Your goal is to provide evidence-based fitness advice, analyze workout logs, and create highly personalized workout programs.
 ${toneInstruction}
 Regardless of tone, NEVER invent workout numbers, dates, or program details that are not present in the data given to you below — if you don't have the data, say so instead of guessing.
+
+[Conversation Style]
+Keep replies short and natural, like a real chat between two people texting — not an essay. Default to 2-4 sentences unless the user is explicitly asking for a detailed breakdown (a new program, a full analysis, a step-by-step plan) or the topic genuinely needs more room.
+Check the conversation history before replying: if you already explained something earlier in this chat, do NOT re-explain it — refer back briefly ("kayak yang gue bilang tadi...") instead of repeating the full explanation again. Only restate a fact if the user is asking about it again or seems confused.
 
 ${bioString}
 ${memoryBlock}

@@ -53,14 +53,14 @@ export default function CreatePostModal({ user, onClose, theme, t, initialFiles 
         if (url) imageUrls.push(url);
       }
 
-      await createCommunityPost(
+      const newPostId = await createCommunityPost(
         user?.uid,
         user?.name || user?.email?.split('@')[0],
         user?.photoURL,
         { text, imageUrls, ...postDataOverrides }
       );
-      
-      onClose(true);
+
+      onClose(true, newPostId);
     } catch (err) {
       console.error(err);
       await showAlert('Gagal memposting. Silakan coba lagi.', { type: 'error', title: 'Gagal' });

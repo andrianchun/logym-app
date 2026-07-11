@@ -8,7 +8,7 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 // --- IMPORT MESIN FIREBASE ---
 import { auth, db } from './firebase';
 import { onAuthStateChanged, signOut, deleteUser } from 'firebase/auth';
-import { doc, setDoc, onSnapshot, deleteField, deleteDoc, collection, getDocs, query, where, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, getDoc, onSnapshot, deleteField, deleteDoc, collection, getDocs, query, where, writeBatch } from 'firebase/firestore';
 
 // --- IMPORT KOMPONEN UI ---
 import Header from './components/Header';
@@ -43,7 +43,7 @@ import { checkAchievements, ACHIEVEMENTS } from './data/achievements';
 // --- IMPORT DATA & MESIN ---
 import { playSoundEffect } from './utils/audio';
 import { fetchExercisesFromApi } from './utils/exerciseDbApi';
-import { AI_MODELS, detectPlateaus } from './utils/aiAgent';
+import { AI_MODELS, detectPlateaus, getRaigaNotification } from './utils/aiAgent';
 import useDialog from './hooks/useDialog';
 import { getLocalYMD, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos } from './data/constants';
 import { Loader2, Download } from 'lucide-react';
@@ -244,9 +244,37 @@ export default function App() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [profileForceTab, setProfileForceTab] = useState(null);
   const [highlightPostId, setHighlightPostId] = useState(null);
+  const [initialProfileUserId, setInitialProfileUserId] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
   const [showQuestionnaire, setShowQuestionnaire] = useState(false);
   const [globalDetailExercise, setGlobalDetailExercise] = useState(null);
+
+  useEffect(() => {
+    const handleUrlParams = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const u = params.get('u');
+      if (u) {
+        if (u.length > 20) {
+          // likely a UID
+          setInitialProfileUserId(u);
+          setShowProfileModal(true);
+        } else {
+          // likely a username
+          try {
+            const usernameRef = doc(db, 'usernames', u.toLowerCase());
+            const snap = await getDoc(usernameRef);
+            if (snap.exists() && snap.data().uid) {
+              setInitialProfileUserId(snap.data().uid);
+              setShowProfileModal(true);
+            }
+          } catch (e) {
+            console.error("Error fetching username:", e);
+          }
+        }
+      }
+    };
+    handleUrlParams();
+  }, []);
   const [isFreshAccount, setIsFreshAccount] = useState(false);
   const [showGymManager, setShowGymManager] = useState(false);
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
@@ -263,6 +291,69 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [history]
   );
+
+  const scheduleRaigaPush = async (type, id, vars) => {
+    try {
+      const perm = await LocalNotifications.requestPermissions();
+      if (perm.display !== 'granted') return;
+      const copy = getRaigaNotification(type, raigaPersona, vars);
+      if (!copy) return;
+      const [h, m] = (defaultReminderTime || '09:00').split(':');
+      const fireAt = new Date();
+      fireAt.setHours(parseInt(h, 10), parseInt(m, 10), 0, 0);
+      if (fireAt.getTime() <= Date.now()) fireAt.setDate(fireAt.getDate() + 1); // slot udah lewat hari ini -> besok pagi
+      await LocalNotifications.schedule({
+        notifications: [{
+          id,
+          title: copy.title,
+          body: copy.body,
+          schedule: { at: fireAt },
+          largeIcon: 'coach_raiga_avatar',
+        }]
+      });
+    } catch (err) {
+      console.warn('Raiga push notif error:', err);
+    }
+  };
+
+  // Nudge kalau user belum latihan N hari — dijadwalkan ulang tiap hari count-nya berubah,
+  // tapi cuma sekali per hari yang sama (dedup via localStorage) supaya tidak spam tiap app dibuka.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform() || !reminderEnabled) return;
+    const MISSED_THRESHOLD_DAYS = 2;
+    const completedDates = Object.keys(history).filter(d => {
+      const day = history[d];
+      const workouts = day?.workouts || (day?.status ? [day] : []);
+      return workouts.some(w => w.status === 'completed');
+    }).sort((a, b) => b.localeCompare(a));
+    if (completedDates.length === 0) return; // belum ada riwayat sama sekali, jangan nagih dulu
+
+    const daysSince = Math.floor((Date.now() - new Date(completedDates[0]).getTime()) / 86400000);
+    if (daysSince < MISSED_THRESHOLD_DAYS) return;
+
+    const dedupKey = `lyfit_missed_notif_${user?.uid || 'guest'}`;
+    const dedupVal = `${completedDates[0]}_${daysSince}`;
+    if (localStorage.getItem(dedupKey) === dedupVal) return;
+
+    scheduleRaigaPush('missed', 88000000 + (daysSince % 1000), { days: daysSince })
+      .then(() => localStorage.setItem(dedupKey, dedupVal));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [history, reminderEnabled, raigaPersona, defaultReminderTime, user?.uid]);
+
+  // Plateau insight juga didorong sebagai notifikasi native, bukan cuma bubble in-app —
+  // dedup terpisah dari yang dipakai GymAIChat karena tujuannya beda (push vs sesi chat).
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform() || !reminderEnabled) return;
+    const top = plateauInsights?.[0];
+    if (!top) return;
+    const insightKey = `${top.name}_${top.weeks}_${top.maxWeight}`;
+    const dedupKey = `lyfit_insight_notif_${user?.uid || 'guest'}`;
+    if (localStorage.getItem(dedupKey) === insightKey) return;
+
+    scheduleRaigaPush('insight', 89000000 + (top.weeks % 1000), { exName: top.name, weeks: top.weeks, maxWeight: top.maxWeight })
+      .then(() => localStorage.setItem(dedupKey, insightKey));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plateauInsights, reminderEnabled, raigaPersona, defaultReminderTime, user?.uid]);
 
   // Global handleAcceptProgram hoisted here so GymAIChat can call it from any tab
   const handleAcceptAiProgram = React.useCallback(async (programData) => {
@@ -961,9 +1052,16 @@ export default function App() {
   //  - 3b: history — diff per tanggal, hanya tanggal yang berubah yang dikirim
   // ==========================================
   useEffect(() => {
-    if (user && isDataLoaded && !isUpdatingFromServer.current && !hasParseError) {
-      const timer = setTimeout(() => {
-        if (isUpdatingFromServer.current) return; // double-check before firing
+    if (user && isDataLoaded && !hasParseError) {
+      let retryTimer = null;
+      // Jika onSnapshot sedang menulis data dari server saat timer ini berbunyi, JANGAN
+      // buang perubahan lokal — coba lagi tiap 500ms sampai guard-nya lepas, supaya
+      // perubahan yang kebetulan terjadi persis di window 3 detik itu tidak hilang.
+      const attemptSave = () => {
+        if (isUpdatingFromServer.current) {
+          retryTimer = setTimeout(attemptSave, 500);
+          return;
+        }
         // SAFETY: Jangan simpan ke Firestore jika programs masih sama dengan defaultPrograms —
         // ini indikasi data user belum selesai di-load dari server (race condition).
         // Biarkan onSnapshot selesai dulu, baru auto-save boleh jalan.
@@ -981,9 +1079,10 @@ export default function App() {
           userAchievements,
           updatedAt: new Date().toISOString()
         }, { merge: true }).catch(err => console.error("Auto-save Cloud gagal:", err));
-      }, 2000);
+      };
+      const timer = setTimeout(attemptSave, 2000);
 
-      return () => clearTimeout(timer);
+      return () => { clearTimeout(timer); if (retryTimer) clearTimeout(retryTimer); };
     }
   }, [programs, exerciseLibrary, theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, user, isDataLoaded, userAchievements, userProfile, userApiKeys, aiProvider, aiModel, raigaPersona, raigaCustomInstruction, raigaMemory]);
 
@@ -992,9 +1091,13 @@ export default function App() {
   const lastSavedHistoryJson = useRef(null);
 
   useEffect(() => {
-    if (user && isDataLoaded && !isUpdatingFromServer.current && !hasParseError) {
-      const timer = setTimeout(() => {
-        if (isUpdatingFromServer.current) return; // double-check before firing
+    if (user && isDataLoaded && !hasParseError) {
+      let retryTimer = null;
+      const attemptSave = () => {
+        if (isUpdatingFromServer.current) {
+          retryTimer = setTimeout(attemptSave, 500);
+          return;
+        }
 
         const baseline = lastSavedHistoryJson.current || {};
         const newBaseline = { ...baseline };
@@ -1034,9 +1137,10 @@ export default function App() {
               }
            });
         }
-      }, 2000);
+      };
+      const timer = setTimeout(attemptSave, 2000);
 
-      return () => clearTimeout(timer);
+      return () => { clearTimeout(timer); if (retryTimer) clearTimeout(retryTimer); };
     }
   }, [history, user, isDataLoaded]);
 
@@ -2189,6 +2293,7 @@ export default function App() {
       <ProgramQuestionnaireModal
          isOpen={showQuestionnaire}
          user={user}
+         userProfile={userProfile}
          onClose={() => {
            setShowQuestionnaire(false);
            if (user?.uid) {
@@ -2225,6 +2330,7 @@ export default function App() {
       <React.Suspense fallback={null}>
         <ProfileModal
            showProfileModal={showProfileModal} setShowProfileModal={setShowProfileModal} 
+           initialViewingUserId={initialProfileUserId}
            user={user} setUser={setUser} t={t} theme={theme} handleLogout={handleLogout} history={history}
            activityTargets={activityTargets} programs={programs} setPrograms={setPrograms} exerciseLibrary={exerciseLibrary}
            lang={lang} language={language} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} selectedDate={selectedDate} units={units} activePlanIds={activePlanIds}
@@ -2345,6 +2451,7 @@ export default function App() {
                units={units}
                activePlanIds={activePlanIds}
                userProfile={userProfile}
+               raigaPersona={raigaPersona}
              />
          )}
 
@@ -2365,6 +2472,9 @@ export default function App() {
                userProfile={userProfile} history={history}
                setShowSettings={setShowSettings}
                onAcceptProgram={handleAcceptAiProgram}
+               setHighlightPostId={setHighlightPostId}
+               setShowProfileModal={setShowProfileModal}
+               setProfileForceTab={setProfileForceTab}
              />
          )}
 
@@ -2467,9 +2577,10 @@ export default function App() {
         user={user}
         onShareComplete={(postId) => {
           setUnlockedAchievementsPopup([]);
-          // Open ProfileModal on the community feed tab
+          // Open ProfileModal on the community feed tab, scrolled to the post just shared
           setProfileForceTab('beranda');
           setShowProfileModal(true);
+          if (postId) setHighlightPostId(postId);
         }}
       />
 

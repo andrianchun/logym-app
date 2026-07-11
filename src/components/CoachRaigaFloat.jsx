@@ -244,12 +244,16 @@ export default function CoachRaigaFloat({
                 onPointerCancel={onPointerUp}
                 title="Tahan untuk geser · Ketuk untuk chat"
                 aria-label="Coach Raiga — ketuk untuk chat"
-            >
-                {/* Titik unread — mengikuti sinyal gabungan dari GymAIChat (insight proaktif ATAU balasan yang belum dibaca) */}
-                {hasUnreadChat && (
-                    <span className="absolute top-0.5 right-0.5 w-3 h-3 bg-rose-500 rounded-full border-2 border-neutral-900 pointer-events-none" />
-                )}
-            </div>
+            />
+
+            {/* Titik unread — sibling DI LUAR avatar (yang overflow-hidden buat crop foto bulat),
+                supaya bisa nongol keluar lingkaran, bukan ke-crop ikut avatar. */}
+            {hasUnreadChat && (
+                <span
+                    className="absolute top-0 right-0 w-3.5 h-3.5 bg-rose-500 rounded-full pointer-events-none animate-pulse"
+                    style={{ boxShadow: '0 0 6px 2px rgba(244,63,94,0.65)', animationDuration: '2.2s' }}
+                />
+            )}
         </div>
     );
 }

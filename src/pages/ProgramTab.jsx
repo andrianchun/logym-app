@@ -127,13 +127,14 @@ const SortableExerciseItem = ({ ex, prevEx, idx, routineId, t, lang, soundEnable
   );
 };
 
-const ProgramTab = ({ 
-  t, lang, programs, setPrograms, user, exerciseLibrary, soundEnabled, 
+const ProgramTab = ({
+  t, lang, programs, setPrograms, user, exerciseLibrary, soundEnabled,
   setActiveAddModalTarget, saveStateToHistory, openQuestionnaire,
   activePlanIds, setActivePlanIds, gymProfiles,
   focusRoutineId, setFocusRoutineId, setConfirmModal, activityTargets,
   userApiKeys, aiProvider, aiModel, userProfile, history,
-  keyStatuses, setKeyStatuses, setAiProvider, setAiModel, setShowSettings
+  keyStatuses, setKeyStatuses, setAiProvider, setAiModel, setShowSettings,
+  setHighlightPostId, setShowProfileModal, setProfileForceTab
 }) => {
   
   const isDark = t.bgCard !== 'bg-white';
@@ -1061,9 +1062,14 @@ const ProgramTab = ({
               userName: user?.name || user?.email?.split('@')[0] || 'Anonim',
             }
           }}
-          onClose={async (success) => {
+          onClose={async (success, newPostId) => {
             setPendingShareProgram(null);
-            if (success) await showAlert('Program berhasil dibagikan ke komunitas!', { type: 'success', title: 'Berhasil Dibagikan' });
+            if (success) {
+              // Langsung ke feed, di-scroll ke postingan yang baru dibagikan
+              if (setProfileForceTab) setProfileForceTab('beranda');
+              if (setShowProfileModal) setShowProfileModal(true);
+              if (newPostId && setHighlightPostId) setHighlightPostId(newPostId);
+            }
           }}
         />
       )}

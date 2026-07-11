@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Trophy, Heart, MessageCircle, Flame, Loader2, Award, Plus, Bell,
-  MoreHorizontal, Trash2, Edit3, Send, RefreshCw, Share2, X, Check, ClipboardList
+  MoreHorizontal, Trash2, Edit3, Send, RefreshCw, Share2, X, Check, ClipboardList, Search
 } from 'lucide-react';
 import {
   getGlobalFeed, getUserPosts, toggleLike, deletePost, updatePost,
   addComment, getComments, repostPost, getNotifications, sendNotification,
-  getWeeklyLeaderboard
+  getWeeklyLeaderboard, updateLeaderboardScore, getCurrentWeekId, searchUsers
 } from '../utils/communityApi';
 import { getFollowingIds, getBlockedList, blockUser } from '../utils/followApi';
 import { containsBadWords, reportPost, reportUser, getLocalHiddenPosts, getLocalBlockedUsers } from '../utils/moderationApi';
@@ -20,7 +20,7 @@ import UnifiedBadge from '../components/UnifiedBadge';
 
 import useDialog from '../hooks/useDialog';
 
-const FILTERS = ['Semua', 'Diikuti', 'Saya'];
+const FILTERS = ['Semua', 'Diikuti', 'Teman'];
 
 const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, playSoundEffect, activeFilter = 'Semua', highlightPostId = null, onClearHighlight = null }) => {
   const [feed, setFeed] = useState([]);
@@ -31,6 +31,9 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
   const [blockedIds, setBlockedIds] = useState([]);
   const [viewingProfile, setViewingProfile] = useState(null); // {userId, userName, userPhoto}
   const [leaderboard, setLeaderboard] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
   
   // per-post state
   const [likedPosts, setLikedPosts] = useState({});
@@ -48,11 +51,32 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
   const [flashingPostId, setFlashingPostId] = useState(null);
 
   useEffect(() => {
-    if (!highlightPostId || feed.length === 0) return;
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+    
+    setIsSearching(true);
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        const results = await searchUsers(searchQuery);
+        setSearchResults(results); // Allow searching self
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery, user?.uid]);
+
+  useEffect(() => {
     const el = postRefs.current[highlightPostId];
     if (el) {
       setTimeout(() => {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.scrollIntoView({ behavior: 'instant', block: 'center' });
         setFlashingPostId(highlightPostId);
         setTimeout(() => {
           setFlashingPostId(null);
@@ -74,9 +98,8 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      let data = activeFilter === 'Saya' && user?.uid
-        ? await getUserPosts(user?.uid, 30) 
-        : await getGlobalFeed(50);
+      // Teman is mutuals (or just following for now since we don't fetch followerIds yet)
+      let data = await getGlobalFeed(50);
       
       const hiddenPosts = getLocalHiddenPosts();
       const blockedUsersLocal = getLocalBlockedUsers();
@@ -89,9 +112,11 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
         p.isHidden !== true // Server-side Auto-Takedown
       );
 
-      // if filter is 'Diikuti'
       if (activeFilter === 'Diikuti' && user?.uid) {
-        data = data.filter(p => followingIds.includes(p.userId) || p.userId === user.uid);
+        data = data.filter(p => followingIds.includes(p.userId));
+      } else if (activeFilter === 'Teman' && user?.uid) {
+        // TODO: Implement mutual follow / contacts logic. For now, showing following.
+        data = data.filter(p => followingIds.includes(p.userId));
       }
       setFeed(data);
 
@@ -106,6 +131,19 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
       if (activeFilter === 'Semua') {
         const lb = await getWeeklyLeaderboard();
         setLeaderboard(lb);
+
+        // Pastikan user ini "terdaftar" di leaderboard minggu ini (skor 0 kalau belum pernah
+        // aktif) supaya dia kelihatan punya posisi dan termotivasi mempertahankannya — bukan
+        // cuma nongol begitu udah dapat poin. +0 aman diulang (tidak mereset skor asli),
+        // tapi dibatasi sekali/minggu lewat localStorage biar tidak nulis Firestore tiap buka tab.
+        if (user?.uid) {
+          const seedKey = `lyfit_lb_seeded_${getCurrentWeekId()}_${user.uid}`;
+          if (!localStorage.getItem(seedKey)) {
+            updateLeaderboardScore(user.uid, user.name || user.email?.split('@')[0], user.photoURL, 0)
+              .then(() => localStorage.setItem(seedKey, '1'))
+              .catch(() => {});
+          }
+        }
       } else {
         setLeaderboard([]);
       }
@@ -128,11 +166,11 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
     if (!postId) return;
     const el = postRefs.current[postId];
     if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.scrollIntoView({ behavior: 'instant', block: 'center' });
       setFlashingPostId(postId);
       setTimeout(() => setFlashingPostId(null), 2500);
     } else {
-      showAlert('Postingan asli tidak dapat ditemukan atau berada terlalu jauh di bawah.');
+      showAlert('Postingan tidak dapat ditemukan atau berada terlalu jauh di bawah.');
     }
   };
 
@@ -660,60 +698,102 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
           </div>
         ) : (
           <div className="flex flex-col space-y-4">
-            {/* Leaderboard Section */}
+            {/* Search Bar */}
             {activeFilter === 'Semua' && (
-              <div className={`p-4 rounded-3xl ${isDark ? 'bg-gradient-to-br from-blue-500/10 to-[#1e1c17] border border-blue-500/20' : 'bg-gradient-to-br from-blue-50 to-white border border-blue-200'} shadow-lg mb-2 relative overflow-hidden`}>
-                <div className="absolute top-0 right-0 p-3 opacity-10">
-                  <Trophy size={64} className={isDark ? 'text-blue-400' : 'text-blue-600'} />
-                </div>
-                <div className="flex items-start gap-3 mb-4 relative z-10">
-                  <div className={`p-2 rounded-xl ${isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600'}`}>
-                    <Trophy size={18} />
-                  </div>
-                  <div>
-                    <h3 className={`font-black text-sm tracking-wide ${isDark ? 'text-blue-300' : 'text-blue-700'}`}>
-                      10 Pengguna Teratas
-                    </h3>
-                    <p className={`text-[10px] font-bold ${isDark ? 'text-blue-300/60' : 'text-blue-600/70'}`}>
-                      share latihanmu ke sini dan jadilah juara!
-                    </p>
-                  </div>
+              <div className="relative mb-2">
+                <div className="relative flex items-center">
+                  <Search size={16} className={`absolute left-3 ${t.textMuted}`} />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Cari teman via username atau nama..."
+                    className={`w-full pl-9 pr-4 py-2.5 rounded-xl border font-semibold text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${isDark ? 'bg-slate-800/80 border-slate-700 text-white placeholder-slate-500' : 'bg-slate-100 border-slate-200 text-slate-800 placeholder-slate-400'}`}
+                  />
+                  {searchQuery && (
+                    <button onClick={() => setSearchQuery('')} className="absolute right-3 p-1">
+                      <X size={14} className={t.textMuted} />
+                    </button>
+                  )}
                 </div>
                 
-                <div className="flex gap-3 overflow-x-auto hide-scrollbar pt-2 pb-3 px-1 relative z-10 min-h-[80px]">
+                {/* Search Results Dropdown */}
+                {searchQuery.trim() && (
+                  <div className={`absolute top-full left-0 right-0 mt-2 z-30 rounded-xl overflow-hidden shadow-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                    {isSearching ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="animate-spin text-blue-500" size={20} />
+                      </div>
+                    ) : searchResults.length > 0 ? (
+                      <div className="max-h-60 overflow-y-auto">
+                        {searchResults.map(resultUser => (
+                          <button
+                            key={resultUser.id}
+                            onClick={() => setViewingProfile({ userId: resultUser.id, userName: resultUser.name, userPhoto: resultUser.photoUrl })}
+                            className={`w-full flex items-center gap-3 p-3 text-left transition-colors border-b last:border-b-0 ${isDark ? 'border-slate-700 hover:bg-slate-700/50' : 'border-slate-100 hover:bg-slate-50'}`}
+                          >
+                            <div className="shrink-0 w-10 h-10 rounded-full overflow-hidden border border-blue-100 dark:border-blue-900 bg-blue-50 flex items-center justify-center">
+                              {resultUser.photoUrl ? (
+                                <img src={resultUser.photoUrl} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <span className="font-black text-blue-500 text-sm">{resultUser.name?.charAt(0).toUpperCase()}</span>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className={`font-bold text-sm truncate ${t.textMain}`}>{resultUser.name}</p>
+                              {resultUser.username && (
+                                <p className={`text-[11px] truncate ${t.textMuted}`}>@{resultUser.username}</p>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="py-4 text-center">
+                        <p className={`text-xs font-semibold ${t.textMuted}`}>Tidak ditemukan "{searchQuery}"</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Leaderboard Section */}
+            {activeFilter === 'Semua' && (
+              <div className={`-mx-4 -mt-3 mb-2 border-b ${t.navBg} ${t.border} flex flex-col`}>
+                <div className={`px-4 py-2 border-b border-dashed ${isDark ? 'border-slate-700/50' : 'border-slate-200'} flex items-center gap-2`}>
+                  <Trophy size={14} className="text-yellow-500" />
+                  <span className={`text-[11px] font-black uppercase tracking-wider ${t.textMain}`}>Leaderboard Minggu Ini</span>
+                </div>
+                <div className={`px-4 py-3 flex items-center gap-3 overflow-x-auto hide-scrollbar`}>
                   {leaderboard.length === 0 ? (
-                    <div className={`w-full flex flex-col items-center justify-center py-4 text-center ${isDark ? 'text-blue-400/60' : 'text-blue-600/60'}`}>
-                      <Award size={24} className="mb-2 opacity-50" />
-                      <p className="text-xs font-bold">Jadilah yang pertama membagikan latihanmu sekarang!</p>
-                    </div>
-                  ) : (
-                    leaderboard.map((lbUser, idx) => (
-                      <button 
-                        key={lbUser.id}
-                        onClick={() => setViewingProfile({ userId: lbUser.id, userName: lbUser.name, userPhoto: lbUser.photoUrl })}
-                        className="flex flex-col items-center gap-1.5 shrink-0 group relative"
-                      >
-                        <div className="relative">
-                          <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-cyan-300 via-blue-500 to-indigo-600 opacity-60 blur-[2px] group-hover:opacity-100 transition-opacity" />
-                          <div className={`relative p-[2px] bg-${isDark ? 'slate-800' : 'white'} rounded-full z-10`}>
-                            {lbUser.photoUrl ? (
-                              <img src={lbUser.photoUrl} alt="" className="w-12 h-12 rounded-full object-cover" />
-                            ) : (
-                              <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-black text-lg">
-                                {(lbUser.name || '?').charAt(0).toUpperCase()}
-                              </div>
-                            )}
+                    <span className={`text-[11px] font-bold ${t.textMuted}`}>Share latihanmu dan jadilah juara minggu ini!</span>
+                ) : (
+                  leaderboard.map((lbUser, idx) => (
+                    <button
+                      key={lbUser.id}
+                      onClick={() => setViewingProfile({ userId: lbUser.id, userName: lbUser.name, userPhoto: lbUser.photoUrl })}
+                      className="flex flex-col items-center gap-1 shrink-0"
+                      title={lbUser.name}
+                    >
+                      <div className="relative">
+                        {lbUser.photoUrl ? (
+                          <img src={lbUser.photoUrl} alt="" className="w-9 h-9 rounded-full object-cover border-2 border-blue-400" />
+                        ) : (
+                          <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-black text-sm border-2 border-blue-400">
+                            {(lbUser.name || '?').charAt(0).toUpperCase()}
                           </div>
-                          <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center text-[10px] font-black z-20 border-2 border-white dark:border-slate-800">
-                            {idx + 1}
-                          </div>
+                        )}
+                        <div className={`absolute -bottom-1 -right-1 w-4 h-4 bg-blue-500 text-white rounded-full flex items-center justify-center text-[9px] font-black border ${isDark ? 'border-slate-900' : 'border-white'}`}>
+                          {idx + 1}
                         </div>
-                        <span className={`text-[10px] font-bold max-w-[60px] truncate ${isDark ? 'text-white/80' : 'text-black/80'}`}>
-                          {lbUser.name}
-                        </span>
-                      </button>
-                    ))
-                  )}
+                      </div>
+                      <span className={`text-[9px] font-bold max-w-[44px] truncate ${isDark ? 'text-white/70' : 'text-black/70'}`}>
+                        {lbUser.name}
+                      </span>
+                    </button>
+                  ))
+                )}
                 </div>
               </div>
             )}
@@ -747,10 +827,15 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
           theme={theme}
           t={t}
           postDataOverrides={createPostOverrides}
-          onClose={(shouldRefresh) => {
+          onClose={(shouldRefresh, newPostId) => {
             setIsCreatingPost(false);
             setCreatePostOverrides({});
-            if (shouldRefresh) loadData();
+            if (shouldRefresh) {
+              loadData().then(() => {
+                // Scroll ke postingan yang baru dibuat, biar user yakin udah kekirim
+                if (newPostId) setTimeout(() => scrollToPost(newPostId), 300);
+              });
+            }
           }}
         />
       )}
@@ -764,7 +849,12 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
           isDark={isDark}
           t={t}
           leaderboardRank={leaderboard.findIndex(u => u.id === viewingProfile.userId) + 1}
+          leaderboardScore={leaderboard.find(u => u.id === viewingProfile.userId)?.score}
           onClose={() => setViewingProfile(null)}
+          onNavigateToPost={(postId) => {
+            setViewingProfile(null);
+            scrollToPost(postId);
+          }}
         />
       )}
 

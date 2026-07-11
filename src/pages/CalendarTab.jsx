@@ -6,6 +6,7 @@ import { formatNumber } from '../utils/numberFormat';
 import { parseWorkoutDurationMinutes, calculateWorkoutCalories } from '../utils/workoutCalc';
 import PanoramicSlider from '../components/PanoramicSlider';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { getRaigaNotification } from '../utils/aiAgent';
 
 const CalendarTab = ({
   t, lang, theme, history, setHistory, programs,
@@ -13,7 +14,7 @@ const CalendarTab = ({
   setActiveTab, soundEnabled, playSoundEffect, navigateToWorkoutDate,
   exerciseLogs, skippedExercises, handleEditPastWorkout,
   weekStartDay = 0, defaultReminderTime = "15:00", reminderEnabled = true,
-  unitSystem, setConfirmModal, activePlanIds = [], userProfile
+  unitSystem, setConfirmModal, activePlanIds = [], userProfile, raigaPersona = 'santai'
 }) => {
   const isImp = unitSystem === 'imperial';
   const [calendarDate, setCalendarDate] = useState(() => {
@@ -442,26 +443,30 @@ const CalendarTab = ({
       if (prepTime.getTime() >= Date.now()) {
         const id1 = Math.floor(Math.random() * 1000000);
         notifIds.push(id1);
+        const copy = getRaigaNotification('prep', raigaPersona, { program: programName });
         notifs.push({
-          title: "Persiapan Latihan! 🏋️",
-          body: `Jadwal ${programName} dimulai 30 menit lagi. Yuk bersiap-siap!`,
+          title: copy.title,
+          body: copy.body,
           id: id1,
           schedule: { at: prepTime },
           actionTypeId: "",
-          extra: null
+          extra: null,
+          largeIcon: 'coach_raiga_avatar'
         });
       }
 
       if (targetTime.getTime() >= Date.now()) {
         const id2 = Math.floor(Math.random() * 1000000);
         notifIds.push(id2);
+        const copy = getRaigaNotification('start', raigaPersona, { program: programName });
         notifs.push({
-          title: "Waktunya Latihan! 🏋️",
-          body: `Hari ini jadwalmu: ${programName}. Yuk mulai sesimu sekarang!`,
+          title: copy.title,
+          body: copy.body,
           id: id2,
           schedule: { at: targetTime },
           actionTypeId: "",
-          extra: null
+          extra: null,
+          largeIcon: 'coach_raiga_avatar'
         });
       }
 

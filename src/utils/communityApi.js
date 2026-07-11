@@ -91,8 +91,9 @@ export const shareWorkoutToFeed = async (userId, userName, userPhoto, workoutDat
       likedBy: [],
       commentCount: 0,
     });
-    // Add +1 Leaderboard Score for posting a workout
-    await updateLeaderboardScore(userId, userName, userPhoto, 1);
+    // Sesi latihan beneran dihargai lebih tinggi dari sekadar posting/share (lihat
+    // updateLeaderboardScore call lain: createCommunityPost/shareAchievementToFeed/repostPost = +1)
+    await updateLeaderboardScore(userId, userName, userPhoto, 3);
   } catch (err) {
     console.error("Gagal share ke feed:", err);
   }
@@ -101,7 +102,7 @@ export const shareWorkoutToFeed = async (userId, userName, userPhoto, workoutDat
 // ─── Create Community Post ────────────────────────────────────────────────────
 export const createCommunityPost = async (userId, userName, userPhoto, postData) => {
   try {
-    await addDoc(collection(db, 'community_posts'), {
+    const docRef = await addDoc(collection(db, 'community_posts'), {
       userId,
       userName: userName || 'Anonim',
       userPhoto: userPhoto || null,
@@ -131,6 +132,9 @@ export const createCommunityPost = async (userId, userName, userPhoto, postData)
     if (postData.type === 'repost' && postData.originalUserId && postData.originalUserId !== userId) {
       await sendNotification(postData.originalUserId, { type: 'repost', fromUserId: userId, fromUserName: userName, fromUserPhoto: userPhoto, postId: postData.originalPostId });
     }
+    // Post/share biasa tetap dihargai, tapi lebih kecil dari sesi latihan beneran (shareWorkoutToFeed = +3)
+    await updateLeaderboardScore(userId, userName, userPhoto, 1);
+    return docRef.id;
   } catch (err) {
     console.error("Gagal membuat postingan:", err);
     throw err;
@@ -185,7 +189,7 @@ export const toggleLike = async (postId, userId, postOwnerId, fromUserName = nul
 // --- Repost -------------------------------------------------------------------
 export const repostPost = async (userId, userName, userPhoto, originalPost, caption = '') => {
   try {
-    await addDoc(collection(db, 'community_posts'), {
+    const docRef = await addDoc(collection(db, 'community_posts'), {
       userId,
       userName: userName || 'Anonim',
       userPhoto: userPhoto || null,
@@ -206,6 +210,8 @@ export const repostPost = async (userId, userName, userPhoto, originalPost, capt
     if (originalPost.userId !== userId) {
       await sendNotification(originalPost.userId, { type: 'repost', fromUserId: userId, fromUserName: userName, fromUserPhoto: userPhoto, postId: originalPost.id });
     }
+    await updateLeaderboardScore(userId, userName, userPhoto, 1);
+    return docRef.id;
   } catch (err) {
     console.error("Gagal repost:", err);
     throw err;
@@ -358,6 +364,7 @@ export const shareAchievementToFeed = async (userId, userName, userPhoto, achiev
       likes: 0, likedBy: [], commentCount: 0,
       timestamp: serverTimestamp()
     });
+    await updateLeaderboardScore(userId, userName, userPhoto, 1);
     return docRef.id;
   } catch (err) {
     console.error("Gagal share achievement:", err);
@@ -380,7 +387,7 @@ export const getSharedTemplates = async (limitCount = 20) => {
 // ─── Update User Profile in Feed ──────────────────────────────────────────────
 
 // ─── Update User Profile in Feed ──────────────────────────────────────────────
-export const updateUserProfileInFeed = async (userId, newName, newPhoto) => {
+export const updateUserProfileInFeed = async (userId, newName, newPhoto, newUsername, newGender, newAge) => {
   if (!userId) return;
   try {
     // 1. Update community_users (Use set with merge because document might not exist)
@@ -388,8 +395,29 @@ export const updateUserProfileInFeed = async (userId, newName, newPhoto) => {
     const userUpdate = {};
     if (newName !== undefined) userUpdate.name = newName;
     if (newPhoto !== undefined) userUpdate.photoUrl = newPhoto;
+    if (newUsername !== undefined) userUpdate.username = newUsername;
+    // Hanya gender + usia (angka hasil hitung) yang dipublikasikan — tanggal lahir asli
+    // tetap privat di users/{uid} dan sengaja tidak pernah disalin ke sini.
+    if (newGender !== undefined) userUpdate.gender = newGender;
+    if (newAge !== undefined) userUpdate.age = newAge;
     if (Object.keys(userUpdate).length > 0) {
       await setDoc(userRef, userUpdate, { merge: true });
+    }
+
+    // 1.5 Update leaderboard for the current week
+    if (Object.keys(userUpdate).length > 0) {
+      const weekId = getCurrentWeekId();
+      const lbRef = doc(db, 'leaderboards', weekId);
+      const lbSnap = await getDoc(lbRef);
+      if (lbSnap.exists()) {
+        const lbData = lbSnap.data();
+        if (lbData.scores && lbData.scores[userId]) {
+           const lbUpdate = {};
+           if (newName !== undefined) lbUpdate[`scores.${userId}.name`] = newName;
+           if (newPhoto !== undefined) lbUpdate[`scores.${userId}.photoUrl`] = newPhoto;
+           if (Object.keys(lbUpdate).length > 0) await updateDoc(lbRef, lbUpdate);
+        }
+      }
     }
 
     // 2. Update all posts in community_posts — WriteBatch maksimal 500 operasi, pecah per 450
@@ -410,5 +438,57 @@ export const updateUserProfileInFeed = async (userId, newName, newPhoto) => {
   }
 };
 
+export const searchUsers = async (searchQuery) => {
+  if (!searchQuery) return [];
+  const qStr = searchQuery.toLowerCase().replace(/^@/, '').trim();
+  if (!qStr) return [];
+  
+  try {
+    const usersRef = collection(db, 'community_users');
+    const resultsMap = new Map();
 
+    // 1. Search by username (lowercase)
+    const usernameQ = query(usersRef, where('username', '>=', qStr), where('username', '<=', qStr + '\uf8ff'), limit(10));
+    const snap1 = await getDocs(usernameQ);
+    snap1.forEach(doc => {
+      const data = doc.data();
+      resultsMap.set(doc.id, { id: doc.id, name: data.name || 'Pengguna', photoUrl: data.photoUrl || data.photoURL || null, username: data.username || null });
+    });
 
+    // 2. Search by name (Capitalized First Letter)
+    const capitalizedQ = qStr.charAt(0).toUpperCase() + qStr.slice(1);
+    const nameQ = query(usersRef, where('name', '>=', capitalizedQ), where('name', '<=', capitalizedQ + '\uf8ff'), limit(10));
+    const snap2 = await getDocs(nameQ);
+    snap2.forEach(doc => {
+      if (!resultsMap.has(doc.id)) {
+        const data = doc.data();
+        resultsMap.set(doc.id, { id: doc.id, name: data.name || 'Pengguna', photoUrl: data.photoUrl || data.photoURL || null, username: data.username || null });
+      }
+    });
+
+    return Array.from(resultsMap.values());
+  } catch (err) {
+    console.error("Gagal search user:", err);
+    return [];
+  }
+};
+
+export const getUserWeeklyScoreAndRank = async (userId) => {
+  try {
+    const weekId = getCurrentWeekId();
+    const lbRef = doc(db, 'leaderboards', weekId);
+    const snap = await getDoc(lbRef);
+    if (!snap.exists()) return { score: 0, rank: 0 };
+    const scores = snap.data().scores || {};
+    const myScore = scores[userId]?.score || 0;
+    
+    let rank = 1;
+    for (const uid in scores) {
+      if (scores[uid].score > myScore) rank++;
+    }
+    return { score: myScore, rank };
+  } catch (err) {
+    console.error("Gagal get user score:", err);
+    return { score: 0, rank: 0 };
+  }
+};

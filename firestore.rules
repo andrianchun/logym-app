@@ -31,6 +31,11 @@ service cloud.firestore {
       match /history_years/{year} {
         allow read, write: if isOwner(uid);
       }
+
+      // Sesi chat Coach Raiga — satu dokumen per sesi, hanya pemiliknya yang boleh akses.
+      match /ai_sessions/{sessionId} {
+        allow read, write: if isOwner(uid);
+      }
     }
 
     // Dokumen legacy — tidak lagi ditulis kecuali saat proses hapus akun (oleh pemiliknya sendiri).
@@ -65,6 +70,12 @@ service cloud.firestore {
         allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
         allow update, delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       }
+    }
+
+    match /usernames/{username} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if isSignedIn() && resource.data.uid == request.auth.uid;
     }
 
     // Notifikasi: penerima yang berhak baca/tandai-dibaca; pengirim (siapa saja yang login)

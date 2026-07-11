@@ -8,7 +8,7 @@ import useDialog from '../hooks/useDialog';
 import GymManagerModal from '../components/GymManagerModal';
 import { getPlanBgConfig } from '../utils/planBg';
 
-const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, soundEnabled, gymProfiles, setGymProfiles, activeGymId, setActiveGymId, exerciseLibrary, units, user, userApiKeys, aiProvider, aiModel, keyStatuses, setKeyStatuses, setAiProvider, setAiModel, setShowSettings }) => {
+const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, soundEnabled, gymProfiles, setGymProfiles, activeGymId, setActiveGymId, exerciseLibrary, units, user, userProfile, userApiKeys, aiProvider, aiModel, keyStatuses, setKeyStatuses, setAiProvider, setAiModel, setShowSettings }) => {
   const [step, setStep] = useState(0);
   const [useAI, setUseAI] = useState(false);
   
@@ -25,18 +25,18 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
   };
 
   const [answers, setAnswers] = useState({
-    name: user?.displayName?.split(' ')[0] || '',
-    gender: null,
-    dob: '',
-    height: 170,
+    name: userProfile?.name || user?.displayName?.split(' ')[0] || '',
+    gender: userProfile?.gender || null,
+    dob: userProfile?.dob || '',
+    height: userProfile?.height || 170,
     heightFt: 5,
     heightIn: 7,
-    weight: 70,
-    targetWeight: 65,
-    goal: null,
-    experience: null,
-    activityLevel: null,
-    days: [], // Now an array of selected days
+    weight: userProfile?.weight || 70,
+    targetWeight: userProfile?.targetWeight || 65,
+    goal: userProfile?.goal || null,
+    experience: userProfile?.experience || null,
+    activityLevel: userProfile?.activityLevel || null,
+    days: [],
     equipment: null,
     duration: null
   });
@@ -100,7 +100,22 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
     if (isOpen) {
       setStep(0);
       setUseAI(false);
-      setAnswers({ name: user?.displayName?.split(' ')[0] || '', gender: null, dob: '', height: 170, heightFt: 5, heightIn: 7, weight: isImp ? 150 : 70, targetWeight: isImp ? 140 : 65, goal: null, experience: null, activityLevel: null, days: [], equipment: null, duration: null });
+      setAnswers({ 
+          name: userProfile?.name || user?.displayName?.split(' ')[0] || '', 
+          gender: userProfile?.gender || null, 
+          dob: userProfile?.dob || '', 
+          height: userProfile?.height || 170, 
+          heightFt: 5, 
+          heightIn: 7, 
+          weight: userProfile?.weight || (isImp ? 150 : 70), 
+          targetWeight: userProfile?.targetWeight || (isImp ? 140 : 65), 
+          goal: userProfile?.goal || null, 
+          experience: userProfile?.experience || null, 
+          activityLevel: userProfile?.activityLevel || null, 
+          days: [], 
+          equipment: null, 
+          duration: null 
+      });
       setIsGenerating(false);
       setRecommendedPlan(null);
     }
