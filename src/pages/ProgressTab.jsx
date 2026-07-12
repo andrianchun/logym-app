@@ -268,9 +268,17 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
      }
   }, [chartDataObj, selectedDate, activeChartLines]);
 
-  useEffect(() => { 
+  useEffect(() => {
     if (isSubCard) return;
-    
+
+    // Kalau pilihan yang ada sekarang (dari localStorage atau klik manual user) masih relevan
+    // buat chartType saat ini, JANGAN ditimpa — sebelumnya efek ini rerun tiap history/programs
+    // berubah dan selalu reset balik ke "latihan aktif hari ini", jadi toggle user kerasa
+    // "kacau" ke-reset terus. Auto-pilih default cuma kalau selection kosong atau sudah gak
+    // nyambung sama sekali (misal abis ganti tab Per Latihan/Per Otot).
+    const stillRelevant = activeChartLines.length > 0 && activeChartLines.some(item => chartDataObj.items.includes(item));
+    if (stillRelevant) return;
+
     let activeItems = [];
     const todayStr = selectedDate || getLocalYMD(new Date());
 
@@ -466,13 +474,24 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
 
   const chartWidth = calculateChartWidth(pointWidth);
 
-  const toggleChartLine = (item) => { 
-    playSoundEffect('click', soundEnabled); 
+  const [limitHintVisible, setLimitHintVisible] = useState(false);
+  const limitHintTimeoutRef = useRef(null);
+  useEffect(() => () => { if (limitHintTimeoutRef.current) clearTimeout(limitHintTimeoutRef.current); }, []);
+
+  const toggleChartLine = (item) => {
+    playSoundEffect('click', soundEnabled);
     setActiveChartLines(prev => {
         if (prev.includes(item)) return prev.filter(i => i !== item);
-        if (prev.length >= 6) return [...prev.slice(1), item];
-        return [...prev, item];
-    }); 
+        if (prev.length >= 6) {
+            // Jangan auto-lepas yang paling lama — user harus manual matiin salah satu dulu.
+            // Cuma kasih hint kecil sebentar, bukan block diam-diam.
+            setLimitHintVisible(true);
+            if (limitHintTimeoutRef.current) clearTimeout(limitHintTimeoutRef.current);
+            limitHintTimeoutRef.current = setTimeout(() => setLimitHintVisible(false), 2000);
+            return prev;
+        }
+        return [...prev, item]; // ditaruh di akhir -> render-nya jadi paling kanan-bawah di antara yang aktif
+    });
   };
 
   const isImp = units?.weight === 'lbs';
@@ -578,8 +597,22 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                  ))}
              </div>
         ) : (
-            <div key={chartType} className="grid grid-rows-2 grid-flow-col gap-2 overflow-x-auto pb-2 hide-scrollbar auto-cols-max no-swipe" style={{ WebkitOverflowScrolling: 'touch' }} onTouchStart={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
-              {chartDataObj.items.map((item, idx) => {
+            <div className="no-swipe">
+            {/* Tinggi selalu dicadangkan (toggle lewat opacity, bukan conditional render) biar
+                ukuran kartu gak goyang pas hint muncul/hilang. */}
+            <div className={`text-[10px] font-bold mb-1.5 h-3.5 leading-none ${t.textMuted} transition-opacity duration-200 ${limitHintVisible ? 'opacity-100' : 'opacity-0'}`}>
+                Maksimal pilih 6 item — matikan salah satu dulu.
+            </div>
+            <div key={chartType} className="grid grid-rows-2 grid-flow-col gap-2 overflow-x-auto pb-2 hide-scrollbar auto-cols-max" style={{ WebkitOverflowScrolling: 'touch' }} onTouchStart={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
+              {/* Aktif dikumpulkan ke kiri, urutannya ngikutin urutan aktivasi di activeChartLines
+                  (baru diaktifkan = ditaruh paling akhir di grup aktif = kanan-bawah). Sisanya
+                  (yang belum aktif) tetap di urutan asli chartDataObj.items. Warna tetap dikunci
+                  ke index asli biar konsisten sama warna garis di grafik. */}
+              {[
+                ...activeChartLines.filter(item => chartDataObj.items.includes(item)),
+                ...chartDataObj.items.filter(item => !activeChartLines.includes(item))
+              ].map((item) => {
+                 const idx = chartDataObj.items.indexOf(item);
                  const isActive = activeChartLines.includes(item);
                  return (
                    <button key={item} onClick={() => toggleChartLine(item)} className="px-3 py-1.5 rounded-full caption font-black transition-all border active:scale-95 whitespace-nowrap snap-start flex items-center justify-center h-8" style={{ backgroundColor: isActive ? chartColors[idx % chartColors.length] : 'transparent', borderColor: chartColors[idx % chartColors.length], color: isActive ? '#fff' : chartColors[idx % chartColors.length], opacity: isActive ? 1 : 0.5 }}>
@@ -587,6 +620,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                    </button>
                  )
               })}
+            </div>
             </div>
         )}
         

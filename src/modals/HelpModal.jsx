@@ -5,7 +5,7 @@ const HelpModal = ({ showHelp, setShowHelp, t, lang }) => {
   if (!showHelp) return null;
 
   return (
-    <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in`} onClick={() => setActiveHelp(null)}>
+    <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in`} onClick={() => setShowHelp(false)}>
         <div className={`w-full max-w-md mx-auto ${t.bgCard} rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 border ${t.border} p-5 pb-5`} onClick={e => e.stopPropagation()}>
             
             <div className="flex justify-between items-center mb-4 shrink-0">

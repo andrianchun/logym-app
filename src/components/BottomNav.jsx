@@ -25,7 +25,7 @@ const BottomNav = ({ t, lang, activeTab, setActiveTab, setIsEditingMode, soundEn
             <button
               key={tab.id}
               onClick={() => handleTabClick(tab.id)}
-              className={`relative flex items-center justify-center h-[52px] rounded-[22px] transition-all duration-300 border ${isActive ? `flex-1 ${t.bgAccentSoft} ${t.borderAccentSoft} px-3` : 'w-[52px] bg-transparent border-transparent'} group`}
+              className={`relative flex items-center justify-center h-[52px] rounded-[22px] transition-all duration-300 border ${isActive ? `flex-1 ${t.bgAccentSoft} ${t.navBorderActive} px-3` : 'w-[52px] bg-transparent border-transparent'} group`}
             >
               <span className={`flex items-center justify-center transition-all duration-300 ${isActive ? t.navIconActive : t.navIconInactive + ' group-hover:' + t.textMuted}`}>
                 <tab.icon size={22} strokeWidth={isActive ? 2.5 : 2} className="shrink-0" />

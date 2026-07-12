@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Moon, Sun, Globe, Volume2, VolumeX, Timer, Download, Upload, CalendarDays, Bell, BellOff, Clock, Activity, Scale, Ruler, Thermometer, Database, Trash2, Plus, MessageCircle, Brain } from 'lucide-react';
+import { X, Moon, Sun, Globe, Volume2, VolumeX, Timer, Download, Upload, CalendarDays, Bell, BellOff, Clock, Activity, Scale, Ruler, Thermometer, Database, Trash2, Plus, MessageCircle, Brain, HelpCircle, ChevronDown } from 'lucide-react';
 import SwipeInput from '../components/SwipeInput';
 import { AI_MODELS, PERSONA_PRESETS } from '../utils/aiAgent';
 
@@ -24,6 +24,7 @@ export default function SettingsModal({
   connectedApps, setConnectedApps
 }) {
   const [activeTab, setActiveTab] = useState('preferensi');
+  const [openFaqIndex, setOpenFaqIndex] = useState(null);
   const [prevShowSettings, setPrevShowSettings] = useState(showSettings);
 
   if (showSettings !== prevShowSettings) {
@@ -35,11 +36,31 @@ export default function SettingsModal({
               if (el) el.scrollIntoView({ behavior: 'smooth' });
           }, 300);
       } else if (showSettings === 'satuan') {
-          setActiveTab('satuan');
+          // Satuan Unit sekarang jadi bagian bawah tab Preferensi (digabung), bukan tab sendiri.
+          setActiveTab('preferensi');
+          setTimeout(() => {
+              const el = document.getElementById('satuan-unit-settings');
+              if (el) el.scrollIntoView({ behavior: 'smooth' });
+          }, 300);
       } else if (showSettings === true) {
           setActiveTab('preferensi');
       }
   }
+
+  const FAQ_ITEMS = [
+      { q: 'Bagaimana cara sinkronisasi data antar HP dan laptop?', a: 'Cukup login pakai email & sandi yang sama di semua perangkat. Data otomatis tersinkron lewat cloud dalam hitungan detik, gak perlu langkah tambahan.' },
+      { q: 'Bagaimana cara mengubah angka set/reps/beban dengan cepat?', a: 'Klik sekali di kolom angkanya (set, reps, atau beban), lalu geser (swipe) ke atas/bawah buat mengubah nilainya. Angka akan menyala saat berubah.' },
+      { q: 'Bagaimana cara menata ulang urutan latihan atau program?', a: 'Masuk ke Mode Edit lewat ikon pensil di sebelah nama program, lalu tahan dan geser ikon titik-titik untuk mengurutkan ulang.' },
+      { q: 'Latihan yang saya cari tidak ada di Database, gimana?', a: 'Buka tab Database, cari opsi tambah/kelola latihan — kamu bisa buat exercise custom sendiri lengkap dengan target otot dan link YouTube.' },
+      { q: 'Bagaimana cara mengisi jadwal minggu ini otomatis seperti minggu lalu?', a: 'Di tab Kalender, pakai tombol "+ Ulangi 7 Hari Lalu" untuk menyalin jadwal minggu sebelumnya ke minggu ini secara otomatis.' },
+      { q: 'Apa itu Coach Raiga dan bagaimana cara pakainya?', a: 'Coach Raiga adalah AI personal trainer bawaan app. Ajak ngobrol soal progres latihanmu, minta dibuatkan program baru, atau minta ubah program yang sudah aktif langsung lewat chat (misal "naikkan beban bench di Push Day"). Gaya bicaranya bisa diganti (santai/galak/serius/custom) di tab Lanjutan.' },
+      { q: 'Bisa gak scan otomatis hasil timbangan pintar?', a: 'Bisa — di kartu Komposisi Tubuh Dashboard ada opsi upload/scan foto hasil aplikasi timbangan pintar (Zepp Life, Mi Fit, Garmin, Huawei Health, dll), AI akan otomatis membaca angkanya.' },
+      { q: 'Bagaimana cara pakai fitur Komunitas?', a: 'Kamu bisa share progres latihan atau pencapaian ke feed, follow user lain, cari user lewat username, dan pantau leaderboard skor sosial mingguan.' },
+      { q: 'Grafik Progres Latihan bisa difilter?', a: 'Bisa — toggle tampilan per exercise atau per kelompok otot, maksimal 6 item ditampilkan bersamaan dalam satu grafik.' },
+      { q: 'Bagaimana cara mengatur pengingat latihan?', a: 'Buka tab Lanjutan, atur jam pengingat default dan aktifkan notifikasinya di sana.' },
+      { q: 'Data saya aman gak kalau ganti HP?', a: 'Aman — selain sinkron otomatis lewat akun, kamu juga bisa backup manual (export/import file JSON) di tab Lanjutan sebagai cadangan tambahan.' },
+      { q: 'Bagaimana cara ganti tema, bahasa, atau satuan (kg/lbs, cm/ft, dll)?', a: 'Semua ada di tab Preferensi ini — gulir ke atas untuk Tema/Bahasa/Suara, dan ke bawah untuk Satuan & Unit.' },
+  ];
 
   if (!showSettings) return null;
 
@@ -69,7 +90,7 @@ export default function SettingsModal({
       {/* Tabs */}
       <div className={`flex border-b ${t.border} px-2 shrink-0 overflow-x-auto no-scrollbar`}>
           <button onClick={() => setActiveTab('preferensi')} className={`flex-1 py-3 text-sm font-bold border-b-2 whitespace-nowrap px-4 transition-colors ${activeTab === 'preferensi' ? `border-[#3b82f6] ${t.textMain}` : `border-transparent ${t.textMuted}`}`}>Preferensi</button>
-          <button onClick={() => setActiveTab('satuan')} className={`flex-1 py-3 text-sm font-bold border-b-2 whitespace-nowrap px-4 transition-colors ${activeTab === 'satuan' ? `border-[#3b82f6] ${t.textMain}` : `border-transparent ${t.textMuted}`}`}>Satuan Unit</button>
+          <button onClick={() => setActiveTab('faq')} className={`flex-1 py-3 text-sm font-bold border-b-2 whitespace-nowrap px-4 transition-colors ${activeTab === 'faq' ? `border-[#3b82f6] ${t.textMain}` : `border-transparent ${t.textMuted}`}`}>FAQ</button>
           <button onClick={() => setActiveTab('lanjutan')} className={`flex-1 py-3 text-sm font-bold border-b-2 whitespace-nowrap px-4 transition-colors ${activeTab === 'lanjutan' ? `border-[#3b82f6] ${t.textMain}` : `border-transparent ${t.textMuted}`}`}>Lanjutan</button>
       </div>
 
@@ -130,19 +151,18 @@ export default function SettingsModal({
                     <span className="font-bold">Awal Minggu</span>
                 </div>
                 <div className={`relative flex w-32 p-1 rounded-full ${t.btnBg} shrink-0`}>
-                    <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full transition-transform duration-300 ease-out ${t.bgAccent} shadow-sm`} style={{ transform: weekStartDay === 1 ? 'translateX(100%)' : 'translateX(0)', left: '4px' }}></div>
-                    <button onClick={() => setWeekStartDay(0)} className={`flex flex-1 justify-center items-center py-1.5 rounded-full relative z-10 transition-colors duration-300 ${weekStartDay === 0 ? 'text-white' : t.textMuted} text-xs font-bold`}>Minggu</button>
+                    <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full transition-transform duration-300 ease-out ${t.bgAccent} shadow-sm`} style={{ transform: weekStartDay === 0 ? 'translateX(100%)' : 'translateX(0)', left: '4px' }}></div>
                     <button onClick={() => setWeekStartDay(1)} className={`flex flex-1 justify-center items-center py-1.5 rounded-full relative z-10 transition-colors duration-300 ${weekStartDay === 1 ? 'text-white' : t.textMuted} text-xs font-bold`}>Senin</button>
+                    <button onClick={() => setWeekStartDay(0)} className={`flex flex-1 justify-center items-center py-1.5 rounded-full relative z-10 transition-colors duration-300 ${weekStartDay === 0 ? 'text-white' : t.textMuted} text-xs font-bold`}>Minggu</button>
                 </div>
                 </div>
             </div>
 
-          </div>
-        )}
+            {/* Separator — Satuan & Unit digabung ke tab yang sama, dipisah judul & spacing */}
+            <p id="satuan-unit-settings" className={`body-md ${t.textMuted} uppercase tracking-wider pt-2`}>
+                Satuan & Unit
+            </p>
 
-        {/* TAB 2: SATUAN UNIT */}
-        {activeTab === 'satuan' && (
-          <div className="space-y-4 animate-in fade-in duration-300">
             <div className={`p-4 rounded-2xl border ${t.border} ${t.bgCard} space-y-2`}>
                 {/* Berat Badan */}
                 <div className="flex justify-between items-center py-2">
@@ -213,20 +233,49 @@ export default function SettingsModal({
           </div>
         )}
 
+        {/* TAB: FAQ */}
+        {activeTab === 'faq' && (
+          <div className="space-y-4 animate-in fade-in duration-300">
+            <div className={`p-4 rounded-2xl border ${t.border} ${t.bgCard}`}>
+                <p className={`body-md ${t.textMuted} uppercase tracking-wider mb-3 flex items-center gap-2`}>
+                    <HelpCircle size={16} /> Pertanyaan Umum
+                </p>
+                <div className="space-y-1">
+                    {FAQ_ITEMS.map((item, i) => (
+                        <div key={i} className={`border-t ${i === 0 ? 'border-transparent' : 'border-black/5 dark:border-white/5'}`}>
+                            <button
+                                onClick={() => setOpenFaqIndex(openFaqIndex === i ? null : i)}
+                                className="w-full flex items-center justify-between gap-3 py-3 text-left"
+                            >
+                                <span className={`font-bold text-sm ${t.textMain}`}>{item.q}</span>
+                                <ChevronDown size={16} className={`shrink-0 ${t.textMuted} transition-transform duration-200 ${openFaqIndex === i ? 'rotate-180' : ''}`} />
+                            </button>
+                            {openFaqIndex === i && (
+                                <p className={`text-xs ${t.textMuted} leading-relaxed pb-3 pr-6 animate-in fade-in duration-200`}>
+                                    {item.a}
+                                </p>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </div>
+          </div>
+        )}
+
         {/* TAB 3: LANJUTAN */}
         {activeTab === 'lanjutan' && (
           <div className="space-y-4 animate-in fade-in duration-300">
-            {/* AI AGENT SETTINGS */}
+            {/* API UNTUK AI */}
             <div id="ai-agent-settings" className={`p-4 rounded-2xl border ${t.border} ${t.bgCard} space-y-3`}>
                 <p className={`body-md ${t.textMuted} uppercase tracking-wider mb-2 flex items-center gap-2`}>
-                <Activity size={16} /> Agentic AI & Coach Settings
+                <Activity size={16} /> API untuk AI
                 </p>
-                
+
                 <div className="space-y-3">
                     <div className="space-y-2">
                         {(userApiKeys || []).map((key, index) => (
                             <div key={index} className="flex items-center gap-2">
-                                <input 
+                                <input
                                     type="password"
                                     value={key}
                                     onChange={(e) => {
@@ -240,7 +289,7 @@ export default function SettingsModal({
                                     data-1p-ignore="true"
                                     className={`flex-1 font-mono text-sm px-4 py-2.5 rounded-xl outline-none border ${t.border} focus:ring-2 ${t.ringAccent} ${t.inputBg} ${t.textMain}`}
                                 />
-                                <button 
+                                <button
                                     onClick={() => {
                                         const newKeys = [...(userApiKeys || [])];
                                         newKeys.splice(index, 1);
@@ -252,7 +301,7 @@ export default function SettingsModal({
                                 </button>
                             </div>
                         ))}
-                        <button 
+                        <button
                             onClick={() => setUserApiKeys([...(userApiKeys || []), ''])}
                             className={`w-full py-2.5 rounded-xl border border-dashed ${t.borderDashed} ${t.btnBg} ${t.textMain} font-bold text-sm flex items-center justify-center gap-2 transition-colors`}
                         >
@@ -260,12 +309,22 @@ export default function SettingsModal({
                         </button>
                     </div>
                     <p className={`text-[10px] ${t.textMuted} leading-tight mt-2`}>
-                        API Key wajib diisi agar fitur AI Coach berfungsi penuh secara gratis. Anda bebas memasukkan sebanyak mungkin API key campuran (Gemini, ChatGPT, Claude), sistem akan otomatis mendeteksinya. <br/><br/>
-                        Daftar API Gratis:<br/>
-                        - <a href="https://aistudio.google.com" target="_blank" rel="noreferrer" className="text-blue-500 underline font-bold">Google AI Studio</a> (Gemini)<br/>
-                        - <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" className="text-blue-500 underline font-bold">OpenAI Platform</a> (ChatGPT)<br/>
-                        - <a href="https://console.anthropic.com/" target="_blank" rel="noreferrer" className="text-blue-500 underline font-bold">Anthropic Console</a> (Claude)
+                        Silakan diisi untuk berjaga-jaga jika layanan AI dari aplikasi sedang bermasalah.
                     </p>
+                    <div className="grid grid-cols-3 gap-2 pt-1">
+                        <a href="https://aistudio.google.com" target="_blank" rel="noreferrer" className={`flex flex-col items-center gap-1.5 py-3 rounded-xl ${t.btnBg} hover:opacity-80 transition-opacity`}>
+                            <svg width="22" height="22" viewBox="0 0 24 24"><defs><linearGradient id="gemini-grad" x1="0" y1="0" x2="24" y2="24"><stop offset="0%" stopColor="#4C8DF6"/><stop offset="100%" stopColor="#B06AF5"/></linearGradient></defs><path d="M12 2C12 2 12.6 8.8 15.3 11.5C18 14.2 22 14.8 22 14.8C22 14.8 18 15.4 15.3 18.1C12.6 20.8 12 22 12 22C12 22 11.4 20.8 8.7 18.1C6 15.4 2 14.8 2 14.8C2 14.8 6 14.2 8.7 11.5C11.4 8.8 12 2 12 2Z" fill="url(#gemini-grad)"/></svg>
+                            <span className={`text-[10px] font-bold ${t.textMain}`}>Gemini</span>
+                        </a>
+                        <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" className={`flex flex-col items-center gap-1.5 py-3 rounded-xl ${t.btnBg} hover:opacity-80 transition-opacity`}>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={t.textMain}><path d="M9.5 3.5C7 2 4.5 3.5 4 6C2.5 6.8 1.8 9 2.5 11C1.5 13 2.3 15.5 4.3 16.7C4.3 19.2 6.4 21 8.8 20.7C10.3 22 12.7 22 14.2 20.7C16.7 21 18.8 19.2 18.8 16.7C20.8 15.5 21.5 13 20.5 11C21.2 9 20.5 6.8 19 6C18.5 3.5 16 2 13.5 3.5C11.9 2.5 10.1 2.5 9.5 3.5Z"/><circle cx="9" cy="10" r="1"/><circle cx="15" cy="10" r="1"/><circle cx="9" cy="15" r="1"/><circle cx="15" cy="15" r="1"/></svg>
+                            <span className={`text-[10px] font-bold ${t.textMain}`}>ChatGPT</span>
+                        </a>
+                        <a href="https://console.anthropic.com/" target="_blank" rel="noreferrer" className={`flex flex-col items-center gap-1.5 py-3 rounded-xl ${t.btnBg} hover:opacity-80 transition-opacity`}>
+                            <svg width="22" height="22" viewBox="0 0 24 24"><path d="M6.5 4L2 20H5.5L6.6 16H11.9L13 20H16.5L12 4H6.5ZM7.5 13L9.25 7L11 13H7.5Z" fill="#D97757"/><path d="M15.5 4L20 20H16.5L15.4 16H14.5L15.7 12H16.4L15.1 7.4L15.5 4Z" fill="#D97757" opacity="0.55"/></svg>
+                            <span className={`text-[10px] font-bold ${t.textMain}`}>Claude</span>
+                        </a>
+                    </div>
                 </div>
             </div>
 
@@ -274,32 +333,22 @@ export default function SettingsModal({
                 <p className={`body-md ${t.textMuted} uppercase tracking-wider mb-2 flex items-center gap-2`}>
                   <MessageCircle size={16} /> Kepribadian Coach Raiga
                 </p>
-                <div className="grid grid-cols-2 gap-2">
-                    {Object.entries(PERSONA_PRESETS).map(([key, preset]) => (
+                <div className="grid grid-cols-3 gap-2">
+                    {[
+                        { key: 'santai', emoji: '😄' },
+                        { key: 'galak', emoji: '😠' },
+                        { key: 'serius', emoji: '😐' },
+                    ].map(p => (
                         <button
-                            key={key}
-                            onClick={() => setRaigaPersona(key)}
-                            className={`py-2.5 px-3 rounded-xl text-sm font-bold transition-all text-left ${raigaPersona === key ? `${t.bgAccent} text-white shadow-sm` : `${t.btnBg} ${t.textMuted}`}`}
+                            key={p.key}
+                            onClick={() => setRaigaPersona(p.key)}
+                            title={PERSONA_PRESETS[p.key]?.label}
+                            className={`py-3 rounded-xl text-2xl transition-all flex items-center justify-center ${raigaPersona === p.key ? `${t.bgAccent} shadow-sm` : t.btnBg}`}
                         >
-                            {preset.label}
+                            {p.emoji}
                         </button>
                     ))}
-                    <button
-                        onClick={() => setRaigaPersona('custom')}
-                        className={`py-2.5 px-3 rounded-xl text-sm font-bold transition-all text-left ${raigaPersona === 'custom' ? `${t.bgAccent} text-white shadow-sm` : `${t.btnBg} ${t.textMuted}`}`}
-                    >
-                        Custom
-                    </button>
                 </div>
-                {raigaPersona === 'custom' && (
-                    <textarea
-                        value={raigaCustomInstruction}
-                        onChange={(e) => setRaigaCustomInstruction(e.target.value)}
-                        placeholder="Contoh: Jadi pelatih militer yang strict, jangan basa-basi, langsung ke instruksi."
-                        rows={3}
-                        className={`w-full text-sm px-4 py-2.5 rounded-xl outline-none border ${t.border} focus:ring-2 ${t.ringAccent} ${t.inputBg} ${t.textMain} resize-none`}
-                    />
-                )}
             </div>
 
             {/* MEMORI COACH RAIGA */}
@@ -309,7 +358,7 @@ export default function SettingsModal({
                 </p>
                 {(!raigaMemory || raigaMemory.length === 0) ? (
                     <p className={`text-xs ${t.textMuted} leading-relaxed`}>
-                        Belum ada memori tersimpan. Tandai pesanmu sendiri di chat (ikon bookmark) untuk menyimpannya di sini — Raiga akan selalu mengingatnya di percakapan berikutnya.
+                        Belum ada memori tersimpan. Tandai pesan di chat (ikon bookmark) untuk menyimpannya ke sini. Coach Raiga akan mengingatnya.
                     </p>
                 ) : (
                     <div className="space-y-2">

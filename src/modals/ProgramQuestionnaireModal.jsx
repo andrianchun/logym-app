@@ -25,7 +25,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
   };
 
   const [answers, setAnswers] = useState({
-    name: userProfile?.name || user?.displayName?.split(' ')[0] || '',
+    name: userProfile?.name || user?.name?.split(' ')[0] || '',
     gender: userProfile?.gender || null,
     dob: userProfile?.dob || '',
     height: userProfile?.height || 170,
@@ -101,7 +101,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
       setStep(0);
       setUseAI(false);
       setAnswers({ 
-          name: userProfile?.name || user?.displayName?.split(' ')[0] || '', 
+          name: userProfile?.name || user?.name?.split(' ')[0] || '', 
           gender: userProfile?.gender || null, 
           dob: userProfile?.dob || '', 
           height: userProfile?.height || 170, 

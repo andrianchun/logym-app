@@ -57,17 +57,37 @@ export const getWeeklyLeaderboard = async () => {
     const weekId = getCurrentWeekId();
     const lbRef = doc(db, 'leaderboards', weekId);
     const snap = await getDoc(lbRef);
-    if(!snap.exists()) return [];
-    const data = snap.data();
-    if(!data || !data.scores) return [];
-    
-    const arr = Object.entries(data.scores).map(([id, val]) => ({
+    const data = snap.exists() ? snap.data() : null;
+    const scores = data?.scores || {};
+
+    const arr = Object.entries(scores).map(([id, val]) => ({
       id,
       name: val.name,
       photoUrl: val.photoUrl,
       score: val.score || 0
     }));
-    return arr.sort((a,b) => b.score - a.score).slice(0, 10);
+    arr.sort((a, b) => b.score - a.score);
+    let top = arr.slice(0, 10);
+
+    // scores.{weekId} cuma berisi user yang sudah aktif (atau seed 0 dari diri sendiri)
+    // minggu ini — kalau komunitasnya masih kecil, leaderboard bisa kelihatan kosong
+    // walau total user yang ada sebenarnya < 10. Isi sisa slot dengan user komunitas lain
+    // (skor 0, cuma buat tampilan — TIDAK ditulis ke Firestore, jadi aman dari rules yang
+    // cuma izinin user nulis skor miliknya sendiri).
+    if (top.length < 10) {
+      const existingIds = new Set(top.map(u => u.id));
+      const usersSnap = await getDocs(query(collection(db, 'community_users'), limit(10 + top.length + 5)));
+      const padding = [];
+      usersSnap.forEach(docSnap => {
+        if (padding.length >= 10 - top.length) return;
+        if (existingIds.has(docSnap.id)) return;
+        const u = docSnap.data();
+        padding.push({ id: docSnap.id, name: u.name || 'Pengguna', photoUrl: u.photoUrl || null, score: 0 });
+      });
+      top = [...top, ...padding];
+    }
+
+    return top;
   } catch(e) {
     console.error("Fetch LB Error:", e);
     return [];

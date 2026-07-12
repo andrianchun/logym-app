@@ -1,11 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { doc, setDoc, deleteDoc, getDocs, collection } from 'firebase/firestore';
-import { Send, X, Check, Loader2, Dumbbell, Menu, Plus, MessageSquare, Trash2, Bookmark } from 'lucide-react';
-import { buildSystemPrompt, summarizeWorkoutLogs, summarizeBiometrics, summarizeActivePrograms, isTrivialMessage, chatWithAI, AI_MODELS, getAvailableModels, getProviderStatus } from '../utils/aiAgent';
+import { Send, X, Check, Loader2, Dumbbell, Menu, Plus, MessageSquare, Trash2, Bookmark, ChevronDown } from 'lucide-react';
+import { buildSystemPrompt, summarizeWorkoutLogs, summarizeBiometrics, summarizeActivePrograms, summarizeFavoriteProgram, needsPersonalContext, needsAppHelpContext, APP_HELP_REFERENCE, chatWithAI, AI_MODELS, getAvailableModels, getProviderStatus } from '../utils/aiAgent';
 import renderMiniMarkdown from '../utils/miniMarkdown';
 import { db } from '../firebase';
 
 const THINKING_PHASES = ['Membaca riwayat latihanmu...', 'Menganalisis progress mingguan...', 'Menyusun jawaban...'];
+
+// Jaring pengaman sisi client — instruksi prompt gak selalu 100% dipatuhi AI, jadi
+// redundansi kayak "Full Body Gainz 3 Hari" atau "SEN: Day 1: Power & Strength" tetap
+// dibersihkan di sini biar UI-nya konsisten apa pun yang di-generate.
+const cleanPlanName = (name) => (name || '')
+    .replace(/\s*[\(\-–]?\s*\d+\s*(hari|x\s*\/?\s*minggu|x\s*seminggu|days?)\s*\)?\s*$/i, '')
+    .trim();
+
+const cleanRoutineName = (name) => (name || '')
+    .replace(/^(day|hari)\s*\d+\s*[:\-–]\s*/i, '')
+    .trim();
 
 export default function GymAIChat({
     isOpen,
@@ -37,6 +48,7 @@ export default function GymAIChat({
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [expandedRoutines, setExpandedRoutines] = useState(() => new Set());
     const [thinkingPhaseIdx, setThinkingPhaseIdx] = useState(0);
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
@@ -344,13 +356,18 @@ export default function GymAIChat({
                 .map(ex => ex.name)
                 .join(', ');
 
-            // Purely social/filler messages ("hai", "makasih") skip the heavy data blocks —
-            // narrow whitelist, defaults to full context whenever there's any doubt.
-            const trivial = isTrivialMessage(userMsg.content);
-            const logsSummary = trivial ? '' : summarizeWorkoutLogs(history, exerciseLibrary, programs);
-            const bioSummary = trivial ? '' : summarizeBiometrics(history, userProfile);
-            const activeProgramsSummary = trivial ? '' : summarizeActivePrograms(programs, activePlanIds);
-            const systemContent = buildSystemPrompt(userProfile, exLibStr, logsSummary, bioSummary, activeProgramsSummary, raigaPersona, raigaCustomInstruction, raigaMemory);
+            // Cuma tarik data pribadi (riwayat, biometrik, program aktif) kalau pesannya
+            // memang kelihatan butuh itu — basa-basi atau pertanyaan umum di luar
+            // program/progress user gak usah, biar hemat token. Default aman: kalau ragu,
+            // tetap disertakan (lihat needsPersonalContext).
+            const needsContext = needsPersonalContext(userMsg.content);
+            const logsSummary = needsContext ? summarizeWorkoutLogs(history, exerciseLibrary, programs) : '';
+            const bioSummary = needsContext ? summarizeBiometrics(history, userProfile) : '';
+            const activeProgramsSummary = needsContext ? summarizeActivePrograms(programs, activePlanIds) : '';
+            const favoriteProgramSummary = needsContext ? summarizeFavoriteProgram(history) : '';
+            // Referensi cara-pakai-app juga cuma nempel kalau pesannya kelihatan nanya soal fitur/navigasi app.
+            const appHelpBlock = needsAppHelpContext(userMsg.content) ? APP_HELP_REFERENCE : '';
+            const systemContent = buildSystemPrompt(userProfile, exLibStr, logsSummary, bioSummary, activeProgramsSummary, raigaPersona, raigaCustomInstruction, raigaMemory, favoriteProgramSummary, appHelpBlock);
 
             // Keep only last 10 real messages; local error/warning bubbles never go to the API
             const recentHistory = messages.filter(m => !m.isError && !m.isSystemWarning).slice(-10);
@@ -454,7 +471,7 @@ export default function GymAIChat({
         }
     };
 
-    const renderMessageContent = (msg) => {
+    const renderMessageContent = (msg, msgIdx) => {
         if (msg.isError) {
             return <div className="text-red-400 text-sm">{msg.content}</div>;
         }
@@ -503,19 +520,45 @@ export default function GymAIChat({
                     <div className="bg-neutral-800/50 backdrop-blur-md border border-blue-500/30 rounded-xl p-4 space-y-3 mt-2 shadow-lg shadow-blue-500/10">
                         <div className="flex items-center gap-2 text-blue-400">
                             <Dumbbell size={18} />
-                            <h4 className="font-bold text-sm">{jsonPart.action === 'update' ? 'Program Update' : 'Program Proposal'}</h4>
+                            <h4 className="font-bold text-sm">{jsonPart.action === 'update' ? 'Update Program' : 'Usulan Program'}</h4>
                         </div>
                         <div>
-                            <p className="font-bold text-white text-base">{jsonPart.planName}</p>
+                            <p className="font-bold text-white text-base">{cleanPlanName(jsonPart.planName)}</p>
                             <p className="text-xs text-neutral-400 mt-1">{jsonPart.description}</p>
                         </div>
                         <div className="space-y-1">
-                            {jsonPart.routines?.map((r, i) => (
-                                <div key={i} className="text-xs text-neutral-300 flex justify-between items-center bg-neutral-900 p-2 rounded-lg">
-                                    <span className="font-semibold text-blue-300">{r.name}{r.assignedDays?.length ? ` (${r.assignedDays.join(', ')})` : ''}</span>
-                                    <span>{r.exercises?.length || 0} Exercises</span>
-                                </div>
-                            ))}
+                            {jsonPart.routines?.map((r, i) => {
+                                const routineKey = `${msgIdx}-${i}`;
+                                const isOpen = expandedRoutines.has(routineKey);
+                                const daysLabel = r.assignedDays?.length ? r.assignedDays.join(', ').toUpperCase() : null;
+                                return (
+                                    <div key={i} className="bg-neutral-900 rounded-lg overflow-hidden">
+                                        <button
+                                            onClick={() => setExpandedRoutines(prev => {
+                                                const next = new Set(prev);
+                                                if (next.has(routineKey)) next.delete(routineKey); else next.add(routineKey);
+                                                return next;
+                                            })}
+                                            className="w-full text-xs text-neutral-300 flex justify-between items-start gap-2 p-2 text-left"
+                                        >
+                                            <span className="font-semibold text-blue-300">
+                                                {daysLabel ? `${daysLabel}: ` : ''}{cleanRoutineName(r.name)}
+                                            </span>
+                                            <ChevronDown size={12} className={`shrink-0 mt-0.5 text-neutral-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+                                        </button>
+                                        {isOpen && (
+                                            <div className="px-2 pb-2 space-y-1 animate-in fade-in duration-150">
+                                                {(r.exercises || []).map((ex, j) => (
+                                                    <div key={j} className="text-[11px] text-neutral-400 flex justify-between items-center bg-black/20 px-2 py-1.5 rounded-md">
+                                                        <span className="text-neutral-200">{ex.name}</span>
+                                                        <span className="font-mono shrink-0 ml-2">{ex.sets}x{ex.reps}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
                         <button
                             onClick={() => {
@@ -524,7 +567,7 @@ export default function GymAIChat({
                             }}
                             className="w-full mt-2 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 rounded-xl text-sm transition-colors flex items-center justify-center gap-2"
                         >
-                            <Check size={16} /> {jsonPart.action === 'update' ? 'Terapkan Perubahan' : 'Accept & Save Program'}
+                            <Check size={16} /> Simpan
                         </button>
                     </div>
                 )}
@@ -571,7 +614,7 @@ export default function GymAIChat({
                     : 'transform 0.38s cubic-bezier(0.34,1.15,0.64,1)',
             }}
         >
-            <div className="pointer-events-auto flex flex-col w-full max-w-md h-[85vh] max-h-[800px] bg-neutral-900/80 backdrop-blur-3xl border border-white/10 rounded-[2rem] shadow-[0_0_40px_rgba(0,0,0,0.5)] overflow-hidden relative">
+            <div className="pointer-events-auto flex flex-col w-full max-w-md h-[85vh] max-h-[800px] bg-neutral-900/60 backdrop-blur-2xl border border-white/10 rounded-[2rem] shadow-[0_0_40px_rgba(0,0,0,0.5)] overflow-hidden relative">
             {isSidebarOpen && <div className="absolute inset-0 bg-black/60 z-[110] transition-opacity cursor-pointer" onClick={() => setIsSidebarOpen(false)} />}
 
             <div className={`absolute inset-y-0 left-0 w-64 bg-neutral-900 border-r border-white/10 z-[120] transform transition-transform duration-300 flex flex-col ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
@@ -606,6 +649,15 @@ export default function GymAIChat({
             </div>
 
             <div className="flex-1 flex flex-col w-full h-full relative">
+
+                {/* Lapisan warna di belakang chat — kasih backdrop-blur bubble sesuatu buat
+                    di-blur, tanpa ini efek glassmorphism-nya gak kerasa (blur cuma nge-blur
+                    warna gelap rata, jadi kelihatan solid biasa). */}
+                <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                    <div className="absolute -top-16 -left-12 w-64 h-64 rounded-full bg-blue-500/25 blur-3xl" />
+                    <div className="absolute top-1/3 -right-16 w-72 h-72 rounded-full bg-indigo-500/20 blur-3xl" />
+                    <div className="absolute bottom-0 left-1/4 w-56 h-56 rounded-full bg-sky-400/15 blur-3xl" />
+                </div>
 
                 {/* HEADER */}
                 <div className="p-4 border-b border-white/10 flex items-center justify-between bg-black/40 backdrop-blur-md z-10">
@@ -676,7 +728,7 @@ export default function GymAIChat({
                                     <Bookmark size={14} fill={(raigaMemory || []).includes(msg.content.trim().slice(0, 160)) ? 'currentColor' : 'none'} />
                                 </button>
                             )}
-                            <div className={`max-w-[85%] rounded-2xl p-4 ${msg.role === 'user' ? 'bg-blue-500/20 backdrop-blur-md border border-blue-500/30 shadow-lg text-white rounded-tr-sm' : 'bg-white/5 backdrop-blur-md text-neutral-100 border border-white/10 rounded-tl-sm shadow-lg'}`}>
+                            <div className={`max-w-[85%] rounded-2xl p-4 ${msg.role === 'user' ? 'bg-gradient-to-b from-blue-500/30 to-blue-600/15 backdrop-blur-xl saturate-150 border border-blue-400/30 shadow-lg text-white rounded-tr-sm' : 'bg-gradient-to-b from-white/15 to-white/5 backdrop-blur-xl saturate-150 text-neutral-100 border border-white/15 rounded-tl-sm shadow-lg shadow-black/20'}`}>
                                 {isThinkingPlaceholder ? (
                                     <div className="flex items-center gap-2">
                                         <Loader2 size={16} className="text-blue-400 animate-spin shrink-0" />
@@ -684,7 +736,7 @@ export default function GymAIChat({
                                     </div>
                                 ) : (
                                     <>
-                                        {renderMessageContent(msg)}
+                                        {renderMessageContent(msg, idx)}
                                         <div className={`text-[10px] mt-2 opacity-50 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
                                             {new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                                         </div>

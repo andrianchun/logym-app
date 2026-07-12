@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Plus, Wind, Play, CalendarDays, X, CheckCircle, ChevronDown, ChevronUp, Dumbbell, Share2 } from 'lucide-react';
 import { fetchExercisesFromApi } from '../utils/exerciseDbApi';
 import { shareWorkoutToFeed } from '../utils/communityApi';
+import { normalizeMuscleKey } from '../data/constants';
 
 // Import Komponen Pecahan
 import WorkoutHeader from '../components/WorkoutHeader';
@@ -335,6 +336,22 @@ const WorkoutTab = ({
     }));
   };
 
+    // Kelompok otot besar (compound lift: dada/punggung/paha) bisa toleransi lompatan
+    // beban lebih besar; otot kecil/isolasi (lengan, bahu isolasi, betis, core) lebih
+    // sensitif ke perubahan beban jadi lompatannya lebih halus — pola umum yang dipakai
+    // banyak program strength training (linear progression compound vs isolasi).
+    const LARGE_MUSCLE_GROUPS = new Set(['chest', 'upper-back', 'lower-back', 'quadriceps', 'hamstring', 'gluteal']);
+    const getSuggestedIncrement = (exItem, lastWeight, isImp) => {
+        const targets = Array.isArray(exItem?.target) ? exItem.target : [exItem?.target];
+        const isLarge = targets.some(t => LARGE_MUSCLE_GROUPS.has(normalizeMuscleKey(t)));
+        const flatStep = isImp ? (isLarge ? 5 : 2.5) : (isLarge ? 2.5 : 1.25);
+        // ~2.5% dari beban kerja sesi lalu, gak pernah di bawah step minimal di atas —
+        // biar tetap masuk akal buat beban ringan (curl 5kg) maupun berat (squat 100kg).
+        const roundTo = flatStep;
+        const pctStep = lastWeight > 0 ? Math.round((lastWeight * 0.025) / roundTo) * roundTo : 0;
+        return Math.max(flatStep, pctStep);
+    };
+
     const getOverloadHint = (exItem) => {
       if (!exItem || !exerciseLibrary || exItem.type === 'time') return null;
       
@@ -407,12 +424,15 @@ const WorkoutTab = ({
       }
       
       const hasLastSession = lastSessionWeight > 0;
-      const uStr = units?.weight === 'lbs' ? 'lbs' : 'kg';
-      
+      const isImp = units?.weight === 'lbs';
+      const uStr = isImp ? 'lbs' : 'kg';
+
       if (hasLastSession) {
         const targetReps = exItem.reps || 10;
         const reachedTarget = lastSessionReps >= targetReps;
-        
+        const step = getSuggestedIncrement(exItem, lastSessionWeight, isImp);
+        const microStep = Math.round((step / 2) * 100) / 100;
+
         let missionText = "";
         const goal = userProfile?.goal || 'muscle_gain';
         const exp = userProfile?.experience || 'beginner';
@@ -427,7 +447,7 @@ const WorkoutTab = ({
            }
         } else if (goal === 'general') {
            if (reachedTarget) {
-             missionText = `Stamina bagus di sesi lalu:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nKamu boleh coba naikkan beban pelan-pelan (2,5 ${uStr}) kalau masih sanggup.`;
+             missionText = `Stamina bagus di sesi lalu:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nKamu boleh coba naikkan beban pelan-pelan (+${step} ${uStr}) kalau masih sanggup.`;
            } else {
              missionText = `Sesi lalu:\n${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps\n\nJika ini sudah nyaman, lanjutkan latihan dengan beban ini. Nikmati prosesnya, agar tubuh tetap bugar.`;
            }
@@ -435,11 +455,11 @@ const WorkoutTab = ({
            // muscle_gain / Default
            if (reachedTarget) {
              if (exp === 'beginner') {
-               missionText = `Target reps sesi lalu tercapai:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nDi fase Newbie Gains, ototmu sangat gampang berkembang, sikat NAIK BEBAN (2.5 ${uStr}) sekarang!`;
+               missionText = `Target reps sesi lalu tercapai:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nDi fase Newbie Gains, ototmu sangat gampang berkembang, sikat NAIK BEBAN (+${step} ${uStr}) sekarang!`;
              } else if (exp === 'advanced') {
-               missionText = `Target reps sesi lalu tercapai:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nCoba microload (+1.25 ${uStr}) atau perbaiki tempo sebelum benar-benar naik beban berat. Aman, tidak perlu tergesa-gesa!`;
+               missionText = `Target reps sesi lalu tercapai:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nCoba microload (+${microStep} ${uStr}) atau perbaiki tempo sebelum benar-benar naik beban berat. Aman, tidak perlu tergesa-gesa!`;
              } else {
-               missionText = `Kamu menembus target reps sesi lalu:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nSaatnya NAIK BEBAN (2.5 ${uStr}) hari ini, reps boleh turun sedikit.`;
+               missionText = `Kamu menembus target reps sesi lalu:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nSaatnya NAIK BEBAN (+${step} ${uStr}) hari ini, reps boleh turun sedikit.`;
              }
            } else {
              missionText = `Sesi lalu:\n${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps (Target: ${targetReps} Reps)\n\nHari ini fokus TAMBAH REPETISI, sampai menembus target! Beban masih tetap.`;

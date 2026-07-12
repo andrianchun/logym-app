@@ -244,28 +244,40 @@ export default function App() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [profileForceTab, setProfileForceTab] = useState(null);
   const [highlightPostId, setHighlightPostId] = useState(null);
-  const [initialProfileUserId, setInitialProfileUserId] = useState(null);
+  // { userId, nonce } — nonce (bukan cuma userId) supaya klik notifikasi/deep-link ke
+  // orang yang SAMA berturut-turut tetap dianggap request baru oleh ProfileModal (state
+  // primitif yang gak berubah nilainya gak akan re-trigger useEffect di sana).
+  const [profileViewRequest, setProfileViewRequest] = useState(null);
+  const openUserProfile = (userId) => {
+    setProfileViewRequest({ userId, nonce: Date.now() });
+    setShowProfileModal(true);
+  };
   const [showHelp, setShowHelp] = useState(false);
   const [showQuestionnaire, setShowQuestionnaire] = useState(false);
   const [globalDetailExercise, setGlobalDetailExercise] = useState(null);
 
+  const urlParamsHandled = useRef(false);
   useEffect(() => {
+    // Tunggu onAuthStateChanged selesai dulu — usernames/{username} & community_users
+    // butuh isSignedIn() di rules, jadi query yang nembak sebelum token auth terpasang
+    // bakal kena permission-denied diam-diam (link share ?u= kelihatan gak ngapa-ngapain).
+    if (isAuthChecking || urlParamsHandled.current) return;
+    urlParamsHandled.current = true;
+
     const handleUrlParams = async () => {
       const params = new URLSearchParams(window.location.search);
       const u = params.get('u');
       if (u) {
         if (u.length > 20) {
           // likely a UID
-          setInitialProfileUserId(u);
-          setShowProfileModal(true);
+          openUserProfile(u);
         } else {
           // likely a username
           try {
             const usernameRef = doc(db, 'usernames', u.toLowerCase());
             const snap = await getDoc(usernameRef);
             if (snap.exists() && snap.data().uid) {
-              setInitialProfileUserId(snap.data().uid);
-              setShowProfileModal(true);
+              openUserProfile(snap.data().uid);
             }
           } catch (e) {
             console.error("Error fetching username:", e);
@@ -274,7 +286,7 @@ export default function App() {
       }
     };
     handleUrlParams();
-  }, []);
+  }, [isAuthChecking]);
   const [isFreshAccount, setIsFreshAccount] = useState(false);
   const [showGymManager, setShowGymManager] = useState(false);
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
@@ -964,6 +976,9 @@ export default function App() {
                   if (parsedSettings.userApiKey) migratedKeys.push(parsedSettings.userApiKey);
                   if (parsedSettings.userGeminiApiKey && parsedSettings.userGeminiApiKey !== parsedSettings.userApiKey) migratedKeys.push(parsedSettings.userGeminiApiKey);
               }
+              // Buang entri kosong yang kepencet "+ Tambah" tapi gak jadi diisi — biar gak
+              // nyangkut sebagai baris kosong yang "muncul lagi" tiap kali data di-refresh.
+              migratedKeys = migratedKeys.filter(k => k && k.trim());
               setUserApiKeys(migratedKeys);
               setAiProvider(parsedSettings.aiProvider || 'google');
               // Saved model IDs from older versions may no longer exist on the APIs
@@ -1075,7 +1090,7 @@ export default function App() {
         setDoc(mainDocRef, {
           programs,
           exerciseLibrary,
-          settings: { theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, userProfile, userApiKeys, aiProvider, aiModel, raigaPersona, raigaCustomInstruction, raigaMemory },
+          settings: { theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, userProfile, userApiKeys: (userApiKeys || []).filter(k => k && k.trim()), aiProvider, aiModel, raigaPersona, raigaCustomInstruction, raigaMemory },
           userAchievements,
           updatedAt: new Date().toISOString()
         }, { merge: true }).catch(err => console.error("Auto-save Cloud gagal:", err));
@@ -1456,6 +1471,10 @@ export default function App() {
     refsToDelete.push(doc(db, 'community_users', uid));
     refsToDelete.push(doc(db, 'users', uid));
     refsToDelete.push(doc(db, 'userData', uid));
+    // Lepaskan reservasi username supaya tidak nyangkut selamanya di akun yang sudah dihapus
+    if (userProfile?.username) {
+      refsToDelete.push(doc(db, 'usernames', userProfile.username));
+    }
 
     // WriteBatch maksimal 500 operasi — pecah per 450
     for (let i = 0; i < refsToDelete.length; i += 450) {
@@ -1542,8 +1561,11 @@ export default function App() {
     inputBg: theme === 'dark' ? 'bg-white/5' : 'bg-black/[0.03]',
     btnBg: theme === 'dark' ? 'bg-white/[0.06] hover:bg-white/10' : 'bg-black/5 hover:bg-black/10',
     navBg: theme === 'dark' ? 'bg-white/[0.04] glass-nav' : 'bg-white/70 glass-nav',
-    navIconActive: theme === 'dark' ? 'text-sky-400' : 'text-[#3b82f6]',
+    // Sengaja pakai #3b82f6 (bukan sky-400 kayak textAccent/borderAccent dark-mode lainnya) —
+    // biar konsisten sama bgAccentSoft-nya pill nav aktif, gak ada warna biru yang lebih terang nyelip.
+    navIconActive: 'text-[#3b82f6]',
     navIconInactive: theme === 'dark' ? 'text-slate-500' : 'text-slate-400',
+    navBorderActive: 'border-[#3b82f6]/30',
     placeholderAccent: theme === 'dark' ? 'placeholder-sky-400/40' : 'placeholder-[#3b82f6]/40',
     borderDashed: theme === 'dark' ? 'border-white/10' : 'border-black/10',
     bgBox: theme === 'dark' ? 'bg-black/20' : 'bg-[#3b82f6]/10',
@@ -2330,7 +2352,7 @@ export default function App() {
       <React.Suspense fallback={null}>
         <ProfileModal
            showProfileModal={showProfileModal} setShowProfileModal={setShowProfileModal} 
-           initialViewingUserId={initialProfileUserId}
+           initialViewingUserId={profileViewRequest}
            user={user} setUser={setUser} t={t} theme={theme} handleLogout={handleLogout} history={history}
            activityTargets={activityTargets} programs={programs} setPrograms={setPrograms} exerciseLibrary={exerciseLibrary}
            lang={lang} language={language} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} selectedDate={selectedDate} units={units} activePlanIds={activePlanIds}
@@ -2380,10 +2402,13 @@ export default function App() {
         isOffline={isOffline}
         onNotifClick={(notif) => {
           if (notif.postId) {
+            // like/comment/repost — repost's postId points at the ORIGINAL post it shared
             setHighlightPostId(notif.postId);
             setShowProfileModal(true);
+          } else if (notif.fromUserId) {
+            // follow — go straight to the follower's profile
+            openUserProfile(notif.fromUserId);
           }
-          // follow notifications have no postId — just close panel (handled by NotificationPanel)
         }}
       />
       

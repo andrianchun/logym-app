@@ -8,8 +8,8 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
       { key: 'steps', label: 'Langkah', color: theme === 'dark' ? '#38bdf8' : '#0284c7', type: 'single' }, // Sky Blue
       { key: 'calories', label: 'Kalori', color: theme === 'dark' ? '#818cf8' : '#4f46e5', type: 'grouped',  // Indigo
         subMetrics: [
-            { key: 'nutritionCalories', label: 'Masuk', color: theme === 'dark' ? '#60a5fa' : '#2563eb' },
-            { key: 'activityCalories', label: 'Dibakar', color: theme === 'dark' ? '#2dd4bf' : '#0d9488' }
+            { key: 'nutritionCalories', label: 'Masuk', color: theme === 'dark' ? '#34d399' : '#059669' },
+            { key: 'activityCalories', label: 'Dibakar', color: theme === 'dark' ? '#60a5fa' : '#2563eb' }
         ]
       },
       { key: 'activeMinutes', label: 'Durasi Aktif', color: theme === 'dark' ? '#3b82f6' : '#1d4ed8', type: 'single' }, // Blue

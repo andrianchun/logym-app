@@ -136,6 +136,18 @@ export default function SharedProfileView({
         {/* Gradient Overlay for Text Readability */}
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/20" />
 
+        {/* Skor Sosial — pojok kiri atas, biar Postingan/Pengikut/Mengikuti di bawah bisa naik */}
+        <div className="absolute top-6 left-6 z-10 flex items-center gap-2 bg-black/40 backdrop-blur-md rounded-full pl-2.5 pr-3.5 py-1.5 shadow-lg">
+          {scoreData.rank > 0 && scoreData.rank <= 10 && (
+            <span className="flex items-center gap-1 text-amber-400 font-black text-xs">
+              <Trophy size={13} /> #{scoreData.rank}
+            </span>
+          )}
+          <span className="text-white/80 text-xs font-bold">
+            Skor Sosial <span className="text-white font-black">{scoreData.score}</span>
+          </span>
+        </div>
+
         {/* Name at bottom of Hero */}
         <div className="absolute bottom-16 left-6 right-24 z-10">
             <div>
@@ -171,7 +183,7 @@ export default function SharedProfileView({
       </div>
 
       {/* BOTTOM SHEET SECTION (Curved) */}
-      <div className="relative -mt-10 min-h-[60vh] rounded-tl-[3rem] bg-white dark:bg-slate-900 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-20 pb-24">
+      <div className="relative -mt-10 min-h-[60vh] rounded-tl-[3rem] bg-white/70 dark:bg-slate-900/70 glass-card shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-20 pb-24">
         
         {/* Floating Action Button (Overlapping the curve) */}
         <div className="absolute -top-7 right-8 flex items-center gap-3">
@@ -213,23 +225,6 @@ export default function SharedProfileView({
 
         {/* Stats Row */}
         <div className="pt-10 px-6 pb-6">
-          <div className="flex items-center justify-end">
-            <div className="flex flex-col items-end gap-1">
-              {scoreData.rank > 0 && scoreData.rank <= 10 && (
-                <span className="text-xl font-black text-amber-500 flex items-center gap-1">
-                  <Trophy size={18} /> #{scoreData.rank}
-                </span>
-              )}
-              
-              <div className="flex items-center gap-1.5">
-                <span className={`text-sm font-medium ${isDark ? 'text-white/70' : 'text-slate-500'}`}>Skor Minggu Ini</span>
-                <span className={`text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{scoreData.score}</span>
-              </div>
-            </div>
-          </div>
-          
-          <hr className={`my-6 border-t ${isDark ? 'border-white/10' : 'border-slate-200'}`} />
-          
           <div className="flex justify-between items-center text-center">
             <div className="flex flex-col items-center flex-1">
               <ClipboardList size={22} className={`mb-2 ${isDark ? 'text-white/70' : 'text-slate-700'}`} />

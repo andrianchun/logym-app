@@ -10,7 +10,7 @@ import { collection, query, where, getDocs, documentId } from 'firebase/firestor
 import { db } from '../firebase';
 import UserProfileModal from './UserProfileModal';
 
-export default function FollowListModal({ currentUser, type, isDark, t, onClose }) {
+export default function FollowListModal({ currentUser, type, isDark, t, onClose, onEditOwnProfile = null }) {
   const [list, setList] = useState([]);        // [{uid, name, photo}]
   const [isLoading, setIsLoading] = useState(true);
   const [followingSet, setFollowingSet] = useState(new Set()); // UIDs I follow
@@ -239,6 +239,10 @@ export default function FollowListModal({ currentUser, type, isDark, t, onClose 
           isDark={isDark}
           t={t}
           onClose={() => setSelectedUser(null)}
+          onEditPersonalClick={onEditOwnProfile ? () => {
+            setSelectedUser(null);
+            onEditOwnProfile();
+          } : undefined}
         />
       )}
     </div>

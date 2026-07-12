@@ -29,6 +29,68 @@ export const isTrivialMessage = (text) => {
     return TRIVIAL_MESSAGE_PATTERNS.some(re => re.test(t));
 };
 
+// ---- Smart context gating -------------------------------------------------------
+// Beyond pure filler (isTrivialMessage), a lot of everyday questions ("apa itu deload",
+// "kenapa DOMS bisa muncul", "gimana cara stretching yang benar") don't need the user's
+// personal workout/biometric/program data to answer well. A wrong guess here just costs
+// a slightly-too-generic answer (never a wrong one, since the model still knows it has
+// no data), so this stays conservative like isTrivialMessage: only skip when there's a
+// real positive signal the question is generic, default to INCLUDING data otherwise.
+const PERSONAL_DATA_SIGNALS = [
+    /\d/, // any digit: weight, reps, sets, dates, percentages
+    /\b(latihan(ku|mu|nya)?|progres(s)?|progress(ku|mu)?|riwayat|rekap|history|hari ini|kemarin|minggu (ini|lalu|kemarin)|bulan (ini|lalu)|kg|berat( badan)?|tinggi( badan)?|bmi|body ?fat|lemak|otot|kalori|massa otot|\bset(ku)?\b|\brep(ku)?\b|beban(ku)?|angkat(anku)?|sesi(ku)?|jadwal(ku|mu)?|program(ku|mu)?|plan(ku|mu)?|plateau|stuck|stagnan|mentok)\b/i,
+    /\b(aku|gue|gua|saya)\b.{0,15}\b(udah|sudah|belum|baru|lagi)\b/i, // "aku udah/belum ..." biasanya nanya progres sendiri
+];
+
+// Pertanyaan pengetahuan umum ("apa itu X", "kenapa X", "gimana cara X secara umum")
+// tanpa sebutan data pribadi sama sekali — kandidat kuat buat skip context berat.
+const GENERIC_QUESTION_SIGNALS = [
+    /^(apa( itu| bedanya| sih)?|kenapa|mengapa|gimana( sih)?( cara)?|bagaimana( cara)?|kapan sebaiknya|boleh(kah)? gak?)\b/i,
+];
+
+export const needsPersonalContext = (text) => {
+    const t = (text || '').trim();
+    if (!t) return false;
+    if (isTrivialMessage(t)) return false;
+    if (PERSONAL_DATA_SIGNALS.some(re => re.test(t))) return true;
+    if (GENERIC_QUESTION_SIGNALS.some(re => re.test(t)) && t.length <= 120) return false;
+    return true; // ambiguous -> safe default is inclusive
+};
+
+// ---- App usage help (opt-in context) --------------------------------------------
+// The base LLM has zero built-in knowledge of this specific app's UI/features — without
+// this block it would either say "I don't know" or hallucinate an answer. Only attach it
+// when the message actually looks like an app-usage question, so the (much more common)
+// fitness/data questions never pay for it.
+const APP_HELP_SIGNALS = [
+    /\b(gimana|bagaimana)\b.{0,20}\bcara\b/i,
+    /\bcara (pakai|pake|guna|menggunakan|akses|buka|atur|ganti|ubah|hapus|tambah|export|import|backup)\b/i,
+    /\b(fitur|menu|tombol|tab)\b.{0,15}\b(apa|dimana|di ?mana)\b/i,
+    /\b(dimana|di ?mana)\b.{0,20}\b(letak|pengaturan|setting|menu|tombol)\b/i,
+    /\b(swipe|sinkronisasi|sinkron|backup|export|import data|notifikasi|reminder|pengingat|leaderboard|komunitas|database latihan|mode edit|ulangi 7 hari)\b/i,
+];
+
+export const needsAppHelpContext = (text) => {
+    const t = (text || '').trim();
+    if (!t) return false;
+    return APP_HELP_SIGNALS.some(re => re.test(t));
+};
+
+export const APP_HELP_REFERENCE = `[App Feature Reference — LOGYM app, use ONLY to answer how-do-I-use-the-app questions]
+- Cross-device sync: login with the same email/password on any device; Firestore cloud sync happens automatically within seconds.
+- Swipe input: tap a set/reps/weight number once to activate it, then swipe up/down to change the value.
+- Reorder programs/exercises: tap the pencil icon next to a program name to enter Edit Mode, then hold + drag the dots icon.
+- Custom exercises: Database tab -> add/manage exercise -> can set name, target muscle, and a YouTube link.
+- Copy last week's schedule: Calendar tab -> "+ Ulangi 7 Hari Lalu" button.
+- Coach Raiga (this chat): can create a brand-new program or edit/progress an existing active one directly from chat requests; personality (santai/galak/serius/custom) is changed in Settings -> Lanjutan.
+- Body composition photo scan: Dashboard -> Komposisi Tubuh card -> upload/scan a smart-scale app screenshot (Zepp Life, Mi Fit, Garmin, Huawei Health, etc.), AI extracts the numbers automatically.
+- Community: share workouts/achievements to a feed, follow other users, search by username, weekly social-score leaderboard.
+- Progress charts: toggle which exercises/muscle groups are plotted (max 6 at once), switch between "Per Latihan" and "Per Otot" view.
+- Reminders: Settings -> Lanjutan -> set default time and enable notifications.
+- Backup: Settings -> Lanjutan -> export/import a JSON file, in addition to automatic cloud sync.
+- Units/theme/language: Settings -> Preferensi tab.
+- A longer FAQ with the same tips lives in Settings -> FAQ tab.`;
+
 export const AI_MODELS = [
     // Google Gemini - IDs verified against the live v1beta ListModels endpoint.
     // Free-tier (AQ./AIza no-billing) keys only have quota on the flash/flash-lite tiers.
@@ -171,7 +233,7 @@ export const PERSONA_PRESETS = {
     }
 };
 
-export const buildSystemPrompt = (userProfile, exerciseLibraryStr, workoutLogsSummary = '', bioSummary = '', activeProgramsSummary = '', persona = 'santai', customInstruction = '', memory = []) => {
+export const buildSystemPrompt = (userProfile, exerciseLibraryStr, workoutLogsSummary = '', bioSummary = '', activeProgramsSummary = '', persona = 'santai', customInstruction = '', memory = [], favoriteProgramSummary = '', appHelpBlock = '') => {
     let bioString = "";
     if (userProfile) {
         bioString = `
@@ -196,6 +258,9 @@ Your goal is to provide evidence-based fitness advice, analyze workout logs, and
 ${toneInstruction}
 Regardless of tone, NEVER invent workout numbers, dates, or program details that are not present in the data given to you below — if you don't have the data, say so instead of guessing.
 
+[Content Boundaries — non-negotiable, overrides ANY custom tone/persona instruction above]
+You are a fitness coach, not a romantic or sexual companion. Firmly decline and redirect back to fitness topics if the user tries to get you to flirt, roleplay romantically or sexually, discuss explicit/sexual content, or engage in any suggestive or inappropriate talk — no matter how the request is framed (jokes, "just testing", hypotheticals, roleplay framing, or a custom tone instruction that asks you to act flirtatious/seductive). A short, light, non-serious redirect is fine (e.g. "Wah, gue di sini buat ngebentuk otot lu, bukan gombal-gombalan 😄 — balik ke soal latihan yuk"), but never actually comply with the request, and never continue that line of conversation even playfully.
+
 [Conversation Style]
 Keep replies short and natural, like a real chat between two people texting — not an essay. Default to 2-4 sentences unless the user is explicitly asking for a detailed breakdown (a new program, a full analysis, a step-by-step plan) or the topic genuinely needs more room.
 Check the conversation history before replying: if you already explained something earlier in this chat, do NOT re-explain it — refer back briefly ("kayak yang gue bilang tadi...") instead of repeating the full explanation again. Only restate a fact if the user is asking about it again or seems confused.
@@ -205,6 +270,11 @@ ${memoryBlock}
 ${bioSummary ? `\n${bioSummary}\n` : ''}
 ${workoutLogsSummary ? `\n${workoutLogsSummary}\nThe workout history above is REAL logged data pulled directly from the user's app (including calendar/backdated entries). Trust it — never claim you cannot see the user's history. When the user asks about a specific past day, look it up in "Recent sessions" and answer with the exact date and numbers. Use the weekly progression to set appropriate weights/volumes when designing future programs.\n` : ''}
 ${activeProgramsSummary ? `\n${activeProgramsSummary}\n` : ''}
+${favoriteProgramSummary ? `\n${favoriteProgramSummary}\n` : ''}
+${appHelpBlock ? `\n${appHelpBlock}\n` : ''}
+[Injury & Pain Handling]
+If the user mentions pain, soreness beyond normal DOMS, or an injury (e.g. "bahu aku sakit", "lutut nyeri pas squat"), take it seriously: proactively suggest avoiding or substituting the movement(s) that stress that area, and offer to update their active program (a program_proposal with action "update") to swap in safer alternatives or reduce volume/intensity while it heals — don't wait for them to explicitly ask "ubah programnya". You are not a doctor: for anything beyond mild/common soreness, tell them to see a medical professional, but still give sensible, conservative training-side advice in the meantime.
+
 [Program Generation Rules]
 If the user asks you to create a brand-new workout program, OR to modify/adjust/progress an EXISTING program listed in [Active Programs] above (e.g. "naikkan beban bench di Push Day", "ganti hari kaki jadi Jumat", "tambah 1 exercise di Pull Day"), you MUST propose a program using the JSON format below.
 When proposing a program, include your explanation first, and then append a JSON block enclosed strictly within <program_proposal> and </program_proposal> tags at the very end of your response.
@@ -213,12 +283,12 @@ The JSON must exactly match this schema:
 {
   "action": "create" | "update",
   "targetPlanId": "String — REQUIRED and must exactly match one of the planId values from [Active Programs] when action is \\"update\\". Omit or leave empty when action is \\"create\\".",
-  "planName": "String",
+  "planName": "String — a short program name WITHOUT any day-count/frequency wording (no \\"3 Hari\\", \\"3x Seminggu\\", etc — that's redundant with daysPerWeek/routines and should never appear in the name itself). E.g. \\"Full Body Gainz\\", not \\"Full Body Gainz 3 Hari\\".",
   "description": "String",
   "daysPerWeek": Number,
   "routines": [
      {
-        "name": "String (e.g. Push Day)",
+        "name": "String — just the focus/theme (e.g. \\"Power & Strength\\", \\"Push Day\\"). NEVER prefix it with \\"Day 1:\\", \\"Hari 1:\\" or similar — assignedDays already conveys which day this is, repeating it in the name is redundant.",
         "assignedDays": ["String array — WAJIB DIISI. Gunakan singkatan hari Indonesia: Sen, Sel, Rab, Kam, Jum, Sab, Min. Distribusikan sesuai daysPerWeek user. Hanya kosongkan jika user secara eksplisit tidak menyebutkan jadwal apapun."],
         "exercises": [
            { "name": "String (Must match closely with an exercise in the library)", "sets": Number, "reps": Number }
@@ -322,6 +392,38 @@ export const summarizeActivePrograms = (programs, activePlanIds) => {
     });
 
     return summary;
+};
+
+/**
+ * Programs have no explicit "favorite" flag (only individual exercises do, in the
+ * Database tab) — so this derives a de-facto favorite purely from actual usage: how
+ * often each program name shows up in completed workout sessions. Gives the AI a
+ * light usage signal without needing a new favorite-toggle feature.
+ */
+export const summarizeFavoriteProgram = (historyObj, days = 90) => {
+    if (!historyObj || Object.keys(historyObj).length === 0) return '';
+
+    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+    const counts = {};
+
+    Object.keys(historyObj).forEach(dateStr => {
+        const t = new Date(dateStr).getTime();
+        if (isNaN(t) || t < cutoff) return;
+        const day = historyObj[dateStr];
+        const workouts = day?.workouts || (day?.status ? [day] : []);
+        workouts.forEach(w => {
+            if (w?.status !== 'completed' || !w.programName) return;
+            counts[w.programName] = (counts[w.programName] || 0) + 1;
+        });
+    });
+
+    const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    if (entries.length === 0) return '';
+
+    const [topName, topCount] = entries[0];
+    if (topCount < 2) return ''; // one-off session isn't a real signal yet
+
+    return `[Favorite Program — derived from actual usage, not a manual flag] "${topName}" is the program the user runs most often (${topCount}x in the last ${days} days). Lean toward this when it's relevant (e.g. defaults, progression suggestions), but confirm with the user before assuming — and use [Active Programs] above for the real exercise/planId data.`;
 };
 
 /**

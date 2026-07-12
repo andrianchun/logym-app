@@ -4,8 +4,12 @@ import { db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { X } from 'lucide-react';
 
-export default function UserProfileModal({ profileUserId, profileUserName, profileUserPhoto, currentUser, isDark, t, leaderboardRank, leaderboardScore, onClose, onNavigateToPost }) {
+export default function UserProfileModal({ profileUserId, profileUserName, profileUserPhoto, currentUser, isDark, t, leaderboardRank, leaderboardScore, onClose, onNavigateToPost, onEditPersonalClick }) {
   const [userProfileData, setUserProfileData] = useState(null);
+  // Bisa saja profil yang dibuka di sini adalah diri sendiri (mis. dari hasil search,
+  // leaderboard, daftar follower, atau share link ?u= milik sendiri) — kalau begitu,
+  // tombol aksinya harus jadi "Edit", bukan "Follow" (gak masuk akal follow diri sendiri).
+  const isOwnProfile = !!currentUser?.uid && currentUser.uid === profileUserId;
 
   useEffect(() => {
     if (!profileUserId) return;
@@ -34,11 +38,12 @@ export default function UserProfileModal({ profileUserId, profileUserName, profi
           profileUserName={profileUserName}
           profileUserPhoto={profileUserPhoto}
           currentUser={currentUser}
-          isOwnProfile={false}
+          isOwnProfile={isOwnProfile}
           isDark={isDark}
           t={t}
           userProfileData={userProfileData}
           onClose={onClose}
+          onEditPersonalClick={isOwnProfile ? onEditPersonalClick : undefined}
           onPostClick={(postId) => {
             onClose();
             if (onNavigateToPost) onNavigateToPost(postId);

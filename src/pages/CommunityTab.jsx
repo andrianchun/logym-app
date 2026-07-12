@@ -22,7 +22,7 @@ import useDialog from '../hooks/useDialog';
 
 const FILTERS = ['Semua', 'Diikuti', 'Teman'];
 
-const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, playSoundEffect, activeFilter = 'Semua', highlightPostId = null, onClearHighlight = null }) => {
+const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, playSoundEffect, activeFilter = 'Semua', highlightPostId = null, onClearHighlight = null, onEditOwnProfile = null }) => {
   const [feed, setFeed] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(null);
@@ -389,7 +389,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
             {menuOpen === post.id && (
               <div 
                 onClick={(e) => e.stopPropagation()}
-                className={`absolute right-0 top-8 z-50 ${isDark ? 'bg-slate-800 border-white/10' : 'bg-white border-black/10'} border rounded-2xl shadow-xl overflow-hidden w-max`}
+                className={`absolute right-0 top-8 z-50 glass-card ${isDark ? 'bg-slate-800/80 border-white/10' : 'bg-white/80 border-black/10'} border rounded-2xl shadow-xl overflow-hidden w-max`}
               >
                 {isOwn ? (
                   <>
@@ -708,7 +708,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Cari teman via username atau nama..."
-                    className={`w-full pl-9 pr-4 py-2.5 rounded-xl border font-semibold text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${isDark ? 'bg-slate-800/80 border-slate-700 text-white placeholder-slate-500' : 'bg-slate-100 border-slate-200 text-slate-800 placeholder-slate-400'}`}
+                    className={`w-full pl-9 pr-4 py-2.5 rounded-xl border font-semibold text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/50 glass-card ${isDark ? 'bg-slate-800/60 border-slate-700 text-white placeholder-slate-500' : 'bg-slate-100/70 border-slate-200 text-slate-800 placeholder-slate-400'}`}
                   />
                   {searchQuery && (
                     <button onClick={() => setSearchQuery('')} className="absolute right-3 p-1">
@@ -719,7 +719,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
                 
                 {/* Search Results Dropdown */}
                 {searchQuery.trim() && (
-                  <div className={`absolute top-full left-0 right-0 mt-2 z-30 rounded-xl overflow-hidden shadow-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                  <div className={`absolute top-full left-0 right-0 mt-2 z-30 rounded-xl overflow-hidden shadow-xl border glass-card ${isDark ? 'bg-slate-800/85 border-slate-700' : 'bg-white/85 border-slate-200'}`}>
                     {isSearching ? (
                       <div className="flex items-center justify-center py-4">
                         <Loader2 className="animate-spin text-blue-500" size={20} />
@@ -855,6 +855,10 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
             setViewingProfile(null);
             scrollToPost(postId);
           }}
+          onEditPersonalClick={onEditOwnProfile ? () => {
+            setViewingProfile(null);
+            onEditOwnProfile();
+          } : undefined}
         />
       )}
 

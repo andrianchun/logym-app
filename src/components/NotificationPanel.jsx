@@ -9,10 +9,10 @@ export default function NotificationPanel({ user, isDark, t, onClose, onNotifCli
   const accentBgStrong = t?.bgAccent || 'bg-[#3b82f6] text-white';
 
   const TYPE_CONFIG = {
-    like:    { icon: Heart,         color: 'text-rose-400',  bg: 'bg-rose-400/10',   label: 'menyukai postinganmu' },
-    comment: { icon: MessageCircle, color: accent,           bg: accentBg,            label: 'mengomentari postinganmu' },
-    follow:  { icon: UserPlus,      color: accent,           bg: accentBg,            label: 'mulai mengikutimu' },
-    repost:  { icon: RefreshCw,     color: accent,           bg: accentBg,            label: 'membagikan ulang postinganmu' },
+    like:    { icon: Heart,         color: 'text-rose-400',  bg: 'bg-rose-400/10',   solidBg: 'bg-rose-500',    label: 'menyukai postinganmu' },
+    comment: { icon: MessageCircle, color: accent,           bg: accentBg,            solidBg: 'bg-[#3b82f6]',  label: 'mengomentari postinganmu' },
+    follow:  { icon: UserPlus,      color: accent,           bg: accentBg,            solidBg: 'bg-[#3b82f6]',  label: 'mulai mengikutimu' },
+    repost:  { icon: RefreshCw,     color: accent,           bg: accentBg,            solidBg: 'bg-[#3b82f6]',  label: 'membagikan ulang postinganmu' },
   };
 
   const [notifications, setNotifications] = useState([]);
@@ -44,11 +44,11 @@ export default function NotificationPanel({ user, isDark, t, onClose, onNotifCli
   const modalContent = (
     <div className="fixed inset-0 z-[1000] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300" onClick={onClose}>
       <div
-        className={`w-full max-w-sm ${isDark ? 'bg-[#0d1f2d]' : 'bg-white'} rounded-3xl flex flex-col max-h-[85vh] shadow-2xl animate-in zoom-in-95 border ${isDark ? 'border-[#1d4ed8]/50' : 'border-black/8'}`}
+        className={`w-full max-w-sm glass-card ${isDark ? 'bg-[#0d1f2d]/70' : 'bg-white/70'} rounded-3xl flex flex-col max-h-[85vh] shadow-2xl animate-in zoom-in-95 border ${isDark ? 'border-white/10' : 'border-black/8'}`}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className={`px-4 py-3 flex items-center justify-between border-b ${isDark ? 'border-[#1d4ed8]/50' : 'border-black/8'}`}>
+        <div className={`px-4 py-3 flex items-center justify-between border-b ${isDark ? 'border-white/10' : 'border-black/8'}`}>
           <div className="flex items-center gap-2">
             <Bell size={18} className={accent} />
             <h3 className={`font-black text-base ${isDark ? 'text-white' : 'text-slate-900'}`}>Notifikasi</h3>
@@ -80,7 +80,7 @@ export default function NotificationPanel({ user, isDark, t, onClose, onNotifCli
                     if (onNotifClick) onNotifClick(notif);
                     onClose();
                   }}
-                  className={`flex items-center gap-3 px-4 py-3 border-b ${isDark ? 'border-[#1d4ed8]/40 hover:bg-[#1d4ed8]/20' : 'border-black/5 hover:bg-[#3b82f6]/5'} ${!notif.read ? accentBg : ''} transition-colors cursor-pointer`}>
+                  className={`flex items-center gap-3 px-4 py-3 border-b ${isDark ? 'border-white/10 hover:bg-white/5' : 'border-black/5 hover:bg-[#3b82f6]/5'} ${!notif.read ? accentBg : ''} transition-colors cursor-pointer`}>
                   <div className="relative">
                     {notif.fromUserPhoto ? (
                       <img src={notif.fromUserPhoto} alt="" className={`w-9 h-9 rounded-full object-cover ring-2 ${isDark ? 'ring-[#1d4ed8]' : 'ring-[#3b82f6]/20'}`} />
@@ -89,8 +89,8 @@ export default function NotificationPanel({ user, isDark, t, onClose, onNotifCli
                         {(notif.fromUserName || '?').charAt(0).toUpperCase()}
                       </div>
                     )}
-                    <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center border-2 ${isDark ? 'border-[#0d1f2d]' : 'border-white'} ${cfg.bg}`}>
-                      <Icon size={8} className={cfg.color} />
+                    <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center border-2 ${isDark ? 'border-[#0d1f2d]' : 'border-white'} ${cfg.solidBg}`}>
+                      <Icon size={8} className="text-white" />
                     </div>
                   </div>
                   <div className="flex-1 min-w-0">

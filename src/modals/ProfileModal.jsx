@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Camera, Edit2, Award, Trophy, Users, LogOut, Check, Loader2, Activity, AlertTriangle, Share2, ShieldAlert } from 'lucide-react';
+import { X, Camera, Edit2, Award, Trophy, Users, LogOut, Check, Loader2, Activity, AlertTriangle, Share2, ShieldAlert, ZoomIn } from 'lucide-react';
+import Cropper from 'react-easy-crop';
 import { updateProfile } from 'firebase/auth';
 import { doc, updateDoc, setDoc, getDoc, runTransaction } from 'firebase/firestore';
 import { auth, storage, db } from '../firebase';
@@ -56,7 +57,15 @@ export default function ProfileModal({
     const [isUploading, setIsUploading] = useState(false);
     const [showModPanel, setShowModPanel] = useState(false);
     const [localHighlight, setLocalHighlight] = useState(null);
-    const [viewingUserId, setViewingUserId] = useState(initialViewingUserId);
+    const [viewingUserId, setViewingUserId] = useState(initialViewingUserId?.userId || null);
+    // initialViewingUserId sekarang { userId, nonce } — nonce-nya (bukan userId doang)
+    // yang dipakai sebagai dependency, biar klik ke user yang SAMA berturut-turut
+    // (misal notif follow yang sama) tetap dianggap request baru dan modalnya kebuka lagi.
+    useEffect(() => {
+        if (initialViewingUserId?.userId) {
+            setViewingUserId(initialViewingUserId.userId);
+        }
+    }, [initialViewingUserId]);
     const fileInputRef = useRef(null);
     const [activeTab, setActiveTab] = useState(globalProfileLastTab);
     const scrollPositions = useRef(globalProfileScrolls);
@@ -68,8 +77,9 @@ export default function ProfileModal({
     const [showEditPersonal, setShowEditPersonal] = useState(false);
     const [editGender, setEditGender] = useState(userProfile?.gender || '');
     const [editDob, setEditDob] = useState(userProfile?.dob || '');
-    const [editName, setEditName] = useState(user?.displayName || '');
+    const [editName, setEditName] = useState(user?.name || '');
     const [editUsername, setEditUsername] = useState(userProfile?.username || '');
+    const isUsernameLocked = !!userProfile?.username;
 
     const calculateAge = (dob) => {
         if (!dob) return null;
@@ -86,6 +96,16 @@ export default function ProfileModal({
         if (!dob) return false;
         const age = calculateAge(dob);
         return age >= 13;
+    };
+
+    // Dipakai dari mana pun (tab profil sendiri, atau dari lihat "diri sendiri" lewat
+    // search/leaderboard/follower list) untuk buka form edit profil yang sama.
+    const openEditPersonal = () => {
+        setEditName(user?.name || '');
+        setEditUsername(userProfile?.username || '');
+        setEditGender(userProfile?.gender || '');
+        setEditDob(userProfile?.dob || '');
+        setShowEditPersonal(true);
     };
 
     // If a forceTab is specified (e.g., navigate to beranda after share), switch to it
@@ -166,61 +186,80 @@ export default function ProfileModal({
         }
     }, [uploadStatus.show]);
 
-    const [pendingPhotoFile, setPendingPhotoFile] = useState(null);
+    // Foto sumber yang baru dipilih (object URL) — dorong langsung ke cropper, tanpa dialog konfirmasi.
+    const [cropSourceUrl, setCropSourceUrl] = useState(null);
+    const [crop, setCrop] = useState({ x: 0, y: 0 });
+    const [zoom, setZoom] = useState(1);
+    const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
 
+    // Hasil crop selalu di-downscale & dikompres ke WebP (lihat getCroppedBlob), jadi ukuran
+    // file akhir yang disimpan ke Firebase Storage gak tergantung ukuran/format foto sumber —
+    // limit di sini cuma jaga-jaga biar browser gak nge-freeze decode foto yang gede banget.
+    const MAX_SOURCE_FILE_MB = 20;
 
-
-    const handleFileChange = async (e) => {
+    const handleFileChange = (e) => {
         const file = e.target.files[0];
+        if (e.target) e.target.value = '';
         if (!file) return;
 
-        // Limit size to 2MB
-        if (file.size > 2 * 1024 * 1024) {
-            setUploadStatus({ show: true, success: false, message: 'Gagal! Ukuran foto maksimal 2MB. Silakan pilih foto dengan ukuran lebih kecil.' });
-            if (e.target) e.target.value = '';
+        if (file.size > MAX_SOURCE_FILE_MB * 1024 * 1024) {
+            setUploadStatus({ show: true, success: false, message: `Gagal! Ukuran foto maksimal ${MAX_SOURCE_FILE_MB}MB. Silakan pilih foto dengan ukuran lebih kecil.` });
             return;
         }
 
-        const fileSignature = file.name.replace(/[^a-zA-Z0-9]/g, '_') + '_' + file.size;
-        const isAlreadyUploaded = !!(user?.uploadedPhotos?.[fileSignature]);
-
-
-
-        setPendingPhotoFile(file);
-        if (e.target) e.target.value = '';
+        setCrop({ x: 0, y: 0 });
+        setZoom(1);
+        setCroppedAreaPixels(null);
+        setCropSourceUrl(URL.createObjectURL(file));
     };
 
+    const closeCropper = () => {
+        if (cropSourceUrl) URL.revokeObjectURL(cropSourceUrl);
+        setCropSourceUrl(null);
+    };
+
+    // Render area crop terpilih (dari react-easy-crop) jadi Blob WebP persegi, di-downscale
+    // maksimal 512x512 — cukup buat avatar, terlepas dari resolusi foto aslinya — biar hemat
+    // storage & bandwidth Firebase (WebP jauh lebih kecil dari JPEG/PNG di kualitas yang sama).
+    const AVATAR_OUTPUT_SIZE = 512;
+    const getCroppedBlob = (imageSrc, pixelCrop) => new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => {
+            const outSize = Math.min(AVATAR_OUTPUT_SIZE, pixelCrop.width, pixelCrop.height);
+            const canvas = document.createElement('canvas');
+            canvas.width = outSize;
+            canvas.height = outSize;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(image, pixelCrop.x, pixelCrop.y, pixelCrop.width, pixelCrop.height, 0, 0, outSize, outSize);
+            canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Gagal memproses gambar')), 'image/webp', 0.85);
+        };
+        image.onerror = reject;
+        image.src = imageSrc;
+    });
+
     const confirmPhotoUpload = async () => {
-        if (!pendingPhotoFile) return;
+        if (!cropSourceUrl || !croppedAreaPixels) return;
         setIsUploading(true);
         try {
-            const fileSignature = pendingPhotoFile.name.replace(/[^a-zA-Z0-9]/g, '_') + '_' + pendingPhotoFile.size;
-            let photoURL = user?.uploadedPhotos?.[fileSignature];
+            const blob = await getCroppedBlob(cropSourceUrl, croppedAreaPixels);
 
-            if (!photoURL) {
-                // Delete old photo from Firebase if exists (cleaning up transition to Cloudinary)
-                if (user?.photoURL?.includes('firebasestorage')) {
-                    try {
-                        await deleteObject(ref(storage, user.photoURL));
-                    } catch (e) { console.log("Old photo not found or already deleted"); }
-                }
-
-                // Upload to Firebase Storage
-                photoURL = await uploadImageToFirebase(pendingPhotoFile, `lyfit_users/${user.uid}/profile/profile_pic_${Date.now()}`);
-                // Anti-cache is technically no longer needed since URL is unique, but kept for safety
-                photoURL = photoURL.includes('?') ? `${photoURL}&v=${Date.now()}` : `${photoURL}?v=${Date.now()}`;
+            // Delete old photo from Firebase if exists (cleaning up transition to Cloudinary)
+            if (user?.photoURL?.includes('firebasestorage')) {
+                try {
+                    await deleteObject(ref(storage, user.photoURL));
+                } catch (e) { console.log("Old photo not found or already deleted"); }
             }
+
+            let photoURL = await uploadImageToFirebase(blob, `lyfit_users/${user.uid}/profile/profile_pic_${Date.now()}.webp`);
+            photoURL = photoURL.includes('?') ? `${photoURL}&v=${Date.now()}` : `${photoURL}?v=${Date.now()}`;
 
             await updateProfile(auth.currentUser, { photoURL });
             const userRef = doc(db, 'users', user.uid);
             const now = Date.now();
-            
-            const newUploadedPhotos = { ...(user?.uploadedPhotos || {}) };
-            newUploadedPhotos[fileSignature] = photoURL;
 
-            await setDoc(userRef, { photoURL, lastPhotoUpdate: now, uploadedPhotos: newUploadedPhotos }, { merge: true });
+            await setDoc(userRef, { photoURL, lastPhotoUpdate: now }, { merge: true });
             await updateUserProfileInFeed(user.uid, undefined, photoURL);
-            if (setUser) setUser(prev => ({ ...prev, photoURL, lastPhotoUpdate: now, uploadedPhotos: newUploadedPhotos }));
+            if (setUser) setUser(prev => ({ ...prev, photoURL, lastPhotoUpdate: now }));
             setUploadStatus({ show: true, success: true, message: 'Foto profil berhasil diperbarui!' });
             setTimeout(() => {
                 setUploadStatus(prev => prev.success ? { show: false, success: false, message: '' } : prev);
@@ -230,7 +269,7 @@ export default function ProfileModal({
             setUploadStatus({ show: true, success: false, message: err.message || 'Gagal mengupload foto profil. Periksa koneksi internet atau coba lagi nanti.' });
         }
         setIsUploading(false);
-        setPendingPhotoFile(null);
+        closeCropper();
     };
 
 
@@ -261,25 +300,6 @@ export default function ProfileModal({
                                         className="flex-1 py-3 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition-colors"
                                     >Keluar</button>
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Photo Confirm Dialog */}
-                {pendingPhotoFile && (
-                    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-                        <div className={`mx-6 p-6 rounded-2xl ${t.bgCard} border ${t.border} shadow-2xl max-w-sm w-full animate-in zoom-in-95`}>
-                            <div className={`flex items-center space-x-3 mb-4 text-sky-500`}>
-                                <Camera size={24} />
-                                <h3 className="text-xl font-black">Yakin Ganti Foto?</h3>
-                            </div>
-                            <p className={`${t.textMuted} mb-6 leading-relaxed text-sm`}>
-                                Yakin akan mengganti foto profil ini?
-                            </p>
-                            <div className="flex w-full space-x-3">
-                                <button onClick={() => setPendingPhotoFile(null)} className={`flex-1 py-3 rounded-xl font-bold ${t.bgBox} ${t.textMain} transition-all text-sm hover:opacity-80`}>Batal</button>
-                                <button onClick={confirmPhotoUpload} className={`flex-1 py-3 rounded-xl font-bold bg-sky-500 text-white hover:bg-sky-600 shadow-lg shadow-sky-500/20 transition-all text-sm`}>Ya, Yakin</button>
                             </div>
                         </div>
                     </div>
@@ -381,13 +401,7 @@ export default function ProfileModal({
                             onFileChange={handleFileChange}
                             isUploading={isUploading}
                             onEditNameClick={() => setIsEditingName(true)}
-                            onEditPersonalClick={() => {
-                                setEditName(user?.displayName || '');
-                                setEditUsername(userProfile?.username || '');
-                                setEditGender(userProfile?.gender || '');
-                                setEditDob(userProfile?.dob || '');
-                                setShowEditPersonal(true);
-                            }}
+                            onEditPersonalClick={openEditPersonal}
                             userProfileData={userProfile}
                             onPostClick={(postId) => {
                                 setActiveTab('beranda');
@@ -399,13 +413,13 @@ export default function ProfileModal({
                     {/* TAB: COMMUNITY */}
                     {activeTab === 'beranda' && (
                         <div className="-mx-4 -mt-4">
-                            <CommunityTab 
-                                t={t} 
-                                theme={theme} 
+                            <CommunityTab
+                                t={t}
+                                theme={theme}
                                 user={user}
                                 programs={programs}
                                 setPrograms={setPrograms}
-                                soundEnabled={soundEnabled} 
+                                soundEnabled={soundEnabled}
                                 playSoundEffect={playSoundEffect}
                                 activeFilter={activeFilter}
                                 highlightPostId={localHighlight || highlightPostId}
@@ -413,6 +427,7 @@ export default function ProfileModal({
                                     setLocalHighlight(null);
                                     if (onClearHighlight) onClearHighlight();
                                 }}
+                                onEditOwnProfile={openEditPersonal}
                             />
                         </div>
                     )}
@@ -438,7 +453,53 @@ export default function ProfileModal({
                     setFollowListType(null);
                     refreshCounts(); // refresh after any follow/unfollow/block action
                 }}
+                onEditOwnProfile={() => {
+                    setFollowListType(null);
+                    openEditPersonal();
+                }}
             />
+        )}
+
+        {/* Photo Cropper — sibling di root, z-[200] biar beneran di atas modal Data Personal (z-[110]).
+            Ditaruh di luar wrapper utama (z-[100]) karena tiap fixed+z-index bikin stacking context
+            sendiri — z-[200] di dalam wrapper z-[100] tetap kalah dari sibling lain yang z-[110]. */}
+        {cropSourceUrl && (
+            <div className="fixed inset-0 z-[200] flex flex-col bg-black animate-in fade-in duration-150">
+                <div className="flex items-center justify-between px-4 py-3 text-white shrink-0">
+                    <button onClick={closeCropper} disabled={isUploading} className="p-2 -ml-2 disabled:opacity-40">
+                        <X size={22} />
+                    </button>
+                    <h3 className="font-black text-sm">Atur Foto Profil</h3>
+                    <button onClick={confirmPhotoUpload} disabled={isUploading || !croppedAreaPixels} className="p-2 -mr-2 disabled:opacity-40">
+                        {isUploading ? <Loader2 size={20} className="animate-spin" /> : <Check size={22} className="text-sky-400" />}
+                    </button>
+                </div>
+                <div className="relative flex-1 min-h-0">
+                    <Cropper
+                        image={cropSourceUrl}
+                        crop={crop}
+                        zoom={zoom}
+                        aspect={1}
+                        cropShape="round"
+                        showGrid={false}
+                        onCropChange={setCrop}
+                        onZoomChange={setZoom}
+                        onCropComplete={(_, pixels) => setCroppedAreaPixels(pixels)}
+                    />
+                </div>
+                <div className="flex items-center gap-3 px-6 py-5 shrink-0">
+                    <ZoomIn size={18} className="text-white/70 shrink-0" />
+                    <input
+                        type="range"
+                        min={1}
+                        max={3}
+                        step={0.01}
+                        value={zoom}
+                        onChange={(e) => setZoom(Number(e.target.value))}
+                        className="flex-1 accent-sky-500"
+                    />
+                </div>
+            </div>
         )}
 
         {/* Edit Personal Details Modal */}
@@ -458,7 +519,7 @@ export default function ProfileModal({
                                     <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover group-hover:opacity-75 transition-opacity" />
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-700 to-slate-900 group-hover:opacity-75 transition-opacity">
-                                        <span className="text-3xl font-black text-white/50">{user?.displayName?.substring(0,2)?.toUpperCase()}</span>
+                                        <span className="text-3xl font-black text-white/50">{user?.name?.substring(0,2)?.toUpperCase()}</span>
                                     </div>
                                 )}
                                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
@@ -485,12 +546,12 @@ export default function ProfileModal({
                             />
                         </div>
 
-                        {/* Username */}
+                        {/* Username — permanen setelah pertama kali diset, biar link share & pencarian gak berubah-ubah */}
                         <div>
                             <label className={`text-xs font-bold ${t.textMuted} mb-2 block`}>Username</label>
                             <div className="relative">
                                 <span className={`absolute left-4 top-1/2 -translate-y-1/2 font-bold text-sm ${t.textMuted}`}>@</span>
-                                <input 
+                                <input
                                     type="text"
                                     value={editUsername}
                                     onChange={(e) => {
@@ -499,10 +560,13 @@ export default function ProfileModal({
                                     }}
                                     maxLength={20}
                                     placeholder="username_kamu"
-                                    className={`w-full pl-8 pr-4 py-3 rounded-xl border-2 font-bold text-sm border-transparent ${t.inputBg} ${t.textMain} focus:outline-none focus:border-blue-500`}
+                                    disabled={isUsernameLocked}
+                                    className={`w-full pl-8 pr-4 py-3 rounded-xl border-2 font-bold text-sm border-transparent ${t.inputBg} ${t.textMain} focus:outline-none focus:border-blue-500 ${isUsernameLocked ? 'opacity-60 cursor-not-allowed' : ''}`}
                                 />
                             </div>
-                            <p className={`text-[10px] mt-1 font-medium ${t.textMuted}`}>Hanya huruf kecil, angka, dan garis bawah (_).</p>
+                            <p className={`text-[10px] mt-1 font-medium ${t.textMuted}`}>
+                                {isUsernameLocked ? 'Username cuma bisa disetel sekali dan tidak bisa diubah lagi.' : 'Hanya huruf kecil, angka, dan garis bawah (_). Tidak bisa diubah lagi setelah disimpan.'}
+                            </p>
                         </div>
 
                         {/* Jenis Kelamin */}
@@ -541,11 +605,12 @@ export default function ProfileModal({
                                     
                                     if (user?.uid) {
                                         try {
-                                            // Handle Username logic
+                                            // Handle Username logic — permanen begitu sudah pernah diset,
+                                            // supaya link share (?u=username) dan hasil search gak jadi basi.
                                             const oldUsername = userProfile?.username || null;
                                             let isUsernameUpdated = false;
 
-                                            if (newUsername !== oldUsername) {
+                                            if (!isUsernameLocked && newUsername !== oldUsername) {
                                                 const usernameRef = doc(db, 'usernames', newUsername);
                                                 await runTransaction(db, async (transaction) => {
                                                     const snap = await transaction.get(usernameRef);
@@ -559,10 +624,10 @@ export default function ProfileModal({
 
                                             setUserProfile(prev => ({ ...prev, gender: editGender, dob: editDob, name: safeName, username: newUsername }));
 
-                                            const isNameUpdated = safeName !== user.displayName;
+                                            const isNameUpdated = safeName !== user.name;
                                             if (isNameUpdated) {
                                                 await updateProfile(auth.currentUser, { displayName: safeName });
-                                                if (setUser) setUser(prev => ({ ...prev, name: safeName, displayName: safeName }));
+                                                if (setUser) setUser(prev => ({ ...prev, name: safeName }));
                                             }
                                             // Gender/usia selalu dikirim ulang (bukan cuma saat berubah) supaya profil
                                             // yang gender/dob-nya sudah terisi dari sebelumnya (sebelum fitur publish
@@ -682,7 +747,7 @@ export default function ProfileModal({
         )}
 
         {viewingUserId && (
-            <UserProfileModal 
+            <UserProfileModal
                 profileUserId={viewingUserId}
                 currentUser={user}
                 isDark={theme === 'dark'}
@@ -692,6 +757,11 @@ export default function ProfileModal({
                     setViewingUserId(null);
                     setActiveTab('beranda');
                     setLocalHighlight(postId);
+                }}
+                onEditPersonalClick={() => {
+                    setViewingUserId(null);
+                    setActiveTab('pencapaian');
+                    openEditPersonal();
                 }}
             />
         )}

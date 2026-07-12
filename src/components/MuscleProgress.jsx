@@ -203,6 +203,20 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
         return stats;
     }, [filteredHistory, programs, exerciseLibrary]);
 
+    // maxScore dipakai sebagai acuan "100" — dihitung sekali di sini dan dipakai ulang baik
+    // buat bodyData (di bawah) maupun tooltip sub-otot (deltoid lateral/rear, adductor/
+    // abductor) biar semua tampilan "Skor Otot" konsisten di skala 0-100 yang sama.
+    const muscleMaxScore = useMemo(() => {
+        const bodyStats = {};
+        Object.entries(muscleStats).forEach(([lyfitMuscle, score]) => {
+            const mapped = muscleMapping[lyfitMuscle] || [];
+            mapped.forEach(m => {
+                bodyStats[m] = (bodyStats[m] || 0) + score;
+            });
+        });
+        return Math.max(...Object.values(bodyStats), 1);
+    }, [muscleStats]);
+
     // Prepare data for react-body-highlighter
     const bodyData = useMemo(() => {
         const bodyStats = {};
@@ -213,11 +227,9 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
             });
         });
 
-        const maxScore = Math.max(...Object.values(bodyStats), 1);
-        
         return Object.keys(bodyStats).map(muscle => {
-            const score = bodyStats[muscle];
-            const ratio = score / maxScore;
+            const rawScore = bodyStats[muscle];
+            const ratio = rawScore / muscleMaxScore;
             let freq = 1;
             if (ratio >= 0.8) freq = 5;
             else if (ratio >= 0.6) freq = 4;
@@ -228,20 +240,23 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
                 name: muscle,
                 muscles: [muscle],
                 frequency: freq,
-                score: score
+                // Dinormalisasi ke skala 0-100 relatif terhadap otot yang paling banyak
+                // dilatih — sebelumnya ini volume mentah (kg x reps / reps / detik campur
+                // jadi satu tanpa satuan yang jelas), sekarang selalu 0-100 dan gampang dibaca.
+                score: Math.round(ratio * 100)
             };
         });
-    }, [muscleStats]);
+    }, [muscleStats, muscleMaxScore]);
 
     // Prepare data for Radar Chart
     const radarData = useMemo(() => {
         const orderedMuscles = [
-            'neck', 'trapezius', 
-            'front-deltoids', 'back-deltoids', 
-            'chest', 'upper-back', 'lower-back', 
-            'biceps', 'triceps', 'forearm', 
-            'abs', 'obliques', 
-            'quadriceps', 'adductor', 'gluteal', 'hamstring', 
+            'neck', 'trapezius',
+            'front-deltoids', 'back-deltoids',
+            'chest', 'upper-back', 'lower-back',
+            'biceps', 'triceps', 'forearm',
+            'abs', 'obliques',
+            'quadriceps', 'adductor', 'gluteal', 'hamstring',
             'calves'
         ];
 
@@ -250,7 +265,7 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
             .map(item => ({
                 muscle: radarLabels[item.name]?.[lang?.id] || item.name,
                 score: item.score,
-                fullMark: Math.max(...bodyData.map(d=>d.score)) * 1.1 || 100
+                fullMark: 110 // skor sudah 0-100 tetap (relatif ke otot terbanyak), sisa 10 buat headroom visual
             }));
     }, [bodyData, lang]);
 
@@ -323,10 +338,10 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
                 onTouchEnd={handleTouchEnd}
             >
                 {viewMode === 'image' ? (
-                    <div className="flex flex-row gap-2 sm:gap-8 justify-center items-start w-full">
+                    <div className="flex flex-row gap-5 sm:gap-8 justify-center items-start w-full">
                         <div className="flex flex-col items-center w-1/2 max-w-[180px]">
                             <div className="relative w-full">
-                                <img src="/coach-front.webp" alt="Coach Depan" className="absolute inset-0 w-full h-full object-contain pointer-events-none z-0 mix-blend-luminosity opacity-90 dark:opacity-75 transform scale-[1.25] -translate-x-1.5 -translate-y-2" />
+                                <img src="/coach-front.webp" alt="Coach Depan" className="absolute inset-0 w-full h-full object-contain pointer-events-none z-0 mix-blend-luminosity opacity-90 dark:opacity-75 transform scale-[1.20] -translate-x-1 translate-y-1" />
                                 <div className="relative z-10 mix-blend-screen dark:mix-blend-color-dodge">
                                     <Model
                                         data={bodyData}
@@ -347,7 +362,7 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
                         </div>
                         <div className="flex flex-col items-center w-1/2 max-w-[180px]">
                             <div className="relative w-full">
-                                <img src="/coach-back.webp" alt="Coach Belakang" className="absolute inset-0 w-full h-full object-contain pointer-events-none z-0 mix-blend-luminosity opacity-90 dark:opacity-75 transform scale-[1.25]" />
+                                <img src="/coach-back.webp" alt="Coach Belakang" className="absolute inset-0 w-full h-full object-contain pointer-events-none z-0 mix-blend-luminosity opacity-90 dark:opacity-75 transform scale-[1.20] translate-y-2" />
                                 <div className="relative z-10 mix-blend-screen dark:mix-blend-color-dodge">
                                     <Model
                                         data={bodyData}
@@ -423,13 +438,13 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
                                     {lang?.id === 'EN' ? 'Lateral Delt' : 'Bahu Samping'}
                                 </span>
                                 <span style={{ color: theme === 'dark' ? '#a6e8ff' : '#3b82f6', fontSize: '11px', fontWeight: 900, marginBottom: '6px' }}>
-                                    Skor Otot : {Math.round(muscleStats['deltoid_lateral'] || 0)}
+                                    Skor Otot : {Math.round((muscleStats['deltoid_lateral'] || 0) / muscleMaxScore * 100)}
                                 </span>
                                 <span style={{ color: theme === 'dark' ? '#a1a1aa' : '#71717a', fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
                                     {lang?.id === 'EN' ? 'Rear Delt' : 'Bahu Blk'}
                                 </span>
                                 <span style={{ color: theme === 'dark' ? '#a6e8ff' : '#3b82f6', fontSize: '11px', fontWeight: 900 }}>
-                                    Skor Otot : {Math.round(muscleStats['deltoid_rear'] || 0)}
+                                    Skor Otot : {Math.round((muscleStats['deltoid_rear'] || 0) / muscleMaxScore * 100)}
                                 </span>
                             </>
                         ) : (selectedMuscle.muscle === 'adductor' || selectedMuscle.muscle === 'abductors') ? (
@@ -438,13 +453,13 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
                                     {lang?.id === 'EN' ? 'Adductors' : 'Paha Dlm'}
                                 </span>
                                 <span style={{ color: theme === 'dark' ? '#a6e8ff' : '#3b82f6', fontSize: '11px', fontWeight: 900, marginBottom: '6px' }}>
-                                    Skor Otot : {Math.round(muscleStats['adductors'] || 0)}
+                                    Skor Otot : {Math.round((muscleStats['adductors'] || 0) / muscleMaxScore * 100)}
                                 </span>
                                 <span style={{ color: theme === 'dark' ? '#a1a1aa' : '#71717a', fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
                                     {lang?.id === 'EN' ? 'Abductors' : 'Paha Luar'}
                                 </span>
                                 <span style={{ color: theme === 'dark' ? '#a6e8ff' : '#3b82f6', fontSize: '11px', fontWeight: 900 }}>
-                                    Skor Otot : {Math.round(muscleStats['abductors'] || 0)}
+                                    Skor Otot : {Math.round((muscleStats['abductors'] || 0) / muscleMaxScore * 100)}
                                 </span>
                             </>
                         ) : (
