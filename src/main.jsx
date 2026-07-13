@@ -10,7 +10,23 @@ class ErrorBoundary extends React.Component {
   }
 
   static getDerivedStateFromError(error) {
+    // Handle Vite chunk load errors gracefully
+    if (error && error.message && (
+      error.message.includes('Failed to fetch dynamically imported module') ||
+      error.message.includes('Importing a module script failed')
+    )) {
+      if (!sessionStorage.getItem('app-updated-reload')) {
+        sessionStorage.setItem('app-updated-reload', 'true');
+        window.location.reload(true);
+      }
+    }
     return { hasError: true, error };
+  }
+
+  componentDidMount() {
+    setTimeout(() => {
+      sessionStorage.removeItem('app-updated-reload');
+    }, 1000);
   }
 
   componentDidCatch(error, errorInfo) {

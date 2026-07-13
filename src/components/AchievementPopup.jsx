@@ -57,8 +57,13 @@ const AchievementPopup = ({ achievements, onClose, soundEnabled, playSoundEffect
             Pencapaian Baru!
           </div>
 
-          <div className={`w-32 h-32 my-6 flex items-center justify-center rounded-full ${ach.bg} ${ach.color} ${ach.borderColor} border-4 shadow-lg animate-bounce`}>
-            {ach.icon({ size: 64, strokeWidth: 1.5 })}
+          <div className={`w-32 h-32 my-6 flex items-center justify-center rounded-full ${ach.bg} ${ach.color} overflow-hidden relative ${ach.borderColor} border-4 shadow-lg animate-bounce`}>
+            {ach.imageUrl ? (
+                <img src={ach.imageUrl} alt={ach.title} className="w-full h-full object-cover mix-blend-screen" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} />
+            ) : null}
+            <div style={{ display: ach.imageUrl ? 'none' : 'block' }}>
+                {ach.fallbackIcon ? ach.fallbackIcon({ size: 64, strokeWidth: 1.5 }) : null}
+            </div>
           </div>
 
           <h3 className={`text-2xl font-black mb-2 ${isDark ? 'text-white' : 'text-black'}`}>{ach.title}</h3>

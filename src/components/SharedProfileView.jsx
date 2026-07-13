@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, MoreHorizontal, Share2, ClipboardList, AlertTriangle, LogOut, Camera, Edit2, UserPlus, UserCheck, ShieldAlert, Trophy, Check, Heart, MessageSquare } from 'lucide-react';
 import UnifiedBadge from './UnifiedBadge';
-import { getUserPosts, getUserWeeklyScoreAndRank } from '../utils/communityApi';
+import { ACHIEVEMENTS, getAchievementContext } from '../data/achievements';
+import { getUserPosts, getUserWeeklyScoreAndRank, shareAchievementToFeed } from '../utils/communityApi';
+import { toJpeg } from 'html-to-image';
 import { followUser, unfollowUser, isFollowing, getFollowerCount, getFollowingCount, blockUser, isBlocked, unblockUser } from '../utils/followApi';
 import { reportUser, getLocalBlockedUsers, banUserGlobal } from '../utils/moderationApi';
 import useDialog from '../hooks/useDialog';
@@ -26,7 +28,11 @@ export default function SharedProfileView({
   newName,
   setNewName,
   handleUpdateName,
-  onPostClick
+  onPostClick,
+  history,
+  userAchievements = [],
+  onAchievementShareComplete,
+  onBadgeActionClick
 }) {
   const { dialog, showAlert, showConfirm } = useDialog(isDark);
   
@@ -38,6 +44,11 @@ export default function SharedProfileView({
   const [isUserBlocked, setIsUserBlocked] = useState(false);
   const [isLoadingFollow, setIsLoadingFollow] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [showAllBadges, setShowAllBadges] = useState(false);
+  const [selectedBadgeInfo, setSelectedBadgeInfo] = useState(null);
+  const [isCapturing, setIsCapturing] = useState(false);
+  
+  const profileContainerRef = useRef(null);
 
   const isAdmin = currentUser?.email === 'untheryan@gmail.com';
 
@@ -90,8 +101,13 @@ export default function SharedProfileView({
   const handleShareProfile = async () => {
     const shareUrl = `${window.location.origin}/?u=${userProfileData?.username || profileUserId}`;
     const text = `Lihat profil ${profileUserName} di LOGYM! ${shareUrl}`;
+    
     if (navigator.share) {
-      navigator.share({ title: profileUserName, text, url: shareUrl });
+      try {
+        await navigator.share({ title: profileUserName, text, url: shareUrl });
+      } catch (err) {
+        console.error(err);
+      }
     } else {
       navigator.clipboard?.writeText(text);
       await showAlert('Link profil disalin ke clipboard!', { type: 'success' });
@@ -118,11 +134,18 @@ export default function SharedProfileView({
     }
   };
 
-  const achievements = posts.filter(p => p.type === 'achievement');
+  const uniqueAchievementIds = new Set();
+  const achievements = [];
+  posts.forEach(p => {
+    if (p.type === 'achievement' && !uniqueAchievementIds.has(p.achievementId)) {
+      uniqueAchievementIds.add(p.achievementId);
+      achievements.push(p);
+    }
+  });
   const regularPosts = posts.filter(p => p.type !== 'achievement');
 
   return (
-    <div className={`w-full h-full relative overflow-y-auto overflow-x-hidden hide-scrollbar bg-slate-100 dark:bg-slate-900`}>
+    <div ref={profileContainerRef} className={`w-full h-full relative overflow-y-auto overflow-x-hidden hide-scrollbar bg-slate-100 dark:bg-slate-900`}>
       {/* HERO SECTION */}
       <div className="relative w-full h-[45vh] min-h-[350px] bg-slate-900">
         {profileUserPhoto ? (
@@ -244,15 +267,86 @@ export default function SharedProfileView({
           </div>
         </div>
 
-        {/* Achievements */}
-        {achievements.length > 0 && (
-          <div className="pl-6 mb-8">
-             <div className="flex overflow-x-auto hide-scrollbar gap-4 pr-6 pb-2 snap-x snap-mandatory scroll-smooth">
-              {achievements.map((p, i) => (
-                <div key={i} className={`shrink-0 p-4 rounded-3xl snap-center ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
-                  <UnifiedBadge achievementId={p.achievementId} achievementTitle={p.achievementTitle} isDark={isDark} t={t} />
-                </div>
-              ))}
+        {/* Koleksi Pencapaian (Only for Own Profile) */}
+        {isOwnProfile && (
+          <div className="px-6 mb-8 mt-2">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`font-black text-lg ${isDark ? 'text-white' : 'text-slate-900'}`}>Koleksi Badge</h3>
+              {ACHIEVEMENTS.length > 6 && (
+                <button 
+                  onClick={() => setShowAllBadges(!showAllBadges)} 
+                  className={`text-[10px] font-black uppercase tracking-wider px-3 py-1.5 rounded-full ${isDark ? 'bg-white/10 text-white/70 hover:text-white' : 'bg-slate-200 text-slate-600 hover:text-slate-900'} transition-all`}
+                >
+                  {showAllBadges ? 'Sembunyikan' : 'Lihat Semua'}
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {(showAllBadges ? ACHIEVEMENTS : ACHIEVEMENTS.slice(0, 6)).map((ach) => {
+                const isUnlocked = userAchievements.includes(ach.id);
+                let achievementCtx = null;
+                if (isOwnProfile) {
+                   achievementCtx = getAchievementContext(history, userProfileData, {
+                      postCount: posts.length,
+                      followingCount: followingCount,
+                      followersCount: followerCount
+                   });
+                }
+                const progress = isUnlocked ? ach.target : ach.calculateProgress(achievementCtx);
+                return (
+                  <UnifiedBadge 
+                    key={ach.id} 
+                    achievementId={ach.id} 
+                    achievementTitle={ach.title} 
+                    isUnlocked={isUnlocked} 
+                    currentProgress={progress}
+                    target={ach.target}
+                    metric={ach.metric}
+                    isDark={isDark} 
+                    t={t} 
+                    onClick={() => {
+                        setSelectedBadgeInfo({
+                            ach,
+                            isUnlocked,
+                            progress,
+                            target: ach.target,
+                            metric: ach.metric,
+                        });
+                    }}
+                  />
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Pinned Shared Achievements (for public profile) */}
+        {!isOwnProfile && achievements.length > 0 && (
+          <div className="pl-6 mb-8 mt-2">
+             <div className="flex overflow-x-auto hide-scrollbar gap-2 pr-6 pb-2 snap-x snap-mandatory scroll-smooth">
+              {achievements.map((p, i) => {
+                const achDef = ACHIEVEMENTS.find(a => a.id === p.achievementId);
+                return (
+                  <div key={i} className="shrink-0 snap-center">
+                    <UnifiedBadge 
+                       achievementId={p.achievementId} 
+                       achievementTitle={p.achievementTitle} 
+                       isUnlocked={true} 
+                       isDark={isDark} 
+                       t={t} 
+                       onClick={achDef ? () => {
+                           setSelectedBadgeInfo({
+                               ach: achDef,
+                               isUnlocked: true,
+                               progress: achDef.target,
+                               target: achDef.target,
+                               metric: achDef.metric,
+                           });
+                       } : undefined}
+                    />
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -345,6 +439,64 @@ export default function SharedProfileView({
       </div>
       
       {dialog}
+
+      {/* Badge Detail Modal */}
+      {selectedBadgeInfo && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-6 bg-black/50 backdrop-blur-sm animate-in fade-in duration-150" onClick={() => setSelectedBadgeInfo(null)}>
+           <div className={`w-full max-w-sm rounded-3xl p-6 shadow-2xl border animate-in zoom-in-95 duration-200 flex flex-col items-center text-center ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200'}`} onClick={e => e.stopPropagation()}>
+              <div className={`w-28 h-28 rounded-full ${selectedBadgeInfo.ach.bg} ${selectedBadgeInfo.ach.color} flex items-center justify-center mb-5 shadow-sm relative ${selectedBadgeInfo.ach.borderColor ? `border-2 ${selectedBadgeInfo.ach.borderColor}` : ''} overflow-hidden ${!selectedBadgeInfo.isUnlocked ? 'opacity-50 grayscale' : ''}`}>
+                 {selectedBadgeInfo.ach.imageUrl ? (
+                   <img src={selectedBadgeInfo.ach.imageUrl} alt={selectedBadgeInfo.ach.title} className="w-full h-full object-cover mix-blend-screen" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} />
+                 ) : null}
+                 <div style={{ display: selectedBadgeInfo.ach.imageUrl ? 'none' : 'block' }}>
+                   {selectedBadgeInfo.ach.fallbackIcon({ size: 48, strokeWidth: selectedBadgeInfo.isUnlocked ? 2 : 1.5 })}
+                 </div>
+              </div>
+              
+              <h2 className={`text-2xl font-black mb-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>{selectedBadgeInfo.ach.title}</h2>
+              <p className={`text-sm font-medium mb-6 ${isDark ? 'text-white/70' : 'text-slate-600'} leading-relaxed`}>{selectedBadgeInfo.ach.description}</p>
+              
+              {!selectedBadgeInfo.isUnlocked && selectedBadgeInfo.target > 0 && (
+                <div className="w-full mb-8">
+                  <div className={`w-full h-2.5 rounded-full ${isDark ? 'bg-white/10' : 'bg-black/10'} overflow-hidden`}>
+                    <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, Math.max(0, ((selectedBadgeInfo.progress || 0) / selectedBadgeInfo.target) * 100))}%` }} />
+                  </div>
+                  <div className={`text-[10px] font-black text-center mt-3 uppercase tracking-widest ${isDark ? 'text-white/50' : 'text-slate-500'}`}>
+                    Progress: {selectedBadgeInfo.progress || 0} / {selectedBadgeInfo.target} {selectedBadgeInfo.metric}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-3 w-full">
+                 <button onClick={() => setSelectedBadgeInfo(null)} className={`flex-1 py-3.5 rounded-2xl font-black text-sm transition-all active:scale-95 ${isDark ? 'bg-white/10 text-white hover:bg-white/15' : 'bg-slate-100 text-slate-900 hover:bg-slate-200'}`}>
+                   Tutup
+                 </button>
+                 
+                 {selectedBadgeInfo.isUnlocked ? (
+                   <button onClick={async () => {
+                      try {
+                        const postId = await shareAchievementToFeed(currentUser.uid, currentUser.name || currentUser.email?.split('@')[0], currentUser.photoURL, selectedBadgeInfo.ach);
+                        setSelectedBadgeInfo(null);
+                        await showAlert('Pencapaian berhasil dibagikan ke Feed Komunitas!', { type: 'success' });
+                        if (onAchievementShareComplete) onAchievementShareComplete(postId);
+                      } catch (err) {
+                        await showAlert('Gagal membagikan ke Feed.', { type: 'error' });
+                      }
+                   }} className="flex-1 py-3.5 rounded-2xl font-black text-sm bg-blue-500 text-white hover:bg-blue-600 active:scale-95 transition-all flex items-center justify-center gap-2">
+                      <Share2 size={18} /> Bagikan
+                   </button>
+                 ) : selectedBadgeInfo.ach.action && (
+                   <button onClick={() => {
+                      if (onBadgeActionClick) onBadgeActionClick(selectedBadgeInfo.ach.action.tab);
+                      setSelectedBadgeInfo(null);
+                   }} className="flex-[1.5] py-3.5 rounded-2xl font-black text-sm bg-blue-500 text-white hover:bg-blue-600 active:scale-95 transition-all flex items-center justify-center gap-2">
+                      {selectedBadgeInfo.ach.action.label}
+                   </button>
+                 )}
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 }

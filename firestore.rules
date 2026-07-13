@@ -109,16 +109,14 @@ service cloud.firestore {
       allow delete: if isSignedIn() && resource.data.blockerId == request.auth.uid;
     }
 
-    // Leaderboard mingguan: tiap user hanya boleh mengubah entri skornya sendiri di dalam
-    // map `scores`. Admin dikecualikan untuk fitur seedLeaderboard (isi data dummy).
+    // Leaderboard mingguan: siapa saja yang login boleh mengupdate field 'scores' 
+    // (karena user bisa me-like post orang lain, yang menambah skor orang tersebut).
     match /leaderboards/{weekId} {
       allow read: if isSignedIn();
-      allow create: if isAdmin() ||
-        (isSignedIn() && request.resource.data.scores.keys().hasOnly([request.auth.uid]));
+      allow create: if isSignedIn();
       allow update: if isAdmin() || (
         isSignedIn() &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['scores']) &&
-        request.resource.data.scores.diff(resource.data.get('scores', {})).affectedKeys().hasOnly([request.auth.uid])
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['scores'])
       );
     }
 

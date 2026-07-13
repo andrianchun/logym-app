@@ -27,6 +27,7 @@ const PanoramicSlider = forwardRef(({
   const containerRef = useRef(null);
   const trackRef    = useRef(null);   // div yang di-translate
   const animating   = useRef(false);  // true saat snap/swipe animation berjalan
+  const justDragged = useRef(false);  // mencegah event click bocor setelah swipe
 
   // Semua drag state dalam satu ref object — zero re-renders
   const drag = useRef({
@@ -125,6 +126,10 @@ const PanoramicSlider = forwardRef(({
     // Arah belum terkunci = tap biasa, tidak ada swipe
     if (d.dir === null) return;
 
+    // Tandai bahwa ini adalah akhir dari drag (swipe)
+    justDragged.current = true;
+    setTimeout(() => { justDragged.current = false; }, 100);
+
     // Swipe vertikal
     if (d.dir === 'v') {
       if (Math.abs(dy) > 40) {
@@ -167,6 +172,12 @@ const PanoramicSlider = forwardRef(({
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
+      onClickCapture={(e) => {
+        if (justDragged.current) {
+          e.stopPropagation();
+          e.preventDefault();
+        }
+      }}
     >
       {/* Track — ini yang bergerak horizontal */}
       <div

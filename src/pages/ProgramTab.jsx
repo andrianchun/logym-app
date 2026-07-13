@@ -134,7 +134,7 @@ const ProgramTab = ({
   focusRoutineId, setFocusRoutineId, setConfirmModal, activityTargets,
   userApiKeys, aiProvider, aiModel, userProfile, history,
   keyStatuses, setKeyStatuses, setAiProvider, setAiModel, setShowSettings,
-  setHighlightPostId, setShowProfileModal, setProfileForceTab
+  setHighlightPostId, setShowProfileModal, setProfileForceTab, onPostCreated
 }) => {
   
   const isDark = t.bgCard !== 'bg-white';
@@ -1065,10 +1065,7 @@ const ProgramTab = ({
           onClose={async (success, newPostId) => {
             setPendingShareProgram(null);
             if (success) {
-              // Langsung ke feed, di-scroll ke postingan yang baru dibagikan
-              if (setProfileForceTab) setProfileForceTab('beranda');
-              if (setShowProfileModal) setShowProfileModal(true);
-              if (newPostId && setHighlightPostId) setHighlightPostId(newPostId);
+              if (onPostCreated) onPostCreated(newPostId);
             }
           }}
         />

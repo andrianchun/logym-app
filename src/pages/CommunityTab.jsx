@@ -3,12 +3,14 @@ import {
   Trophy, Heart, MessageCircle, Flame, Loader2, Award, Plus, Bell,
   MoreHorizontal, Trash2, Edit3, Send, RefreshCw, Share2, X, Check, ClipboardList, Search
 } from 'lucide-react';
+import { toJpeg } from 'html-to-image';
 import {
   getGlobalFeed, getUserPosts, toggleLike, deletePost, updatePost,
   addComment, getComments, repostPost, getNotifications, sendNotification,
-  getWeeklyLeaderboard, updateLeaderboardScore, getCurrentWeekId, searchUsers
+  getWeeklyLeaderboard, updateLeaderboardScore, getCurrentWeekId, searchUsers,
+  getFollowingFeed
 } from '../utils/communityApi';
-import { getFollowingIds, getBlockedList, blockUser } from '../utils/followApi';
+import { getFollowingIds, getFollowerList, getBlockedList, blockUser } from '../utils/followApi';
 import { containsBadWords, reportPost, reportUser, getLocalHiddenPosts, getLocalBlockedUsers } from '../utils/moderationApi';
 import { formatNumber } from '../utils/numberFormat';
 import { ACHIEVEMENTS } from '../data/achievements';
@@ -21,13 +23,20 @@ import UnifiedBadge from '../components/UnifiedBadge';
 import useDialog from '../hooks/useDialog';
 
 const FILTERS = ['Semua', 'Diikuti', 'Teman'];
+const SOURCE_FILTERS = [
+  { id: 'all', label: 'Semua App' },
+  { id: 'logym', label: 'Logym' },
+  { id: 'lomeal', label: 'Lomeal' },
+];
 
 const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, playSoundEffect, activeFilter = 'Semua', highlightPostId = null, onClearHighlight = null, onEditOwnProfile = null }) => {
   const [feed, setFeed] = useState([]);
+  const [sourceFilter, setSourceFilter] = useState('all');
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedImages, setSelectedImages] = useState(null);
   const [isCreatingPost, setIsCreatingPost] = useState(false);
   const [followingIds, setFollowingIds] = useState([]);
+  const [followerIds, setFollowerIds] = useState([]);
   const [blockedIds, setBlockedIds] = useState([]);
   const [viewingProfile, setViewingProfile] = useState(null); // {userId, userName, userPhoto}
   const [leaderboard, setLeaderboard] = useState([]);
@@ -98,8 +107,24 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Teman is mutuals (or just following for now since we don't fetch followerIds yet)
-      let data = await getGlobalFeed(50);
+      let data = [];
+      
+      if (activeFilter === 'Semua') {
+        data = await getGlobalFeed(50);
+      } else if (activeFilter === 'Diikuti' && user?.uid) {
+        if (followingIds.length > 0) {
+          data = await getFollowingFeed(followingIds, 50);
+        } else {
+          data = [];
+        }
+      } else if (activeFilter === 'Teman' && user?.uid) {
+        const mutualIds = followingIds.filter(id => followerIds.includes(id));
+        if (mutualIds.length > 0) {
+          data = await getFollowingFeed(mutualIds, 50);
+        } else {
+          data = [];
+        }
+      }
       
       const hiddenPosts = getLocalHiddenPosts();
       const blockedUsersLocal = getLocalBlockedUsers();
@@ -112,12 +137,6 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
         p.isHidden !== true // Server-side Auto-Takedown
       );
 
-      if (activeFilter === 'Diikuti' && user?.uid) {
-        data = data.filter(p => followingIds.includes(p.userId));
-      } else if (activeFilter === 'Teman' && user?.uid) {
-        // TODO: Implement mutual follow / contacts logic. For now, showing following.
-        data = data.filter(p => followingIds.includes(p.userId));
-      }
       setFeed(data);
 
       // init liked state
@@ -152,13 +171,14 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
       showAlert(e.message || "Gagal memuat feed", { type: 'error', title: 'Error Feed' });
     }
     setIsLoading(false);
-  }, [activeFilter, user?.uid, followingIds, blockedIds]);
+  }, [activeFilter, user?.uid, followingIds, followerIds, blockedIds]);
 
   useEffect(() => { loadData(); }, [activeFilter, loadData]);
 
   useEffect(() => {
     if (!user?.uid) return;
     getFollowingIds(user.uid).then(setFollowingIds);
+    getFollowerList(user.uid).then(list => setFollowerIds(list.map(f => f.uid)));
     getBlockedList(user.uid).then(setBlockedIds);
   }, [user?.uid]);
 
@@ -300,12 +320,39 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
   };
 
   const handleNativeShare = async (post) => {
-    const text = post.text || `Postingan dari ${post.userName} di LOGYM`;
-    if (navigator.share) {
-      navigator.share({ title: post.userName, text });
-    } else {
-      navigator.clipboard?.writeText(text);
-      await showAlert('Teks postingan disalin ke clipboard!', { type: 'success' });
+    try {
+      const el = postRefs.current[post.id];
+      const shareUrl = `${window.location.origin}/?p=${post.id}`;
+      const text = post.text ? `${post.userName} di LOGYM: "${post.text}" - ${shareUrl}` : `Postingan dari ${post.userName} di LOGYM - ${shareUrl}`;
+      
+      if (el && navigator.share) {
+        const dataUrl = await toJpeg(el, { quality: 0.95, backgroundColor: isDark ? '#0f172a' : '#f1f5f9' });
+        const blob = await (await fetch(dataUrl)).blob();
+        const file = new File([blob], `logym-post-${post.id}.jpg`, { type: 'image/jpeg' });
+        
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ title: post.userName, text, files: [file] });
+          return;
+        }
+      }
+      
+      if (navigator.share) {
+        await navigator.share({ title: post.userName, text, url: shareUrl });
+      } else {
+        const link = document.createElement('a');
+        link.download = `logym-post-${post.userName}.jpg`;
+        if (el) {
+          const dataUrl = await toJpeg(el, { quality: 0.95, backgroundColor: isDark ? '#0f172a' : '#f1f5f9' });
+          link.href = dataUrl;
+          link.click();
+          await showAlert('Gambar postingan berhasil diunduh!', { type: 'success' });
+        } else {
+          navigator.clipboard?.writeText(text);
+          await showAlert('Teks postingan disalin ke clipboard!', { type: 'success' });
+        }
+      }
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -344,13 +391,11 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
       <div
         key={post.id || idx}
         ref={el => { if (el) postRefs.current[post.id] = el; }}
-        className={`${
-          isDark ? 'bg-slate-800/40' : 'bg-white/60'
-        } backdrop-blur-md rounded-3xl p-4 border transition-all duration-500 ${
+        className={`pb-6 border-b transition-all duration-500 ${
           flashingPostId === post.id
-            ? 'border-[#3b82f6] shadow-[0_0_0_3px_rgba(65,117,155,0.3)]'
-            : isDark ? 'border-white/10' : 'border-white/40'
-        } shadow-[0_8px_30px_rgb(0,0,0,0.04)] ${menuOpen === post.id ? 'relative z-50' : 'relative z-10'}`}
+            ? 'bg-blue-500/10'
+            : isDark ? 'border-white/10' : 'border-slate-200'
+        } ${menuOpen === post.id ? 'relative z-50' : 'relative z-10'}`}
       >
 
         {/* Post header */}
@@ -364,6 +409,13 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
               >
                 {post.userName}
               </button>
+              {post.sourceApp && (
+                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
+                  post.sourceApp === 'lomeal' ? 'bg-green-500/20 text-green-600' : 'bg-blue-500/20 text-blue-600'
+                }`}>
+                  {post.sourceApp === 'lomeal' ? 'Lomeal' : 'Logym'}
+                </span>
+              )}
             </div>
             <div className={`flex items-center gap-1.5 text-[11px] font-medium ${t.textMuted}`}>
               <span>{formatTimeAgo(post.timestamp)}</span>
@@ -457,39 +509,76 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
                 {post.text && <p className={`text-sm ${t.textMain} mb-3 whitespace-pre-wrap`}>{post.text}</p>}
                 <div 
                   onClick={() => scrollToPost(post.originalPostId)}
-                className={`mb-3 p-3 rounded-2xl border cursor-pointer hover:opacity-80 transition-opacity ${isDark ? 'bg-white/5 border-white/8' : 'bg-slate-50 border-black/6'}`}
+                className={`mb-3 rounded-2xl border cursor-pointer hover:opacity-80 transition-opacity flex flex-col overflow-hidden relative ${isDark ? 'border-white/8' : 'border-black/6'}`}
               >
-                <div className="flex items-center gap-2 mb-1.5">
-                  {renderAvatar(post.originalUserName, post.originalUserPhoto, post.originalUserId)}
-                  <span className={`text-xs font-black ${t.textMain}`}>{post.originalUserName}</span>
-                </div>
-                {post.originalText && <p className={`text-xs ${t.textMuted} leading-relaxed`}>{post.originalText}</p>}
-                {post.originalImageUrls?.[0] && (
-                  <img src={post.originalImageUrls[0]} alt="" className="mt-2 w-full rounded-xl object-cover max-h-40" />
-                )}
-                
-                {post.originalType === 'template' && (
-                  <div className={`mt-2 p-2 rounded-xl text-[11px] font-bold ${isDark ? 'bg-black/20 text-white' : 'bg-slate-100 text-black'} flex items-center gap-2`}>
-                     <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${isDark ? 'bg-white/10' : 'bg-black/5'}`}>
-                       <ClipboardList size={14} className={t.textMain} />
-                     </div>
-                     Program Latihan
-                  </div>
-                )}
-                {(post.originalType === 'workout_log' || !post.originalType) && !post.originalImageUrls?.length && !post.originalText && (
-                  <div className={`mt-2 p-2 rounded-xl text-[11px] font-bold ${isDark ? 'bg-black/20 text-white' : 'bg-slate-100 text-black'} flex items-center gap-2`}>
-                     <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${isDark ? 'bg-amber-500/20' : 'bg-amber-100'}`}>
-                       <Flame size={14} className="text-amber-500" />
-                     </div>
-                     Sesi Latihan Selesai
-                  </div>
-                )}
-                {post.originalType === 'achievement' && (
-                  <div className={`mt-2 p-2 rounded-xl text-[11px] font-bold ${isDark ? 'bg-amber-900/20 text-amber-500' : 'bg-amber-50 text-amber-600'} flex items-center gap-2`}>
-                     <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${isDark ? 'bg-amber-500/20' : 'bg-amber-100'}`}>
-                       <Award size={14} className="text-amber-500" />
-                     </div>
-                     Lencana Terbuka
+                {post.originalImageUrls?.[0] ? (
+                  <>
+                    <img src={post.originalImageUrls[0]} alt="" className="w-full aspect-[4/3] sm:aspect-video object-cover object-top block" />
+                    <div className="absolute inset-x-0 bottom-0 p-3 bg-[#061626]/60 backdrop-blur-md border-t border-white/10">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        {renderAvatar(post.originalUserName, post.originalUserPhoto, post.originalUserId)}
+                        <span className={`text-xs font-black text-white`}>{post.originalUserName}</span>
+                      </div>
+                      {post.originalText && <p className={`text-xs text-white/80 leading-relaxed`}>{post.originalText}</p>}
+                      
+                      {post.originalType === 'template' && (
+                        <div className={`mt-2 p-2 rounded-xl text-[11px] font-bold bg-black/40 text-white flex items-center gap-2`}>
+                           <div className={`w-6 h-6 rounded-lg flex items-center justify-center bg-white/20`}>
+                             <ClipboardList size={14} className="text-white" />
+                           </div>
+                           Program Latihan
+                        </div>
+                      )}
+                      {(post.originalType === 'workout_log' || !post.originalType) && !post.originalImageUrls?.length && !post.originalText && (
+                        <div className={`mt-2 p-2 rounded-xl text-[11px] font-bold bg-black/40 text-white flex items-center gap-2`}>
+                           <div className={`w-6 h-6 rounded-lg flex items-center justify-center bg-amber-500/20`}>
+                             <Flame size={14} className="text-amber-500" />
+                           </div>
+                           Sesi Latihan Selesai
+                        </div>
+                      )}
+                      {post.originalType === 'achievement' && (
+                        <div className={`mt-2 p-2 rounded-xl text-[11px] font-bold bg-amber-900/40 text-amber-400 flex items-center gap-2 border border-amber-500/20`}>
+                           <div className={`w-6 h-6 rounded-lg flex items-center justify-center bg-amber-500/30`}>
+                             <Award size={14} className="text-amber-400" />
+                           </div>
+                           Lencana Terbuka
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className={`p-3 ${isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
+                    <div className="flex items-center gap-2 mb-1.5">
+                      {renderAvatar(post.originalUserName, post.originalUserPhoto, post.originalUserId)}
+                      <span className={`text-xs font-black ${t.textMain}`}>{post.originalUserName}</span>
+                    </div>
+                    {post.originalText && <p className={`text-xs ${t.textMuted} leading-relaxed`}>{post.originalText}</p>}
+                    
+                    {post.originalType === 'template' && (
+                      <div className={`mt-2 p-2 rounded-xl text-[11px] font-bold ${isDark ? 'bg-black/20 text-white' : 'bg-slate-100 text-black'} flex items-center gap-2`}>
+                         <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${isDark ? 'bg-white/10' : 'bg-black/5'}`}>
+                           <ClipboardList size={14} className={t.textMain} />
+                         </div>
+                         Program Latihan
+                      </div>
+                    )}
+                    {(post.originalType === 'workout_log' || !post.originalType) && !post.originalImageUrls?.length && !post.originalText && (
+                      <div className={`mt-2 p-2 rounded-xl text-[11px] font-bold ${isDark ? 'bg-black/20 text-white' : 'bg-slate-100 text-black'} flex items-center gap-2`}>
+                         <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${isDark ? 'bg-amber-500/20' : 'bg-amber-100'}`}>
+                           <Flame size={14} className="text-amber-500" />
+                         </div>
+                         Sesi Latihan Selesai
+                      </div>
+                    )}
+                    {post.originalType === 'achievement' && (
+                      <div className={`mt-2 p-2 rounded-xl text-[11px] font-bold ${isDark ? 'bg-amber-900/20 text-amber-500' : 'bg-amber-50 text-amber-600'} flex items-center gap-2`}>
+                         <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${isDark ? 'bg-amber-500/20' : 'bg-amber-100'}`}>
+                           <Award size={14} className="text-amber-500" />
+                         </div>
+                         Lencana Terbuka
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -501,15 +590,21 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
               <div className="mb-3">
                 {post.text && <p className={`text-sm ${t.textMain} mb-3 whitespace-pre-wrap`}>{post.text}</p>}
                 {post.imageUrl && !post.imageUrls && (
-                  <div className="w-full rounded-[2rem] overflow-hidden cursor-pointer mb-2" onClick={() => setSelectedImage(post.imageUrl)}>
-                    <img src={post.imageUrl} alt="Shared workout" className="w-full h-auto object-contain block" loading="lazy" />
+                  <div className={`w-full h-[240px] rounded-2xl overflow-hidden cursor-pointer mb-2`} onClick={() => setSelectedImages({ urls: [post.imageUrl], index: 0 })}>
+                    <img src={post.imageUrl} alt="Shared workout" className="w-full h-full object-cover object-top block" loading="lazy" />
                   </div>
                 )}
                 {post.imageUrls && post.imageUrls.length > 0 && (
-                  <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar snap-x mb-2">
+                  <div
+                    className="overflow-x-auto hide-scrollbar mb-2 gap-1.5"
+                    style={{display:'flex', touchAction:'pan-x pan-y', WebkitOverflowScrolling:'touch'}}
+                    onTouchStart={e => e.stopPropagation()}
+                    onTouchMove={e => e.stopPropagation()}
+                    onTouchEnd={e => e.stopPropagation()}
+                  >
                     {post.imageUrls.map((url, i) => (
-                      <div key={i} className="relative w-[80%] h-64 shrink-0 snap-center rounded-xl overflow-hidden cursor-pointer" onClick={() => setSelectedImage(url)}>
-                        <img src={url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                      <div key={i} style={{minWidth: post.imageUrls.length === 1 ? '100%' : '85%', height:'240px'}} className={`shrink-0 overflow-hidden cursor-pointer ${post.imageUrls.length === 1 ? 'rounded-2xl' : i === 0 ? 'rounded-l-2xl' : ''} ${i === post.imageUrls.length - 1 && post.imageUrls.length > 1 ? 'rounded-r-2xl' : ''}`} onClick={() => setSelectedImages({ urls: post.imageUrls, index: i })}>
+                        <img src={url} alt="" className="w-full h-full object-cover object-top block" loading="lazy" />
                       </div>
                     ))}
                   </div>
@@ -531,10 +626,16 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
               <div className="mb-3">
                 {post.text && <p className={`text-sm ${t.textMain} mb-3 whitespace-pre-wrap`}>{post.text}</p>}
                 {post.imageUrls && post.imageUrls.length > 0 && (
-                  <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar snap-x">
+                  <div
+                    className="overflow-x-auto hide-scrollbar gap-1.5"
+                    style={{display:'flex', touchAction:'pan-x pan-y', WebkitOverflowScrolling:'touch'}}
+                    onTouchStart={e => e.stopPropagation()}
+                    onTouchMove={e => e.stopPropagation()}
+                    onTouchEnd={e => e.stopPropagation()}
+                  >
                     {post.imageUrls.map((url, i) => (
-                      <div key={i} className="relative w-[80%] h-64 shrink-0 snap-center rounded-xl overflow-hidden cursor-pointer" onClick={() => setSelectedImage(url)}>
-                        <img src={url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                      <div key={i} style={{minWidth: post.imageUrls.length === 1 ? '100%' : '85%', height:'240px'}} className={`shrink-0 overflow-hidden cursor-pointer ${post.imageUrls.length === 1 ? 'rounded-2xl' : i === 0 ? 'rounded-l-2xl' : ''} ${i === post.imageUrls.length - 1 && post.imageUrls.length > 1 ? 'rounded-r-2xl' : ''}`} onClick={() => setSelectedImages({ urls: post.imageUrls, index: i })}>
+                        <img src={url} alt="" className="w-full h-full object-cover object-top block" loading="lazy" />
                       </div>
                     ))}
                   </div>
@@ -688,122 +789,142 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
   };
 
   return (
-    <div className="w-full flex flex-col pb-24">
+    <div className={`w-full flex flex-col pb-24 ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}>
+      
+      {/* Top Sheet (Header + Leaderboard) */}
+      <div className={`relative pt-4 pb-8 px-4 rounded-b-[2.5rem] shadow-lg z-20 transition-colors duration-300 ${isDark ? 'bg-slate-900/90 border-b border-white/5' : 'bg-white/95'} backdrop-blur-2xl`}>
+        {/* Search Bar as floating pill */}
+        {activeFilter === 'Semua' && (
+          <div className="relative mb-6">
+            <div className="relative flex items-center">
+              <Search size={18} className={`absolute left-4 ${isDark ? 'text-white/40' : 'text-slate-400'}`} />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Cari pengguna..."
+                className={`w-full pl-11 pr-4 py-3.5 rounded-full border-0 font-medium text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/50 shadow-sm ${isDark ? 'bg-slate-800 text-white placeholder-white/30' : 'bg-slate-100/70 text-slate-800 placeholder-slate-400'}`}
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')} className="absolute right-4 p-1">
+                  <X size={16} className={t.textMuted} />
+                </button>
+              )}
+            </div>
+            
+            {/* Search Results Dropdown */}
+            {searchQuery.trim() && (
+              <div className={`absolute top-full left-0 right-0 mt-2 z-30 rounded-2xl overflow-hidden shadow-xl border glass-card ${isDark ? 'bg-slate-800/95 border-slate-700' : 'bg-white/95 border-slate-100'}`}>
+                {isSearching ? (
+                  <div className="flex items-center justify-center py-6">
+                    <Loader2 className="animate-spin text-blue-500" size={24} />
+                  </div>
+                ) : searchResults.length > 0 ? (
+                  <div className="max-h-60 overflow-y-auto">
+                    {searchResults.map(resultUser => (
+                      <button
+                        key={resultUser.id}
+                        onClick={() => setViewingProfile({ userId: resultUser.id, userName: resultUser.name, userPhoto: resultUser.photoUrl })}
+                        className={`w-full flex items-center gap-4 p-4 text-left transition-colors border-b last:border-b-0 ${isDark ? 'border-slate-700 hover:bg-slate-700/50' : 'border-slate-100 hover:bg-slate-50'}`}
+                      >
+                        <div className="shrink-0 w-12 h-12 rounded-[16px] overflow-hidden border border-blue-100 dark:border-blue-900 bg-blue-50 flex items-center justify-center">
+                          {resultUser.photoUrl ? (
+                            <img src={resultUser.photoUrl} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="font-black text-blue-500 text-lg">{resultUser.name?.charAt(0).toUpperCase()}</span>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`font-bold text-base truncate ${t.textMain}`}>{resultUser.name}</p>
+                          {resultUser.username && (
+                            <p className={`text-xs font-medium mt-0.5 truncate ${t.textMuted}`}>@{resultUser.username}</p>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-6 text-center">
+                    <p className={`text-sm font-medium ${t.textMuted}`}>Tidak ditemukan "{searchQuery}"</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Leaderboard Section */}
+        {activeFilter === 'Semua' && (
+          <div className="flex flex-col">
+            <div className="flex items-center justify-between mb-4 px-1">
+              <div className="flex items-center gap-2">
+                <Trophy size={18} className="text-blue-500" />
+                <span className={`text-sm font-black uppercase tracking-wider ${isDark ? 'text-white' : 'text-slate-800'}`}>Leaderboard</span>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-4 overflow-x-auto hide-scrollbar pb-2 px-1">
+              {leaderboard.length === 0 ? (
+                <span className={`text-sm font-medium ${t.textMuted}`}>Jadilah juara minggu ini!</span>
+              ) : (
+                leaderboard.map((lbUser, idx) => (
+                  <button
+                    key={lbUser.id}
+                    onClick={() => setViewingProfile({ userId: lbUser.id, userName: lbUser.name, userPhoto: lbUser.photoUrl })}
+                    className="flex flex-col items-center gap-2 shrink-0"
+                    title={lbUser.name}
+                  >
+                    <div className="relative">
+                      {lbUser.photoUrl ? (
+                        <img src={lbUser.photoUrl} alt="" className={`w-[72px] h-[72px] rounded-[24px] object-cover border-[3px] ${idx === 0 ? 'border-yellow-400' : idx === 1 ? 'border-slate-300' : idx === 2 ? 'border-amber-600' : 'border-blue-400'} shadow-md`} />
+                      ) : (
+                        <div className={`w-[72px] h-[72px] rounded-[24px] bg-blue-50 text-blue-500 flex items-center justify-center font-black text-3xl border-[3px] ${idx === 0 ? 'border-yellow-400' : idx === 1 ? 'border-slate-300' : idx === 2 ? 'border-amber-600' : 'border-blue-400'} shadow-md`}>
+                          {(lbUser.name || '?').charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className={`absolute -bottom-2.5 left-1/2 -translate-x-1/2 px-2.5 py-0.5 ${idx === 0 ? 'bg-yellow-400 text-yellow-900' : idx === 1 ? 'bg-slate-300 text-slate-800' : idx === 2 ? 'bg-amber-600 text-amber-50' : 'bg-blue-500 text-white'} rounded-full flex items-center justify-center text-[11px] font-black border-2 ${isDark ? 'border-slate-900' : 'border-white'} shadow-sm`}>
+                        #{idx + 1}
+                      </div>
+                    </div>
+                    <span className={`text-[11px] font-bold max-w-[68px] truncate mt-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                      {lbUser.name}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+      </div>
+
+      <div className="px-4 pb-2 relative z-10 flex gap-2">
+        {SOURCE_FILTERS.map((f) => (
+          <button
+            key={f.id}
+            onClick={() => setSourceFilter(f.id)}
+            className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-colors ${sourceFilter === f.id ? `${t.bgAccentSoft} ${t.textAccent} border ${t.borderAccentSoft}` : `${t.textMuted} border ${t.border}`}`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
       {/* Feed */}
-      <div className="px-4 pt-3">
+      <div className="px-4 pt-4 relative z-10">
         {isLoading ? (
           <div className={`flex flex-col items-center justify-center py-20 ${t.textAccent} opacity-60`}>
             <Loader2 className="animate-spin mb-4" size={32} />
             <p className="font-bold text-sm">Memuat feed komunitas...</p>
           </div>
         ) : (
-          <div className="flex flex-col space-y-4">
-            {/* Search Bar */}
-            {activeFilter === 'Semua' && (
-              <div className="relative mb-2">
-                <div className="relative flex items-center">
-                  <Search size={16} className={`absolute left-3 ${t.textMuted}`} />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Cari teman via username atau nama..."
-                    className={`w-full pl-9 pr-4 py-2.5 rounded-xl border font-semibold text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/50 glass-card ${isDark ? 'bg-slate-800/60 border-slate-700 text-white placeholder-slate-500' : 'bg-slate-100/70 border-slate-200 text-slate-800 placeholder-slate-400'}`}
-                  />
-                  {searchQuery && (
-                    <button onClick={() => setSearchQuery('')} className="absolute right-3 p-1">
-                      <X size={14} className={t.textMuted} />
-                    </button>
-                  )}
-                </div>
-                
-                {/* Search Results Dropdown */}
-                {searchQuery.trim() && (
-                  <div className={`absolute top-full left-0 right-0 mt-2 z-30 rounded-xl overflow-hidden shadow-xl border glass-card ${isDark ? 'bg-slate-800/85 border-slate-700' : 'bg-white/85 border-slate-200'}`}>
-                    {isSearching ? (
-                      <div className="flex items-center justify-center py-4">
-                        <Loader2 className="animate-spin text-blue-500" size={20} />
-                      </div>
-                    ) : searchResults.length > 0 ? (
-                      <div className="max-h-60 overflow-y-auto">
-                        {searchResults.map(resultUser => (
-                          <button
-                            key={resultUser.id}
-                            onClick={() => setViewingProfile({ userId: resultUser.id, userName: resultUser.name, userPhoto: resultUser.photoUrl })}
-                            className={`w-full flex items-center gap-3 p-3 text-left transition-colors border-b last:border-b-0 ${isDark ? 'border-slate-700 hover:bg-slate-700/50' : 'border-slate-100 hover:bg-slate-50'}`}
-                          >
-                            <div className="shrink-0 w-10 h-10 rounded-full overflow-hidden border border-blue-100 dark:border-blue-900 bg-blue-50 flex items-center justify-center">
-                              {resultUser.photoUrl ? (
-                                <img src={resultUser.photoUrl} alt="" className="w-full h-full object-cover" />
-                              ) : (
-                                <span className="font-black text-blue-500 text-sm">{resultUser.name?.charAt(0).toUpperCase()}</span>
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className={`font-bold text-sm truncate ${t.textMain}`}>{resultUser.name}</p>
-                              {resultUser.username && (
-                                <p className={`text-[11px] truncate ${t.textMuted}`}>@{resultUser.username}</p>
-                              )}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="py-4 text-center">
-                        <p className={`text-xs font-semibold ${t.textMuted}`}>Tidak ditemukan "{searchQuery}"</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Leaderboard Section */}
-            {activeFilter === 'Semua' && (
-              <div className={`-mx-4 -mt-3 mb-2 border-b ${t.navBg} ${t.border} flex flex-col`}>
-                <div className={`px-4 py-2 border-b border-dashed ${isDark ? 'border-slate-700/50' : 'border-slate-200'} flex items-center gap-2`}>
-                  <Trophy size={14} className="text-yellow-500" />
-                  <span className={`text-[11px] font-black uppercase tracking-wider ${t.textMain}`}>Leaderboard Minggu Ini</span>
-                </div>
-                <div className={`px-4 py-3 flex items-center gap-3 overflow-x-auto hide-scrollbar`}>
-                  {leaderboard.length === 0 ? (
-                    <span className={`text-[11px] font-bold ${t.textMuted}`}>Share latihanmu dan jadilah juara minggu ini!</span>
-                ) : (
-                  leaderboard.map((lbUser, idx) => (
-                    <button
-                      key={lbUser.id}
-                      onClick={() => setViewingProfile({ userId: lbUser.id, userName: lbUser.name, userPhoto: lbUser.photoUrl })}
-                      className="flex flex-col items-center gap-1 shrink-0"
-                      title={lbUser.name}
-                    >
-                      <div className="relative">
-                        {lbUser.photoUrl ? (
-                          <img src={lbUser.photoUrl} alt="" className="w-9 h-9 rounded-full object-cover border-2 border-blue-400" />
-                        ) : (
-                          <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-black text-sm border-2 border-blue-400">
-                            {(lbUser.name || '?').charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                        <div className={`absolute -bottom-1 -right-1 w-4 h-4 bg-blue-500 text-white rounded-full flex items-center justify-center text-[9px] font-black border ${isDark ? 'border-slate-900' : 'border-white'}`}>
-                          {idx + 1}
-                        </div>
-                      </div>
-                      <span className={`text-[9px] font-bold max-w-[44px] truncate ${isDark ? 'text-white/70' : 'text-black/70'}`}>
-                        {lbUser.name}
-                      </span>
-                    </button>
-                  ))
-                )}
-                </div>
-              </div>
-            )}
-
-            {feed.length === 0 ? (
+          <div className="flex flex-col space-y-6">
+            {feed.filter(p => sourceFilter === 'all' || p.sourceApp === sourceFilter).length === 0 ? (
               <p className={`text-center py-10 ${t.textMuted} text-sm font-bold`}>
-                {activeFilter === 'Diikuti' ? 'Ikuti seseorang untuk melihat postingan mereka.' : 'Belum ada post di komunitas.'}
+                {activeFilter === 'Diikuti' ? 'Ikuti seseorang untuk melihat postingan mereka.' : 'Belum ada post di komunitas dengan filter ini.'}
               </p>
             ) : (
-              feed.map((post, idx) => renderPostCard(post, idx))
+              feed.filter(p => sourceFilter === 'all' || p.sourceApp === sourceFilter).map((post, idx) => renderPostCard(post, idx))
             )}
           </div>
         )}
@@ -819,7 +940,9 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
 
       {/* Modals */}
 
-      <ImageModal imageUrl={selectedImage} onClose={() => setSelectedImage(null)} />
+      {selectedImages && selectedImages.urls && (
+        <ImageModal images={selectedImages.urls} initialIndex={selectedImages.index} onClose={() => setSelectedImages(null)} />
+      )}
 
       {isCreatingPost && (
         <CreatePostModal

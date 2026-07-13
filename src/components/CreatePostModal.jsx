@@ -10,6 +10,7 @@ export default function CreatePostModal({ user, onClose, theme, t, initialFiles 
   const [text, setText] = useState('');
   const [images, setImages] = useState(initialFiles);
   const [isUploading, setIsUploading] = useState(false);
+  const [draggedIndex, setDraggedIndex] = useState(null);
   const fileInputRef = useRef(null);
 
   const isDark = theme === 'dark';
@@ -21,12 +22,36 @@ export default function CreatePostModal({ user, onClose, theme, t, initialFiles 
 
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
-    const validFiles = files.filter(f => f.type.startsWith('image/')).slice(0, 5 - images.length);
+    const validFiles = files.filter(f => f.type.startsWith('image/')).slice(0, 10 - images.length);
     setImages(prev => [...prev, ...validFiles]);
   };
 
   const removeImage = (index) => {
     setImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleDragStart = (e, index) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault(); 
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e, dropIndex) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === dropIndex) return;
+
+    setImages(prev => {
+      const newImages = [...prev];
+      const draggedItem = newImages[draggedIndex];
+      newImages.splice(draggedIndex, 1);
+      newImages.splice(dropIndex, 0, draggedItem);
+      return newImages;
+    });
+    setDraggedIndex(null);
   };
 
   const MAX_CHARS = 500;
@@ -71,22 +96,22 @@ export default function CreatePostModal({ user, onClose, theme, t, initialFiles 
 
   return (
     <div className="fixed inset-0 z-[999] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-300">
-      <div className={`w-full sm:max-w-md ${isDark ? 'bg-slate-900' : 'bg-white'} rounded-t-3xl sm:rounded-3xl flex flex-col max-h-[90vh] shadow-2xl animate-in slide-in-from-bottom-10`}>
+      <div className={`w-full sm:max-w-xl ${isDark ? 'bg-slate-900/80 backdrop-blur-2xl border border-white/10' : 'bg-white/90 backdrop-blur-2xl border border-black/10'} rounded-t-[2.5rem] sm:rounded-[2.5rem] flex flex-col max-h-[85vh] shadow-2xl animate-in slide-in-from-bottom-10`}>
         
         {/* Header */}
-        <div className={`p-4 flex items-center justify-between border-b ${isDark ? 'border-white/10' : 'border-black/10'} shrink-0`}>
-          <button onClick={() => onClose()} className={`p-2 rounded-full ${isDark ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-black/5 hover:bg-black/10 text-black'}`}>
-            <X size={20} />
+        <div className="p-5 flex items-center justify-between shrink-0">
+          <button onClick={() => onClose()} className={`p-2.5 rounded-full ${isDark ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-black/5 hover:bg-black/10 text-black'} transition-colors`}>
+            <X size={24} />
           </button>
-          <h3 className={`font-black text-lg ${isDark ? 'text-white' : 'text-black'}`}>
+          <h3 className={`font-black text-xl ${isDark ? 'text-white' : 'text-black'}`}>
             {isTemplate ? 'Bagikan Program' : (isRepost ? 'Bagikan Ulang' : 'Buat Postingan')}
           </h3>
           <button 
             onClick={handleSubmit}
             disabled={isUploading || !canPost}
-            className={`px-4 py-1.5 rounded-full font-bold text-sm ${t?.bgAccent || 'bg-[#3b82f6] text-white'} disabled:opacity-50`}
+            className={`px-6 py-2.5 rounded-2xl font-black text-base ${t?.bgAccent || 'bg-[#3b82f6] text-white'} shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all active:translate-y-0 disabled:opacity-50 disabled:hover:translate-y-0`}
           >
-            {isUploading ? <Loader2 size={16} className="animate-spin" /> : 'Post'}
+            {isUploading ? <Loader2 size={20} className="animate-spin" /> : 'Post'}
           </button>
         </div>
 
@@ -105,7 +130,7 @@ export default function CreatePostModal({ user, onClose, theme, t, initialFiles 
               placeholder={isTemplate
                 ? 'Tambahkan deskripsi, tips, atau cerita tentang program ini...'
                 : 'Bagikan progress atau tips latihanmu hari ini...'}
-              className={`w-full min-h-[100px] resize-none outline-none text-base bg-transparent ${isDark ? 'text-white placeholder-white/40' : 'text-black placeholder-black/40'}`}
+              className={`w-full min-h-[140px] resize-none outline-none text-lg bg-transparent ${isDark ? 'text-white placeholder-white/40' : 'text-black placeholder-black/40'}`}
             />
             {(isNearLimit || text.length > 0) && (
               <div className={`text-right text-xs font-bold mt-1 ${
@@ -135,16 +160,26 @@ export default function CreatePostModal({ user, onClose, theme, t, initialFiles 
 
           {/* Selected Images Preview */}
           {images.length > 0 && (
-            <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar snap-x">
+            <div className="flex gap-3 overflow-x-auto pb-4 hide-scrollbar snap-x">
               {images.map((file, i) => (
-                <div key={i} className="relative w-28 h-36 shrink-0 snap-center rounded-xl overflow-hidden bg-black/5 border border-black/5">
-                  <img src={URL.createObjectURL(file)} alt="preview" className="w-full h-full object-cover" />
+                <div 
+                  key={i} 
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, i)}
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, i)}
+                  className={`relative w-32 h-44 shrink-0 snap-center rounded-2xl overflow-hidden bg-black/5 border border-white/10 cursor-grab active:cursor-grabbing shadow-md transition-transform ${draggedIndex === i ? 'opacity-50 scale-95' : ''}`}
+                >
+                  <img src={URL.createObjectURL(file)} alt="preview" className="w-full h-full object-cover pointer-events-none select-none" />
                   <button 
                     onClick={() => removeImage(i)}
-                    className="absolute top-1 right-1 p-1 rounded-full bg-black/50 text-white hover:bg-rose-500 transition-colors"
+                    className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-white hover:bg-rose-500 backdrop-blur-md transition-colors"
                   >
-                    <X size={14} />
+                    <X size={16} />
                   </button>
+                  <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-white text-[10px] font-bold shadow-sm pointer-events-none select-none">
+                    {i + 1}
+                  </div>
                 </div>
               ))}
             </div>
@@ -153,7 +188,7 @@ export default function CreatePostModal({ user, onClose, theme, t, initialFiles 
 
         {/* Footer */}
         {(!isTemplate && !isRepost) && (
-          <div className={`p-3 border-t ${isDark ? 'border-white/10 bg-slate-900' : 'border-black/10 bg-white'} rounded-b-3xl flex items-center shrink-0`}>
+          <div className="p-4 shrink-0">
             <input 
               type="file" 
               multiple 
@@ -164,11 +199,11 @@ export default function CreatePostModal({ user, onClose, theme, t, initialFiles 
             />
             <button 
               onClick={() => fileInputRef.current?.click()}
-              disabled={images.length >= 5}
-              className={`p-2 rounded-xl flex items-center gap-2 font-bold text-sm disabled:opacity-50 ${t?.textAccent || 'text-[#3b82f6]'} ${t?.bgAccentSoft || 'bg-[#3b82f6]/10'} hover:opacity-80`}
+              disabled={images.length >= 10}
+              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-2 font-black text-base shadow-sm transition-all disabled:opacity-50 ${t?.textAccent || 'text-[#3b82f6]'} ${t?.bgAccentSoft || 'bg-[#3b82f6]/10'} hover:bg-[#3b82f6]/20 active:scale-[0.98]`}
             >
-              <ImagePlus size={20} />
-              <span>Tambah Foto ({images.length}/5)</span>
+              <ImagePlus size={24} />
+              <span>Tambah Foto ({images.length}/10)</span>
             </button>
           </div>
         )}

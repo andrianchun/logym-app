@@ -242,6 +242,9 @@ export const buildSystemPrompt = (userProfile, exerciseLibraryStr, workoutLogsSu
 - Experience Level: ${userProfile.experience || 'Beginner'}
 - Days per week: ${userProfile.daysPerWeek || 3}
 - Gender: ${userProfile.gender || 'Unknown'}
+${userProfile.medicalCondition ? `- Medical/Injuries: ${userProfile.medicalCondition}` : ''}
+${userProfile.lomealSync?.preferences?.dietProfile ? `- Diet Profile (from Lomeal): ${userProfile.lomealSync.preferences.dietProfile}` : ''}
+${userProfile.lomealSync?.preferences?.allergies ? `- Allergies/Intolerances (from Lomeal): ${userProfile.lomealSync.preferences.allergies}` : ''}
 `;
     }
 

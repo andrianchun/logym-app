@@ -98,6 +98,7 @@ export const getWeeklyLeaderboard = async () => {
 export const shareWorkoutToFeed = async (userId, userName, userPhoto, workoutData) => {
   try {
     await addDoc(collection(db, 'community_posts'), {
+      sourceApp: 'logym',
       userId,
       userName: userName || 'Anonim',
       userPhoto: userPhoto || null,
@@ -123,6 +124,7 @@ export const shareWorkoutToFeed = async (userId, userName, userPhoto, workoutDat
 export const createCommunityPost = async (userId, userName, userPhoto, postData) => {
   try {
     const docRef = await addDoc(collection(db, 'community_posts'), {
+      sourceApp: 'logym',
       userId,
       userName: userName || 'Anonim',
       userPhoto: userPhoto || null,
@@ -210,6 +212,7 @@ export const toggleLike = async (postId, userId, postOwnerId, fromUserName = nul
 export const repostPost = async (userId, userName, userPhoto, originalPost, caption = '') => {
   try {
     const docRef = await addDoc(collection(db, 'community_posts'), {
+      sourceApp: 'logym',
       userId,
       userName: userName || 'Anonim',
       userPhoto: userPhoto || null,
@@ -272,6 +275,39 @@ export const getGlobalFeed = async (limitCount = 30) => {
     return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
   } catch (err) {
     console.error("Gagal fetch feed:", err);
+    return [];
+  }
+};
+
+export const getFollowingFeed = async (followingIds = [], limitCount = 30) => {
+  if (!followingIds || followingIds.length === 0) return [];
+  try {
+    // Firestore 'in' operator supports up to 30 items.
+    const chunks = [];
+    for (let i = 0; i < followingIds.length; i += 30) {
+      chunks.push(followingIds.slice(i, i + 30));
+    }
+    
+    let allPosts = [];
+    for (const chunk of chunks) {
+      try {
+        const q = query(collection(db, 'community_posts'), where('userId', 'in', chunk), orderBy('timestamp', 'desc'), limit(limitCount));
+        const snap = await getDocs(q);
+        allPosts = [...allPosts, ...snap.docs.map(d => ({ id: d.id, ...d.data() }))];
+      } catch (err) {
+        // Fallback jika belum ada index composite (userId IN, timestamp DESC)
+        console.warn("Fallback getFollowingFeed (unindexed):", err);
+        const q = query(collection(db, 'community_posts'), where('userId', 'in', chunk), limit(100));
+        const snap = await getDocs(q);
+        allPosts = [...allPosts, ...snap.docs.map(d => ({ id: d.id, ...d.data() }))];
+      }
+    }
+    
+    return allPosts
+      .sort((a, b) => (b.timestamp?.toMillis?.() ?? 0) - (a.timestamp?.toMillis?.() ?? 0))
+      .slice(0, limitCount);
+  } catch (err) {
+    console.error("Gagal fetch following feed:", err);
     return [];
   }
 };
@@ -360,6 +396,7 @@ export const getLeaderboard = async (limitCount = 50) => {
 export const shareTemplate = async (userId, userName, program) => {
   try {
     const docRef = await addDoc(collection(db, 'community_posts'), {
+      sourceApp: 'logym',
       type: 'template', userId, userName: userName || 'Coach Raiga',
       programName: program.name || 'My Custom Program',
       planName: program.planName || 'Custom Plan',
@@ -378,6 +415,7 @@ export const shareTemplate = async (userId, userName, program) => {
 export const shareAchievementToFeed = async (userId, userName, userPhoto, achievement) => {
   try {
     const docRef = await addDoc(collection(db, 'community_posts'), {
+      sourceApp: 'logym',
       type: 'achievement', userId, userName: userName || 'Anonim',
       userPhoto: userPhoto || null,
       achievementId: achievement.id, achievementTitle: achievement.title,

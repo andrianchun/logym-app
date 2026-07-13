@@ -46,9 +46,11 @@ export default function ProfileModal({
     onClearHighlight = null,
     forceTab = null,
     onAchievementShareComplete = null,
+    onPostCreated = null,
     userProfile,
     setUserProfile,
-    initialViewingUserId = null
+    initialViewingUserId = null,
+    setActiveTab: setAppActiveTab
 }) {
     // NOTE: early return moved AFTER all hooks to comply with Rules of Hooks
 
@@ -78,6 +80,7 @@ export default function ProfileModal({
     const [editGender, setEditGender] = useState(userProfile?.gender || '');
     const [editDob, setEditDob] = useState(userProfile?.dob || '');
     const [editName, setEditName] = useState(user?.name || '');
+    const [editMedicalCondition, setEditMedicalCondition] = useState(userProfile?.medicalCondition || '');
     const [editUsername, setEditUsername] = useState(userProfile?.username || '');
     const isUsernameLocked = !!userProfile?.username;
 
@@ -105,6 +108,7 @@ export default function ProfileModal({
         setEditUsername(userProfile?.username || '');
         setEditGender(userProfile?.gender || '');
         setEditDob(userProfile?.dob || '');
+        setEditMedicalCondition(userProfile?.medicalCondition || '');
         setShowEditPersonal(true);
     };
 
@@ -273,11 +277,59 @@ export default function ProfileModal({
     };
 
 
+    // --- LOCAL SWIPE HANDLER FOR PROFILE MODAL ---
+    const localTouchStartX = useRef(null);
+    const localTouchStartY = useRef(null);
+
+    const handleLocalTouchStart = (e) => {
+        if (e.target.closest('input[type="range"]') || e.target.closest('.no-local-swipe')) return;
+        localTouchStartX.current = e.touches[0].clientX;
+        localTouchStartY.current = e.touches[0].clientY;
+    };
+
+    const handleLocalTouchEnd = (e) => {
+        if (localTouchStartX.current === null || localTouchStartY.current === null) return;
+        if (e.target.closest('input[type="range"]') || e.target.closest('.no-local-swipe')) return;
+        
+        const touchEndX = e.changedTouches[0].clientX;
+        const touchEndY = e.changedTouches[0].clientY;
+        
+        const distanceX = localTouchStartX.current - touchEndX;
+        const distanceY = localTouchStartY.current - touchEndY;
+        
+        localTouchStartX.current = null;
+        localTouchStartY.current = null;
+
+        if (Math.abs(distanceX) > 60 && Math.abs(distanceX) > Math.abs(distanceY) * 1.5) {
+            e.stopPropagation();
+            const tabs = ['beranda', 'bagikan', 'pencapaian'];
+            const currentIndex = tabs.indexOf(activeTab);
+            
+            if (distanceX > 0) {
+                // Swipe Left -> Next Tab
+                if (currentIndex < tabs.length - 1) {
+                    playSoundEffect('click', soundEnabled);
+                    setActiveTab(tabs[currentIndex + 1]);
+                }
+            } else {
+                // Swipe Right -> Prev Tab
+                if (currentIndex > 0) {
+                    playSoundEffect('click', soundEnabled);
+                    setActiveTab(tabs[currentIndex - 1]);
+                }
+            }
+        }
+    };
+
     // Guard placed here, after all hooks, to respect Rules of Hooks
     if (!showProfileModal) return null;
 
     return (<>
-        <div className={`fixed inset-0 z-[100] flex flex-col bg-black/80 backdrop-blur-md animate-in fade-in`}>
+        <div 
+            className={`fixed inset-0 z-[100] flex flex-col bg-black/80 backdrop-blur-md animate-in fade-in no-swipe`}
+            onTouchStart={handleLocalTouchStart}
+            onTouchEnd={handleLocalTouchEnd}
+        >
             <div className={`w-full max-w-lg mx-auto ${t.bgApp} h-full flex flex-col shadow-2xl relative overflow-hidden`}>
                 
                 {/* Logout Confirmation Dialog */}
@@ -382,6 +434,7 @@ export default function ProfileModal({
                             units={units}
                             activePlanIds={activePlanIds}
                             userProfile={userProfile}
+                            onPostCreated={onPostCreated}
                         />
                     )}
 
@@ -403,6 +456,13 @@ export default function ProfileModal({
                             onEditNameClick={() => setIsEditingName(true)}
                             onEditPersonalClick={openEditPersonal}
                             userProfileData={userProfile}
+                            history={history}
+                            userAchievements={userAchievements}
+                            onAchievementShareComplete={onAchievementShareComplete}
+                            onBadgeActionClick={(tabId) => {
+                                setShowProfileModal(false);
+                                if (setAppActiveTab) setAppActiveTab(tabId);
+                            }}
                             onPostClick={(postId) => {
                                 setActiveTab('beranda');
                                 setLocalHighlight(postId);
@@ -592,6 +652,20 @@ export default function ProfileModal({
                                 <p className={`text-[10px] mt-1.5 font-bold text-rose-500 animate-in fade-in`}>Usia harus di atas 13 tahun.</p>
                             ) : null}
                         </div>
+
+                        {/* Kondisi Medis / Cedera */}
+                        <div>
+                            <label className={`text-xs font-bold ${t.textMuted} mb-2 block`}>Kondisi Medis / Cedera Fisik (Opsional)</label>
+                            <input
+                                type="text"
+                                value={editMedicalCondition}
+                                onChange={(e) => setEditMedicalCondition(e.target.value)}
+                                maxLength={100}
+                                placeholder="Misal: Nyeri lutut kanan, riwayat asma..."
+                                className={`w-full px-4 py-3 rounded-xl border-2 font-bold text-sm border-transparent ${t.inputBg} ${t.textMain} focus:outline-none focus:border-blue-500`}
+                            />
+                            <p className={`text-[10px] mt-1 font-medium ${t.textMuted}`}>AI akan mempertimbangkan ini saat menyusun program latihan.</p>
+                        </div>
                     </div>
                     
                     <div className="flex space-x-2 pt-2">
@@ -622,7 +696,7 @@ export default function ProfileModal({
                                                 isUsernameUpdated = true;
                                             }
 
-                                            setUserProfile(prev => ({ ...prev, gender: editGender, dob: editDob, name: safeName, username: newUsername }));
+                                            setUserProfile(prev => ({ ...prev, gender: editGender, dob: editDob, name: safeName, username: newUsername, medicalCondition: editMedicalCondition.trim() }));
 
                                             const isNameUpdated = safeName !== user.name;
                                             if (isNameUpdated) {
@@ -694,8 +768,13 @@ export default function ProfileModal({
                     </div>
                     
                     <div className="flex flex-col items-center text-center">
-                        <div className={`w-24 h-24 rounded-full ${selectedAchievement.bg} ${selectedAchievement.color} flex items-center justify-center mb-4 shadow-lg ${selectedAchievement.borderColor ? `border-4 ${selectedAchievement.borderColor}` : ''} ${!userAchievements?.includes(selectedAchievement.id) ? 'grayscale opacity-50' : ''}`}>
-                            {selectedAchievement.icon({ size: 48, strokeWidth: 1.5 })}
+                        <div className={`w-24 h-24 rounded-full ${selectedAchievement.bg} ${selectedAchievement.color} flex items-center justify-center mb-4 shadow-lg overflow-hidden ${selectedAchievement.borderColor ? `border-4 ${selectedAchievement.borderColor}` : ''} ${!userAchievements?.includes(selectedAchievement.id) ? 'grayscale opacity-50' : ''}`}>
+                            {selectedAchievement.imageUrl ? (
+                                <img src={selectedAchievement.imageUrl} alt={selectedAchievement.title} className="w-full h-full object-cover mix-blend-screen" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} />
+                            ) : null}
+                            <div style={{ display: selectedAchievement.imageUrl ? 'none' : 'block' }}>
+                                {selectedAchievement.fallbackIcon ? selectedAchievement.fallbackIcon({ size: 48, strokeWidth: 1.5 }) : null}
+                            </div>
                         </div>
                         
                         <h3 className={`text-xl font-black mb-1 ${isDark ? 'text-white' : 'text-black'}`}>{selectedAchievement.title}</h3>

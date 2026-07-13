@@ -12,10 +12,11 @@ import ProgressTab from '../pages/ProgressTab';
 import { MuscleProgress } from './MuscleProgress';
 import { shareWorkoutToFeed } from '../utils/communityApi';
 import CreatePostModal from './CreatePostModal';
+import ActivityRings from './ActivityRings';
 import { parseWorkoutDurationMinutes, calculateWorkoutCalories } from '../utils/workoutCalc';
 let globalTemplateIndex = 0; // default to bodycomp
 
-export default function ShareCardGenerator({ user, setUser, t, theme, history, activityTargets, programs, exerciseLibrary, lang, language, soundEnabled, playSoundEffect, selectedDate, units, activePlanIds, userProfile }) {
+export default function ShareCardGenerator({ user, setUser, t, theme, history, activityTargets, programs, exerciseLibrary, lang, language, soundEnabled, playSoundEffect, selectedDate, units, activePlanIds, userProfile, onPostCreated }) {
     const cardRef = useRef(null);
     const fileInputRef = useRef(null);
     const galleryInputRef = useRef(null);
@@ -172,7 +173,7 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
     }, [history, selectedDate]);
 
     const templates = useMemo(() => {
-        const arr = ['bodycomp', 'activity', 'progress'];
+        const arr = ['bodycomp', 'activity', 'calendar', 'progress'];
         if (workoutsList.length > 0) {
             workoutsList.forEach((_, idx) => arr.push(`workout_daily_${idx}`));
         }
@@ -641,6 +642,7 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
         if (activeTemplate === 'bodycomp') return '/bg-dashboard.webp';
         if (activeTemplate === 'activity') return '/bg-activity.webp';
         if (activeTemplate === 'progress') return '/bg-progress.webp';
+        if (activeTemplate === 'calendar') return '/bg-calendar.webp';
         if (activeTemplate === 'radar') return '/bg-progress.webp'; // bg-radar tidak pernah ada — pakai bg progress
         if (activeTemplate.startsWith('workout_daily')) {
             const idx = parseInt(activeTemplate.replace('workout_daily_', ''), 10);
@@ -654,10 +656,26 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
         return '/bg-progress.webp';
     };
 
+    const getCalendarCells = (dateStr) => {
+        const d = dateStr ? new Date(dateStr) : new Date();
+        const year = d.getFullYear();
+        const month = d.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        const startDayOfWeek = firstDay.getDay(); // Sunday = 0
+        
+        const cells = [];
+        for (let i = 0; i < startDayOfWeek; i++) cells.push(null);
+        for (let i = 1; i <= lastDay.getDate(); i++) {
+            cells.push(new Date(year, month, i));
+        }
+        return cells;
+    };
+
     return (
         <div className="space-y-4 animate-in fade-in">
             
-            <div className="relative mx-auto w-full max-w-[340px]">
+            <div className="relative mx-auto w-full max-w-[440px]">
                 
                 <div 
                     ref={cardRef}
@@ -695,11 +713,11 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                                 className="absolute inset-0 opacity-70 transition-all duration-500"
                                 style={{
                                     backgroundImage: `url(${getBgForTemplate()})`,
-                                    backgroundSize: activeTemplate === 'bodycomp' ? '200%' : activeTemplate === 'activity' ? '150%' : '160%',
-                                    backgroundPosition: activeTemplate === 'bodycomp' ? '38% 0%' : activeTemplate === 'activity' ? '65% 0%' : activeTemplate.startsWith('workout_daily') ? '25% 0%' : '60% 0%',
+                                    backgroundSize: activeTemplate === 'calendar' ? '115%' : activeTemplate === 'bodycomp' ? '200%' : activeTemplate === 'activity' ? '150%' : '160%',
+                                    backgroundPosition: activeTemplate === 'calendar' ? '10% 80px' : activeTemplate === 'bodycomp' ? '38% 0%' : activeTemplate === 'activity' ? '65% 0%' : activeTemplate.startsWith('workout_daily') ? '25% 0%' : '60% 0%',
                                     backgroundRepeat: 'no-repeat',
-                                    maskImage: (activeTemplate === 'activity') ? 'radial-gradient(ellipse at 50% 10%, rgba(0,0,0,1) 30%, rgba(0,0,0,0) 85%)' : 'linear-gradient(to bottom, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 100%)',
-                                    WebkitMaskImage: (activeTemplate === 'activity') ? 'radial-gradient(ellipse at 50% 10%, rgba(0,0,0,1) 30%, rgba(0,0,0,0) 85%)' : 'linear-gradient(to bottom, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 100%)'
+                                    maskImage: (activeTemplate === 'activity' || activeTemplate === 'calendar') ? 'radial-gradient(ellipse at 50% 10%, rgba(0,0,0,1) 30%, rgba(0,0,0,0) 85%)' : 'linear-gradient(to bottom, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 100%)',
+                                    WebkitMaskImage: (activeTemplate === 'activity' || activeTemplate === 'calendar') ? 'radial-gradient(ellipse at 50% 10%, rgba(0,0,0,1) 30%, rgba(0,0,0,0) 85%)' : 'linear-gradient(to bottom, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 100%)'
                                 }}
                             />
                         )}
@@ -889,13 +907,115 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                             </div>
                         )}
 
+                        {/* ================= CALENDAR ================= */}
+                        {activeTemplate === 'calendar' && (() => {
+                            const refDate = workoutDate ? new Date(workoutDate) : new Date();
+                            const cells = getCalendarCells(refDate);
+                            
+                            let monthCalories = 0;
+                            let monthDuration = 0;
+
+                            cells.forEach(dateObj => {
+                                if (!dateObj) return;
+                                const dKey = getLocalYMD(dateObj);
+                                const dayData = history?.[dKey] || {};
+                                const workouts = dayData.workouts || [];
+                                const completed = workouts.filter(w => w.status === 'completed' || w.timestamp || (w.log && Object.keys(w.log).length > 0));
+                                
+                                completed.forEach(w => {
+                                     const dur = parseWorkoutDurationMinutes(w.duration) || 0;
+                                     monthDuration += dur;
+                                     monthCalories += calculateWorkoutCalories(userProfile?.weight, dur) || 0;
+                                });
+                            });
+
+                            return (
+                                <div className="flex flex-col h-full justify-between">
+                                    <div className="mb-2">
+                                        <h3 className="text-2xl font-black text-white uppercase tracking-wider mb-0.5">Aktivitas Bulanan</h3>
+                                        <p className="text-[10px] text-white/70 font-bold tracking-wide uppercase">{refDate.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</p>
+                                    </div>
+
+                                    <div className="flex gap-6 mb-4">
+                                        <div className="flex flex-col">
+                                            <span className="text-[9px] font-bold text-white/60 uppercase mb-0.5">Total Kalori</span>
+                                            <span className="text-base font-black text-white">{formatNumber(monthCalories)} <span className="text-[10px] font-normal text-white/50">kcal</span></span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-[9px] font-bold text-white/60 uppercase mb-0.5">Durasi Total</span>
+                                            <span className="text-base font-black text-white">{Math.floor(monthDuration / 60)}j {monthDuration % 60}m</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex-1 flex flex-col justify-center bg-black/20 rounded-xl p-3 border border-white/5">
+                                        <div className="grid grid-cols-7 gap-1 mb-2">
+                                            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
+                                                <div key={i} className="text-center text-[9px] font-bold uppercase text-white/50">{day}</div>
+                                            ))}
+                                        </div>
+                                        <div className="grid grid-cols-7 gap-y-1 gap-x-1" style={{ gridAutoRows: '48px' }}>
+                                            {cells.map((dateObj, idx) => {
+                                                if (!dateObj) return <div key={`blank-${idx}`} />;
+                                                const dateKey = getLocalYMD(dateObj);
+                                                const day = dateObj.getDate();
+                                                const dayData = history?.[dateKey] || {};
+                                                const workouts = dayData.workouts || [];
+                                                const totalSteps = parseInt(dayData.bioData?.steps) || 0;
+                                                const hasActivity = workouts.length > 0 || totalSteps > 0;
+                                                
+                                                let ringRender = null;
+                                                if (hasActivity) {
+                                                    const completed = workouts.filter(w => w.status === 'completed' || w.timestamp || (w.log && Object.keys(w.log).length > 0));
+                                                    let totalDuration = 0;
+                                                    let totalCalories = 0;
+                                                    completed.forEach(w => {
+                                                        const dur = parseWorkoutDurationMinutes(w.duration) || 0;
+                                                        totalDuration += dur;
+                                                        totalCalories += calculateWorkoutCalories(userProfile?.weight, dur) || 0;
+                                                    });
+                                                    
+                                                    const targetDuration = activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 7) : 45;
+                                                    const targetCalories = activityTargets?.calories || 400;
+                                                    const targetSteps = activityTargets?.steps || 10000;
+
+                                                    ringRender = (
+                                                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+                                                            <ActivityRings 
+                                                                calories={totalCalories} calorieTarget={targetCalories}
+                                                                duration={totalDuration} durationTarget={targetDuration}
+                                                                steps={totalSteps} stepTarget={targetSteps}
+                                                                size={40} strokeWidth={3.5} gap={1} 
+                                                            />
+                                                        </div>
+                                                    );
+                                                }
+
+                                                return (
+                                                    <div key={dateKey} className="relative flex flex-col items-center justify-center w-full h-full">
+                                                        {ringRender}
+                                                        <span className="text-[10px] font-bold text-white/90 z-10">{day}</span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="flex justify-between mt-4 px-2 mb-2">
+                                        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[#f43f5e]"></div><span className="text-[9px] font-bold text-white/60">Kalori</span></div>
+                                        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[#10b981]"></div><span className="text-[9px] font-bold text-white/60">Latihan</span></div>
+                                        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[#3b82f6]"></div><span className="text-[9px] font-bold text-white/60">Langkah</span></div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
                         {/* ================= PROGRESS ================= */}
                         {activeTemplate === 'progress' && (
                             <div className="flex flex-col h-full flex-1 justify-between">
                                 <h3 className="text-lg font-black text-white uppercase tracking-wider mb-2">Progres Latihan</h3>
-                                <div className="flex-1 -mx-5 -mb-5 bg-[#061626]/80 rounded-t-3xl pt-2 relative z-10 border-t border-white/10 overflow-visible">
-                                    <div className="absolute inset-0 pointer-events-none rounded-t-3xl" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.4) 100%)' }} />
-                                    <div className="relative z-10 h-full p-3 pb-2">
+                                <div className="mt-auto -mx-5 -mb-5 bg-[#061626]/40 backdrop-blur-md rounded-t-[45px] pt-4 relative z-10 border-t border-white/10 overflow-visible">
+                                    <div className="absolute inset-0 pointer-events-none rounded-t-[45px]" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.5) 100%)' }} />
+                                    <div className="relative z-10 p-3 pb-2">
                                         <div className="share-card-progress pointer-events-none mt-[-20px] mx-[-10px]">
                                             <ProgressTab 
                                                 t={{...t, textMain: 'text-white', textMuted: 'text-white/60', border: 'border-white/10', bgBox: 'bg-white/5', bgAccent: 'bg-white/20', btnBg: 'bg-white/5'}} 
@@ -941,34 +1061,47 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                                             </div>
                                             
                                             {/* MINI STATS */}
-                                            <div className="w-[70%] flex flex-wrap items-center gap-1.5 mb-2">
-                                                <div className="flex items-center gap-1.5 bg-white/10 px-2 py-1 rounded border border-white/10">
-                                                    <Clock size={12} className="text-sky-400" />
-                                                    <span className="text-[9px] font-black text-white">{getWorkoutDurationMins(latestWorkout)} m</span>
+                                            <div className="w-[55%] flex flex-col gap-1.5 mb-2">
+                                                <div className="flex flex-wrap items-center gap-1.5">
+                                                    <div className="flex items-center gap-1.5 bg-white/10 px-2 py-1 rounded border border-white/10">
+                                                        <Clock size={12} className="text-sky-400" />
+                                                        <span className="text-[9px] font-black text-white">{getWorkoutDurationMins(latestWorkout)} m</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5 bg-white/10 px-2 py-1 rounded border border-white/10">
+                                                        <Flame size={12} className="text-orange-400" />
+                                                        <span className="text-[9px] font-black text-white">{calculateWorkoutCalories(bioData.weight, getWorkoutDurationMins(latestWorkout))} kcal</span>
+                                                    </div>
                                                 </div>
-                                                <div className="flex items-center gap-1.5 bg-white/10 px-2 py-1 rounded border border-white/10">
-                                                    <Flame size={12} className="text-orange-400" />
-                                                    <span className="text-[9px] font-black text-white">{calculateWorkoutCalories(bioData.weight, getWorkoutDurationMins(latestWorkout))} kcal</span>
-                                                </div>
-                                                <div className="flex items-center gap-1.5 bg-white/10 px-2 py-1 rounded border border-white/10">
-                                                    <Dumbbell size={12} className="text-amber-400" />
-                                                    <span className="text-[9px] font-black text-white">{formatNumber(getWorkoutVolume(latestWorkout))} kg</span>
+                                                <div className="flex flex-wrap items-center gap-1.5">
+                                                    <div className="flex items-center gap-1.5 bg-white/10 px-2 py-1 rounded border border-white/10">
+                                                        <Dumbbell size={12} className="text-amber-400" />
+                                                        <span className="text-[9px] font-black text-white">{formatNumber(getWorkoutVolume(latestWorkout))} kg</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                             
                                             {/* EXERCISES LIST COMPACT */}
-                                            <div className="w-[60%] mb-2">
-                                                <p className="text-[10px] text-white/80 font-medium leading-tight">
-                                                    {(latestWorkout.overriddenExercises || programs?.find(p => p.id === latestWorkout.programId)?.exercises || []).map(ex => ex.name).join(' • ')}
-                                                </p>
+                                            <div className="w-[40%] mb-2">
+                                                {(() => {
+                                                    const exNames = (latestWorkout.overriddenExercises || programs?.find(p => p.id === latestWorkout.programId)?.exercises || []).map(ex => ex.name).join(' • ');
+                                                    const len = exNames.length;
+                                                    let fontSize = 'text-[10px]';
+                                                    if (len < 50) fontSize = 'text-xs';
+                                                    else if (len > 100) fontSize = 'text-[9px]';
+                                                    return (
+                                                        <p className={`${fontSize} text-white/80 font-medium leading-tight`}>
+                                                            {exNames}
+                                                        </p>
+                                                    );
+                                                })()}
                                             </div>
                                         </div>
 
                                         {/* RADAR CHART (LOCKED TO BOTTOM) */}
-                                        <div className="absolute bottom-[-20px] left-[-20px] right-[-20px] bg-[#061626]/80 rounded-3xl pt-2 z-10 border-t border-white/10 overflow-hidden flex flex-col h-[180px]">
-                                            <div className="absolute inset-0 pointer-events-none rounded-3xl" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.4) 100%)' }} />
+                                        <div className="absolute bottom-[-35px] left-[-20px] right-[-20px] bg-[#061626]/30 backdrop-blur-sm rounded-[45px] pt-2 z-10 border-t border-white/10 overflow-hidden flex flex-col h-[140px]">
+                                            <div className="absolute inset-0 pointer-events-none rounded-[45px]" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.5) 100%)' }} />
                                             <div className="relative z-10 h-full p-2 flex items-center justify-center">
-                                                <div className="share-card-radar pointer-events-none w-full transform scale-[0.85] origin-center mt-[-15px]">
+                                                <div className="share-card-radar pointer-events-none w-full transform scale-[0.75] origin-center mt-[10px]">
                                                     <MuscleProgress 
                                                         history={{ [latestWorkoutDate]: { workouts: [simulatedWorkout] } }}
                                                         programs={programs}
@@ -1004,7 +1137,7 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
             </div>
 
             {/* Navigation and Custom Background Text */}
-            <div className="flex items-center justify-between mt-3 mb-2 w-full max-w-[340px] mx-auto px-1 relative">
+            <div className="flex items-center justify-between mt-3 mb-2 w-full max-w-[440px] mx-auto px-1 relative">
                 <button 
                     onClick={prevTemplate} 
                     className={`p-2 shrink-0 rounded-full bg-black/10 dark:bg-white/5 shadow-xl border border-black/10 dark:border-white/10 hover:opacity-80 transition-all text-zinc-600 dark:text-zinc-300`}
@@ -1047,7 +1180,7 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
             </div>
 
             {/* Action Buttons */}
-            <div className="flex justify-center w-full space-x-2 pt-2">
+            <div className="flex justify-center w-full max-w-[440px] mx-auto space-x-2 pt-2">
                 <button 
                     onClick={() => fileInputRef.current?.click()}
                     className="flex shrink-0 items-center justify-center p-3 rounded-2xl bg-black/10 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:bg-black/20 dark:hover:bg-white/10 transition-all text-zinc-600 dark:text-zinc-300 shadow-sm"
@@ -1115,10 +1248,11 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                     theme={theme} 
                     initialFiles={pendingShareFiles} 
                     postDataOverrides={pendingWorkoutData}
-                    onClose={(success) => {
+                    onClose={(success, newPostId) => {
                         setPendingShareFiles(null);
                         if (success) {
                             showToast("Berhasil dibagikan ke komunitas!");
+                            if (onPostCreated) onPostCreated(newPostId);
                         }
                     }} 
                 />

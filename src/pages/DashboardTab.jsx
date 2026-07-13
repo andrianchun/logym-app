@@ -36,7 +36,7 @@ const MiniBox = ({ label, value, unit, t, theme }) => (
     </div>
 );
 
-const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, exerciseLibrary, navigateToWorkoutDate, soundEnabled, playSoundEffect, theme, selectedDate, biometricStandard, units, setConfirmModal, activityTargets, setActivityTargets, gymProfiles, activeGymId, activePlanIds, userApiKeys, aiProvider, aiModel, userAchievements, connectedApps, userProfile, keyStatuses, setKeyStatuses, setShowSettings }) => {
+const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, exerciseLibrary, navigateToWorkoutDate, soundEnabled, playSoundEffect, theme, selectedDate, biometricStandard, units, setConfirmModal, activityTargets, setActivityTargets, gymProfiles, activeGymId, activePlanIds, userApiKeys, aiProvider, aiModel, userAchievements, connectedApps, userProfile, keyStatuses, setKeyStatuses, setShowSettings, lomealToday }) => {
   const todayStr = getLocalYMD(new Date());
   const activeDate = todayStr;
 
@@ -814,6 +814,22 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
       </div>
       </div>
 
+      {lomealToday && (
+        <div className={`relative z-10 flex items-center gap-3 p-4 rounded-2xl ${t.bgCard} border ${t.border} anim-rise mt-4`} style={{ animationDelay: '90ms' }}>
+          <span className={`w-9 h-9 rounded-full ${t.bgAccentSoft} ${t.textAccent} flex items-center justify-center shrink-0`}>
+            <Utensils size={16} />
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className={`caption ${t.textMuted}`}>Kalori dimakan hari ini (Lomeal)</p>
+            <p className={`body-lg font-black ${t.textMain}`}>
+              {formatNumber(lomealToday.kcal)} kkal
+              <span className={`caption font-normal ${t.textMuted} ml-2`}>
+                P{formatNumber(lomealToday.protein)} · K{formatNumber(lomealToday.carbs)} · L{formatNumber(lomealToday.fat)}
+              </span>
+            </p>
+          </div>
+        </div>
+      )}
 
 
       {/* --- GRUP PROGRESS --- */}

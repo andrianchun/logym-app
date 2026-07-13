@@ -11,10 +11,10 @@ const WorkoutHeader = ({ t, language, selectedDate, soundEnabled, playSoundEffec
       <div className="px-3 flex items-start justify-between gap-4">
         <div className="flex flex-col">
           <h1 className="text-4xl sm:text-5xl font-black tracking-tight leading-none text-zinc-900 dark:text-white capitalize mb-1">
-            {dayName}.
+            {dayName}
           </h1>
           <h2 className={`text-3xl sm:text-4xl font-black tracking-tight leading-none ${t.textAccent}`}>
-            {dateName}.
+            {dateName}
           </h2>
         </div>
         {warmupVideos && (

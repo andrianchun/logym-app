@@ -1,19 +1,30 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X } from 'lucide-react';
 
-export default function ImageModal({ imageUrl, onClose }) {
+export default function ImageModal({ images = [], initialIndex = 0, onClose }) {
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
-  const dragStartRef = useRef({ x: 0, y: 0, initialPinchDistance: null });
+  const [isClosing, setIsClosing] = useState(false);
+  
+  const dragStartRef = useRef({ x: 0, y: 0, initialPinchDistance: null, startTouchX: 0 });
 
   useEffect(() => {
-    // Prevent body scroll when modal is open
     document.body.style.overflow = 'hidden';
+    
+    window.history.pushState(null, '', window.location.href);
+    const handlePopState = () => {
+      onClose();
+    };
+    window.addEventListener('popstate', handlePopState);
+    
     return () => {
       document.body.style.overflow = 'auto';
+      window.removeEventListener('popstate', handlePopState);
     };
-  }, []);
+  }, [onClose]);
+
+  if (!images || images.length === 0) return null;
 
   const getPinchDistance = (touches) => {
     if (touches.length < 2) return null;
@@ -25,11 +36,12 @@ export default function ImageModal({ imageUrl, onClose }) {
   const handleTouchStart = (e) => {
     if (e.touches.length === 2) {
       dragStartRef.current.initialPinchDistance = getPinchDistance(e.touches);
-    } else if (e.touches.length === 1 && scale > 1) {
+    } else if (e.touches.length === 1) {
       setIsDragging(true);
       dragStartRef.current = {
         x: e.touches[0].clientX - position.x,
-        y: e.touches[0].clientY - position.y
+        y: e.touches[0].clientY - position.y,
+        startTouchX: e.touches[0].clientX
       };
     }
   };
@@ -41,66 +53,102 @@ export default function ImageModal({ imageUrl, onClose }) {
       const newScale = Math.min(Math.max(1, scale + delta * 0.01), 4);
       setScale(newScale);
       
-      // Reset position when zoomed out completely
-      if (newScale === 1) {
-        setPosition({ x: 0, y: 0 });
-      }
-      
+      if (newScale === 1) setPosition({ x: 0, y: 0 });
       dragStartRef.current.initialPinchDistance = currentDistance;
-    } else if (e.touches.length === 1 && isDragging && scale > 1) {
-      setPosition({
-        x: e.touches[0].clientX - dragStartRef.current.x,
-        y: e.touches[0].clientY - dragStartRef.current.y
-      });
+      
+    } else if (e.touches.length === 1 && isDragging) {
+      if (scale > 1) {
+        setPosition({
+          x: e.touches[0].clientX - dragStartRef.current.x,
+          y: e.touches[0].clientY - dragStartRef.current.y
+        });
+      } else if (images.length > 1) {
+        let diffX = e.touches[0].clientX - dragStartRef.current.startTouchX;
+        // Resistance at edges
+        if ((currentIndex === 0 && diffX > 0) || (currentIndex === images.length - 1 && diffX < 0)) {
+          diffX = diffX * 0.3;
+        }
+        setPosition({ x: diffX, y: 0 });
+      }
     }
   };
 
   const handleTouchEnd = () => {
     setIsDragging(false);
     dragStartRef.current.initialPinchDistance = null;
+    
+    if (scale === 1 && images.length > 1) {
+      if (position.x > 80 && currentIndex > 0) {
+        setCurrentIndex(prev => prev - 1);
+      } else if (position.x < -80 && currentIndex < images.length - 1) {
+        setCurrentIndex(prev => prev + 1);
+      }
+      setPosition({ x: 0, y: 0 });
+    }
   };
 
-  if (!imageUrl) return null;
+  const handleClose = () => {
+    if (isClosing) return;
+    setIsClosing(true);
+    window.history.back();
+  };
+
+  const containerTransform = `translateX(calc(-${currentIndex * 100}vw + ${scale === 1 ? position.x : 0}px))`;
 
   return (
-    <div className="fixed inset-0 z-[1000] bg-black/95 backdrop-blur-xl flex flex-col justify-center items-center animate-in fade-in duration-300">
+    <div 
+      className="fixed inset-0 z-[1000] bg-slate-950/80 backdrop-blur-xl flex flex-col justify-center animate-in fade-in duration-300 overflow-hidden"
+      onClick={(e) => { if(e.target === e.currentTarget) handleClose(); }}
+    >
       
-      {/* Top Bar */}
-      <div className="absolute top-0 left-0 right-0 p-4 flex justify-end z-10 bg-gradient-to-b from-black/60 to-transparent" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
-        <button 
-          onClick={onClose}
-          className="p-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors backdrop-blur-md"
-        >
-          <X size={24} />
-        </button>
-      </div>
+      {/* Pagination indicators - Bottom */}
+      {images.length > 1 && (
+        <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1.5 z-20 pointer-events-none">
+          {images.map((_, idx) => (
+            <div key={idx} className={`h-1.5 rounded-full transition-all duration-300 shadow-sm ${idx === currentIndex ? 'w-6 bg-white' : 'w-1.5 bg-white/40'}`} />
+          ))}
+        </div>
+      )}
 
-      {/* Image Container */}
+      {/* Carousel Track */}
       <div 
-        className="w-full h-full flex justify-center items-center overflow-hidden touch-none"
+        className={`flex h-full w-full touch-none ${!isDragging ? 'transition-transform duration-300 ease-out' : ''}`}
+        style={{ transform: containerTransform }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        onClick={(e) => {
-          // Reset zoom on click roughly (simple click toggle)
-          if (scale > 1) {
-            setScale(1);
-            setPosition({ x: 0, y: 0 });
-          }
-        }}
+        onClick={(e) => { if(e.target === e.currentTarget) handleClose(); }}
       >
-        <img 
-          src={imageUrl} 
-          alt="Fullscreen view" 
-          className="max-w-full max-h-[85vh] object-contain transition-transform duration-200 ease-out"
-          style={{ 
-            transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-            cursor: scale > 1 ? 'grab' : 'zoom-in'
-          }}
-          draggable="false"
-        />
+        {images.map((img, idx) => (
+          <div 
+            key={idx} 
+            className="w-[100vw] h-full shrink-0 flex justify-center items-center relative px-4 py-12"
+            onClick={(e) => { if(e.target === e.currentTarget) handleClose(); }}
+          >
+            <img 
+              src={img} 
+              alt={`Fullscreen view ${idx + 1}`} 
+              className={`max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-6rem)] object-contain rounded-xl shadow-2xl ${scale === 1 ? 'transition-transform duration-300' : ''}`}
+              style={{ 
+                transform: idx === currentIndex && scale > 1 ? `translate(${position.x}px, ${position.y}px) scale(${scale})` : 'none',
+                cursor: scale > 1 ? 'grab' : 'zoom-in'
+              }}
+              draggable="false"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (scale > 1) {
+                  setScale(1);
+                  setPosition({ x: 0, y: 0 });
+                } else {
+                  handleClose();
+                }
+              }}
+            />
+          </div>
+        ))}
       </div>
 
     </div>
   );
 }
+

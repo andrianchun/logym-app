@@ -82,6 +82,16 @@ export default function App() {
   }, []);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
+  // --- SINKRON LOMEAL (app pencatat kalori pendamping) — baca kalori dimakan hari ini ---
+  const [lomealToday, setLomealToday] = useState(null);
+  useEffect(() => {
+    if (!user?.uid) { setLomealToday(null); return; }
+    const unsub = onSnapshot(doc(db, 'users', user.uid), (snap) => {
+      setLomealToday(snap.data()?.lomealSync?.today || null);
+    });
+    return unsub;
+  }, [user?.uid]);
+
   // --- PWA INSTALL PROMPT ---
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
@@ -244,9 +254,14 @@ export default function App() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [profileForceTab, setProfileForceTab] = useState(null);
   const [highlightPostId, setHighlightPostId] = useState(null);
-  // { userId, nonce } — nonce (bukan cuma userId) supaya klik notifikasi/deep-link ke
-  // orang yang SAMA berturut-turut tetap dianggap request baru oleh ProfileModal (state
-  // primitif yang gak berubah nilainya gak akan re-trigger useEffect di sana).
+
+  const handlePostCreated = (postId) => {
+    setProfileForceTab('beranda');
+    setShowProfileModal(true);
+    if (postId) setHighlightPostId(postId);
+    setTimeout(() => setProfileForceTab(null), 500);
+  };
+
   const [profileViewRequest, setProfileViewRequest] = useState(null);
   const openUserProfile = (userId) => {
     setProfileViewRequest({ userId, nonce: Date.now() });
@@ -789,7 +804,7 @@ export default function App() {
         setExerciseLogs({});
         setExtraExercises([]);
         setSkippedExercises({});
-        setUserApiKey('');
+        setUserApiKeys([]);
         setAiProvider('google');
         setAiModel('gemini-3.5-flash');
         setUserProfile(null);
@@ -2360,10 +2375,9 @@ export default function App() {
            highlightPostId={highlightPostId}
            onClearHighlight={() => setHighlightPostId(null)}
            forceTab={profileForceTab}
-           onAchievementShareComplete={(postId) => {
-             // Highlight the newly shared post in the community feed
-             if (postId) setHighlightPostId(postId);
-           }}
+           setActiveTab={setActiveTab}
+           onAchievementShareComplete={handlePostCreated}
+           onPostCreated={handlePostCreated}
         />
       </React.Suspense>
       )}
@@ -2431,6 +2445,7 @@ export default function App() {
                setShowSettings={setShowSettings}
                userAchievements={userAchievements} connectedApps={connectedApps}
                userProfile={userProfile}
+               lomealToday={lomealToday}
              />
          )}
          
@@ -2477,11 +2492,13 @@ export default function App() {
                activePlanIds={activePlanIds}
                userProfile={userProfile}
                raigaPersona={raigaPersona}
+               activityTargets={activityTargets}
              />
          )}
 
          {activeTab === 'program' && (
              <ProgramTab setConfirmModal={setConfirmModal} 
+               onPostCreated={handlePostCreated}
                t={t} lang={lang} programs={programs} setPrograms={setPrograms} 
                user={user} exerciseLibrary={exerciseLibrary} soundEnabled={soundEnabled}
                setActiveAddModalTarget={setActiveAddModalTarget}
