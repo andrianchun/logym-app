@@ -987,7 +987,6 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
       {/* In-app dialog */}
       {dialog}
     </div>
-    </div>
   );
 };
 
