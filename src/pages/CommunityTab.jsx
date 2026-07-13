@@ -896,7 +896,6 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
           </div>
         )}
       </div>
-      </div>
 
       <div className="px-4 pb-2 relative z-10 flex gap-2">
         {SOURCE_FILTERS.map((f) => (
@@ -987,6 +986,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
 
       {/* In-app dialog */}
       {dialog}
+    </div>
     </div>
   );
 };
