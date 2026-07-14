@@ -7,6 +7,7 @@ import ScrollPicker from '../components/ScrollPicker';
 import useDialog from '../hooks/useDialog';
 import GymManagerModal from '../components/GymManagerModal';
 import { getPlanBgConfig } from '../utils/planBg';
+import { calcBMR, ACTIVITY_MULTIPLIERS } from '../utils/bmr';
 
 const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, soundEnabled, gymProfiles, setGymProfiles, activeGymId, setActiveGymId, exerciseLibrary, units, user, userProfile, userApiKeys, aiProvider, aiModel, keyStatuses, setKeyStatuses, setAiProvider, setAiModel, setShowSettings }) => {
   const [step, setStep] = useState(0);
@@ -298,20 +299,13 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
     
     // Hitung BMR & TDEE
     const age = answers.dob ? (new Date().getFullYear() - new Date(answers.dob).getFullYear()) : 25;
-    let bmr = 10 * finalWeight + 6.25 * finalHeight - 5 * age;
-    bmr = Math.round(answers.gender === 'female' ? bmr - 161 : bmr + 5);
-    
+    const bmr = calcBMR({ weight: finalWeight, height: finalHeight, age, gender: answers.gender });
+
     // Hitung BMI
     const hMeter = finalHeight / 100;
     const bmi = Number((finalWeight / (hMeter * hMeter)).toFixed(1));
 
-    const activityMultipliers = {
-      sedentary: 1.2,
-      light: 1.375,
-      moderate: 1.55,
-      active: 1.725
-    };
-    const tdee = Math.round(bmr * (activityMultipliers[answers.activityLevel] || 1.2));
+    const tdee = Math.round(bmr * (ACTIVITY_MULTIPLIERS[answers.activityLevel] || 1.2));
     
     let calorieDelta = 0;
     if (answers.goal === 'fat_loss') calorieDelta = -500;

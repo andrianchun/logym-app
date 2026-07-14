@@ -12,6 +12,7 @@ import { MuscleProgress } from '../components/MuscleProgress';
 import SwipeInput from '../components/SwipeInput';
 import { formatNumber } from '../utils/numberFormat';
 import { parseWorkoutDurationMinutes, calculateWorkoutCalories } from '../utils/workoutCalc';
+import { calcBMR } from '../utils/bmr';
 
 
 const MetricBox = ({ label, value, unit, icon, color, t, theme }) => (
@@ -36,7 +37,7 @@ const MiniBox = ({ label, value, unit, t, theme }) => (
     </div>
 );
 
-const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, exerciseLibrary, navigateToWorkoutDate, soundEnabled, playSoundEffect, theme, selectedDate, biometricStandard, units, setConfirmModal, activityTargets, setActivityTargets, gymProfiles, activeGymId, activePlanIds, userApiKeys, aiProvider, aiModel, userAchievements, connectedApps, userProfile, keyStatuses, setKeyStatuses, setShowSettings, lomealToday }) => {
+const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, exerciseLibrary, navigateToWorkoutDate, soundEnabled, playSoundEffect, theme, selectedDate, biometricStandard, units, setConfirmModal, activityTargets, setActivityTargets, gymProfiles, activeGymId, activePlanIds, userApiKeys, aiProvider, aiModel, userAchievements, connectedApps, userProfile, keyStatuses, setKeyStatuses, setShowSettings, lomealToday, lomealTargets }) => {
   const todayStr = getLocalYMD(new Date());
   const activeDate = todayStr;
 
@@ -180,8 +181,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      // Auto-calculate BMR for dashboard display if not exist
      if (mergedData.height > 0 && mergedData.weight > 0 && !mergedData.bmr && userProfile?.gender && userProfile?.dob) {
          const age = new Date().getFullYear() - new Date(userProfile.dob).getFullYear() || 25;
-         let bmr = 10 * mergedData.weight + 6.25 * mergedData.height - 5 * age;
-         mergedData.bmr = Math.round(userProfile.gender === 'female' ? bmr - 161 : bmr + 5);
+         mergedData.bmr = calcBMR({ weight: mergedData.weight, height: mergedData.height, age, gender: userProfile.gender });
      }
      
      return { 
@@ -382,8 +382,8 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   const { mergedDailyActiveMinutes, mergedDailyCalories, mergedWeeklyActiveMinutes, mergedWeeklyWorkoutDuration, mergedWeeklySessions, mergedWeeklyCalories } = useMemo(() => {
      const currentWeight = Number(bioData.weight) || 70; // Asumsi 70kg jika tidak ada data
      let dailyActive = Number(bioData.activeMinutes || 0);
-     let dailyCals = Number(bioData.activityCalories || 0);
-     
+     const isDailyCalsManual = !!bioData._manualFlags?.activityCalories;
+
      const todayWks = history[activeDate]?.workouts || [];
      const todayCompletedWks = todayWks.filter(w => w.status === 'completed' || w.programId === 'adhoc');
      
@@ -397,12 +397,16 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      
      dailyActive = Math.max(dailyActive, intTodayDur);
 
-     // Kalori Dibakar = BMR + Langkah Kaki + Workout
-     const bmrCalories = Math.round(currentWeight * 24); // ~24 kcal/kg/day (sederhana)
+     // Kalori Dibakar = BMR + Langkah Kaki + Workout — bmr Mifflin-St Jeor asli (sudah
+     // dihitung di atas buat kartu Komposisi Tubuh), fallback 1600 nyamain konvensi Lomeal
+     // (nutrition.js: calcBMR(profile) || 1600) buat profil yang belum lengkap.
+     const bmrCalories = bioData.bmr || 1600;
      const stepsCalories = Math.round((Number(bioData.steps || 0) * 0.04)); // ~0.04 kcal per langkah
      const workoutCalories = intTodayCals;
      const totalDailyCals = bmrCalories + stepsCalories + workoutCalories;
-     dailyCals = dailyCals > 0 ? Math.max(dailyCals, totalDailyCals) : totalDailyCals;
+     // Manual (flag dari modal input / koreksi Lomeal) menang & dibekukan; kalau bukan
+     // manual, selalu pakai hasil hitung fresh (bisa naik-turun wajar, bukan ratchet Math.max).
+     const dailyCals = isDailyCalsManual ? (Number(bioData.activityCalories) || 0) : totalDailyCals;
      
      let weeklyDur = 0;
      let weeklyWorkoutDur = 0;
@@ -417,25 +421,26 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          const dayData = history[dateStr] || {};
          
          let extDur = Number(dayData.bioData?.activeMinutes || 0);
-         let extCal = Number(dayData.bioData?.activityCalories || 0);
+         const extCal = Number(dayData.bioData?.activityCalories || 0);
+         const isDayCalManual = !!dayData.bioData?._manualFlags?.activityCalories;
          const dayWeight = Number(dayData.bioData?.weight) || currentWeight;
-         
+
          let intDur = 0;
          let intCal = 0;
-         
+
          const wks = dayData.workouts || [];
          const completedWks = wks.filter(w => w.status === 'completed' || w.programId === 'adhoc');
          weeklySess += completedWks.length;
-         
+
          completedWks.forEach(w => {
              const wDuration = parseWorkoutDurationMinutes(w.duration);
              intDur += wDuration;
              intCal += calculateWorkoutCalories(dayWeight, wDuration);
          });
-         
+
          weeklyDur += Math.max(extDur, intDur);
          weeklyWorkoutDur += intDur;
-         weeklyCals += Math.max(extCal, intCal);
+         weeklyCals += isDayCalManual ? extCal : Math.max(extCal, intCal);
      }
      
      // Override with manual weekly if user explicitly saved a modified value in the modal
@@ -445,15 +450,48 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      if (bioData.weeklySessions !== undefined && bioData.weeklySessions !== '') weeklySess = Number(bioData.weeklySessions);
      if (bioData.weeklyCalories !== undefined && bioData.weeklyCalories !== '') weeklyCals = Number(bioData.weeklyCalories);
      
-     return { 
-         mergedDailyActiveMinutes: dailyActive, 
+     return {
+         mergedDailyActiveMinutes: dailyActive,
          mergedDailyCalories: dailyCals,
-         mergedWeeklyActiveMinutes: weeklyDur, 
+         mergedWeeklyActiveMinutes: weeklyDur,
          mergedWeeklyWorkoutDuration: weeklyWorkoutDur,
          mergedWeeklySessions: weeklySess,
          mergedWeeklyCalories: weeklyCals
      };
   }, [history, activeDate, bioData]);
+
+  // Kalori dibakar cuma dihitung on-the-fly buat tampilan (tidak pernah tersimpan ke
+  // bioData.activityCalories) — tulis balik nilai hasil hitung hari ini biar Lomeal
+  // (yang cuma baca bio.activityCalories, read-only) bisa nampilin bonus kalori olahraga.
+  // Skip kalau hari ini udah ditandai manual (dari modal input Logym atau koreksi Lomeal) —
+  // jangan nimpa balik nilai yang sengaja di-override user.
+  useEffect(() => {
+     if (activeDate === todayStr && !bioData._manualFlags?.activityCalories && mergedDailyCalories > 0 && Number(bioData.activityCalories || 0) !== mergedDailyCalories) {
+         setHistory(prev => ({
+             ...prev,
+             [activeDate]: {
+                 ...(prev[activeDate] || {}),
+                 bioData: { ...(prev[activeDate]?.bioData || {}), activityCalories: mergedDailyCalories }
+             }
+         }));
+     }
+  }, [mergedDailyCalories, activeDate, todayStr]);
+
+  // Snapshot target/fase diet hari ini — di-refresh terus selama activeDate === todayStr,
+  // otomatis membeku jadi arsip begitu tanggalnya lewat (efek ini gak pernah nyentuh hari lain).
+  useEffect(() => {
+     if (activeDate !== todayStr) return;
+     const snap = { nutritionGoal: activityTargets?.nutritionGoal || null, calorieDelta: activityTargets?.calorieDelta || 0, tdee: activityTargets?.tdee || null };
+     const existing = bioData.targetSnapshot;
+     if (existing && existing.nutritionGoal === snap.nutritionGoal && existing.calorieDelta === snap.calorieDelta && existing.tdee === snap.tdee) return;
+     setHistory(prev => ({
+         ...prev,
+         [activeDate]: {
+             ...(prev[activeDate] || {}),
+             bioData: { ...(prev[activeDate]?.bioData || {}), targetSnapshot: snap }
+         }
+     }));
+  }, [activityTargets?.nutritionGoal, activityTargets?.calorieDelta, activityTargets?.tdee, activeDate, todayStr]);
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300 pb-6">
@@ -680,47 +718,39 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                       );
                   })()}
 
-                 {/* Kalori Makanan */}
+                 {/* Kalori Dimakan — ditarik dari Lomeal (lomealSync.today); target juga dari Lomeal
+                     (lomealSync.targets) karena delta cutting/bulking sekarang murni diatur di sana. */}
                  <div className="flex flex-col h-full">
-                     <div className="flex items-center space-x-1.5 mb-1"><span className="w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-500 flex items-center justify-center shrink-0"><Utensils size={11}/></span> <span className={`caption ${t.textMuted} capitalize`}>Kalori Makanan</span></div>
+                     <div className="flex items-center space-x-1.5 mb-1"><span className="w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-500 flex items-center justify-center shrink-0"><Utensils size={11}/></span> <span className={`caption ${t.textMuted} capitalize`}>Kalori Dimakan</span></div>
+                     {(() => {
+                       // Manual entry Logym sendiri menang duluan (kalau ditandai manual),
+                       // baru fallback ke push otomatis Lomeal — dulu punya Lomeal SELALU
+                       // menang, jadi manual entry di sini langsung ketiban tiap kali Lomeal sync.
+                       const nutritionCalories = (bioData._manualFlags?.nutritionCalories ? bioData.nutritionCalories : null) ?? lomealToday?.kcal ?? bioData.nutritionCalories;
+                       const foodTarget = lomealTargets?.kcal || 2000;
+                       return (
                      <div className="flex flex-col flex-1 justify-end">
                          <div className="flex items-baseline space-x-1 mb-2">
-                             <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{formatNumber(bioData.nutritionCalories, language) || '-'}</span>
-                             <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold whitespace-nowrap">/ {formatNumber(Math.max(0, (activityTargets?.activityCalories || 2000) + (activityTargets?.calorieDelta || 0)), language)}</span>
+                             <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{formatNumber(nutritionCalories, language) || '-'}</span>
+                             <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold whitespace-nowrap">/ {formatNumber(foodTarget, language)}</span>
                          </div>
                          <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full mb-1 overflow-hidden shrink-0">
-                             <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Number(bioData.nutritionCalories || 0) / Math.max(1, (activityTargets?.activityCalories || 2000) + (activityTargets?.calorieDelta || 0))) * 100)}%` }}></div>
-                         </div>
-                         <div className="flex items-center gap-1.5 mt-0.5 opacity-80">
-                             {activityTargets?.nutritionGoal && activityTargets.nutritionGoal !== 'custom' && (
-                                 <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-sm ${activityTargets.nutritionGoal === 'cutting' ? 'bg-rose-500/15 text-rose-500' : (activityTargets.nutritionGoal === 'maintenance' ? 'bg-zinc-500/15 text-zinc-500 dark:text-zinc-400' : 'bg-emerald-500/15 text-emerald-500')} uppercase tracking-wider`}>
-                                     {activityTargets.nutritionGoal.replace('_', ' ')}
-                                 </span>
-                             )}
-                             <span className="text-[9px] text-zinc-500 dark:text-zinc-400 font-bold whitespace-nowrap">
-                                 {activityTargets?.calorieDelta > 0 ? '+' : ''}{activityTargets?.calorieDelta || 0} kcal/hari
-                             </span>
+                             <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Number(nutritionCalories || 0) / foodTarget) * 100)}%` }}></div>
                          </div>
                      </div>
+                       );
+                     })()}
                  </div>
 
-                 {/* Kalori Dibakar */}
+                 {/* Kalori Dibakar — murni informatif (BMR+langkah+olahraga), gak ada target manual lagi */}
                  <div className="flex flex-col h-full text-right items-end">
                      <div className="flex items-center justify-end space-x-1.5 mb-1"><span className={`caption ${t.textMuted} capitalize`}>Kalori Dibakar</span> <span className="w-5 h-5 rounded-full bg-blue-500/15 text-blue-500 flex items-center justify-center shrink-0"><Flame size={11}/></span></div>
                      <div className="flex flex-col flex-1 justify-end w-full">
                          <div className="flex items-baseline justify-end space-x-1 mb-2">
                                       <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{mergedDailyCalories > 0 ? formatNumber(mergedDailyCalories, language) : '-'}</span>
-                                      <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold whitespace-nowrap">/ {formatNumber(activityTargets?.activityCalories || 2500, language)}</span>
+                                      <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold whitespace-nowrap">kcal</span>
                                   </div>
-                         <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full mb-1 overflow-hidden shrink-0 flex justify-end">
-                             <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Number(mergedDailyCalories || 0) / (activityTargets?.activityCalories || 2500)) * 100)}%` }}></div>
-                         </div>
-                         <div className="flex items-center justify-end gap-1.5 mt-0.5 opacity-0 pointer-events-none select-none">
-                             {activityTargets?.nutritionGoal && activityTargets.nutritionGoal !== 'custom' && (
-                                 <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wider">SPACER</span>
-                             )}
-                             <span className="text-[9px] font-bold whitespace-nowrap">spacer</span>
-                         </div>
+                         <div className="w-full h-1.5 rounded-full mb-1 shrink-0"></div>
                      </div>
                  </div>
 
@@ -813,24 +843,6 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          </div>
       </div>
       </div>
-
-      {lomealToday && (
-        <div className={`relative z-10 flex items-center gap-3 p-4 rounded-2xl ${t.bgCard} border ${t.border} anim-rise mt-4`} style={{ animationDelay: '90ms' }}>
-          <span className={`w-9 h-9 rounded-full ${t.bgAccentSoft} ${t.textAccent} flex items-center justify-center shrink-0`}>
-            <Utensils size={16} />
-          </span>
-          <div className="flex-1 min-w-0">
-            <p className={`caption ${t.textMuted}`}>Kalori dimakan hari ini (Lomeal)</p>
-            <p className={`body-lg font-black ${t.textMain}`}>
-              {formatNumber(lomealToday.kcal)} kkal
-              <span className={`caption font-normal ${t.textMuted} ml-2`}>
-                P{formatNumber(lomealToday.protein)} · K{formatNumber(lomealToday.carbs)} · L{formatNumber(lomealToday.fat)}
-              </span>
-            </p>
-          </div>
-        </div>
-      )}
-
 
       {/* --- GRUP PROGRESS --- */}
       <div id="progress-accordion" className="relative z-10 flex flex-col w-full min-w-0 anim-rise mt-6 transition-all duration-300" style={{ animationDelay: '120ms' }}>
@@ -1095,52 +1107,6 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                                       className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-4 rounded-xl outline-none font-black text-center text-xl pr-14`}
                                   />
                                   <span className={`absolute right-4 top-1/2 -translate-y-1/2 caption font-bold ${t.textMuted}`}>Mnt</span>
-                              </div>
-                          </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3 mt-3">
-                          <div>
-                              <label className={`caption font-bold ${t.textMuted} mb-1 block uppercase tracking-wider`}>Target Bakar</label>
-                              <div className="relative">
-                                  <SwipeInput 
-                                      value={targetForm.activityCalories || ''} 
-                                      onChange={(v) => setTargetForm(p => ({...p, activityCalories: v}))} 
-                                      min={1000} max={6000} step={100} 
-                                      placeholder="2500"
-                                      language={language}
-                                      className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-4 rounded-xl outline-none font-black text-center text-xl pr-14`}
-                                  />
-                                  <span className={`absolute right-4 top-1/2 -translate-y-1/2 caption font-bold ${t.textMuted}`}>Kcal</span>
-                              </div>
-                          </div>
-                          <div className="col-span-2 mt-4 pt-4 border-t border-dashed border-black/10 dark:border-white/10">
-                              <label className={`caption font-bold ${t.textMuted} mb-2 block uppercase tracking-wider`}>Target Nutrisi Harian</label>
-                              <div className="grid grid-cols-2 gap-2 mb-3">
-                                  {[
-                                      { id: 'cutting', label: 'Cutting', delta: -500, icon: '🔥', color: 'text-rose-500' },
-                                      { id: 'maintenance', label: 'Maintenance', delta: 0, icon: '⚖️', color: 'text-zinc-500 dark:text-zinc-400' },
-                                      { id: 'clean_bulk', label: 'Clean Bulk', delta: 300, icon: '💪', color: 'text-emerald-500' },
-                                      { id: 'aggressive_bulk', label: 'Aggressive', delta: 500, icon: '🚀', color: 'text-orange-500' },
-                                  ].map(preset => (
-                                      <button key={preset.id} onClick={() => setTargetForm(p => ({...p, nutritionGoal: preset.id, calorieDelta: preset.delta}))} className={`p-2 rounded-xl border flex flex-col items-center justify-center text-center transition-all ${targetForm.nutritionGoal === preset.id ? `border-current bg-black/5 dark:bg-white/5 ${preset.color}` : `${t.border} opacity-50 hover:opacity-100`}`}>
-                                          <span className="text-lg mb-1">{preset.icon}</span>
-                                          <span className="text-[10px] font-bold uppercase">{preset.label}</span>
-                                          <span className="text-[9px] opacity-70">{preset.delta > 0 ? '+' : ''}{preset.delta} kcal</span>
-                                      </button>
-                                  ))}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                  <div className="relative flex-1">
-                                      <SwipeInput 
-                                          value={targetForm.calorieDelta ?? ''} 
-                                          onChange={(v) => setTargetForm(p => ({...p, calorieDelta: v, nutritionGoal: 'custom'}))} 
-                                          min={-1500} max={1500} step={50} 
-                                          placeholder="0"
-                                          language={language}
-                                          className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-3 rounded-xl outline-none font-black text-center text-sm`}
-                                      />
-                                  </div>
-                                  <span className={`caption font-bold ${t.textMuted}`}>Kcal (Custom Defisit/Surplus)</span>
                               </div>
                           </div>
                       </div>

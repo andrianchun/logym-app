@@ -44,6 +44,7 @@ import { checkAchievements, ACHIEVEMENTS } from './data/achievements';
 import { playSoundEffect } from './utils/audio';
 import { fetchExercisesFromApi } from './utils/exerciseDbApi';
 import { AI_MODELS, detectPlateaus, getRaigaNotification } from './utils/aiAgent';
+import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
 import useDialog from './hooks/useDialog';
 import { getLocalYMD, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos } from './data/constants';
 import { Loader2, Download } from 'lucide-react';
@@ -82,12 +83,16 @@ export default function App() {
   }, []);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
-  // --- SINKRON LOMEAL (app pencatat kalori pendamping) — baca kalori dimakan hari ini ---
+  // --- SINKRON LOMEAL (app pencatat kalori pendamping) — baca kalori dimakan hari ini +
+  // target kalori/makro (delta bulking/cutting sekarang murni diatur di Lomeal, Logym cuma
+  // baca, gak punya preset delta sendiri lagi — lihat Lomeal src/utils/biometricSync.js). ---
   const [lomealToday, setLomealToday] = useState(null);
+  const [lomealTargets, setLomealTargets] = useState(null);
   useEffect(() => {
-    if (!user?.uid) { setLomealToday(null); return; }
+    if (!user?.uid) { setLomealToday(null); setLomealTargets(null); return; }
     const unsub = onSnapshot(doc(db, 'users', user.uid), (snap) => {
       setLomealToday(snap.data()?.lomealSync?.today || null);
+      setLomealTargets(snap.data()?.lomealSync?.targets || null);
     });
     return unsub;
   }, [user?.uid]);
@@ -145,6 +150,21 @@ export default function App() {
   const [raigaMemory, setRaigaMemory] = useState([]);
   const [hasUnreadChat, setHasUnreadChat] = useState(false);
   const [activityTargets, setActivityTargets] = useState({ steps: 10000, weeklyDuration: 150, sleep: 8 });
+
+  // TDEE hidup — dihitung ulang tiap biometrik/activityLevel berubah (termasuk dari sinkron
+  // Lomeal), bukan dibekukan sejak onboarding kayak sebelumnya. Tunggu isDataLoaded biar gak
+  // nimpa activityTargets.tdee pakai default kosong sebelum Firestore selesai hydrate.
+  useEffect(() => {
+    if (!isDataLoaded) return;
+    const { weight, height, dob, gender, activityLevel } = userProfile || {};
+    if (!weight || !height || !dob || !gender) return;
+    const age = new Date().getFullYear() - new Date(dob).getFullYear();
+    const bmr = calcBMR({ weight, height, age, gender });
+    if (!bmr) return;
+    const tdee = Math.round(bmr * (ACTIVITY_MULTIPLIERS[activityLevel] || 1.2));
+    setActivityTargets(prev => (prev.tdee === tdee ? prev : { ...prev, tdee }));
+  }, [userProfile?.weight, userProfile?.height, userProfile?.dob, userProfile?.gender, userProfile?.activityLevel, isDataLoaded]);
+
   const [userAchievements, setUserAchievements] = useState([]);
   const [unlockedAchievementsPopup, setUnlockedAchievementsPopup] = useState([]);
 
@@ -2445,7 +2465,7 @@ export default function App() {
                setShowSettings={setShowSettings}
                userAchievements={userAchievements} connectedApps={connectedApps}
                userProfile={userProfile}
-               lomealToday={lomealToday}
+               lomealToday={lomealToday} lomealTargets={lomealTargets}
              />
          )}
          
