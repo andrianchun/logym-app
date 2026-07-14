@@ -11,7 +11,7 @@ import ProgressTab from './ProgressTab';
 import { MuscleProgress } from '../components/MuscleProgress';
 import SwipeInput from '../components/SwipeInput';
 import { formatNumber } from '../utils/numberFormat';
-import { parseWorkoutDurationMinutes, calculateWorkoutCalories } from '../utils/workoutCalc';
+import { parseWorkoutDurationMinutes, calculateWorkoutCalories, calculateSmartWorkoutCalories } from '../utils/workoutCalc';
 import { calcBMR } from '../utils/bmr';
 
 
@@ -67,6 +67,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   
   // TARGET SETTINGS
   const [showTargetModal, setShowTargetModal] = useState(false);
+
   const [targetForm, setTargetForm] = useState(activityTargets || { steps: 10000, weeklyDuration: 150, sleep: 8, activityCalories: 2500, calorieDelta: 0 });
 
   useEffect(() => {
@@ -379,7 +380,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   const dispMainWaist = units?.height === 'ft' && bioData.waist ? Number((bioData.waist * 0.393701).toFixed(1)) : bioData.waist || '-';
 
   // Smart Merge Deduplication (LyFit Internal + BioData/HealthConnect)
-  const { mergedDailyActiveMinutes, mergedDailyCalories, mergedWeeklyActiveMinutes, mergedWeeklyWorkoutDuration, mergedWeeklySessions, mergedWeeklyCalories } = useMemo(() => {
+  const { mergedDailyActiveMinutes, mergedDailyCalories, mergedDailyCaloriesFloor, mergedDailySessions, mergedWeeklyActiveMinutes, mergedWeeklyWorkoutDuration, mergedWeeklySessions, mergedWeeklyCalories } = useMemo(() => {
      const currentWeight = Number(bioData.weight) || 70; // Asumsi 70kg jika tidak ada data
      let dailyActive = Number(bioData.activeMinutes || 0);
      const isDailyCalsManual = !!bioData._manualFlags?.activityCalories;
@@ -392,7 +393,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      todayCompletedWks.forEach(w => {
          const wDuration = parseWorkoutDurationMinutes(w.duration);
          intTodayDur += wDuration;
-         intTodayCals += calculateWorkoutCalories(currentWeight, wDuration);
+         intTodayCals += calculateSmartWorkoutCalories(currentWeight, w, w.log);
      });
      
      dailyActive = Math.max(dailyActive, intTodayDur);
@@ -404,9 +405,14 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      const stepsCalories = Math.round((Number(bioData.steps || 0) * 0.04)); // ~0.04 kcal per langkah
      const workoutCalories = intTodayCals;
      const totalDailyCals = bmrCalories + stepsCalories + workoutCalories;
-     // Manual (flag dari modal input / koreksi Lomeal) menang & dibekukan; kalau bukan
-     // manual, selalu pakai hasil hitung fresh (bisa naik-turun wajar, bukan ratchet Math.max).
-     const dailyCals = isDailyCalsManual ? (Number(bioData.activityCalories) || 0) : totalDailyCals;
+     // BMR + langkah + workout internal Logym adalah LANTAI yang gak boleh ketimpa manual —
+     // BMR gak mungkin 0/minus (selalu terbakar walau diam), dan hasil latihan yang beneran
+     // ke-log di Logym gak boleh "hilang" cuma gara-gara ada input manual (dari modal Logym
+     // sendiri ATAU koreksi dari Lomeal) yang lebih kecil atau bahkan kosong/kehapus.
+     // Manual cuma BOLEH menaikkan (extra aktivitas yang gak ke-track otomatis), gak pernah
+     // menurunkan di bawah totalDailyCals — jadi walau nilainya di-nolkan, tetap fallback aman.
+     const manualCals = isDailyCalsManual ? (Number(bioData.activityCalories) || 0) : 0;
+     const dailyCals = Math.max(totalDailyCals, manualCals);
      
      let weeklyDur = 0;
      let weeklyWorkoutDur = 0;
@@ -435,7 +441,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          completedWks.forEach(w => {
              const wDuration = parseWorkoutDurationMinutes(w.duration);
              intDur += wDuration;
-             intCal += calculateWorkoutCalories(dayWeight, wDuration);
+             intCal += calculateSmartWorkoutCalories(dayWeight, w, w.log);
          });
 
          weeklyDur += Math.max(extDur, intDur);
@@ -453,6 +459,8 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      return {
          mergedDailyActiveMinutes: dailyActive,
          mergedDailyCalories: dailyCals,
+         mergedDailyCaloriesFloor: totalDailyCals,
+         mergedDailySessions: todayCompletedWks.length,
          mergedWeeklyActiveMinutes: weeklyDur,
          mergedWeeklyWorkoutDuration: weeklyWorkoutDur,
          mergedWeeklySessions: weeklySess,
@@ -460,22 +468,27 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      };
   }, [history, activeDate, bioData]);
 
-  // Kalori dibakar cuma dihitung on-the-fly buat tampilan (tidak pernah tersimpan ke
-  // bioData.activityCalories) — tulis balik nilai hasil hitung hari ini biar Lomeal
-  // (yang cuma baca bio.activityCalories, read-only) bisa nampilin bonus kalori olahraga.
-  // Skip kalau hari ini udah ditandai manual (dari modal input Logym atau koreksi Lomeal) —
-  // jangan nimpa balik nilai yang sengaja di-override user.
+  // Tulis balik mergedDailyCalories (udah dilindungi Math.max lantai BMR+langkah+workout,
+  // lihat useMemo di atas) ke bioData.activityCalories — biar Lomeal, yang baca field mentah
+  // ini LANGSUNG tanpa lewat proteksi Math.max di atas, tetap ikut kelindungi. Sengaja TIDAK
+  // di-skip walau lagi manual: kalau manual masih >= lantai, ini no-op (angkanya udah sama);
+  // kalau manual pernah kesetel/kehapus jadi di bawah lantai, ini nyembuhin balik ke lantai.
+  // activityCaloriesFloor juga ikut ditulis (lantai mentah, TANPA manual) — biar Lomeal bisa
+  // baca lantainya sendiri sebelum push koreksi, gak cuma ngandelin Logym nyembuhin belakangan.
   useEffect(() => {
-     if (activeDate === todayStr && !bioData._manualFlags?.activityCalories && mergedDailyCalories > 0 && Number(bioData.activityCalories || 0) !== mergedDailyCalories) {
+     if (activeDate !== todayStr || mergedDailyCalories <= 0) return;
+     const calsChanged = Number(bioData.activityCalories || 0) !== mergedDailyCalories;
+     const floorChanged = Number(bioData.activityCaloriesFloor || 0) !== mergedDailyCaloriesFloor;
+     if (calsChanged || floorChanged) {
          setHistory(prev => ({
              ...prev,
              [activeDate]: {
                  ...(prev[activeDate] || {}),
-                 bioData: { ...(prev[activeDate]?.bioData || {}), activityCalories: mergedDailyCalories }
+                 bioData: { ...(prev[activeDate]?.bioData || {}), activityCalories: mergedDailyCalories, activityCaloriesFloor: mergedDailyCaloriesFloor }
              }
          }));
      }
-  }, [mergedDailyCalories, activeDate, todayStr]);
+  }, [mergedDailyCalories, mergedDailyCaloriesFloor, activeDate, todayStr]);
 
   // Snapshot target/fase diet hari ini — di-refresh terus selama activeDate === todayStr,
   // otomatis membeku jadi arsip begitu tanggalnya lewat (efek ini gak pernah nyentuh hari lain).
@@ -523,13 +536,13 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
 
            {/* Coach: Tajam di atas latar belakang kartu */}
            <div
-             className="absolute right-0 -top-12 bottom-0 w-72 z-10 pointer-events-none overflow-hidden parallax-container"
+             className="absolute -right-5 -top-12 bottom-0 w-72 z-10 pointer-events-none overflow-hidden parallax-container"
              style={{
                maskImage: 'linear-gradient(to bottom, black 60%, transparent 85%)',
                WebkitMaskImage: 'linear-gradient(to bottom, black 60%, transparent 85%)'
              }}
            >
-             <img src="/bg-dashboard.webp" alt="" className={`w-full h-full object-cover object-top drop-shadow-xl origin-top transition-transform duration-500 ease-out ${isKomposisiExpanded ? 'scale-[1.60]' : 'scale-110'}`} />
+             <img src="/bg-dashboard.webp" alt="" className={`w-full h-full object-cover object-top drop-shadow-xl origin-top transition-transform duration-500 ease-out ${isKomposisiExpanded ? 'scale-[1.60]' : 'scale-[1.15]'}`} />
            </div>
 
           {/* Konten Kartu: Berada di atas coach */}
@@ -542,13 +555,13 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                    )}
                </div>
                <div className="flex items-center space-x-2">
-                   <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(bioDataDate || activeDate); setShowDetailsModal(true); }} className={`p-2 rounded-full ${t.bgBox} backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Info size={16}/></button>
-                   <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(activeDate); setManualTab('komposisi'); setShowManualModal(true); }} className={`p-2 rounded-full ${t.bgBox} backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Pencil size={16}/></button>
+                   <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(bioDataDate || activeDate); setShowDetailsModal(true); }} className={`p-2 rounded-full bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Info size={16}/></button>
+                   <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(activeDate); setManualTab('komposisi'); setShowManualModal(true); }} className={`p-2 rounded-full bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Pencil size={16}/></button>
                </div>
            </div>
            
            <div className="flex justify-between items-end w-full relative z-10 mb-1 flex-1">
-                <div className={`w-[calc(50%-4px)] flex flex-col space-y-1 justify-end h-full p-3 rounded-2xl ${t.bgBox} backdrop-blur-md`}>
+                <div className={`w-[calc(50%-4px)] flex flex-col space-y-1 justify-end h-full p-3 rounded-2xl bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md`}>
                    {/* Fisik */}
                    <div className="flex flex-col">
                        <span className={`text-[10px] ${t.textMuted} mb-0.5 font-bold`}>Fisik</span>
@@ -602,15 +615,15 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
            </div>
   
            <div className={`grid grid-cols-4 gap-2 relative z-10 mt-1`}>
-                <div className={`p-1.5 rounded-xl ${t.bgBox} backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{dispMainMuscle} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">{isImp ? 'lbs' : 'kg'}</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Massa<br/>Otot</span></div>
-                <div className={`p-1.5 rounded-xl ${t.bgBox} backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.musclePercent, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Otot</span></div>
-                <div className={`p-1.5 rounded-xl ${t.bgBox} backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.proteinPercent, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Protein</span></div>
-                <div className={`p-1.5 rounded-xl ${t.bgBox} backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.waterPercent, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Air</span></div>
+                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{dispMainMuscle} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">{isImp ? 'lbs' : 'kg'}</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Massa<br/>Otot</span></div>
+                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.musclePercent, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Otot</span></div>
+                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.proteinPercent, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Protein</span></div>
+                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.waterPercent, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Air</span></div>
                 
-                <div className={`p-1.5 rounded-xl ${t.bgBox} backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.visceralFat, language) || '-'}</span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Lemak<br/>Visceral</span></div>
-                <div className={`p-1.5 rounded-xl ${t.bgBox} backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{dispMainWaist} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">{isImp ? 'in' : 'cm'}</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Lingkar<br/>Perut</span></div>
-                <div className={`p-1.5 rounded-xl ${t.bgBox} backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.boneMass, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Mineral<br/>Tulang</span></div>
-                <div className={`p-1.5 rounded-xl ${t.bgBox} backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.bodyAge, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">th</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Usia<br/>Tubuh</span></div>
+                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.visceralFat, language) || '-'}</span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Lemak<br/>Visceral</span></div>
+                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{dispMainWaist} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">{isImp ? 'in' : 'cm'}</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Lingkar<br/>Perut</span></div>
+                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.boneMass, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Mineral<br/>Tulang</span></div>
+                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.bodyAge, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">th</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Usia<br/>Tubuh</span></div>
             </div>
            
            <button
@@ -622,12 +635,18 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                        const targetId = isExpanding ? 'komposisi-subcard' : 'komposisi-accordion';
                        const el = document.getElementById(targetId);
                        if (el) {
-                           const y = el.getBoundingClientRect().top + window.scrollY - (isExpanding ? 100 : 80);
-                           window.scrollTo({ top: y, behavior: 'smooth' });
+                           if (isExpanding) {
+                               const bottom = el.getBoundingClientRect().bottom;
+                               if (bottom > window.innerHeight - 100) {
+                                   window.scrollTo({ top: bottom + window.scrollY - window.innerHeight + 120, behavior: 'smooth' });
+                               }
+                           } else {
+                               window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 80, behavior: 'smooth' });
+                           }
                        }
-                   }, 150);
+                   }, 320);
                }}
-               className={`self-center mt-3 p-2 rounded-full ${t.bgBox} backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border} transition-all relative z-20`}
+               className={`self-center mt-3 p-2 rounded-full bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border} transition-all relative z-20`}
            >
                {isKomposisiExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
            </button>
@@ -673,24 +692,25 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                      <p className={`caption ${t.textMuted} mt-0.5`} style={{fontSize: '0.65rem'}}>Hari ini: {new Date(activeDate).toLocaleDateString(language==='ID'?'id-ID':'en-US', { day: 'numeric', month: 'short' })}</p>
                  </div>
                  <div className="flex space-x-2">
-                     <button onClick={() => { playSoundEffect('click', soundEnabled); setShowTargetModal(true); }} className={`p-2 rounded-full ${t.bgBox} backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Settings size={16}/></button>
-                     <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(activeDate); setManualTab('harian'); setShowManualModal(true); }} className={`p-2 rounded-full ${t.bgBox} backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Pencil size={16}/></button>
+
+                     <button onClick={() => { playSoundEffect('click', soundEnabled); setShowTargetModal(true); }} className={`p-2 rounded-full bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Settings size={16}/></button>
+                     <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(activeDate); setManualTab('harian'); setShowManualModal(true); }} className={`p-2 rounded-full bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Pencil size={16}/></button>
                  </div>
              </div>
 
              <div className="flex flex-col flex-1 justify-between pt-6 pb-2">
-                 <div className={`p-4 rounded-2xl ${t.bgBox} backdrop-blur-md border ${t.border}`}>
-                     <div className="grid grid-cols-2 gap-x-4 gap-y-4 h-full content-between">
+                 <div className={`p-5 -mx-4 w-[calc(100%+2rem)] ${t.bgBox} backdrop-blur-md border-y border-x-0 ${t.border}`}>
+                     <div className="grid grid-cols-2 gap-x-5 gap-y-5 h-full content-between">
                          {/* Langkah Kaki */}
                          <div className="flex flex-col h-full">
-                     <div className="flex items-center space-x-1.5 mb-1"><span className="w-5 h-5 rounded-full bg-sky-500/15 text-sky-500 flex items-center justify-center shrink-0"><Footprints size={11}/></span> <span className={`caption ${t.textMuted} capitalize`}>Langkah Kaki</span></div>
+                     <div className="flex items-center space-x-1.5 mb-1"><span className="w-5 h-5 rounded-full bg-blue-500/15 text-blue-500 flex items-center justify-center shrink-0"><Footprints size={11}/></span> <span className={`caption ${t.textMuted} capitalize`}>Langkah Kaki</span></div>
                      <div className="flex flex-col flex-1 justify-end">
                          <div className="flex items-baseline space-x-1 mb-2">
                              <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{bioData.steps > 0 ? formatNumber(bioData.steps, language) : '-'}</span>
                              <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold whitespace-nowrap">/ {formatNumber(activityTargets?.steps || 10000, language)}</span>
                          </div>
                          <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full mb-1 overflow-hidden shrink-0">
-                             <div className="h-full bg-sky-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Number(bioData.steps || 0) / (activityTargets?.steps || 10000)) * 100)}%` }}></div>
+                             <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Number(bioData.steps || 0) / (activityTargets?.steps || 10000)) * 100)}%` }}></div>
                          </div>
                          <span className="text-[9px] invisible whitespace-nowrap">{formatNumber(mergedWeeklySessions, language)} Sesi ({formatNumber(mergedWeeklyWorkoutDuration, language)} menit)</span>
                      </div>
@@ -718,39 +738,33 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                       );
                   })()}
 
-                 {/* Kalori Dimakan — ditarik dari Lomeal (lomealSync.today); target juga dari Lomeal
-                     (lomealSync.targets) karena delta cutting/bulking sekarang murni diatur di sana. */}
+                 {/* Kalori Dimakan */}
                  <div className="flex flex-col h-full">
                      <div className="flex items-center space-x-1.5 mb-1"><span className="w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-500 flex items-center justify-center shrink-0"><Utensils size={11}/></span> <span className={`caption ${t.textMuted} capitalize`}>Kalori Dimakan</span></div>
                      {(() => {
-                       // Manual entry Logym sendiri menang duluan (kalau ditandai manual),
-                       // baru fallback ke push otomatis Lomeal — dulu punya Lomeal SELALU
-                       // menang, jadi manual entry di sini langsung ketiban tiap kali Lomeal sync.
-                       const nutritionCalories = (bioData._manualFlags?.nutritionCalories ? bioData.nutritionCalories : null) ?? lomealToday?.kcal ?? bioData.nutritionCalories;
+                       const nutritionCalories = lomealToday?.kcal ?? bioData.nutritionCalories;
                        const foodTarget = lomealTargets?.kcal || 2000;
                        return (
-                     <div className="flex flex-col flex-1 justify-end">
-                         <div className="flex items-baseline space-x-1 mb-2">
-                             <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{formatNumber(nutritionCalories, language) || '-'}</span>
-                             <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold whitespace-nowrap">/ {formatNumber(foodTarget, language)}</span>
+                         <div className="flex flex-col flex-1 justify-end">
+                             <div className="flex items-baseline space-x-1 mb-0.5">
+                                 <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{formatNumber(nutritionCalories, language) || '-'}</span>
+                             </div>
+                             {lomealToday && (
+                                <p className={`font-medium ${t.textMuted} truncate`} style={{fontSize: '0.65rem'}}>Lomeal: {lomealToday.mealsCount || 0} sesi makan</p>
+                             )}
                          </div>
-                         <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full mb-1 overflow-hidden shrink-0">
-                             <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Number(nutritionCalories || 0) / foodTarget) * 100)}%` }}></div>
-                         </div>
-                     </div>
                        );
                      })()}
                  </div>
 
-                 {/* Kalori Dibakar — murni informatif (BMR+langkah+olahraga), gak ada target manual lagi */}
+                 {/* Kalori Dibakar */}
                  <div className="flex flex-col h-full text-right items-end">
                      <div className="flex items-center justify-end space-x-1.5 mb-1"><span className={`caption ${t.textMuted} capitalize`}>Kalori Dibakar</span> <span className="w-5 h-5 rounded-full bg-blue-500/15 text-blue-500 flex items-center justify-center shrink-0"><Flame size={11}/></span></div>
                      <div className="flex flex-col flex-1 justify-end w-full">
-                         <div className="flex items-baseline justify-end space-x-1 mb-2">
-                                      <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{mergedDailyCalories > 0 ? formatNumber(mergedDailyCalories, language) : '-'}</span>
-                                      <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold whitespace-nowrap">kcal</span>
-                                  </div>
-                         <div className="w-full h-1.5 rounded-full mb-1 shrink-0"></div>
+                         <div className="flex items-baseline justify-end mb-0.5">
+                             <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{mergedDailyCalories > 0 ? formatNumber(mergedDailyCalories, language) : '-'}</span>
+                         </div>
+                         <p className={`font-medium ${t.textMuted} truncate`} style={{fontSize: '0.65rem'}}>Logym: {mergedDailySessions || 0} sesi latihan</p>
                      </div>
                  </div>
 
@@ -785,13 +799,13 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                  <div className={`col-span-2 grid grid-cols-3 gap-x-2 pt-2 mt-2 border-t border-dashed ${t.borderDashed}`}>
                      {/* Tekanan Darah */}
                      <div className="flex flex-col">
-                         <div className="flex items-center space-x-1 mb-1 text-sky-400"><Activity size={12}/> <span className={`text-[10px] ${t.textMuted}`}>Tensi</span></div>
+                         <div className="flex items-center space-x-1 mb-1 text-blue-400"><Activity size={12}/> <span className={`text-[10px] ${t.textMuted}`}>Tensi</span></div>
                          <span className={`text-lg font-black ${t.textMain} leading-none`}>{bioData.bloodPressure || '-'}</span>
                      </div>
                      
                      {/* Detak Jantung */}
                      <div className="flex flex-col items-center">
-                         <div className="flex items-center space-x-1 mb-1 text-sky-400"><HeartPulse size={12}/> <span className={`text-[10px] ${t.textMuted}`}>Nadi</span></div>
+                         <div className="flex items-center space-x-1 mb-1 text-blue-400"><HeartPulse size={12}/> <span className={`text-[10px] ${t.textMuted}`}>Nadi</span></div>
                          <div className="flex flex-col items-center">
                              <span className={`text-lg font-black ${t.textMain} leading-none`}>{bioData.heartRate > 0 ? <>{formatNumber(bioData.heartRate, language)} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">bpm</span></> : '-'}</span>
                              <span className="text-[8px] text-zinc-500 dark:text-zinc-400 whitespace-nowrap mt-0.5">Min {bioData.minHeartRate > 0 ? formatNumber(bioData.minHeartRate, language) : '-'} &bull; Max {bioData.maxHeartRate > 0 ? formatNumber(bioData.maxHeartRate, language) : '-'}</span>
@@ -800,7 +814,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                      
                      {/* SpO2 */}
                      <div className="flex flex-col items-end text-right">
-                         <div className="flex items-center space-x-1 mb-1 text-sky-400"><Wind size={12}/> <span className={`text-[10px] ${t.textMuted}`}>SpO2</span></div>
+                         <div className="flex items-center space-x-1 mb-1 text-blue-400"><Wind size={12}/> <span className={`text-[10px] ${t.textMuted}`}>SpO2</span></div>
                          <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.oxygenSaturation, language) || '-'} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span>
                      </div>
                  </div>
@@ -816,12 +830,18 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                          const targetId = isExpanding ? 'aktivitas-subcard' : 'aktivitas-accordion';
                          const el = document.getElementById(targetId);
                          if (el) {
-                             const y = el.getBoundingClientRect().top + window.scrollY - (isExpanding ? 100 : 80);
-                             window.scrollTo({ top: y, behavior: 'smooth' });
+                             if (isExpanding) {
+                                 const bottom = el.getBoundingClientRect().bottom;
+                                 if (bottom > window.innerHeight - 100) {
+                                     window.scrollTo({ top: bottom + window.scrollY - window.innerHeight + 120, behavior: 'smooth' });
+                                 }
+                             } else {
+                                 window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 80, behavior: 'smooth' });
+                             }
                          }
-                     }, 150);
+                     }, 320);
                  }}
-                 className={`self-center mt-4 p-2 rounded-full ${t.bgBox} backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border} transition-all relative z-20`}
+                 className={`self-center mt-4 p-2 rounded-full bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border} transition-all relative z-20`}
              >
                  {isAktivitasExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
              </button>
@@ -885,18 +905,23 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                          const targetId = isExpanding ? 'progress-subcard' : 'progress-accordion';
                          const el = document.getElementById(targetId);
                          if (el) {
-                             const y = el.getBoundingClientRect().top + window.scrollY - (isExpanding ? 100 : 80);
-                             window.scrollTo({ top: y, behavior: 'smooth' });
+                             if (isExpanding) {
+                                 const bottom = el.getBoundingClientRect().bottom;
+                                 if (bottom > window.innerHeight - 100) {
+                                     window.scrollTo({ top: bottom + window.scrollY - window.innerHeight + 120, behavior: 'smooth' });
+                                 }
+                             } else {
+                                 window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 80, behavior: 'smooth' });
+                             }
                          }
-                     }, 150);
+                     }, 320);
                  }}
-                 className={`self-center mt-3 mb-2 p-2 rounded-full ${t.bgBox} backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border} transition-all relative z-20`}
+                 className={`self-center mt-3 mb-2 p-2 rounded-full bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border} transition-all relative z-20`}
              >
                  {isProgressExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
              </button>
           </div>
         </div>
-          
       <div id="progress-subcard" className={`grid relative z-10 transition-all duration-300 ease-in-out ${isProgressExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
         <div className="overflow-hidden">
           <div className={`rounded-b-2xl border border-t-0 ${t.border} ${t.bgSunken} shadow-inner relative z-10`}>
@@ -915,7 +940,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
       <DashboardModals 
         t={t} lang={lang} theme={theme}
         showManualModal={showManualModal} setShowManualModal={setShowManualModal} manualTab={manualTab} setManualTab={setManualTab}
-        modalDate={modalDate} setModalDate={setModalDate} formBio={formBio} setFormBio={setFormBio} bioData={bioData}
+        modalDate={modalDate} setModalDate={setModalDate} formBio={formBio} setFormBio={setFormBio} bioData={bioData} lomealToday={lomealToday}
         handleSaveManualData={handleSaveManualData} handleDeleteBioData={handleDeleteBioData} soundEnabled={soundEnabled}
         units={units} setConfirmModal={setConfirmModal} userApiKeys={userApiKeys} aiProvider={aiProvider} aiModel={aiModel} keyStatuses={keyStatuses} setKeyStatuses={setKeyStatuses} setShowSettings={setShowSettings}
       />
@@ -1039,56 +1064,60 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
            </div>
         </div>
       ), document.body)}
+
       {/* MODAL PENGATURAN TARGET */}
       {showTargetModal && createPortal(
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in" onClick={() => setShowTargetModal(false)}>
-              <div className={`w-full max-w-sm ${t.bgCard} rounded-3xl p-5 border ${t.border} shadow-2xl animate-in zoom-in-95`} onClick={e => e.stopPropagation()}>
-                  <div className="flex justify-between items-center mb-5">
-                      <h3 className={`h3 ${t.textMain}`}>Pengaturan Target</h3>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm anim-fade-in" onClick={() => setShowTargetModal(false)}>
+              <div className={`w-full max-w-sm rounded-[2rem] border ${t.border} ${t.bgCard} p-6 shadow-2xl anim-scale-in`} onClick={e => e.stopPropagation()}>
+                  <div className="flex items-center justify-between mb-6">
+                      <h3 className={`h2 ${t.textMain} flex items-center gap-2`}><Settings size={20} className={t.textAccent}/> Target Harian</h3>
+                      <button onClick={() => { playSoundEffect('click', soundEnabled); setShowTargetModal(false); }} className={`p-1.5 rounded-full ${t.bgBox} ${t.textMuted} hover:${t.textMain} transition-colors`}><X size={16}/></button>
                   </div>
-                  
-                  <div className="space-y-4 mb-6">
-                      <div>
-                          <label className={`caption font-bold ${t.textMuted} mb-1 block uppercase tracking-wider`}>Langkah Kaki</label>
+
+                  <div className="space-y-4">
+                      {/* Langkah */}
+                      <div className={`p-4 rounded-2xl ${t.bgBox} border ${t.borderDashed}`}>
+                          <div className="flex items-center gap-3 mb-3">
+                              <div className="w-8 h-8 rounded-full bg-blue-500/20 text-blue-500 flex items-center justify-center shrink-0">
+                                  <Footprints size={14} />
+                              </div>
+                              <div className="flex-1">
+                                  <label className={`text-xs font-bold uppercase tracking-wider ${t.textMuted}`}>Target Langkah Kaki</label>
+                              </div>
+                          </div>
                           <div className="relative">
                               <SwipeInput 
                                   value={targetForm.steps || ''} 
-                                  onChange={(v) => setTargetForm(p => ({...p, steps: v}))} 
-                                  min={0} max={50000} step={500} 
-                                  placeholder="10000"
+                                  onChange={(v) => setTargetForm(p => ({...p, steps: Number(v)}))} 
+                                  min={0} max={50000} step={1000} 
+                                  placeholder="Contoh: 10000"
                                   language={language}
-                                  className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-4 rounded-xl outline-none font-black text-center text-xl pr-16`}
+                                  className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-4 rounded-xl outline-none font-black text-center text-xl pr-14`}
                               />
                               <span className={`absolute right-4 top-1/2 -translate-y-1/2 caption font-bold ${t.textMuted}`}>Langkah</span>
                           </div>
                       </div>
-                      <div>
-                          <label className={`caption font-bold ${t.textMuted} mb-1 block uppercase tracking-wider`}>Durasi Aktif (Mingguan)</label>
-                          <div className="relative">
-                              <SwipeInput
-                                  value={targetForm.weeklyDuration || ''}
-                                  onChange={(v) => setTargetForm(p => ({...p, weeklyDuration: v}))}
-                                  min={0} max={600} step={5}
-                                  placeholder="150"
-                                  language={language}
-                                  className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-4 rounded-xl outline-none font-black text-center text-xl pr-16`}
-                              />
-                              <span className={`absolute right-4 top-1/2 -translate-y-1/2 caption font-bold ${t.textMuted}`}>Mnt/mgg</span>
+
+                      {/* Tidur */}
+                      <div className={`p-4 rounded-2xl ${t.bgBox} border ${t.borderDashed}`}>
+                          <div className="flex items-center gap-3 mb-3">
+                              <div className="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-500 flex items-center justify-center shrink-0">
+                                  <Moon size={14} />
+                              </div>
+                              <div className="flex-1">
+                                  <label className={`text-xs font-bold uppercase tracking-wider ${t.textMuted}`}>Durasi Tidur</label>
+                              </div>
                           </div>
-                          <p className={`caption ${t.textMuted} mt-1`} style={{fontSize: '0.65rem'}}>Total menit aktif per minggu. Rekomendasi WHO: 150 menit/minggu.</p>
-                      </div>
-                      <div>
-                          <label className={`caption font-bold ${t.textMuted} mb-1 block uppercase tracking-wider`}>Tidur</label>
                           <div className="flex gap-2">
                               <div className="relative flex-1">
                                   <SwipeInput 
                                       value={Math.floor(targetForm.sleep || 0) || ''} 
                                       onChange={(v) => {
-                                          const currentMins = Math.round(((targetForm.sleep || 0) % 1) * 60) || 0;
+                                          const currentMins = Math.round(((targetForm.sleep || 0) % 1) * 60);
                                           setTargetForm(p => ({...p, sleep: (Number(v) || 0) + (currentMins/60)}));
                                       }} 
                                       min={0} max={24} step={1} 
-                                      placeholder="8"
+                                      placeholder="0"
                                       language={language}
                                       className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-4 rounded-xl outline-none font-black text-center text-xl pr-14`}
                                   />
@@ -1130,6 +1159,8 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
           </div>,
           document.body
       )}
+
+
 
     </div>
     </div>

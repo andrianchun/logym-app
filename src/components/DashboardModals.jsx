@@ -13,7 +13,7 @@ import { HealthConnect } from 'capacitor-health-connect';
 const DashboardModals = ({ 
   t, lang, theme,
   showManualModal, setShowManualModal, manualTab, setManualTab, 
-  modalDate, setModalDate, formBio, setFormBio, bioData,
+  modalDate, setModalDate, formBio, setFormBio, bioData, lomealToday,
   handleSaveManualData, handleDeleteBioData, soundEnabled, units, setConfirmModal,
   userApiKeys, aiProvider, aiModel, setKeyStatuses, setShowSettings, keyStatuses
 }) => {
@@ -285,7 +285,7 @@ const DashboardModals = ({
                         <div className="grid grid-cols-2 gap-2.5">
                             <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Langkah</label><SwipeInput language={lang?.id || 'ID'} value={formBio.steps || ''} onChange={(val) => setFormBio({...formBio, steps: val})} step={100} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.steps, "5000")} /></div>
                             <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Durasi Aktif (mnt)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.activeMinutes || ''} onChange={(val) => setFormBio({...formBio, activeMinutes: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.activeMinutes, "30")} /></div>
-                            <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Kalori Makanan (kcal)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.nutritionCalories || ''} onChange={(val) => setFormBio({...formBio, nutritionCalories: val})} step={10} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.nutritionCalories, "2000")} /></div>
+                            <div><label className={`flex items-center gap-1 ${t.textMuted} text-xs mb-0.5 truncate`}>Kalori Makanan {lomealToday && <span className="px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-500 text-[8px] uppercase font-bold tracking-wider">LOMEAL</span>}</label><SwipeInput language={lang?.id || 'ID'} value={lomealToday ? Math.round(lomealToday.kcal) : (formBio.nutritionCalories || '')} disabled={!!lomealToday} onChange={(val) => setFormBio({...formBio, nutritionCalories: val})} step={10} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center ${lomealToday ? 'opacity-50 cursor-not-allowed' : ''}`} placeholder={ph(bioData?.nutritionCalories, "2000")} /></div>
                             <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Kalori Dibakar (kcal)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.activityCalories || ''} onChange={(val) => setFormBio({...formBio, activityCalories: val})} step={10} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.activityCalories, "300")} /></div>
                         </div>
 

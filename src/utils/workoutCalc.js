@@ -32,3 +32,62 @@ export const calculateWorkoutCalories = (weightKg, durationMinutes) => {
   const duration = Number(durationMinutes) || 0;
   return Math.round(weight * WORKOUT_MET * (duration / 60));
 };
+
+/**
+ * Estimasi kalori terbakar super cerdas (Set-Based) atau dari Health Connect.
+ * Mencegah eksploitasi timer karena hanya menghitung set yang benar-benar selesai dicentang.
+ * @param {number} weightKg - berat badan pengguna (kg).
+ * @param {object} workout - Objek workout yang berisi exercises/overriddenExercises dan durasi.
+ * @param {object} logs - Objek exerciseLogs (e.g. { "101": [{ done: true, r: 10 }] })
+ * @param {number} [globalRestTime=90] - Default rest timer jika tidak ada di set/exercise.
+ * @returns {number} estimasi kcal yang sangat akurat
+ */
+export const calculateSmartWorkoutCalories = (weightKg, workout, logs, globalRestTime = 90) => {
+  if (!workout) return 0;
+
+  // 1. Prioritas Utama: Jika ada data nyata dari Smartwatch / Health Connect
+  if (workout.caloriesBurned) {
+    return Number(workout.caloriesBurned);
+  }
+
+  // 2. Fallback: Jika tidak ada logs sama sekali (riwayat lama banget), pakai blind timer lawas
+  if (!logs || Object.keys(logs).length === 0) {
+    const durMins = parseWorkoutDurationMinutes(workout.duration);
+    return calculateWorkoutCalories(weightKg, durMins);
+  }
+
+  const weight = Number(weightKg) || 70;
+  let totalCalories = 0;
+
+  // Ambil daftar latihan (bisa dari Override atau Adhoc)
+  const exercises = workout.overriddenExercises || workout.exercises || [];
+
+  exercises.forEach(ex => {
+    const exLogs = logs[ex.id];
+    if (!exLogs || !Array.isArray(exLogs)) return;
+
+    exLogs.forEach(set => {
+      // HANYA hitung kalori jika set benar-benar dicentang selesai
+      if (set.done) {
+        if (ex.type === 'time') {
+          // KARDIO (Waktu): Durasi penuh * MET 7.0 (Jogging ringan/sedang)
+          const setDurMins = Number(set.d || ex.duration || 0);
+          totalCalories += weight * 7.0 * (setDurMins / 60);
+        } else {
+          // BEBAN (Reps): Asumsi repetisi makan waktu rata-rata 4 detik per rep (TUT)
+          const reps = Number(set.r || ex.reps || 10);
+          const activeWorkMins = (reps * 4) / 60;
+          totalCalories += weight * WORKOUT_MET * (activeWorkMins / 60); // MET 6.0 untuk angkat beban
+
+          // Kalori pemulihan / Istirahat pasca-set (MET 2.0 santai)
+          const restSecs = Number(set.rest || ex.restTime || workout.restTime || globalRestTime);
+          const restMins = restSecs / 60;
+          totalCalories += weight * 2.0 * (restMins / 60);
+        }
+      }
+    });
+  });
+
+  return Math.round(totalCalories);
+};
+

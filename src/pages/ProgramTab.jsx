@@ -676,7 +676,7 @@ const ProgramTab = ({
         <div className="flex-none flex flex-row relative z-10 w-full min-h-[350px]">
           
           {/* HEADER BACKGROUND IMAGE (Restricted to header) */}
-          <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+          <div className="absolute inset-0 z-0 pointer-events-none">
             {/* Base Layer for Glassmorphism */}
             <div 
               className={`absolute inset-0 transition-all duration-700 ${group.isAI ? 'opacity-20 blur-2xl scale-110' : 'opacity-60'}`}
@@ -689,7 +689,7 @@ const ProgramTab = ({
             />
             {/* Focal Layer for Left Panel */}
             <div 
-              className={`absolute top-0 bottom-0 left-0 w-[55%] transition-all duration-700 opacity-100`}
+              className={`absolute top-0 -bottom-12 left-0 w-[55%] transition-all duration-700 opacity-100`}
               style={{
                 WebkitMaskImage: 'linear-gradient(to right, black 80%, transparent 100%)',
                 maskImage: 'linear-gradient(to right, black 80%, transparent 100%)'

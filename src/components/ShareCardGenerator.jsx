@@ -13,7 +13,7 @@ import { MuscleProgress } from './MuscleProgress';
 import { shareWorkoutToFeed } from '../utils/communityApi';
 import CreatePostModal from './CreatePostModal';
 import ActivityRings from './ActivityRings';
-import { parseWorkoutDurationMinutes, calculateWorkoutCalories } from '../utils/workoutCalc';
+import { parseWorkoutDurationMinutes, calculateWorkoutCalories, calculateSmartWorkoutCalories } from '../utils/workoutCalc';
 let globalTemplateIndex = 0; // default to bodycomp
 
 export default function ShareCardGenerator({ user, setUser, t, theme, history, activityTargets, programs, exerciseLibrary, lang, language, soundEnabled, playSoundEffect, selectedDate, units, activePlanIds, userProfile, onPostCreated }) {
@@ -311,7 +311,7 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
     if (todayActivity.workouts?.length) {
        todayActivity.workouts.forEach(w => {
            const wMins = parseWorkoutDurationMinutes(w.duration);
-           workoutCal += calculateWorkoutCalories(bioData.weight, wMins);
+           workoutCal += calculateSmartWorkoutCalories(bioData.weight, w, w.log);
            dailyIntDur += wMins;
        });
     }
@@ -925,7 +925,7 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                                 completed.forEach(w => {
                                      const dur = parseWorkoutDurationMinutes(w.duration) || 0;
                                      monthDuration += dur;
-                                     monthCalories += calculateWorkoutCalories(userProfile?.weight, dur) || 0;
+                                     monthCalories += calculateSmartWorkoutCalories(userProfile?.weight, w, w.log) || 0;
                                 });
                             });
 
@@ -971,7 +971,7 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                                                     completed.forEach(w => {
                                                         const dur = parseWorkoutDurationMinutes(w.duration) || 0;
                                                         totalDuration += dur;
-                                                        totalCalories += calculateWorkoutCalories(userProfile?.weight, dur) || 0;
+                                                        totalCalories += calculateSmartWorkoutCalories(userProfile?.weight, w, w.log) || 0;
                                                     });
                                                     
                                                     const targetDuration = activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 7) : 45;
@@ -1069,7 +1069,7 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                                                     </div>
                                                     <div className="flex items-center gap-1.5 bg-white/10 px-2 py-1 rounded border border-white/10">
                                                         <Flame size={12} className="text-orange-400" />
-                                                        <span className="text-[9px] font-black text-white">{calculateWorkoutCalories(bioData.weight, getWorkoutDurationMins(latestWorkout))} kcal</span>
+                                                        <span className="text-[9px] font-black text-white">{calculateSmartWorkoutCalories(bioData.weight, latestWorkout, latestWorkout.log)} kcal</span>
                                                     </div>
                                                 </div>
                                                 <div className="flex flex-wrap items-center gap-1.5">
