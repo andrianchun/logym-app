@@ -352,9 +352,15 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
              const newBio = { ...currentBio };
              
              if (manualTab === 'komposisi') {
-                 ['weight', 'height', 'waist', 'bmi', 'bmiStatus', 'bodyFat', 'bodyFatStatus', 'bmr', 'muscleMass', 'musclePercent', 'boneMass', 'visceralFat', 'waterPercent', 'proteinPercent', 'bodyAge', 'bodyScore'].forEach(k => newBio[k] = null);
+                 ['weight', 'height', 'waist', 'bmi', 'bmiStatus', 'bodyFat', 'bodyFatStatus', 'bmr', 'muscleMass', 'musclePercent', 'boneMass', 'visceralFat', 'waterPercent', 'proteinPercent', 'bodyAge', 'bodyScore'].forEach(k => { 
+                     newBio[k] = null;
+                     if (newBio._manualFlags) delete newBio._manualFlags[k];
+                 });
              } else {
-                 ['steps', 'energyScore', 'activeMinutes', 'activityCalories', 'nutritionCalories', 'sleep', 'sleepLog', 'heartRate', 'minHeartRate', 'maxHeartRate', 'bloodPressure', 'oxygenSaturation', 'waterIntake', 'weeklyDuration', 'weeklySessions', 'weeklyCalories'].forEach(k => newBio[k] = null);
+                 ['steps', 'energyScore', 'activeMinutes', 'activityCalories', 'nutritionCalories', 'sleep', 'sleepLog', 'heartRate', 'minHeartRate', 'maxHeartRate', 'bloodPressure', 'oxygenSaturation', 'waterIntake', 'weeklyDuration', 'weeklySessions', 'weeklyCalories'].forEach(k => { 
+                     newBio[k] = null;
+                     if (newBio._manualFlags) delete newBio._manualFlags[k];
+                 });
              }
              
              const isCompletelyEmpty = Object.values(newBio).every(v => v === null || v === undefined || v === '');
@@ -405,10 +411,19 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      
      let intTodayDur = 0;
      let intTodayCals = 0;
+     let intTodayExercises = 0;
      todayCompletedWks.forEach(w => {
          const wDuration = parseWorkoutDurationMinutes(w.duration);
          intTodayDur += wDuration;
          intTodayCals += calculateSmartWorkoutCalories(currentWeight, w, w.log);
+         
+         if (w.exercises && Array.isArray(w.exercises)) {
+             intTodayExercises += w.exercises.length;
+         } else if (w.log && typeof w.log === 'object') {
+             intTodayExercises += Object.keys(w.log).length;
+         } else {
+             intTodayExercises += 1;
+         }
      });
      
      dailyActive = Math.max(dailyActive, intTodayDur);
@@ -424,7 +439,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      // Proteksi Math.max dihilangkan karena menyebabkan bug "ratchet" (terkunci ke nilai max) dan 
      // membuat nilai dashboard berbeda dengan yang tersimpan di history.
      const manualCals = isDailyCalsManual ? (Number(bioData.activityCalories) || 0) : 0;
-     const dailyCals = isDailyCalsManual ? manualCals : totalDailyCals;
+     const dailyCals = isDailyCalsManual ? Math.max(bmrCalories, manualCals) : totalDailyCals;
      
      let weeklyDur = 0;
      let weeklyWorkoutDur = 0;
@@ -472,7 +487,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          mergedDailyActiveMinutes: dailyActive,
          mergedDailyCalories: dailyCals,
          mergedDailyCaloriesFloor: totalDailyCals,
-         mergedDailySessions: todayCompletedWks.length,
+         mergedDailySessions: intTodayExercises,
          mergedWeeklyActiveMinutes: weeklyDur,
          mergedWeeklyWorkoutDuration: weeklyWorkoutDur,
          mergedWeeklySessions: weeklySess,
@@ -762,7 +777,10 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                                  <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{formatNumber(nutritionCalories, language) || '-'}</span>
                              </div>
                              {lomealToday && (
-                                <p className={`font-medium ${t.textMuted} truncate`} style={{fontSize: '0.65rem'}}>Lomeal: {lomealToday.mealsCount || 0} sesi makan</p>
+                                <div className={`font-medium ${t.textMuted} truncate flex items-center gap-1.5`} style={{fontSize: '0.65rem'}}>
+                                  <span className="px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-500 text-[8px] uppercase font-bold tracking-wider">LOMEAL</span>
+                                  {lomealToday.mealsCount || 0} konsumsi
+                                </div>
                              )}
                          </div>
                        );
@@ -776,7 +794,10 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                          <div className="flex items-baseline justify-end mb-0.5">
                              <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{mergedDailyCalories > 0 ? formatNumber(mergedDailyCalories, language) : '-'}</span>
                          </div>
-                         <p className={`font-medium ${t.textMuted} truncate`} style={{fontSize: '0.65rem'}}>Logym: {mergedDailySessions || 0} sesi latihan</p>
+                         <div className={`font-medium ${t.textMuted} truncate flex items-center justify-end gap-1.5`} style={{fontSize: '0.65rem'}}>
+                           <span className="px-1 py-0.5 rounded bg-sky-500/20 text-sky-500 text-[8px] uppercase font-bold tracking-wider">LOGYM</span>
+                           {mergedDailySessions || 0} latihan
+                         </div>
                      </div>
                  </div>
 

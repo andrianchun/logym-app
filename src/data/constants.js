@@ -42,7 +42,11 @@ export const defaultMasterExercises = [
   { id: 132, name: 'Elliptical', target: ['Cardio'], type: 'time', defaultWeight: 0, duration: 15, equipment: 'Elliptical Machine', level: 'beginner', ytVideo: '' },
   { id: 133, name: 'Jump Rope', target: ['Cardio'], type: 'time', defaultWeight: 0, duration: 5, equipment: 'Rope', level: 'intermediate', ytVideo: '' },
   { id: 134, name: 'Dumbbell Goblet Squat', target: ['Quads', 'Glutes'], type: 'weight', defaultWeight: 10, equipment: 'Dumbbell', level: 'beginner', ytVideo: 'https://youtu.be/MeIiIdhgPgl' },
-  { id: 135, name: 'Barbell Bench Press', target: ['Dada Tengah', 'Triceps', 'Deltoid Depan'], type: 'weight', defaultWeight: 20, equipment: 'Barbell', level: 'intermediate', ytVideo: 'https://youtu.be/rT7DgCr-3pg' }
+  { id: 135, name: 'Barbell Bench Press', target: ['Dada Tengah', 'Triceps', 'Deltoid Depan'], type: 'weight', defaultWeight: 20, equipment: 'Barbell', level: 'intermediate', ytVideo: 'https://youtu.be/rT7DgCr-3pg' },
+  { id: 136, name: 'Swimming (Renang)', target: ['Cardio', 'Core', 'Lats'], type: 'time', defaultWeight: 0, duration: 30, equipment: 'Pool', level: 'intermediate', ytVideo: '' },
+  { id: 137, name: 'Jogging / Running', target: ['Cardio', 'Quads', 'Calves'], type: 'time', defaultWeight: 0, duration: 20, equipment: 'Body Weight', level: 'beginner', ytVideo: '' },
+  { id: 138, name: 'Walking / Jalan Kaki', target: ['Cardio'], type: 'time', defaultWeight: 0, duration: 30, equipment: 'Body Weight', level: 'beginner', ytVideo: '' },
+  { id: 139, name: 'Cycling / Sepeda', target: ['Cardio', 'Quads'], type: 'time', defaultWeight: 0, duration: 30, equipment: 'Bicycle', level: 'beginner', ytVideo: '' }
 ];
 
 export const defaultPrograms = [

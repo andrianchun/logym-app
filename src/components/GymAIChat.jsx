@@ -669,23 +669,8 @@ export default function GymAIChat({
                         <div>
                             <h3 className="font-bold text-white leading-tight">Coach Raiga</h3>
                             <div className="flex items-center gap-1 mt-1">
-                                <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${getProviderStatus(AI_MODELS.find(m => m.id === aiModel)?.provider, userApiKeys, keyStatuses) === 'ready' ? 'bg-blue-500' : getProviderStatus(AI_MODELS.find(m => m.id === aiModel)?.provider, userApiKeys, keyStatuses) === 'warning' ? 'bg-yellow-500' : 'bg-red-500'}`}></span>
-                                <select 
-                                    value={aiModel}
-                                    onChange={(e) => {
-                                        const selectedModelId = e.target.value;
-                                        const selectedModel = AI_MODELS.find(m => m.id === selectedModelId);
-                                        if (selectedModel) {
-                                            setAiProvider(selectedModel.provider);
-                                            setAiModel(selectedModel.id);
-                                        }
-                                    }}
-                                    className="bg-transparent text-blue-400 text-[10px] font-mono outline-none cursor-pointer appearance-none"
-                                >
-                                    {getAvailableModels(userApiKeys).map(m => {
-                                        return <option key={m.id} value={m.id} className="bg-neutral-900 text-white">{m.name}</option>;
-                                    })}
-                                </select>
+                                <span className={`w-1.5 h-1.5 rounded-full animate-pulse bg-emerald-500`}></span>
+                                <span className="text-blue-400 text-[10px] font-mono">Online</span>
                             </div>
                         </div>
                     </div>

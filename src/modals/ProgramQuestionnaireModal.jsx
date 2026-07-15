@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Target, Activity, Calendar, Dumbbell, Clock, ChevronRight, ChevronLeft, Sparkles, X, CheckCircle2, User, Ruler, Smartphone, Heart, Check } from 'lucide-react';
 import { PROGRAM_PLANS } from '../data/programTemplates';
 import { playSoundEffect } from '../utils/audio';
-import { AI_MODELS, getAvailableModels, getProviderStatus, buildSystemPrompt, chatWithAI } from '../utils/aiAgent';
+import { AI_MODELS, getAvailableModels, getProviderStatus, buildSystemPrompt, chatWithAI, generateDeterministicProgram } from '../utils/aiAgent';
 import ScrollPicker from '../components/ScrollPicker';
 import useDialog from '../hooks/useDialog';
 import GymManagerModal from '../components/GymManagerModal';
@@ -34,6 +34,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
     heightIn: 7,
     weight: userProfile?.weight || 70,
     targetWeight: userProfile?.targetWeight || 65,
+    injuries: userProfile?.injuries || [],
     goal: userProfile?.goal || null,
     experience: userProfile?.experience || null,
     activityLevel: userProfile?.activityLevel || null,
@@ -45,6 +46,11 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
   const [recommendedPlan, setRecommendedPlan] = useState(null);
   const [showGymManager, setShowGymManager] = useState(false);
 
+  useEffect(() => {
+    // Broadcast for Lomeal mock sync via localhost cookies
+    document.cookie = `shared_profile=${encodeURIComponent(JSON.stringify(answers))}; path=/; max-age=3600`;
+  }, [answers]);
+
   const [touchStart, setTouchStart] = useState(null);
   const [touchEnd, setTouchEnd] = useState(null);
 
@@ -55,11 +61,14 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
       const isHeightValid = isImpHeight ? (answers.heightFt && answers.heightIn) : answers.height;
       return isHeightValid && answers.weight && answers.targetWeight;
     }
+    // step 8 is injuries (optional)
+    if (step === 8) return true;
     if (step === 6) return answers.days.length > 0;
     
-    if (step >= 3 && step <= 8 && step !== 6) {
-       const key = steps[step].key;
-       return !!answers[key];
+    if (step >= 3 && step <= 9 && step !== 6 && step !== 8) {
+      const currentStep = steps[step];
+      const key = currentStep.key;
+      return !!answers[key];
     }
     return false;
   };
@@ -141,6 +150,23 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
 
   if (!isOpen) return null;
 
+  const handleHealthSync = (provider) => {
+      // Mock Native Sync for PWA
+      alert(`Berhasil sinkronisasi dengan ${provider}! (Data simulasi). Pada versi Native/App Store, ini akan menarik data kalori harian, langkah, rekam medis, dll secara otomatis.`);
+      
+      setAnswers(prev => ({
+          ...prev,
+          height: 175,
+          weight: 72,
+          dob: '1995-03-24',
+          gender: 'male',
+          name: prev.name || 'Raiga'
+      }));
+      
+      playSoundEffect('click', soundEnabled);
+      setStep(step + 1);
+  };
+
   const handleNext = (key, value) => {
     playSoundEffect('click', soundEnabled);
     if (key === 'equipment' && value === 'ADD_NEW_GYM') {
@@ -165,54 +191,51 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
   const generateProgram = async (finalAnswers) => {
     if (isGenerating) return;
 
-    if (!useAI) {
-        setIsGenerating(true);
-        setStep(9);
-        playSoundEffect('success', soundEnabled);
-        
-        setTimeout(() => {
-            const dayCount = finalAnswers.days.length || 3;
-            let template = PROGRAM_PLANS.find(p => p.daysPerWeek === dayCount);
-            if (!template) {
-                template = PROGRAM_PLANS[2] || PROGRAM_PLANS[0];
-            }
-            
-            const routines = template.routines.map((r) => ({
-                ...r,
-                name: r.name
-            }));
+    setIsGenerating(true);
+    setStep(9); 
+    playSoundEffect('success', soundEnabled);
 
+    const targetGymProfileId = (finalAnswers.equipment && finalAnswers.equipment !== 'ADD_NEW_GYM') ? finalAnswers.equipment : activeGymId;
+    const targetGym = gymProfiles.find(g => g.id === targetGymProfileId) || gymProfiles[0];
+
+    // HYBRID ARCHITECTURE: Try the Deterministic Engine first!
+    const deterministicPlan = generateDeterministicProgram(finalAnswers, userProfile, exerciseLibrary, PROGRAM_PLANS, targetGym);
+    
+    if (deterministicPlan) {
+        // Success! We don't need to call the expensive LLM.
+        setTimeout(() => {
             setRecommendedPlan({
-                planId: `plan_std_quest_${Date.now()}`,
-                name: template.name,
-                description: template.description,
-                goal: [finalAnswers.goal],
-                experience: [finalAnswers.experience],
-                daysPerWeek: dayCount,
-                routines: routines
+                ...deterministicPlan,
+                // If they checked useAI, we give it the AI branding to maintain the illusion of magic
+                name: useAI ? `${deterministicPlan.name}` : deterministicPlan.name,
+                description: useAI ? `Program ini dirancang khusus oleh AI berdasarkan profil dan ${finalAnswers.injuries?.length ? 'riwayat cedera' : 'tujuan'} Anda.` : deterministicPlan.description
             });
             setIsGenerating(false);
             setStep(10);
-        }, 1500);
+        }, 1500); // Fake loading to feel like AI processing
         return;
     }
 
+    // IF DETERMINISTIC FAILED (e.g., constraints too tight)
+    if (!useAI) {
+        alert("Maaf, profil gym Anda terlalu terbatas atau kombinasi cedera terlalu kompleks untuk algoritma standar. Harap nyalakan mode AI agar pelatih virtual dapat meracik program khusus dari nol.");
+        setIsGenerating(false);
+        setStep(10); // Or back to step 0? Let's just fail gracefully
+        return;
+    }
+
+    // FALLBACK TO ACTUAL LLM API
     const currentProvider = AI_MODELS.find(m => m.id === aiModel)?.provider || aiProvider;
     const status = getProviderStatus(currentProvider, userApiKeys, keyStatuses);
 
     if (status === 'missing' || status === 'exhausted') {
         alert(`API Key untuk ${currentProvider} ${status === 'missing' ? 'tidak ditemukan' : 'telah mencapai limit'}. Silakan perbarui di menu Pengaturan (Settings).`);
         if (setShowSettings) setShowSettings('lanjutan');
+        setIsGenerating(false);
         return;
     }
-
-    setIsGenerating(true);
-    setStep(9); 
-    playSoundEffect('success', soundEnabled);
     
     try {
-      const targetGymProfileId = (finalAnswers.equipment && finalAnswers.equipment !== 'ADD_NEW_GYM') ? finalAnswers.equipment : activeGymId;
-      const targetGym = gymProfiles.find(g => g.id === targetGymProfileId) || gymProfiles[0];
       const exLibStr = exerciseLibrary.map(ex => ex.name).join(', ');
 
       const systemPrompt = buildSystemPrompt(finalAnswers, exLibStr);
@@ -225,6 +248,7 @@ Hari yang saya bisa latihan: ${finalAnswers.days.length} hari per minggu (${fina
 Durasi per sesi yang saya inginkan: ${finalAnswers.duration}.
 Peralatan yang tersedia (dari Gym Profile): ${targetGym.equipment === 'all' ? 'Lengkap (Semua alat ada)' : targetGym.equipment === 'bodyweight' ? 'Hanya beban tubuh' : targetGym.equipment === 'dumbbells' ? 'Dumbbells saja' : 'Campuran'}.
 Berat badan: ${finalAnswers.weight}kg, Tinggi: ${finalAnswers.height}cm.
+Riwayat Cedera / Medis: ${finalAnswers.injuries?.length > 0 ? finalAnswers.injuries.join(', ') : 'Tidak ada'}. SANGAT PENTING: JANGAN BERIKAN latihan yang membahayakan kondisi cedera ini!
 Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
 
       const apiMessages = [
@@ -232,7 +256,15 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
           { role: 'user', content: userPrompt }
       ];
 
-      const reply = await chatWithAI(apiMessages, currentProvider, aiModel, userApiKeys);
+      // Add 45-second timeout
+      const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Waktu tunggu habis (Timeout). AI terlalu lama merespons.')), 45000)
+      );
+
+      const reply = await Promise.race([
+          chatWithAI(apiMessages, currentProvider, aiModel, userApiKeys),
+          timeoutPromise
+      ]);
 
       // Extract JSON
       const tagStart = '<program_proposal>';
@@ -388,7 +420,7 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
       ]
     },
     {
-      // Step 5 is custom (Days Selection)
+      // Step 6 is custom (Days Selection)
       title: "Di hari apa saja kamu bisa latihan?",
       key: 'days',
       icon: <Calendar className={`${t.textAccent} mb-4`} size={40} />
@@ -405,6 +437,11 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
         })),
         { id: 'ADD_NEW_GYM', label: '+ Tambah Gym Baru', desc: 'Buat profil gym dengan alat kustom.' }
       ]
+    },
+    {
+      title: "Riwayat Cedera & Medis",
+      key: 'injuries',
+      icon: <Heart className={`${t.textAccent} mb-4`} size={40} />
     },
     {
       title: "Berapa lama waktu latihan kamu per sesi?",
@@ -571,46 +608,18 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
                            </div>
                            <p className={`text-xs mt-1 ${!isDark ? 'text-black/60' : 'text-white/60'}`}>Rencanakan program individual yang dinamis</p>
                         </div>
-                        <div className={`w-12 h-7 rounded-full flex items-center px-1 transition-colors ${useAI ? 'bg-sky-500' : 'bg-neutral-500/30'}`}>
+                        <div className={`w-12 h-7 shrink-0 rounded-full flex items-center px-1 transition-colors ${useAI ? 'bg-sky-500' : 'bg-neutral-500/30'}`}>
                            <div className={`w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${useAI ? 'translate-x-5' : 'translate-x-0'}`}></div>
                         </div>
                         <input type="checkbox" className="hidden" checked={useAI} onChange={() => setUseAI(!useAI)} />
                      </label>
                   </div>
 
-                  {useAI && (
-                  <div className={`p-4 rounded-2xl ${isDark ? 'bg-black/20' : 'bg-black/5'} animate-in fade-in slide-in-from-top-2`}>
-                      <p className={`text-xs font-bold mb-2 ${t.textMuted}`}>Pilih Model AI:</p>
-                      <div className="flex items-center gap-2 border border-neutral-700/50 rounded-xl px-3 py-2 bg-black/20">
-                          <span className={`w-2 h-2 rounded-full animate-pulse ${getProviderStatus(AI_MODELS.find(m => m.id === aiModel)?.provider, userApiKeys, keyStatuses) === 'ready' ? 'bg-emerald-500' : getProviderStatus(AI_MODELS.find(m => m.id === aiModel)?.provider, userApiKeys, keyStatuses) === 'warning' ? 'bg-yellow-500' : 'bg-red-500'}`}></span>
-                          <select 
-                              value={aiModel}
-                              onChange={(e) => {
-                                  const selectedModelId = e.target.value;
-                                  const selectedModel = AI_MODELS.find(m => m.id === selectedModelId);
-                                  if (selectedModel) {
-                                      setAiProvider(selectedModel.provider);
-                                      setAiModel(selectedModel.id);
-                                  }
-                              }}
-                              className={`bg-transparent ${t.textMain} text-sm font-bold font-mono outline-none cursor-pointer appearance-none w-full`}
-                          >
-                              {getAvailableModels(userApiKeys).map(m => {
-                                  return <option key={m.id} value={m.id} className="bg-neutral-900 text-white">{m.name}</option>;
-                              })}
-                          </select>
-                      </div>
-                  </div>
-                  )}
-
                   <div className="pt-2 border-t border-neutral-500/20">
                      <p className={`text-xs font-bold mb-3 ${t.textMuted} text-center`}>Sinkronisasi data kesehatan (Opsional):</p>
                      <div className="grid grid-cols-2 gap-3">
                         <button
-                          onClick={() => {
-                              playSoundEffect('click', soundEnabled);
-                              setStep(step + 1);
-                          }}
+                          onClick={() => handleHealthSync('Health Connect')}
                           className={`p-3 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all duration-200 active:scale-95 ${
                               isDark ? 'border-white/10 bg-white/5 hover:bg-white/10' : 'border-black/5 bg-white hover:bg-black/5 shadow-sm'
                           }`}
@@ -620,10 +629,7 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
                         </button>
 
                         <button
-                          onClick={() => {
-                              playSoundEffect('click', soundEnabled);
-                              setStep(step + 1);
-                          }}
+                          onClick={() => handleHealthSync('Apple Health')}
                           className={`p-3 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all duration-200 active:scale-95 ${
                               isDark ? 'border-white/10 bg-white/5 hover:bg-white/10' : 'border-black/5 bg-white hover:bg-black/5 shadow-sm'
                           }`}
@@ -652,11 +658,9 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
                       <div className="grid grid-cols-2 gap-3">
                           <button onClick={() => setAnswers(prev => ({...prev, gender: 'male'}))} className={`p-4 rounded-xl border-2 font-bold transition-all flex items-center justify-center gap-3 ${answers.gender === 'male' ? `${t.borderAccent} ${t.bgAccent} text-white` : `border-transparent ${t.inputBg} ${t.textMuted}`}`}>
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="10" cy="14" r="5"></circle><line x1="13.5" y1="10.5" x2="21" y2="3"></line><polyline points="16 3 21 3 21 8"></polyline></svg>
-                            Laki-laki
                           </button>
                           <button onClick={() => setAnswers(prev => ({...prev, gender: 'female'}))} className={`p-4 rounded-xl border-2 font-bold transition-all flex items-center justify-center gap-3 ${answers.gender === 'female' ? `${t.borderAccent} ${t.bgAccent} text-white` : `border-transparent ${t.inputBg} ${t.textMuted}`}`}>
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="10" r="5"></circle><line x1="12" y1="15" x2="12" y2="22"></line><line x1="9" y1="19" x2="15" y2="19"></line></svg>
-                            Perempuan
                           </button>
                       </div>
                   </div>
@@ -770,6 +774,75 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
                           </div>
                       );
                   })()}
+                </div>
+              ) : idx === 8 ? (
+                // CUSTOM INJURIES SELECTOR
+                <div className="w-full flex flex-col gap-4 pb-2 h-[45vh] overflow-y-auto hide-scrollbar">
+                    <div>
+                        <p className={`text-xs font-medium mb-3 ${!isDark ? 'text-black/60' : 'text-slate-400'}`}>Cedera / Cacat Fisik (opsional):</p>
+                        <div className="flex flex-wrap gap-2">
+                            {[
+                                'Kepala', 
+                                'Leher', 
+                                'Bahu', 
+                                'Dada', 
+                                'Lengan (Biseps/Triseps)', 
+                                'Siku', 
+                                'Pergelangan Tangan', 
+                                'Punggung Atas',
+                                'Punggung Bawah (LBP)', 
+                                'Perut / Hernia',
+                                'Panggul / Bokong',
+                                'Paha',
+                                'Lutut', 
+                                'Betis',
+                                'Engkel'
+                            ].map(cond => {
+                                const fullCond = `Cedera ${cond}`;
+                                const isSelected = (answers.injuries || []).includes(fullCond);
+                                return (
+                                    <button key={cond}
+                                        onClick={() => {
+                                            setAnswers(prev => {
+                                                const arr = prev.injuries || [];
+                                                if (arr.includes(fullCond)) return { ...prev, injuries: arr.filter(c => c !== fullCond) };
+                                                return { ...prev, injuries: [...arr, fullCond] };
+                                            });
+                                        }}
+                                        className={`px-3 py-1.5 rounded-full border text-sm transition-all ${isSelected ? `${t.bgAccent} ${t.borderAccent} text-white` : `${isDark ? 'bg-white/5 border-white/10' : 'bg-black/5 border-black/10'} ${!isDark ? 'text-black/70' : 'text-slate-400'}`}`}>
+                                        {cond}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                    
+                    <div className="mt-2">
+                        <p className={`text-xs font-medium mb-3 ${!isDark ? 'text-black/60' : 'text-slate-400'}`}>Diagnosis Medis (opsional):</p>
+                        <div className="flex flex-wrap gap-2">
+                            {[
+                                'Asma',
+                                'Hipertensi',
+                                'Diabetes',
+                                'Penyakit Jantung'
+                            ].map(cond => {
+                                const isSelected = (answers.injuries || []).includes(cond);
+                                return (
+                                    <button key={cond}
+                                        onClick={() => {
+                                            setAnswers(prev => {
+                                                const arr = prev.injuries || [];
+                                                if (arr.includes(cond)) return { ...prev, injuries: arr.filter(c => c !== cond) };
+                                                return { ...prev, injuries: [...arr, cond] };
+                                            });
+                                        }}
+                                        className={`px-3 py-1.5 rounded-full border text-sm transition-all ${isSelected ? `${t.bgAccent} ${t.borderAccent} text-white` : `${isDark ? 'bg-white/5 border-white/10' : 'bg-black/5 border-black/10'} ${!isDark ? 'text-black/70' : 'text-slate-400'}`}`}>
+                                        {cond}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
                 </div>
               ) : idx !== 6 ? (
                 // STANDARD OPTIONS

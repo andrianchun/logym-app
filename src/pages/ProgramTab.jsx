@@ -983,7 +983,7 @@ const ProgramTab = ({
           {/* TEXT HEADER (NO BLUR) */}
           <div className="w-full sm:w-3/4 p-5 pb-4 sm:p-6 sm:pb-5">
             <div className="flex items-center gap-2 mb-2">
-              <h3 className={`font-black text-3xl text-white drop-shadow-lg`}>Buat Program</h3>
+              <h3 className={`font-black text-3xl text-white drop-shadow-lg`}>Program Latihan</h3>
             </div>
             <p className={`text-sm font-medium text-white/90 drop-shadow-md leading-relaxed`}>
               Jawab beberapa pertanyaan untuk mendapatkan program latihan terbaik yang dipersonalisasi untuk Anda.
@@ -1005,7 +1005,7 @@ const ProgramTab = ({
                 }}
                 className={`w-full py-3.5 rounded-[14px] font-bold text-white transition-all active:scale-95 flex items-center justify-center text-sm bg-white/10 hover:bg-white/20 border border-white/20 shadow-sm`}
               >
-                Buat Custom
+                Program Custom
               </button>
             </div>
           </div>

@@ -23,10 +23,26 @@ const ScrollPicker = ({ value, onChange, min = 0, max = 200, step = 1, width = '
   // Handle initial scroll position
   useEffect(() => {
     if (!containerRef.current || isScrolling || isEditing) return;
-    const index = options.indexOf(value);
+    let index = options.indexOf(value);
+    
+    if (index === -1) {
+      // Find closest option if exact match not found (e.g. 78.1 with step 1)
+      let minDiff = Infinity;
+      options.forEach((opt, idx) => {
+        const diff = Math.abs(opt - value);
+        if (diff < minDiff) {
+          minDiff = diff;
+          index = idx;
+        }
+      });
+    }
+
     if (index !== -1) {
       containerRef.current.scrollTop = index * 40; // 40px is the height of one item
-      setActiveOpt(value);
+      setActiveOpt(options[index]);
+      if (options[index] !== value) {
+        onChange(options[index]); // Sync parent state with snapped value
+      }
     }
   }, [value, options, isScrolling, isEditing]);
 
