@@ -875,3 +875,99 @@ export async function chatWithAI(messages, aiProvider = 'google', aiModel = 'gem
         throw new Error(backendErr.message || (lastError ? lastError.message : `Semua jalur AI untuk ${aiProvider} gagal. Coba lagi nanti.`));
     }
 }
+
+// ---------------------------------------------------------------------------
+// HYBRID ENGINE: Deterministic Program Generator
+// Tries to build a workout plan from templates without calling the LLM.
+// Returns a plan object on success, or null if constraints are too tight.
+// ---------------------------------------------------------------------------
+
+// Map injury → exercises to EXCLUDE (by name substring, case-insensitive)
+const INJURY_EXCLUSIONS = {
+    'lutut':        ['squat', 'lunge', 'leg press', 'step up', 'jump', 'running', 'lari'],
+    'punggung bawah': ['deadlift', 'good morning', 'hyperextension', 'bent over', 'row barbell'],
+    'bahu':         ['overhead press', 'shoulder press', 'upright row', 'lateral raise', 'military press'],
+    'pergelangan tangan': ['wrist curl', 'push up', 'bench press', 'plank', 'burpee'],
+    'leher':        ['neck', 'behind neck', 'shrug'],
+    'siku':         ['tricep', 'curl', 'push up', 'bench press'],
+    'pinggul':      ['hip thrust', 'hip hinge', 'sumo', 'lunge'],
+    'hamstring':    ['deadlift', 'leg curl', 'nordic curl'],
+};
+
+const isInjured = (exName, injuries = []) => {
+    const n = exName.toLowerCase();
+    return injuries.some(inj => {
+        const key = Object.keys(INJURY_EXCLUSIONS).find(k => inj.toLowerCase().includes(k));
+        return key && INJURY_EXCLUSIONS[key].some(bad => n.includes(bad));
+    });
+};
+
+// Equipment capability map
+const EQUIPMENT_ALLOWS = {
+    all:         () => true,
+    barbell:     (ex) => !['machine', 'cable', 'smith'].some(w => ex.toLowerCase().includes(w)),
+    dumbbells:   (ex) => !['barbell', 'machine', 'cable', 'smith', 'bar '].some(w => ex.toLowerCase().includes(w)),
+    bodyweight:  (ex) => ['push', 'pull', 'dip', 'plank', 'crunch', 'squat', 'lunge', 'burpee', 'mountain', 'sit'].some(w => ex.toLowerCase().includes(w)),
+};
+
+export const generateDeterministicProgram = (answers, userProfile, exerciseLibrary = [], programPlans = [], targetGym = null) => {
+    try {
+        const injuries   = answers.injuries   || [];
+        const daysCount  = (answers.days      || []).length || 3;
+        const goal       = (answers.goal      || '').toLowerCase();
+        const experience = (answers.experience|| '').toLowerCase();
+        const equipmentType = targetGym?.equipment || 'all';
+        const equipCheck = EQUIPMENT_ALLOWS[equipmentType] || EQUIPMENT_ALLOWS.all;
+
+        // Filter exercise library to safe exercises for this user
+        const safeExercises = exerciseLibrary.filter(ex => {
+            if (isInjured(ex.name, injuries)) return false;
+            if (!equipCheck(ex.name)) return false;
+            return true;
+        });
+
+        // Pick a template plan matching the user's goal + day count
+        const matchingPlans = programPlans.filter(plan => {
+            if (plan.daysPerWeek !== daysCount) return false;
+            if (goal.includes('kurus') || goal.includes('turun') || goal.includes('fat loss')) {
+                return plan.goal === 'fat_loss' || plan.goal === 'general_fitness';
+            }
+            if (goal.includes('otot') || goal.includes('massa') || goal.includes('gede') || goal.includes('muscle')) {
+                return plan.goal === 'muscle_gain' || plan.goal === 'hypertrophy';
+            }
+            if (goal.includes('kuat') || goal.includes('strength')) {
+                return plan.goal === 'strength';
+            }
+            return plan.goal === 'general_fitness';
+        });
+
+        const basePlan = matchingPlans[0] || programPlans.find(p => p.daysPerWeek === daysCount) || programPlans[0];
+        if (!basePlan) return null;
+
+        // Substitute unsafe exercises in each day with safe alternatives
+        const days = (basePlan.days || []).map(day => ({
+            ...day,
+            exercises: (day.exercises || []).map(ex => {
+                if (!isInjured(ex.name, injuries) && equipCheck(ex.name)) return ex;
+                // Find a safe substitute from the library in the same muscle group
+                const sub = safeExercises.find(s =>
+                    s.muscle === ex.muscle && !day.exercises.some(e => e.name === s.name)
+                );
+                return sub ? { ...ex, name: sub.name, id: sub.id } : null;
+            }).filter(Boolean),
+        }));
+
+        const suffix = injuries.length > 0 ? ' (Cedera-Aman)' : '';
+        return {
+            ...basePlan,
+            name: `${basePlan.name}${suffix}`,
+            days,
+            isAI: false,
+            generatedBy: 'deterministic',
+        };
+    } catch (e) {
+        console.warn('[generateDeterministicProgram] error:', e);
+        return null;
+    }
+};
+
