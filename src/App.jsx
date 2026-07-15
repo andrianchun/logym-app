@@ -38,6 +38,7 @@ import HelpModal from './modals/HelpModal';
 const ProfileModal = React.lazy(() => import('./modals/ProfileModal'));
 const ProgramQuestionnaireModal = React.lazy(() => import('./modals/ProgramQuestionnaireModal'));
 import AchievementPopup from './components/AchievementPopup';
+import PwaUpdater from './components/PwaUpdater';
 import { checkAchievements, ACHIEVEMENTS } from './data/achievements';
 
 // --- IMPORT DATA & MESIN ---
@@ -2626,6 +2627,8 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* OVERLAYS & NOTIFICATIONS */}
+      <PwaUpdater t={t} isDark={theme === 'dark'} />
       {/* Achievement Popup */}
       <AchievementPopup 
         achievements={unlockedAchievementsPopup} 
