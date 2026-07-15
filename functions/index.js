@@ -129,10 +129,15 @@ exports.aiChat = onCall({ region: REGION, cors: true, timeoutSeconds: 120, memor
     for (const key of keys) {
         try {
             if (provider === 'google') {
-                const contents = nonSystem.map(m => ({
-                    role: m.role === 'user' ? 'user' : 'model',
-                    parts: [{ text: m.content }]
-                }));
+                const contents = nonSystem.map(m => {
+                    if (Array.isArray(m.content)) {
+                        return { role: m.role === 'user' ? 'user' : 'model', parts: m.content };
+                    }
+                    return {
+                        role: m.role === 'user' ? 'user' : 'model',
+                        parts: [{ text: m.content }]
+                    };
+                });
                 return { text: await callGoogle(key, model, systemPrompt, contents) };
             }
             if (provider === 'openai') {
