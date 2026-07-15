@@ -148,17 +148,26 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          activeMinutes: todayDailyData.activeMinutes !== undefined ? todayDailyData.activeMinutes : (emptyBio.activeMinutes || 0),
          activityCalories: todayDailyData.activityCalories !== undefined ? todayDailyData.activityCalories : (emptyBio.activityCalories || 0),
          nutritionCalories: todayDailyData.nutritionCalories !== undefined ? todayDailyData.nutritionCalories : (emptyBio.nutritionCalories || 0),
-         sleep: todayDailyData.sleep !== undefined ? todayDailyData.sleep : (emptyBio.sleep || ''),
-         energyScore: todayDailyData.energyScore !== undefined ? todayDailyData.energyScore : (emptyBio.energyScore || 0),
-         heartRate: todayDailyData.heartRate !== undefined ? todayDailyData.heartRate : (emptyBio.heartRate || 0),
-         minHeartRate: todayDailyData.minHeartRate !== undefined ? todayDailyData.minHeartRate : (emptyBio.minHeartRate || 0),
-         maxHeartRate: todayDailyData.maxHeartRate !== undefined ? todayDailyData.maxHeartRate : (emptyBio.maxHeartRate || 0),
+         sleep: todayDailyData.sleep !== undefined ? todayDailyData.sleep : (emptyBio.sleep || 0),
+         sleepLog: todayDailyData.sleepLog !== undefined ? todayDailyData.sleepLog : (emptyBio.sleepLog || []),
+         energyScore: todayDailyData.energyScore !== undefined ? todayDailyData.energyScore : (emptyBio.energyScore || null),
+         heartRate: todayDailyData.heartRate !== undefined ? todayDailyData.heartRate : (emptyBio.heartRate || null),
+         minHeartRate: todayDailyData.minHeartRate !== undefined ? todayDailyData.minHeartRate : (emptyBio.minHeartRate || null),
+         maxHeartRate: todayDailyData.maxHeartRate !== undefined ? todayDailyData.maxHeartRate : (emptyBio.maxHeartRate || null),
          bloodPressure: todayDailyData.bloodPressure !== undefined ? todayDailyData.bloodPressure : (emptyBio.bloodPressure || ''),
-         oxygenSaturation: todayDailyData.oxygenSaturation !== undefined ? todayDailyData.oxygenSaturation : (emptyBio.oxygenSaturation || 0),
+         oxygenSaturation: todayDailyData.oxygenSaturation !== undefined ? todayDailyData.oxygenSaturation : (emptyBio.oxygenSaturation || null),
          waterIntake: todayDailyData.waterIntake !== undefined ? todayDailyData.waterIntake : (emptyBio.waterIntake || 0),
-         weeklyDuration: todayDailyData.weeklyDuration !== undefined ? todayDailyData.weeklyDuration : emptyBio.weeklyDuration,
-         weeklySessions: todayDailyData.weeklySessions !== undefined ? todayDailyData.weeklySessions : emptyBio.weeklySessions,
-         weeklyCalories: todayDailyData.weeklyCalories !== undefined ? todayDailyData.weeklyCalories : emptyBio.weeklyCalories,
+         weeklyDuration: todayDailyData.weeklyDuration !== undefined ? todayDailyData.weeklyDuration : (emptyBio.weeklyDuration || 0),
+         weeklySessions: todayDailyData.weeklySessions !== undefined ? todayDailyData.weeklySessions : (emptyBio.weeklySessions || 0),
+         weeklyCalories: todayDailyData.weeklyCalories !== undefined ? todayDailyData.weeklyCalories : (emptyBio.weeklyCalories || 0),
+         _manualFlags: (() => {
+             const inherited = { ...(latestBodyData?._manualFlags || {}) };
+             ['steps', 'activeMinutes', 'activityCalories', 'nutritionCalories', 'sleep', 'energyScore', 'heartRate', 'minHeartRate', 'maxHeartRate', 'bloodPressure', 'oxygenSaturation', 'waterIntake'].forEach(k => delete inherited[k]);
+             return {
+                 ...inherited,
+                 ...(todayDailyData?._manualFlags || {})
+             };
+         })()
      };
      
      // Auto-calculate BMI for dashboard display if weight and height exist
@@ -180,9 +189,11 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      }
      
      // Auto-calculate BMR for dashboard display if not exist
-     if (mergedData.height > 0 && mergedData.weight > 0 && !mergedData.bmr && userProfile?.gender && userProfile?.dob) {
-         const age = new Date().getFullYear() - new Date(userProfile.dob).getFullYear() || 25;
-         mergedData.bmr = calcBMR({ weight: mergedData.weight, height: mergedData.height, age, gender: userProfile.gender });
+     if (mergedData.weight > 0 && !mergedData.bmr) {
+         const age = userProfile?.dob ? (new Date().getFullYear() - new Date(userProfile.dob).getFullYear()) : 25;
+         const h = mergedData.height > 0 ? mergedData.height : 165;
+         const g = userProfile?.gender || 'male';
+         mergedData.bmr = calcBMR({ weight: mergedData.weight, height: h, age, gender: g });
      }
      
      return { 
@@ -304,21 +315,25 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
 
              const evaluatedData = evaluateBiometrics(dataToSave);
              
-             // Penanda untuk mencegah auto-sync menimpa data yang diketik manual
-             const manualFlags = {};
-             Object.keys(evaluatedData).forEach(k => {
-                 if (evaluatedData[k] !== null && evaluatedData[k] !== '') manualFlags[k] = true;
-             });
-             
              setHistory(prev => {
                  const existingBio = prev[modalDate]?.bioData || {};
+                 const manualFlags = { ...(existingBio._manualFlags || {}) };
+                 
+                 Object.keys(evaluatedData).forEach(k => {
+                     if (evaluatedData[k] !== null && evaluatedData[k] !== '') {
+                         manualFlags[k] = true;
+                     } else {
+                         delete manualFlags[k]; // Hapus flag jika input dikosongkan agar bisa kembali auto
+                     }
+                 });
+
                  return {
                      ...prev,
                      [modalDate]: {
                          ...(prev[modalDate] || {}),
                          bioData: {
                              ...evaluatedData,
-                             _manualFlags: { ...(existingBio._manualFlags || {}), ...manualFlags }
+                             _manualFlags: manualFlags
                          }
                      }
                  };
@@ -405,14 +420,11 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      const stepsCalories = Math.round((Number(bioData.steps || 0) * 0.04)); // ~0.04 kcal per langkah
      const workoutCalories = intTodayCals;
      const totalDailyCals = bmrCalories + stepsCalories + workoutCalories;
-     // BMR + langkah + workout internal Logym adalah LANTAI yang gak boleh ketimpa manual —
-     // BMR gak mungkin 0/minus (selalu terbakar walau diam), dan hasil latihan yang beneran
-     // ke-log di Logym gak boleh "hilang" cuma gara-gara ada input manual (dari modal Logym
-     // sendiri ATAU koreksi dari Lomeal) yang lebih kecil atau bahkan kosong/kehapus.
-     // Manual cuma BOLEH menaikkan (extra aktivitas yang gak ke-track otomatis), gak pernah
-     // menurunkan di bawah totalDailyCals — jadi walau nilainya di-nolkan, tetap fallback aman.
+     // Jika diset manual, gunakan nilai manual. Jika tidak, gunakan perhitungan otomatis (BMR + langkah + workout).
+     // Proteksi Math.max dihilangkan karena menyebabkan bug "ratchet" (terkunci ke nilai max) dan 
+     // membuat nilai dashboard berbeda dengan yang tersimpan di history.
      const manualCals = isDailyCalsManual ? (Number(bioData.activityCalories) || 0) : 0;
-     const dailyCals = Math.max(totalDailyCals, manualCals);
+     const dailyCals = isDailyCalsManual ? manualCals : totalDailyCals;
      
      let weeklyDur = 0;
      let weeklyWorkoutDur = 0;

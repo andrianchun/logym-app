@@ -730,7 +730,7 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
         </div>
 
         {/* ── Tab Switcher (All vs Custom) ───────────────────────── */}
-        <div className={`relative flex w-full p-1.5 rounded-full ${t.btnBg}`}>
+        <div className={`relative flex w-full p-1.5 rounded-full ${t.btnBg} no-swipe`}>
             <div className={`absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] rounded-full transition-transform duration-300 ease-out ${t.bgAccent} shadow-sm`} style={{ transform: viewMode === 'all' ? 'translateX(0)' : 'translateX(100%)', left: '6px' }}></div>
             
             <button

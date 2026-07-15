@@ -51,7 +51,7 @@ export default function useDialog(isDark = false, customBgClass = null) {
     >
       <div
         className={`w-full max-w-xs rounded-3xl p-5 shadow-2xl border animate-in zoom-in-95 duration-200 ${
-          isDark ? `${customBgClass || 'bg-slate-900'} border-white/10` : 'bg-white border-black/8'
+          isDark ? `${customBgClass || 'bg-slate-900/80 backdrop-blur-xl'} border-white/10` : 'bg-white/80 backdrop-blur-xl border-black/8'
         }`}
         onClick={e => e.stopPropagation()}
       >
