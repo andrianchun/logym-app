@@ -14,21 +14,29 @@ const ConfirmModal = ({ confirmModal, setConfirmModal, t, lang, soundEnabled, pl
          </div>
          <h3 className="h2 mb-2">{confirmModal.title}</h3>
          <p className={`body-md ${t?.textMuted} mb-6 leading-relaxed`}>{confirmModal.message}</p>
-         <div className="flex gap-3">
-            <button 
-              onClick={() => { if (confirmModal.onCancel) confirmModal.onCancel(); setConfirmModal({isOpen:false}); }} 
-              className={`flex-1 py-3 rounded-xl font-bold body-lg ${t?.textMuted} ${t?.btnBg} active:scale-[0.98] transition-all`}
-            >
-              {lang?.cancel || 'Batal'}
-            </button>
+         <div className={confirmModal.onDiscard ? "flex flex-col gap-2.5" : "flex gap-3"}>
             {confirmModal.onConfirm && (
               <button 
                 onClick={() => { playSoundEffect('click', soundEnabled); const cb = confirmModal.onConfirm; setConfirmModal({isOpen:false}); setTimeout(() => cb(), 0); }} 
-                className={`flex-1 py-3 rounded-xl font-black body-lg text-white shadow-lg active:scale-[0.98] transition-all ${isDelete ? 'bg-rose-500 shadow-rose-500/20 hover:bg-rose-600' : t?.bgAccent + ' shadow-black/20 hover:opacity-90'}`}
+                className={`w-full py-3.5 rounded-xl font-black body-lg text-white shadow-lg active:scale-[0.98] transition-all ${isDelete ? 'bg-rose-500 shadow-rose-500/20 hover:bg-rose-600' : t?.bgAccent + ' shadow-black/20 hover:opacity-90'}`}
               >
                 {confirmModal.confirmText || (isDelete ? 'Ya, Hapus' : 'Ya, Lanjutkan')}
               </button>
             )}
+            {confirmModal.onDiscard && (
+              <button 
+                onClick={() => { playSoundEffect('click', soundEnabled); const cb = confirmModal.onDiscard; setConfirmModal({isOpen:false}); setTimeout(() => cb(), 0); }} 
+                className={`w-full py-3.5 rounded-xl font-bold body-lg text-rose-500 bg-rose-500/10 hover:bg-rose-500/20 active:scale-[0.98] transition-all`}
+              >
+                {confirmModal.discardText || 'Buang'}
+              </button>
+            )}
+            <button 
+              onClick={() => { if (confirmModal.onCancel) confirmModal.onCancel(); setConfirmModal({isOpen:false}); }} 
+              className={`w-full py-3.5 rounded-xl font-bold body-lg ${t?.textMuted} ${t?.btnBg} active:scale-[0.98] transition-all`}
+            >
+              {lang?.cancel || 'Batal'}
+            </button>
          </div>
       </div>
     </div>

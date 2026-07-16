@@ -321,7 +321,10 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                  
                  Object.keys(evaluatedData).forEach(k => {
                      if (evaluatedData[k] !== null && evaluatedData[k] !== '') {
-                         manualFlags[k] = true;
+                         // Simpan nilainya sendiri (bukan cuma `true`) — activityCalories butuh angka
+                         // manual yang STABIL sebagai basis, supaya tidak ikut kebaca ulang dari
+                         // bioData.activityCalories yang tiap render ditimpa hasil hitung otomatis.
+                         manualFlags[k] = evaluatedData[k];
                      } else {
                          delete manualFlags[k]; // Hapus flag jika input dikosongkan agar bisa kembali auto
                      }
@@ -435,11 +438,15 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      const stepsCalories = Math.round((Number(bioData.steps || 0) * 0.04)); // ~0.04 kcal per langkah
      const workoutCalories = intTodayCals;
      const totalDailyCals = bmrCalories + stepsCalories + workoutCalories;
-     // Jika diset manual, gunakan nilai manual. Jika tidak, gunakan perhitungan otomatis (BMR + langkah + workout).
-     // Proteksi Math.max dihilangkan karena menyebabkan bug "ratchet" (terkunci ke nilai max) dan 
-     // membuat nilai dashboard berbeda dengan yang tersimpan di history.
-     const manualCals = isDailyCalsManual ? (Number(bioData.activityCalories) || 0) : 0;
-     const dailyCals = isDailyCalsManual ? Math.max(bmrCalories, manualCals) : totalDailyCals;
+     // Jika diset manual, pakai nilai manual itu SEBAGAI BASIS (BMR+langkah pengganti), tapi
+     // workout Logym hari ini tetap selalu ditambahkan di atasnya — manual cuma menimpa sinkronisasi
+     // alat/app LAIN (lihat dialog konfirmasi di handleSaveManualData), bukan tracking latihan sendiri.
+     // Basis diambil dari _manualFlags (angka yang user ketik, stabil) BUKAN dari bioData.activityCalories
+     // (field itu ditimpa hasil hitung tiap render oleh efek auto-save di bawah) — kalau dari situ,
+     // workoutCalories bakal numpuk dobel tiap render karena basisnya sendiri sudah kebawa workout
+     // hasil render sebelumnya. Ini juga yang bikin bug "ratchet" versi sebelumnya (Math.max lawas).
+     const manualCals = isDailyCalsManual ? (Number(bioData._manualFlags.activityCalories) || 0) : 0;
+     const dailyCals = isDailyCalsManual ? Math.max(bmrCalories, manualCals) + workoutCalories : totalDailyCals;
      
      let weeklyDur = 0;
      let weeklyWorkoutDur = 0;
@@ -473,7 +480,9 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
 
          weeklyDur += Math.max(extDur, intDur);
          weeklyWorkoutDur += intDur;
-         weeklyCals += isDayCalManual ? extCal : Math.max(extCal, intCal);
+         // Sama seperti dailyCals di atas: kalau manual, tambahkan tetap workout hari itu (intCal)
+         // di atas basis manual (bukan extCal, yang bisa sudah ketimpa hasil hitung otomatis).
+         weeklyCals += isDayCalManual ? (Number(dayData.bioData?._manualFlags?.activityCalories) || 0) + intCal : Math.max(extCal, intCal);
      }
      
      // Override with manual weekly if user explicitly saved a modified value in the modal
@@ -769,17 +778,20 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                  <div className="flex flex-col h-full">
                      <div className="flex items-center space-x-1.5 mb-1"><span className="w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-500 flex items-center justify-center shrink-0"><Utensils size={11}/></span> <span className={`caption ${t.textMuted} capitalize`}>Kalori Dimakan</span></div>
                      {(() => {
-                       const nutritionCalories = lomealToday?.kcal ?? bioData.nutritionCalories;
+                       // lomealSync.today bisa basi (push dari Lomeal telat/gagal, silent-catch) —
+                       // cuma dipercaya kalau ymd-nya beneran hari ini, biar gak nampilin angka kemarin.
+                       const lomealFresh = lomealToday?.ymd === todayStr ? lomealToday : null;
+                       const nutritionCalories = lomealFresh?.kcal ?? bioData.nutritionCalories;
                        const foodTarget = lomealTargets?.kcal || 2000;
                        return (
                          <div className="flex flex-col flex-1 justify-end">
                              <div className="flex items-baseline space-x-1 mb-0.5">
                                  <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{formatNumber(nutritionCalories, language) || '-'}</span>
                              </div>
-                             {lomealToday && (
+                             {lomealFresh && (
                                 <div className={`font-medium ${t.textMuted} truncate flex items-center gap-1.5`} style={{fontSize: '0.65rem'}}>
                                   <span className="px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-500 text-[8px] uppercase font-bold tracking-wider">LOMEAL</span>
-                                  {lomealToday.mealsCount || 0} konsumsi
+                                  {lomealFresh.mealsCount || 0} konsumsi
                                 </div>
                              )}
                          </div>

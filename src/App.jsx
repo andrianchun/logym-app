@@ -48,7 +48,7 @@ import { AI_MODELS, detectPlateaus, getRaigaNotification } from './utils/aiAgent
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
 import useDialog from './hooks/useDialog';
 import { getLocalYMD, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos } from './data/constants';
-import { Loader2, Download } from 'lucide-react';
+import { Loader2, Download, X } from 'lucide-react';
 
 // Serialisasi kanonik (key di-sort) supaya perbandingan tidak terpengaruh urutan key
 // antara objek buatan lokal vs hasil decode Firestore.
@@ -74,6 +74,10 @@ export default function App() {
   const [user, setUser] = useState(__previewUser);
   const [isAuthChecking, setIsAuthChecking] = useState(!__previewUser);
   const [isDataLoaded, setIsDataLoaded] = useState(!!__previewUser);
+  // Listener history (tahun ini) terpisah dari listener dokumen utama di atas — isDataLoaded
+  // bisa true duluan sementara history masih kosong, bikin efek load-tanggal di bawah kepancing
+  // jalan dengan history={} dan mengunci loadedDate padahal _activeSession-nya belum sempat masuk.
+  const [isHistoryLoaded, setIsHistoryLoaded] = useState(!!__previewUser);
   const [isSplashMinTimeReached, setIsSplashMinTimeReached] = useState(false);
 
   useEffect(() => {
@@ -169,9 +173,26 @@ export default function App() {
   const [userAchievements, setUserAchievements] = useState([]);
   const [unlockedAchievementsPopup, setUnlockedAchievementsPopup] = useState([]);
 
-  const [exerciseLibrary, setExerciseLibrary] = useState(defaultMasterExercises);
-  const [programs, setPrograms] = useState(defaultPrograms);
-  const [history, setHistory] = useState({});
+  const [exerciseLibrary, _setExerciseLibrary] = useState(defaultMasterExercises);
+  const setExerciseLibrary = (val) => {
+      if (!isExecutingSnapshot.current) lastLocalWriteAt.current = Date.now();
+      _setExerciseLibrary(val);
+  };
+  const [programs, _setPrograms] = useState(defaultPrograms);
+  const lastLocalWriteAt = useRef(0);
+  const isExecutingSnapshot = useRef(false);
+  
+  const setPrograms = (val) => {
+      if (!isExecutingSnapshot.current) lastLocalWriteAt.current = Date.now();
+      _setPrograms(val);
+  };
+
+  const [history, _setHistory] = useState({});
+  const lastLocalHistoryWriteAt = useRef(0);
+  const setHistory = (val) => {
+     if (!isExecutingSnapshot.current) lastLocalHistoryWriteAt.current = Date.now();
+     _setHistory(val);
+  };
   
   const [activeTab, _setActiveTab] = useState('dashboard');
   const [tabSlideDir, setTabSlideDir] = useState('');
@@ -236,7 +257,11 @@ export default function App() {
 
   const [selectedDate, setSelectedDate] = useState(getLocalYMD(new Date()));
   const [loadedDate, setLoadedDate] = useState(null);
-  const [activePlanIds, setActivePlanIds] = useState(['custom']);
+  const [activePlanIds, _setActivePlanIds] = useState(['custom']);
+  const setActivePlanIds = (val) => {
+      if (!isExecutingSnapshot.current) lastLocalWriteAt.current = Date.now();
+      _setActivePlanIds(val);
+  };
   const [activeProgramId, setActiveProgramId] = useState(defaultPrograms[0]?.id || null);
     const [focusWorkoutId, setFocusWorkoutId] = useState(null);
 
@@ -245,25 +270,27 @@ export default function App() {
     if (!programs || programs.length === 0) return;
     let changed = false;
     const newProgs = programs.map(p => {
-      let pChanged = false;
-      const newRoutines = p.routines?.map(r => {
-         let rChanged = false;
-         const seen = new Set();
-         const newExs = r.exercises?.map(ex => {
-           if (seen.has(ex.id)) {
-             rChanged = true;
-             const newId = ex.id + '-' + Math.random().toString(36).substr(2, 5);
+       if (!p.exercises || p.exercises.length === 0) return p;
+       
+       let pChanged = false;
+       const seen = new Set();
+       const newExs = p.exercises.map(ex => {
+          const exIdStr = String(ex.id);
+          if (seen.has(exIdStr)) {
+             pChanged = true;
+             const newId = exIdStr + '-' + Math.random().toString(36).substr(2, 5);
              seen.add(newId);
              return { ...ex, id: newId };
-           }
-           seen.add(ex.id);
-           return ex;
-         });
-         if (rChanged) { pChanged = true; return { ...r, exercises: newExs }; }
-         return r;
-      });
-      if (pChanged) { changed = true; return { ...p, routines: newRoutines }; }
-      return p;
+          }
+          seen.add(exIdStr);
+          return ex;
+       });
+
+       if (pChanged) { 
+           changed = true; 
+           return { ...p, exercises: newExs }; 
+       }
+       return p;
     });
     if (changed) {
       setPrograms(newProgs);
@@ -819,6 +846,7 @@ export default function App() {
       } else {
         setUser(null);
         setIsDataLoaded(false);
+        setIsHistoryLoaded(false);
         setHistory({});
         setPrograms(defaultPrograms);
         setExerciseLibrary(defaultMasterExercises);
@@ -850,6 +878,10 @@ export default function App() {
   // ==========================================
   const isUpdatingFromServer = useRef(false);
   const [hasParseError, setHasParseError] = useState(false);
+  // Kegagalan auto-save selama ini cuma nyangkut di console — user gak pernah tahu, padahal
+  // gejalanya fatal: perubahan "kesimpan" di layar lalu balik sendiri begitu snapshot server
+  // datang. Tampilkan di UI supaya ketahuan dan bisa dilaporkan.
+  const [cloudSaveError, setCloudSaveError] = useState(null);
 
   useEffect(() => {
     let unsubscribeMain = null;
@@ -858,7 +890,7 @@ export default function App() {
     // Baseline diff milik user sebelumnya tidak berlaku lagi
     lastSavedHistoryJson.current = null;
 
-    if (localStorage.getItem('__PREVIEW_USER')) { setIsDataLoaded(true); return; }
+    if (localStorage.getItem('__PREVIEW_USER')) { setIsDataLoaded(true); setIsHistoryLoaded(true); return; }
 
     if (user) {
 
@@ -868,6 +900,8 @@ export default function App() {
 
       unsubscribeMain = onSnapshot(mainDocRef, async (docSnap) => {
         if (docSnap.exists()) {
+          isUpdatingFromServer.current = true;
+          isExecutingSnapshot.current = true;
           try {
             const data = docSnap.data();
             
@@ -938,15 +972,21 @@ export default function App() {
                 ...p,
                 restTime: p.restTime ?? 120,
                 warmupVideoUrls: p.warmupVideoUrls ?? [],
-                // Migrate built-in default programs: add planId + assignedDays if missing
-                planId: p.planId ?? (DEFAULT_DAYS[p.id] ? 'custom' : undefined),
-                planName: p.planName ?? (DEFAULT_DAYS[p.id] ? 'Program Default' : undefined),
+                // Migrate built-in default programs: add planId + assignedDays if missing.
+                // null, BUKAN undefined — Firestore menolak seluruh dokumen yang mengandung
+                // undefined, yang bikin SEMUA auto-save gagal diam-diam sejak program ini masuk state.
+                planId: p.planId ?? (DEFAULT_DAYS[p.id] ? 'custom' : null),
+                planName: p.planName ?? (DEFAULT_DAYS[p.id] ? 'Program Default' : null),
                 assignedDays: p.assignedDays ?? DEFAULT_DAYS[p.id] ?? [],
                 exercises: p.exercises ? p.exercises.map(ex => 
                   (ex.id === 101 && ex.name === 'Incline Smith Machine Press') ? { ...ex, name: 'Smith Machine Incline Bench Press' } : ex
                 ) : []
               }));
-              setPrograms(prev => JSON.stringify(prev) === JSON.stringify(migratedPrograms) ? prev : migratedPrograms);
+              if (Date.now() - lastLocalWriteAt.current > 5000) {
+                 setPrograms(prev => JSON.stringify(prev) === JSON.stringify(migratedPrograms) ? prev : migratedPrograms);
+              } else {
+                 console.log('[Sync] Skipping programs update from server due to recent local write');
+              }
             }
             if (data.exerciseLibrary) {
               const parsedLib = typeof data.exerciseLibrary === 'string' ? JSON.parse(data.exerciseLibrary) : data.exerciseLibrary;
@@ -962,7 +1002,11 @@ export default function App() {
                   }
               });
 
-              setExerciseLibrary(prev => JSON.stringify(prev) === JSON.stringify(migratedLib) ? prev : migratedLib);
+              if (Date.now() - lastLocalWriteAt.current > 5000) {
+                 setExerciseLibrary(prev => JSON.stringify(prev) === JSON.stringify(migratedLib) ? prev : migratedLib);
+              } else {
+                 console.log('[Sync] Skipping exerciseLibrary update from server due to recent local write');
+              }
             }
             if (data.settings) {
               const parsedSettings = typeof data.settings === 'string' ? JSON.parse(data.settings) : data.settings;
@@ -999,9 +1043,14 @@ export default function App() {
               }
               if (parsedSettings.activeGymId) setActiveGymId(parsedSettings.activeGymId);
               if (parsedSettings.activityTargets) setActivityTargets(parsedSettings.activityTargets);
-              if (parsedSettings.activePlanIds) setActivePlanIds(parsedSettings.activePlanIds);
-              else if (parsedSettings.activePlanId) setActivePlanIds([parsedSettings.activePlanId]);
-              else setActivePlanIds(['custom']); // default: always activate the built-in default plan
+              
+              if (Date.now() - lastLocalWriteAt.current > 5000) {
+                 if (parsedSettings.activePlanIds) setActivePlanIds(parsedSettings.activePlanIds);
+                 else if (parsedSettings.activePlanId) setActivePlanIds([parsedSettings.activePlanId]);
+                 else setActivePlanIds(['custom']); // default: always activate the built-in default plan
+              } else {
+                 console.log('[Sync] Skipping activePlanIds update from server due to recent local write');
+              }
               
               if (parsedSettings.userProfile) setUserProfile(parsedSettings.userProfile);
               else setUserProfile(null);
@@ -1045,7 +1094,7 @@ export default function App() {
             setHasParseError(true);
           }
 
-          isUpdatingFromServer.current = true;
+          isExecutingSnapshot.current = false;
           setIsDataLoaded(true);
           setTimeout(() => { isUpdatingFromServer.current = false; }, 3000); // diperpanjang untuk cegah race condition auto-save
         } else {
@@ -1064,30 +1113,40 @@ export default function App() {
 
       unsubscribeHistory = onSnapshot(historyDocRef, (docSnap) => {
         if (docSnap.exists()) {
+           isUpdatingFromServer.current = true;
+           isExecutingSnapshot.current = true;
            try {
              const data = docSnap.data();
-             isUpdatingFromServer.current = true;
              // Seed baseline diff: tanggal yang datang dari server dianggap sudah tersimpan,
              // sehingga auto-save berikutnya hanya mengirim tanggal yang benar-benar berubah.
              const base = { ...(lastSavedHistoryJson.current || {}) };
              Object.keys(data).forEach(d => { base[d] = serializeDay(data[d]); });
              lastSavedHistoryJson.current = base;
-             setHistory(prev => {
-                const newState = { ...prev, ...data };
-                return JSON.stringify(prev) === JSON.stringify(newState) ? prev : newState;
-             });
-             setTimeout(() => { isUpdatingFromServer.current = false; }, 3000); // diperpanjang dari 1500ms untuk cegah race condition auto-save
+             
+             if (Date.now() - lastLocalHistoryWriteAt.current > 5000) {
+                 setHistory(prev => {
+                    const newState = { ...prev, ...data };
+                    return JSON.stringify(prev) === JSON.stringify(newState) ? prev : newState;
+                 });
+             } else {
+                 console.log('[Sync] Skipping history update from server due to recent local write');
+             }
            } catch (err) {
              console.error("Parse Error saat load history tahun ini:", err);
              setHasParseError(true);
            }
+           isExecutingSnapshot.current = false;
+           setTimeout(() => { isUpdatingFromServer.current = false; }, 3000);
         }
+        setIsHistoryLoaded(true);
       }, (error) => {
          console.error("Gagal menarik history tahun ini:", error);
+         setIsHistoryLoaded(true);
       });
 
     } else {
       setIsDataLoaded(true);
+      setIsHistoryLoaded(true);
     }
 
     return () => {
@@ -1122,14 +1181,23 @@ export default function App() {
         }
         const mainDocRef = doc(db, "users", user.uid);
 
-        // Simpan Profil & Program ke Dokumen Utama
-        setDoc(mainDocRef, {
-          programs,
-          exerciseLibrary,
-          settings: { theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, userProfile, userApiKeys: (userApiKeys || []).filter(k => k && k.trim()), aiProvider, aiModel, raigaPersona, raigaCustomInstruction, raigaMemory },
-          userAchievements,
-          updatedAt: new Date().toISOString()
-        }, { merge: true }).catch(err => console.error("Auto-save Cloud gagal:", err));
+        // Simpan Profil & Program ke Dokumen Utama.
+        // try/catch WAJIB: setDoc melempar SINKRON (bukan promise rejection) kalau datanya
+        // mengandung undefined — .catch() saja tidak pernah kena, dan errornya lenyap tanpa jejak.
+        try {
+          setDoc(mainDocRef, {
+            programs,
+            exerciseLibrary,
+            settings: { theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, userProfile, userApiKeys: (userApiKeys || []).filter(k => k && k.trim()), aiProvider, aiModel, raigaPersona, raigaCustomInstruction, raigaMemory },
+            userAchievements,
+            updatedAt: new Date().toISOString()
+          }, { merge: true })
+            .then(() => setCloudSaveError(null))
+            .catch(err => { console.error("Auto-save Cloud gagal:", err); setCloudSaveError(err?.message || String(err)); });
+        } catch (err) {
+          console.error("Auto-save Cloud gagal (sync):", err);
+          setCloudSaveError(err?.message || String(err));
+        }
       };
       const timer = setTimeout(attemptSave, 2000);
 
@@ -1180,13 +1248,24 @@ export default function App() {
         lastSavedHistoryJson.current = newBaseline;
         for (const year of dirtyYears) {
            const yearRef = doc(db, "users", user.uid, "history_years", year);
-           setDoc(yearRef, dirtyByYear[year], { merge: true }).catch(err => {
-              console.error(`Auto-save History ${year} gagal:`, err);
-              // Batalkan baseline tanggal yang gagal supaya dicoba lagi pada save berikutnya
+           // Batalkan baseline tanggal yang gagal supaya dicoba lagi pada save berikutnya
+           const rollback = (err, label) => {
+              console.error(`Auto-save History ${year} gagal${label}:`, err);
+              setCloudSaveError(err?.message || String(err));
               if (lastSavedHistoryJson.current) {
                  Object.keys(dirtyByYear[year]).forEach(d => { delete lastSavedHistoryJson.current[d]; });
               }
-           });
+           };
+           // try/catch WAJIB: setDoc melempar SINKRON kalau data mengandung undefined —
+           // tanpa ini baseline sudah terlanjur di-update dan tanggal itu dianggap "tersimpan"
+           // selamanya padahal tidak pernah ketulis (data hilang diam-diam sampai reload).
+           try {
+              setDoc(yearRef, dirtyByYear[year], { merge: true })
+                 .then(() => setCloudSaveError(null))
+                 .catch(err => rollback(err, ''));
+           } catch (err) {
+              rollback(err, ' (sync)');
+           }
         }
       };
       const timer = setTimeout(attemptSave, 2000);
@@ -1609,14 +1688,42 @@ export default function App() {
   };
 
   const navigateToWorkoutDate = (dateStr, progId) => {
-    playSoundEffect('click', soundEnabled); setSelectedDate(dateStr);
-    if(progId) {
-       setActiveProgramId(progId);
-       setFocusWorkoutId(progId === 'adhoc' ? 'extra' : progId);
-       setSessionToRun(progId === 'adhoc' ? 'extra' : progId);
+    const doNav = () => {
+       playSoundEffect('click', soundEnabled); setSelectedDate(dateStr);
+       if(progId) {
+          setActiveProgramId(progId);
+          setFocusWorkoutId(progId === 'adhoc' ? 'extra' : progId);
+          setSessionToRun(progId === 'adhoc' ? 'extra' : progId);
+       }
+       setResumeDurationSecs(0);
+       setActiveTab('workout'); setIsEditingMode(false); 
+    };
+
+    const isJustSwitchingDate = !progId;
+    const isTargetSameAsActive = isWorkoutActive && (
+       sessionToRunRef.current === progId || 
+       (sessionToRunRef.current === 'extra' && progId === 'adhoc')
+    );
+
+    if (isWorkoutActive && !isTargetSameAsActive && !isJustSwitchingDate) {
+       setConfirmModal({
+          isOpen: true,
+          title: 'Sesi Latihan Berjalan',
+          message: 'Kamu sedang memiliki sesi latihan yang aktif berjalan. Apakah kamu ingin menyimpan sesi yang berjalan saat ini, atau langsung membuangnya dan berpindah ke sesi baru ini?',
+          onConfirm: () => {
+             if (sessionToRunRef.current) handleSaveWorkout(sessionToRunRef.current);
+             setTimeout(doNav, 100);
+          },
+          confirmText: 'Simpan Perubahan',
+          onDiscard: () => {
+             handleCancelWorkout(sessionToRunRef.current);
+             setTimeout(doNav, 100);
+          },
+          discardText: 'Buang Perubahan'
+       });
+    } else {
+       doNav();
     }
-    setResumeDurationSecs(0);
-    setActiveTab('workout'); setIsEditingMode(false); 
   };
 
   const getDayHistory = (dateStr) => {
@@ -1627,8 +1734,12 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (!isDataLoaded) return;
-    
+    // Tunggu history (bukan cuma dokumen utama) — kalau tidak, efek ini bisa jalan duluan
+    // dengan history={} (kosong), langsung mengunci loadedDate, dan begitu history yang asli
+    // (berikut _activeSession hasil restore dari localStorage) datang belakangan, efek ini
+    // sudah tidak jalan lagi karena dianggap "sudah di-load" untuk tanggal itu.
+    if (!isDataLoaded || !isHistoryLoaded) return;
+
     // GUARD: Mencegah circular dependency (flickering).
     // Jangan overwrite exerciseLogs jika kita hanya merespon autosave buatan sendiri.
     // Tetap load jika tanggal berubah (loadedDate !== selectedDate) atau server memberi data baru.
@@ -1664,10 +1775,36 @@ export default function App() {
     } else { setExerciseLogs({}); setSkippedExercises({}); setExtraExercises([]); }
     
     setLoadedDate(selectedDate);
-  }, [selectedDate, activeProgramId, history, programs, isDataLoaded, loadedDate]);
+  }, [selectedDate, activeProgramId, history, programs, isDataLoaded, isHistoryLoaded, loadedDate]);
+
+  const getBaseEx = (exId) => {
+    const baseIdNum = typeof exId === 'string' && exId.includes('-') ? Number(exId.split('-')[0]) : exId;
+    const baseIdStr = typeof exId === 'string' && exId.includes('-') ? exId.split('-')[0] : exId;
+    
+    // 1. Cari di history hari ini (overriddenExercises atau exercises)
+    const todayData = history[selectedDate];
+    if (todayData && todayData.workouts) {
+       for (const w of todayData.workouts) {
+          const found = (w.overriddenExercises || w.exercises || []).find(e => 
+             e?.id === exId || e?.id === baseIdStr || e?.id === baseIdNum ||
+             e?.originalId === baseIdStr || e?.originalId === baseIdNum
+          );
+          if (found) return found;
+       }
+    }
+
+    // 2. Cari di programs & extraExercises
+    return [...programs.map(p => p.exercises || []).flat(), ...extraExercises].find(e => e?.id === exId || e?.id === baseIdNum || e?.id === baseIdStr);
+  };
 
   const getSetLogs = (ex, idToCheck) => {
     if (exerciseLogs[idToCheck]) return exerciseLogs[idToCheck];
+    
+    // Fallback if the idToCheck is a composite ID but history was loaded with the base ID
+    const baseIdStr = typeof idToCheck === 'string' && idToCheck.includes('-') ? idToCheck.split('-')[0] : null;
+    const baseIdNum = baseIdStr ? Number(baseIdStr) : null;
+    if (baseIdStr && exerciseLogs[baseIdStr]) return exerciseLogs[baseIdStr];
+    if (baseIdNum && exerciseLogs[baseIdNum]) return exerciseLogs[baseIdNum];
     
     const libMatch = exerciseLibrary.find(e => e.id === ex?.id || e.name?.toLowerCase() === ex?.name?.toLowerCase());
     const suggestedWeight = libMatch?.lastWeight || libMatch?.rm10 || ex?.defaultWeight || 0;
@@ -1678,23 +1815,6 @@ export default function App() {
       d: ex?.duration || 10, 
       done: false 
     }));
-  };
-
-  const getBaseEx = (exId) => {
-    const baseIdNum = typeof exId === 'string' && exId.includes('-') ? Number(exId.split('-')[0]) : exId;
-    const baseIdStr = typeof exId === 'string' && exId.includes('-') ? exId.split('-')[0] : exId;
-    
-    // 1. Cari di history hari ini (overriddenExercises atau exercises)
-    const todayData = history[selectedDate];
-    if (todayData && todayData.workouts) {
-       for (const w of todayData.workouts) {
-          const found = (w.overriddenExercises || w.exercises || []).find(e => e?.id === exId || e?.originalId === baseIdStr || e?.originalId === baseIdNum);
-          if (found) return found;
-       }
-    }
-
-    // 2. Cari di programs & extraExercises
-    return [...programs.map(p => p.exercises || []).flat(), ...extraExercises].find(e => e?.id === exId || e?.id === baseIdNum || e?.id === baseIdStr);
   };
 
   const handleSetChange = (exId, setIdx, field, val) => {
@@ -1884,6 +2004,65 @@ export default function App() {
     });
   };
 
+  // Hapus permanen 1 exercise dari sesi PROGRAM yang SUDAH SELESAI (koreksi riwayat lewat Kalender).
+  // Beda dari handleRemoveExtraEx (yang hapus dari extraExercises/"Latihan Ekstra") — exercise
+  // program gak punya array terpisah, jadi harus difilter langsung dari overriddenExercises (atau
+  // dibekukan dulu dari rutinitas live kalau belum pernah dibekukan) milik entri workout itu di history.
+  const handleRemoveProgramExercise = (ex) => {
+    playSoundEffect('click', soundEnabled);
+    const compositeId = ex.id;
+    const originalId = ex.originalId ?? ex.id;
+    const workoutId = ex.workoutId;
+
+    const dayData = history[selectedDate];
+    const targetW = dayData?.workouts?.find(w => w.id === workoutId);
+    const srcProg = targetW ? programs.find(p => p.id === targetW.programId) : null;
+    const baseList = targetW?.overriddenExercises?.length > 0 ? targetW.overriddenExercises : (srcProg?.exercises || []);
+    if (baseList.filter(e => e.id !== originalId).length === 0) {
+      // Semua exercise di sesi ini bakal kehapus — overriddenExercises jadi [] bikin save berikutnya
+      // mengira "belum pernah dibekukan" dan narik ulang rutinitas live (lihat handleSaveWorkout).
+      setConfirmModal({
+        isOpen: true,
+        title: 'Tidak Bisa Dihapus',
+        message: 'Ini exercise terakhir di sesi ini. Untuk menghapus semuanya, hapus seluruh jadwal lewat tombol "Hapus Jadwal" di Kalender.',
+        onConfirm: () => {}
+      });
+      return;
+    }
+
+    setConfirmModal({
+      isOpen: true,
+      title: 'Hapus Latihan',
+      message: 'Yakin hapus exercise ini dari riwayat sesi yang sudah selesai? Log dan kalorinya ikut hilang permanen.',
+      onConfirm: () => {
+        setExerciseLogs(prev => {
+          const next = { ...prev };
+          delete next[compositeId];
+          return next;
+        });
+        setSkippedExercises(prev => {
+          const next = { ...prev };
+          delete next[compositeId];
+          return next;
+        });
+        setHistory(prev => {
+          const day = prev[selectedDate];
+          if (!day?.workouts) return prev;
+          const workouts = day.workouts.map(w => {
+            if (w.id !== workoutId) return w;
+            const prog = programs.find(p => p.id === w.programId);
+            const list = w.overriddenExercises?.length > 0 ? w.overriddenExercises : (prog?.exercises || []);
+            const newLog = { ...(w.log || {}) };
+            delete newLog[compositeId];
+            return { ...w, overriddenExercises: list.filter(e => e.id !== originalId), log: newLog };
+          });
+          return { ...prev, [selectedDate]: { ...day, workouts } };
+        });
+        setLastActionTime(Date.now());
+      }
+    });
+  };
+
   const handleCancelWorkout = (progId) => {
     setConfirmModal({
         isOpen: true,
@@ -1956,7 +2135,7 @@ export default function App() {
     if (exerciseLogs) {
       Object.keys(exerciseLogs).forEach(id => {
         if (Array.isArray(exerciseLogs[id])) {
-          cleanLogs[id] = exerciseLogs[id].filter(s => s.type !== 'warmup');
+          cleanLogs[id] = exerciseLogs[id];
         } else {
           cleanLogs[id] = exerciseLogs[id];
         }
@@ -1976,6 +2155,7 @@ export default function App() {
             ...existingW,
             status: 'completed',
             log: cleanLogs,
+            skipped: skippedExercises,
             exercises: extraExercises,
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             duration: formatDur(durationSecs)
@@ -1999,6 +2179,7 @@ export default function App() {
                 ...existingW,
                 status: 'completed',
                 log: cleanLogs,
+                skipped: skippedExercises,
                 exercises: extraExercises,
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 duration: formatDur(finalSecs)
@@ -2010,6 +2191,7 @@ export default function App() {
                 programName: 'Ekstra',
                 status: 'completed',
                 log: cleanLogs,
+                skipped: skippedExercises,
                 exercises: extraExercises,
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 duration: formatDur(durationSecs)
@@ -2062,6 +2244,7 @@ export default function App() {
               programId: realProgramId,
               status: 'completed',
               log: cleanLogs,
+              skipped: skippedExercises,
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
               duration: formatDur(finalSecs),
               ...(frozenExercises ? { overriddenExercises: frozenExercises } : {})
@@ -2089,6 +2272,7 @@ export default function App() {
                programName: pName,
                status: 'completed',
                log: cleanLogs,
+               skipped: skippedExercises,
                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                duration: durationSecs > 0 ? formatDur(durationSecs) : '00:00',
                // Bekukan exercise saat ini juga, supaya riwayat tetap utuh walau rutinitas diedit/dihapus nanti
@@ -2144,78 +2328,99 @@ export default function App() {
   };
 
   const handleEditPastWorkout = (dateStr, w) => {
-    playSoundEffect('click', soundEnabled);
-    setSelectedDate(dateStr);
-    setActiveProgramId(w.programId);
-    setFocusWorkoutId(w.programId === 'adhoc' ? 'extra' : w.id);
-    // Tanpa ini, FloatingTimer tidak tahu sesi mana yang harus dibuka saat diklik
-    // (klik jadi tidak bereaksi) karena ia membaca sessionToRun, bukan focusWorkoutId.
-    setSessionToRun(w.programId === 'adhoc' ? 'extra' : w.id);
+    const doEdit = () => {
+      playSoundEffect('click', soundEnabled);
+      setSelectedDate(dateStr);
+      setActiveProgramId(w.programId);
+      setFocusWorkoutId(w.programId === 'adhoc' ? 'extra' : w.id);
+      setSessionToRun(w.programId === 'adhoc' ? 'extra' : w.id);
 
-    // Parse previous duration to seconds
-    let prevSecs = 0;
-    if (w.duration) {
-      if (typeof w.duration === 'number') {
-        prevSecs = w.duration * 60;
-      } else if (typeof w.duration === 'string') {
-        const parts = w.duration.split(':').map(Number);
-        if (parts.length === 3) {
-          prevSecs = (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
-        } else if (parts.length === 2) {
-          prevSecs = (parts[0] || 0) * 60 + (parts[1] || 0);
+      let prevSecs = 0;
+      if (w.duration) {
+        if (typeof w.duration === 'number') {
+          prevSecs = w.duration * 60;
+        } else if (typeof w.duration === 'string') {
+          const parts = w.duration.split(':').map(Number);
+          if (parts.length === 3) {
+            prevSecs = (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
+          } else if (parts.length === 2) {
+            prevSecs = (parts[0] || 0) * 60 + (parts[1] || 0);
+          }
         }
       }
-    }
-    
-    // Automatically resume timer globally
-    setIsWorkoutActive(true);
-    setWorkoutStartTime(Date.now() - (prevSecs * 1000));
-    setResumeDurationSecs(0);
-    
-    // Load the specific log for this workout if it exists
-    let logsToLoad = {};
-    let skippedToLoad = {};
-    let extraToLoad = [];
-    
-    const dayData = history[dateStr] || {};
-    if (w.log && Object.keys(w.log).length > 0) {
-      logsToLoad = w.log;
-    } else {
-      if (dayData && dayData._activeSession && dayData._activeSession.exerciseLogs && Object.keys(dayData._activeSession.exerciseLogs).length > 0) {
-        logsToLoad = dayData._activeSession.exerciseLogs;
+      
+      setIsWorkoutActive(true);
+      setWorkoutStartTime(Date.now() - (prevSecs * 1000));
+      setResumeDurationSecs(0);
+      
+      let logsToLoad = {};
+      let skippedToLoad = {};
+      let extraToLoad = [];
+      
+      const dayData = history[dateStr] || {};
+      if (w.log && Object.keys(w.log).length > 0) {
+        logsToLoad = w.log;
       } else {
-        // Fallback
-        if (dayData && dayData.workouts) {
-          dayData.workouts.forEach(work => {
-            if (work.log) logsToLoad = { ...logsToLoad, ...work.log };
-          });
+        if (dayData && dayData._activeSession && dayData._activeSession.exerciseLogs && Object.keys(dayData._activeSession.exerciseLogs).length > 0) {
+          logsToLoad = dayData._activeSession.exerciseLogs;
+        } else {
+          if (dayData && dayData.workouts) {
+            dayData.workouts.forEach(work => {
+              if (work.log) logsToLoad = { ...logsToLoad, ...work.log };
+            });
+          }
         }
       }
-    }
-    
-    if (w.programId === 'adhoc' && w.exercises && w.exercises.length > 0) {
-      extraToLoad = w.exercises;
-    } else if (dayData && dayData._activeSession && dayData._activeSession.extraExercises) {
-      extraToLoad = dayData._activeSession.extraExercises;
-    }
+      
+      if (w.programId === 'adhoc' && w.exercises && w.exercises.length > 0) {
+        extraToLoad = w.exercises;
+      } else if (dayData && dayData._activeSession && dayData._activeSession.extraExercises) {
+        extraToLoad = dayData._activeSession.extraExercises;
+      }
 
-    if (w.skipped && Object.keys(w.skipped).length > 0) {
-      skippedToLoad = w.skipped;
-    } else if (dayData && dayData._activeSession && dayData._activeSession.skippedExercises) {
-      skippedToLoad = dayData._activeSession.skippedExercises;
-    }
-    
-    setExerciseLogs(logsToLoad);
-    setSkippedExercises(skippedToLoad);
-    setExtraExercises(extraToLoad);
-    
-    setSessionSnapshot({
-        exerciseLogs: JSON.parse(JSON.stringify(logsToLoad)),
-        skippedExercises: JSON.parse(JSON.stringify(skippedToLoad)),
-        extraExercises: JSON.parse(JSON.stringify(extraToLoad))
-    });
+      if (w.skipped && Object.keys(w.skipped).length > 0) {
+        skippedToLoad = w.skipped;
+      } else if (dayData && dayData._activeSession && dayData._activeSession.skippedExercises) {
+        skippedToLoad = dayData._activeSession.skippedExercises;
+      }
+      
+      setExerciseLogs(logsToLoad);
+      setSkippedExercises(skippedToLoad);
+      setExtraExercises(extraToLoad);
+      
+      setSessionSnapshot({
+          exerciseLogs: JSON.parse(JSON.stringify(logsToLoad)),
+          skippedExercises: JSON.parse(JSON.stringify(skippedToLoad)),
+          extraExercises: JSON.parse(JSON.stringify(extraToLoad))
+      });
 
-    setActiveTab('workout');
+      setActiveTab('workout');
+    };
+
+    if (isWorkoutActive) {
+       setConfirmModal({
+          isOpen: true,
+          title: 'Sesi Latihan Berjalan',
+          message: 'Kamu sedang memiliki sesi latihan yang aktif berjalan. Apakah kamu ingin menyimpan sesi yang berjalan saat ini, atau langsung membuangnya dan berpindah untuk mengedit riwayat latihan ini?',
+          onConfirm: () => {
+             if (sessionToRunRef.current) handleSaveWorkout(sessionToRunRef.current);
+             setTimeout(doEdit, 100);
+          },
+          confirmText: 'Simpan Perubahan',
+          onDiscard: () => {
+             // Directly cancel without a second modal
+             setIsImmersiveMode(false);
+             setIsWorkoutActive(false);
+             setWorkoutStartTime(null);
+             setRestTargetTime(null);
+             setRestTimer(0);
+             setTimeout(doEdit, 100);
+          },
+          discardText: 'Buang Perubahan'
+       });
+    } else {
+       doEdit();
+    }
   };
 
   const addExerciseTarget = (ex) => {
@@ -2331,6 +2536,18 @@ export default function App() {
       onTouchEnd={handleGlobalTouchEnd}
     >
       <ConfirmModal confirmModal={confirmModal} setConfirmModal={setConfirmModal} t={t} lang={lang} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} />
+
+      {cloudSaveError && (
+        <div className="fixed top-[calc(1rem+env(safe-area-inset-top,0px))] left-1/2 -translate-x-1/2 z-[9999] w-[92%] max-w-md p-3 px-4 rounded-2xl bg-rose-600 text-white shadow-2xl flex items-start gap-2.5 animate-in slide-in-from-top-4 fade-in duration-300">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-black mb-0.5">Gagal menyimpan ke cloud</p>
+            <p className="text-[11px] leading-snug text-white/85 break-words">{cloudSaveError}</p>
+          </div>
+          <button onClick={() => setCloudSaveError(null)} className="shrink-0 p-1 rounded-full text-white/70 hover:text-white hover:bg-white/10">
+            <X size={14} />
+          </button>
+        </div>
+      )}
       <AddExerciseModal t={t} lang={lang} activeAddModalTarget={activeAddModalTarget} setActiveAddModalTarget={setActiveAddModalTarget} exerciseLibrary={exerciseLibrary} onAddExerciseTarget={addExerciseTarget} setActiveTab={setActiveTab} />
       <HelpModal showHelp={showHelp} setShowHelp={setShowHelp} t={t} lang={lang} />
       {globalDetailExercise && (
@@ -2472,6 +2689,7 @@ export default function App() {
          
          {activeTab === 'workout' && (
              <WorkoutTab 
+              setConfirmModal={setConfirmModal}
               t={t} lang={lang} language={language} programs={programs} selectedDate={selectedDate} setSelectedDate={setSelectedDate}
               history={history} setHistory={setHistory} setActiveTab={setActiveTab}
               units={units} userProfile={userProfile}
@@ -2480,7 +2698,7 @@ export default function App() {
                exerciseLibrary={exerciseLibrary} setExerciseLibrary={setExerciseLibrary}
                exerciseLogs={exerciseLogs} skippedExercises={skippedExercises} extraExercises={extraExercises}
                onSetChange={handleSetChange} onToggleSet={handleToggleSet} onSkipSet={handleSkipSet} onAddSet={handleAddSet} onAddWarmupSets={handleAddWarmupSets} onRemoveSet={handleRemoveSet}
-               onToggleSkip={handleToggleSkip} onRemoveExtra={handleRemoveExtraEx}
+               onToggleSkip={handleToggleSkip} onRemoveExtra={handleRemoveExtraEx} onRemoveProgramExercise={handleRemoveProgramExercise}
                isCurrentlyCompleted={isCurrentlyCompleted} onSaveWorkout={handleSaveWorkout} onCancelWorkout={handleCancelWorkout}
                gymProfiles={gymProfiles} activeGymId={activeGymId}
                onAddExtraClick={() => setActiveAddModalTarget({type: 'adhoc'})} 
@@ -2507,6 +2725,7 @@ export default function App() {
                t={t} lang={lang} theme={theme} history={history} setHistory={setHistory} programs={programs} 
                soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} navigateToWorkoutDate={navigateToWorkoutDate} 
                exerciseLogs={exerciseLogs} skippedExercises={skippedExercises} handleEditPastWorkout={handleEditPastWorkout}
+               sessionToRun={sessionToRun} isWorkoutActive={isWorkoutActive}
                selectedDate={selectedDate} setSelectedDate={setSelectedDate} setActiveTab={setActiveTab}
                weekStartDay={weekStartDay} defaultReminderTime={defaultReminderTime} reminderEnabled={reminderEnabled}
                units={units}

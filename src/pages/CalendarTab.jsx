@@ -15,7 +15,7 @@ const CalendarTab = ({
   setActiveTab, soundEnabled, playSoundEffect, navigateToWorkoutDate,
   exerciseLogs, skippedExercises, handleEditPastWorkout,
   weekStartDay = 0, defaultReminderTime = "15:00", reminderEnabled = true,
-  unitSystem, setConfirmModal, activePlanIds = [], userProfile, raigaPersona = 'santai', activityTargets
+  unitSystem, setConfirmModal, activePlanIds = [], userProfile, raigaPersona = 'santai', activityTargets, sessionToRun, isWorkoutActive
 }) => {
   const isImp = unitSystem === 'imperial';
   const [calendarDate, setCalendarDate] = useState(() => {
@@ -256,7 +256,42 @@ const CalendarTab = ({
 
   const [repeatDays, setRepeatDays] = useState(1);
   const [repeatCount, setRepeatCount] = useState(4);
-  const [draggedDate, setDraggedDate] = useState(null);
+  const [clipboardAction, setClipboardAction] = useState(null); // 'copy' | 'move'
+  const [clipboardSourceDate, setClipboardSourceDate] = useState(null);
+  const [longPressDate, setLongPressDate] = useState(null);
+  
+  const isLongPressActive = useRef(false);
+  const longPressTimer = useRef(null);
+  const longPressStartPos = useRef(null);
+
+  const startLongPress = (e, dateStr) => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    isLongPressActive.current = false;
+    
+    longPressStartPos.current = { x: e.clientX, y: e.clientY };
+    
+    longPressTimer.current = setTimeout(() => {
+      isLongPressActive.current = true;
+      setLongPressDate(dateStr);
+    }, 500);
+  };
+
+  const handleLongPressMove = (e) => {
+    if (longPressStartPos.current) {
+      if (e.clientX !== undefined && e.clientY !== undefined) {
+          const dx = Math.abs(e.clientX - longPressStartPos.current.x);
+          const dy = Math.abs(e.clientY - longPressStartPos.current.y);
+          if (dx > 10 || dy > 10) cancelLongPress();
+          return;
+      }
+    }
+    cancelLongPress();
+  };
+
+  const cancelLongPress = () => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+  };
+
   const [expandedWorkoutId, setExpandedWorkoutId] = useState(null);
   const [notificationModalTarget, setNotificationModalTarget] = useState(null);
   const [slideDirection, setSlideDirection] = useState('right');
@@ -650,24 +685,30 @@ const CalendarTab = ({
     alert(`Jadwal berhasil diulang ${copied} kali!`);
   };
 
-  const handleDragStart = (e, dateStr) => {
-    setDraggedDate(dateStr);
-    e.dataTransfer.setData('text/plain', dateStr);
-  };
-  const handleDrop = (e, targetDateStr) => {
-    e.preventDefault();
-    if (!draggedDate || draggedDate === targetDateStr) return;
+  const executeClipboardAction = (targetDateStr) => {
+    if (!clipboardSourceDate || clipboardSourceDate === targetDateStr) {
+       setClipboardAction(null);
+       setClipboardSourceDate(null);
+       return;
+    }
     const h = { ...history };
-    const srcWorkouts = getDayWorkouts(draggedDate);
+    const srcWorkouts = getDayWorkouts(clipboardSourceDate);
     const targetD = h[targetDateStr] || { workouts: [] };
     
-    h[targetDateStr] = { ...targetD, workouts: [...(targetD.workouts||[]), ...srcWorkouts] };
+    const newWorkouts = srcWorkouts.map(w => ({
+       ...w,
+       id: `moved_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    }));
+    h[targetDateStr] = { ...targetD, workouts: [...(targetD.workouts||[]), ...newWorkouts] };
     
-    const srcD = h[draggedDate] || { workouts: [] };
-    h[draggedDate] = { ...srcD, workouts: [] };
+    if (clipboardAction === 'move') {
+       const srcD = h[clipboardSourceDate] || { workouts: [] };
+       h[clipboardSourceDate] = { ...srcD, workouts: [] };
+    }
     
     setHistory(h);
-    setDraggedDate(null);
+    setClipboardAction(null);
+    setClipboardSourceDate(null);
   };
 
   const addWorkoutToDate = async (p) => {
@@ -702,54 +743,79 @@ const CalendarTab = ({
     setShowProgramSelect(false);
   };
 
-  const removeWorkout = (workoutId) => {
+  const removeWorkout = (workoutId, dateStr = selectedDate) => {
     setConfirmModal({
       isOpen: true,
       title: 'Hapus Jadwal?',
       message: 'Yakin ingin menghapus jadwal ini?',
       onConfirm: () => {
-        
-        const dCheck = history[selectedDate];
-        if (dCheck && dCheck.workouts) {
-          const workoutToRemove = dCheck.workouts.find(w => w.id === workoutId);
+        const dCheck = history[dateStr];
+        if (dCheck && Array.isArray(dCheck.workouts)) {
+          const workoutToRemove = dCheck.workouts.find(w => String(w.id) === String(workoutId));
           if (workoutToRemove && workoutToRemove.reminderNotifId) {
             cancelWorkoutNotification(workoutToRemove.reminderNotifId);
           }
         }
-
         setHistory(prev => {
           const h = { ...prev };
-          const d = h[selectedDate] || {};
-          
-          if (workoutId.startsWith('projected_')) {
-              const progId = workoutId.split('_')[1];
-              h[selectedDate] = { 
-                  ...d, 
-                  deletedProjected: [...(d.deletedProjected || []), progId] 
-              };
-          } else if (d.workouts) {
-              const workoutToRemove = d.workouts.find(w => w.id === workoutId);
-              let newActiveSession = { ...(d._activeSession || {}) };
-              
-              if (workoutToRemove) {
-                 const progExercises = workoutToRemove.programId === 'adhoc' ? workoutToRemove.exercises : programs.find(p => p.id === workoutToRemove.programId)?.exercises;
-                 if (progExercises) {
-                   const newLogs = { ...(newActiveSession.exerciseLogs || {}) };
-                   const newSkipped = { ...(newActiveSession.skippedExercises || {}) };
-                   progExercises.forEach(ex => {
-                      delete newLogs[ex.id];
-                      delete newSkipped[ex.id];
-                   });
-                   newActiveSession.exerciseLogs = newLogs;
-                   newActiveSession.skippedExercises = newSkipped;
-                 }
-              }
+          const d = h[dateStr] || {};
 
-              h[selectedDate] = { ...d, workouts: d.workouts.filter(w => w.id !== workoutId), _activeSession: newActiveSession };
-          } else if (workoutId === 'virtual_adhoc') {
-              h[selectedDate] = { ...d, _activeSession: { ...(d._activeSession || {}), extraExercises: [] } };
+          let newDeletedProjected = [...(d.deletedProjected || [])];
+          let newActiveSession = { ...(d._activeSession || {}) };
+          let newWorkouts = d.workouts && Array.isArray(d.workouts) ? [...d.workouts] : [];
+          
+          if (String(workoutId).startsWith('projected_')) {
+              const progId = String(workoutId).split('_')[1];
+              if (!newDeletedProjected.includes(progId)) {
+                  newDeletedProjected.push(progId);
+              }
           }
           
+          if (workoutId === 'virtual_adhoc') {
+              newActiveSession.extraExercises = [];
+          } else {
+              const workoutToRemove = newWorkouts.find(w => String(w.id) === String(workoutId));
+              if (workoutToRemove) {
+                  try {
+                     const progExercises = workoutToRemove.programId === 'adhoc' ? (workoutToRemove.exercises || []) : (programs.find(p => p.id === workoutToRemove.programId)?.exercises || []);
+                     if (progExercises && Array.isArray(progExercises) && progExercises.length > 0) {
+                       const newLogs = { ...(newActiveSession.exerciseLogs || {}) };
+                       const newSkipped = { ...(newActiveSession.skippedExercises || {}) };
+                       progExercises.forEach(ex => {
+                          if (ex && ex.id) {
+                              delete newLogs[ex.id];
+                              delete newSkipped[ex.id];
+                          }
+                       });
+                       newActiveSession.exerciseLogs = newLogs;
+                       newActiveSession.skippedExercises = newSkipped;
+                     }
+                  } catch (err) {
+                      console.error('Error during log cleanup:', err);
+                  }
+                  
+                  if (workoutToRemove.programId && !newDeletedProjected.includes(workoutToRemove.programId)) {
+                      newDeletedProjected.push(workoutToRemove.programId);
+                  }
+                  
+                  newWorkouts = newWorkouts.filter(w => String(w.id) !== String(workoutId));
+              }
+          }
+
+          h[dateStr] = { 
+              ...d, 
+              workouts: newWorkouts,
+              _activeSession: newActiveSession,
+              deletedProjected: newDeletedProjected
+          };
+
+          // Jika setelah dihapus hari itu benar-benar kosong dan bukan adhoc, tandai untuk dihapus agar auto-save membersihkannya
+          if (h[dateStr] && Array.isArray(h[dateStr].workouts) && h[dateStr].workouts.length === 0 && (!h[dateStr]._activeSession || Object.keys(h[dateStr]._activeSession).length === 0)) {
+              if (!h[dateStr].deletedProjected || h[dateStr].deletedProjected.length === 0) {
+                  h[dateStr] = { _delete: true };
+              }
+          }
+
           return h;
         });
       }
@@ -915,7 +981,7 @@ const CalendarTab = ({
 
             let cellStyle = `w-full h-full max-w-[44px] max-h-[44px] mx-auto relative flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer border border-transparent hover:bg-black/5 dark:hover:bg-white/5 text-zinc-500 dark:text-zinc-300`;
             if (isSelected) {
-              cellStyle = `w-full h-full max-w-[44px] max-h-[44px] mx-auto relative flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer ${t.bgAccent} text-white shadow-lg shadow-[#3b82f6]/30 scale-[1.1] z-10`;
+              cellStyle = `w-full h-full max-w-[44px] max-h-[44px] mx-auto relative flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer ${t.bgAccent} text-white shadow-lg ${t.shadowAccent} scale-[1.1] z-10`;
             } else if (isToday) {
               cellStyle = `w-full h-full max-w-[44px] max-h-[44px] mx-auto relative flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer border-2 ${t.borderAccentSoft} ${t.textAccent} font-bold hover:bg-black/5 dark:hover:bg-white/5`;
             }
@@ -1147,7 +1213,7 @@ const CalendarTab = ({
                       // scale-[1.1]) supaya "cursor" biru terasa konsisten saat mode berpindah.
                       let cellStyle = `w-11 h-11 mx-auto relative flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer border border-transparent hover:bg-black/5 dark:hover:bg-white/5 text-zinc-500 dark:text-zinc-300`;
                       if (isSelected) {
-                        cellStyle = `w-11 h-11 mx-auto relative flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer ${t.bgAccent} text-white shadow-lg shadow-[#3b82f6]/30 scale-[1.1] z-10`;
+                        cellStyle = `w-11 h-11 mx-auto relative flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer ${t.bgAccent} text-white shadow-lg ${t.shadowAccent} scale-[1.1] z-10`;
                       } else if (isToday) {
                         cellStyle = `w-11 h-11 mx-auto relative flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer border-2 ${t.borderAccentSoft} ${t.textAccent} font-bold hover:bg-black/5 dark:hover:bg-white/5`;
                       }
@@ -1155,12 +1221,25 @@ const CalendarTab = ({
                       return (
                         <div
                           key={dateKey}
-                          onClick={() => { changeSelectedDateWithAnim(dateKey); setShowProgramSelect(false); setShowActionMenu(null); }}
-                          draggable={workouts.length > 0}
-                          onDragStart={(e) => handleDragStart(e, dateKey)}
-                          onDragOver={(e) => e.preventDefault()}
-                          onDrop={(e) => handleDrop(e, dateKey)}
-                          className="py-1"
+                          onClick={() => { 
+                            if (isLongPressActive.current) {
+                               isLongPressActive.current = false;
+                               return;
+                            }
+                            if (clipboardAction && clipboardSourceDate) {
+                               executeClipboardAction(dateKey);
+                            } else {
+                               changeSelectedDateWithAnim(dateKey); setShowProgramSelect(false); setShowActionMenu(null);
+                            }
+                          }}
+                          onPointerDown={(e) => workouts.length > 0 && startLongPress(e, dateKey)}
+                          onPointerMove={handleLongPressMove}
+                          onPointerUp={cancelLongPress}
+                          onPointerLeave={cancelLongPress}
+                          onPointerCancel={cancelLongPress}
+                          onContextMenu={(e) => e.preventDefault()}
+                          className="py-1 relative select-none"
+                          style={{ WebkitTouchCallout: 'none' }}
                         >
                           <div className={cellStyle}>
                             <span className="body-md font-medium mb-1.5">{day}</span>
@@ -1216,7 +1295,7 @@ const CalendarTab = ({
         }}
       >
          {/* Fixed Glassmorphism Background Container */}
-         <div className={`absolute inset-0 rounded-t-[2.5rem] border-t ${t.border} ${theme === 'dark' ? 'bg-[#121a2f]/95' : 'bg-white/95'} backdrop-blur-xl shadow-[0_-10px_40px_rgba(0,0,0,0.15)] pointer-events-none`}></div>
+         <div className={`absolute inset-0 rounded-t-[2.5rem] border-t ${t.border} ${theme === 'dark' ? 'bg-[#05070d]/90' : 'bg-[#eef3fb]/90'} backdrop-blur-xl shadow-[0_-10px_40px_rgba(0,0,0,0.15)] pointer-events-none`}></div>
 
          {/* DRAG HANDLE — area tarik naik/turun */}
          <div
@@ -1382,9 +1461,9 @@ const CalendarTab = ({
                                           text: t.textAccent,
                                           badge: t.bgAccent + ' text-white'
                                        } : {
-                                          bg: theme === 'dark' ? 'bg-[#3b82f6]/5' : 'bg-[#3b82f6]/[0.04]',
+                                          bg: t.bgAccentSoft + ' opacity-40',
                                           dot: t.borderAccentSoft,
-                                          text: theme === 'dark' ? 'text-sky-400/60' : 'text-[#3b82f6]/60',
+                                          text: t.textAccent + ' opacity-60',
                                           badge: ''
                                        };
 
@@ -1405,7 +1484,7 @@ const CalendarTab = ({
                                               }, 150);
                                             }}>
                                               <div className="absolute top-4 right-4 flex items-center gap-1 z-10">
-                                                <button onClick={(e) => { e.stopPropagation(); removeWorkout(w.id); }} className={`p-1.5 ${c.text} opacity-50 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg transition-colors`} title="Hapus Jadwal">
+                                                <button onClick={(e) => { e.stopPropagation(); removeWorkout(w.id, targetDateStr); }} className={`p-1.5 ${c.text} opacity-50 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg transition-colors`} title="Hapus Jadwal">
                                                   <X size={16} />
                                                 </button>
                                               </div>
@@ -1480,11 +1559,26 @@ const CalendarTab = ({
                                                 </div>
                                                 <div className="flex gap-2">
                                                    <button onClick={(e) => { e.stopPropagation(); setExpandedWorkoutId(null); }} className={`flex-1 py-3 rounded-xl border border-dashed border-black/20 dark:border-white/20 body-lg font-bold ${c.text}`}>Tutup</button>
-                                                   {(!isCompleted || getExercisesForWorkout(w).length > 0) && (
-                                                     <button onClick={(e) => { e.stopPropagation(); const hasExercises = getExercisesForWorkout(w).length > 0; if (!isCompleted && !hasExercises) { navigateToWorkoutDate(targetDateStr, w.programId); } else { handleEditPastWorkout(targetDateStr, w); } }} className={`flex-[2] py-3 rounded-xl bg-black/10 dark:bg-white/10 font-black body-lg flex items-center justify-center gap-2 transition-all ${c.text}`}>
-                                                       <Edit2 size={16} /> {isCompleted ? 'Edit Riwayat' : (getExercisesForWorkout(w).length > 0 ? 'Mulai Latihan' : 'Edit Latihan')}
-                                                     </button>
-                                                   )}
+                                                   {(!isCompleted || getExercisesForWorkout(w).length > 0) && (() => {
+                                                      const hasExercises = getExercisesForWorkout(w).length > 0;
+                                                      const isActiveSession = isWorkoutActive && (sessionToRun === w.id || sessionToRun === w.programId || (sessionToRun === 'extra' && w.programId === 'adhoc'));
+                                                      const isPrimary = isActiveSession || (!isCompleted && hasExercises);
+                                                      const btnText = isActiveSession ? 'Lanjutkan Latihan' : (isCompleted ? 'Edit Riwayat' : (hasExercises ? 'Mulai Latihan' : 'Edit Latihan'));
+                                                      return (
+                                                        <button onClick={(e) => { 
+                                                          e.stopPropagation(); 
+                                                          if (isActiveSession) {
+                                                            navigateToWorkoutDate(targetDateStr, sessionToRun);
+                                                          } else if (!isCompleted && !hasExercises) { 
+                                                            navigateToWorkoutDate(targetDateStr, w.programId); 
+                                                          } else { 
+                                                            handleEditPastWorkout(targetDateStr, w); 
+                                                          } 
+                                                        }} className={`flex-[2] py-3 rounded-xl font-black body-lg flex items-center justify-center gap-2 transition-all ${isPrimary ? `${t.bgAccent} text-white shadow-lg ${t.shadowAccent}` : `bg-black/10 dark:bg-white/10 ${c.text}`}`}>
+                                                          {!isPrimary && <Edit2 size={16} />} {btnText}
+                                                        </button>
+                                                      );
+                                                    })()}
                                                 </div>
                                               </div>
                                             )}
@@ -1610,6 +1704,39 @@ const CalendarTab = ({
           onNativeSync={() => { handleAddToNativeCalendar(notificationModalTarget.workoutId, notificationModalTarget.programName, notificationModalTarget.dateStr, notificationModalTarget.currentTime); setNotificationModalTarget(null); }}
           onClose={() => setNotificationModalTarget(null)}
         />
+      )}
+
+      {/* Long Press Action Modal */}
+      {longPressDate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setLongPressDate(null)}>
+          <div className={`${t.bgCard} w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-200`} onClick={e => e.stopPropagation()}>
+            <h3 className="text-xl font-black mb-4 text-center">Opsi Jadwal</h3>
+            <div className="flex flex-col gap-3">
+              <button onClick={() => { setClipboardSourceDate(longPressDate); setClipboardAction('copy'); setLongPressDate(null); }} className={`w-full py-4 rounded-2xl font-bold body-lg transition-all ${t.bgAccent} text-white shadow-lg ${t.shadowAccent}`}>
+                Salin Jadwal
+              </button>
+              <button onClick={() => { setClipboardSourceDate(longPressDate); setClipboardAction('move'); setLongPressDate(null); }} className={`w-full py-4 rounded-2xl font-bold body-lg transition-all border-2 ${t.borderAccentSoft} ${t.textAccent}`}>
+                Pindah Jadwal
+              </button>
+            </div>
+            <button onClick={() => setLongPressDate(null)} className={`mt-4 w-full py-3 rounded-2xl font-bold border ${t.border} opacity-70`}>Batal</button>
+          </div>
+        </div>
+      )}
+
+      {/* Clipboard Banner */}
+      {clipboardAction && clipboardSourceDate && (
+        <div className={`fixed bottom-[calc(5rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 flex justify-center animate-in slide-in-from-bottom-8 fade-in duration-300 pointer-events-none`}>
+          <div className={`pointer-events-auto w-full max-w-md mx-auto p-4 rounded-2xl shadow-xl flex items-center justify-between gap-4 ${t.bgCard} border ${t.border}`}>
+            <div className="flex-1">
+              <div className="font-bold body-md">Pilih Tanggal Tujuan</div>
+              <div className={`body-sm opacity-80`}>Untuk {clipboardAction === 'copy' ? 'menyalin' : 'memindahkan'} jadwal dari {clipboardSourceDate}</div>
+            </div>
+            <button onClick={() => { setClipboardAction(null); setClipboardSourceDate(null); }} className={`px-4 py-2 rounded-xl font-bold body-sm bg-black/10 dark:bg-white/10 active:scale-95 transition-transform`}>
+              Batal
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

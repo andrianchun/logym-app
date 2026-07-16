@@ -202,7 +202,8 @@ const ProgramTab = ({
         warmupVideoUrls: [],
         exercises: [],
         planId: targetPlanId === 'custom' ? null : targetPlanId,
-        planName: targetPlanName
+        // null, bukan undefined — undefined bikin Firestore nolak seluruh dokumen saat auto-save
+        planName: targetPlanName ?? null
       };
       setPrograms([...programs, newProg]);
       setExpandedRoutineId(newProg.id);

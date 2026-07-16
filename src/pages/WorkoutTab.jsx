@@ -25,7 +25,7 @@ const WorkoutTab = ({
   exerciseLibrary, setExerciseLibrary,
   exerciseLogs, skippedExercises, extraExercises,
   onSetChange, onToggleSet, onSkipSet, onAddSet, onAddWarmupSets, onRemoveSet,
-  onToggleSkip, onRemoveExtra,
+  onToggleSkip, onRemoveExtra, onRemoveProgramExercise,
   isCurrentlyCompleted, onSaveWorkout, onCancelWorkout,
   onAddExtraClick, onAddExtraExercise,
   gymProfiles, activeGymId,
@@ -133,6 +133,16 @@ const WorkoutTab = ({
 
   const [isClosingImmersive, setIsClosingImmersive] = React.useState(false);
 
+  const smartScrollTo = (el, offset = 100) => {
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const isTopVisible = rect.top >= 80 && rect.top <= (window.innerHeight || document.documentElement.clientHeight) - 120;
+    if (!isTopVisible) {
+      const y = rect.top + window.scrollY - offset;
+      window.scrollTo({ top: y, behavior: 'smooth' });
+    }
+  };
+
   const scrollToFirstIncompleteExercise = (wId, ignoreExId = null) => {
     let targetExId = null;
     let list = wId === 'extra' ? extraExercises : activeProgramsList.find(p => p.workoutId === wId || p.id === wId)?.exercises;
@@ -150,16 +160,14 @@ const WorkoutTab = ({
     if (targetExId) {
       const el = document.getElementById(`exercise-card-${targetExId}`);
       if (el) {
-         const y = el.getBoundingClientRect().top + window.scrollY - 100;
-         window.scrollTo({ top: y, behavior: 'smooth' });
+         smartScrollTo(el, 100);
          return;
       }
     }
     // fallback to session
     const sel = document.getElementById(`session-${wId}`);
     if (sel) {
-      const y = sel.getBoundingClientRect().top + window.scrollY - 80;
-      window.scrollTo({ top: y, behavior: 'smooth' });
+      smartScrollTo(sel, 80);
     }
   };
 
@@ -192,10 +200,7 @@ const WorkoutTab = ({
     if (isNowExpanded) {
       setTimeout(() => {
         const el = document.getElementById(`session-${id}`);
-        if (el) {
-          const y = el.getBoundingClientRect().top + window.scrollY - 80;
-          window.scrollTo({ top: y, behavior: 'smooth' });
-        }
+        smartScrollTo(el, 80);
       }, 150);
     }
   };
@@ -481,17 +486,65 @@ const WorkoutTab = ({
     };
 
   const handleStartWorkout = (progId) => {
-    playSoundEffect('success', soundEnabled);
-    setSessionToRun(progId);
-    setIsImmersiveMode(true);
-    setIsWorkoutActive(true);
-    if (!workoutStartTime) {
-      if (resumeDurationSecs && resumeDurationSecs > 0) {
-        setWorkoutStartTime(Date.now() - (resumeDurationSecs * 1000));
-        if (setResumeDurationSecs) setResumeDurationSecs(0); // Reset after using
-      } else {
-        setWorkoutStartTime(Date.now());
+    const doStart = () => {
+      playSoundEffect('success', soundEnabled);
+      setSessionToRun(progId);
+      setIsImmersiveMode(true);
+      setIsWorkoutActive(true);
+      if (!workoutStartTime || sessionToRun !== progId) {
+        let prevSecsToUse = resumeDurationSecs || 0;
+        if (!prevSecsToUse) {
+          // Coba cari durasi sebelumnya dari history hari ini (berjaga-jaga jika resumeDurationSecs ter-reset atau user buka tab manual)
+          const todayData = history[selectedDate];
+          if (todayData && todayData.workouts) {
+             const wInHistory = todayData.workouts.find(w => w.programId === progId || w.id === progId || (progId === 'extra' && w.programId === 'adhoc'));
+             if (wInHistory && wInHistory.duration) {
+                if (typeof wInHistory.duration === 'number') prevSecsToUse = wInHistory.duration * 60;
+                else if (typeof wInHistory.duration === 'string') {
+                   const parts = wInHistory.duration.split(':').map(Number);
+                   if (parts.length === 3) prevSecsToUse = (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
+                   else if (parts.length === 2) prevSecsToUse = (parts[0] || 0) * 60 + (parts[1] || 0);
+                }
+             }
+          }
+        }
+
+        if (prevSecsToUse > 0) {
+          setWorkoutStartTime(Date.now() - (prevSecsToUse * 1000));
+          if (setResumeDurationSecs) setResumeDurationSecs(0); // Reset after using
+        } else {
+          setWorkoutStartTime(Date.now());
+        }
       }
+    };
+
+    if (isWorkoutActive && sessionToRun && sessionToRun !== progId) {
+      if (setConfirmModal) {
+        setConfirmModal({
+          isOpen: true,
+          title: 'Sesi Latihan Berjalan',
+          message: 'Kamu sedang memiliki sesi latihan yang aktif berjalan. Apakah kamu ingin menyimpan sesi yang berjalan saat ini, atau langsung membuangnya dan memulai latihan yang baru?',
+          onConfirm: () => {
+             if (sessionToRun && onSaveWorkout) onSaveWorkout(sessionToRun);
+             setTimeout(doStart, 100);
+          },
+          confirmText: 'Simpan Perubahan',
+          onDiscard: () => {
+             // Langsung buang tanpa memanggil onCancelWorkout yang men-trigger modal tambahan
+             setIsImmersiveMode(false);
+             setIsWorkoutActive(false);
+             setWorkoutStartTime(null);
+             if (setRestTargetTime) setRestTargetTime(null);
+             if (setRestTimer) setRestTimer(0);
+             setTimeout(doStart, 100);
+          },
+          discardText: 'Buang Perubahan'
+        });
+      } else {
+        doStart();
+      }
+    } else {
+      doStart();
     }
   };
 
@@ -723,9 +776,11 @@ const WorkoutTab = ({
                                 ex={ex} idx={idx} isExtra={false}
                                 t={t} lang={lang} soundEnabled={soundEnabled}
                                 units={units}
-                                isSkip={!!skippedExercises[ex.id]} 
-                                onToggleSkip={() => onToggleSkip(ex.id)} 
-                                onRemoveExtra={onRemoveExtra} 
+                                isSkip={!!skippedExercises[ex.id]}
+                                onToggleSkip={() => onToggleSkip(ex.id)}
+                                onRemoveExtra={onRemoveExtra}
+                                canDeleteCompleted={prog.status === 'completed'}
+                                onRemoveProgramExercise={onRemoveProgramExercise}
                                 onOpenVideo={() => handleOpenDetail(ex)}
                                 onReplaceClick={() => { setDetailExercise(ex); setShowAlternativeModal(true); }}
                                 sets={getSetLogs(ex)}
@@ -937,13 +992,22 @@ const WorkoutTab = ({
         }
 
         const isCompleted = isAllSetsDone;
-        const isDisabled = !hasExercises || allSkipped || isCompleted;
+
+        // Cek history hari ini
+        const todayData = history[selectedDate];
+        const wInHistory = todayData?.workouts?.find(w => w.programId === sessionData.workoutId || w.id === sessionData.workoutId || (sessionData.workoutId === 'extra' && w.programId === 'adhoc'));
+        const hasHistoryDuration = wInHistory && wInHistory.duration;
+
+        const isDisabled = !hasExercises || allSkipped;
 
         let btnText = isExtra ? "MULAI EKSTRA" : "MULAI LATIHAN";
         let btnIcon = <Play size={24} className="ml-1" />;
         let btnClass = `${t.bgAccent} shadow-[0_8px_30px_rgb(0,0,0,0.15)] disabled:opacity-50 text-white`;
 
-        if (isCompleted) {
+        if (hasHistoryDuration || isCurrentlyCompleted) {
+          btnText = "LANJUTKAN LATIHAN";
+          btnIcon = <Play size={24} className="ml-1" />;
+        } else if (isCompleted) {
           btnText = "SESI SELESAI";
           btnIcon = <CheckCircle size={24} />;
           btnClass = `${t.bgAccent} text-white shadow-lg opacity-80`;

@@ -12,7 +12,8 @@ const ExerciseCard = ({
   t, lang, soundEnabled, units,
   isSkip, onToggleSkip, onRemoveExtra, onOpenVideo, onReplaceClick,
   sets, onUpdateSet, onToggleSet, onSkipSet, onAddSet, onAddWarmupSets, onRemoveSet,
-  gymProfiles, activeGymId, overloadHint
+  gymProfiles, activeGymId, overloadHint,
+  canDeleteCompleted = false, onRemoveProgramExercise
 }) => {
   const isImp = units?.weight === 'lbs';
   const exType = ex.type || 'weight';
@@ -149,6 +150,13 @@ const ExerciseCard = ({
                  )}
                  {isExtra && (
                     <button onClick={() => onRemoveExtra(ex.id)} className="w-10 h-10 rounded-full bg-rose-500/80 backdrop-blur-md border border-rose-500/50 text-white flex items-center justify-center hover:bg-rose-500 transition-colors shadow-sm">
+                        <X size={18} />
+                    </button>
+                 )}
+                 {/* Exercise dari program cuma bisa dihapus permanen saat ngedit sesi yang SUDAH SELESAI
+                     (koreksi riwayat lewat Kalender) — bukan saat mengubah rutinitas yang masih aktif. */}
+                 {!isExtra && canDeleteCompleted && (
+                    <button onClick={() => onRemoveProgramExercise(ex)} className="w-10 h-10 rounded-full bg-rose-500/80 backdrop-blur-md border border-rose-500/50 text-white flex items-center justify-center hover:bg-rose-500 transition-colors shadow-sm">
                         <X size={18} />
                     </button>
                  )}

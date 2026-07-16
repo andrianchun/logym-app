@@ -58,13 +58,19 @@ export const calculateSmartWorkoutCalories = (weightKg, workout, logs, globalRes
 
   const weight = Number(weightKg) || 70;
   let totalCalories = 0;
+  let matchedAnyExercise = false;
 
   // Ambil daftar latihan (bisa dari Override atau Adhoc)
   const exercises = workout.overriddenExercises || workout.exercises || [];
 
   exercises.forEach(ex => {
-    const exLogs = logs[ex.id];
+    // Sesi program biasa (bukan adhoc) me-render tiap exercise dengan id gabungan
+    // `${ex.id}-${workout.id}` (lihat WorkoutTab.jsx activeProgramsList) — makanya exerciseLogs
+    // (dan w.log yang disimpan) kepakai key gabungan itu, sedangkan overriddenExercises/exercises
+    // menyimpan id ASLI (tanpa gabungan). Coba id asli dulu (adhoc/riwayat lama), baru id gabungan.
+    const exLogs = logs[ex.id] || (workout.id != null ? logs[`${ex.id}-${workout.id}`] : undefined);
     if (!exLogs || !Array.isArray(exLogs)) return;
+    matchedAnyExercise = true;
 
     exLogs.forEach(set => {
       // HANYA hitung kalori jika set benar-benar dicentang selesai
@@ -87,6 +93,15 @@ export const calculateSmartWorkoutCalories = (weightKg, workout, logs, globalRes
       }
     });
   });
+
+  // Log beneran ada isinya (dan sudah lolos guard "logs kosong" di atas), tapi gak ada satupun
+  // exercise di overriddenExercises/exercises yang id-nya cocok sama log — biasanya riwayat lama
+  // atau sesi adhoc yang kehilangan daftar exercise-nya. Daripada nampilin 0 kcal padahal orangnya
+  // beneran latihan, fallback ke estimasi timer biasa (durasi × MET) alih-alih diam-diam jadi 0.
+  if (totalCalories === 0 && !matchedAnyExercise) {
+    const durMins = parseWorkoutDurationMinutes(workout.duration);
+    return calculateWorkoutCalories(weight, durMins);
+  }
 
   return Math.round(totalCalories);
 };

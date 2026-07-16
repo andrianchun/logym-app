@@ -9,6 +9,13 @@
       "autoPort": true
     },
     {
+      "name": "lyfit-dev-host",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "--host"],
+      "port": 5173,
+      "autoPort": true
+    },
+    {
       "name": "lyfit-preview",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "preview"],
