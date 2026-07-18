@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Plus, Wind, Play, CalendarDays, X, CheckCircle, ChevronDown, ChevronUp, Dumbbell, Share2 } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
+import { Plus, Wind, Play, CalendarDays, X, CheckCircle, ChevronDown, ChevronUp, Dumbbell, Share2, Flame, Brain } from 'lucide-react';
 import { fetchExercisesFromApi } from '../utils/exerciseDbApi';
 import { shareWorkoutToFeed } from '../utils/communityApi';
 import { normalizeMuscleKey } from '../data/constants';
@@ -49,6 +50,8 @@ const WorkoutTab = ({
   const [showAlternativeModal, setShowAlternativeModal] = useState(false);
   const [showProgramSelect, setShowProgramSelect] = useState(false);
   const [expandedSessions, setExpandedSessions] = useState({});
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [celebrationSession, setCelebrationSession] = useState(null);
   const isDark = t?.bgCard !== 'bg-white';
   const { dialog, showAlert } = useDialog(isDark);
 
@@ -92,6 +95,41 @@ const WorkoutTab = ({
             });
           }
         });
+      }
+    }
+  }
+
+  // FORCE INJECT ACTIVE WORKOUT (If it's running but not found in sourceWorkouts, e.g. started from past date)
+  if (isWorkoutActive && sessionToRun) {
+    const isAlreadyInSource = sourceWorkouts.some(w => w.id === sessionToRun || w.programId === sessionToRun);
+    if (!isAlreadyInSource) {
+      let progId = sessionToRun;
+      if (sessionToRun.startsWith('projected_')) {
+         const parts = sessionToRun.split('_');
+         progId = parts[1];
+      }
+      
+      if (progId === 'extra') {
+         sourceWorkouts.push({
+            id: 'extra',
+            programId: 'adhoc',
+            programName: 'Latihan Ekstra',
+            status: 'planned',
+            isProjected: true,
+            log: {}
+         });
+      } else {
+         const prog = programs.find(p => p.id === progId);
+         if (prog) {
+           sourceWorkouts.push({
+             id: sessionToRun,
+             programId: progId,
+             programName: prog.name,
+             status: 'planned',
+             isProjected: true,
+             log: {}
+           });
+         }
       }
     }
   }
@@ -350,59 +388,69 @@ const WorkoutTab = ({
         const targets = Array.isArray(exItem?.target) ? exItem.target : [exItem?.target];
         const isLarge = targets.some(t => LARGE_MUSCLE_GROUPS.has(normalizeMuscleKey(t)));
         const flatStep = isImp ? (isLarge ? 5 : 2.5) : (isLarge ? 2.5 : 1.25);
-        // ~2.5% dari beban kerja sesi lalu, gak pernah di bawah step minimal di atas —
-        // biar tetap masuk akal buat beban ringan (curl 5kg) maupun berat (squat 100kg).
         const roundTo = flatStep;
         const pctStep = lastWeight > 0 ? Math.round((lastWeight * 0.025) / roundTo) * roundTo : 0;
         return Math.max(flatStep, pctStep);
     };
 
+    const historicalStatsRef = React.useRef({});
+    
+    React.useEffect(() => {
+      historicalStatsRef.current = {};
+    }, [history]);
+
     const getOverloadHint = (exItem) => {
       if (!exItem || !exerciseLibrary || exItem.type === 'time') return null;
       
-      let historyMax10RM = 0;
-      let lastSessionWeight = 0;
-      let lastSessionReps = 0;
-      let mostRecentDateMs = 0;
-      
-      // 1. Scan history
-      Object.keys(history || {}).forEach(dateStr => {
-        const day = history[dateStr];
-        const dateMs = new Date(dateStr).getTime();
+      if (!historicalStatsRef.current[exItem.id]) {
+        let historyMax10RM = 0;
+        let lastSessionWeight = 0;
+        let lastSessionReps = 0;
+        let mostRecentDateMs = 0;
         
-        if (day.workouts) {
-          day.workouts.forEach(w => {
-            const exLogKey = `${exItem.id}-${w.id}`;
-            const targetLog = w.log && (w.log[exLogKey] || w.log[exItem.id]);
-
-            if (w.status === 'completed' && targetLog) {
-              let bestWeightInSession = 0;
-              let bestRepsAtWeight = 0;
-              
-              targetLog.forEach(s => {
-                if (!s.skipped && s.type !== 'warmup' && s.w > 0 && s.r > 0) {
-                  const c1RM = Number(s.w) * (1 + Number(s.r) / 30);
-                  const c10RM = c1RM / 1.3333;
-                  if (c10RM > historyMax10RM) historyMax10RM = c10RM;
-                  
-                  if (Number(s.w) > bestWeightInSession) {
-                    bestWeightInSession = Number(s.w);
-                    bestRepsAtWeight = Number(s.r);
-                  } else if (Number(s.w) === bestWeightInSession && Number(s.r) > bestRepsAtWeight) {
-                    bestRepsAtWeight = Number(s.r);
+        Object.keys(history || {}).forEach(dateStr => {
+          const day = history[dateStr];
+          const dateMs = new Date(dateStr).getTime();
+          
+          if (day.workouts) {
+            day.workouts.forEach(w => {
+              const exLogKey = `${exItem.id}-${w.id}`;
+              const targetLog = w.log && (w.log[exLogKey] || w.log[exItem.id]);
+  
+              if (w.status === 'completed' && targetLog) {
+                let bestWeightInSession = 0;
+                let bestRepsAtWeight = 0;
+                
+                targetLog.forEach(s => {
+                  if (!s.skipped && s.type !== 'warmup' && s.w > 0 && s.r > 0) {
+                    const c1RM = Number(s.w) * (1 + Number(s.r) / 30);
+                    const c10RM = c1RM / 1.3333;
+                    if (c10RM > historyMax10RM) historyMax10RM = c10RM;
+                    
+                    if (Number(s.w) > bestWeightInSession) {
+                      bestWeightInSession = Number(s.w);
+                      bestRepsAtWeight = Number(s.r);
+                    } else if (Number(s.w) === bestWeightInSession && Number(s.r) > bestRepsAtWeight) {
+                      bestRepsAtWeight = Number(s.r);
+                    }
                   }
+                });
+                
+                if (bestWeightInSession > 0 && dateMs > mostRecentDateMs) {
+                  mostRecentDateMs = dateMs;
+                  lastSessionWeight = bestWeightInSession;
+                  lastSessionReps = bestRepsAtWeight;
                 }
-              });
-              
-              if (bestWeightInSession > 0 && dateMs > mostRecentDateMs) {
-                mostRecentDateMs = dateMs;
-                lastSessionWeight = bestWeightInSession;
-                lastSessionReps = bestRepsAtWeight;
               }
-            }
-          });
-        }
-      });
+            });
+          }
+        });
+        
+        historicalStatsRef.current[exItem.id] = { historyMax10RM, lastSessionWeight, lastSessionReps };
+      }
+      
+      let { historyMax10RM, lastSessionWeight, lastSessionReps } = historicalStatsRef.current[exItem.id];
+
 
       // 2. Scan current session
       let currentMax10RM = 0;
@@ -423,8 +471,10 @@ const WorkoutTab = ({
       
       if (isNewRecord) {
         return {
-          title: "🏆 REKOR BARU DIPECAHKAN!",
-          text: `Mantap! Kamu baru saja buat rekor 10RM baru: ${currentMax10RM} ${units?.weight === 'lbs' ? 'lbs' : 'kg'}!\n\nLanjutkan kerja kerasnya! 💪`
+          title: "REKOR BARU DIPECAHKAN!",
+          text: `Mantap! Kamu baru saja buat rekor 10RM baru: ${currentMax10RM} ${units?.weight === 'lbs' ? 'lbs' : 'kg'}!\n\nLanjutkan kerja kerasnya!`,
+          mode: 'praise',
+          isNewRecord: true
         };
       }
       
@@ -443,44 +493,44 @@ const WorkoutTab = ({
         const exp = userProfile?.experience || 'beginner';
         
         if (goal === 'fat_loss') {
-           missionText = `Pertahankan beban sesi lalu:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nJika sedang defisit kalori, fokus jaga massa otot, tidak perlu memaksakan naik beban jika tidak fit.`;
+           missionText = `Beban sesi minggu lalu:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nJika sedang defisit kalori, jaga massa otot. Usahakan angkat beban yang sama, jangan paksakan naik jika tidak fit.`;
         } else if (goal === 'strength') {
            if (reachedTarget) {
-             missionText = `Kekuatan optimal sesi lalu:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nHari ini wajib NAIK BEBAN! Ayo, semangat! 💪`;
+             missionText = `Kekuatan optimal di sesi sebelumnya:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nTarget hari ini: NAIK BEBAN! Ayo, semangat!`;
            } else {
-             missionText = `Sesi lalu:\n${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps\n\nFokus pada kekuatan! Usahakan NAIK BEBAN sedikit, walaupun reps sedikit turun.`;
+             missionText = `Beban sesi minggu lalu:\n${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps\n\nFokus pada kekuatan! Usahakan NAIK BEBAN hari ini, tidak apa jika reps sedikit turun.`;
            }
         } else if (goal === 'general') {
            if (reachedTarget) {
-             missionText = `Stamina bagus di sesi lalu:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nKamu boleh coba naikkan beban pelan-pelan (+${step} ${uStr}) kalau masih sanggup.`;
+             missionText = `Stamina bagus di sesi sebelumnya:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nKamu boleh coba naikkan beban pelan-pelan (+${step} ${uStr}) kalau merasa sanggup.`;
            } else {
-             missionText = `Sesi lalu:\n${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps\n\nJika ini sudah nyaman, lanjutkan latihan dengan beban ini. Nikmati prosesnya, agar tubuh tetap bugar.`;
+             missionText = `Beban sesi minggu lalu:\n${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps\n\nJika ini sudah nyaman, ulangi beban ini. Nikmati prosesnya!`;
            }
         } else {
            // muscle_gain / Default
            if (reachedTarget) {
              if (exp === 'beginner') {
-               missionText = `Target reps sesi lalu tercapai:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nDi fase Newbie Gains, ototmu sangat gampang berkembang, sikat NAIK BEBAN (+${step} ${uStr}) sekarang!`;
+               missionText = `Target reps sesi sebelumnya tercapai:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nSebagai pemula, ototmu gampang berkembang, sikat NAIK BEBAN (+${step} ${uStr}) hari ini!`;
              } else if (exp === 'advanced') {
-               missionText = `Target reps sesi lalu tercapai:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nCoba microload (+${microStep} ${uStr}) atau perbaiki tempo sebelum benar-benar naik beban berat. Aman, tidak perlu tergesa-gesa!`;
+               missionText = `Target reps sesi sebelumnya tercapai:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nCoba microload (+${microStep} ${uStr}) atau perbaiki tempo hari ini sebelum benar-benar lompat beban.`;
              } else {
-               missionText = `Kamu menembus target reps sesi lalu:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nSaatnya NAIK BEBAN (+${step} ${uStr}) hari ini, reps boleh turun sedikit.`;
+               missionText = `Sesi sebelumnya kamu berhasil menembus target:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nSaatnya NAIK BEBAN (+${step} ${uStr}) hari ini, reps boleh turun sedikit.`;
              }
            } else {
-             missionText = `Sesi lalu:\n${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps (Target: ${targetReps} Reps)\n\nHari ini fokus TAMBAH REPETISI, sampai menembus target! Beban masih tetap.`;
+             missionText = `Beban sesi minggu lalu:\n${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps (Target: ${targetReps} Reps)\n\nHari ini fokus TAMBAH REPETISI dengan beban yang sama, sampai tembus target!`;
            }
         }
         
         return {
-          title: "🎯 TARGET HARI INI",
-          text: `${missionText}\n\n🏆 All-Time 10RM: ${true10RM} ${uStr}`,
-          mode: reachedTarget ? 'praise' : 'push'
+          title: "TARGET HARI INI",
+          text: `${missionText}\n\n10RM terakhir: ${true10RM} ${uStr}`,
+          mode: 'push'
         };
       } else {
         return {
-          title: "🎯 TARGET HARI INI",
-          text: `Atur beban yang cukup menantang untuk diangkat 10 repetisi dengan form benar.\n\n🏆 All-Time 10RM: ${true10RM > 0 ? true10RM + ' ' + uStr : '-'}`,
-          mode: 'neutral'
+          title: "TARGET HARI INI",
+          text: `Atur beban yang cukup menantang untuk diangkat 10 repetisi dengan form benar.\n\n10RM terakhir: ${true10RM > 0 ? true10RM + ' ' + uStr : '-'}`,
+          mode: 'push'
         };
       }
     };
@@ -525,7 +575,19 @@ const WorkoutTab = ({
           title: 'Sesi Latihan Berjalan',
           message: 'Kamu sedang memiliki sesi latihan yang aktif berjalan. Apakah kamu ingin menyimpan sesi yang berjalan saat ini, atau langsung membuangnya dan memulai latihan yang baru?',
           onConfirm: () => {
-             if (sessionToRun && onSaveWorkout) onSaveWorkout(sessionToRun);
+             if (sessionToRun && onSaveWorkout) {
+               if (soundEnabled) {
+                 const audio = new Audio('/cheer.wav');
+                 audio.volume = 1.0;
+                 audio.play().catch(() => {});
+               }
+               setCelebrationSession(sessionToRun);
+               setShowCelebration(true);
+               setTimeout(() => {
+                 setShowCelebration(false);
+                 onSaveWorkout(sessionToRun);
+               }, 2000);
+             }
              setTimeout(doStart, 100);
           },
           confirmText: 'Simpan Perubahan',
@@ -659,7 +721,17 @@ const WorkoutTab = ({
           }}
           onSaveWorkout={() => {
             setIsImmersiveMode(false);
-            onSaveWorkout(sessionToRun);
+            if (soundEnabled) {
+              const audio = new Audio('/cheer.wav');
+              audio.volume = 1.0;
+              audio.play().catch(() => {});
+            }
+            setCelebrationSession(sessionToRun);
+            setShowCelebration(true);
+            setTimeout(() => {
+              setShowCelebration(false);
+              onSaveWorkout(sessionToRun);
+            }, 2000);
           }}
           onCancelWorkout={() => {
             onCancelWorkout(sessionToRun);
@@ -680,7 +752,6 @@ const WorkoutTab = ({
 
       {/* KONTEN UTAMA WORKOUT TAB */}
       <div className="relative z-10">
-
       {detailExercise && !showAlternativeModal && (
         <ExerciseDetailModal 
             ex={detailExercise} 
@@ -1034,6 +1105,25 @@ const WorkoutTab = ({
         );
       })()}
       {dialog}
+      {/* CELEBRATION MODAL */}
+      {/* CELEBRATION MODAL */}
+      {showCelebration && createPortal(
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+           <div className="absolute inset-0 bg-black/80 backdrop-blur-md animate-in fade-in duration-300"></div>
+           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200vw] h-[200vw] bg-[radial-gradient(ellipse_at_center,rgba(59,130,246,0.2)_0%,transparent_50%)] animate-spin-slow pointer-events-none"></div>
+           <div className="relative z-10 flex flex-col items-center animate-in zoom-in-95 fade-in slide-in-from-bottom-10 duration-500">
+             <div className={`w-32 h-32 rounded-full ${t.bgAccent} shadow-[0_0_40px_rgba(59,130,246,0.5)] flex items-center justify-center mb-6`}>
+                <Flame size={64} className="text-white animate-pulse" />
+             </div>
+             <h1 className="text-4xl font-black text-white tracking-widest text-center drop-shadow-[0_0_15px_rgba(255,255,255,0.8)] uppercase">Latihan Selesai!</h1>
+             <p className="text-white/80 mt-2 font-bold text-lg">Kerja Bagus Hari Ini! 💪</p>
+           </div>
+        </div>,
+        document.body
+      )}
+      
+      {/* FOOTER PADDING */}
+      <div className="h-24"></div>
       
       </div> {/* END OF KONTEN UTAMA WORKOUT TAB */}
     </>

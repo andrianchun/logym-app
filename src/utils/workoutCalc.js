@@ -83,7 +83,14 @@ export const calculateSmartWorkoutCalories = (weightKg, workout, logs, globalRes
           // BEBAN (Reps): Asumsi repetisi makan waktu rata-rata 4 detik per rep (TUT)
           const reps = Number(set.r || ex.reps || 10);
           const activeWorkMins = (reps * 4) / 60;
-          totalCalories += weight * WORKOUT_MET * (activeWorkMins / 60); // MET 6.0 untuk angkat beban
+          let setCal = weight * WORKOUT_MET * (activeWorkMins / 60); // MET 6.0 untuk angkat beban
+
+          // Bonus kalori dari beban yang diangkat (Force x Distance -> kcal)
+          const setWeight = Number(set.w || ex.defaultWeight || 0);
+          if (setWeight > 0) {
+             setCal += setWeight * reps * 0.006;
+          }
+          totalCalories += setCal;
 
           // Kalori pemulihan / Istirahat pasca-set (MET 2.0 santai)
           const restSecs = Number(set.rest || ex.restTime || workout.restTime || globalRestTime);
@@ -104,5 +111,91 @@ export const calculateSmartWorkoutCalories = (weightKg, workout, logs, globalRes
   }
 
   return Math.round(totalCalories);
+};
+
+/**
+ * Estimasi kalori terbakar saat sesi LIVE berlangsung.
+ * Menggabungkan durasi baseline (mondar-mandir di gym) dengan tambahan intensitas set selesai.
+ */
+export const calculateLiveWorkoutCalories = (weightKg, exercises, logs, currentDurationSecs) => {
+  const weight = Number(weightKg) || 70;
+  // Baseline kalori selama di gym (MET 2.5: aktivitas ringan, berdiri, berjalan pelan)
+  const baselineCalories = weight * 2.5 * (currentDurationSecs / 3600);
+  
+  let extraCalories = 0;
+  
+  if (exercises && logs) {
+    exercises.forEach(ex => {
+      const exLogs = logs[ex.id];
+      if (!exLogs || !Array.isArray(exLogs)) return;
+
+      exLogs.forEach(set => {
+        if (set.done) {
+          if (ex.type === 'time') {
+            const setDurMins = Number(set.d || ex.duration || 0);
+            // Tambahan MET 4.5 (total 7.0 - 2.5 baseline)
+            extraCalories += weight * 4.5 * (setDurMins / 60);
+          } else {
+            const reps = Number(set.r || ex.reps || 10);
+            const activeWorkMins = (reps * 4) / 60;
+            // Tambahan MET 3.5 (total WORKOUT_MET 6.0 - 2.5 baseline)
+            let setCal = weight * 3.5 * (activeWorkMins / 60);
+            
+            const setWeight = Number(set.w || ex.defaultWeight || 0);
+            if (setWeight > 0) {
+               setCal += setWeight * reps * 0.006;
+            }
+            extraCalories += setCal;
+          }
+        }
+      });
+    });
+  }
+
+  return Math.round(baselineCalories + extraCalories);
+};
+
+/**
+ * Estimasi kalori terbakar saat sesi LIVE berlangsung, dikhususkan untuk Card Mode (FloatingTimer).
+ * Mengekstrak informasi exercise langsung dari exerciseLibrary berdasarkan kunci log.
+ */
+export const calculateLiveCaloriesFromLogs = (weightKg, logs, exerciseLibrary, currentDurationSecs) => {
+  const weight = Number(weightKg) || 70;
+  const baselineCalories = weight * 2.5 * (currentDurationSecs / 3600);
+  
+  let extraCalories = 0;
+  
+  if (logs && exerciseLibrary) {
+    Object.keys(logs).forEach(logKey => {
+      const exLogs = logs[logKey];
+      if (!Array.isArray(exLogs)) return;
+
+      // logKey might be "101" or "101-prog-1". Extract the base ID:
+      const baseIdStr = logKey.split('-')[0];
+      const baseId = isNaN(parseInt(baseIdStr)) ? baseIdStr : parseInt(baseIdStr);
+      const ex = exerciseLibrary.find(e => e.id === baseId) || {};
+
+      exLogs.forEach(set => {
+        if (set.done) {
+          if (ex.type === 'time') {
+            const setDurMins = Number(set.d || ex.duration || 0);
+            extraCalories += weight * 4.5 * (setDurMins / 60);
+          } else {
+            const reps = Number(set.r || ex.reps || 10);
+            const activeWorkMins = (reps * 4) / 60;
+            let setCal = weight * 3.5 * (activeWorkMins / 60);
+            
+            const setWeight = Number(set.w || ex.defaultWeight || 0);
+            if (setWeight > 0) {
+               setCal += setWeight * reps * 0.006;
+            }
+            extraCalories += setCal;
+          }
+        }
+      });
+    });
+  }
+
+  return Math.round(baselineCalories + extraCalories);
 };
 

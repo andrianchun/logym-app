@@ -41,7 +41,12 @@ const SwipeInput = ({ value, onChange, disabled, step = 1, className, min = 0, m
         const validStep = isNaN(Number(step)) ? 1 : Number(step);
         const validStartVal = isNaN(dragRef.current.startVal) ? 0 : dragRef.current.startVal;
         
-        let newValue = validStartVal + (steps * validStep);
+        let newValue = validStartVal;
+        if (steps > 0) {
+            newValue = Math.ceil((validStartVal + 0.0001) / validStep) * validStep + (steps - 1) * validStep;
+        } else if (steps < 0) {
+            newValue = Math.floor((validStartVal - 0.0001) / validStep) * validStep + (steps + 1) * validStep;
+        }
         const validMin = isNaN(Number(min)) ? 0 : Number(min);
         const validMax = max !== undefined && !isNaN(Number(max)) ? Number(max) : undefined;
 

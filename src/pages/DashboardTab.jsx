@@ -578,7 +578,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                WebkitMaskImage: 'linear-gradient(to bottom, black 60%, transparent 85%)'
              }}
            >
-             <img src="/bg-dashboard.webp" alt="" className={`w-full h-full object-cover object-top drop-shadow-xl origin-top transition-transform duration-500 ease-out ${isKomposisiExpanded ? 'scale-[1.60]' : 'scale-[1.15]'}`} />
+             <img src="/bg-dashboard.webp" alt="" className={`w-full h-full object-cover object-top drop-shadow-xl origin-top transition-transform duration-500 ease-out scale-[1.15]`} />
            </div>
 
           {/* Konten Kartu: Berada di atas coach */}
@@ -711,13 +711,13 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
 
          {/* Extracted Image */}
          <div
-             className="absolute right-0 -top-20 bottom-0 w-[26rem] z-10 pointer-events-none overflow-hidden parallax-container"
+             className="absolute right-0 -top-8 bottom-0 w-[26rem] z-10 pointer-events-none overflow-hidden parallax-container"
              style={{
                maskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)',
                WebkitMaskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)'
              }}
          >
-             <img src="/bg-activity.webp" alt="" className={`w-full h-full object-cover object-top drop-shadow-xl origin-top transform translate-x-4 transition-transform duration-500 ease-out ${isAktivitasExpanded ? 'scale-105' : 'scale-100'}`} />
+             <img src="/bg-activity.webp" alt="" className={`w-full h-full object-cover object-top drop-shadow-xl origin-top transform translate-x-4 transition-transform duration-500 ease-out`} />
          </div>
 
          {/* Content Layer */}
@@ -734,8 +734,8 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                  </div>
              </div>
 
-             <div className="flex flex-col flex-1 justify-between pt-6 pb-2">
-                 <div className={`p-5 -mx-4 w-[calc(100%+2rem)] ${t.bgBox} backdrop-blur-md border-y border-x-0 ${t.border}`}>
+             <div className="flex flex-col flex-1 pt-6 pb-2 space-y-6">
+                 <div className="px-1">
                      <div className="grid grid-cols-2 gap-x-5 gap-y-5 h-full content-between">
                          {/* Langkah Kaki */}
                          <div className="flex flex-col h-full">
@@ -773,9 +773,13 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                           </div>
                       );
                   })()}
+                     </div>
+                 </div>
 
-                 {/* Kalori Dimakan */}
-                 <div className="flex flex-col h-full">
+                 <div className={`py-4 px-5 -mx-4 w-[calc(100%+2rem)] ${t.bgBox} backdrop-blur-md border-y border-x-0 ${t.border}`}>
+                     <div className="grid grid-cols-2 gap-x-5 gap-y-5 h-full content-between">
+                         {/* Kalori Dimakan */}
+                         <div className="flex flex-col h-full">
                      <div className="flex items-center space-x-1.5 mb-1"><span className="w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-500 flex items-center justify-center shrink-0"><Utensils size={11}/></span> <span className={`caption ${t.textMuted} capitalize`}>Kalori Dimakan</span></div>
                      {(() => {
                        // lomealSync.today bisa basi (push dari Lomeal telat/gagal, silent-catch) —
@@ -812,9 +816,13 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                          </div>
                      </div>
                  </div>
+                     </div>
+                 </div>
 
-                 {/* Tidur */}
-                 <div className="flex flex-col h-full">
+                 <div className="px-1 space-y-5">
+                     <div className="grid grid-cols-2 gap-x-5 gap-y-5 h-full content-between">
+                         {/* Tidur */}
+                         <div className="flex flex-col h-full">
                      <div className="flex items-center space-x-1.5 mb-1"><span className="w-5 h-5 rounded-full bg-violet-500/15 text-violet-500 flex items-center justify-center shrink-0"><Moon size={11}/></span> <span className={`caption ${t.textMuted} capitalize`}>Tidur</span></div>
                      <div className="flex flex-col flex-1 justify-end">
                          <div className="flex items-baseline space-x-1 mb-2">
@@ -839,9 +847,10 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                          </div>
                      </div>
                  </div>
+                     </div>
                  
                  {/* ROW 4: Tekanan Darah, Detak Jantung, SpO2 (Sebaris bertiga) */}
-                 <div className={`col-span-2 grid grid-cols-3 gap-x-2 pt-2 mt-2 border-t border-dashed ${t.borderDashed}`}>
+                 <div className={`grid grid-cols-3 gap-x-2 pt-2 border-t border-dashed ${t.borderDashed}`}>
                      {/* Tekanan Darah */}
                      <div className="flex flex-col">
                          <div className="flex items-center space-x-1 mb-1 text-blue-400"><Activity size={12}/> <span className={`text-[10px] ${t.textMuted}`}>Tensi</span></div>
@@ -862,8 +871,8 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                          <div className="flex items-center space-x-1 mb-1 text-blue-400"><Wind size={12}/> <span className={`text-[10px] ${t.textMuted}`}>SpO2</span></div>
                          <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.oxygenSaturation, language) || '-'} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span>
                      </div>
+                     </div>
                  </div>
-             </div>
              </div>
              
              <button
@@ -891,7 +900,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                  {isAktivitasExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
              </button>
           </div>
-         </div>
+          </div>
           
           <div id="aktivitas-subcard" className={`grid relative z-10 transition-all duration-300 ease-in-out ${isAktivitasExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
              <div className="overflow-hidden">
@@ -906,11 +915,11 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
              </div>
           </div>
          </div>
-      </div>
-      </div>
+       </div>
+      {/* Grid container intentionally not closed here yet */}
 
       {/* --- GRUP PROGRESS --- */}
-      <div id="progress-accordion" className="relative z-10 flex flex-col w-full min-w-0 anim-rise mt-6 transition-all duration-300" style={{ animationDelay: '120ms' }}>
+      <div id="progress-accordion" className="relative z-10 flex flex-col w-full min-w-0 anim-rise mt-6 sm:mt-0 transition-all duration-300" style={{ animationDelay: '120ms' }}>
         <div className="relative z-20">
         {/* SECTION: PROGRESS TAB — Main card */}
           {/* Card Background Layer */}
@@ -918,13 +927,18 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
 
           {/* Extracted Image (Pop-out dari Kiri) */}
           <div
-             className="absolute inset-x-0 -top-10 bottom-0 w-full z-10 pointer-events-none overflow-hidden parallax-container"
+             className="absolute inset-0 z-10 pointer-events-none parallax-container overflow-hidden rounded-2xl"
              style={{
-               maskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)',
-               WebkitMaskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)'
+               maskImage: 'linear-gradient(to right, transparent 0%, black 15%)',
+               WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 15%)'
              }}
           >
-             <img src="/bg-progress.webp" alt="" className={`w-full h-full object-cover object-[35%_top] drop-shadow-xl transition-transform duration-500 ease-out ${isProgressExpanded ? 'scale-125' : 'scale-100'}`} />
+             <div className="absolute inset-0" style={{
+                 maskImage: 'linear-gradient(to bottom, black 75%, transparent 100%)',
+                 WebkitMaskImage: 'linear-gradient(to bottom, black 75%, transparent 100%)'
+             }}>
+                 <img src="/bg-progress.webp" alt="" className="absolute -right-12 -top-8 w-[33rem] max-w-[120%] h-auto drop-shadow-xl transition-transform duration-500 ease-out" />
+             </div>
           </div>
 
           {/* ------------------------------ */}
@@ -979,7 +993,8 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
           </div>
         </div>
       </div>
-      </div>
+      </div> {/* <-- Closes progress-accordion */}
+      </div> {/* <-- Closes the grid container */}
 
       {/* MODULAR MODALS */}
       <DashboardModals 
@@ -1207,7 +1222,6 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
 
 
 
-    </div>
     </div>
   );
 };

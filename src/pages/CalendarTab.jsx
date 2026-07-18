@@ -27,7 +27,15 @@ const CalendarTab = ({
   });
   
   const [isTablet, setIsTablet] = useState(window.innerWidth >= 640);
-  const [calendarMode, setCalendarMode] = useState('monthly');
+  const [calendarMode, setCalendarMode] = useState(() => {
+    return localStorage.getItem('logym_calendar_mode') || 'weekly';
+  });
+
+  useEffect(() => {
+    if (calendarMode === 'weekly' || calendarMode === 'monthly') {
+      localStorage.setItem('logym_calendar_mode', calendarMode);
+    }
+  }, [calendarMode]);
   const [showBottomSheet, setShowBottomSheet] = useState(false);
   const [showMonthlyStats, setShowMonthlyStats] = useState(false);
 
@@ -1030,7 +1038,7 @@ const CalendarTab = ({
                 <div className={cellStyle}>
                   {ringRender}
                   <span className={`body-md font-bold ${showMonthlyStats ? 'z-10' : 'mb-1'}`}>{day}</span>
-                  {!showMonthlyStats && workouts.length > 0 && (
+                  {calendarMode === 'monthly' && !showMonthlyStats && workouts.length > 0 && (
                     <div className="absolute bottom-1 flex gap-0.5 items-center">
                       {workouts.slice(0, workouts.length > 3 ? 2 : 3).map(w => {
                         const isDone = checkIsCompletedStrict(w, dateKey);
@@ -1084,7 +1092,7 @@ const CalendarTab = ({
                 )}
               </button>
               
-              {calendarMode === 'monthly' && (
+              {(calendarMode === 'monthly' || calendarMode === 'weekly') && (
                 <button
                   onClick={() => {
                     setShowMonthlyStats(!showMonthlyStats);
@@ -1099,7 +1107,8 @@ const CalendarTab = ({
             <button 
               onClick={() => {
                 if (calendarMode === 'monthPicker') setCalendarMode('yearPicker');
-                else if (calendarMode !== 'monthly') setCalendarMode('monthPicker');
+                else if (calendarMode === 'yearPicker') setCalendarMode('monthly');
+                else setCalendarMode('monthPicker');
               }}
               className={`text-2xl font-black ${t.textMain} tracking-tight hover:${t.textAccent} transition-colors`}
             >
@@ -1243,17 +1252,6 @@ const CalendarTab = ({
                         >
                           <div className={cellStyle}>
                             <span className="body-md font-medium mb-1.5">{day}</span>
-                            {workouts.length > 0 && (
-                              <div className="absolute bottom-1.5 flex gap-0.5">
-                                {workouts.slice(0,3).map(w => {
-                                  const isDone = checkIsCompletedStrict(w, dateKey);
-                                  const isTargetSelected = isSelected;
-                                  return (
-                                    <div key={w.id} className={`w-1.5 h-1.5 rounded-full ${isTargetSelected ? (isDone ? 'bg-white' : 'bg-white/20 border border-white') : (isDone ? t.bgAccent.replace('text-', 'bg-') : 'border ' + t.borderAccent)}`}></div>
-                                  );
-                                })}
-                              </div>
-                            )}
                           </div>
                         </div>
                       );
@@ -1291,7 +1289,7 @@ const CalendarTab = ({
           height: calendarMode === 'weekly' ? `calc(100% - ${(fixedHeaderRef.current?.offsetHeight || 0) + (weeklyRulerRef.current?.offsetHeight || 0) + 20}px)` : '70vh',
           transform: sheetDragY !== null
             ? `translateY(${sheetDragY}px)`
-            : `translateY(${calendarMode === 'monthly' ? ((sheetRef.current?.offsetHeight || 0) - peekHeight) : 0}px)`
+            : `translateY(${(calendarMode === 'monthPicker' || calendarMode === 'yearPicker') ? (sheetRef.current?.offsetHeight || 1000) : (calendarMode === 'monthly' ? ((sheetRef.current?.offsetHeight || 0) - peekHeight) : 0)}px)`
         }}
       >
          {/* Fixed Glassmorphism Background Container */}
@@ -1371,7 +1369,55 @@ const CalendarTab = ({
                      >
                        <div ref={isCurr ? sheetContentRef : undefined} className="px-3 sm:px-6 pb-32 flex flex-col gap-3">
 
-                         <div className="space-y-4">
+                         {showMonthlyStats ? (() => {
+                             const dayData = history[targetDateStr] || {};
+                             const bio = dayData.bioData || {};
+                             const dailySteps = parseInt(bio.steps) || 0;
+                             const dailyWorkouts = panelWorkouts.filter(w => checkIsCompletedStrict(w, targetDateStr));
+                             let dailyDuration = 0;
+                             let dailyCalories = 0;
+                             dailyWorkouts.forEach(w => {
+                                 const dur = parseWorkoutDurationMinutes(w.duration) || 0;
+                                 dailyDuration += dur;
+                                 dailyCalories += calculateWorkoutCalories(userProfile?.weight, dur) || 0;
+                             });
+                             const tDuration = activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 7) : 45;
+                             const tCalories = activityTargets?.calories || 400;
+                             const tSteps = activityTargets?.steps || 10000;
+
+                             return (
+                                 <div className="space-y-4">
+                                   <div className={`p-4 rounded-3xl ${t.bgCard} ${t.border} border shadow-lg flex flex-col gap-4 animate-in fade-in zoom-in-95`}>
+                                     <div className="flex items-center gap-5 px-2 py-1">
+                                       <ActivityRings 
+                                          calories={dailyCalories} calorieTarget={tCalories}
+                                          duration={dailyDuration} durationTarget={tDuration}
+                                          steps={dailySteps} stepTarget={tSteps}
+                                          size={86} strokeWidth={9} gap={3} 
+                                       />
+                                       <div className="flex-1 space-y-2">
+                                         <p className="caption font-bold text-rose-500 flex justify-between"><span>Kalori</span> <span>{formatNumber(dailyCalories)} / {formatNumber(tCalories)}</span></p>
+                                         <p className="caption font-bold text-emerald-500 flex justify-between"><span>Durasi</span> <span>{formatNumber(dailyDuration)} / {formatNumber(tDuration)}</span></p>
+                                         <p className="caption font-bold text-yellow-500 flex justify-between"><span>Langkah</span> <span>{formatNumber(dailySteps)} / {formatNumber(tSteps)}</span></p>
+                                       </div>
+                                     </div>
+                                     {(bio.weight || bio.fat || bio.bloodPressure || bio.heartRate || bio.bloodSugar || bio.sleep || bio.temperature || bio.notes) && (
+                                       <div className="mt-2 pt-4 border-t border-black/10 dark:border-white/10 grid grid-cols-2 gap-y-3 gap-x-2 text-[11px] opacity-80">
+                                         {bio.weight && <div><b className="opacity-70">Berat:</b><br/>{bio.weight} {isImp ? 'lbs' : 'kg'}</div>}
+                                         {bio.fat && <div><b className="opacity-70">Lemak:</b><br/>{bio.fat}%</div>}
+                                         {bio.bloodPressure && <div><b className="opacity-70">Tensi:</b><br/>{bio.bloodPressure} mmHg</div>}
+                                         {bio.heartRate && <div><b className="opacity-70">Detak:</b><br/>{bio.heartRate} bpm</div>}
+                                         {bio.bloodSugar && <div><b className="opacity-70">Gula Darah:</b><br/>{bio.bloodSugar} mg/dL</div>}
+                                         {bio.temperature && <div><b className="opacity-70">Suhu:</b><br/>{bio.temperature} °{isImp ? 'F' : 'C'}</div>}
+                                         {bio.sleep && <div><b className="opacity-70">Tidur:</b><br/>{bio.sleep} jam</div>}
+                                         {bio.notes && <div className="col-span-2 mt-1"><b className="opacity-70">Catatan Klinis:</b><br/>{bio.notes}</div>}
+                                       </div>
+                                     )}
+                                   </div>
+                                 </div>
+                             );
+                         })() : (
+                           <div className="space-y-4 animate-in fade-in">
                            {panelWorkouts.length === 0 ? (
                               <div className="p-4 text-center flex flex-col items-center">
                                 {(!activePlanIds || activePlanIds.length === 0) ? (
@@ -1461,9 +1507,9 @@ const CalendarTab = ({
                                           text: t.textAccent,
                                           badge: t.bgAccent + ' text-white'
                                        } : {
-                                          bg: t.bgAccentSoft + ' opacity-40',
+                                          bg: 'bg-[#3b82f6]/5',
                                           dot: t.borderAccentSoft,
-                                          text: t.textAccent + ' opacity-60',
+                                          text: t.textAccent,
                                           badge: ''
                                        };
 
@@ -1592,6 +1638,7 @@ const CalendarTab = ({
                               })()
                            )}
                          </div>
+                         )}
 
                          {activePlanIds.length > 0 && (
                              <button 
@@ -1625,29 +1672,21 @@ const CalendarTab = ({
         <div className="fixed inset-0 z-[9999] flex items-center justify-center px-6" onClick={() => setShowProgramSelect(false)}>
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm animate-in fade-in duration-300 ease-out" />
           <div 
-            className={`relative w-full max-w-xs rounded-3xl p-5 shadow-2xl border ${t.border} animate-in zoom-in-95 fade-in duration-300 ease-out`}
+            className={`relative w-full max-w-xs rounded-3xl p-5 shadow-2xl border ${t.border} animate-in zoom-in-95 fade-in duration-300 ease-out ${theme === 'dark' ? 'bg-black/70' : 'bg-white/70'}`}
             style={{ 
-              background: (t.bgCard?.includes('0d1526') || t.bgCard?.includes('05070d')) 
-                ? 'rgba(15, 40, 60, 0.65)' 
-                : 'rgba(255, 255, 255, 0.65)', 
               backdropFilter: 'blur(40px) saturate(180%)',
               WebkitBackdropFilter: 'blur(40px) saturate(180%)'
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl ${t.bgAccentSoft} flex items-center justify-center`}>
-                  <CalendarPlus size={20} className={t.textAccent} />
-                </div>
-                <h3 className={`font-black body-lg ${t.textMain}`}>Jadwalkan Sesi</h3>
-              </div>
+            <div className="flex items-center justify-between mb-4 mt-2">
+              <h3 className={`font-black text-xl ${t.textMain}`}>Tambah Sesi Ekstra</h3>
               <button onClick={() => setShowProgramSelect(false)} className={`p-2 rounded-full hover:bg-black/10 dark:hover:bg-white/10 ${t.textMuted}`}>
                 <X size={18} />
               </button>
             </div>
 
-            <div className={`h-px mb-4 ${(t.bgCard?.includes('0d1526') || t.bgCard?.includes('05070d')) ? 'bg-white/10' : 'bg-black/10'}`} />
+            <div className={`h-px mb-4 ${theme === 'dark' ? 'bg-white/10' : 'bg-black/10'}`} />
 
             <div className="space-y-4 max-h-64 overflow-y-auto pr-1">
               {(() => {
@@ -1666,11 +1705,10 @@ const CalendarTab = ({
                         <button 
                           key={p.id} 
                           onClick={() => addWorkoutToDate(p)}
-                          className={`w-full p-3 rounded-xl text-left body-lg font-bold transition-all flex justify-between items-center ${t.textMain}`}
-                          style={{ background: (t.bgCard?.includes('0d1526') || t.bgCard?.includes('05070d')) ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }}
+                          className={`w-full p-4 rounded-2xl text-left body-lg font-bold transition-all flex justify-between items-center ${t.textMain} ${theme === 'dark' ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-black/5 border-black/10 hover:bg-black/10'} border shadow-sm backdrop-blur-md`}
                         >
                           {p.name}
-                          <Plus size={16} className="opacity-40" />
+                          <Plus size={18} className="opacity-40" />
                         </button>
                       ))}
                     </div>
@@ -1679,14 +1717,7 @@ const CalendarTab = ({
               })()}
             </div>
 
-            <div className={`h-px mt-4 mb-3 ${(t.bgCard?.includes('0d1526') || t.bgCard?.includes('05070d')) ? 'bg-white/10' : 'bg-black/10'}`} />
-
-            <button 
-              onClick={() => { setShowProgramSelect(false); setActiveTab('program'); }}
-              className={`w-full py-3 rounded-2xl text-center caption font-bold ${t.textMuted} hover:${t.textAccent} transition-colors`}
-            >
-              Kelola Program →
-            </button>
+            <div className="pb-2"></div>
           </div>
         </div>
       )}

@@ -248,7 +248,7 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
   const chartWidth = Math.max(multiChartData.length * pointWidth, window.innerWidth - 64);
 
   return (
-    <div className={!isSubCard ? "p-5" : ""}>
+    <div className={!isSubCard ? "px-5 pb-5 pt-2" : ""}>
 
          <div ref={scrollRef} 
               onScroll={!isSubCard ? handleScroll : undefined}

@@ -1,13 +1,13 @@
 import React, { useEffect } from 'react';
 import { Clock, X, Flame } from 'lucide-react';
 import { playSoundEffect } from '../utils/audio';
-import { calculateWorkoutCalories } from '../utils/workoutCalc';
+import { calculateLiveCaloriesFromLogs } from '../utils/workoutCalc';
 
 const FloatingTimer = ({
   restTimer, setRestTimer, defaultRestTime, t, soundEnabled,
   isWorkoutActive, activeTab, setActiveTab, workoutStartTime,
   isImmersiveMode, setIsImmersiveMode, sessionToRun, focusWorkoutId, setFocusWorkoutId,
-  userProfile
+  userProfile, exerciseLogs, exerciseLibrary
 }) => {
   
   const [workoutSeconds, setWorkoutSeconds] = React.useState(0);
@@ -69,7 +69,7 @@ const FloatingTimer = ({
     return isNegative ? `-${text}` : text;
   };
 
-  const caloriesBurned = calculateWorkoutCalories(userProfile?.weight || 70, Math.floor(workoutSeconds / 60));
+  const caloriesBurned = calculateLiveCaloriesFromLogs(userProfile?.weight || 70, exerciseLogs, exerciseLibrary, workoutSeconds);
 
   return (
     <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 pointer-events-none flex justify-center animate-in slide-in-from-bottom-8 fade-in duration-300">

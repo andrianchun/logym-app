@@ -850,6 +850,11 @@ export default function App() {
         setHistory({});
         setPrograms(defaultPrograms);
         setExerciseLibrary(defaultMasterExercises);
+        // PENTING: Reset timestamp debounce supaya reset state ini tidak 
+        // dianggap sebagai "perubahan lokal baru" yang memblokir sinkronisasi onSnapshot
+        lastLocalWriteAt.current = 0;
+        lastLocalHistoryWriteAt.current = 0;
+        
         setExerciseLogs({});
         setExtraExercises([]);
         setSkippedExercises({});
@@ -1075,7 +1080,7 @@ export default function App() {
             if (data.userAchievements) setUserAchievements(data.userAchievements);
             setUser(prev => {
                 if (!prev) return prev;
-                return {
+                const next = {
                     ...prev,
                     ...(data.lastPhotoUpdate !== undefined && { lastPhotoUpdate: data.lastPhotoUpdate }),
                     ...(data.customCardBg !== undefined && { customCardBg: data.customCardBg }),
@@ -1084,6 +1089,7 @@ export default function App() {
                     ...(data.uploadedBackgrounds !== undefined && { uploadedBackgrounds: data.uploadedBackgrounds }),
                     ...(data.cardBgUploads !== undefined && { cardBgUploads: data.cardBgUploads }),
                 };
+                return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
             });
             // Sync onboarding flag from Firebase to localStorage
             if (data.onboardingCompleted && user.uid) {
@@ -1203,7 +1209,7 @@ export default function App() {
 
       return () => { clearTimeout(timer); if (retryTimer) clearTimeout(retryTimer); };
     }
-  }, [programs, exerciseLibrary, theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, user, isDataLoaded, userAchievements, userProfile, userApiKeys, aiProvider, aiModel, raigaPersona, raigaCustomInstruction, raigaMemory]);
+  }, [programs, exerciseLibrary, theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, user?.uid, isDataLoaded, userAchievements, userProfile, userApiKeys, aiProvider, aiModel, raigaPersona, raigaCustomInstruction, raigaMemory]);
 
   // Baseline serialisasi per tanggal — merepresentasikan kondisi terakhir yang tersimpan di server.
   // Tanggal yang serialisasinya sama dengan baseline tidak perlu dikirim ulang.
@@ -1291,6 +1297,11 @@ export default function App() {
       }
       const newBadges = checkAchievements(history, userAchievements, lastWorkout);
       if (newBadges.length > 0) {
+        if (soundEnabled) {
+          const audio = new Audio('/cheer.wav');
+          audio.volume = 1.0;
+          audio.play().catch(() => {});
+        }
         setUnlockedAchievementsPopup(prev => [...prev, ...newBadges]);
         setUserAchievements(prev => {
           const newSet = new Set([...prev, ...newBadges.map(b => b.id)]);
@@ -1299,7 +1310,7 @@ export default function App() {
       }
     }
     historyRef.current = history;
-  }, [history, isDataLoaded, userAchievements]);
+  }, [history, isDataLoaded, userAchievements, soundEnabled]);
 
   // ==========================================
   // 3.5. REAL-TIME SYNC EXERCISE LOGS TO HISTORY
@@ -2786,6 +2797,7 @@ export default function App() {
         sessionToRun={sessionToRun} setSessionToRun={setSessionToRun}
         userProfile={userProfile}
         focusWorkoutId={focusWorkoutId} setFocusWorkoutId={setFocusWorkoutId}
+        exerciseLogs={exerciseLogs} exerciseLibrary={exerciseLibrary}
       />
 
       {/* === GLOBAL COACH RAIGA FLOAT === */}

@@ -32,14 +32,14 @@ const ActivityRings = ({
       {/* Background Rings */}
       <circle cx={center} cy={center} r={radius1} fill="none" stroke="#f43f5e" strokeWidth={strokeWidth} opacity={0.2} />
       <circle cx={center} cy={center} r={radius2} fill="none" stroke="#10b981" strokeWidth={strokeWidth} opacity={0.2} />
-      <circle cx={center} cy={center} r={radius3} fill="none" stroke="#3b82f6" strokeWidth={strokeWidth} opacity={0.2} />
+      <circle cx={center} cy={center} r={radius3} fill="none" stroke="#facc15" strokeWidth={strokeWidth} opacity={0.2} />
 
       {/* Progress Rings */}
       <circle cx={center} cy={center} r={radius1} fill="none" stroke="#f43f5e" strokeWidth={strokeWidth} 
         strokeDasharray={getCirc(radius1)} strokeDashoffset={getOffset(calories, calorieTarget, radius1)} strokeLinecap="round" />
       <circle cx={center} cy={center} r={radius2} fill="none" stroke="#10b981" strokeWidth={strokeWidth} 
         strokeDasharray={getCirc(radius2)} strokeDashoffset={getOffset(duration, durationTarget, radius2)} strokeLinecap="round" />
-      <circle cx={center} cy={center} r={radius3} fill="none" stroke="#3b82f6" strokeWidth={strokeWidth} 
+      <circle cx={center} cy={center} r={radius3} fill="none" stroke="#facc15" strokeWidth={strokeWidth} 
         strokeDasharray={getCirc(radius3)} strokeDashoffset={getOffset(steps, stepTarget, radius3)} strokeLinecap="round" />
     </svg>
   );

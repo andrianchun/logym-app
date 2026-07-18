@@ -75,6 +75,9 @@ const ImmersiveWorkout = ({
 
   const [activeSetDetail, setActiveSetDetail] = useState(null);
   const [showIntensityInfo, setShowIntensityInfo] = useState(false);
+  const [rpeMode, setRpeMode] = useState(() => {
+    return localStorage.getItem('logym_rpe_mode') !== 'false';
+  });
 
   const handleSaveSetDetail = (exId, setIdx, details) => {
     onSetChange(exId, setIdx, 'notes', details.notes);
@@ -685,7 +688,7 @@ const ImmersiveWorkout = ({
                   <button 
                     onClick={() => {
                        playSoundEffect('click', soundEnabled);
-                       setActiveSetDetail({ setIdx: activeSetIdx, rir: s.rir !== undefined && s.rir !== '' ? s.rir : 3, rpe: s.rpe !== undefined && s.rpe !== '' ? s.rpe : 7, notes: s.notes || '' });
+                       setActiveSetDetail({ setIdx: activeSetIdx, rir: s.rir !== undefined ? s.rir : '', rpe: s.rpe !== undefined ? s.rpe : '', notes: s.notes || '' });
                     }}
                     className={`w-16 sm:w-20 rounded-2xl ${isFilled ? `${t.bgAccent} text-white` : `${t.bgAccentSoft} ${t.textAccent}`} hover:opacity-80 transition flex items-center justify-center shrink-0 shadow-xl`}
                     title="Catatan Set"
@@ -742,85 +745,166 @@ const ImmersiveWorkout = ({
         </div>
       )}
 
-      {/* SET DETAILS MODAL */}
-      {activeSetDetail !== null && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in zoom-in-95" onClick={() => setActiveSetDetail(null)}>
-          <div className={`w-full max-w-sm p-5 rounded-2xl border ${t.border} ${t.bgCard} shadow-2xl`} onClick={e => e.stopPropagation()}>
-              <h3 className="text-xl font-black mb-4">Catatan Set {activeSetDetail.setIdx + 1}</h3>
+      {/* SET DETAILS MODAL (BOTTOM SHEET) */}
+      {activeSetDetail !== null && createPortal(
+        <div className="fixed inset-0 z-[999] flex flex-col justify-end bg-black/50 backdrop-blur-sm animate-in fade-in" onClick={() => { setActiveSetDetail(null); setShowIntensityInfo(false); }}>
+          <div className={`w-full max-w-lg mx-auto bg-white/70 dark:bg-[#121a2f]/70 backdrop-blur-2xl border-t border-white/30 dark:border-white/10 shadow-2xl rounded-t-[2.5rem] p-6 pb-12 sm:pb-8 animate-in slide-in-from-bottom-1/2 duration-300`} onClick={e => e.stopPropagation()}>
             
-            <div className="mb-5 bg-black/5 dark:bg-white/5 p-3 rounded-xl border border-black/5 dark:border-white/5">
-              <div className="flex justify-between items-center mb-2">
-                <div className="flex items-center gap-1">
-                    <label className="text-sm font-bold">Intensitas Set</label>
-                  <button onClick={(e) => { e.stopPropagation(); setShowIntensityInfo(!showIntensityInfo); }} className={`p-1 rounded-full hover:bg-black/10 dark:hover:bg-white/10 ${t.textMuted} hover:${t.textAccent} transition-colors`}>
-                    <Info size={14} />
-                  </button>
-                </div>
-                  <div className={`text-sm font-black px-3 py-1 rounded-md ${t.bgAccent} text-white`}>
-                  RPE {activeSetDetail.rpe !== '' ? activeSetDetail.rpe : 7} / RIR {activeSetDetail.rir !== '' ? activeSetDetail.rir : 3}
-                </div>
-              </div>
-              
-              {showIntensityInfo && (
-                  <div className="p-3 mb-3 rounded-lg bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 animate-in slide-in-from-top-1">
-                    <div className="text-xs sm:text-sm text-gray-500 space-y-2">
-                      <p>
-                        <strong>RPE (Perceived Exertion):</strong> Skala 1-10 seberapa berat usaha latihan dengan beban tersebut.
-                      </p>
-                      <ul className="list-disc pl-4 space-y-1">
-                        <li><strong>RPE 7-8:</strong> Ideal untuk sebagian besar latihan (sisa tenaga 2-3 repetisi).</li>
-                        <li><strong>RPE 9:</strong> Sangat berat, sisa tenaga 1 repetisi. Biasanya dipakai di set terakhir suatu gerakan.</li>
-                        <li><strong>RPE 10:</strong> Maksimal, gagal angkat (<i>failure</i>). Gunakan dengan bijak, biasanya hanya di repetisi paling terakhir dari sesi latihan.</li>
-                      </ul>
-                      <p className="opacity-80 italic mt-1">
-                        *Berbanding terbalik dengan RIR (Reps in Reserve) atau sisa repetisi sebelum gagal angkat. RIR 2 sama dengan RPE 8.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-              <input 
-                type="range" 
-                min="1" max="10" step="0.5"
-                value={activeSetDetail.rpe !== '' ? activeSetDetail.rpe : 7} 
-                onChange={e => {
-                  const rpe = Number(e.target.value);
-                  const rir = 10 - rpe;
-                  setActiveSetDetail({...activeSetDetail, rir, rpe});
-                }}
-                  className="w-full cursor-pointer mt-2 mb-2"
-                />
-              </div>
-
-              <div className="mb-5">
-                <label className="text-sm font-bold mb-2 block">Catatan Tambahan</label>
-                <div className="flex flex-wrap gap-2 mb-3">
-                {["Terlalu Ringan", "Cukup Menantang", "Berat Banget", "Gagal Angkat", "Form Rusak"].map(tag => (
-                  <button 
-                    key={tag} 
-                    onClick={(e) => {
-                      e.preventDefault();
-                      playSoundEffect('click', soundEnabled);
-                      const currentNotes = activeSetDetail.notes ? activeSetDetail.notes + (activeSetDetail.notes.endsWith(' ') ? '' : ', ') : '';
-                      if(!currentNotes.includes(tag)) {
-                        setActiveSetDetail({...activeSetDetail, notes: currentNotes + tag});
-                      }
-                    }}
-                      className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors`}
-                  >
-                    {tag}
-                  </button>
-                ))}
-              </div>
-              <textarea rows="3" placeholder="Bagaimana rasanya set ini?" value={activeSetDetail.notes} onChange={e => setActiveSetDetail({...activeSetDetail, notes: e.target.value})} className={`w-full p-3 rounded-xl ${t.inputBg} ${t.textMain} placeholder-black/30 dark:placeholder-white/30 body-lg resize-none outline-none focus:ring-1 focus:${t.ringAccent}`}></textarea>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-xl font-black">Catatan Set {logs[activeSetDetail.setIdx]?.type === 'warmup' ? 'Pemanasan' : (activeSetDetail.setIdx + 1)}</h3>
+              <button onClick={() => setActiveSetDetail(null)} className={`p-2 rounded-full bg-black/5 dark:bg-white/5 hover:bg-black/10 transition-colors`}>
+                <X size={20} />
+              </button>
             </div>
 
-              <div className="flex gap-3 mt-2">
-                <button onClick={() => setActiveSetDetail(null)} className={`flex-1 py-3 rounded-xl border border-dashed ${t.border} font-bold text-base hover:opacity-80`}>Batal</button>
-                <button onClick={() => handleSaveSetDetail(ex.id, activeSetDetail.setIdx, activeSetDetail)} className={`flex-[2] py-3 rounded-xl ${t.bgAccent} text-white font-black text-lg shadow-xl hover:opacity-90`}>Simpan</button>
+            <div className="flex gap-4">
+              {/* KIRI: Textarea & Tags */}
+              <div className="flex-1 flex flex-col gap-4">
+                
+                <div className="relative">
+                  <textarea 
+                    rows="3" 
+                    placeholder="Tulis catatan set ini (opsional)..." 
+                    value={activeSetDetail.notes} 
+                    onChange={e => setActiveSetDetail({...activeSetDetail, notes: e.target.value})} 
+                    className={`w-full p-4 pr-10 rounded-3xl bg-black/5 dark:bg-white/5 ${t.textMain} placeholder-black/30 dark:placeholder-white/30 text-base resize-none outline-none focus:ring-2 focus:${t.ringAccent}`}
+                  />
+                  {activeSetDetail.notes && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); playSoundEffect('click', soundEnabled); setActiveSetDetail({...activeSetDetail, notes: ''}); }}
+                      className={`absolute top-3 right-3 p-1.5 rounded-full bg-black/10 dark:bg-white/10 ${t.textMuted} hover:text-rose-500 hover:bg-rose-500/10 transition-colors`}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-2">
+                    {[
+                      { label: 'Terlalu Ringan', rpe: 4, rir: 6, color: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
+                      { label: 'Cukup Menantang', rpe: 7, rir: 3, color: 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20' },
+                      { label: 'Berat Banget', rpe: 9, rir: 1, color: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20' },
+                      { label: 'Gagal Angkat (Failure)', rpe: 10, rir: 0, color: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20' }
+                    ].map(tag => (
+                      <button
+                        key={tag.label}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          playSoundEffect('click', soundEnabled);
+                          setActiveSetDetail({
+                            ...activeSetDetail,
+                            notes: tag.label,
+                            rpe: tag.rpe,
+                            rir: tag.rir
+                          });
+                        }}
+                        className={`px-4 py-3 rounded-2xl text-sm font-bold border ${activeSetDetail.notes === tag.label ? tag.color + ' ring-2 ring-current' : 'bg-black/5 dark:bg-white/5 border-transparent hover:bg-black/10 dark:hover:bg-white/10'} text-left transition-all flex items-center justify-between`}
+                      >
+                        <span>{tag.label}</span>
+                        <span className="text-[10px] uppercase tracking-widest opacity-60">{rpeMode ? 'RPE ' + tag.rpe : 'RIR ' + tag.rir}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+              {/* KANAN: RPE Vertical Select */}
+              <div className="w-14 shrink-0 flex flex-col relative">
+                <div className="flex items-center justify-center gap-1 mb-3">
+                  <button onClick={() => {
+                    const newMode = !rpeMode;
+                    setRpeMode(newMode);
+                    localStorage.setItem('logym_rpe_mode', newMode);
+                  }} className="text-[10px] font-black tracking-widest uppercase text-zinc-500 hover:text-blue-500 flex items-center gap-0.5 transition-colors">
+                    {rpeMode ? 'RPE' : 'RIR'} <ArrowLeftRight size={10} />
+                  </button>
+                  <button onClick={() => setShowIntensityInfo(!showIntensityInfo)} className="text-zinc-400 hover:text-blue-500 transition-colors"><Info size={12} /></button>
+                </div>
+
+                {/* POPUP INFO */}
+                {showIntensityInfo && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setShowIntensityInfo(false); }} />
+                    <div className="absolute bottom-full right-0 mb-4 w-64 p-4 rounded-3xl bg-white/95 dark:bg-[#121a2f]/95 backdrop-blur-2xl shadow-2xl border border-black/10 dark:border-white/10 animate-in slide-in-from-bottom-2 z-50 pointer-events-none">
+                      <div className="text-xs text-zinc-600 dark:text-zinc-300 space-y-2">
+                        {rpeMode ? (
+                          <>
+                            <p><strong>RPE (Perceived Exertion):</strong> Skala 1-10 seberapa berat usaha latihan.</p>
+                            <ul className="list-disc pl-4 space-y-1">
+                              <li><strong>RPE 7-8:</strong> Ideal (sisa tenaga 2-3 rep).</li>
+                              <li><strong>RPE 9:</strong> Sangat berat (sisa tenaga 1 rep).</li>
+                              <li><strong>RPE 10:</strong> Maksimal / gagal angkat.</li>
+                            </ul>
+                          </>
+                        ) : (
+                          <>
+                            <p><strong>RIR (Reps in Reserve):</strong> Estimasi sisa tenaga / sisa repetisi sebelum gagal angkat.</p>
+                            <ul className="list-disc pl-4 space-y-1">
+                              <li><strong>RIR 2-3:</strong> Ideal (setara RPE 7-8).</li>
+                              <li><strong>RIR 1:</strong> Sangat berat (setara RPE 9).</li>
+                              <li><strong>RIR 0:</strong> Maksimal / gagal angkat.</li>
+                            </ul>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                <div className="flex-1 bg-black/10 dark:bg-white/10 rounded-[2rem] p-1 flex flex-col justify-between shadow-inner">
+                   {(rpeMode ? [10, 9, 8, 7, 6, 5, 4, 3, 2, 1] : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]).map((val) => {
+                      const isSelected = rpeMode ? activeSetDetail.rpe === val : activeSetDetail.rir === val;
+                      return (
+                        <button 
+                          key={val}
+                          onClick={() => {
+                            playSoundEffect('click', soundEnabled);
+                            const rpe = rpeMode ? val : 10 - val;
+                            const rir = rpeMode ? 10 - val : val;
+                            
+                            let notes = activeSetDetail.notes;
+                            const allTemplates = ['Terlalu Ringan', 'Cukup Menantang', 'Berat Banget', 'Gagal Angkat (Failure)'];
+                            if (!notes || allTemplates.includes(notes)) {
+                              if (rpe <= 4) notes = 'Terlalu Ringan';
+                              else if (rpe <= 7) notes = 'Cukup Menantang';
+                              else if (rpe <= 9) notes = 'Berat Banget';
+                              else notes = 'Gagal Angkat (Failure)';
+                            }
+
+                            setActiveSetDetail({...activeSetDetail, rpe, rir, notes});
+                          }}
+                          className={`flex-1 min-h-[26px] flex items-center justify-center rounded-full text-xs font-bold transition-all ${isSelected ? t.bgAccent + ' text-white shadow-md scale-110' : 'text-zinc-500 hover:bg-black/10 dark:hover:bg-white/10'} `}
+                        >
+                          {val}
+                        </button>
+                      )
+                   })}
+                </div>
               </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button 
+                onClick={() => {
+                   playSoundEffect('click', soundEnabled);
+                   const emptyDetail = { setIdx: activeSetDetail.setIdx, notes: '', rpe: '', rir: '' };
+                   handleSaveSetDetail(ex.id, activeSetDetail.setIdx, emptyDetail);
+                }} 
+                className={`flex-1 py-4 rounded-2xl border-2 border-rose-500/20 text-rose-500 font-bold text-base hover:bg-rose-500/10 transition-colors bg-rose-500/5`}
+              >
+                Hapus Data
+              </button>
+              <button 
+                onClick={() => handleSaveSetDetail(ex.id, activeSetDetail.setIdx, activeSetDetail)} 
+                className={`flex-[1.5] py-4 rounded-2xl ${t.bgAccent} text-white font-black text-lg shadow-xl shadow-blue-500/20 hover:scale-[1.02] transition-transform`}
+              >
+                Simpan
+              </button>
+            </div>
+
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
     </div>
