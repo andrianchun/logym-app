@@ -2,16 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { Target, Activity, Calendar, Dumbbell, Clock, ChevronRight, ChevronLeft, Sparkles, X, CheckCircle2, User, Ruler, Smartphone, Heart, Check } from 'lucide-react';
 import { PROGRAM_PLANS } from '../data/programTemplates';
 import { playSoundEffect } from '../utils/audio';
-import { AI_MODELS, getAvailableModels, getProviderStatus, buildSystemPrompt, chatWithAI, generateDeterministicProgram } from '../utils/aiAgent';
+import { checkOverallAIStatus, buildSystemPrompt, chatWithAI, generateDeterministicProgram } from '../utils/aiAgent';
 import ScrollPicker from '../components/ScrollPicker';
 import useDialog from '../hooks/useDialog';
 import GymManagerModal from '../components/GymManagerModal';
 import { getPlanBgConfig } from '../utils/planBg';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from '../utils/bmr';
 
-const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, soundEnabled, gymProfiles, setGymProfiles, activeGymId, setActiveGymId, exerciseLibrary, units, user, userProfile, userApiKeys, aiProvider, aiModel, keyStatuses, setKeyStatuses, setAiProvider, setAiModel, setShowSettings }) => {
+const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, soundEnabled, gymProfiles, setGymProfiles, activeGymId, setActiveGymId, exerciseLibrary, units, user, userProfile, userApiKeys, keyStatuses, setKeyStatuses, setShowSettings }) => {
   const [step, setStep] = useState(0);
-  const [useAI, setUseAI] = useState(false);
+  const [connectedHealthApps, setConnectedHealthApps] = useState([]);
+  const aiStatus = checkOverallAIStatus(userApiKeys, keyStatuses);
+  const isAiReady = aiStatus === 'ready';
   
   const isValidAge = (dob) => {
       if (!dob) return false;
@@ -101,7 +103,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
   };
 
   const isDark = t.bgCard !== 'bg-white';
-  const { dialog, showConfirm } = useDialog(isDark, t.bgCard);
+  const { dialog, showConfirm, showAlert } = useDialog(isDark, t.bgCard);
   const isImp = units?.weight === 'lbs';
   const isImpHeight = units?.height === 'ft';
 
@@ -109,7 +111,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
   useEffect(() => {
     if (isOpen) {
       setStep(0);
-      setUseAI(false);
+      setConnectedHealthApps([]);
       setAnswers({ 
           name: userProfile?.name || user?.name?.split(' ')[0] || '', 
           gender: userProfile?.gender || null, 
@@ -150,9 +152,12 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
 
   if (!isOpen) return null;
 
-  const handleHealthSync = (provider) => {
+  const handleHealthSync = async (provider) => {
+      playSoundEffect('click', soundEnabled);
       // Mock Native Sync for PWA
-      alert(`Berhasil sinkronisasi dengan ${provider}! (Data simulasi). Pada versi Native/App Store, ini akan menarik data kalori harian, langkah, rekam medis, dll secara otomatis.`);
+      await showAlert(`Berhasil sinkronisasi dengan ${provider}! (Data simulasi). Pada versi Native/App Store, ini akan menarik data kalori harian, langkah, rekam medis, dll secara otomatis.`, { title: 'Tersinkronisasi', type: 'success' });
+      
+      setConnectedHealthApps(prev => prev.includes(provider) ? prev : [...prev, provider]);
       
       setAnswers(prev => ({
           ...prev,
@@ -162,9 +167,6 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
           gender: 'male',
           name: prev.name || 'Raiga'
       }));
-      
-      playSoundEffect('click', soundEnabled);
-      setStep(step + 1);
   };
 
   const handleNext = (key, value) => {
@@ -198,42 +200,8 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
     const targetGymProfileId = (finalAnswers.equipment && finalAnswers.equipment !== 'ADD_NEW_GYM') ? finalAnswers.equipment : activeGymId;
     const targetGym = gymProfiles.find(g => g.id === targetGymProfileId) || gymProfiles[0];
 
-    // HYBRID ARCHITECTURE: Try the Deterministic Engine first!
-    const deterministicPlan = generateDeterministicProgram(finalAnswers, userProfile, exerciseLibrary, PROGRAM_PLANS, targetGym);
-    
-    if (deterministicPlan) {
-        // Success! We don't need to call the expensive LLM.
-        setTimeout(() => {
-            setRecommendedPlan({
-                ...deterministicPlan,
-                // If they checked useAI, we give it the AI branding to maintain the illusion of magic
-                name: useAI ? `${deterministicPlan.name}` : deterministicPlan.name,
-                description: useAI ? `Program ini dirancang khusus oleh AI berdasarkan profil dan ${finalAnswers.injuries?.length ? 'riwayat cedera' : 'tujuan'} Anda.` : deterministicPlan.description
-            });
-            setIsGenerating(false);
-            setStep(10);
-        }, 1500); // Fake loading to feel like AI processing
-        return;
-    }
-
-    // IF DETERMINISTIC FAILED (e.g., constraints too tight)
-    if (!useAI) {
-        alert("Maaf, profil gym Anda terlalu terbatas atau kombinasi cedera terlalu kompleks untuk algoritma standar. Harap nyalakan mode AI agar pelatih virtual dapat meracik program khusus dari nol.");
-        setIsGenerating(false);
-        setStep(10); // Or back to step 0? Let's just fail gracefully
-        return;
-    }
-
-    // FALLBACK TO ACTUAL LLM API
-    const currentProvider = AI_MODELS.find(m => m.id === aiModel)?.provider || aiProvider;
-    const status = getProviderStatus(currentProvider, userApiKeys, keyStatuses);
-
-    if (status === 'missing' || status === 'exhausted') {
-        alert(`API Key untuk ${currentProvider} ${status === 'missing' ? 'tidak ditemukan' : 'telah mencapai limit'}. Silakan perbarui di menu Pengaturan (Settings).`);
-        if (setShowSettings) setShowSettings('lanjutan');
-        setIsGenerating(false);
-        return;
-    }
+    // Kita tidak langsung pakai algoritma standar di awal agar selalu memberi AI kesempatan
+    // (karena ada fallback ke backend proxy). Jika backend juga gagal, kita tangkap di catch block.
     
     try {
       const exLibStr = exerciseLibrary.map(ex => ex.name).join(', ');
@@ -317,6 +285,20 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
       setStep(10);
     } catch (e) {
       console.error(e);
+      if (e.message.includes('quota') || e.message.includes('RATE_LIMIT') || e.message.includes('Semua jalur AI gagal') || e.message.includes('terlalu banyak permintaan')) {
+          const deterministicPlan = generateDeterministicProgram(finalAnswers, userProfile, exerciseLibrary, PROGRAM_PLANS, targetGym);
+          if (deterministicPlan) {
+              await showConfirm('Server AI penuh/limit. Kami telah membuatkan program menggunakan algoritma standar sebagai gantinya.', { title: 'AI Sibuk', hideCancel: true });
+              setRecommendedPlan({
+                 ...deterministicPlan,
+                 name: deterministicPlan.name,
+                 description: deterministicPlan.description
+              });
+              setStep(10);
+              setIsGenerating(false);
+              return;
+          }
+      }
       await showConfirm(e.message || 'Terjadi kesalahan saat membuat program. Coba lagi?', { title: 'Gagal' });
       setStep(8);
       setIsGenerating(false);
@@ -601,18 +583,24 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
                 // CUSTOM SYNC SELECTOR
                 <div className="flex-1 flex flex-col pb-2 space-y-4 mt-4 overflow-y-auto hide-scrollbar">
                   <div>
-                     <label className={`flex items-center justify-between p-4 rounded-2xl border-2 cursor-pointer transition-all ${useAI ? (isDark ? 'border-sky-500/50 bg-sky-500/10' : 'border-sky-500 bg-sky-50') : (isDark ? 'border-white/10 bg-white/5' : 'border-black/5 bg-white')}`}>
-                        <div>
-                           <div className={`font-black text-base ${!isDark ? 'text-black' : t.textMain} flex items-center gap-2`}>
-                               Gunakan AI <Sparkles size={16} className={useAI ? "text-sky-500" : "text-neutral-500"} />
-                           </div>
-                           <p className={`text-xs mt-1 ${!isDark ? 'text-black/60' : 'text-white/60'}`}>Rencanakan program individual yang dinamis</p>
+                     <div className={`flex flex-col p-4 rounded-2xl border-2 transition-all ${isAiReady ? (isDark ? 'border-sky-500/50 bg-sky-500/10' : 'border-sky-500 bg-sky-50') : (isDark ? 'border-rose-500/50 bg-rose-500/10' : 'border-rose-500 bg-rose-50')}`}>
+                        <div className={`font-black text-base ${!isDark ? 'text-black' : t.textMain} mb-1`}>
+                            {isAiReady ? 'AI Siap Digunakan!' : 'Server AI Sedang Penuh'}
                         </div>
-                        <div className={`w-12 h-7 shrink-0 rounded-full flex items-center px-1 transition-colors ${useAI ? 'bg-sky-500' : 'bg-neutral-500/30'}`}>
-                           <div className={`w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${useAI ? 'translate-x-5' : 'translate-x-0'}`}></div>
-                        </div>
-                        <input type="checkbox" className="hidden" checked={useAI} onChange={() => setUseAI(!useAI)} />
-                     </label>
+                        <p className={`text-xs ${!isDark ? 'text-black/60' : 'text-white/60'} leading-relaxed`}>
+                            {isAiReady 
+                                ? 'Program latihan Anda akan dirancang secara cerdas dan spesifik oleh AI.' 
+                                : 'Aplikasi akan menggunakan algoritma standar. Jika Anda tetap ingin menggunakan AI, silakan gunakan API pribadi.'}
+                        </p>
+                        {!isAiReady && (
+                            <button 
+                                onClick={() => { if (setShowSettings) setShowSettings('lanjutan'); }} 
+                                className={`mt-3 py-2 px-4 text-xs font-bold rounded-lg text-white ${t.bgAccent} active:scale-95 transition-all w-max`}
+                            >
+                                Buka Pengaturan API
+                            </button>
+                        )}
+                     </div>
                   </div>
 
                   <div className="pt-2 border-t border-neutral-500/20">
@@ -621,21 +609,25 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
                         <button
                           onClick={() => handleHealthSync('Health Connect')}
                           className={`p-3 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all duration-200 active:scale-95 ${
-                              isDark ? 'border-white/10 bg-white/5 hover:bg-white/10' : 'border-black/5 bg-white hover:bg-black/5 shadow-sm'
+                              connectedHealthApps.includes('Health Connect')
+                                  ? 'border-sky-500 bg-sky-500/10 shadow-[0_0_15px_rgba(14,165,233,0.3)]'
+                                  : isDark ? 'border-white/10 bg-white/5 hover:bg-white/10' : 'border-black/5 bg-white hover:bg-black/5 shadow-sm'
                           }`}
                         >
                           <img src="/health-connect.webp" alt="Health Connect" className="w-8 h-8 shrink-0 rounded-[22%] object-cover" />
-                          <span className={`font-black text-xs ${!isDark ? 'text-black' : t.textMain}`}>Health Connect</span>
+                          <span className={`font-black text-xs ${connectedHealthApps.includes('Health Connect') ? 'text-sky-500' : (!isDark ? 'text-black' : t.textMain)}`}>Health Connect</span>
                         </button>
 
                         <button
                           onClick={() => handleHealthSync('Apple Health')}
                           className={`p-3 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all duration-200 active:scale-95 ${
-                              isDark ? 'border-white/10 bg-white/5 hover:bg-white/10' : 'border-black/5 bg-white hover:bg-black/5 shadow-sm'
+                              connectedHealthApps.includes('Apple Health')
+                                  ? 'border-sky-500 bg-sky-500/10 shadow-[0_0_15px_rgba(14,165,233,0.3)]'
+                                  : isDark ? 'border-white/10 bg-white/5 hover:bg-white/10' : 'border-black/5 bg-white hover:bg-black/5 shadow-sm'
                           }`}
                         >
                           <img src="/apple-health.webp" alt="Apple Health" className="w-8 h-8 shrink-0" />
-                          <span className={`font-black text-xs ${!isDark ? 'text-black' : t.textMain}`}>Apple Health</span>
+                          <span className={`font-black text-xs ${connectedHealthApps.includes('Apple Health') ? 'text-sky-500' : (!isDark ? 'text-black' : t.textMain)}`}>Apple Health</span>
                         </button>
                      </div>
                   </div>
@@ -925,7 +917,7 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
               </div>
               <h2 className={`text-2xl font-black ${t.textMain} mt-8 mb-2`}>Menganalisa Jadwal...</h2>
               <p className={`text-sm ${t.textMuted} text-center max-w-xs`}>
-                {useAI ? `AI sedang menyusun rutinitas ${answers.days.length} hari terbaik untuk profil kamu.` : `Sistem sedang memuat program ${answers.days.length} hari terbaik untuk profil kamu.`}
+                {isAiReady ? `AI sedang menyusun rutinitas ${answers.days.length} hari terbaik untuk profil kamu.` : `Sistem sedang memuat program ${answers.days.length} hari terbaik untuk profil kamu.`}
               </p>
             </div>
           )}

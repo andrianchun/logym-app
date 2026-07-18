@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { doc, setDoc, deleteDoc, getDocs, collection } from 'firebase/firestore';
 import { Send, X, Check, Loader2, Dumbbell, Menu, Plus, MessageSquare, Trash2, Bookmark, ChevronDown } from 'lucide-react';
-import { buildSystemPrompt, summarizeWorkoutLogs, summarizeBiometrics, summarizeActivePrograms, summarizeFavoriteProgram, needsPersonalContext, needsAppHelpContext, APP_HELP_REFERENCE, chatWithAI, AI_MODELS, getAvailableModels, getProviderStatus } from '../utils/aiAgent';
+import { buildSystemPrompt, summarizeWorkoutLogs, summarizeBiometrics, summarizeActivePrograms, summarizeFavoriteProgram, needsPersonalContext, needsAppHelpContext, APP_HELP_REFERENCE, chatWithAI, AI_MODELS, getAvailableModels, getProviderStatus, checkOverallAIStatus } from '../utils/aiAgent';
 import renderMiniMarkdown from '../utils/miniMarkdown';
 import { db } from '../firebase';
 
@@ -22,8 +22,6 @@ export default function GymAIChat({
     isOpen,
     onClose,
     userApiKeys,
-    aiProvider,
-    aiModel,
     userProfile,
     history,
     exerciseLibrary,
@@ -39,8 +37,6 @@ export default function GymAIChat({
     user,
     keyStatuses,
     setKeyStatuses,
-    setAiProvider,
-    setAiModel,
     setShowSettings,
     setConfirmModal,
     avatarOrigin = null,  // { x, y } posisi tengah avatar di layar
@@ -67,11 +63,14 @@ export default function GymAIChat({
     useEffect(() => {
         clearTimeout(phaseTimer.current);
         if (isOpen) {
-            setPhase('opening');                                    // mount dulu (scale=0)
-            phaseTimer.current = setTimeout(() => setPhase('open'), 20); // beri 1 frame lalu animate ke scale(1)
+            setPhase('opening');
+            phaseTimer.current = setTimeout(() => {
+                setPhase('open');
+                setTimeout(() => scrollToBottom('auto'), 50);
+            }, 20);
         } else {
-            setPhase('closing');                                    // animate ke scale(0)
-            phaseTimer.current = setTimeout(() => setPhase('closed'), 360); // unmount setelah animasi selesai
+            setPhase('closing');
+            phaseTimer.current = setTimeout(() => setPhase('closed'), 360);
         }
         return () => clearTimeout(phaseTimer.current);
     }, [isOpen]);
@@ -241,11 +240,11 @@ export default function GymAIChat({
     const prevIsOpenRef = useRef(false);
     useEffect(() => {
         if (isOpen && !prevIsOpenRef.current) {
-            const raigaSession = sessions.find(s => s.origin === 'raiga');
-            if (raigaSession?.unread) {
-                setActiveSessionId(raigaSession.id);
-                setMessages(raigaSession.messages);
-                setSessions(prev => prev.map(s => s.id === raigaSession.id ? { ...s, unread: false } : s));
+            const unreadSession = sessions.find(s => s.unread);
+            if (unreadSession) {
+                setActiveSessionId(unreadSession.id);
+                setMessages(unreadSession.messages);
+                setSessions(prev => prev.map(s => s.id === unreadSession.id ? { ...s, unread: false } : s));
                 setIsSidebarOpen(false);
             }
         }
@@ -301,31 +300,23 @@ export default function GymAIChat({
         }
     };
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const scrollToBottom = (behavior = 'smooth') => {
+        messagesEndRef.current?.scrollIntoView({ behavior });
     };
 
+    const isFirstScroll = useRef(true);
     useEffect(() => {
-        scrollToBottom();
+        if (isFirstScroll.current) {
+            isFirstScroll.current = false;
+            return;
+        }
+        scrollToBottom('smooth');
     }, [messages, isLoading]);
 
     const handleSend = async () => {
         if (!input.trim() || isLoading) return;
 
-        const currentProvider = AI_MODELS.find(m => m.id === aiModel)?.provider || aiProvider;
-        const status = getProviderStatus(currentProvider, userApiKeys, keyStatuses);
-
-        if (status === 'missing' || status === 'exhausted') {
-            const warningMsg = {
-                role: 'model',
-                content: `API Key untuk **${currentProvider}** ${status === 'missing' ? 'tidak ditemukan' : 'telah mencapai limit/habis'}. Silakan perbarui di Pengaturan.`,
-                isSystemWarning: true,
-                timestamp: Date.now()
-            };
-            setMessages(prev => [...prev, { role: 'user', content: input, timestamp: Date.now() }, warningMsg]);
-            setInput('');
-            return;
-        }
+        // Preemptive check dihapus agar selalu mencoba backend proxy
 
         const userMsg = { role: 'user', content: input.trim(), timestamp: Date.now() };
 
@@ -388,7 +379,7 @@ export default function GymAIChat({
             const isStillViewing = () => isOpenRef.current && activeSessionIdRef.current === currentSessionId;
 
             let streamedText = '';
-            const reply = await chatWithAI(apiMessages, currentProvider, aiModel, userApiKeys, setKeyStatuses, (chunk) => {
+            const reply = await chatWithAI(apiMessages, userApiKeys, setKeyStatuses, (chunk) => {
                 streamedText += chunk;
                 if (isStillViewing()) {
                     setMessages(prev => prev.map(m => m.id === tempId ? { ...m, content: streamedText } : m));
@@ -405,7 +396,11 @@ export default function GymAIChat({
             console.error(err);
             if (isOpenRef.current && activeSessionIdRef.current === currentSessionId) {
                 // Drop the empty thinking placeholder instead of leaving it dangling next to the error bubble
-                setMessages(prev => [...prev.filter(m => m.id !== tempId), { role: 'model', content: `Error: ${err.message}`, timestamp: Date.now(), isError: true }]);
+                let errorMsg = `Error: ${err.message}`;
+                if (err.message.includes('quota') || err.message.includes('RATE_LIMIT') || err.message.includes('Semua jalur AI gagal')) {
+                    errorMsg = `Server AI sedang sibuk/penuh, dan API Key pribadi Anda juga telah mencapai limit. Silakan perbarui di Pengaturan.`;
+                }
+                setMessages(prev => [...prev.filter(m => m.id !== tempId), { role: 'model', content: errorMsg, timestamp: Date.now(), isError: true }]);
             }
         } finally {
             setIsLoading(false);

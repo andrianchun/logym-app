@@ -18,7 +18,7 @@ export default function SettingsModal({
   setConfirmModal,
   biometricStandard, setBiometricStandard,
   units, setUnits,
-  userApiKeys, setUserApiKeys, aiProvider, setAiProvider, aiModel, setAiModel,
+  userApiKeys, setUserApiKeys,
   raigaPersona, setRaigaPersona, raigaCustomInstruction, setRaigaCustomInstruction,
   raigaMemory, setRaigaMemory,
   connectedApps, setConnectedApps

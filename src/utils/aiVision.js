@@ -4,13 +4,18 @@ import { functions } from '../firebase';
 // Shared API keys sekarang hidup di backend (functions/.env), bukan di bundle client.
 // Alur: key pribadi user dipanggil langsung dari browser; tanpa key -> proxy Cloud Functions.
 
-export async function extractBiometricsFromImage(base64Image, mimeType, userApiKeys = [], aiProvider = 'google', aiModel = 'gemini-3.5-flash', setKeyStatuses = null) {
+export async function extractBiometricsFromImage(base64Image, mimeType, userApiKeys = [], setKeyStatuses = null) {
     const keys = Array.isArray(userApiKeys) ? userApiKeys : [userApiKeys];
-    const validKeys = keys.filter(k => k && typeof k === 'string' && k.trim() !== '');
+    
+    const envKeys = [
+        import.meta.env.VITE_GEMINI_API_KEY,
+        import.meta.env.VITE_OPENAI_API_KEY,
+        import.meta.env.VITE_ANTHROPIC_API_KEY
+    ].filter(k => k && typeof k === 'string' && k.trim() !== '');
 
-    let providerKeys = [];
-    if (aiProvider === 'google') providerKeys = validKeys.filter(k => !k.trim().startsWith('sk-'));
-    else if (aiProvider === 'openai') providerKeys = validKeys.filter(k => k.trim().startsWith('sk-') && !k.trim().startsWith('sk-ant'));
+    const validKeys = [...keys, ...envKeys].filter(k => k && typeof k === 'string' && k.trim() !== '');
+    
+    const providers = ['google', 'openai', 'anthropic'];
 
     const prompt = `You are a highly advanced medical and fitness data extractor. Analyze the provided image, which may be a screenshot of a health app, a smart scale app (like Zepp Life, Mi Fit, Garmin, Huawei Health, Renpho), a smartwatch screen, or a medical document.
 Extract all numerical biometric data and fitness metrics you can find.
@@ -47,11 +52,17 @@ For sleep, use "Hh Mm" format (e.g., "7h 30m").
   "bloodPressure": string
 }`;
 
-    if (providerKeys.length > 0) {
+    if (validKeys.length > 0) {
         let lastError = null;
 
-        for (let i = 0; i < providerKeys.length; i++) {
-            const key = providerKeys[i].trim();
+        for (let i = 0; i < validKeys.length; i++) {
+            const key = validKeys[i].trim();
+            let aiProvider = 'google';
+            if (key.startsWith('sk-ant')) aiProvider = 'anthropic';
+            else if (key.startsWith('sk-')) aiProvider = 'openai';
+
+            if (!providers.includes(aiProvider)) continue;
+
             try {
                 let res = null;
                 let rawText = '';
@@ -67,7 +78,7 @@ For sleep, use "Hh Mm" format (e.g., "7h 30m").
                         }]
                     };
                     const googleModels = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-flash-lite-latest'];
-                    const preferredModel = googleModels.includes(aiModel) ? aiModel : 'gemini-3.5-flash';
+                    const preferredModel = 'gemini-3.5-flash';
                     const modelFallbackChain = [preferredModel, ...googleModels.filter(m => m !== preferredModel)];
 
                     let visionResult = null;
@@ -93,8 +104,7 @@ For sleep, use "Hh Mm" format (e.g., "7h 30m").
                     if (!visionResult) throw new Error('All Gemini models failed for this key.');
                     res = visionResult;
                 } else if (aiProvider === 'openai') {
-                    const validModels = ['gpt-4o-mini', 'gpt-4o', 'gpt-4', 'gpt-3.5-turbo'];
-                    const model = validModels.includes(aiModel) ? aiModel : 'gpt-4o-mini';
+                    const model = 'gpt-4o-mini';
                     const payload = {
                         model: model,
                         messages: [
@@ -114,8 +124,7 @@ For sleep, use "Hh Mm" format (e.g., "7h 30m").
                         body: JSON.stringify(payload)
                     });
                 } else if (aiProvider === 'anthropic') {
-                    const validModels = ['claude-opus-4-5', 'claude-sonnet-4-5', 'claude-haiku-4-5'];
-                    const model = validModels.includes(aiModel) ? aiModel : 'claude-haiku-4-5';
+                    const model = 'claude-haiku-4-5';
                     const payload = {
                         model: model,
                         max_tokens: 1024,
@@ -138,7 +147,8 @@ For sleep, use "Hh Mm" format (e.g., "7h 30m").
 
                 if (!res || !res.ok) {
                     if (res && !rawText) rawText = await res.text();
-                    throw new Error(errorMsg + " " + rawText.substring(0, 50));
+                    const statusStr = res ? ` (${res.status})` : '';
+                    throw new Error(`API Error${statusStr}: ${rawText.substring(0, 80)}`);
                 }
 
                 const data = await res.json();
@@ -151,7 +161,7 @@ For sleep, use "Hh Mm" format (e.g., "7h 30m").
                 return JSON.parse(extractedText);
 
             } catch (err) {
-                console.error(`AI Vision Error (Key ${i + 1}/${providerKeys.length}):`, err);
+                console.error(`AI Vision Error (Key ${i + 1}/${validKeys.length}):`, err);
                 lastError = err;
                 
                 const errMsg = err.message || '';
@@ -180,9 +190,7 @@ For sleep, use "Hh Mm" format (e.g., "7h 30m").
         const res = await call({
             imageBase64: base64Image,
             mimeType: mimeType || 'image/jpeg',
-            prompt,
-            provider: aiProvider,
-            model: aiModel
+            prompt
         });
         let extractedText = res.data?.text || '{}';
         extractedText = extractedText.replace(/```json\n?/gi, '').replace(/```\n?/g, '').trim();

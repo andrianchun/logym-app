@@ -654,15 +654,46 @@ export const summarizeWorkoutLogs = (historyObj, exerciseLibrary = [], programs 
     return summary;
 };
 
-export async function chatWithAI(messages, aiProvider = 'google', aiModel = 'gemini-3.5-flash', userApiKeys = [], setKeyStatuses = null, onChunk = null) {
+export const checkOverallAIStatus = (userApiKeys, keyStatuses) => {
+    // If no keys, we rely on backend proxy which is assumed 'ready' unless it repeatedly fails (not tracked in keyStatuses right now).
     const keys = Array.isArray(userApiKeys) ? userApiKeys : [userApiKeys];
-    const validKeys = keys.filter(k => k && typeof k === 'string' && k.trim() !== '');
-    const providerKeys = validKeys.filter(k => detectKeyProvider(k) === aiProvider);
+    
+    // Inject local environment variables if available
+    const envKeys = [
+        import.meta.env.VITE_GEMINI_API_KEY,
+        import.meta.env.VITE_OPENAI_API_KEY,
+        import.meta.env.VITE_ANTHROPIC_API_KEY
+    ].filter(k => k && typeof k === 'string' && k.trim() !== '');
+    
+    const validKeys = [...keys, ...envKeys].filter(k => k && typeof k === 'string' && k.trim() !== '');
+    if (validKeys.length === 0) return 'ready'; // backend fallback
 
+    // Kita tidak memblokir UI di awal (karena ada fallback backend proxy).
+    // Biarkan aplikasi mencoba memanggil AI. Jika backend juga limit/mati, exception akan dilempar
+    // dan ditangkap dengan anggun oleh masing-masing UI (try-catch).
+    return 'ready';
+};
+
+export async function chatWithAI(messages, userApiKeys = [], setKeyStatuses = null, onChunk = null) {
+    const keys = Array.isArray(userApiKeys) ? userApiKeys : [userApiKeys];
+    
+    // Inject local environment variables if available
+    const envKeys = [
+        import.meta.env.VITE_GEMINI_API_KEY,
+        import.meta.env.VITE_OPENAI_API_KEY,
+        import.meta.env.VITE_ANTHROPIC_API_KEY
+    ].filter(k => k && typeof k === 'string' && k.trim() !== '');
+
+    const validKeys = [...keys, ...envKeys].filter(k => k && typeof k === 'string' && k.trim() !== '');
+    
+    const providers = ['google', 'openai', 'anthropic'];
     let lastError = null;
 
-    for (let i = 0; i < providerKeys.length; i++) {
-        const key = providerKeys[i].trim();
+    // Try each valid key in order
+    for (let i = 0; i < validKeys.length; i++) {
+        const key = validKeys[i].trim();
+        const aiProvider = detectKeyProvider(key);
+        if (!aiProvider || !providers.includes(aiProvider)) continue;
 
         try {
             if (aiProvider === 'google') {
@@ -678,7 +709,7 @@ export async function chatWithAI(messages, aiProvider = 'google', aiModel = 'gem
                 };
 
                 const googleModels = AI_MODELS.filter(m => m.provider === 'google').map(m => m.id);
-                const preferredModel = googleModels.includes(aiModel) ? aiModel : 'gemini-3.5-flash';
+                const preferredModel = 'gemini-3.5-flash';
                 const modelFallbackChain = [preferredModel, ...googleModels.filter(m => m !== preferredModel)];
                 for (let mIdx = 0; mIdx < modelFallbackChain.length; mIdx++) {
                     const model = modelFallbackChain[mIdx];
@@ -732,7 +763,7 @@ export async function chatWithAI(messages, aiProvider = 'google', aiModel = 'gem
             }
             else if (aiProvider === 'openai') {
                 const openaiModels = AI_MODELS.filter(m => m.provider === 'openai').map(m => m.id);
-                const model = openaiModels.includes(aiModel) ? aiModel : 'gpt-4o-mini';
+                const model = 'gpt-4o-mini';
 
                 // Stored AI replies use role 'model' (Gemini convention); OpenAI only accepts 'assistant'
                 const normalizedMessages = messages.map(m => ({
@@ -788,7 +819,7 @@ export async function chatWithAI(messages, aiProvider = 'google', aiModel = 'gem
             }
             else if (aiProvider === 'anthropic') {
                 const anthropicModels = AI_MODELS.filter(m => m.provider === 'anthropic').map(m => m.id);
-                const model = anthropicModels.includes(aiModel) ? aiModel : 'claude-sonnet-4-5';
+                const model = 'claude-sonnet-4-5';
 
                 const systemPrompt = messages.find(m => m.role === 'system')?.content || '';
                 const history = messages.filter(m => m.role !== 'system').map(m => ({
@@ -846,7 +877,7 @@ export async function chatWithAI(messages, aiProvider = 'google', aiModel = 'gem
                 }
             }
         } catch (err) {
-            console.error(`AI Chat Error (Key ${i + 1}/${providerKeys.length}):`, err);
+            console.error(`AI Chat Error (Key ${i + 1}/${validKeys.length}):`, err);
             lastError = err;
             
             const errMsg = err.message || '';
@@ -868,11 +899,11 @@ export async function chatWithAI(messages, aiProvider = 'google', aiModel = 'gem
     // Tanpa key pribadi, atau semua key pribadi gagal: pakai backend proxy (shared keys di server)
     try {
         const call = httpsCallable(functions, 'aiChat', { timeout: 120000 });
-        const res = await call({ messages, provider: aiProvider, model: aiModel });
+        const res = await call({ messages });
         return res.data?.text || '';
     } catch (backendErr) {
         console.error('AI backend proxy error:', backendErr);
-        throw new Error(backendErr.message || (lastError ? lastError.message : `Semua jalur AI untuk ${aiProvider} gagal. Coba lagi nanti.`));
+        throw new Error(backendErr.message || (lastError ? lastError.message : `Semua jalur AI gagal. Coba lagi nanti.`));
     }
 }
 

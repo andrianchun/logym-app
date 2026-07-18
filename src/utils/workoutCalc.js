@@ -76,9 +76,21 @@ export const calculateSmartWorkoutCalories = (weightKg, workout, logs, globalRes
       // HANYA hitung kalori jika set benar-benar dicentang selesai
       if (set.done) {
         if (ex.type === 'time') {
-          // KARDIO (Waktu): Durasi penuh * MET 7.0 (Jogging ringan/sedang)
+          // KARDIO (Waktu): Durasi penuh * MET 7.0 (Jogging ringan/sedang) atau dinamis berdasar jarak
           const setDurMins = Number(set.d || ex.duration || 0);
-          totalCalories += weight * 7.0 * (setDurMins / 60);
+          const distKm = Number(set.dist || 0);
+          let met = 7.0;
+          if (distKm > 0 && setDurMins > 0) {
+              const speedKmH = distKm / (setDurMins / 60);
+              // Estimasi MET lari/jogging berdasar kecepatan (contoh sederhana)
+              if (speedKmH <= 4) met = 3.5;
+              else if (speedKmH <= 6) met = 5.0;
+              else if (speedKmH <= 8) met = 8.0;
+              else if (speedKmH <= 10) met = 9.8;
+              else if (speedKmH <= 12) met = 11.5;
+              else met = 12.0;
+          }
+          totalCalories += weight * met * (setDurMins / 60);
         } else {
           // BEBAN (Reps): Asumsi repetisi makan waktu rata-rata 4 detik per rep (TUT)
           const reps = Number(set.r || ex.reps || 10);
@@ -133,8 +145,19 @@ export const calculateLiveWorkoutCalories = (weightKg, exercises, logs, currentD
         if (set.done) {
           if (ex.type === 'time') {
             const setDurMins = Number(set.d || ex.duration || 0);
-            // Tambahan MET 4.5 (total 7.0 - 2.5 baseline)
-            extraCalories += weight * 4.5 * (setDurMins / 60);
+            const distKm = Number(set.dist || 0);
+            let met = 7.0;
+            if (distKm > 0 && setDurMins > 0) {
+                const speedKmH = distKm / (setDurMins / 60);
+                if (speedKmH <= 4) met = 3.5;
+                else if (speedKmH <= 6) met = 5.0;
+                else if (speedKmH <= 8) met = 8.0;
+                else if (speedKmH <= 10) met = 9.8;
+                else if (speedKmH <= 12) met = 11.5;
+                else met = 12.0;
+            }
+            // Tambahan MET (total met - 2.5 baseline)
+            extraCalories += weight * Math.max(0, met - 2.5) * (setDurMins / 60);
           } else {
             const reps = Number(set.r || ex.reps || 10);
             const activeWorkMins = (reps * 4) / 60;

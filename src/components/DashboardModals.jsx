@@ -4,7 +4,7 @@ import { X, Check, CalendarDays, Loader2, ShieldAlert, HeartPulse, Camera, Image
 import { playSoundEffect } from '../utils/audio';
 import SwipeInput from './SwipeInput';
 import { extractBiometricsFromImage } from '../utils/aiVision';
-import { AI_MODELS, getProviderStatus } from '../utils/aiAgent';
+import { checkOverallAIStatus } from '../utils/aiAgent';
 
 // --- IMPORT CAPACITOR & HEALTH CONNECT BARU ---
 import { Capacitor } from '@capacitor/core';
@@ -15,7 +15,7 @@ const DashboardModals = ({
   showManualModal, setShowManualModal, manualTab, setManualTab, 
   modalDate, setModalDate, formBio, setFormBio, bioData, lomealToday,
   handleSaveManualData, handleDeleteBioData, soundEnabled, units, setConfirmModal,
-  userApiKeys, aiProvider, aiModel, setKeyStatuses, setShowSettings, keyStatuses
+  userApiKeys, setKeyStatuses, setShowSettings, keyStatuses
 }) => {
   const isImp = units?.weight === 'lbs';
 
@@ -67,17 +67,10 @@ const DashboardModals = ({
               const base64Data = dataUrl.split(',')[1];
               const mimeType = 'image/jpeg';
 
-              const currentProvider = AI_MODELS.find(m => m.id === aiModel)?.provider || aiProvider;
-              const status = getProviderStatus(currentProvider, userApiKeys, keyStatuses || {});
-              
-              if (status === 'missing' || status === 'exhausted') {
-                  alert(`API Key untuk ${currentProvider} ${status === 'missing' ? 'tidak ditemukan' : 'telah mencapai limit'}. Silakan perbarui di menu Pengaturan (Settings).`);
-                  if (setShowSettings) setShowSettings('lanjutan');
-                  return;
-              }
+              // Hapus pengecekan status awal agar selalu mencoba backend proxy jika key lokal habis
 
               try {
-                  const aiData = await extractBiometricsFromImage(base64Data, mimeType, userApiKeys, currentProvider, aiModel, setKeyStatuses);
+                  const aiData = await extractBiometricsFromImage(base64Data, mimeType, userApiKeys, setKeyStatuses);
                   setFormBio(prev => {
                       const newBio = { ...prev };
                       // Basic Metrics
@@ -123,10 +116,10 @@ const DashboardModals = ({
                   setScanSuccess(true);
                   setTimeout(() => setScanSuccess(false), 2500);
               } catch (err) {
-                  if (err.message === 'RATE_LIMIT_EXCEEDED') {
-                      setScanError('Server penuh. Masukkan API Key pribadimu di Pengaturan untuk bypass limit.');
+                  if (err.message === 'RATE_LIMIT_EXCEEDED' || err.message.includes('terlalu banyak permintaan') || err.message.includes('Server penuh') || err.message.includes('Semua jalur AI gagal') || err.message.includes('quota')) {
+                      alert(`Server AI sedang sibuk/penuh, dan API Key pribadi Anda juga telah mencapai limit. Silakan perbarui di menu Pengaturan (Settings).`);
+                      if (setShowSettings) setShowSettings('lanjutan');
                   } else {
-
                       setScanError(err.message || 'Gagal membaca gambar');
                   }
               } finally {
@@ -308,6 +301,18 @@ const DashboardModals = ({
 
                             {/* Skor Energi */}
                             <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Energy Score</label><SwipeInput language={lang?.id || 'ID'} value={formBio.energyScore || ''} onChange={(val) => setFormBio({...formBio, energyScore: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.energyScore, "80")} /></div>
+                        </div>
+
+                        {/* Group 2B: Sleep Stages & HRV (Opsional) */}
+                        <div className="mt-4">
+                           <label className={`block ${t.textMuted} text-xs mb-1 truncate`}>Detail Tahap Tidur (mnt) & HRV</label>
+                           <div className="grid grid-cols-5 gap-2">
+                               <SwipeInput language={lang?.id || 'ID'} value={formBio.sleepAwake || ''} onChange={(val) => setFormBio({...formBio, sleepAwake: val})} step={5} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center`} placeholder="Awake" />
+                               <SwipeInput language={lang?.id || 'ID'} value={formBio.sleepRem || ''} onChange={(val) => setFormBio({...formBio, sleepRem: val})} step={5} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center`} placeholder="REM" />
+                               <SwipeInput language={lang?.id || 'ID'} value={formBio.sleepLight || ''} onChange={(val) => setFormBio({...formBio, sleepLight: val})} step={5} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center`} placeholder="Light" />
+                               <SwipeInput language={lang?.id || 'ID'} value={formBio.sleepDeep || ''} onChange={(val) => setFormBio({...formBio, sleepDeep: val})} step={5} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center`} placeholder="Deep" />
+                               <SwipeInput language={lang?.id || 'ID'} value={formBio.hrv || ''} onChange={(val) => setFormBio({...formBio, hrv: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center`} placeholder="HRV" />
+                           </div>
                         </div>
 
                         {/* Group 3: Tensi */}

@@ -337,7 +337,7 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
                     })}
                     {chartMetricsList.map(metric => (
                         activeChartMetrics.includes(metric.key) && 
-                        <Line key={metric.key} yAxisId={metric.key} type="monotone" name={metric.label} dataKey={metric.key} stroke={metric.color} strokeWidth={2} dot={{ r: 2, strokeWidth: 0, fill: metric.color }} activeDot={{ r: 5, strokeWidth: 0, fill: metric.color }} connectNulls={true} isAnimationActive={false} />
+                        <Line key={metric.key} yAxisId={metric.key} type="natural" name={metric.label} dataKey={metric.key} stroke={metric.color} strokeWidth={1.5} dot={false} activeDot={{ r: 5, strokeWidth: 0, fill: metric.color }} connectNulls={true} isAnimationActive={false} />
                     ))}
                  </LineChart>
              </div>

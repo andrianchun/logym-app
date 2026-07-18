@@ -8,6 +8,7 @@ import PanoramicSlider from '../components/PanoramicSlider';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { getRaigaNotification } from '../utils/aiAgent';
 import ActivityRings from '../components/ActivityRings';
+import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 
 const CalendarTab = ({
   t, lang, theme, history, setHistory, programs,
@@ -1406,13 +1407,121 @@ const CalendarTab = ({
                                          {bio.weight && <div><b className="opacity-70">Berat:</b><br/>{bio.weight} {isImp ? 'lbs' : 'kg'}</div>}
                                          {bio.fat && <div><b className="opacity-70">Lemak:</b><br/>{bio.fat}%</div>}
                                          {bio.bloodPressure && <div><b className="opacity-70">Tensi:</b><br/>{bio.bloodPressure} mmHg</div>}
-                                         {bio.heartRate && <div><b className="opacity-70">Detak:</b><br/>{bio.heartRate} bpm</div>}
+                                         {bio.heartRate && <div><b className="opacity-70">Detak Jantung:</b><br/>{bio.heartRate} bpm</div>}
+                                         {bio.minHeartRate && bio.maxHeartRate && <div><b className="opacity-70">Nadi (Min/Max):</b><br/>{bio.minHeartRate} - {bio.maxHeartRate} bpm</div>}
+                                         {bio.oxygenSaturation && <div><b className="opacity-70">SpO2 (Oksigen):</b><br/>{bio.oxygenSaturation}%</div>}
                                          {bio.bloodSugar && <div><b className="opacity-70">Gula Darah:</b><br/>{bio.bloodSugar} mg/dL</div>}
                                          {bio.temperature && <div><b className="opacity-70">Suhu:</b><br/>{bio.temperature} °{isImp ? 'F' : 'C'}</div>}
-                                         {bio.sleep && <div><b className="opacity-70">Tidur:</b><br/>{bio.sleep} jam</div>}
+                                         {bio.sleep && <div><b className="opacity-70">Tidur:</b><br/>{typeof bio.sleep === 'string' && bio.sleep.includes('h') ? bio.sleep.split(' ').map(s => s.includes('h') ? s.replace('h', ' jam') : s.replace('m', ' mnt')).join(' ') : `${bio.sleep} jam`}</div>}
                                          {bio.notes && <div className="col-span-2 mt-1"><b className="opacity-70">Catatan Klinis:</b><br/>{bio.notes}</div>}
                                        </div>
                                      )}
+                                     
+                                     {/* HEART RATE ANALYSIS BLOCK */}
+                                     {(() => {
+                                        // Only show if there's heart rate info or just show dummy for today for demo
+                                        const hasAnyHeartRateData = bio.heartRate || bio.minHeartRate || bio.maxHeartRate;
+                                        
+                                        const age = userProfile?.dob ? (new Date().getFullYear() - new Date(userProfile.dob).getFullYear()) : 30;
+                                        const maxHR = 220 - age;
+                                        let seed = targetDateStr.charCodeAt(targetDateStr.length - 1) || 1;
+                                        // Realistic HR curve for a workout (Warmup -> Interval 1 -> Peak -> Interval 2 -> Cooldown)
+                                        const hrData = [
+                                            75, 82, 95, 115, 125,
+                                            130, 145, 155, 148, 162,
+                                            168, 175, 172, 180, 176,
+                                            165, 150, 145, 155, 162,
+                                            150, 135, 120, 105, 90
+                                        ];
+                                        
+                                        let zoneMins = [0,0,0,0,0];
+                                        hrData.forEach(val => {
+                                            const p = val / maxHR;
+                                            if (p < 0.6) zoneMins[0]++;
+                                            else if (p < 0.7) zoneMins[1]++;
+                                            else if (p < 0.8) zoneMins[2]++;
+                                            else if (p < 0.9) zoneMins[3]++;
+                                            else zoneMins[4]++;
+                                        });
+                                    
+                                        const maxDataHr = Math.max(...hrData);
+                                        const avgHr = Math.round(hrData.reduce((a,b)=>a+b,0)/hrData.length);
+                                        
+                                        const chartData = hrData.map((val, i) => ({ index: i, value: val }));
+                                        
+                                        const zoneLabels = [
+                                            { name: 'Warm Up', color: 'bg-zinc-400', pct: 50, val: zoneMins[0] },
+                                            { name: 'Fat Burn', color: 'bg-sky-400', pct: 60, val: zoneMins[1] },
+                                            { name: 'Cardio', color: 'bg-emerald-400', pct: 70, val: zoneMins[2] },
+                                            { name: 'Anaerobic', color: 'bg-amber-400', pct: 80, val: zoneMins[3] },
+                                            { name: 'Peak', color: 'bg-rose-500', pct: 90, val: zoneMins[4] }
+                                        ];
+                                        
+                                        const totalMins = zoneMins.reduce((a,b)=>a+b,0);
+                                        
+                                        return (
+                                            <div className="mt-2 mb-2 p-4 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <h4 className={`text-[10px] font-black uppercase tracking-widest ${t.textMain}`}>Zona Nadi Saat Latihan</h4>
+                                                    <span className="text-[8px] font-bold bg-blue-500/20 text-blue-500 px-1.5 py-0.5 rounded">DUMMY DATA</span>
+                                                </div>
+                                                
+                                                <div className="flex justify-between items-end mb-4">
+                                                    <div>
+                                                        <div className={`text-[9px] font-bold uppercase tracking-widest ${t.textMuted}`}>Rata-rata</div>
+                                                        <div className="flex items-baseline gap-1"><span className={`text-2xl font-black tracking-tighter ${t.textMain}`}>{avgHr}</span><span className={`text-[9px] font-bold ${t.textMuted}`}>bpm</span></div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <div className={`text-[9px] font-bold uppercase tracking-widest ${t.textMuted}`}>Maksimal</div>
+                                                        <div className="flex items-baseline justify-end gap-1"><span className={`text-xl font-black tracking-tighter ${t.textMain}`}>{maxDataHr}</span><span className={`text-[9px] font-bold ${t.textMuted}`}>bpm</span></div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="relative w-full h-24 mb-5 border-b border-black/10 dark:border-white/10">
+                                                    <ResponsiveContainer width="100%" height="100%">
+                                                        <AreaChart data={chartData} margin={{ top: 5, right: 5, left: 5, bottom: 0 }}>
+                                                            <defs>
+                                                                <linearGradient id="colorHr" x1="0" y1="0" x2="0" y2="1">
+                                                                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.6}/>
+                                                                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                                                                </linearGradient>
+                                                            </defs>
+                                                            <Area 
+                                                                type="natural" 
+                                                                dataKey="value" 
+                                                                stroke="#3b82f6" 
+                                                                strokeWidth={1.5}
+                                                                fillOpacity={1} 
+                                                                fill="url(#colorHr)" 
+                                                                isAnimationActive={false}
+                                                                dot={false}
+                                                                activeDot={{ r: 4, fill: '#3b82f6', stroke: '#fff', strokeWidth: 1.5 }}
+                                                            />
+                                                        </AreaChart>
+                                                    </ResponsiveContainer>
+                                                </div>
+                                                
+                                                <div className="space-y-2.5">
+                                                    {zoneLabels.map((z, i) => {
+                                                        if (z.val === 0) return null;
+                                                        const wPct = (z.val / totalMins) * 100;
+                                                        return (
+                                                            <div key={i} className="flex flex-col gap-1">
+                                                                <div className="flex justify-between items-center text-[9px]">
+                                                                    <span className={`font-bold ${t.textMain}`}>{z.name} <span className="opacity-50">(&gt;{Math.round(maxHR * (z.pct/100))} bpm)</span></span>
+                                                                    <span className="font-bold opacity-80">{Math.round(wPct)}%</span>
+                                                                </div>
+                                                                <div className="relative w-full h-1.5 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden">
+                                                                    <div className={`absolute top-0 bottom-0 left-0 rounded-full ${z.color} transition-all duration-1000`} style={{ width: `${wPct}%` }}></div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        );
+                                     })()}
+
                                    </div>
                                  </div>
                              );
@@ -1469,7 +1578,13 @@ const CalendarTab = ({
                                   const prog = w.programId === 'adhoc' 
                                     ? null
                                     : programs.find(p => p.id === w.programId);
-                                  const parentPlanName = prog?.planName || (prog?.planId ? 'Latihan Kustom' : 'Ekstra');
+                                  
+                                  const exs = w.overriddenExercises || w.exercises || (prog?.exercises) || [];
+                                  const isCardio = exs.length > 0 && exs.every(ex => ex.target?.some(t => t.toLowerCase().includes('cardio') || t.toLowerCase().includes('kardio')));
+                                  
+                                  let parentPlanName = prog?.planName || (prog?.planId ? 'Latihan Kustom' : 'Sesi Ekstra');
+                                  if (isCardio) parentPlanName += ' (Kardio)';
+                                  else if (parentPlanName === 'Sesi Ekstra') parentPlanName = 'Sesi Beban Ekstra';
                                   if (!acc[parentPlanName]) acc[parentPlanName] = [];
                                   acc[parentPlanName].push(w);
                                   return acc;
@@ -1603,6 +1718,7 @@ const CalendarTab = ({
                                                      );
                                                   })}
                                                 </div>
+
                                                 <div className="flex gap-2">
                                                    <button onClick={(e) => { e.stopPropagation(); setExpandedWorkoutId(null); }} className={`flex-1 py-3 rounded-xl border border-dashed border-black/20 dark:border-white/20 body-lg font-bold ${c.text}`}>Tutup</button>
                                                    {(!isCompleted || getExercisesForWorkout(w).length > 0) && (() => {

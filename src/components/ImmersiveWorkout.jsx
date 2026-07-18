@@ -582,6 +582,7 @@ const ImmersiveWorkout = ({
         {/* Scroll Pickers */}
         <div className="flex flex-col gap-6">
           {(() => {
+            const isCardio = ex.target?.some(t => t.toLowerCase().includes('cardio') || t.toLowerCase().includes('kardio'));
             const itemLogs = getLogsForEx(ex);
             const itemSet = itemLogs[activeSetIdx] || itemLogs[0];
             return (
@@ -601,14 +602,35 @@ const ImmersiveWorkout = ({
                   )}
                   
                   {ex.type === 'time' ? (
-                    <div className="flex-1 flex flex-col items-center">
-                      <span className="body-md mb-2 uppercase">Durasi (dtk)</span>
-                      <ScrollPicker 
-                        value={itemSet?.d || 15} 
-                        onChange={(val) => onSetChange(ex.id, activeSetIdx, 'd', val)}
-                        min={5} max={300} step={5} width="w-full" theme={theme} t={t}
-                      />
-                    </div>
+                    isCardio ? (
+                      <>
+                        <div className="flex-1 flex flex-col items-center">
+                          <span className="body-md mb-2 uppercase">Jarak (km)</span>
+                          <ScrollPicker 
+                            value={itemSet?.dist || 0} 
+                            onChange={(val) => onSetChange(ex.id, activeSetIdx, 'dist', val)}
+                            min={0} max={50} step={0.1} width="w-full" theme={theme} t={t}
+                          />
+                        </div>
+                        <div className="flex-1 flex flex-col items-center">
+                          <span className="body-md mb-2 uppercase">Durasi (mnt)</span>
+                          <ScrollPicker 
+                            value={itemSet?.d || 15} 
+                            onChange={(val) => onSetChange(ex.id, activeSetIdx, 'd', val)}
+                            min={1} max={300} step={1} width="w-full" theme={theme} t={t}
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex-1 flex flex-col items-center">
+                        <span className="body-md mb-2 uppercase">Durasi (dtk)</span>
+                        <ScrollPicker 
+                          value={itemSet?.d || 15} 
+                          onChange={(val) => onSetChange(ex.id, activeSetIdx, 'd', val)}
+                          min={5} max={300} step={5} width="w-full" theme={theme} t={t}
+                        />
+                      </div>
+                    )
                   ) : (
                     <div className="flex-1 flex flex-col items-center">
                       <span className="body-md mb-2 uppercase">Repetisi</span>

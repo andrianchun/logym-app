@@ -13,6 +13,7 @@ import SwipeInput from '../components/SwipeInput';
 import { formatNumber } from '../utils/numberFormat';
 import { parseWorkoutDurationMinutes, calculateWorkoutCalories, calculateSmartWorkoutCalories } from '../utils/workoutCalc';
 import { calcBMR } from '../utils/bmr';
+import { AreaChart, Area, ResponsiveContainer, YAxis } from 'recharts';
 
 
 const MetricBox = ({ label, value, unit, icon, color, t, theme }) => (
@@ -37,7 +38,7 @@ const MiniBox = ({ label, value, unit, t, theme }) => (
     </div>
 );
 
-const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, exerciseLibrary, navigateToWorkoutDate, soundEnabled, playSoundEffect, theme, selectedDate, biometricStandard, units, setConfirmModal, activityTargets, setActivityTargets, gymProfiles, activeGymId, activePlanIds, userApiKeys, aiProvider, aiModel, userAchievements, connectedApps, userProfile, keyStatuses, setKeyStatuses, setShowSettings, lomealToday, lomealTargets }) => {
+const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, exerciseLibrary, navigateToWorkoutDate, soundEnabled, playSoundEffect, theme, selectedDate, biometricStandard, units, setConfirmModal, activityTargets, setActivityTargets, gymProfiles, activeGymId, activePlanIds, userApiKeys, userAchievements, connectedApps, userProfile, keyStatuses, setKeyStatuses, setShowSettings, lomealToday, lomealTargets }) => {
   const todayStr = getLocalYMD(new Date());
   const activeDate = todayStr;
 
@@ -111,6 +112,20 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
       localStorage.setItem('lyfit_aktivitas_expanded', JSON.stringify(isAktivitasExpanded));
   }, [isAktivitasExpanded]);
 
+  const [isSleepExpanded, setIsSleepExpanded] = useState(() => {
+      try {
+          const saved = localStorage.getItem('lyfit_sleep_expanded');
+          if (saved !== null) return JSON.parse(saved);
+      } catch(e) {}
+      return false;
+  });
+
+  useEffect(() => {
+      localStorage.setItem('lyfit_sleep_expanded', JSON.stringify(isSleepExpanded));
+  }, [isSleepExpanded]);
+
+  const [sleepSubTab, setSleepSubTab] = useState('stages');
+
   // Parallax removed for performance
 
   const emptyBio = {
@@ -118,6 +133,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
     muscleMass: null, musclePercent: null, boneMass: null, waterPercent: null, visceralFat: null, bmr: null, bodyAge: null, 
     waist: null, waistToHip: null, proteinPercent: null, bodyType: '-', weightSuggestion: '-',
     steps: '', activeMinutes: '', activityCalories: '', nutritionCalories: '', sleep: '', energyScore: null, 
+    sleepAwake: '', sleepRem: '', sleepLight: '', sleepDeep: '', hrv: null,
     heartRate: null, minHeartRate: null, maxHeartRate: null, bloodPressure: '', oxygenSaturation: null, waterIntake: '',
     weeklyDuration: '', weeklySessions: '', weeklyCalories: ''
   };
@@ -149,6 +165,11 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          activityCalories: todayDailyData.activityCalories !== undefined ? todayDailyData.activityCalories : (emptyBio.activityCalories || 0),
          nutritionCalories: todayDailyData.nutritionCalories !== undefined ? todayDailyData.nutritionCalories : (emptyBio.nutritionCalories || 0),
          sleep: todayDailyData.sleep !== undefined ? todayDailyData.sleep : (emptyBio.sleep || 0),
+         sleepAwake: todayDailyData.sleepAwake !== undefined ? todayDailyData.sleepAwake : (emptyBio.sleepAwake || ''),
+         sleepRem: todayDailyData.sleepRem !== undefined ? todayDailyData.sleepRem : (emptyBio.sleepRem || ''),
+         sleepLight: todayDailyData.sleepLight !== undefined ? todayDailyData.sleepLight : (emptyBio.sleepLight || ''),
+         sleepDeep: todayDailyData.sleepDeep !== undefined ? todayDailyData.sleepDeep : (emptyBio.sleepDeep || ''),
+         hrv: todayDailyData.hrv !== undefined ? todayDailyData.hrv : (emptyBio.hrv || null),
          sleepLog: todayDailyData.sleepLog !== undefined ? todayDailyData.sleepLog : (emptyBio.sleepLog || []),
          energyScore: todayDailyData.energyScore !== undefined ? todayDailyData.energyScore : (emptyBio.energyScore || null),
          heartRate: todayDailyData.heartRate !== undefined ? todayDailyData.heartRate : (emptyBio.heartRate || null),
@@ -162,7 +183,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          weeklyCalories: todayDailyData.weeklyCalories !== undefined ? todayDailyData.weeklyCalories : (emptyBio.weeklyCalories || 0),
          _manualFlags: (() => {
              const inherited = { ...(latestBodyData?._manualFlags || {}) };
-             ['steps', 'activeMinutes', 'activityCalories', 'nutritionCalories', 'sleep', 'energyScore', 'heartRate', 'minHeartRate', 'maxHeartRate', 'bloodPressure', 'oxygenSaturation', 'waterIntake'].forEach(k => delete inherited[k]);
+             ['steps', 'activeMinutes', 'activityCalories', 'nutritionCalories', 'sleep', 'energyScore', 'heartRate', 'minHeartRate', 'maxHeartRate', 'bloodPressure', 'oxygenSaturation', 'waterIntake', 'sleepAwake', 'sleepRem', 'sleepLight', 'sleepDeep', 'hrv'].forEach(k => delete inherited[k]);
              return {
                  ...inherited,
                  ...(todayDailyData?._manualFlags || {})
@@ -360,7 +381,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                      if (newBio._manualFlags) delete newBio._manualFlags[k];
                  });
              } else {
-                 ['steps', 'energyScore', 'activeMinutes', 'activityCalories', 'nutritionCalories', 'sleep', 'sleepLog', 'heartRate', 'minHeartRate', 'maxHeartRate', 'bloodPressure', 'oxygenSaturation', 'waterIntake', 'weeklyDuration', 'weeklySessions', 'weeklyCalories'].forEach(k => { 
+                 ['steps', 'energyScore', 'activeMinutes', 'activityCalories', 'nutritionCalories', 'sleep', 'sleepLog', 'heartRate', 'minHeartRate', 'maxHeartRate', 'bloodPressure', 'oxygenSaturation', 'waterIntake', 'weeklyDuration', 'weeklySessions', 'weeklyCalories', 'sleepAwake', 'sleepRem', 'sleepLight', 'sleepDeep', 'hrv'].forEach(k => { 
                      newBio[k] = null;
                      if (newBio._manualFlags) delete newBio._manualFlags[k];
                  });
@@ -404,7 +425,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   const dispMainWaist = units?.height === 'ft' && bioData.waist ? Number((bioData.waist * 0.393701).toFixed(1)) : bioData.waist || '-';
 
   // Smart Merge Deduplication (LyFit Internal + BioData/HealthConnect)
-  const { mergedDailyActiveMinutes, mergedDailyCalories, mergedDailyCaloriesFloor, mergedDailySessions, mergedWeeklyActiveMinutes, mergedWeeklyWorkoutDuration, mergedWeeklySessions, mergedWeeklyCalories } = useMemo(() => {
+  const { mergedDailyActiveMinutes, mergedDailyCalories, mergedDailyCaloriesFloor, mergedDailySessions, mergedWeeklyActiveMinutes, mergedWeeklyWorkoutDuration, mergedWeeklySessions, mergedWeeklyCardio, mergedWeeklyWeight, mergedWeeklyCalories } = useMemo(() => {
      const currentWeight = Number(bioData.weight) || 70; // Asumsi 70kg jika tidak ada data
      let dailyActive = Number(bioData.activeMinutes || 0);
      const isDailyCalsManual = !!bioData._manualFlags?.activityCalories;
@@ -451,6 +472,8 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      let weeklyDur = 0;
      let weeklyWorkoutDur = 0;
      let weeklySess = 0;
+     let weeklyCardioSess = 0;
+     let weeklyWeightSess = 0;
      let weeklyCals = 0;
      const end = new Date(activeDate);
      
@@ -476,6 +499,11 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
              const wDuration = parseWorkoutDurationMinutes(w.duration);
              intDur += wDuration;
              intCal += calculateSmartWorkoutCalories(dayWeight, w, w.log);
+
+             const exs = w.overriddenExercises || w.exercises || [];
+             const isCardioWorkout = exs.length > 0 && exs.every(ex => ex.target?.some(t => t.toLowerCase().includes('cardio') || t.toLowerCase().includes('kardio')));
+             if (isCardioWorkout) weeklyCardioSess++;
+             else weeklyWeightSess++;
          });
 
          weeklyDur += Math.max(extDur, intDur);
@@ -500,6 +528,8 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          mergedWeeklyActiveMinutes: weeklyDur,
          mergedWeeklyWorkoutDuration: weeklyWorkoutDur,
          mergedWeeklySessions: weeklySess,
+         mergedWeeklyCardio: weeklyCardioSess,
+         mergedWeeklyWeight: weeklyWeightSess,
          mergedWeeklyCalories: weeklyCals
      };
   }, [history, activeDate, bioData]);
@@ -768,7 +798,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                                   <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full mb-1 overflow-hidden shrink-0 flex justify-end">
                                       <div className={`h-full ${t.bgAccent} rounded-full transition-all duration-500`} style={{ width: `${progress}%` }}></div>
                                   </div>
-                                  <span className="text-[9px] text-zinc-500 dark:text-zinc-400 whitespace-nowrap">Minggu ini: {formatNumber(mergedWeeklySessions, language)} sesi • {formatNumber(mergedWeeklyActiveMinutes, language)} mnt</span>
+                                  <span className="text-[9px] text-zinc-500 dark:text-zinc-400 whitespace-nowrap">Minggu ini: {mergedWeeklyWeight} Beban • {mergedWeeklyCardio} Kardio</span>
                               </div>
                           </div>
                       );
@@ -820,35 +850,6 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                  </div>
 
                  <div className="px-1 space-y-5">
-                     <div className="grid grid-cols-2 gap-x-5 gap-y-5 h-full content-between">
-                         {/* Tidur */}
-                         <div className="flex flex-col h-full">
-                     <div className="flex items-center space-x-1.5 mb-1"><span className="w-5 h-5 rounded-full bg-violet-500/15 text-violet-500 flex items-center justify-center shrink-0"><Moon size={11}/></span> <span className={`caption ${t.textMuted} capitalize`}>Tidur</span></div>
-                     <div className="flex flex-col flex-1 justify-end">
-                         <div className="flex items-baseline space-x-1 mb-2">
-                             <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{bioData.sleep || '-'}</span>
-                         </div>
-                         <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden shrink-0">
-                             <div className="h-full bg-violet-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (parseSleepHours(bioData.sleep) / (activityTargets?.sleep || 8)) * 100)}%` }}></div>
-                         </div>
-                     </div>
-                 </div>
-
-                 {/* Skor Energi */}
-                 <div className="flex flex-col h-full text-right items-end">
-                     <div className="flex items-center justify-end space-x-1.5 mb-1"><span className={`caption ${t.textMuted} capitalize`}>Skor Energi</span> <span className="w-5 h-5 rounded-full bg-slate-400/15 text-slate-400 flex items-center justify-center shrink-0"><Zap size={11}/></span></div>
-                     <div className="flex flex-col flex-1 justify-end w-full">
-                         <div className="flex items-baseline justify-end space-x-1 mb-2">
-                              <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{bioData.energyScore > 0 ? formatNumber(bioData.energyScore, language) : '-'}</span>
-                             <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold">/ 100</span>
-                         </div>
-                         <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden shrink-0 flex justify-end">
-                             <div className="h-full bg-slate-400 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, Number(bioData.energyScore || 0))}%` }}></div>
-                         </div>
-                     </div>
-                 </div>
-                     </div>
-                 
                  {/* ROW 4: Tekanan Darah, Detak Jantung, SpO2 (Sebaris bertiga) */}
                  <div className={`grid grid-cols-3 gap-x-2 pt-2 border-t border-dashed ${t.borderDashed}`}>
                      {/* Tekanan Darah */}
@@ -918,6 +919,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
        </div>
       {/* Grid container intentionally not closed here yet */}
 
+      <div className="flex flex-col space-y-4 sm:space-y-6">
       {/* --- GRUP PROGRESS --- */}
       <div id="progress-accordion" className="relative z-10 flex flex-col w-full min-w-0 anim-rise mt-6 sm:mt-0 transition-all duration-300" style={{ animationDelay: '120ms' }}>
         <div className="relative z-20">
@@ -994,6 +996,347 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
         </div>
       </div>
       </div> {/* <-- Closes progress-accordion */}
+
+      {/* --- GRUP SLEEP ANALYTICS --- */}
+      <div id="sleep-accordion" className="relative z-10 flex flex-col w-full min-w-0 anim-rise mt-6 sm:mt-0 transition-all duration-300" style={{ animationDelay: '150ms' }}>
+        <div className="relative z-20">
+          <div className={`absolute top-10 inset-x-0 bottom-0 border ${t.border} ${theme === 'dark' ? 'bg-black/40 backdrop-blur-md' : 'bg-white/45 backdrop-blur-md'} shadow-sm z-0 ${isSleepExpanded ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'}`}></div>
+
+          <div
+             className="absolute inset-0 z-10 pointer-events-none parallax-container overflow-hidden rounded-2xl"
+             style={{
+               maskImage: 'linear-gradient(to right, transparent 0%, black 15%)',
+               WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 15%)'
+             }}
+          >
+             <div className="absolute inset-0" style={{
+                 maskImage: 'linear-gradient(to bottom, black 75%, transparent 100%)',
+                 WebkitMaskImage: 'linear-gradient(to bottom, black 75%, transparent 100%)'
+             }}>
+                 <img src="/bg-empty.webp" alt="" className="absolute -right-36 top-2 w-[44rem] max-w-[170%] h-auto drop-shadow-xl transition-transform duration-500 ease-out" />
+             </div>
+          </div>
+
+          <div className="relative z-20 flex flex-col mt-10 pb-4 px-6 pt-4">
+             <div className="flex items-center justify-between mb-4">
+                 <div>
+                     <h3 className={`h2 ${t.textMain}`}>Tidur & Pemulihan</h3>
+                 </div>
+                 <div className="flex gap-2">
+                     <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(activeDate); setManualTab('harian'); setShowManualModal(true); }} className={`p-2 rounded-full bg-indigo-500/10 dark:bg-indigo-500/20 backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border} transition-all relative z-20`}>
+                         <Pencil size={16} />
+                     </button>
+                 </div>
+             </div>
+
+             <div className="flex justify-between items-end mb-2 mt-4">
+                 <div>
+                     <span className={`text-[10px] font-bold uppercase tracking-widest ${t.textMuted}`}>Durasi Tidur</span>
+                     <div className="flex items-baseline space-x-1 mt-1">
+                         {(() => {
+                             const sleepStr = bioData.sleep;
+                             if (!sleepStr || parseFloat(sleepStr) <= 0) {
+                                 return <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>-</span>;
+                             }
+                             if (typeof sleepStr === 'string' && sleepStr.includes('h')) {
+                                 const parts = sleepStr.split(' ');
+                                 const h = parts[0]?.replace('h', '') || '0';
+                                 const m = parts[1]?.replace('m', '') || '0';
+                                 return (
+                                     <>
+                                         <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>{h}</span>
+                                         <span className={`body-lg font-bold ${t.textMuted} mr-1`}>jam</span>
+                                         <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>{m}</span>
+                                         <span className={`body-lg font-bold ${t.textMuted}`}>mnt</span>
+                                     </>
+                                 );
+                             }
+                             return (
+                                 <>
+                                     <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>{sleepStr}</span>
+                                     <span className={`body-lg font-bold ${t.textMuted}`}>jam</span>
+                                 </>
+                             );
+                         })()}
+                     </div>
+                 </div>
+             </div>
+
+             <div className="flex justify-between items-end mb-2 mt-2">
+                 <div>
+                     <span className={`text-[10px] font-bold uppercase tracking-widest ${t.textMuted}`}>Skor Energi</span>
+                     <div className="flex items-baseline space-x-1 mt-1">
+                         <span className={`text-3xl font-black tracking-tighter ${t.textMain}`}>{parseFloat(bioData.energyScore) > 0 ? formatNumber(bioData.energyScore, language) : '-'}</span>
+                         <span className={`text-sm font-bold ${t.textMuted}`}>/ 100</span>
+                     </div>
+                 </div>
+                 <div className="text-right pb-1">
+                     <span className={`text-[10px] font-bold uppercase tracking-widest ${t.textMuted}`}>Kualitas</span>
+                     <div className={`text-lg font-black ${parseFloat(bioData.sleep) >= 7 ? 'text-emerald-500' : (parseFloat(bioData.sleep) > 0 ? 'text-amber-500' : t.textMuted)}`}>
+                         {parseFloat(bioData.sleep) >= 7 ? 'Optimal' : (parseFloat(bioData.sleep) > 0 ? 'Kurang' : '-')}
+                     </div>
+                 </div>
+             </div>
+             
+             <button
+                  onClick={() => {
+                      playSoundEffect('click', soundEnabled);
+                      const isExpanding = !isSleepExpanded;
+                      setIsSleepExpanded(isExpanding);
+                      setTimeout(() => {
+                          const targetId = isExpanding ? 'sleep-subcard' : 'sleep-accordion';
+                          const el = document.getElementById(targetId);
+                          if (el) {
+                              if (isExpanding) {
+                                  const bottom = el.getBoundingClientRect().bottom;
+                                  if (bottom > window.innerHeight - 100) {
+                                      window.scrollTo({ top: bottom + window.scrollY - window.innerHeight + 120, behavior: 'smooth' });
+                                  }
+                              } else {
+                                  window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 80, behavior: 'smooth' });
+                              }
+                          }
+                      }, 320);
+                  }}
+                  className={`self-center mt-6 mb-2 p-2 rounded-full bg-indigo-500/10 dark:bg-indigo-500/20 backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border} transition-all relative z-20`}
+              >
+                  {isSleepExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+              </button>
+          </div>
+        </div>
+        
+        <div id="sleep-subcard" className={`grid relative z-10 transition-all duration-300 ease-in-out ${isSleepExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
+          <div className="overflow-hidden">
+            <div className={`rounded-b-2xl border border-t-0 ${t.border} ${t.bgSunken} shadow-inner relative z-10 p-6`}>
+                <div className={`relative flex w-full p-1.5 rounded-full ${t.btnBg} mb-6`} style={{ zIndex: 10 }}>
+                     <div className={`absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] rounded-full transition-transform duration-300 ease-out ${t.bgAccent} shadow-sm`} style={{ transform: sleepSubTab === 'stages' ? 'translateX(0)' : 'translateX(100%)', left: '6px', zIndex: 1 }}></div>
+                     <button onClick={() => { playSoundEffect('click', soundEnabled); setSleepSubTab('stages'); }} className={`flex-1 py-2.5 rounded-full body-md font-black relative transition-colors duration-300 ${sleepSubTab === 'stages' ? 'text-white' : t.textMuted}`} style={{ zIndex: 2 }}>Tahap Tidur</button>
+                     <button onClick={() => { playSoundEffect('click', soundEnabled); setSleepSubTab('somnogram'); }} className={`flex-1 py-2.5 rounded-full body-md font-black relative transition-colors duration-300 ${sleepSubTab === 'somnogram' ? 'text-white' : t.textMuted}`} style={{ zIndex: 2 }}>Hipnogram</button>
+                </div>
+                
+                {(() => {
+                    const sAwake = parseFloat(bioData.sleepAwake);
+                    const sRem = parseFloat(bioData.sleepRem);
+                    const sLight = parseFloat(bioData.sleepLight);
+                    const sDeep = parseFloat(bioData.sleepDeep);
+                    const sHrv = parseFloat(bioData.hrv);
+                    
+                    const hasStages = !isNaN(sAwake) || !isNaN(sRem) || !isNaN(sLight) || !isNaN(sDeep) || !isNaN(sHrv);
+                    
+                    if (!hasStages) {
+                        return (
+                            <div className="py-8 flex flex-col items-center justify-center text-center">
+                                <Moon size={24} className={`mb-3 opacity-20 ${t.textMain}`} />
+                                <span className={`text-xs font-bold ${t.textMuted}`}>Detail tahap tidur tidak tersedia</span>
+                                <span className={`text-[9px] mt-1 opacity-70 ${t.textMuted}`}>Hubungkan dengan smartwatch/Health Connect atau input manual untuk melihat analisis mendalam.</span>
+                            </div>
+                        );
+                    }
+                    
+                    const totalMins = (isNaN(sAwake)?0:sAwake) + (isNaN(sRem)?0:sRem) + (isNaN(sLight)?0:sLight) + (isNaN(sDeep)?0:sDeep);
+                    
+                    const renderSleepBar = (label, valMins, minTargetPct, maxTargetPct, colorClass) => {
+                        if (isNaN(valMins)) return null;
+                        const pct = totalMins > 0 ? (valMins / totalMins) * 100 : 0;
+                        const h = Math.floor(valMins / 60);
+                        const m = Math.floor(valMins % 60);
+                        const durStr = h > 0 ? (m > 0 ? `${h}j ${m}m` : `${h}j`) : `${m}m`;
+                        const targetLeft = minTargetPct;
+                        const targetWidth = maxTargetPct - minTargetPct;
+                        
+                        return (
+                            <div className="flex flex-col mb-4 last:mb-0 relative">
+                                <div className="flex justify-between items-end mb-1">
+                                    <span className={`text-[10px] font-bold ${t.textMuted}`}>{label}</span>
+                                    <span className={`text-xs font-black ${t.textMain}`}>{durStr} <span className="text-[9px] font-normal opacity-60">({Math.round(pct)}%)</span></span>
+                                </div>
+                                <div className="relative w-full h-2 rounded-full bg-black/10 dark:bg-white/10 overflow-visible">
+                                    <div className="absolute top-0 bottom-0 bg-black/10 dark:bg-white/10 border-x border-black/20 dark:border-white/20" style={{ left: `${targetLeft}%`, width: `${targetWidth}%` }}></div>
+                                    <div className={`absolute top-0 bottom-0 left-0 rounded-full ${colorClass} transition-all duration-700`} style={{ width: `${Math.min(100, pct)}%` }}></div>
+                                    <div className="absolute -top-1 -bottom-1 w-px bg-zinc-400/50" style={{ left: `${targetLeft}%` }}></div>
+                                    <div className="absolute -top-1 -bottom-1 w-px bg-zinc-400/50" style={{ left: `${maxTargetPct}%` }}></div>
+                                </div>
+                            </div>
+                        );
+                    };
+
+                    const renderHrvBar = (val) => {
+                        if (isNaN(val) || val <= 0) return null;
+                        const minHrv = 30;
+                        const maxHrv = 100;
+                        let pct = ((val - minHrv) / (maxHrv - minHrv)) * 100;
+                        if (pct < 0) pct = 0; if (pct > 100) pct = 100;
+                        
+                        return (
+                            <div className="flex flex-col mt-4 pt-4 border-t border-dashed border-zinc-500/20 relative">
+                                <div className="flex justify-between items-end mb-1">
+                                    <span className={`text-[10px] font-bold ${t.textMuted}`}>HRV (Heart Rate Variability)</span>
+                                    <span className={`text-xs font-black text-rose-500`}>{val} <span className="text-[9px] font-normal opacity-60">ms</span></span>
+                                </div>
+                                <div className="relative w-full h-2 rounded-full bg-black/10 dark:bg-white/10 overflow-visible">
+                                    <div className="absolute top-0 bottom-0 bg-black/10 dark:bg-white/10 border-x border-black/20 dark:border-white/20" style={{ left: '30%', width: '70%' }}></div>
+                                    <div className={`absolute top-0 bottom-0 left-0 rounded-full bg-rose-500 transition-all duration-700`} style={{ width: `${pct}%` }}></div>
+                                    <div className="absolute -top-1 -bottom-1 w-px bg-zinc-400/50" style={{ left: '30%' }}></div>
+                                </div>
+                            </div>
+                        );
+                    };
+
+                    const renderSpo2Bar = (val) => {
+                        if (isNaN(val) || val <= 0) return null;
+                        let pct = val;
+                        if (pct < 0) pct = 0; if (pct > 100) pct = 100;
+                        return (
+                            <div className="flex flex-col mt-4 pt-4 border-t border-dashed border-zinc-500/20 relative">
+                                <div className="flex justify-between items-end mb-1">
+                                    <span className={`text-[10px] font-bold ${t.textMuted}`}>SpO2 (Oksigen Darah)</span>
+                                    <span className={`text-xs font-black text-sky-400`}>{val} <span className="text-[9px] font-normal opacity-60">%</span></span>
+                                </div>
+                                <div className="relative w-full h-2 rounded-full bg-black/10 dark:bg-white/10 overflow-visible">
+                                    <div className="absolute top-0 bottom-0 bg-black/10 dark:bg-white/10 border-x border-black/20 dark:border-white/20" style={{ left: '95%', width: '5%' }}></div>
+                                    <div className={`absolute top-0 bottom-0 left-0 rounded-full bg-sky-400 transition-all duration-700`} style={{ width: `${pct}%` }}></div>
+                                    <div className="absolute -top-1 -bottom-1 w-px bg-zinc-400/50" style={{ left: '95%' }}></div>
+                                </div>
+                            </div>
+                        );
+                    };
+
+                    const renderRhrBar = (val) => {
+                        if (isNaN(val) || val <= 0) return null;
+                        const min = 40; const max = 120;
+                        let pct = ((val - min) / (max - min)) * 100;
+                        if (pct < 0) pct = 0; if (pct > 100) pct = 100;
+                        return (
+                            <div className="flex flex-col mt-4 pt-4 border-t border-dashed border-zinc-500/20 relative">
+                                <div className="flex justify-between items-end mb-1">
+                                    <span className={`text-[10px] font-bold ${t.textMuted}`}>RHR (Nadi Istirahat)</span>
+                                    <span className={`text-xs font-black text-rose-500`}>{val} <span className="text-[9px] font-normal opacity-60">bpm</span></span>
+                                </div>
+                                <div className="relative w-full h-2 rounded-full bg-black/10 dark:bg-white/10 overflow-visible">
+                                    <div className="absolute top-0 bottom-0 bg-black/10 dark:bg-white/10 border-x border-black/20 dark:border-white/20" style={{ left: '25%', width: '25%' }}></div>
+                                    <div className={`absolute top-0 bottom-0 left-0 rounded-full bg-rose-500 transition-all duration-700`} style={{ width: `${pct}%` }}></div>
+                                    <div className="absolute -top-1 -bottom-1 w-px bg-zinc-400/50" style={{ left: '25%' }}></div>
+                                    <div className="absolute -top-1 -bottom-1 w-px bg-zinc-400/50" style={{ left: '50%' }}></div>
+                                </div>
+                            </div>
+                        );
+                    };
+
+                    return (
+                        <div className="flex flex-col mt-2">
+                            {sleepSubTab === 'stages' ? (
+                                <>
+                                    {/* Awake: 5-10% */}
+                                    {renderSleepBar('Awake (Tidur Ayam)', sAwake, 5, 10, 'bg-zinc-400')}
+                                    {/* REM: 20-25% */}
+                                    {renderSleepBar('REM (Mimpi)', sRem, 20, 25, 'bg-sky-400')}
+                                    {/* Light: 50-60% */}
+                                    {renderSleepBar('Light (Tidur Ringan)', sLight, 50, 60, 'bg-indigo-400')}
+                                    {/* Deep: 15-25% */}
+                                    {renderSleepBar('Deep (Tidur Nyenyak)', sDeep, 15, 25, 'bg-violet-600')}
+                                    
+                                    {/* HRV, SpO2, RHR */}
+                                    {renderHrvBar(sHrv)}
+                                    {renderSpo2Bar(parseFloat(bioData.oxygenSaturation))}
+                                    {renderRhrBar(parseFloat(bioData.heartRate))}
+                                    
+                                    <div className="flex flex-wrap items-center gap-1.5 mt-6 pt-4 border-t border-dashed border-zinc-500/20">
+                                       <div className="flex items-center space-x-1.5"><div className="w-3 h-3 bg-black/10 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-sm"></div><span className={`text-[9px] font-bold ${t.textMuted}`}>Rentang Normal</span></div>
+                                       <span className="text-[9px] text-zinc-500">(Berdasarkan usia rata-rata)</span>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="mt-2">
+                                    {true ? (
+                                        <>
+                                            <div className="relative h-32 flex flex-col justify-between mb-2">
+                                                <div className="absolute left-0 top-0 bottom-0 w-12 flex flex-col justify-between text-[9px] font-bold text-zinc-400 py-1 z-10">
+                                                    <span>Awake</span>
+                                                    <span>REM</span>
+                                                    <span>Light</span>
+                                                    <span>Deep</span>
+                                                </div>
+                                                <div className="absolute left-12 right-0 top-0 bottom-0 flex flex-col justify-between pointer-events-none">
+                                                    <div className={`h-px w-full ${t.borderDashed} border-b`}></div>
+                                                    <div className={`h-px w-full ${t.borderDashed} border-b`}></div>
+                                                    <div className={`h-px w-full ${t.borderDashed} border-b`}></div>
+                                                    <div className={`h-px w-full ${t.borderDashed} border-b`}></div>
+                                                </div>
+                                                <div className="absolute left-12 right-0 top-0 bottom-0">
+                                                    {(() => {
+                                                        const sleepData = [
+                                                            { time: '22:00', stage: 3 },
+                                                            { time: '22:30', stage: 1 },
+                                                            { time: '23:00', stage: 0 },
+                                                            { time: '00:00', stage: 1 },
+                                                            { time: '01:00', stage: 2 },
+                                                            { time: '01:30', stage: 1 },
+                                                            { time: '02:30', stage: 0 },
+                                                            { time: '03:30', stage: 1 },
+                                                            { time: '04:00', stage: 2 },
+                                                            { time: '05:00', stage: 1 },
+                                                            { time: '06:00', stage: 3 }
+                                                        ];
+                                                        return (
+                                                            <ResponsiveContainer width="100%" height="100%">
+                                                                <AreaChart data={sleepData} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
+                                                                    <defs>
+                                                                        <linearGradient id="colorSleepStroke" x1="0" y1="0" x2="0" y2="1">
+                                                                            <stop offset="0%" stopColor="#a1a1aa" />
+                                                                            <stop offset="33%" stopColor="#38bdf8" />
+                                                                            <stop offset="66%" stopColor="#818cf8" />
+                                                                            <stop offset="100%" stopColor="#7c3aed" />
+                                                                        </linearGradient>
+                                                                        <linearGradient id="colorSleepFill" x1="0" y1="0" x2="0" y2="1">
+                                                                            <stop offset="0%" stopColor="#a1a1aa" stopOpacity={0.5}/>
+                                                                            <stop offset="33%" stopColor="#38bdf8" stopOpacity={0.5}/>
+                                                                            <stop offset="66%" stopColor="#818cf8" stopOpacity={0.5}/>
+                                                                            <stop offset="100%" stopColor="#7c3aed" stopOpacity={0.1}/>
+                                                                        </linearGradient>
+                                                                    </defs>
+                                                                    <YAxis domain={[0, 3]} hide />
+                                                                    <Area 
+                                                                        type="stepAfter" 
+                                                                        dataKey="stage" 
+                                                                        stroke="url(#colorSleepStroke)" 
+                                                                        strokeWidth={1.5}
+                                                                        strokeLinejoin="round"
+                                                                        fillOpacity={1} 
+                                                                        fill="url(#colorSleepFill)" 
+                                                                        isAnimationActive={false}
+                                                                        dot={false}
+                                                                    />
+                                                                </AreaChart>
+                                                            </ResponsiveContainer>
+                                                        );
+                                                    })()}
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-wrap gap-x-4 gap-y-2 mt-6 pt-4 border-t border-dashed border-zinc-500/20">
+                                                <div className="flex items-center space-x-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-zinc-400"></div><span className={`text-[10px] font-bold ${t.textMuted}`}>Awake</span></div>
+                                                <div className="flex items-center space-x-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-sky-400"></div><span className={`text-[10px] font-bold ${t.textMuted}`}>REM</span></div>
+                                                <div className="flex items-center space-x-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-indigo-400"></div><span className={`text-[10px] font-bold ${t.textMuted}`}>Light</span></div>
+                                                <div className="flex items-center space-x-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-violet-600"></div><span className={`text-[10px] font-bold ${t.textMuted}`}>Deep</span></div>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="py-12 flex flex-col items-center justify-center text-center">
+                                            <Moon size={24} className={`mb-3 opacity-20 ${t.textMain}`} />
+                                            <span className={`text-xs font-bold ${t.textMuted}`}>Grafik Hipnogram tidak tersedia</span>
+                                            <span className={`text-[9px] mt-1 opacity-70 ${t.textMuted}`}>Hubungkan aplikasi dengan Health Connect/Smartwatch untuk melihat visualisasi siklus tidur mendetail.</span>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })()}
+            </div>
+          </div>
+        </div>
+      </div> {/* <-- Closes sleep-accordion */}
+      </div> {/* <-- Closes right column wrapper */}
+
       </div> {/* <-- Closes the grid container */}
 
       {/* MODULAR MODALS */}
@@ -1002,7 +1345,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
         showManualModal={showManualModal} setShowManualModal={setShowManualModal} manualTab={manualTab} setManualTab={setManualTab}
         modalDate={modalDate} setModalDate={setModalDate} formBio={formBio} setFormBio={setFormBio} bioData={bioData} lomealToday={lomealToday}
         handleSaveManualData={handleSaveManualData} handleDeleteBioData={handleDeleteBioData} soundEnabled={soundEnabled}
-        units={units} setConfirmModal={setConfirmModal} userApiKeys={userApiKeys} aiProvider={aiProvider} aiModel={aiModel} keyStatuses={keyStatuses} setKeyStatuses={setKeyStatuses} setShowSettings={setShowSettings}
+        units={units} setConfirmModal={setConfirmModal} userApiKeys={userApiKeys} keyStatuses={keyStatuses} setKeyStatuses={setKeyStatuses} setShowSettings={setShowSettings}
       />
 
       {/* DETAIL BIOMETRIK MODAL */}

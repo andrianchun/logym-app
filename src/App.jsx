@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 
 // --- IMPORT CAPACITOR (FULLSCREEN) ---
 import { Capacitor } from '@capacitor/core';
@@ -45,6 +45,7 @@ import { checkAchievements, ACHIEVEMENTS } from './data/achievements';
 import { playSoundEffect } from './utils/audio';
 import { fetchExercisesFromApi } from './utils/exerciseDbApi';
 import { AI_MODELS, detectPlateaus, getRaigaNotification } from './utils/aiAgent';
+import { calculateReadiness } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
 import useDialog from './hooks/useDialog';
 import { getLocalYMD, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos } from './data/constants';
@@ -147,8 +148,6 @@ export default function App() {
   const [gymProfiles, setGymProfiles] = useState([{ id: 'default', name: 'LOGYM', equipment: 'all', config: {} }]);
   const [activeGymId, setActiveGymId] = useState('default');
   const [userApiKeys, setUserApiKeys] = useState([]);
-  const [aiProvider, setAiProvider] = useState('google');
-  const [aiModel, setAiModel] = useState('gemini-3.5-flash');
   const [keyStatuses, setKeyStatuses] = useState({});
   const [raigaPersona, setRaigaPersona] = useState('santai');
   const [raigaCustomInstruction, setRaigaCustomInstruction] = useState('');
@@ -361,11 +360,24 @@ export default function App() {
   const { dialog: aiDialog, showAlert: showAiAlert } = useDialog(theme === 'dark');
 
   // Plateau detection — pure rule-based, no AI call
-  const plateauInsights = React.useMemo(
-    () => detectPlateaus(history, 3, 2),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [history]
-  );
+  const plateauInsights = useMemo(() => {
+    // Only recalculate insights when on the dashboard
+    if (activeTab !== 'dashboard') return [];
+    return detectPlateaus(history, 3, 2);
+  }, [history, activeTab]);
+
+  const readiness = useMemo(() => {
+    if (!user || activeTab !== 'dashboard') return null; // Only show on dashboard
+    const todayStr = getLocalYMD(new Date());
+    const todayData = history[todayStr] || {};
+    
+    // Hanya muncul jika hari ini ada jadwal latihan atau ada histori latihan
+    const hasWorkoutToday = (todayData.workouts && todayData.workouts.length > 0) || todayData.programId;
+    if (!hasWorkoutToday) return null;
+
+    const todayBioData = todayData.bioData || {};
+    return calculateReadiness(todayBioData);
+  }, [history, user, activeTab]);
 
   const scheduleRaigaPush = async (type, id, vars) => {
     try {
@@ -859,8 +871,7 @@ export default function App() {
         setExtraExercises([]);
         setSkippedExercises({});
         setUserApiKeys([]);
-        setAiProvider('google');
-        setAiModel('gemini-3.5-flash');
+
         setUserProfile(null);
         setTheme('dark');
         setLanguage('ID');
@@ -1070,9 +1081,9 @@ export default function App() {
               // nyangkut sebagai baris kosong yang "muncul lagi" tiap kali data di-refresh.
               migratedKeys = migratedKeys.filter(k => k && k.trim());
               setUserApiKeys(migratedKeys);
-              setAiProvider(parsedSettings.aiProvider || 'google');
+
               // Saved model IDs from older versions may no longer exist on the APIs
-              setAiModel(AI_MODELS.some(m => m.id === parsedSettings.aiModel) ? parsedSettings.aiModel : 'gemini-3.5-flash');
+
               setRaigaPersona(parsedSettings.raigaPersona || 'santai');
               setRaigaCustomInstruction(parsedSettings.raigaCustomInstruction || '');
               setRaigaMemory(Array.isArray(parsedSettings.raigaMemory) ? parsedSettings.raigaMemory : []);
@@ -1194,7 +1205,7 @@ export default function App() {
           setDoc(mainDocRef, {
             programs,
             exerciseLibrary,
-            settings: { theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, userProfile, userApiKeys: (userApiKeys || []).filter(k => k && k.trim()), aiProvider, aiModel, raigaPersona, raigaCustomInstruction, raigaMemory },
+            settings: { theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, userProfile, userApiKeys: (userApiKeys || []).filter(k => k && k.trim()), raigaPersona, raigaCustomInstruction, raigaMemory },
             userAchievements,
             updatedAt: new Date().toISOString()
           }, { merge: true })
@@ -1209,7 +1220,7 @@ export default function App() {
 
       return () => { clearTimeout(timer); if (retryTimer) clearTimeout(retryTimer); };
     }
-  }, [programs, exerciseLibrary, theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, user?.uid, isDataLoaded, userAchievements, userProfile, userApiKeys, aiProvider, aiModel, raigaPersona, raigaCustomInstruction, raigaMemory]);
+  }, [programs, exerciseLibrary, theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, user?.uid, isDataLoaded, userAchievements, userProfile, userApiKeys, raigaPersona, raigaCustomInstruction, raigaMemory]);
 
   // Baseline serialisasi per tanggal — merepresentasikan kondisi terakhir yang tersimpan di server.
   // Tanggal yang serialisasinya sama dengan baseline tidak perlu dikirim ulang.
@@ -1565,8 +1576,6 @@ export default function App() {
       setShowProfileModal(false);
       setShowSettings(false);
       setUserApiKeys([]);
-      setAiProvider('google');
-      setAiModel('gemini-3.5-flash');
       await signOut(auth);
     } catch (error) {
       console.error("Gagal logout:", error);
@@ -2601,12 +2610,8 @@ export default function App() {
          exerciseLibrary={exerciseLibrary}
          units={units}
          userApiKeys={userApiKeys}
-         aiProvider={aiProvider}
          keyStatuses={keyStatuses}
          setKeyStatuses={setKeyStatuses}
-         setAiProvider={setAiProvider}
-         setAiModel={setAiModel}
-         aiModel={aiModel}
          setShowSettings={setShowSettings}
       />
       </React.Suspense>
@@ -2636,8 +2641,6 @@ export default function App() {
            theme={theme} setTheme={setTheme} language={language} setLanguage={setLanguage} 
            soundEnabled={soundEnabled} setSoundEnabled={setSoundEnabled}
            userApiKeys={userApiKeys} setUserApiKeys={setUserApiKeys}
-           aiProvider={aiProvider} setAiProvider={setAiProvider}
-           aiModel={aiModel} setAiModel={setAiModel}
            keyStatuses={keyStatuses}
            raigaPersona={raigaPersona} setRaigaPersona={setRaigaPersona}
            raigaCustomInstruction={raigaCustomInstruction} setRaigaCustomInstruction={setRaigaCustomInstruction}
@@ -2688,9 +2691,8 @@ export default function App() {
                activityTargets={activityTargets} setActivityTargets={setActivityTargets}
                gymProfiles={gymProfiles} activeGymId={activeGymId}
                activePlanIds={activePlanIds}
-               userApiKeys={userApiKeys} aiProvider={aiProvider} aiModel={aiModel}
+               userApiKeys={userApiKeys}
                keyStatuses={keyStatuses} setKeyStatuses={setKeyStatuses}
-               setAiProvider={setAiProvider} setAiModel={setAiModel}
                setShowSettings={setShowSettings}
                userAchievements={userAchievements} connectedApps={connectedApps}
                userProfile={userProfile}
@@ -2759,9 +2761,8 @@ export default function App() {
                gymProfiles={gymProfiles}
                focusRoutineId={focusRoutineId} setFocusRoutineId={setFocusRoutineId}
                activityTargets={activityTargets}
-               userApiKeys={userApiKeys} aiProvider={aiProvider} aiModel={aiModel}
+               userApiKeys={userApiKeys}
                keyStatuses={keyStatuses} setKeyStatuses={setKeyStatuses}
-               setAiProvider={setAiProvider} setAiModel={setAiModel}
                userProfile={userProfile} history={history}
                setShowSettings={setShowSettings}
                onAcceptProgram={handleAcceptAiProgram}
@@ -2809,6 +2810,7 @@ export default function App() {
           isWorkoutActive={isImmersiveMode}
           activeTab={activeTab}
           onPositionChange={setAvatarPos}
+          readiness={readiness}
         />
       )}
 
@@ -2817,12 +2819,8 @@ export default function App() {
         isOpen={showAiChat}
         onClose={() => setShowAiChat(false)}
         userApiKeys={userApiKeys}
-        aiProvider={aiProvider}
-        aiModel={aiModel}
         keyStatuses={keyStatuses}
         setKeyStatuses={setKeyStatuses}
-        setAiProvider={setAiProvider}
-        setAiModel={setAiModel}
         setShowSettings={setShowSettings}
         userProfile={userProfile}
         history={history}

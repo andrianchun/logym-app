@@ -36,6 +36,7 @@ export default function CoachRaigaFloat({
     hasUnreadChat = false, // dari GymAIChat: ada balasan/insight yang belum dibaca
     isWorkoutActive = false,
     onPositionChange,     // callback(pos: {x,y}) → parent untuk origin animasi chat
+    readiness = null,     // { score, status, message }
 }) {
     // ── POSISI ──────────────────────────────────────────────────────────────
     const defaultPos = () => ({
@@ -137,12 +138,13 @@ export default function CoachRaigaFloat({
     const timerRef = useRef(null);
 
     const topInsight = plateauInsights[0] || null;
-    const insightKey = topInsight ? `plateau_${topInsight.name}_${topInsight.weeks}` : null;
+    const hasReadiness = readiness && readiness.message;
+    const insightKey = topInsight ? `plateau_${topInsight.name}_${topInsight.weeks}` : (hasReadiness ? `readiness_${new Date().toLocaleDateString()}` : null);
     const isDismissed = dismissedKey === insightKey;
 
     useEffect(() => {
         clearTimeout(timerRef.current);
-        if (!topInsight || isDismissed || isWorkoutActive) return;
+        if ((!topInsight && !hasReadiness) || isDismissed || isWorkoutActive) return;
         timerRef.current = setTimeout(() => {
             setIsBouncingIn(true);
             setShowInsight(true);
@@ -162,11 +164,16 @@ export default function CoachRaigaFloat({
     };
 
     const insightMessage = () => {
-        if (!topInsight) return '';
-        const lines = [`Bro, ${topInsight.name} lu udah flat ${topInsight.weeks} minggu (top: ${topInsight.maxWeight}kg).`];
-        if (plateauInsights[1]) lines.push(`${plateauInsights[1].name} juga stuck ${plateauInsights[1].weeks} mgg.`);
-        lines.push('Kayaknya udah waktunya deload atau ganti variasi, gue bisa bantu!');
-        return lines.join(' ');
+        if (topInsight) {
+            const lines = [`Bro, ${topInsight.name} lu udah flat ${topInsight.weeks} minggu (top: ${topInsight.maxWeight}kg).`];
+            if (plateauInsights[1]) lines.push(`${plateauInsights[1].name} juga stuck ${plateauInsights[1].weeks} mgg.`);
+            lines.push('Kayaknya udah waktunya deload atau ganti variasi, gue bisa bantu!');
+            return lines.join(' ');
+        }
+        if (hasReadiness) {
+            return readiness.message;
+        }
+        return '';
     };
 
     const snappedToRight = visualPos.x > window.innerWidth / 2;
@@ -190,7 +197,7 @@ export default function CoachRaigaFloat({
             }}
         >
             {/* ── SPEECH BUBBLE ─────────────────────────────────────────── */}
-            {showInsight && topInsight && !isDismissed && (
+            {showInsight && (topInsight || hasReadiness) && !isDismissed && (
                 <div
                     className="pointer-events-auto absolute w-[250px]
                         bg-neutral-900/97 backdrop-blur-xl border border-blue-500/40
@@ -210,9 +217,13 @@ export default function CoachRaigaFloat({
                     >
                         <X size={13} />
                     </button>
-                    <div className="flex items-center gap-1.5 mb-2 pr-4">
-                        <span className="text-blue-400 text-[10px] font-black uppercase tracking-widest">🧠 Coach Raiga</span>
-                    </div>
+                    {topInsight && (
+                        <div className="flex items-center gap-1.5 mb-2 pr-4">
+                            <span className="text-blue-400 text-[10px] font-black uppercase tracking-widest">
+                                🧠 Coach Insight
+                            </span>
+                        </div>
+                    )}
                     <p className="text-white/90 text-xs leading-relaxed mb-3">
                         {insightMessage()}
                     </p>

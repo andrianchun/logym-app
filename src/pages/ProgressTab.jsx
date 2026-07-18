@@ -521,7 +521,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
               <div className={`w-12 shrink-0 pointer-events-none flex items-center border-r border-slate-500/10 z-10 bg-transparent py-3`}>
                     <LineChart width={48} height={isSubCard ? 250 : 288} data={chartDataObj.data} margin={{ top: 5, right: 0, left: 4, bottom: 5 }}>
                        <YAxis stroke={theme === 'dark' ? '#a1a1aa' : '#64748b'} fontSize={10} tickLine={false} axisLine={false} width={40} domain={yDomain} allowDataOverflow={true} tickFormatter={(v) => v > 999 ? (v/1000).toFixed(1)+'k' : v} />
-                       {chartDataObj.items.map((item, idx) => ( activeChartLines.includes(item) && <Line key={item} type="monotone" dataKey={item} stroke="transparent" dot={false} activeDot={false} isAnimationActive={false} /> ))}
+                       {chartDataObj.items.map((item, idx) => ( activeChartLines.includes(item) && <Line key={item} type="natural" dataKey={item} stroke="transparent" dot={false} activeDot={false} isAnimationActive={false} /> ))}
                     </LineChart>
               </div>
           )}
@@ -576,7 +576,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                   />
                   <XAxis dataKey="date" stroke={theme === 'dark' ? '#a1a1aa' : '#64748b'} fontSize={10} tickLine={false} axisLine={false} padding={{ left: 20, right: 20 }} />
                   <YAxis hide={true} domain={yDomain} allowDataOverflow={true} />
-                  {chartDataObj.items.map((item, idx) => ( activeChartLines.includes(item) && <Line key={item} type="monotone" name={chartType === 'muscle' ? formatTarget(item, lang?.id) : item} dataKey={item} stroke={chartColors[idx % chartColors.length]} strokeWidth={2} dot={{ r: 2, strokeWidth: 0, fill: chartColors[idx % chartColors.length] }} activeDot={{ r: 5, strokeWidth: 0, fill: chartColors[idx % chartColors.length] }} connectNulls={true} isAnimationActive={false} /> ))}
+                  {chartDataObj.items.map((item, idx) => ( activeChartLines.includes(item) && <Line key={item} type="natural" name={chartType === 'muscle' ? formatTarget(item, lang?.id) : item} dataKey={item} stroke={chartColors[idx % chartColors.length]} strokeWidth={1.5} dot={false} activeDot={{ r: 5, strokeWidth: 0, fill: chartColors[idx % chartColors.length] }} connectNulls={true} isAnimationActive={false} /> ))}
                 </LineChart>
                </div>
             ) : ( 

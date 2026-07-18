@@ -132,8 +132,8 @@ const ProgramTab = ({
   setActiveAddModalTarget, saveStateToHistory, openQuestionnaire,
   activePlanIds, setActivePlanIds, gymProfiles,
   focusRoutineId, setFocusRoutineId, setConfirmModal, activityTargets,
-  userApiKeys, aiProvider, aiModel, userProfile, history,
-  keyStatuses, setKeyStatuses, setAiProvider, setAiModel, setShowSettings,
+  userApiKeys, userProfile, history,
+  keyStatuses, setKeyStatuses, setShowSettings,
   setHighlightPostId, setShowProfileModal, setProfileForceTab, onPostCreated
 }) => {
   
