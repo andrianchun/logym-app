@@ -17,6 +17,11 @@ const ExerciseDetailModal = ({
   programs
 }) => {
   const isImp = units?.weight === 'lbs';
+  let initialExType = initialEx.type || 'weight';
+  const isTargetCardio = Array.isArray(initialEx.target) ? initialEx.target.some(t => t.toLowerCase() === 'cardio') : (initialEx.target || '').toLowerCase().includes('cardio');
+  if (initialExType === 'time' && isTargetCardio) {
+    initialExType = 'cardio';
+  }
   const existingLibEx = exerciseLibrary?.find(e => e.name?.toLowerCase() === initialEx.name?.toLowerCase() || e.id === initialEx.id);
   const stored10RM = existingLibEx?.rm10 || 0;
   const storedLastWeight = existingLibEx?.lastWeight || 0;
@@ -537,7 +542,7 @@ const ExerciseDetailModal = ({
                              <table className="w-full text-[10px] table-fixed">
                                <thead className={`bg-black/10 dark:bg-white/10 ${t.textMuted}`}>
                                  <tr>
-                                   {initialEx.type === 'cardio' ? (
+                                   {initialExType === 'cardio' ? (
                                       <>
                                         <th className="py-1 text-center w-8">Set</th>
                                         <th className="py-1 text-center w-12">Jarak</th>
@@ -558,7 +563,7 @@ const ExerciseDetailModal = ({
                                </thead>
                                <tbody>
                                  {log.sets.map((s, idx) => {
-                                    if (initialEx.type === 'cardio') {
+                                    if (initialExType === 'cardio') {
                                         const d = Number(s.distance || 0);
                                         const tMin = Number(s.duration || 0);
                                         let paceStr = '-:--';
@@ -599,7 +604,7 @@ const ExerciseDetailModal = ({
 
                  {/* Tab 3: 1RM Calc / Pace Calc */}
                  <div className="w-1/3 h-full p-5 pb-24 overflow-y-auto hide-scrollbar relative">
-                     {initialEx.type === 'cardio' ? (
+                     {initialExType === 'cardio' ? (
                        <div className="space-y-4 text-center pb-5">
                           <div className="flex items-center justify-center gap-2">
                              <h3 className={`h3 ${t.textMain}`}>Kalkulator Pace</h3>

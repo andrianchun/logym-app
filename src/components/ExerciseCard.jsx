@@ -16,7 +16,11 @@ const ExerciseCard = ({
   canDeleteCompleted = false, onRemoveProgramExercise
 }) => {
   const isImp = units?.weight === 'lbs';
-  const exType = ex.type || 'weight';
+  let exType = ex.type || 'weight';
+  const isTargetCardio = Array.isArray(ex.target) ? ex.target.some(t => t.toLowerCase() === 'cardio') : (ex.target || '').toLowerCase().includes('cardio');
+  if (exType === 'time' && isTargetCardio) {
+    exType = 'cardio';
+  }
   const isCustom = ex.id > 1000000 && ex.source !== 'exercisedb';
   const doneCount = sets.filter(s => s.done).length;
   const totalSets = sets.length;

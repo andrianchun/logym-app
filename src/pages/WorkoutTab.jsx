@@ -400,7 +400,7 @@ const WorkoutTab = ({
     }, [history]);
 
     const getOverloadHint = (exItem) => {
-      if (!exItem || !exerciseLibrary || exItem.type === 'time') return null;
+      if (!exItem || !exerciseLibrary || exItem.type === 'time' || exItem.type === 'cardio' || exItem.target?.includes('Cardio')) return null;
       
       if (!historicalStatsRef.current[exItem.id]) {
         let historyMax10RM = 0;
