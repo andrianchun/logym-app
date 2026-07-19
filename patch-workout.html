@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Logym Data Patcher</title>
+  <style>
+    body { font-family: monospace; background: #0a0a0a; color: #e2e8f0; padding: 2rem; max-width: 700px; margin: 0 auto; }
+    h1 { color: #38bdf8; margin-bottom: 0.5rem; }
+    .log { background: #111827; border: 1px solid #1e3a5f; border-radius: 8px; padding: 1rem; margin-top: 1rem; white-space: pre-wrap; line-height: 1.7; font-size: 0.9rem; }
+    .ok  { color: #34d399; }
+    .err { color: #f87171; }
+    .info{ color: #fbbf24; }
+    button { margin-top: 1rem; background: #2563eb; color: white; border: none; padding: 0.75rem 2rem; border-radius: 8px; font-size: 1rem; cursor: pointer; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <h1>🔧 Logym Data Patcher</h1>
+  <p style="color:#94a3b8">Memindahkan durasi latihan dari Sesi Ekstra → Minggu: Upper Body Focus<br>Tanggal: <strong style="color:#f8fafc">2026-07-19</strong></p>
+  <button id="btn" onclick="runPatch()">▶ Jalankan Patch</button>
+  <div class="log" id="log">Klik tombol di atas untuk mulai...\n</div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+    import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAYCQIrZXFB_J7zp4CkiUQ4OYljw5qaGWo",
+      authDomain: "logym-id.firebaseapp.com",
+      projectId: "logym-id",
+      storageBucket: "logym-id.firebasestorage.app",
+      messagingSenderId: "883134437221",
+      appId: "1:883134437221:web:8a6579be8747a78b62b38c"
+    };
+
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db   = getFirestore(app);
+
+    const TARGET_UID  = 'scCcIIS2TDUgIQOMoWH58jXoGp22';
+    const TARGET_DATE = '2026-07-19';
+    const TARGET_YEAR = '2026';
+
+    const logEl = document.getElementById('log');
+    const btn   = document.getElementById('btn');
+
+    function log(msg, cls='') {
+      const span = document.createElement('span');
+      span.className = cls;
+      span.textContent = msg + '\n';
+      logEl.appendChild(span);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    window.runPatch = async () => {
+      btn.disabled = true;
+      logEl.innerHTML = '';
+
+      const user = auth.currentUser;
+      if (!user) {
+        log('❌ Kamu belum login di browser ini!', 'err');
+        log('Buka dulu app logym.app, login, lalu buka halaman ini lagi.', 'err');
+        btn.disabled = false;
+        return;
+      }
+      if (user.uid !== TARGET_UID) {
+        log(`❌ Login sebagai UID: ${user.uid}`, 'err');
+        log(`   Dibutuhkan UID: ${TARGET_UID}`, 'err');
+        log('Pastikan login dengan akun yang benar.', 'err');
+        btn.disabled = false;
+        return;
+      }
+
+      log(`✅ Login terdeteksi: ${user.email}`, 'ok');
+      log(`📅 Target tanggal: ${TARGET_DATE}\n`, 'info');
+
+      try {
+        const yearRef = doc(db, 'users', TARGET_UID, 'history_years', TARGET_YEAR);
+        const snap    = await getDoc(yearRef);
+
+        if (!snap.exists()) { log('❌ Dokumen history_years/2026 tidak ada!', 'err'); btn.disabled=false; return; }
+
+        const yearData = snap.data();
+        const dayData  = yearData[TARGET_DATE];
+        if (!dayData) { log(`❌ Data tanggal ${TARGET_DATE} tidak ditemukan.`, 'err'); btn.disabled=false; return; }
+
+        const workouts = [...(dayData.workouts || [])];
+        log('📋 Workouts saat ini:');
+        workouts.forEach((w, i) =>
+          log(`  [${i}] ${w.programName || w.programId} | status=${w.status} | duration=${w.duration || '-'}`)
+        );
+        log('');
+
+        // Cari adhoc dengan durasi
+        const adhocIdx = workouts.findIndex(w =>
+          w.programId === 'adhoc' && w.duration && w.duration !== '00:00' && w.duration !== '0'
+        );
+        if (adhocIdx === -1) {
+          log('❌ Sesi adhoc dengan durasi tidak ditemukan. Mungkin sudah dipatch sebelumnya.', 'err');
+          btn.disabled = false;
+          return;
+        }
+
+        const adhocW   = workouts[adhocIdx];
+        const moveDur  = adhocW.duration;
+        const moveLogs = adhocW.log || {};
+        const moveSk   = adhocW.skipped || {};
+        log(`▶ Ditemukan adhoc[${adhocIdx}]: duration=${moveDur}, ${Object.keys(moveLogs).length} log`, 'info');
+
+        // Cari target: non-adhoc, 0 menit / kosong
+        const targetIdx = workouts.findIndex((w, i) =>
+          i !== adhocIdx &&
+          w.programId !== 'adhoc' &&
+          (!w.duration || w.duration === '00:00' || w.duration === '0')
+        );
+        if (targetIdx === -1) {
+          log('❌ Sesi target (0 menit) tidak ditemukan.', 'err');
+          btn.disabled = false;
+          return;
+        }
+
+        const targetW = workouts[targetIdx];
+        log(`▶ Target[${targetIdx}]: ${targetW.programName} (${targetW.programId})`, 'info');
+        log('');
+        log('⚙️  Memproses patch...');
+
+        const patched = workouts.map((w, i) => {
+          if (i === targetIdx) {
+            return {
+              ...w,
+              status: 'completed',
+              duration: moveDur,
+              log: { ...(w.log || {}), ...moveLogs },
+              skipped: { ...(w.skipped || {}), ...moveSk },
+            };
+          }
+          if (i === adhocIdx) {
+            const { duration, log: lg, skipped, ...rest } = w;
+            return { ...rest, duration: '00:00', log: {}, skipped: {} };
+          }
+          return w;
+        });
+
+        log('\n✅ Preview setelah patch:');
+        patched.forEach((w, i) =>
+          log(`  [${i}] ${w.programName || w.programId} | status=${w.status} | duration=${w.duration || '-'}`)
+        );
+
+        await setDoc(yearRef, { [TARGET_DATE]: { ...dayData, workouts: patched } }, { merge: true });
+
+        log('\n🎉 BERHASIL! Data sudah diperbaiki.', 'ok');
+        log('Refresh app Logym kamu sekarang.', 'ok');
+
+      } catch (err) {
+        log('\n❌ Error: ' + err.message, 'err');
+        console.error(err);
+        btn.disabled = false;
+      }
+    };
+
+    // Cek status login
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        log(`ℹ️  Terdeteksi login sebagai: ${user.email} (${user.uid})`, 'info');
+      } else {
+        log('⚠️  Belum login. Buka logym.web.app dulu di tab lain, lalu refresh halaman ini.', 'err');
+      }
+    });
+  </script>
+</body>
+</html>

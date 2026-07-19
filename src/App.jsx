@@ -268,7 +268,129 @@ export default function App() {
       _setActivePlanIds(val);
   };
   const [activeProgramId, setActiveProgramId] = useState(defaultPrograms[0]?.id || null);
-    const [focusWorkoutId, setFocusWorkoutId] = useState(null);
+  const [focusWorkoutId, setFocusWorkoutId] = useState(null);
+
+  // Temporary auto-patch for misplaced workout sessions (V10 - Generic Fix for ALL DATES)
+  useEffect(() => {
+    if (user?.uid === 'scCcIIS2TDUgIQOMoWH58jXoGp22' && !localStorage.getItem('patch_applied_v10')) {
+      const runAutoPatch = async () => {
+        try {
+          if (!programs || programs.length === 0) return;
+          const DAY_MAP = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+
+          setHistory(prevHistory => {
+             let historyChanged = false;
+             const newHistory = { ...prevHistory };
+             const datesToFix = Object.keys(newHistory);
+
+             datesToFix.forEach(TARGET_DATE => {
+                 const dayData = newHistory[TARGET_DATE];
+                 if (!dayData || !dayData.workouts) return;
+
+                 const workouts = [...dayData.workouts];
+                 
+                 // Cari target program untuk hari ini
+                 const dayOfWeek = new Date(TARGET_DATE).getDay();
+                 const dayName = DAY_MAP[dayOfWeek];
+                 const targetProgram = programs.find(p => p.assignedDays && p.assignedDays.includes(dayName));
+                 if (!targetProgram) return;
+
+                 // Cari sesi adhoc yang punya durasi
+                 const adhocIdx = workouts.findIndex(w => 
+                    w.status === 'completed' && 
+                    w.duration && w.duration !== '00:00' && w.duration !== '0' &&
+                    w.programId !== targetProgram.id
+                 );
+
+                 // Cari cangkang kosong target program
+                 const zeroDurTargetIdx = workouts.findIndex(w => w.programId === targetProgram.id && (!w.duration || w.duration === '00:00' || w.duration === '0'));
+
+                 // Jika ada adhoc, merge. Jika tidak ada adhoc tapi targetProgram butuh fix log, kita fix.
+                 let dayChanged = false;
+                 
+                 let patchedWorkouts = workouts;
+                 
+                 if (adhocIdx !== -1) {
+                     const adhocW = workouts[adhocIdx];
+                     patchedWorkouts = workouts.filter((w, i) => i !== zeroDurTargetIdx).map(w => {
+                         if (w.id === adhocW.id) {
+                             return {
+                                 ...w,
+                                 id: `completed_${Date.now()}_${TARGET_DATE}`,
+                                 programId: targetProgram.id,
+                                 programName: targetProgram.name,
+                                 status: 'completed',
+                                 overriddenExercises: targetProgram.exercises || []
+                             };
+                         }
+                         return w;
+                     });
+                     dayChanged = true;
+                 }
+
+                 // Fix logs untuk target program yang udah di-merge atau udah ada
+                 patchedWorkouts = patchedWorkouts.map(w => {
+                     if (w.programId === targetProgram.id && w.status === 'completed' && w.overriddenExercises) {
+                         const newLog = { ...w.log };
+                         const newSkipped = { ...w.skipped };
+                         let fixed = false;
+
+                         w.overriddenExercises.forEach(ex => {
+                             const exId = ex.id;
+                             const expectedKey = `${exId}-${w.id}`;
+                             
+                             if (w.log && !w.log[expectedKey] && !w.log[exId]) {
+                                 const matchingKey = Object.keys(w.log).find(k => k.startsWith(exId));
+                                 if (matchingKey && matchingKey !== expectedKey) {
+                                     newLog[expectedKey] = w.log[matchingKey];
+                                     delete newLog[matchingKey];
+                                     fixed = true;
+                                 }
+                             }
+                             if (w.skipped && !w.skipped[expectedKey] && !w.skipped[exId]) {
+                                 const matchingKey = Object.keys(w.skipped).find(k => k.startsWith(exId));
+                                 if (matchingKey && matchingKey !== expectedKey) {
+                                     newSkipped[expectedKey] = w.skipped[matchingKey];
+                                     delete newSkipped[matchingKey];
+                                     fixed = true;
+                                 }
+                             }
+                         });
+
+                         if (fixed) {
+                             dayChanged = true;
+                             return { ...w, log: newLog, skipped: newSkipped };
+                         }
+                     }
+                     return w;
+                 });
+
+                 if (dayChanged) {
+                     newHistory[TARGET_DATE] = { ...dayData, workouts: patchedWorkouts };
+                     historyChanged = true;
+                     
+                     // Sync individual day to firestore
+                     const yearRef = doc(db, 'users', user.uid, 'history_years', '2026');
+                     setDoc(yearRef, { [TARGET_DATE]: newHistory[TARGET_DATE] }, { merge: true });
+                 }
+             });
+
+             if (historyChanged) {
+                 localStorage.setItem('patch_applied_v10', 'true');
+                 setTimeout(() => window.location.reload(), 1500);
+                 return newHistory;
+             } else {
+                 localStorage.setItem('patch_applied_v10', 'true');
+                 return prevHistory;
+             }
+          });
+        } catch (err) {
+          console.error("Auto patch V10 error:", err);
+        }
+      };
+      runAutoPatch();
+    }
+  }, [user, programs]);
 
   // Self-healing: Hapus duplikat ID pada latihan (menghindari error DndKit dari state lama)
   useEffect(() => {
@@ -2667,7 +2789,8 @@ export default function App() {
 
   // JIKA USER SUDAH LOGIN
   return (
-    <div 
+    <>
+      <div 
       className={`min-h-screen flex flex-col ${t.bgApp} ${t.textMain} font-sans ${activeTab === 'calendar' ? 'h-[100dvh] overflow-hidden' : 'pb-32'} transition-colors duration-300`}
       onTouchStart={handleGlobalTouchStart}
       onTouchEnd={handleGlobalTouchEnd}
@@ -3036,5 +3159,6 @@ export default function App() {
 
       <BottomNav t={t} lang={lang} activeTab={activeTab} setActiveTab={setActiveTab} setIsEditingMode={setIsEditingMode} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} />
     </div>
+    </>
   );
 }

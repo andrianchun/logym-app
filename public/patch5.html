@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Logym Data Patcher (V5)</title>
+  <style>
+    body { font-family: monospace; background: #0a0a0a; color: #e2e8f0; padding: 2rem; max-width: 700px; margin: 0 auto; }
+    h1 { color: #38bdf8; margin-bottom: 0.5rem; }
+    .log { background: #111827; border: 1px solid #1e3a5f; border-radius: 8px; padding: 1rem; margin-top: 1rem; white-space: pre-wrap; line-height: 1.7; font-size: 0.9rem; }
+    .ok  { color: #34d399; }
+    .err { color: #f87171; }
+    .info{ color: #fbbf24; }
+    button { margin-top: 1rem; background: #2563eb; color: white; border: none; padding: 0.75rem 2rem; border-radius: 8px; font-size: 1rem; cursor: pointer; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <h1>🔧 Logym Data Patcher V5</h1>
+  <p style="color:#94a3b8">Memindahkan durasi latihan dari Sesi Ekstra → Minggu: Upper Body Focus<br>Tanggal: <strong style="color:#f8fafc">2026-07-19</strong></p>
+  <button id="btn" onclick="runPatch()">▶ Jalankan Patch V5</button>
+  <div class="log" id="log">Klik tombol di atas untuk mulai...\n</div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+    import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAYCQIrZXFB_J7zp4CkiUQ4OYljw5qaGWo",
+      authDomain: "logym-id.firebaseapp.com",
+      projectId: "logym-id",
+      storageBucket: "logym-id.firebasestorage.app",
+      messagingSenderId: "883134437221",
+      appId: "1:883134437221:web:8a6579be8747a78b62b38c"
+    };
+
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db   = getFirestore(app);
+
+    const TARGET_UID  = 'scCcIIS2TDUgIQOMoWH58jXoGp22';
+    const TARGET_DATE = '2026-07-19';
+    const TARGET_YEAR = '2026';
+
+    const logEl = document.getElementById('log');
+    const btn   = document.getElementById('btn');
+
+    function log(msg, cls='') {
+      const span = document.createElement('span');
+      span.className = cls;
+      span.textContent = msg + '\n';
+      logEl.appendChild(span);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    window.runPatch = async () => {
+      btn.disabled = true;
+      logEl.innerHTML = '';
+
+      const user = auth.currentUser;
+      if (!user) {
+        log('❌ Kamu belum login di browser ini!', 'err');
+        return;
+      }
+      if (user.uid !== TARGET_UID) {
+        log(`❌ Login sebagai UID: ${user.uid}, Dibutuhkan UID: ${TARGET_UID}`, 'err');
+        return;
+      }
+
+      try {
+        log(`⏳ 1. Mengambil daftar program latihan...`, 'info');
+        const userDocRef = doc(db, 'users', TARGET_UID);
+        const userDocSnap = await getDoc(userDocRef);
+        
+        let targetProgram = null;
+        if (userDocSnap.exists()) {
+           const userData = userDocSnap.data();
+           const progs = userData.programs || [];
+           const parsedProgs = typeof progs === 'string' ? JSON.parse(progs) : progs;
+           
+           targetProgram = parsedProgs.find(p => p.name && p.name.includes('Upper Body Focus'));
+        }
+
+        if (!targetProgram) {
+            log('❌ Program Upper Body Focus tidak ditemukan!', 'err');
+            return;
+        }
+        log(`✅ Ditemukan Program: ${targetProgram.name} (${targetProgram.id})`, 'ok');
+
+        log(`⏳ 2. Mengambil history hari ini...`, 'info');
+        const yearRef = doc(db, 'users', TARGET_UID, 'history_years', TARGET_YEAR);
+        const snap    = await getDoc(yearRef);
+
+        if (!snap.exists()) { log('❌ Dokumen history_years/2026 tidak ada!', 'err'); return; }
+
+        const yearData = snap.data();
+        const dayData  = yearData[TARGET_DATE] || {};
+        const workouts = [...(dayData.workouts || [])];
+        
+        log('📋 Workouts saat ini di Database:');
+        workouts.forEach((w, i) =>
+          log(`  [${i}] name=${w.programName} | id=${w.programId} | status=${w.status} | duration=${w.duration || '-'}`)
+        );
+
+        // Cari sesi apapun yang sudah SELESAI dan punya durasi > 0 (mengabaikan strict programId 'adhoc')
+        // Pokoknya yang durasinya paling mendekati 1:23:36 atau yang punya durasi.
+        const adhocIdx = workouts.findIndex(w => 
+          w.status === 'completed' && 
+          w.duration && 
+          w.duration !== '00:00' && 
+          w.duration !== '0' &&
+          !w.programName?.includes('Upper Body Focus')
+        );
+        
+        if (adhocIdx === -1) {
+          log('❌ Sesi latihan dengan durasi nyangkut tidak ditemukan. Apakah sudah dipatch?', 'err');
+          return;
+        }
+
+        const adhocW = workouts[adhocIdx];
+        log(`\n✅ Sesi yang akan dipindah: [${adhocIdx}] ${adhocW.programName} (durasi: ${adhocW.duration})`, 'ok');
+
+        // Check if there's already a completed Upper Body Focus with 0 duration, delete it
+        const zeroDurTargetIdx = workouts.findIndex(w => w.programId === targetProgram.id && (!w.duration || w.duration === '00:00' || w.duration === '0'));
+        if (zeroDurTargetIdx !== -1) {
+            log(`🧹 Menghapus cangkang sesi target lama yang kosong...`, 'info');
+        }
+
+        log(`⚙️  Memproses pemindahan data...`);
+        const patched = workouts.filter((w, i) => i !== zeroDurTargetIdx).map((w) => {
+           if (w.id === adhocW.id) {
+               return {
+                   ...w,
+                   id: `completed_${Date.now()}`, // Reset ID agar tidak nyangkut cache kalender
+                   programId: targetProgram.id,
+                   programName: targetProgram.name,
+                   status: 'completed',
+                   overriddenExercises: targetProgram.exercises || []
+               };
+           }
+           return w;
+        });
+
+        log('\n✅ Preview database setelah patch:');
+        patched.forEach((w, i) =>
+          log(`  [${i}] ${w.programName || w.programId} | status=${w.status} | duration=${w.duration || '-'}`)
+        );
+
+        await setDoc(yearRef, { [TARGET_DATE]: { ...dayData, workouts: patched } }, { merge: true });
+
+        log('\n🎉 BERHASIL! Data sudah diperbaiki seutuhnya.', 'ok');
+        log('Silakan kembali ke aplikasi Logym dan buka tab Kalender.', 'ok');
+
+      } catch (err) {
+        log('\n❌ Error: ' + err.message, 'err');
+        console.error(err);
+      } finally {
+        btn.disabled = false;
+      }
+    };
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) log(`ℹ️  Terdeteksi login sebagai: ${user.email}`, 'info');
+      else log('⚠️  Belum login. Buka logym.web.app dulu, lalu refresh.', 'err');
+    });
+  </script>
+</body>
+</html>

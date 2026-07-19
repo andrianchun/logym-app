@@ -74,7 +74,7 @@ const WorkoutTab = ({
      return activePlanIds.includes(pPlanId);
   });
 
-  if (selectedDate >= todayStr && activePlanIds.length > 0) {
+  if (activePlanIds.length > 0) {
     const planRoutines = programs.filter(p => activePlanIds.includes(p.planId || 'custom'));
     if (planRoutines.length > 0) {
       const dateObj = new Date(selectedDate);
