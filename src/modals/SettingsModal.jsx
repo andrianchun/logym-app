@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { X, Moon, Sun, Globe, Volume2, VolumeX, Timer, Download, Upload, CalendarDays, Bell, BellOff, Clock, Activity, Scale, Ruler, Thermometer, Database, Trash2, Plus, MessageCircle, Brain, HelpCircle, ChevronDown } from 'lucide-react';
 import SwipeInput from '../components/SwipeInput';
 import { AI_MODELS, PERSONA_PRESETS } from '../utils/aiAgent';
+import { FAQ_ITEMS } from '../utils/faqData';
+import BugReportModal from './BugReportModal';
+import AdminDashboardModal from './AdminDashboardModal';
 
 export default function SettingsModal({
   showSettings, setShowSettings, t, lang,
@@ -26,6 +29,8 @@ export default function SettingsModal({
   const [activeTab, setActiveTab] = useState('preferensi');
   const [openFaqIndex, setOpenFaqIndex] = useState(null);
   const [prevShowSettings, setPrevShowSettings] = useState(showSettings);
+  const [showBugReport, setShowBugReport] = useState(false);
+  const [showAdminDashboard, setShowAdminDashboard] = useState(false);
 
   if (showSettings !== prevShowSettings) {
       setPrevShowSettings(showSettings);
@@ -46,21 +51,6 @@ export default function SettingsModal({
           setActiveTab('preferensi');
       }
   }
-
-  const FAQ_ITEMS = [
-      { q: 'Bagaimana cara sinkronisasi data antar HP dan laptop?', a: 'Cukup login pakai email & sandi yang sama di semua perangkat. Data otomatis tersinkron lewat cloud dalam hitungan detik, gak perlu langkah tambahan.' },
-      { q: 'Bagaimana cara mengubah angka set/reps/beban dengan cepat?', a: 'Klik sekali di kolom angkanya (set, reps, atau beban), lalu geser (swipe) ke atas/bawah buat mengubah nilainya. Angka akan menyala saat berubah.' },
-      { q: 'Bagaimana cara menata ulang urutan latihan atau program?', a: 'Masuk ke Mode Edit lewat ikon pensil di sebelah nama program, lalu tahan dan geser ikon titik-titik untuk mengurutkan ulang.' },
-      { q: 'Latihan yang saya cari tidak ada di Database, gimana?', a: 'Buka tab Database, cari opsi tambah/kelola latihan — kamu bisa buat exercise custom sendiri lengkap dengan target otot dan link YouTube.' },
-      { q: 'Bagaimana cara mengisi jadwal minggu ini otomatis seperti minggu lalu?', a: 'Di tab Kalender, pakai tombol "+ Ulangi 7 Hari Lalu" untuk menyalin jadwal minggu sebelumnya ke minggu ini secara otomatis.' },
-      { q: 'Apa itu Coach Raiga dan bagaimana cara pakainya?', a: 'Coach Raiga adalah AI personal trainer bawaan app. Ajak ngobrol soal progres latihanmu, minta dibuatkan program baru, atau minta ubah program yang sudah aktif langsung lewat chat (misal "naikkan beban bench di Push Day"). Gaya bicaranya bisa diganti (santai/galak/serius/custom) di tab Lanjutan.' },
-      { q: 'Bisa gak scan otomatis hasil timbangan pintar?', a: 'Bisa — di kartu Komposisi Tubuh Dashboard ada opsi upload/scan foto hasil aplikasi timbangan pintar (Zepp Life, Mi Fit, Garmin, Huawei Health, dll), AI akan otomatis membaca angkanya.' },
-      { q: 'Bagaimana cara pakai fitur Komunitas?', a: 'Kamu bisa share progres latihan atau pencapaian ke feed, follow user lain, cari user lewat username, dan pantau leaderboard skor sosial mingguan.' },
-      { q: 'Grafik Progres Latihan bisa difilter?', a: 'Bisa — toggle tampilan per exercise atau per kelompok otot, maksimal 6 item ditampilkan bersamaan dalam satu grafik.' },
-      { q: 'Bagaimana cara mengatur pengingat latihan?', a: 'Buka tab Lanjutan, atur jam pengingat default dan aktifkan notifikasinya di sana.' },
-      { q: 'Data saya aman gak kalau ganti HP?', a: 'Aman — selain sinkron otomatis lewat akun, kamu juga bisa backup manual (export/import file JSON) di tab Lanjutan sebagai cadangan tambahan.' },
-      { q: 'Bagaimana cara ganti tema, bahasa, atau satuan (kg/lbs, cm/ft, dll)?', a: 'Semua ada di tab Preferensi ini — gulir ke atas untuk Tema/Bahasa/Suara, dan ke bawah untuk Satuan & Unit.' },
-  ];
 
   if (!showSettings) return null;
 
@@ -258,6 +248,15 @@ export default function SettingsModal({
                         </div>
                     ))}
                 </div>
+                
+                <div className={`mt-6 pt-4 border-t ${t.border}`}>
+                    <button 
+                        onClick={() => setShowBugReport(true)}
+                        className={`w-full flex items-center justify-center gap-2 py-3 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 rounded-xl font-bold text-sm transition-colors`}
+                    >
+                        <AlertTriangle size={16} /> Laporkan Bug / Masalah
+                    </button>
+                </div>
             </div>
           </div>
         )}
@@ -449,6 +448,19 @@ export default function SettingsModal({
                 </div>
             </div>
 
+            {/* ZONA ADMIN (Hanya terlihat jika email cocok) */}
+            {user?.email === 'untheryan@gmail.com' && (
+                <div className={`p-4 rounded-2xl border border-red-500/30 bg-red-500/10 space-y-3 mt-4 mb-8`}>
+                    <p className={`body-md text-red-500 uppercase tracking-wider mb-2 flex items-center gap-2 font-bold`}><ShieldAlert size={16}/> Superadmin Mode</p>
+                    <button 
+                        onClick={() => setShowAdminDashboard(true)} 
+                        className={`w-full flex items-center justify-center space-x-2 py-3 rounded-xl font-bold bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/20 transition-colors`}
+                    >
+                        <ShieldAlert size={16} /> <span>Buka Dasbor Admin</span>
+                    </button>
+                </div>
+            )}
+
             {/* ZONA BERBAHAYA */}
             <div className={`p-4 rounded-2xl border border-rose-500/30 bg-rose-500/5 space-y-3 mt-8`}>
                 <p className={`body-md text-rose-500 font-bold uppercase tracking-wider mb-2 flex items-center gap-2`}>
@@ -489,6 +501,9 @@ export default function SettingsModal({
             <p className={`text-[9px] opacity-40 mt-1 ${t.textMuted}`}>Dibangun dengan ♥️ oleh Andrian Chun &copy; 2026</p>
         </div>
       </div>
+      
+      <BugReportModal showModal={showBugReport} setShowModal={setShowBugReport} user={user} />
+      <AdminDashboardModal showModal={showAdminDashboard} setShowModal={setShowAdminDashboard} user={user} />
     </div>
   );
 }

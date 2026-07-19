@@ -8,7 +8,8 @@ import PanoramicSlider from '../components/PanoramicSlider';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { getRaigaNotification } from '../utils/aiAgent';
 import ActivityRings from '../components/ActivityRings';
-import { AreaChart, Area, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts';
+import { calculateAge, getHRZone } from '../utils/hrZones';
 
 const CalendarTab = ({
   t, lang, theme, history, setHistory, programs,
@@ -1419,107 +1420,145 @@ const CalendarTab = ({
                                      
                                      {/* HEART RATE ANALYSIS BLOCK */}
                                      {(() => {
-                                        // Only show if there's heart rate info or just show dummy for today for demo
-                                        const hasAnyHeartRateData = bio.heartRate || bio.minHeartRate || bio.maxHeartRate;
+                                        const completedWorkouts = panelWorkouts.filter(w => checkIsCompletedStrict(w, targetDateStr));
+                                        if (completedWorkouts.length === 0) return null;
+
+                                        return completedWorkouts.map((w, wIdx) => {
+                                            // Determine the average HR for this specific workout
+                                            let sumHr = 0;
+                                            let countHr = 0;
+                                            const logsToUse = (w.log && Object.keys(w.log).length > 0) ? w.log : (dayData._activeSession?.exerciseLogs || exerciseLogs);
+                                            
+                                            // Attempt to extract real HR from workout logs
+                                            if (logsToUse) {
+                                               Object.values(logsToUse).forEach(exLogs => {
+                                                  exLogs.forEach(s => {
+                                                     if (s.done && Number(s.heartRate) > 0) {
+                                                         sumHr += Number(s.heartRate);
+                                                         countHr++;
+                                                     }
+                                                  });
+                                               });
+                                            }
+                                            const realAvgHr = countHr > 0 ? Math.round(sumHr / countHr) : null;
+                                            
+                                            const age = calculateAge(userProfile?.biometrics?.birthDate || userProfile?.birthDate) || 30;
+                                            const maxHR = 220 - age;
+                                            
+                                            // For now we use dummy data if no real data is found, but scale it around realAvgHr if it exists
+                                            const baseHr = realAvgHr || (120 + (w.id.length % 20)); // Base pseudo-random HR
+                                            let seed = w.id.charCodeAt(w.id.length - 1) || 1;
+                                            
+                                            // Generate deterministic dummy curve based on workout ID so it looks stable but varied per session
+                                            const hrData = [
+                                                baseHr - 40, baseHr - 35, baseHr - 25, baseHr - 15, baseHr - 5,
+                                                baseHr, baseHr + 10, baseHr + 20, baseHr + 15, baseHr + 25,
+                                                baseHr + 30, baseHr + 35, baseHr + 25, baseHr + 35, baseHr + 20,
+                                                baseHr + 10, baseHr - 5, baseHr - 10, baseHr + 5, baseHr + 15,
+                                                baseHr + 5, baseHr - 10, baseHr - 20, baseHr - 30, baseHr - 40
+                                            ].map(v => {
+                                                const noise = ((seed * v) % 15) - 7;
+                                                return Math.max(60, Math.min(Math.round(v + noise), maxHR));
+                                            });
+                                            
+                                            let zoneMins = [0,0,0,0,0];
+                                            hrData.forEach(val => {
+                                                const p = val / maxHR;
+                                                if (p < 0.6) zoneMins[0]++;
+                                                else if (p < 0.7) zoneMins[1]++;
+                                                else if (p < 0.8) zoneMins[2]++;
+                                                else if (p < 0.9) zoneMins[3]++;
+                                                else zoneMins[4]++;
+                                            });
                                         
-                                        const age = userProfile?.dob ? (new Date().getFullYear() - new Date(userProfile.dob).getFullYear()) : 30;
-                                        const maxHR = 220 - age;
-                                        let seed = targetDateStr.charCodeAt(targetDateStr.length - 1) || 1;
-                                        // Realistic HR curve for a workout (Warmup -> Interval 1 -> Peak -> Interval 2 -> Cooldown)
-                                        const hrData = [
-                                            75, 82, 95, 115, 125,
-                                            130, 145, 155, 148, 162,
-                                            168, 175, 172, 180, 176,
-                                            165, 150, 145, 155, 162,
-                                            150, 135, 120, 105, 90
-                                        ];
-                                        
-                                        let zoneMins = [0,0,0,0,0];
-                                        hrData.forEach(val => {
-                                            const p = val / maxHR;
-                                            if (p < 0.6) zoneMins[0]++;
-                                            else if (p < 0.7) zoneMins[1]++;
-                                            else if (p < 0.8) zoneMins[2]++;
-                                            else if (p < 0.9) zoneMins[3]++;
-                                            else zoneMins[4]++;
+                                            const maxDataHr = Math.max(...hrData);
+                                            const avgHr = realAvgHr || Math.round(hrData.reduce((a,b)=>a+b,0)/hrData.length);
+                                            
+                                            const chartData = hrData.map((val, i) => ({ index: i, value: val }));
+                                            
+                                            const zoneLabels = [
+                                                { name: 'Warm Up', color: 'bg-zinc-400', pct: 50, val: zoneMins[0] },
+                                                { name: 'Fat Burn', color: 'bg-sky-400', pct: 60, val: zoneMins[1] },
+                                                { name: 'Cardio', color: 'bg-emerald-400', pct: 70, val: zoneMins[2] },
+                                                { name: 'Anaerobic', color: 'bg-amber-400', pct: 80, val: zoneMins[3] },
+                                                { name: 'Peak', color: 'bg-rose-500', pct: 90, val: zoneMins[4] }
+                                            ];
+                                            
+                                            const totalMins = zoneMins.reduce((a,b)=>a+b,0);
+                                            
+                                            const prog = w.programId === 'adhoc' ? null : programs.find(p => p.id === w.programId);
+                                            const parentPlanName = prog?.planName || (prog?.planId ? 'Kustom' : 'Ekstra');
+                                            const title = `Zona Nadi - ${parentPlanName} - ${w.programName || 'Sesi'}`.toUpperCase();
+                                            
+                                            return (
+                                                <div key={w.id} className="mt-6 pt-6 border-t border-black/10 dark:border-white/10">
+                                                    <div className="flex items-center justify-between mb-4">
+                                                        <h4 className={`text-[10px] font-black uppercase tracking-widest ${t.textMain} truncate pr-2`}>{title}</h4>
+                                                        <span className="text-[8px] font-bold bg-blue-500/20 text-blue-500 px-1.5 py-0.5 rounded shrink-0">DUMMY DATA</span>
+                                                    </div>
+                                                    
+                                                    <div className="flex justify-between items-end mb-4">
+                                                        <div>
+                                                            <div className={`text-[9px] font-bold uppercase tracking-widest ${t.textMuted}`}>Rata-rata</div>
+                                                            <div className="flex items-baseline gap-1"><span className={`text-2xl font-black tracking-tighter ${t.textMain}`}>{avgHr}</span><span className={`text-[9px] font-bold ${t.textMuted}`}>bpm</span></div>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <div className={`text-[9px] font-bold uppercase tracking-widest ${t.textMuted}`}>Maksimal</div>
+                                                            <div className="flex items-baseline justify-end gap-1"><span className={`text-xl font-black tracking-tighter ${t.textMain}`}>{maxDataHr}</span><span className={`text-[9px] font-bold ${t.textMuted}`}>bpm</span></div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div className="relative w-full h-24 mb-5 border-b border-black/10 dark:border-white/10">
+                                                        <ResponsiveContainer width="100%" height="100%">
+                                                            <AreaChart data={chartData} margin={{ top: 5, right: 5, left: 5, bottom: 0 }}>
+                                                                <defs>
+                                                                    <linearGradient id={`colorHr-${w.id}`} x1="0" y1="0" x2="0" y2="1">
+                                                                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.6}/>
+                                                                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                                                                    </linearGradient>
+                                                                </defs>
+                                                                <Tooltip 
+                                                                    contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '10px', fontWeight: 'bold' }}
+                                                                    itemStyle={{ color: '#fff' }}
+                                                                    labelStyle={{ display: 'none' }}
+                                                                    formatter={(value) => [`${value} bpm`, 'HR']}
+                                                                    animationDuration={200}
+                                                                />
+                                                                <Area 
+                                                                    type="natural" 
+                                                                    dataKey="value" 
+                                                                    stroke="#3b82f6" 
+                                                                    strokeWidth={1.5}
+                                                                    fillOpacity={1} 
+                                                                    fill={`url(#colorHr-${w.id})`} 
+                                                                    isAnimationActive={false}
+                                                                    dot={false}
+                                                                    activeDot={{ r: 4, fill: '#3b82f6', stroke: '#fff', strokeWidth: 1.5 }}
+                                                                />
+                                                            </AreaChart>
+                                                        </ResponsiveContainer>
+                                                    </div>
+                                                    
+                                                    <div className="space-y-2.5">
+                                                        {zoneLabels.map((z, i) => {
+                                                            if (z.val === 0) return null;
+                                                            const wPct = (z.val / totalMins) * 100;
+                                                            return (
+                                                                <div key={i} className="flex flex-col gap-1">
+                                                                    <div className="flex justify-between items-center text-[9px]">
+                                                                        <span className={`font-bold ${t.textMain}`}>{z.name} <span className="opacity-50">(&gt;{Math.round(maxHR * (z.pct/100))} bpm)</span></span>
+                                                                        <span className="font-bold opacity-80">{Math.round(wPct)}%</span>
+                                                                    </div>
+                                                                    <div className="relative w-full h-1.5 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden">
+                                                                        <div className={`absolute top-0 bottom-0 left-0 rounded-full ${z.color} transition-all duration-1000`} style={{ width: `${wPct}%` }}></div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            );
                                         });
-                                    
-                                        const maxDataHr = Math.max(...hrData);
-                                        const avgHr = Math.round(hrData.reduce((a,b)=>a+b,0)/hrData.length);
-                                        
-                                        const chartData = hrData.map((val, i) => ({ index: i, value: val }));
-                                        
-                                        const zoneLabels = [
-                                            { name: 'Warm Up', color: 'bg-zinc-400', pct: 50, val: zoneMins[0] },
-                                            { name: 'Fat Burn', color: 'bg-sky-400', pct: 60, val: zoneMins[1] },
-                                            { name: 'Cardio', color: 'bg-emerald-400', pct: 70, val: zoneMins[2] },
-                                            { name: 'Anaerobic', color: 'bg-amber-400', pct: 80, val: zoneMins[3] },
-                                            { name: 'Peak', color: 'bg-rose-500', pct: 90, val: zoneMins[4] }
-                                        ];
-                                        
-                                        const totalMins = zoneMins.reduce((a,b)=>a+b,0);
-                                        
-                                        return (
-                                            <div className="mt-2 mb-2 p-4 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">
-                                                <div className="flex items-center justify-between mb-4">
-                                                    <h4 className={`text-[10px] font-black uppercase tracking-widest ${t.textMain}`}>Zona Nadi Saat Latihan</h4>
-                                                    <span className="text-[8px] font-bold bg-blue-500/20 text-blue-500 px-1.5 py-0.5 rounded">DUMMY DATA</span>
-                                                </div>
-                                                
-                                                <div className="flex justify-between items-end mb-4">
-                                                    <div>
-                                                        <div className={`text-[9px] font-bold uppercase tracking-widest ${t.textMuted}`}>Rata-rata</div>
-                                                        <div className="flex items-baseline gap-1"><span className={`text-2xl font-black tracking-tighter ${t.textMain}`}>{avgHr}</span><span className={`text-[9px] font-bold ${t.textMuted}`}>bpm</span></div>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <div className={`text-[9px] font-bold uppercase tracking-widest ${t.textMuted}`}>Maksimal</div>
-                                                        <div className="flex items-baseline justify-end gap-1"><span className={`text-xl font-black tracking-tighter ${t.textMain}`}>{maxDataHr}</span><span className={`text-[9px] font-bold ${t.textMuted}`}>bpm</span></div>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div className="relative w-full h-24 mb-5 border-b border-black/10 dark:border-white/10">
-                                                    <ResponsiveContainer width="100%" height="100%">
-                                                        <AreaChart data={chartData} margin={{ top: 5, right: 5, left: 5, bottom: 0 }}>
-                                                            <defs>
-                                                                <linearGradient id="colorHr" x1="0" y1="0" x2="0" y2="1">
-                                                                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.6}/>
-                                                                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                                                                </linearGradient>
-                                                            </defs>
-                                                            <Area 
-                                                                type="natural" 
-                                                                dataKey="value" 
-                                                                stroke="#3b82f6" 
-                                                                strokeWidth={1.5}
-                                                                fillOpacity={1} 
-                                                                fill="url(#colorHr)" 
-                                                                isAnimationActive={false}
-                                                                dot={false}
-                                                                activeDot={{ r: 4, fill: '#3b82f6', stroke: '#fff', strokeWidth: 1.5 }}
-                                                            />
-                                                        </AreaChart>
-                                                    </ResponsiveContainer>
-                                                </div>
-                                                
-                                                <div className="space-y-2.5">
-                                                    {zoneLabels.map((z, i) => {
-                                                        if (z.val === 0) return null;
-                                                        const wPct = (z.val / totalMins) * 100;
-                                                        return (
-                                                            <div key={i} className="flex flex-col gap-1">
-                                                                <div className="flex justify-between items-center text-[9px]">
-                                                                    <span className={`font-bold ${t.textMain}`}>{z.name} <span className="opacity-50">(&gt;{Math.round(maxHR * (z.pct/100))} bpm)</span></span>
-                                                                    <span className="font-bold opacity-80">{Math.round(wPct)}%</span>
-                                                                </div>
-                                                                <div className="relative w-full h-1.5 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden">
-                                                                    <div className={`absolute top-0 bottom-0 left-0 rounded-full ${z.color} transition-all duration-1000`} style={{ width: `${wPct}%` }}></div>
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        );
                                      })()}
 
                                    </div>
@@ -1700,20 +1739,55 @@ const CalendarTab = ({
                                                      }
                       
                                                      let textStr = "";
+                                                     let zoneNode = null;
+                                                     
+                                                     const nameLower = (ex.name || '').toLowerCase();
+                                                     const targetLower = Array.isArray(ex.target) ? ex.target.join(' ').toLowerCase() : (ex.target || '').toLowerCase();
+                                                     const cardioKeywords = ['cardio', 'run', 'lari', 'treadmill', 'jog', 'cycle', 'bike', 'sepeda', 'swim', 'renang', 'elliptical', 'rowing', 'dayung', 'walk', 'jalan'];
+                                                     const isCardioMatch = cardioKeywords.some(kw => nameLower.includes(kw) || targetLower.includes(kw));
+                                                     const exType = (ex.type === 'time' && isCardioMatch) ? 'cardio' : (ex.type || 'weight');
+
                                                      if (doneSets.length > 0) {
-                                                        const maxW = Math.max(...doneSets.map(s => Number(s.w) || 0)) || ex.defaultWeight || 0;
-                                                        const maxR = Math.max(...doneSets.map(s => Number(s.r) || 0)) || ex.reps || 0;
-                                                        const maxD = Math.max(...doneSets.map(s => Number(s.d) || 0)) || ex.duration || 0;
                                                         const langId = lang?.id || 'ID';
-                                                        if (ex.type === 'time') textStr = `${doneSets.length} x ${formatNumber(maxD, langId)}s`;
-                                                        else if (ex.type === 'reps') textStr = `${doneSets.length} x ${formatNumber(maxR, langId)}`;
-                                                        else textStr = `${doneSets.length} x ${formatNumber(maxR, langId)} x ${isImp ? formatNumber(Math.round(maxW * 2.20462 * 10)/10, langId) + ' lbs' : formatNumber(maxW, langId) + ' kg'}`;
+                                                        if (exType === 'cardio') {
+                                                            const totalDist = doneSets.reduce((acc, s) => acc + Number(s.distance || 0), 0);
+                                                            const totalDur = doneSets.reduce((acc, s) => acc + Number(s.duration || 0), 0);
+                                                            
+                                                            // Filter out sets that don't have HR for the average calculation
+                                                            const setsWithHr = doneSets.filter(s => Number(s.heartRate) > 0);
+                                                            const avgHr = setsWithHr.length > 0 
+                                                                ? Math.round(setsWithHr.reduce((acc, s) => acc + Number(s.heartRate), 0) / setsWithHr.length) 
+                                                                : 0;
+                                                            
+                                                            const age = calculateAge(userProfile?.biometrics?.birthDate || userProfile?.birthDate);
+                                                            const zone = getHRZone(avgHr, age);
+                                                            
+                                                            textStr = `${totalDist > 0 ? formatNumber(totalDist, langId) + ' km | ' : ''}${totalDur} mnt`;
+                                                            if (zone) {
+                                                              if (zone.error === 'MISSING_AGE') {
+                                                                zoneNode = <span className="text-[9px] text-amber-500 font-bold ml-2 px-1.5 py-0.5 bg-amber-500/10 rounded" title="Set Umur di Profil">Set Umur Profil</span>;
+                                                              } else {
+                                                                zoneNode = <span className={`text-[9px] font-bold ml-2 px-1.5 py-0.5 rounded ${zone.color} bg-black/5 dark:bg-white/5`}>{zone.label}</span>;
+                                                              }
+                                                            }
+                                                        } else {
+                                                            const maxW = Math.max(...doneSets.map(s => Number(s.w) || 0)) || ex.defaultWeight || 0;
+                                                            const maxR = Math.max(...doneSets.map(s => Number(s.r) || 0)) || ex.reps || 0;
+                                                            const maxD = Math.max(...doneSets.map(s => Number(s.d) || 0)) || ex.duration || 0;
+                                                            
+                                                            if (exType === 'time') textStr = `${doneSets.length} x ${formatNumber(maxD, langId)}s`;
+                                                            else if (exType === 'reps') textStr = `${doneSets.length} x ${formatNumber(maxR, langId)}`;
+                                                            else textStr = `${doneSets.length} x ${formatNumber(maxR, langId)} x ${isImp ? formatNumber(Math.round(maxW * 2.20462 * 10)/10, langId) + ' lbs' : formatNumber(maxW, langId) + ' kg'}`;
+                                                        }
                                                      } else textStr = "Belum dimulai";
                       
                                                      return (
                                                        <div key={ex.id} className={`p-2 px-3 rounded-lg bg-black/5 dark:bg-white/5 flex justify-between items-center`}>
                                                          <div className={`body-md truncate mr-2 ${c.text}`}>{idx + 1}. {ex.name}</div>
-                                                         <div className={`body-md font-mono whitespace-nowrap opacity-80 ${c.text}`}>{textStr}</div>
+                                                         <div className={`body-md font-mono whitespace-nowrap opacity-80 flex items-center ${c.text}`}>
+                                                           {textStr}
+                                                           {zoneNode}
+                                                         </div>
                                                        </div>
                                                      );
                                                   })}

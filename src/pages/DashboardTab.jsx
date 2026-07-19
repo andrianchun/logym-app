@@ -46,6 +46,21 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   // STATE KONEKSI & SINKRONISASI
   // ==========================================
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [isRaigaHidden, setIsRaigaHidden] = useState(() => localStorage.getItem('lyfit_raiga_hidden') === 'true');
+
+  useEffect(() => {
+      const handleToggle = (e) => {
+          if (e.detail?.action === 'show' || e.detail?.action === 'showAndOpen') {
+              setIsRaigaHidden(false);
+          } else if (e.detail?.action === 'hide') {
+              setIsRaigaHidden(true);
+          } else {
+              setIsRaigaHidden(prev => !prev);
+          }
+      };
+      window.addEventListener('toggle-raiga-float', handleToggle);
+      return () => window.removeEventListener('toggle-raiga-float', handleToggle);
+  }, []);
 
 
   // ==========================================
@@ -573,7 +588,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   }, [activityTargets?.nutritionGoal, activityTargets?.calorieDelta, activityTargets?.tdee, activeDate, todayStr]);
 
   return (
-    <div className="space-y-4 animate-in fade-in duration-300 pb-6">
+    <div className="space-y-4 animate-in fade-in duration-300 pb-6 overflow-x-hidden">
       
       {/* HEADER & INTEGRASI APPS */}
       <div className="pt-2 px-4 flex justify-between items-center mb-2 anim-rise">
@@ -587,9 +602,17 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                  <Dumbbell size={12} />
                  <span className="body-md font-bold text-[13px]">{gymProfiles?.find(g => g.id === activeGymId)?.name || 'LOGYM'}</span>
                </div>
-               </div>
-             </div>
-          </div>
+            </div>
+         </div>
+         <div className="flex items-center gap-2 relative z-20 h-10 -mr-1">
+            {isRaigaHidden && (
+               <button onClick={() => { playSoundEffect('click', soundEnabled); window.dispatchEvent(new CustomEvent('toggle-raiga-float', { detail: { action: 'showAndOpen' } })); }} className={`flex items-center gap-1.5 bg-blue-500/10 text-blue-500 border border-blue-500/20 rounded-full pl-1.5 pr-2.5 py-1.5 hover:bg-blue-500/20 transition-all shadow-sm animate-in zoom-in-90 duration-300`}>
+                  <div className="w-7 h-7 rounded-full overflow-hidden bg-zinc-900 border border-blue-400 shrink-0" style={{backgroundImage: "url('/bg-program.webp')", backgroundSize: '450%', backgroundPosition: '52% 7%'}}></div>
+                  <span className="text-[10px] font-black tracking-wider uppercase whitespace-nowrap">Konsul Logy</span>
+               </button>
+            )}
+         </div>
+      </div>
        
       <div className="flex flex-col sm:grid sm:grid-cols-2 sm:gap-6 sm:items-start space-y-4 sm:space-y-0">
       {/* --- GRUP KOMPOSISI & BIOMETRIK --- */}

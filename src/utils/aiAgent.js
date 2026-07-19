@@ -291,7 +291,7 @@ The JSON must exactly match this schema:
   "daysPerWeek": Number,
   "routines": [
      {
-        "name": "String — just the focus/theme (e.g. \\"Power & Strength\\", \\"Push Day\\"). NEVER prefix it with \\"Day 1:\\", \\"Hari 1:\\" or similar — assignedDays already conveys which day this is, repeating it in the name is redundant.",
+        "name": "String — just the focus/theme (e.g. \"Power & Strength\", \"Push Day\"). NEVER prefix or suffix it with the day of the week (e.g. do not output \"Push Day (Senin)\" or \"Hari 1: Push\"). assignedDays already conveys which day this is, so any mention of the day inside the routine name is STRICTLY FORBIDDEN.",
         "assignedDays": ["String array — WAJIB DIISI. Gunakan singkatan hari Indonesia: Sen, Sel, Rab, Kam, Jum, Sab, Min. Distribusikan sesuai daysPerWeek user. Hanya kosongkan jika user secara eksplisit tidak menyebutkan jadwal apapun."],
         "exercises": [
            { "name": "String (Must match closely with an exercise in the library)", "sets": Number, "reps": Number }

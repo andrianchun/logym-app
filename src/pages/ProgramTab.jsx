@@ -141,7 +141,9 @@ const ProgramTab = ({
   const { dialog, showAlert } = useDialog(isDark);
   const [expandedRoutineId, setExpandedRoutineId] = useState(null);
   const [editingPlanId, setEditingPlanId] = useState(null);
-  // showAiChat now managed by parent App.jsx (hoisted for global floating button)
+  const [programsSnapshot, setProgramsSnapshot] = useState(null); // snapshot for Batal/cancel
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
 
   useEffect(() => {
     if (focusRoutineId) {
@@ -207,6 +209,7 @@ const ProgramTab = ({
       };
       setPrograms([...programs, newProg]);
       setExpandedRoutineId(newProg.id);
+      scrollToRoutine(newProg.id);
     };
 
   const handleDeleteRoutine = (routineId, routineName) => {
@@ -239,6 +242,31 @@ const ProgramTab = ({
     });
   };
 
+  const scrollToRoutine = (rId) => {
+    setTimeout(() => {
+      const el = document.getElementById(`routine-${rId}`);
+      if (el) {
+        const container = el.closest('.overflow-y-auto');
+        if (container) {
+          const headerOffset = 75;
+          const containerTop = container.getBoundingClientRect().top;
+          const elTop = el.getBoundingClientRect().top;
+          const scrollPos = elTop - containerTop + container.scrollTop - headerOffset;
+          container.scrollTo({ top: scrollPos, behavior: 'smooth' });
+        }
+      }
+    }, 150); 
+  };
+
+  const handleToggleRoutineAccordion = (rId) => {
+    if (expandedRoutineId === rId) {
+      setExpandedRoutineId(null);
+    } else {
+      setExpandedRoutineId(rId);
+      scrollToRoutine(rId);
+    }
+  };
+
   const handleDuplicateRoutine = (routine) => {
     playSoundEffect('click', soundEnabled);
     const dupe = {
@@ -253,6 +281,7 @@ const ProgramTab = ({
     };
     setPrograms([...programs, dupe]);
     setExpandedRoutineId(dupe.id);
+    scrollToRoutine(dupe.id);
   };
 
   const handleRenameRoutine = (routineId, newName) => {
@@ -474,6 +503,8 @@ const ProgramTab = ({
       setPrograms([...programs, newProg]);
       if (setActivePlanIds) setActivePlanIds([...activePlanIds, newPlanId]);
       setExpandedRoutineId(newProg.id);
+      // Snapshot BEFORE entering edit — for new plan, snapshot the pre-add state
+      setProgramsSnapshot(JSON.parse(JSON.stringify(programs)));
       setEditingPlanId(newPlanId);
       
       setTimeout(() => {
@@ -539,47 +570,38 @@ const ProgramTab = ({
 
         <div className="mb-2">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <h4 className={`font-bold text-sm ${t.textMain}`}>Waktu Istirahat Antarset</h4>
+            <h4 className={`font-bold text-sm ${t.textMain}`}>Waktu Istirahat Antarset</h4>
+            <div className="w-[120px]">
+                <SwipeInput 
+                    value={routine.restTime || 120} 
+                    onChange={(val) => handleRestTimeChange(routine.id, val)}
+                    className="w-full bg-black/20 text-blue-400 font-black text-center py-2 rounded-xl outline-none border border-transparent focus:border-blue-500/50 transition-colors"
+                    min={0}
+                    max={600}
+                    step={10}
+                    formatValue={(v) => {
+                       if (v >= 60) {
+                           const m = Math.floor(v / 60);
+                           const s = v % 60;
+                           return s > 0 ? `${m}m ${s}s` : `${m}m`;
+                       }
+                       return `${v}s`;
+                    }}
+                />
             </div>
-            <span className={`text-lg font-black ${t.textAccent}`}>{routine.restTime || 120}s</span>
-          </div>
-          
-          <div className="px-1 mb-4">
-            <input 
-              type="range" 
-              min="0" 
-              max="300" 
-              step="5" 
-              value={routine.restTime || 120} 
-              onChange={(e) => handleRestTimeChange(routine.id, parseInt(e.target.value))}
-              className={`w-full h-2 bg-black/10 dark:bg-white/20 rounded-lg appearance-none cursor-pointer ${t.textAccent.replace('text-', 'accent-')}`}
-            />
-            <div className={`flex justify-between mt-2 text-[10px] font-bold ${t.textMuted}`}>
-              <span>0s</span>
-              <span>150s</span>
-              <span>300s</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-4 gap-2">
-            {restPresets.map(preset => (
-              <button key={preset} onClick={() => { playSoundEffect('click', soundEnabled); handleRestTimeChange(routine.id, preset); }} className={`py-1.5 rounded-xl text-xs font-bold transition-all duration-150 ${(routine.restTime || 120) === preset ? `${t.bgAccent} text-white shadow-md scale-105` : `${t.inputBg} ${t.textMuted} hover:${t.textMain}`}`}>{preset}s</button>
-            ))}
           </div>
         </div>
 
         {/* Exercises */}
         <div>
           <div className="flex items-center gap-2 mb-4">
-            <h4 className={`font-bold text-sm ${t.textMain}`}>Daftar Latihan ({routine.exercises.length})</h4>
+            <h4 className={`font-bold text-sm ${t.textMain}`}>Latihan ({routine.exercises.length})</h4>
           </div>
 
           {routine.exercises.length === 0 ? (
-            <div className={`flex flex-col items-center justify-center py-6 rounded-2xl border-2 border-dashed ${t.borderAccentSoft}`}>
-              <p className={`text-sm ${t.textMuted} mb-3`}>Belum ada latihan di rutinitas ini.</p>
-              <button onClick={() => handleAddExercise(routine.id)} className={`flex items-center px-4 py-2 rounded-full text-white font-bold text-xs ${t.bgAccent} shadow-md hover:opacity-90 transition-all active:scale-95`}><Plus size={14} className="mr-1" /> Tambah Latihan</button>
-            </div>
+             <button onClick={() => handleAddExercise(routine.id)} className="w-full py-4 mt-2 mb-2 border-2 border-dashed border-white/10 text-blue-400 hover:text-blue-300 hover:bg-blue-400/5 hover:border-blue-400/20 font-bold rounded-[100px] transition-all active:scale-95 flex items-center justify-center gap-2">
+                 <Plus size={20} /> Latihan
+             </button>
           ) : (
             <div className="-mx-5 bg-black/5 dark:bg-white/5">
               <DndContext
@@ -680,7 +702,7 @@ const ProgramTab = ({
           <div className="absolute inset-0 z-0 pointer-events-none">
             {/* Base Layer for Glassmorphism */}
             <div 
-              className={`absolute inset-0 transition-all duration-700 ${group.isAI ? 'opacity-20 blur-2xl scale-110' : 'opacity-60'}`}
+              className={`absolute inset-0 ${group.isAI ? 'opacity-20 blur-2xl scale-110' : 'opacity-60'}`}
               style={{
                 backgroundImage: `url('${bgConfig.url}')`,
                 backgroundSize: bgConfig.bgSize || 'cover',
@@ -690,14 +712,14 @@ const ProgramTab = ({
             />
             {/* Focal Layer for Left Panel */}
             <div 
-              className={`absolute top-0 -bottom-12 left-0 w-[55%] transition-all duration-700 opacity-100`}
+              className={`absolute top-0 -bottom-12 left-0 w-[55%] opacity-100`}
               style={{
                 WebkitMaskImage: 'linear-gradient(to right, black 80%, transparent 100%)',
                 maskImage: 'linear-gradient(to right, black 80%, transparent 100%)'
               }}
             >
               <div 
-                className="absolute inset-0 transition-all duration-700"
+                className="absolute inset-0"
                 style={{
                   backgroundImage: `url('${bgConfig.url}')`,
                   backgroundSize: bgConfig.bgSize || 'cover',
@@ -760,34 +782,6 @@ const ProgramTab = ({
                   )}
                 </div>
               </div>
-              <div className="flex gap-1 shrink-0">
-                {editingPlanId === planId ? (
-                  <>
-                    <button 
-                      onClick={() => handleDeletePlan(planId, group.planName)}
-                      className={`p-1.5 rounded-full bg-rose-500/20 text-rose-300 hover:bg-rose-500/40 transition-colors`}
-                    >
-                      <X size={16} />
-                    </button>
-                  </>
-                ) : (
-                  <button 
-                    onClick={() => {
-                      setEditingPlanId(planId);
-                      if (!expandedRoutineId && group.routines.length > 0) {
-                        setExpandedRoutineId(group.routines[0].id);
-                      }
-                      setTimeout(() => {
-                        const el = document.getElementById(`plan-${layout}-${planId}`);
-                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                      }, 150);
-                    }}
-                    className={`p-1.5 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition-colors`}
-                  >
-                    <Edit2 size={16} />
-                  </button>
-                )}
-              </div>
             </div>
 
             {/* SIMPLE SCHEDULE LIST */}
@@ -803,7 +797,7 @@ const ProgramTab = ({
             </div>
 
             {/* ACTION BUTTONS */}
-            <div className="mt-auto flex gap-2 relative z-10 w-full pt-1">
+            <div className="mt-auto flex items-center gap-2 relative z-10 w-full pt-1">
                 <button 
                   onClick={() => { 
                     playSoundEffect('success', soundEnabled); 
@@ -820,9 +814,24 @@ const ProgramTab = ({
                       }, 100);
                     }
                   }}
-                  className={`flex-1 py-3.5 rounded-full font-black text-sm transition-all active:scale-95 flex items-center justify-center gap-2 ${isActive ? `${t.bgAccent} text-white shadow-lg border border-transparent` : `bg-white/10 hover:bg-white/20 border border-white/20 text-white shadow-sm`}`}
+                  className={`flex-1 h-[38px] rounded-full font-black text-sm transition-all active:scale-95 flex items-center justify-center gap-2 ${isActive ? `${t.bgAccent} text-white shadow-lg border border-transparent` : `bg-white/10 hover:bg-white/20 border border-white/20 text-white shadow-sm`}`}
                 >
                   {isActive ? 'Aktif' : 'Aktifkan'}
+                </button>
+                <button 
+                  onClick={() => {
+                    playSoundEffect('click', soundEnabled);
+                    setEditingPlanId(planId);
+                    setProgramsSnapshot(JSON.parse(JSON.stringify(programs)));
+                    setTimeout(() => {
+                      const el = document.getElementById(`plan-${layout}-${planId}`);
+                      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 150);
+                  }}
+                  className={`w-[38px] h-[38px] p-0 rounded-full transition-all flex items-center justify-center bg-white/10 hover:bg-white/20 border border-white/20 text-white shadow-sm shrink-0 active:scale-95`}
+                  title="Edit Program"
+                >
+                  <Edit2 size={15} />
                 </button>
                 {true && (
                   <button 
@@ -834,142 +843,161 @@ const ProgramTab = ({
                         await showAlert('Kamu harus login untuk membagikan program.', { type: 'info' });
                       }
                     }}
-                    className={`w-[48px] h-[48px] p-0 rounded-full transition-all flex items-center justify-center bg-white/10 hover:bg-white/20 border border-white/20 text-white shadow-sm shrink-0`}
+                    className={`w-[38px] h-[38px] p-0 rounded-full transition-all flex items-center justify-center bg-white/10 hover:bg-white/20 border border-white/20 text-white shadow-sm shrink-0 active:scale-95`}
                     title="Bagikan ke Komunitas"
                   >
-                    <Share2 size={18} />
+                    <Share2 size={15} />
                   </button>
                 )}
               </div>
             </div>
           </div>
 
-          {/* ACCORDION CONTENT */}
-          <div className={`grid relative z-10 transition-all duration-500 ease-in-out w-full ${editingPlanId === planId ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
-              <div className="overflow-hidden">
-                  <div className={`flex flex-col mt-3 rounded-[2rem] overflow-hidden border ${isDark ? 'border-white/5 bg-black/20' : 'border-black/5 bg-black/5'} shadow-inner`}>
-                {group.routines.map((routine, idx) => {
-                  const isExpanded = expandedRoutineId === routine.id;
-                  const estDuration = Math.round(routine.exercises.reduce((acc, ex) => acc + (parseInt(ex.sets) || 3), 0) * (45 + (parseInt(routine.restTime) || 90)) / 60);
-                  return (
-                    <div id={`routine-${routine.id}`} key={routine.id} className={`border-t ${t.border}`}>
-                      <div 
-                        onClick={() => { if(!isExpanded) { playSoundEffect('swipe', soundEnabled); setExpandedRoutineId(routine.id); } }}
-                        className={`w-full px-5 py-4 transition-colors ${isExpanded ? t.bgAccentSoft : `hover:${t.inputBg} cursor-pointer`}`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 min-w-0 text-left flex flex-col justify-center">
-                            {isExpanded ? (
-                              <input
-                                type="text"
-                                value={routine.name}
-                                onClick={(e) => e.stopPropagation()}
-                                onChange={(e) => handleRenameRoutine(routine.id, e.target.value)}
-                                style={{
-                                  WebkitMaskImage: 'linear-gradient(to left, transparent 10px, black 40px)',
-                                  maskImage: 'linear-gradient(to left, transparent 10px, black 40px)'
-                                }}
-                                className={`w-full bg-transparent font-black text-lg ${t.textMain} outline-none transition-all border-b-2 border-transparent focus:border-blue-500/50 dark:focus:border-blue-400/50 pb-0.5`}
-                                placeholder="Nama Rutinitas..."
-                              />
-                            ) : (
-                              <h4 className={`font-bold text-lg ${t.textMain} truncate`}>{routine.name}</h4>
-                            )}
-                            <p className={`text-xs ${t.textMuted} mt-1`}>
-                              {routine.assignedDays && routine.assignedDays.length > 0 && (
-                                <span className={`font-bold ${t.textAccent} uppercase`}>{routine.assignedDays.join(', ')} &bull; </span>
-                              )}
-                              {routine.exercises.length} Latihan &bull; {routine.restTime}s Istirahat &bull; ~{estDuration} mnt
-                            </p>
-                          </div>
-                          
-                          <div className="flex items-center shrink-0 h-full mt-1">
-                            {isExpanded && (
-                              <>
-                                <button onClick={(e) => { e.stopPropagation(); handleDuplicateRoutine(routine); }} className={`p-1.5 rounded-xl ${t.textMuted} hover:${t.inputBg} hover:${t.textAccent} transition-colors`}><Copy size={18} /></button>
-                                <button onClick={(e) => { e.stopPropagation(); handleDeleteRoutine(routine.id, routine.name); }} disabled={programs.length <= 1} className={`p-1.5 rounded-xl text-rose-500/70 transition-colors ${programs.length <= 1 ? 'opacity-30 cursor-not-allowed' : `hover:${t.inputBg} hover:text-rose-500`}`}><Trash2 size={18} /></button>
-                              </>
-                            )}
-                            <button onClick={(e) => { e.stopPropagation(); playSoundEffect('swipe', soundEnabled); setExpandedRoutineId(isExpanded ? null : routine.id); }} className={`p-1.5 transition-colors rounded-xl ${isExpanded ? t.textAccent : t.textMuted} hover:${t.inputBg}`}>
-                              {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className={`grid transition-all duration-300 ease-in-out ${isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
-                        <div className="overflow-hidden">
-                          {renderRoutineEditor(routine)}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {/* Add Custom Routine Button */}
-                {true && (
-                  <div className={`px-5 py-4 border-t ${t.border}`}>
-                    {editingPlanId === planId ? (
-                        <div className="flex flex-col gap-3">
-                            <button 
-                              onClick={() => handleCreateRoutine(planId, group.planName)}
-                              className={`w-full py-3 rounded-full font-bold text-sm border-2 border-dashed ${t.borderAccentSoft} ${t.textAccent} hover:${t.bgAccentSoft} transition-all active:scale-95 flex items-center justify-center gap-2`}
-                            >
-                              <Plus size={16} /> Rutinitas Baru
-                            </button>
-                            <div className="flex gap-2">
-                                <button
-                                  onClick={() => {
-                                      playSoundEffect('click', soundEnabled);
-                                      closeEditAndScrollToPlan(planId);
-                                  }}
-                                  className={`flex-[0.4] py-3 rounded-full font-bold text-sm ${t.inputBg} ${t.textMain} hover:opacity-80 transition-all active:scale-95`}
-                                >
-                                  Batal
-                                </button>
-                                <button
-                                  onClick={() => {
-                                      const invalidRoutine = group.routines.find(r => !r.assignedDays || r.assignedDays.length === 0);
-                                      if (invalidRoutine) {
-                                          showAlert(`Rutinitas "${invalidRoutine.name}" belum memiliki jadwal hari. Silakan pilih minimal 1 hari.`, { type: 'error' });
-                                          setExpandedRoutineId(invalidRoutine.id);
-                                      } else {
-                                          playSoundEffect('success', soundEnabled);
-                                          closeEditAndScrollToPlan(planId);
-                                      }
-                                  }}
-                                  className={`flex-1 py-3 rounded-full font-black text-white ${t.bgAccent} hover:opacity-90 shadow-md transition-all active:scale-95 flex items-center justify-center gap-2`}
-                                >
-                                  Simpan Program
-                                </button>
-                            </div>
-                        </div>
-                    ) : (
-                        <button
-                          onClick={() => { playSoundEffect('click', soundEnabled); setEditingPlanId(planId); }}
-                          className={`w-full py-3 rounded-xl font-bold text-sm border-2 border-dashed ${t.borderAccentSoft} ${t.textAccent} hover:${t.bgAccentSoft} transition-all active:scale-95 flex items-center justify-center gap-2`}
-                        >
-                          <Edit2 size={16} /> Edit Program
-                        </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>  
       </div>
     );
   };
   return (
     <div className="flex flex-col animate-in fade-in duration-300 pb-6 max-w-4xl mx-auto w-full space-y-3 sm:space-y-4">
-  
-      {/* AI Generator Banner - REDESIGNED */}
+      {editingPlanId && groupedPrograms[editingPlanId] && (
+        <div className="fixed inset-0 z-[100] bg-neutral-950 overflow-y-auto overflow-x-hidden flex flex-col animate-in slide-in-from-bottom-10 fade-in duration-300 w-full h-full pb-20">
+            {/* DEDICATED VIEW HEADER */}
+            <div className="sticky top-0 bg-neutral-950/90 backdrop-blur-xl z-[60] border-b border-white/5 shadow-2xl">
+                <div className="flex items-center justify-center p-4 max-w-4xl mx-auto w-full">
+                    <input
+                        type="text"
+                        value={groupedPrograms[editingPlanId].planName}
+                        onChange={(e) => handleRenamePlan(editingPlanId, e.target.value)}
+                        maxLength={25}
+                        className="text-xl font-black text-white bg-transparent outline-none text-center border-b-2 border-white/20 focus:border-blue-500 transition-colors pb-0.5 w-full max-w-xs"
+                        placeholder="Nama Program..."
+                    />
+                </div>
+            </div>
+
+            {/* ROUTINES LIST */}
+            <div className="px-4 py-6 flex flex-col gap-6 max-w-4xl mx-auto w-full">
+                {groupedPrograms[editingPlanId].routines.map((routine) => {
+                    const estDuration = Math.round(routine.exercises.reduce((acc, ex) => acc + (parseInt(ex.sets) || 3), 0) * (45 + (parseInt(routine.restTime) || 90)) / 60);
+                    return (
+                        <div id={`routine-${routine.id}`} key={routine.id} className="bg-neutral-900 border border-white/5 rounded-3xl overflow-hidden shadow-xl">
+                            <div className="p-5 border-b border-white/5 bg-black/20 flex flex-col gap-3">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="flex-1 min-w-0">
+                                        <input
+                                            type="text"
+                                            value={routine.name}
+                                            onChange={(e) => handleRenameRoutine(routine.id, e.target.value)}
+                                            className="w-full bg-transparent font-black text-xl text-white outline-none focus:border-blue-500/50 border-b-2 border-transparent transition-colors pb-1"
+                                            placeholder="Nama Rutinitas..."
+                                            maxLength={25}
+                                        />
+                                        <p className="text-xs text-neutral-400 mt-1">
+                                            {routine.assignedDays && routine.assignedDays.length > 0 && (
+                                                <span className="font-bold text-blue-400 uppercase">{routine.assignedDays.join(', ')} &bull; </span>
+                                            )}
+                                            {routine.exercises.length} Latihan &bull; ~{estDuration} mnt
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        <button onClick={() => handleDuplicateRoutine(routine)} className="p-2 rounded-xl text-neutral-400 hover:text-white hover:bg-white/10 transition-colors"><Copy size={18} /></button>
+                                        <button onClick={() => handleDeleteRoutine(routine.id, routine.name)} className="p-2 rounded-xl text-rose-500/70 hover:text-rose-500 hover:bg-rose-500/20 transition-colors"><X size={20} /></button>
+                                        <button onClick={() => handleToggleRoutineAccordion(routine.id)} className={`p-2 rounded-xl transition-colors ${expandedRoutineId === routine.id ? 'text-blue-400' : 'text-neutral-400'} hover:bg-white/10`}>
+                                            {expandedRoutineId === routine.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className={`grid transition-all duration-300 ease-in-out ${expandedRoutineId === routine.id ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
+                                <div className="overflow-hidden">
+                                    {renderRoutineEditor(routine)}
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
+                
+                {groupedPrograms[editingPlanId].routines.length > 0 && (
+                    <button 
+                        onClick={() => handleCreateRoutine(editingPlanId, groupedPrograms[editingPlanId].planName)}
+                        className="mt-2 w-full py-4 border-2 border-dashed border-white/10 text-white/50 hover:text-white/80 hover:bg-white/5 hover:border-white/20 font-bold rounded-3xl transition-all active:scale-95 flex items-center justify-center gap-2"
+                    >
+                        <Plus size={20} /> Tambah Rutinitas
+                    </button>
+                )}
+                
+                {groupedPrograms[editingPlanId].routines.length === 0 && (
+                    <div className="flex flex-col items-center justify-center p-10 border-2 border-dashed border-white/10 rounded-3xl text-neutral-500">
+                        <Dumbbell size={32} className="mb-3 opacity-50" />
+                        <p className="text-sm font-medium">Belum ada rutinitas di program ini.</p>
+                        <button 
+                            onClick={() => handleCreateRoutine(editingPlanId, groupedPrograms[editingPlanId].planName)}
+                            className="mt-4 px-6 py-2.5 bg-blue-500 text-white font-bold rounded-full text-sm active:scale-95 transition-all shadow-lg"
+                        >
+                            + Tambah Rutinitas
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            {/* FIXED FOOTER FOR DEDICATED VIEW */}
+            <div className="fixed bottom-0 left-0 right-0 p-4 bg-neutral-950/90 backdrop-blur-md border-t border-white/5 z-[60] flex gap-3 pb-8 md:pb-4 justify-center">
+                <div className="w-full max-w-4xl flex gap-3">
+                    <button 
+                        onClick={() => {
+                          playSoundEffect('click', soundEnabled);
+                          // Restore snapshot to discard all changes
+                          if (programsSnapshot) {
+                            setPrograms(programsSnapshot);
+                            setProgramsSnapshot(null);
+                          }
+                          closeEditAndScrollToPlan(editingPlanId);
+                        }}
+                        className="flex-1 py-3.5 rounded-2xl font-bold bg-neutral-800 hover:bg-neutral-700 text-white transition-colors"
+                    >
+                        Batal
+                    </button>
+                    <button 
+                        onClick={() => {
+                            const invalidRoutine = groupedPrograms[editingPlanId].routines.find(r => !r.assignedDays || r.assignedDays.length === 0);
+                            const emptyRoutine = groupedPrograms[editingPlanId].routines.find(r => r.exercises.length === 0);
+                            
+                            if (invalidRoutine) {
+                                showAlert(`Rutinitas "${invalidRoutine.name}" belum memiliki jadwal hari. Silakan pilih minimal 1 hari.`, { type: 'error' });
+                            } else if (emptyRoutine) {
+                                setConfirmModal({
+                                    isOpen: true,
+                                    title: 'Rutinitas Kosong',
+                                    message: `Rutinitas "${emptyRoutine.name}" belum memiliki latihan sama sekali. Mau dihapus saja atau batal simpan?`,
+                                    confirmText: 'Ya, Hapus Saja',
+                                    onConfirm: () => {
+                                        setPrograms(prevPrograms => prevPrograms.filter(p => p.id !== emptyRoutine.id));
+                                        if (expandedRoutineId === emptyRoutine.id) setExpandedRoutineId(null);
+                                    }
+                                });
+                            } else {
+                                playSoundEffect('success', soundEnabled);
+                                setProgramsSnapshot(null); // commit changes
+                                closeEditAndScrollToPlan(editingPlanId);
+                            }
+                        }}
+                        className="flex-[2] py-3.5 rounded-2xl font-black bg-blue-500 hover:bg-blue-600 text-white shadow-xl shadow-blue-500/20 transition-all active:scale-95"
+                    >
+                        Simpan Program
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
+      
+      <div className={editingPlanId ? 'pointer-events-none' : ''} aria-hidden={!!editingPlanId}>
+          {/* AI Generator Banner - REDESIGNED */}
       <div 
         className={`w-full rounded-[2rem] border-0 shadow-[0_8px_30px_rgb(0,0,0,0.12)] overflow-hidden transition-all flex flex-col relative min-h-[300px] sm:min-h-[360px]`}
       >
         {/* --- Background Image Layer --- */}
         <div 
-          className={`absolute inset-0 z-0 pointer-events-none transition-all duration-700 opacity-100`}
+          className="absolute inset-0 z-0 pointer-events-none opacity-100"
           style={{
             backgroundImage: `url('/bg-program.webp')`,
             backgroundSize: '130%',
@@ -1077,6 +1105,7 @@ const ProgramTab = ({
       {/* GymAIChat is now rendered globally in App.jsx; onAcceptProgram is passed down via prop */}
       
       {dialog}
+      </div>
     </div>
   );
 };

@@ -41,7 +41,7 @@ export default function CoachRaigaFloat({
     // ── POSISI ──────────────────────────────────────────────────────────────
     const defaultPos = () => ({
         x: window.innerWidth - SIZE - EDGE_PAD,
-        y: clampY(window.innerHeight - SIZE - BOT_SAFE - 20),
+        y: clampY(TOP_SAFE + 10),
     });
 
     const [pos, setPos] = useState(() => {
@@ -59,6 +59,38 @@ export default function CoachRaigaFloat({
 
     const [visualPos, setVisualPos] = useState(pos);
     const [isSnapping, setIsSnapping] = useState(false);
+    const [isVisible, setIsVisible] = useState(() => localStorage.getItem('lyfit_raiga_hidden') !== 'true');
+    const [isHoveringDrop, setIsHoveringDrop] = useState(false);
+    const [showDragDrop, setShowDragDrop] = useState(false);
+
+    // Calculate fixed drop target position
+    const dropTarget = {
+        x: typeof window !== 'undefined' ? window.innerWidth / 2 - SIZE / 2 : 0,
+        y: typeof window !== 'undefined' ? window.innerHeight - 160 : 0
+    };
+
+    useEffect(() => {
+        const handleToggle = (e) => {
+            if (e.detail?.action === 'show' || e.detail?.action === 'showAndOpen') {
+                setIsVisible(true);
+                localStorage.setItem('lyfit_raiga_hidden', 'false');
+                if (e.detail?.action === 'showAndOpen') {
+                    setTimeout(() => onOpenChat?.(), 100);
+                }
+            } else if (e.detail?.action === 'hide') {
+                setIsVisible(false);
+                localStorage.setItem('lyfit_raiga_hidden', 'true');
+            } else {
+                setIsVisible(prev => {
+                    const next = !prev;
+                    localStorage.setItem('lyfit_raiga_hidden', next ? 'false' : 'true');
+                    return next;
+                });
+            }
+        };
+        window.addEventListener('toggle-raiga-float', handleToggle);
+        return () => window.removeEventListener('toggle-raiga-float', handleToggle);
+    }, []);
 
     const isDragging = useRef(false);
     const hasMoved = useRef(false);
@@ -83,7 +115,13 @@ export default function CoachRaigaFloat({
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
-        const onResize = () => snapTo(pos.x, pos.y);
+        let lastWidth = window.innerWidth;
+        const onResize = () => {
+            if (window.innerWidth !== lastWidth) {
+                lastWidth = window.innerWidth;
+                snapTo(pos.x, pos.y);
+            }
+        };
         window.addEventListener('resize', onResize);
         return () => window.removeEventListener('resize', onResize);
     }, [pos, snapTo]);
@@ -99,6 +137,7 @@ export default function CoachRaigaFloat({
             y: e.clientY - visualPos.y,
         };
         setIsSnapping(false);
+        setShowDragDrop(true);
         e.currentTarget.setPointerCapture(e.pointerId);
         e.preventDefault();
         e.stopPropagation(); // tidak trigger global swipe handler
@@ -110,13 +149,34 @@ export default function CoachRaigaFloat({
         const newY = clampY(e.clientY - dragOffset.current.y);
         const moved = Math.abs(newX - visualPos.x) + Math.abs(newY - visualPos.y);
         if (moved > 4) hasMoved.current = true;
-        setVisualPos({ x: newX, y: newY });
-    }, [visualPos]);
+
+        const dist = Math.hypot((newX - dropTarget.x), (newY - dropTarget.y));
+        
+        if (dist < 60) {
+            setIsHoveringDrop(true);
+            setVisualPos({ x: dropTarget.x, y: dropTarget.y });
+        } else {
+            setIsHoveringDrop(false);
+            setVisualPos({ x: newX, y: newY });
+        }
+    }, [visualPos, dropTarget.x, dropTarget.y]);
 
     const onPointerUp = useCallback((e) => {
         if (!isDragging.current) return;
         isDragging.current = false;
+        setShowDragDrop(false);
         const elapsed = Date.now() - dragStartTime.current;
+
+        if (isHoveringDrop) {
+            setIsVisible(false);
+            localStorage.setItem('lyfit_raiga_hidden', 'true');
+            window.dispatchEvent(new CustomEvent('toggle-raiga-float', { detail: { action: 'hide' } }));
+            setIsHoveringDrop(false);
+            // Snap back silently for when it reappears
+            setPos(defaultPos());
+            setVisualPos(defaultPos());
+            return;
+        }
 
         if (!hasMoved.current && elapsed < 300) {
             // Tap → buka chat, kembalikan ke snap pos
@@ -129,7 +189,7 @@ export default function CoachRaigaFloat({
                 e.clientY - dragOffset.current.y,
             );
         }
-    }, [pos, snapTo]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [pos, snapTo, isHoveringDrop]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // ── INSIGHT ─────────────────────────────────────────────────────────────
     const [showInsight, setShowInsight] = useState(false);
@@ -179,10 +239,19 @@ export default function CoachRaigaFloat({
     const snappedToRight = visualPos.x > window.innerWidth / 2;
     const bubbleAbove = visualPos.y > window.innerHeight / 2;
 
-    if (isWorkoutActive) return null;
+    if (isWorkoutActive || !isVisible) return null;
 
     return (
-        // no-swipe → global swipe handler akan skip element ini
+        <>
+        {/* Drop zone UI */}
+        <div 
+            className={`fixed w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 z-[60] pointer-events-none ${showDragDrop ? 'opacity-100' : 'opacity-0 scale-75'} ${isHoveringDrop ? 'bg-rose-500/80 border-rose-500 scale-125 shadow-lg shadow-rose-500/50' : 'bg-black/30 dark:bg-white/20 border-white/30'} border-2`}
+            style={{ left: dropTarget.x, top: dropTarget.y }}
+        >
+            <X size={28} className={`${isHoveringDrop ? 'text-white' : 'text-zinc-400'} transition-colors duration-200`} />
+        </div>
+
+        {/* no-swipe → global swipe handler akan skip element ini */}
         <div
             className="fixed z-50 select-none no-swipe"
             style={{
@@ -266,5 +335,6 @@ export default function CoachRaigaFloat({
                 />
             )}
         </div>
+        </>
     );
 }

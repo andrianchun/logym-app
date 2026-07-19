@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { SkipForward, Video, CheckCircle, Play, Square, Info, ArrowLeftRight, X, Dumbbell, ClipboardEdit, Flame, Brain, Plus } from 'lucide-react';
+import { SkipForward, Video, CheckCircle, Play, Square, Info, ArrowLeftRight, X, Dumbbell, ClipboardEdit, Flame, Brain, Plus, ChevronUp, ChevronDown, Activity } from 'lucide-react';
 import EquipmentIcon from './EquipmentIcon';
 import SwipeInput from './SwipeInput';
 import { formatTarget, exerciseTypeLabels, getVideoId } from '../data/constants';
@@ -17,8 +17,12 @@ const ExerciseCard = ({
 }) => {
   const isImp = units?.weight === 'lbs';
   let exType = ex.type || 'weight';
-  const isTargetCardio = Array.isArray(ex.target) ? ex.target.some(t => t.toLowerCase() === 'cardio') : (ex.target || '').toLowerCase().includes('cardio');
-  if (exType === 'time' && isTargetCardio) {
+  const nameLower = (ex.name || '').toLowerCase();
+  const targetLower = Array.isArray(ex.target) ? ex.target.join(' ').toLowerCase() : (ex.target || '').toLowerCase();
+  const cardioKeywords = ['cardio', 'run', 'lari', 'treadmill', 'jog', 'cycle', 'bike', 'sepeda', 'swim', 'renang', 'elliptical', 'rowing', 'dayung', 'walk', 'jalan'];
+  const isCardioMatch = cardioKeywords.some(kw => nameLower.includes(kw) || targetLower.includes(kw));
+  
+  if (exType === 'time' && isCardioMatch) {
     exType = 'cardio';
   }
   const isCustom = ex.id > 1000000 && ex.source !== 'exercisedb';
@@ -52,8 +56,31 @@ const ExerciseCard = ({
   // ==========================================
   // LOGIKA COUNTDOWN TIMER UNTUK DURASI
   // ==========================================
-  const [activeTimer, setActiveTimer] = useState({ idx: null, timeLeft: 0 });
+  const [activeTimer, setActiveTimer] = useState({ idx: null, timeLeft: 0, mode: 'down' });
   const [deletingSetIdx, setDeletingSetIdx] = useState(null);
+  const [showCardioExtras, setShowCardioExtras] = useState({});
+  const [isTreadmillMode, setIsTreadmillMode] = useState(() => (ex.name || '').toLowerCase().includes('treadmill'));
+
+  const handleCardioChange = (setIdx, field, val) => {
+      onUpdateSet(ex.id, setIdx, field, val);
+      const s = sets[setIdx];
+      let dist = field === 'distance' ? Number(val || 0) : Number(s.distance || 0);
+      let dur = field === 'duration' ? Number(val || 0) : Number(s.duration || 0);
+      let spd = field === 'speed' ? Number(val || 0) : Number(s.speed || 0);
+
+      if (field === 'speed' && dur > 0) {
+         const newDist = (val * (dur / 60)).toFixed(2);
+         onUpdateSet(ex.id, setIdx, 'distance', Number(newDist));
+      }
+      else if (field === 'distance' && dur > 0) {
+         const newSpd = (val / (dur / 60)).toFixed(1);
+         onUpdateSet(ex.id, setIdx, 'speed', Number(newSpd));
+      }
+      else if (field === 'duration' && spd > 0) {
+         const newDist = (spd * (val / 60)).toFixed(2);
+         onUpdateSet(ex.id, setIdx, 'distance', Number(newDist));
+      }
+  };
   const [activeSetDetail, setActiveSetDetail] = useState(null);
   const [showIntensityInfo, setShowIntensityInfo] = useState(false);
   const [rpeMode, setRpeMode] = useState(() => {
@@ -82,32 +109,52 @@ const ExerciseCard = ({
 
   useEffect(() => {
     let interval = null;
-    if (activeTimer.idx !== null && activeTimer.timeLeft > 0) {
+    if (activeTimer.idx !== null) {
       interval = setInterval(() => {
         setActiveTimer(prev => {
-          if (prev.timeLeft <= 1) {
-            clearInterval(interval);
-            // Waktu Habis! Otomatis centang set ini jika belum selesai
-            if (!sets[prev.idx]?.done) {
-                onToggleSet(ex.id, prev.idx);
-                // Kamu bisa ganti efek suaranya khusus timer jika ada
-                playSoundEffect('click', soundEnabled); 
-            }
-            return { idx: null, timeLeft: 0 };
+          if (prev.mode === 'down') {
+              if (prev.timeLeft <= 1) {
+                clearInterval(interval);
+                // Waktu Habis! Otomatis centang set ini jika belum selesai
+                if (!sets[prev.idx]?.done) {
+                    onToggleSet(ex.id, prev.idx);
+                    playSoundEffect('click', soundEnabled); 
+                }
+                return { idx: null, timeLeft: 0, mode: 'down' };
+              }
+              return { ...prev, timeLeft: prev.timeLeft - 1 };
+          } else {
+              // mode === 'up'
+              return { ...prev, timeLeft: prev.timeLeft + 1 };
           }
-          return { ...prev, timeLeft: prev.timeLeft - 1 };
         });
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [activeTimer, ex.id, onToggleSet, sets, soundEnabled]);
+  }, [activeTimer.idx, ex.id, onToggleSet, sets, soundEnabled]);
 
   const toggleTimer = (setIdx, durationMins) => {
     playSoundEffect('click', soundEnabled);
     if (activeTimer.idx === setIdx) {
-        setActiveTimer({ idx: null, timeLeft: 0 }); // Matikan timer
+        // Matikan timer
+        if (activeTimer.mode === 'up') {
+           // Simpan waktu berjalan ke durasi (dalam pecahan menit agar presisi)
+           const elapsedMins = Number((activeTimer.timeLeft / 60).toFixed(2));
+           if (exType === 'cardio') {
+               handleCardioChange(setIdx, 'duration', elapsedMins);
+           } else {
+               onUpdateSet(ex.id, setIdx, 'd', elapsedMins);
+           }
+        }
+        setActiveTimer({ idx: null, timeLeft: 0, mode: 'down' });
     } else {
-        setActiveTimer({ idx: setIdx, timeLeft: durationMins * 60 }); // Mulai (konversi menit ke detik)
+        // Mulai timer
+        const d = Number(durationMins || 0);
+        if (d > 0) {
+           setActiveTimer({ idx: setIdx, timeLeft: Math.round(d * 60), mode: 'down' }); // Hitung mundur
+        } else {
+           setActiveTimer({ idx: setIdx, timeLeft: 0, mode: 'up' }); // Hitung maju
+        }
     }
   };
 
@@ -289,93 +336,134 @@ const ExerciseCard = ({
          {/* DAFTAR SET LATIHAN */}
          <div className={`relative z-10 ${isSkip ? 'hidden' : ''}`}>
              {exType === 'cardio' ? (
-                 <div className="space-y-4">
-                     {sets.map((s, setIdx) => {
-                         // Pace calculation
-                         const d = Number(s.distance || 0);
-                         const tMin = Number(s.duration || 0);
-                         let paceStr = '-:--';
-                         if (d > 0 && tMin > 0) {
-                             const paceTotalSeconds = (tMin * 60) / d;
-                             const pm = Math.floor(paceTotalSeconds / 60);
-                             const ps = Math.floor(paceTotalSeconds % 60);
-                             paceStr = `${pm}:${ps < 10 ? '0' : ''}${ps}`;
-                         }
+                 <>
+                     {/* HEADER KOLOM KARDIO */}
+                     <div className={`grid grid-cols-[40px_1fr_2.1fr_1fr_36px_44px] gap-1 mb-2 text-[9px] font-black text-zinc-400 uppercase tracking-widest text-center items-center`}>
+                        <div></div>
+                        <div>Jarak <br /><span className="normal-case text-[8px] tracking-normal font-bold">(km)</span></div>
+                        <div>Waktu <br /><span className="normal-case text-[8px] tracking-normal font-bold">(mnt)</span></div>
+                        <div>{isTreadmillMode ? 'Kec.' : 'Pace'} <br /><span className="normal-case text-[8px] tracking-normal font-bold">({isTreadmillMode ? 'km/j' : '/km'})</span></div>
+                        <div className="flex justify-center">
+                            <button onClick={() => setIsTreadmillMode(!isTreadmillMode)} className={`p-1 flex items-center justify-center rounded-full text-zinc-400 hover:${t.textAccent} hover:bg-black/10 dark:hover:bg-white/10`} title="Ganti Mode (Treadmill / Lari)">
+                               <ArrowLeftRight size={14} />
+                            </button>
+                        </div>
+                        <div></div>
+                     </div>
 
-                         return (
-                             <div key={setIdx} className={`p-4 rounded-3xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 transition-all ${s.skipped ? 'opacity-50' : s.done ? 'opacity-60' : ''}`}>
-                                 {/* Header Set */}
-                                 <div className="flex items-center justify-between mb-4">
-                                     <div className="flex items-center gap-2">
-                                         <div className="w-8 h-8 rounded-full flex items-center justify-center font-black text-xs bg-black/10 dark:bg-white/10 text-zinc-500 dark:text-zinc-400">
-                                            {getWorkingSetNumber(setIdx)}
-                                         </div>
-                                         <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">Sesi Kardio</span>
-                                     </div>
-                                     <div className="flex items-center gap-2">
-                                         <button onClick={() => { playSoundEffect('click', soundEnabled); setActiveSetDetail({ setIdx, rir: s.rir || '', rpe: s.rpe || '', notes: s.notes || '' }); }} className={`w-8 h-8 flex justify-center items-center rounded-full transition-all ${(s.notes || s.rir || s.rpe) ? `${t.bgAccent} text-white shadow-md` : `text-zinc-400 hover:${t.textAccent} hover:bg-black/10 dark:hover:bg-white/10`}`}>
-                                            <ClipboardEdit size={14} />
-                                         </button>
-                                         <button onClick={() => { playSoundEffect('click', soundEnabled); onRemoveSet(ex.id, setIdx); }} className="w-8 h-8 flex justify-center items-center rounded-full text-rose-500 hover:bg-rose-500/10 transition-colors">
-                                            <X size={14} />
-                                         </button>
-                                     </div>
-                                 </div>
-                                 
-                                 {s.skipped ? (
-                                     <div className="flex items-center justify-center font-bold text-rose-500 bg-rose-500/10 rounded-2xl h-12 border border-rose-500/20 tracking-wider text-xs">
-                                       SKIPPED
-                                     </div>
-                                 ) : (
-                                     <div className="grid grid-cols-2 gap-3">
-                                         {/* Jarak */}
-                                         <div>
-                                            <label className={`block ${t.textMuted} text-[10px] font-black uppercase tracking-widest mb-1 truncate`}>Jarak (km)</label>
-                                            <SwipeInput language={lang?.id || 'ID'} value={s.distance || ''} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'distance', val)} disabled={s.done} step={0.1} min={0} soundEnabled={soundEnabled} className={`w-full bg-black/5 dark:bg-white/5 h-11 rounded-xl text-center font-black ${t.textMain} no-spinners transition-colors text-base focus:bg-black/10 dark:focus:bg-white/10`} />
-                                         </div>
-                                         {/* Waktu */}
-                                         <div>
-                                            <label className={`block ${t.textMuted} text-[10px] font-black uppercase tracking-widest mb-1 truncate`}>Waktu (mnt)</label>
-                                            <SwipeInput language={lang?.id || 'ID'} value={s.duration || ''} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'duration', val)} disabled={s.done} step={1} min={0} soundEnabled={soundEnabled} className={`w-full bg-black/5 dark:bg-white/5 h-11 rounded-xl text-center font-black ${t.textMain} no-spinners transition-colors text-base focus:bg-black/10 dark:focus:bg-white/10`} />
-                                         </div>
-                                         {/* Pace */}
-                                         <div>
-                                            <label className={`block ${t.textMuted} text-[10px] font-black uppercase tracking-widest mb-1 truncate`}>Pace (/km)</label>
-                                            <div className={`w-full bg-black/5 dark:bg-white/5 h-11 rounded-xl flex items-center justify-center font-black ${t.textAccent} text-base`}>{paceStr}</div>
-                                         </div>
-                                         {/* HR */}
-                                         <div>
-                                            <label className={`block ${t.textMuted} text-[10px] font-black uppercase tracking-widest mb-1 truncate`}>Heart Rate</label>
-                                            <SwipeInput language={lang?.id || 'ID'} value={s.heartRate || ''} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'heartRate', val)} disabled={s.done} step={1} min={0} soundEnabled={soundEnabled} className={`w-full bg-black/5 dark:bg-white/5 h-11 rounded-xl text-center font-black ${t.textMain} no-spinners transition-colors text-base focus:bg-black/10 dark:focus:bg-white/10`} />
-                                         </div>
-                                         {/* Elevasi */}
-                                         <div>
-                                            <label className={`block ${t.textMuted} text-[10px] font-black uppercase tracking-widest mb-1 truncate`}>Elevasi (m)</label>
-                                            <SwipeInput language={lang?.id || 'ID'} value={s.elevation || ''} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'elevation', val)} disabled={s.done} step={1} min={0} soundEnabled={soundEnabled} className={`w-full bg-black/5 dark:bg-white/5 h-11 rounded-xl text-center font-black ${t.textMain} no-spinners transition-colors text-base focus:bg-black/10 dark:focus:bg-white/10`} />
-                                         </div>
-                                         {/* Incline */}
-                                         <div>
-                                            <label className={`block ${t.textMuted} text-[10px] font-black uppercase tracking-widest mb-1 truncate`}>Incline (%)</label>
-                                            <SwipeInput language={lang?.id || 'ID'} value={s.incline || ''} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'incline', val)} disabled={s.done} step={0.5} min={0} soundEnabled={soundEnabled} className={`w-full bg-black/5 dark:bg-white/5 h-11 rounded-xl text-center font-black ${t.textMain} no-spinners transition-colors text-base focus:bg-black/10 dark:focus:bg-white/10`} />
-                                         </div>
-                                     </div>
-                                 )}
+                     <div className="space-y-3">
+                         {sets.map((s, setIdx) => {
+                             const d = Number(s.distance || 0);
+                             const tMin = Number(s.duration || 0);
+                             let paceStr = '-:--';
+                             if (d > 0 && tMin > 0) {
+                                 const paceTotalSeconds = (tMin * 60) / d;
+                                 const pm = Math.floor(paceTotalSeconds / 60);
+                                 const ps = Math.floor(paceTotalSeconds % 60);
+                                 paceStr = `${pm}:${ps < 10 ? '0' : ''}${ps}`;
+                             }
 
-                                 <div className="mt-4 pt-4 border-t border-black/5 dark:border-white/5 flex justify-center">
-                                     <button onClick={() => { playSoundEffect('click', soundEnabled); onToggleSet(ex.id, setIdx); }} className={`w-full h-12 rounded-xl flex justify-center items-center font-black transition-all ${s.skipped ? 'bg-rose-500/20 text-rose-500 border border-rose-500/50 hover:bg-rose-500/30' : s.done ? t.bgAccent + ' text-white shadow-lg' : 'bg-transparent border-2 ' + t.borderAccentSoft + ' ' + t.textAccent + ' hover:bg-black/5 dark:hover:bg-white/5'}`}>
+                             return (
+                                 <div key={setIdx} className={`flex flex-col gap-2 transition-all ${s.skipped ? 'opacity-50' : s.done ? 'opacity-60' : ''}`}>
+                                    <div className="grid grid-cols-[40px_1fr_2.1fr_1fr_36px_44px] gap-1 items-center text-center">
+                                       
+                                       {/* Set Number & Delete Button */}
+                                       <div className="flex justify-center">
+                                         <button 
+                                           onClick={() => {
+                                             if (deletingSetIdx === setIdx) {
+                                               playSoundEffect('click', soundEnabled);
+                                               onRemoveSet(ex.id, setIdx);
+                                               setDeletingSetIdx(null);
+                                             } else {
+                                               playSoundEffect('click', soundEnabled);
+                                               setDeletingSetIdx(setIdx);
+                                             }
+                                           }}
+                                           onBlur={() => setDeletingSetIdx(null)}
+                                           className={`w-10 h-10 rounded-full flex items-center justify-center transition-all font-black text-sm ${deletingSetIdx === setIdx ? 'bg-rose-500 text-white shadow-lg scale-110' : (s.type === 'warmup' ? 'bg-orange-500/10 text-orange-500' : 'bg-black/5 dark:bg-white/5 text-zinc-500 dark:text-zinc-400')}`}
+                                         >
+                                           {deletingSetIdx === setIdx ? <X size={16}/> : (s.type === 'warmup' ? <Flame size={16} className="opacity-80"/> : getWorkingSetNumber(setIdx))}
+                                         </button>
+                                       </div>
+
+                                       {/* Jarak */}
                                        {s.skipped ? (
-                                           <span className="flex items-center gap-2"><X size={18} /> SKIPPED</span>
-                                       ) : s.done ? (
-                                           <span className="flex items-center gap-2"><CheckCircle size={18} /> SELESAI</span>
+                                         <div className="col-span-4 flex items-center justify-center font-bold text-rose-500 bg-rose-500/10 rounded-2xl h-10 border border-rose-500/20 tracking-wider text-xs">
+                                           SKIPPED
+                                         </div>
                                        ) : (
-                                           <span className="flex items-center gap-2"><CheckCircle size={18} /> TANDAI SELESAI</span>
+                                         <>
+                                           <div>
+                                              <SwipeInput language={lang?.id || 'ID'} value={s.distance || ''} onChange={(val)=>handleCardioChange(setIdx, 'distance', val)} disabled={s.done} step={0.1} min={0} soundEnabled={soundEnabled} className={`w-full bg-black/5 dark:bg-white/5 h-10 rounded-xl text-center font-black ${t.textMain} no-spinners transition-colors text-sm sm:text-base focus:bg-black/10 dark:focus:bg-white/10`} />
+                                           </div>
+
+                                           {/* Waktu (Timer) */}
+                                           <div className="flex items-center justify-center relative">
+                                              {activeTimer.idx === setIdx ? (
+                                                 <div className={`w-full bg-black/5 dark:bg-white/5 h-10 ${s.done ? 'rounded-xl' : 'rounded-l-xl'} flex items-center justify-center font-black ${t.textAccent} text-sm ring-2 ring-inset ${t.ringAccent}`}>
+                                                    {formatTime(activeTimer.timeLeft)}
+                                                 </div>
+                                              ) : (
+                                                 <SwipeInput language={lang?.id || 'ID'} value={s.duration || ''} onChange={(val)=>handleCardioChange(setIdx, 'duration', val)} disabled={s.done} step={1} min={0} soundEnabled={soundEnabled} isTimeFormat={true} className={`w-full bg-black/5 dark:bg-white/5 h-10 ${s.done ? 'rounded-xl' : 'rounded-l-xl'} text-center font-black ${t.textMain} no-spinners transition-colors text-sm sm:text-base focus:bg-black/10 dark:focus:bg-white/10`} />
+                                              )}
+                                              {!s.done && (
+                                                <button onClick={() => toggleTimer(setIdx, s.duration)} className={`h-10 w-11 shrink-0 rounded-r-xl flex items-center justify-center text-white transition-all ${activeTimer.idx === setIdx ? 'bg-rose-500 shadow-md' : t.bgAccent + ' hover:opacity-80'}`}>
+                                                   {activeTimer.idx === setIdx ? <Square size={16}/> : <Play size={16} className="ml-[2px]"/>}
+                                                </button>
+                                              )}
+                                           </div>
+
+                                           {/* Kecepatan / Pace */}
+                                           <div className="relative w-full">
+                                              <SwipeInput language={lang?.id || 'ID'} value={s.speed || ''} onChange={(val)=>handleCardioChange(setIdx, 'speed', val)} disabled={s.done} step={0.1} min={0} soundEnabled={soundEnabled} className={`w-full bg-black/5 dark:bg-white/5 h-10 rounded-xl text-center font-black ${t.textMain} no-spinners transition-colors text-sm sm:text-base focus:bg-black/10 dark:focus:bg-white/10 ${!isTreadmillMode ? 'opacity-0 absolute inset-0 z-10' : ''}`} />
+                                              {!isTreadmillMode && (
+                                                <div className={`w-full bg-black/5 dark:bg-white/5 h-10 rounded-xl flex items-center justify-center font-black ${t.textMain} text-sm sm:text-base pointer-events-none`}>{paceStr}</div>
+                                              )}
+                                           </div>
+
+                                           {/* Extras Button */}
+                                           <div className="flex justify-center">
+                                             <button 
+                                               onClick={() => { playSoundEffect('click', soundEnabled); setShowCardioExtras(prev => ({...prev, [setIdx]: !prev[setIdx]})); }}
+                                               className={`w-9 h-10 flex justify-center items-center rounded-xl transition-all ${(s.heartRate || s.elevation || s.incline) ? `${t.bgAccent} text-white shadow-md` : `text-zinc-400 bg-black/5 dark:bg-white/5 hover:${t.textAccent} hover:bg-black/10 dark:hover:bg-white/10`}`}
+                                               title="Detak Jantung & Elevasi"
+                                             >
+                                               {showCardioExtras[setIdx] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                             </button>
+                                           </div>
+                                         </>
                                        )}
-                                     </button>
+
+                                       {/* Checkmark Button */}
+                                       <div className="flex justify-center">
+                                         <button onClick={() => { playSoundEffect('click', soundEnabled); onToggleSet(ex.id, setIdx); }} disabled={activeTimer.idx === setIdx} className={`w-11 h-11 rounded-full flex justify-center items-center font-bold transition-all ${s.skipped ? 'bg-rose-500/20 text-rose-500 border border-rose-500/50 hover:bg-rose-500/30' : s.done ? t.bgAccent + ' text-white shadow-lg scale-105' : 'bg-transparent border-2 ' + t.borderAccentSoft + ' ' + t.textAccent + ' hover:bg-black/5 dark:hover:bg-white/5'} ${activeTimer.idx === setIdx ? 'opacity-30 cursor-not-allowed' : ''}`}>
+                                           {s.skipped ? <X size={18} /> : <CheckCircle size={18} />}
+                                         </button>
+                                       </div>
+                                       
+                                    </div>
+                                    
+                                    {/* Extra Cardio Inputs (Baris 2) */}
+                                    {showCardioExtras[setIdx] && !s.skipped && (
+                                        <div className="flex gap-2 pl-[44px] pr-[48px] pt-1 pb-2 animate-in slide-in-from-top-2 fade-in duration-200 items-end">
+                                            {/* HR */}
+                                            <div className="relative flex-1">
+                                               <div className={`absolute -top-3 inset-x-0 text-[8px] font-black uppercase tracking-widest text-center ${t.textMuted}`}>HR (BPM)</div>
+                                               <SwipeInput language={lang?.id || 'ID'} value={s.heartRate || ''} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'heartRate', val)} disabled={s.done} step={1} min={0} soundEnabled={soundEnabled} className={`w-full bg-black/5 dark:bg-white/5 h-10 rounded-xl text-center font-black ${t.textMain} no-spinners transition-colors text-sm focus:bg-black/10 dark:focus:bg-white/10`} />
+                                            </div>
+                                            {/* Elevasi / Incline */}
+                                            <div className="relative flex-1">
+                                               <div className={`absolute -top-3 inset-x-0 text-[8px] font-black uppercase tracking-widest text-center ${t.textMuted}`}>{isTreadmillMode ? 'Incline (%)' : 'Elev (m)'}</div>
+                                               <SwipeInput language={lang?.id || 'ID'} value={isTreadmillMode ? s.incline || '' : s.elevation || ''} onChange={(val)=>onUpdateSet(ex.id, setIdx, isTreadmillMode ? 'incline' : 'elevation', val)} disabled={s.done} step={isTreadmillMode ? 0.5 : 1} min={0} soundEnabled={soundEnabled} className={`w-full bg-black/5 dark:bg-white/5 h-10 rounded-xl text-center font-black ${t.textMain} no-spinners transition-colors text-sm focus:bg-black/10 dark:focus:bg-white/10`} />
+                                            </div>
+                                        </div>
+                                    )}
                                  </div>
-                             </div>
-                         );
-                     })}
-                 </div>
+                             );
+                         })}
+                     </div>
+                 </>
              ) : (
                  <>
                      <div className={`grid ${exType==='weight' ? 'grid-cols-[1fr_2fr_2fr_1fr_1fr]' : 'grid-cols-[1fr_3fr_1fr_1fr]'} gap-2 mb-3 text-[10px] font-black text-zinc-400 uppercase tracking-widest text-center items-center`}>

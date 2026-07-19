@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertCircle, CheckCircle2, Info } from 'lucide-react';
 
 /**
@@ -44,7 +45,7 @@ export default function useDialog(isDark = false, customBgClass = null) {
     info:    <Info         size={22} className="text-sky-500 shrink-0" />,
   };
 
-  const dialog = state ? (
+  const dialog = state ? createPortal(
     <div
       className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center px-6 animate-in fade-in duration-150"
       onClick={() => state.mode === 'alert' && close()}
@@ -97,7 +98,8 @@ export default function useDialog(isDark = false, customBgClass = null) {
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   ) : null;
 
   return { dialog, showAlert, showConfirm };

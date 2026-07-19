@@ -134,6 +134,26 @@ export default function SharedProfileView({
     }
   };
 
+  const handleBanUserAdmin = async () => {
+    if (!isAdmin) return;
+    const confirm = await showConfirm(
+      `Akun ini akan diblokir permanen dan semua postingannya akan disembunyikan secara global. Lanjutkan?`,
+      { title: "BAN PENGGUNA?", confirmText: "Ban Permanen", cancelText: "Batal", danger: true }
+    );
+    if (!confirm) return;
+    try {
+      const success = await banUserGlobal(profileUserId);
+      if (success) {
+        await showAlert("Pengguna berhasil dibanned secara global.", { type: 'success' });
+        if(onClose) onClose();
+      } else {
+        await showAlert("Gagal mem-ban pengguna.", { type: 'error' });
+      }
+    } catch {
+      await showAlert("Terjadi kesalahan sistem.", { type: 'error' });
+    }
+  };
+
   const uniqueAchievementIds = new Set();
   const achievements = [];
   posts.forEach(p => {
@@ -430,7 +450,7 @@ export default function SharedProfileView({
               <AlertTriangle size={14} /> Blokir Pengguna
             </button>
             {isAdmin && (
-              <button onClick={() => {/* Ban user logic */}} className="flex items-center gap-2 text-xs font-bold text-rose-500 hover:text-rose-600 transition-colors">
+              <button onClick={handleBanUserAdmin} className="flex items-center gap-2 text-xs font-bold text-rose-500 hover:text-rose-600 transition-colors">
                 <ShieldAlert size={14} /> Ban User (Admin)
               </button>
             )}

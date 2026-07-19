@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { doc, setDoc, deleteDoc, getDocs, collection } from 'firebase/firestore';
-import { Send, X, Check, Loader2, Dumbbell, Menu, Plus, MessageSquare, Trash2, Bookmark, ChevronDown } from 'lucide-react';
+import { doc, setDoc, deleteDoc, getDocs, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { Send, X, Check, Loader2, Dumbbell, Menu, Plus, MessageSquare, Trash2, Bookmark, ChevronDown, ChevronRight } from 'lucide-react';
 import { buildSystemPrompt, summarizeWorkoutLogs, summarizeBiometrics, summarizeActivePrograms, summarizeFavoriteProgram, needsPersonalContext, needsAppHelpContext, APP_HELP_REFERENCE, chatWithAI, AI_MODELS, getAvailableModels, getProviderStatus, checkOverallAIStatus } from '../utils/aiAgent';
 import renderMiniMarkdown from '../utils/miniMarkdown';
 import { db } from '../firebase';
 
 const THINKING_PHASES = ['Membaca riwayat latihanmu...', 'Menganalisis progress mingguan...', 'Menyusun jawaban...'];
+
+import { FAQ_ITEMS } from '../utils/faqData';
 
 // Jaring pengaman sisi client — instruksi prompt gak selalu 100% dipatuhi AI, jadi
 // redundansi kayak "Full Body Gainz 3 Hari" atau "SEN: Day 1: Power & Strength" tetap
@@ -265,6 +267,39 @@ export default function GymAIChat({
         setIsSidebarOpen(false);
     };
 
+    const handleFaqClick = (faq) => {
+        let sid = activeSessionId;
+        const userMsg = { role: 'user', content: faq.q, timestamp: Date.now() };
+        const aiMsg = { role: 'model', content: faq.a, timestamp: Date.now() + 10 };
+
+        setMessages(prev => [...prev, userMsg, aiMsg]);
+        setTimeout(() => scrollToBottom(), 50);
+
+        if (!sid) {
+            sid = 'session_' + Date.now();
+            setActiveSessionId(sid);
+            setSessions(prev => [{
+                id: sid,
+                title: faq.q.slice(0, 30) + (faq.q.length > 30 ? '...' : ''),
+                origin: 'user',
+                messages: [userMsg, aiMsg],
+                updatedAt: Date.now()
+            }, ...prev]);
+        } else {
+            setSessions(prev => prev.map(s => {
+                if (s.id === sid) {
+                    return {
+                        ...s,
+                        title: s.messages.length === 0 ? faq.q.slice(0, 30) + (faq.q.length > 30 ? '...' : '') : s.title,
+                        messages: [...s.messages, userMsg, aiMsg],
+                        updatedAt: Date.now()
+                    };
+                }
+                return s;
+            }));
+        }
+    };
+
     const doDeleteChat = (id) => {
         const deletingSession = sessions.find(s => s.id === id);
         if (deletingSession?.origin === 'raiga') lastDeliveredInsightKeyRef.current = null;
@@ -336,6 +371,21 @@ export default function GymAIChat({
         setInput('');
         if (inputRef.current) inputRef.current.style.height = 'auto';
         setIsLoading(true);
+
+        // Rekam pertanyaan user ke inbox AI (jika cukup panjang) untuk kurasi FAQ
+        if (userMsg.content.length > 15 && uid) {
+            try {
+                addDoc(collection(db, 'ai_inbox'), {
+                    uid: uid,
+                    email: userProfile?.email || 'unknown',
+                    question: userMsg.content,
+                    timestamp: serverTimestamp(),
+                    isReviewed: false
+                }).catch(e => console.error("Gagal merekam pertanyaan AI:", e));
+            } catch (e) {
+                // Abaikan error agar chat tetap berjalan
+            }
+        }
 
         // Declared outside try/catch so the catch block can still clean up the placeholder
         const tempId = 'temp_' + Date.now();
@@ -677,14 +727,27 @@ export default function GymAIChat({
                 {/* CHAT AREA */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-4 z-10">
                     {messages.length === 0 && (
-                        <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-50">
+                        <div className="flex flex-col items-center justify-center text-center space-y-4 mt-8 mb-4">
                             <div 
                                 className="w-16 h-16 rounded-full border-2 border-blue-500 shadow-lg bg-zinc-900 shrink-0"
                                 style={{ backgroundImage: 'url(/bg-program.webp)', backgroundSize: '450%', backgroundPosition: '52% 7%' }}
                             />
                             <div>
                                 <p className="text-white font-bold">Tanya Apapun!</p>
-                                <p className="text-xs text-neutral-400 max-w-xs mx-auto mt-1">Saya bisa menganalisa riwayat latihanmu, dan membuatkan program latihan baru khusus untukmu.</p>
+                                <p className="text-xs text-neutral-400 max-w-[280px] mx-auto mt-1">Saya bisa menganalisa riwayat latihanmu dan membuat program khusus.</p>
+                                <p className="text-xs text-neutral-500 mt-3 font-medium">Atau pilih FAQ instan berikut:</p>
+                            </div>
+                            <div className="w-full space-y-2 mt-4">
+                                {FAQ_ITEMS.map((faq, i) => (
+                                    <button 
+                                        key={i}
+                                        onClick={() => handleFaqClick(faq)}
+                                        className="w-full text-left bg-white/5 hover:bg-white/10 border border-white/10 text-neutral-300 text-sm p-3 rounded-xl transition-colors group flex items-center justify-between"
+                                    >
+                                        <span className="flex-1 pr-2">{faq.q}</span>
+                                        <ChevronRight size={16} className="text-neutral-600 group-hover:text-blue-400 transition-colors shrink-0" />
+                                    </button>
+                                ))}
                             </div>
                         </div>
                     )}

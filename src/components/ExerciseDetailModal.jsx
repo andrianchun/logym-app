@@ -18,8 +18,12 @@ const ExerciseDetailModal = ({
 }) => {
   const isImp = units?.weight === 'lbs';
   let initialExType = initialEx.type || 'weight';
-  const isTargetCardio = Array.isArray(initialEx.target) ? initialEx.target.some(t => t.toLowerCase() === 'cardio') : (initialEx.target || '').toLowerCase().includes('cardio');
-  if (initialExType === 'time' && isTargetCardio) {
+  const nameLower = (initialEx.name || '').toLowerCase();
+  const targetLower = Array.isArray(initialEx.target) ? initialEx.target.join(' ').toLowerCase() : (initialEx.target || '').toLowerCase();
+  const cardioKeywords = ['cardio', 'run', 'lari', 'treadmill', 'jog', 'cycle', 'bike', 'sepeda', 'swim', 'renang', 'elliptical', 'rowing', 'dayung', 'walk', 'jalan'];
+  const isCardioMatch = cardioKeywords.some(kw => nameLower.includes(kw) || targetLower.includes(kw));
+  
+  if (initialExType === 'time' && isCardioMatch) {
     initialExType = 'cardio';
   }
   const existingLibEx = exerciseLibrary?.find(e => e.name?.toLowerCase() === initialEx.name?.toLowerCase() || e.id === initialEx.id);
@@ -544,7 +548,7 @@ const ExerciseDetailModal = ({
                                  <tr>
                                    {initialExType === 'cardio' ? (
                                       <>
-                                        <th className="py-1 text-center w-8">Set</th>
+                                        <th className="py-1 text-center w-12">Set</th>
                                         <th className="py-1 text-center w-12">Jarak</th>
                                         <th className="py-1 text-center w-12">Waktu</th>
                                         <th className="py-1 text-center w-12">Pace</th>
@@ -710,7 +714,7 @@ const ExerciseDetailModal = ({
               >
                 <Calculator size={24} className="shrink-0" />
                 <span className={`font-black text-xs uppercase tracking-wider whitespace-nowrap transition-all duration-300 ${activeTab === 'calc' ? 'max-w-xs opacity-100 ml-2.5' : 'max-w-0 opacity-0 overflow-hidden m-0'}`}>
-                  {ex.type === 'cardio' ? 'Pace' : 'RM Calc'}
+                  {initialExType === 'cardio' ? 'Pace' : 'RM Calc'}
                 </span>
               </button>
             </div>
