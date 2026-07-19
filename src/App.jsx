@@ -849,6 +849,10 @@ export default function App() {
     if (localStorage.getItem('__PREVIEW_USER')) return;
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
+        setIsDataLoaded(false);
+        setIsHistoryLoaded(false);
+        lastLocalWriteAt.current = 0;
+        lastLocalHistoryWriteAt.current = 0;
         setUser({ 
            uid: currentUser.uid, 
            email: currentUser.email, 
