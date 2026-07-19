@@ -2250,7 +2250,7 @@ export default function App() {
         let isTargetFound = false;
         workouts = workouts.map(w => {
           const isTargetWorkout = focusWorkoutId 
-            ? (w.id === focusWorkoutId) 
+            ? (w.id === focusWorkoutId || w.programId === focusWorkoutId)
             : (progId ? (w.id === progId || w.programId === progId) : w.status === 'planned');
             
           if (isTargetWorkout) {
@@ -2301,30 +2301,69 @@ export default function App() {
         });
 
         if (!isTargetFound) {
-            let pName = 'Sesi Latihan';
-            let pId = progId;
+            // Second-pass: try any planned/non-completed workout matching progId
+            // This catches cases where focusWorkoutId mismatches but the correct session exists
+            let resolvedProgId = progId;
             if (focusWorkoutId && focusWorkoutId.startsWith('projected_')) {
-                pId = focusWorkoutId.replace('projected_','').split('_')[0];
+                resolvedProgId = focusWorkoutId.replace('projected_','').split('_')[0];
             } else if (progId && progId.startsWith('projected_')) {
-                pId = progId.replace('projected_','').split('_')[0];
+                resolvedProgId = progId.replace('projected_','').split('_')[0];
             }
-            const p = programs.find(pr => pr.id === pId || pr.id === progId);
-            if (p) {
-               pName = p.name;
-               pId = p.id;
+
+            const secondPassIdx = workouts.findIndex(w => 
+              w.programId === resolvedProgId && w.status !== 'completed'
+            );
+
+            if (secondPassIdx >= 0) {
+              // Found a matching planned session — update it instead of creating new
+              const existingW = workouts[secondPassIdx];
+              let realProgramId = existingW.programId || resolvedProgId;
+              let frozenExercises = existingW.overriddenExercises;
+              if (!frozenExercises || frozenExercises.length === 0) {
+                const srcProg = programs.find(pr => pr.id === realProgramId);
+                if (srcProg?.exercises?.length > 0) frozenExercises = JSON.parse(JSON.stringify(srcProg.exercises));
+              }
+              let existingSecs = 0;
+              if (existingW.duration) {
+                if (typeof existingW.duration === 'number') existingSecs = existingW.duration * 60;
+                else if (typeof existingW.duration === 'string') {
+                  const parts = existingW.duration.split(':').map(Number);
+                  if (parts.length === 3) existingSecs = (parts[0]||0)*3600+(parts[1]||0)*60+(parts[2]||0);
+                  else if (parts.length === 2) existingSecs = (parts[0]||0)*60+(parts[1]||0);
+                }
+              }
+              const finalSecs = Math.max(durationSecs, existingSecs);
+              workouts[secondPassIdx] = {
+                ...existingW,
+                programId: realProgramId,
+                status: 'completed',
+                log: cleanLogs,
+                skipped: skippedExercises,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                duration: formatDur(finalSecs),
+                ...(frozenExercises ? { overriddenExercises: frozenExercises } : {})
+              };
+            } else {
+              // Truly no match — create new entry
+              let pName = 'Sesi Latihan';
+              let pId = resolvedProgId;
+              const p = programs.find(pr => pr.id === pId || pr.id === progId);
+              if (p) {
+                 pName = p.name;
+                 pId = p.id;
+              }
+              workouts.push({
+                 id: focusWorkoutId || progId || `completed_${Date.now()}`,
+                 programId: pId,
+                 programName: pName,
+                 status: 'completed',
+                 log: cleanLogs,
+                 skipped: skippedExercises,
+                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                 duration: durationSecs > 0 ? formatDur(durationSecs) : '00:00',
+                 ...(p?.exercises?.length > 0 ? { overriddenExercises: JSON.parse(JSON.stringify(p.exercises)) } : {})
+              });
             }
-            workouts.push({
-               id: focusWorkoutId || progId || `completed_${Date.now()}`,
-               programId: pId,
-               programName: pName,
-               status: 'completed',
-               log: cleanLogs,
-               skipped: skippedExercises,
-               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-               duration: durationSecs > 0 ? formatDur(durationSecs) : '00:00',
-               // Bekukan exercise saat ini juga, supaya riwayat tetap utuh walau rutinitas diedit/dihapus nanti
-               ...(p?.exercises?.length > 0 ? { overriddenExercises: JSON.parse(JSON.stringify(p.exercises)) } : {})
-            });
         }
       }
       
