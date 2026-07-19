@@ -284,16 +284,106 @@ const ExerciseCard = ({
 
          {/* DAFTAR SET LATIHAN */}
          <div className={`relative z-10 ${isSkip ? 'hidden' : ''}`}>
-             <div className={`grid ${exType==='weight' ? 'grid-cols-[1fr_2fr_2fr_1fr_1fr]' : 'grid-cols-[1fr_3fr_1fr_1fr]'} gap-2 mb-3 text-[10px] font-black text-zinc-400 uppercase tracking-widest text-center items-center`}>
-               <div>Set</div>
-                 {exType === 'weight' && (
-                   <div>{isImp ? 'LBS' : 'KG'}</div>
-                 )}
-               {exType === 'time' && <div>Menit</div>}
-               {exType !== 'time' && <div>Reps</div>}
-               <div></div>
-               <div></div>
-             </div>
+             {exType === 'cardio' ? (
+                 <div className="space-y-4">
+                     {sets.map((s, setIdx) => {
+                         // Pace calculation
+                         const d = Number(s.distance || 0);
+                         const tMin = Number(s.duration || 0);
+                         let paceStr = '-:--';
+                         if (d > 0 && tMin > 0) {
+                             const paceTotalSeconds = (tMin * 60) / d;
+                             const pm = Math.floor(paceTotalSeconds / 60);
+                             const ps = Math.floor(paceTotalSeconds % 60);
+                             paceStr = `${pm}:${ps < 10 ? '0' : ''}${ps}`;
+                         }
+
+                         return (
+                             <div key={setIdx} className={`p-4 rounded-3xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 transition-all ${s.skipped ? 'opacity-50' : s.done ? 'opacity-60' : ''}`}>
+                                 {/* Header Set */}
+                                 <div className="flex items-center justify-between mb-4">
+                                     <div className="flex items-center gap-2">
+                                         <div className="w-8 h-8 rounded-full flex items-center justify-center font-black text-xs bg-black/10 dark:bg-white/10 text-zinc-500 dark:text-zinc-400">
+                                            {getWorkingSetNumber(setIdx)}
+                                         </div>
+                                         <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">Sesi Kardio</span>
+                                     </div>
+                                     <div className="flex items-center gap-2">
+                                         <button onClick={() => { playSoundEffect('click', soundEnabled); setActiveSetDetail({ setIdx, rir: s.rir || '', rpe: s.rpe || '', notes: s.notes || '' }); }} className={`w-8 h-8 flex justify-center items-center rounded-full transition-all ${(s.notes || s.rir || s.rpe) ? `${t.bgAccent} text-white shadow-md` : `text-zinc-400 hover:${t.textAccent} hover:bg-black/10 dark:hover:bg-white/10`}`}>
+                                            <ClipboardEdit size={14} />
+                                         </button>
+                                         <button onClick={() => { playSoundEffect('click', soundEnabled); onRemoveSet(ex.id, setIdx); }} className="w-8 h-8 flex justify-center items-center rounded-full text-rose-500 hover:bg-rose-500/10 transition-colors">
+                                            <X size={14} />
+                                         </button>
+                                     </div>
+                                 </div>
+                                 
+                                 {s.skipped ? (
+                                     <div className="flex items-center justify-center font-bold text-rose-500 bg-rose-500/10 rounded-2xl h-12 border border-rose-500/20 tracking-wider text-xs">
+                                       SKIPPED
+                                     </div>
+                                 ) : (
+                                     <div className="grid grid-cols-2 gap-3">
+                                         {/* Jarak */}
+                                         <div>
+                                            <label className={`block ${t.textMuted} text-[10px] font-black uppercase tracking-widest mb-1 truncate`}>Jarak (km)</label>
+                                            <SwipeInput language={lang?.id || 'ID'} value={s.distance || ''} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'distance', val)} disabled={s.done} step={0.1} min={0} soundEnabled={soundEnabled} className={`w-full bg-black/5 dark:bg-white/5 h-11 rounded-xl text-center font-black ${t.textMain} no-spinners transition-colors text-base focus:bg-black/10 dark:focus:bg-white/10`} />
+                                         </div>
+                                         {/* Waktu */}
+                                         <div>
+                                            <label className={`block ${t.textMuted} text-[10px] font-black uppercase tracking-widest mb-1 truncate`}>Waktu (mnt)</label>
+                                            <SwipeInput language={lang?.id || 'ID'} value={s.duration || ''} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'duration', val)} disabled={s.done} step={1} min={0} soundEnabled={soundEnabled} className={`w-full bg-black/5 dark:bg-white/5 h-11 rounded-xl text-center font-black ${t.textMain} no-spinners transition-colors text-base focus:bg-black/10 dark:focus:bg-white/10`} />
+                                         </div>
+                                         {/* Pace */}
+                                         <div>
+                                            <label className={`block ${t.textMuted} text-[10px] font-black uppercase tracking-widest mb-1 truncate`}>Pace (/km)</label>
+                                            <div className={`w-full bg-black/5 dark:bg-white/5 h-11 rounded-xl flex items-center justify-center font-black ${t.textAccent} text-base`}>{paceStr}</div>
+                                         </div>
+                                         {/* HR */}
+                                         <div>
+                                            <label className={`block ${t.textMuted} text-[10px] font-black uppercase tracking-widest mb-1 truncate`}>Heart Rate</label>
+                                            <SwipeInput language={lang?.id || 'ID'} value={s.heartRate || ''} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'heartRate', val)} disabled={s.done} step={1} min={0} soundEnabled={soundEnabled} className={`w-full bg-black/5 dark:bg-white/5 h-11 rounded-xl text-center font-black ${t.textMain} no-spinners transition-colors text-base focus:bg-black/10 dark:focus:bg-white/10`} />
+                                         </div>
+                                         {/* Elevasi */}
+                                         <div>
+                                            <label className={`block ${t.textMuted} text-[10px] font-black uppercase tracking-widest mb-1 truncate`}>Elevasi (m)</label>
+                                            <SwipeInput language={lang?.id || 'ID'} value={s.elevation || ''} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'elevation', val)} disabled={s.done} step={1} min={0} soundEnabled={soundEnabled} className={`w-full bg-black/5 dark:bg-white/5 h-11 rounded-xl text-center font-black ${t.textMain} no-spinners transition-colors text-base focus:bg-black/10 dark:focus:bg-white/10`} />
+                                         </div>
+                                         {/* Incline */}
+                                         <div>
+                                            <label className={`block ${t.textMuted} text-[10px] font-black uppercase tracking-widest mb-1 truncate`}>Incline (%)</label>
+                                            <SwipeInput language={lang?.id || 'ID'} value={s.incline || ''} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'incline', val)} disabled={s.done} step={0.5} min={0} soundEnabled={soundEnabled} className={`w-full bg-black/5 dark:bg-white/5 h-11 rounded-xl text-center font-black ${t.textMain} no-spinners transition-colors text-base focus:bg-black/10 dark:focus:bg-white/10`} />
+                                         </div>
+                                     </div>
+                                 )}
+
+                                 <div className="mt-4 pt-4 border-t border-black/5 dark:border-white/5 flex justify-center">
+                                     <button onClick={() => { playSoundEffect('click', soundEnabled); onToggleSet(ex.id, setIdx); }} className={`w-full h-12 rounded-xl flex justify-center items-center font-black transition-all ${s.skipped ? 'bg-rose-500/20 text-rose-500 border border-rose-500/50 hover:bg-rose-500/30' : s.done ? t.bgAccent + ' text-white shadow-lg' : 'bg-transparent border-2 ' + t.borderAccentSoft + ' ' + t.textAccent + ' hover:bg-black/5 dark:hover:bg-white/5'}`}>
+                                       {s.skipped ? (
+                                           <span className="flex items-center gap-2"><X size={18} /> SKIPPED</span>
+                                       ) : s.done ? (
+                                           <span className="flex items-center gap-2"><CheckCircle size={18} /> SELESAI</span>
+                                       ) : (
+                                           <span className="flex items-center gap-2"><CheckCircle size={18} /> TANDAI SELESAI</span>
+                                       )}
+                                     </button>
+                                 </div>
+                             </div>
+                         );
+                     })}
+                 </div>
+             ) : (
+                 <>
+                     <div className={`grid ${exType==='weight' ? 'grid-cols-[1fr_2fr_2fr_1fr_1fr]' : 'grid-cols-[1fr_3fr_1fr_1fr]'} gap-2 mb-3 text-[10px] font-black text-zinc-400 uppercase tracking-widest text-center items-center`}>
+                       <div>Set</div>
+                         {exType === 'weight' && (
+                           <div>{isImp ? 'LBS' : 'KG'}</div>
+                         )}
+                       {exType === 'time' && <div>Menit</div>}
+                       {exType !== 'time' && <div>Reps</div>}
+                       <div></div>
+                       <div></div>
+                     </div>
 
              <div className="space-y-3">
              {sets.map((s, setIdx) => (
@@ -394,6 +484,8 @@ const ExerciseCard = ({
                  </div>
                ))}
                </div>
+               </>
+             )}
                
                <div className="mt-5">
                  <button onClick={() => { playSoundEffect('click', soundEnabled); onAddSet(ex.id); }} className={`w-full py-4 rounded-2xl text-xs font-black tracking-widest uppercase border-2 border-dashed ${t.border} ${t.textMuted} hover:${t.textAccent} hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center justify-center gap-2`}>

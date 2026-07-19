@@ -97,6 +97,8 @@ const ExerciseDetailModal = ({
             sets: completedSets.map(s => ({
               w: Number(s.w) || 0,
               r: Number(s.r) || 0,
+              distance: Number(s.distance) || 0,
+              duration: Number(s.duration) || 0,
               rpe: s.rpe || '',
               notes: s.notes || ''
             }))
@@ -535,23 +537,57 @@ const ExerciseDetailModal = ({
                              <table className="w-full text-[10px] table-fixed">
                                <thead className={`bg-black/10 dark:bg-white/10 ${t.textMuted}`}>
                                  <tr>
-                                   <th className="py-1 text-center w-8">Set</th>
-                                   <th className="py-1 text-center w-14">Beban</th>
-                                   <th className="py-1 text-center w-10">Reps</th>
-                                   <th className="py-1 text-center border-l border-black/5 dark:border-white/5 w-10">RPE</th>
-                                   <th className="py-1 px-2 text-left">Notes</th>
+                                   {initialEx.type === 'cardio' ? (
+                                      <>
+                                        <th className="py-1 text-center w-8">Set</th>
+                                        <th className="py-1 text-center w-12">Jarak</th>
+                                        <th className="py-1 text-center w-12">Waktu</th>
+                                        <th className="py-1 text-center w-12">Pace</th>
+                                        <th className="py-1 px-2 text-left">Notes</th>
+                                      </>
+                                   ) : (
+                                      <>
+                                        <th className="py-1 text-center w-8">Set</th>
+                                        <th className="py-1 text-center w-14">Beban</th>
+                                        <th className="py-1 text-center w-10">Reps</th>
+                                        <th className="py-1 text-center border-l border-black/5 dark:border-white/5 w-10">RPE</th>
+                                        <th className="py-1 px-2 text-left">Notes</th>
+                                      </>
+                                   )}
                                  </tr>
                                </thead>
                                <tbody>
-                                 {log.sets.map((s, idx) => (
-                                    <tr key={idx} className={`border-t border-black/5 dark:border-white/5 ${t.textMain}`}>
-                                      <td className="py-1.5 text-center font-bold opacity-70">{idx + 1}</td>
-                                      <td className={`py-1.5 text-center font-bold ${t.textAccent}`}>{isImp ? Number((s.w * 2.20462).toFixed(1)) : s.w} <span className="text-[8px]">{isImp ? 'lbs' : 'kg'}</span></td>
-                                      <td className="py-1.5 text-center font-bold">{s.r}</td>
-                                      <td className={`py-1.5 text-center border-l border-black/5 dark:border-white/5 ${s.rpe ? '' : 'opacity-30'}`}>{s.rpe || '-'}</td>
-                                      <td className={`py-1.5 px-2 text-left italic truncate ${s.notes ? '' : 'opacity-30'}`} title={s.notes}>{s.notes || '-'}</td>
-                                    </tr>
-                                 ))}
+                                 {log.sets.map((s, idx) => {
+                                    if (initialEx.type === 'cardio') {
+                                        const d = Number(s.distance || 0);
+                                        const tMin = Number(s.duration || 0);
+                                        let paceStr = '-:--';
+                                        if (d > 0 && tMin > 0) {
+                                            const paceTotalSeconds = (tMin * 60) / d;
+                                            const pm = Math.floor(paceTotalSeconds / 60);
+                                            const ps = Math.floor(paceTotalSeconds % 60);
+                                            paceStr = `${pm}:${ps < 10 ? '0' : ''}${ps}`;
+                                        }
+                                        return (
+                                          <tr key={idx} className={`border-t border-black/5 dark:border-white/5 ${t.textMain}`}>
+                                            <td className="py-1.5 text-center font-bold opacity-70">{idx + 1}</td>
+                                            <td className={`py-1.5 text-center font-bold ${t.textAccent}`}>{s.distance} <span className="text-[8px]">km</span></td>
+                                            <td className="py-1.5 text-center font-bold">{s.duration} <span className="text-[8px]">mnt</span></td>
+                                            <td className="py-1.5 text-center font-bold">{paceStr}</td>
+                                            <td className={`py-1.5 px-2 text-left italic truncate ${s.notes ? '' : 'opacity-30'}`} title={s.notes}>{s.notes || '-'}</td>
+                                          </tr>
+                                        );
+                                    }
+                                    return (
+                                      <tr key={idx} className={`border-t border-black/5 dark:border-white/5 ${t.textMain}`}>
+                                        <td className="py-1.5 text-center font-bold opacity-70">{idx + 1}</td>
+                                        <td className={`py-1.5 text-center font-bold ${t.textAccent}`}>{isImp ? Number((s.w * 2.20462).toFixed(1)) : s.w} <span className="text-[8px]">{isImp ? 'lbs' : 'kg'}</span></td>
+                                        <td className="py-1.5 text-center font-bold">{s.r}</td>
+                                        <td className={`py-1.5 text-center border-l border-black/5 dark:border-white/5 ${s.rpe ? '' : 'opacity-30'}`}>{s.rpe || '-'}</td>
+                                        <td className={`py-1.5 px-2 text-left italic truncate ${s.notes ? '' : 'opacity-30'}`} title={s.notes}>{s.notes || '-'}</td>
+                                      </tr>
+                                    );
+                                 })}
                                </tbody>
                              </table>
                            </div>
@@ -561,73 +597,83 @@ const ExerciseDetailModal = ({
                   </div>
                 </div>
 
-                {/* Tab 3: 1RM Calc */}
-                <div className="w-1/3 h-full p-5 pb-24 overflow-y-auto hide-scrollbar relative">
-                    <div className="space-y-4 text-center pb-5">
-                       <div className="flex items-center justify-center gap-2">
-                          <h3 className={`h3 ${t.textMain}`}>Kalkulator RM</h3>
-                          <button onClick={() => setShowRmInfo(!showRmInfo)} className={`p-1.5 rounded-full ${t.inputBg} ${t.textMuted} hover:${t.textAccent} transition-colors`}>
-                             <Info size={16} />
-                          </button>
-                       </div>
-                       
-                       {showRmInfo && (
-                          <div className={`p-3.5 rounded-xl ${t.bgCard} border ${t.border} text-left text-xs ${t.textMuted} space-y-2 shadow-lg mb-4`}>
-                             <p>Kalkulator RM (Repetition Maximum) digunakan untuk mengestimasi beban maksimal yang bisa kamu angkat berdasarkan set terbaikmu.</p>
-                             <p>Jika kamu sudah tahu kapasitas bebanmu (misal: "saya biasa angkat 50kg, 8 repetisi"), masukkan angkanya di bawah lalu <b>Simpan</b> sebagai baseline 10RM.</p>
-                             <p>Jika kamu belum tahu kapasitas beban, silakan dicoba dengan beban ringan terlebih dahulu, naikkan bebannya bertahap sampai cukup untuk 10 repetisi.</p>
-                             <p>Aplikasi LOGYM mencatat rekor 10RM otomatis selama kamu latihan, jadi kamu tidak wajib input manual di sini.</p>
+                 {/* Tab 3: 1RM Calc / Pace Calc */}
+                 <div className="w-1/3 h-full p-5 pb-24 overflow-y-auto hide-scrollbar relative">
+                     {initialEx.type === 'cardio' ? (
+                       <div className="space-y-4 text-center pb-5">
+                          <div className="flex items-center justify-center gap-2">
+                             <h3 className={`h3 ${t.textMain}`}>Kalkulator Pace</h3>
                           </div>
-                       )}
-
-                       <div className="grid grid-cols-2 gap-3">
-                         <div>
-                           <label className={`body-md ${t.textMuted} block mb-0.5`}>Beban ({isImp ? 'lbs' : 'kg'})</label>
-                           <SwipeInput 
-                             value={calcWeight} 
-                             onChange={(val) => setCalcWeight(Math.max(0, val))} 
-                             step={2.5}
-                             min={0}
-                             language={lang?.id || 'ID'}
-                             className={`w-full px-3 py-2 rounded-xl ${t.inputBg} ${t.textMain} font-black text-center h2 outline-none focus:ring-2 ${t.ringAccent}`}
-                           />
-                         </div>
-                         <div>
-                           <label className={`body-md ${t.textMuted} block mb-0.5`}>Repetisi</label>
-                           <SwipeInput 
-                             value={calcReps} 
-                             onChange={(val) => setCalcReps(Math.max(1, val))} 
-                             step={1}
-                             min={1}
-                             language={lang?.id || 'ID'}
-                             className={`w-full px-3 py-2 rounded-xl ${t.inputBg} ${t.textMain} font-black text-center h2 outline-none focus:ring-2 ${t.ringAccent}`}
-                           />
-                         </div>
+                          <div className={`p-3.5 rounded-xl ${t.bgCard} border ${t.border} text-left text-xs ${t.textMuted} space-y-2 shadow-lg mb-4`}>
+                             <p>Pace dihitung otomatis pada sesi kardio. Bagian ini dalam pengembangan untuk visualisasi grafik.</p>
+                          </div>
                        </div>
-                     </div>
-  
-                     <div className={`p-5 rounded-2xl bg-gradient-to-br ${t.gradientBg} shadow-xl border border-white/10`}>
-                       <div className="flex justify-between items-center mb-3 border-b border-white/20 pb-3">
-                         <div>
-                           <p className="text-white/80 text-[10px] uppercase tracking-wider mb-0.5">Estimasi 1RM</p>
-                           <p className="text-white h3">{oneRM} <span className="body-md">{isImp ? 'lbs' : 'kg'}</span></p>
-                         </div>
-                         <div className="text-right">
-                           <p className="text-white/80 text-[10px] uppercase tracking-wider mb-0.5">Estimasi 10RM</p>
-                           <p className="text-white h3">{calculated10RM} <span className="body-md">{isImp ? 'lbs' : 'kg'}</span></p>
-                         </div>
+                     ) : (
+                       <div className="space-y-4 text-center pb-5">
+                          <div className="flex items-center justify-center gap-2">
+                             <h3 className={`h3 ${t.textMain}`}>Kalkulator RM</h3>
+                             <button onClick={() => setShowRmInfo(!showRmInfo)} className={`p-1.5 rounded-full ${t.inputBg} ${t.textMuted} hover:${t.textAccent} transition-colors`}>
+                                <Info size={16} />
+                             </button>
+                          </div>
+                          
+                          {showRmInfo && (
+                             <div className={`p-3.5 rounded-xl ${t.bgCard} border ${t.border} text-left text-xs ${t.textMuted} space-y-2 shadow-lg mb-4`}>
+                                <p>Kalkulator RM (Repetition Maximum) digunakan untuk mengestimasi beban maksimal yang bisa kamu angkat berdasarkan set terbaikmu.</p>
+                                <p>Jika kamu sudah tahu kapasitas bebanmu (misal: "saya biasa angkat 50kg, 8 repetisi"), masukkan angkanya di bawah lalu <b>Simpan</b> sebagai baseline 10RM.</p>
+                                <p>Jika kamu belum tahu kapasitas beban, silakan dicoba dengan beban ringan terlebih dahulu, naikkan bebannya bertahap sampai cukup untuk 10 repetisi.</p>
+                                <p>Aplikasi LOGYM mencatat rekor 10RM otomatis selama kamu latihan, jadi kamu tidak wajib input manual di sini.</p>
+                             </div>
+                          )}
+   
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className={`body-md ${t.textMuted} block mb-0.5`}>Beban ({isImp ? 'lbs' : 'kg'})</label>
+                              <SwipeInput 
+                                value={calcWeight} 
+                                onChange={(val) => setCalcWeight(Math.max(0, val))} 
+                                step={2.5}
+                                min={0}
+                                language={lang?.id || 'ID'}
+                                className={`w-full px-3 py-2 rounded-xl ${t.inputBg} ${t.textMain} font-black text-center h2 outline-none focus:ring-2 ${t.ringAccent}`}
+                              />
+                            </div>
+                            <div>
+                              <label className={`body-md ${t.textMuted} block mb-0.5`}>Repetisi</label>
+                              <SwipeInput 
+                                value={calcReps} 
+                                onChange={(val) => setCalcReps(Math.max(1, val))} 
+                                step={1}
+                                min={1}
+                                language={lang?.id || 'ID'}
+                                className={`w-full px-3 py-2 rounded-xl ${t.inputBg} ${t.textMain} font-black text-center h2 outline-none focus:ring-2 ${t.ringAccent}`}
+                              />
+                            </div>
+                          </div>
+   
+                          <div className={`p-5 rounded-2xl bg-gradient-to-br ${t.gradientBg} shadow-xl border border-white/10`}>
+                            <div className="flex justify-between items-center mb-3 border-b border-white/20 pb-3">
+                              <div>
+                                <p className="text-white/80 text-[10px] uppercase tracking-wider mb-0.5">Estimasi 1RM</p>
+                                <p className="text-white h3">{oneRM} <span className="body-md">{isImp ? 'lbs' : 'kg'}</span></p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-white/80 text-[10px] uppercase tracking-wider mb-0.5">Estimasi 10RM</p>
+                                <p className="text-white h3">{calculated10RM} <span className="body-md">{isImp ? 'lbs' : 'kg'}</span></p>
+                              </div>
+                            </div>
+                            
+                            <button 
+                              onClick={handleSave10RM}
+                              disabled={isRmSaved || calculated10RM === stored10RM}
+                              className={`w-full py-2.5 font-black body-lg rounded-xl shadow-md transition-all ${isRmSaved ? t.bgAccent : (calculated10RM === stored10RM ? 'bg-white/20 text-white/50 cursor-not-allowed' : 'bg-white text-black hover:bg-zinc-100 active:scale-95')}`}
+                            >
+                              {isRmSaved ? 'Tersimpan ✓' : 'Simpan'}
+                            </button>
+                          </div>
                        </div>
-                       
-                       <button 
-                         onClick={handleSave10RM}
-                         disabled={isRmSaved || calculated10RM === stored10RM}
-                         className={`w-full py-2.5 font-black body-lg rounded-xl shadow-md transition-all ${isRmSaved ? t.bgAccent : (calculated10RM === stored10RM ? 'bg-white/20 text-white/50 cursor-not-allowed' : 'bg-white text-black hover:bg-zinc-100 active:scale-95')}`}
-                       >
-                         {isRmSaved ? 'Tersimpan ✓' : 'Simpan'}
-                       </button>
-                     </div>
-                  </div>
-              </div>
+                     )}
+                  </div>  </div>
             ) : (
               <div className="p-6 h-full text-center text-zinc-500 italic flex flex-col items-center justify-center gap-3">
                 <Video size={48} className="opacity-20" />
@@ -658,7 +704,9 @@ const ExerciseDetailModal = ({
                 className={`h-14 rounded-full flex items-center justify-center transition-all duration-300 shadow-xl pointer-events-auto backdrop-blur-xl border border-black/10 dark:border-white/10 ${activeTab === 'calc' ? `flex-1 ${t.bgAccent} text-white px-5` : 'w-14 bg-white/50 dark:bg-white/10 ' + t.textMain}`}
               >
                 <Calculator size={24} className="shrink-0" />
-                <span className={`font-black text-xs uppercase tracking-wider whitespace-nowrap transition-all duration-300 ${activeTab === 'calc' ? 'max-w-xs opacity-100 ml-2.5' : 'max-w-0 opacity-0 overflow-hidden m-0'}`}>RM Calc</span>
+                <span className={`font-black text-xs uppercase tracking-wider whitespace-nowrap transition-all duration-300 ${activeTab === 'calc' ? 'max-w-xs opacity-100 ml-2.5' : 'max-w-0 opacity-0 overflow-hidden m-0'}`}>
+                  {ex.type === 'cardio' ? 'Pace' : 'RM Calc'}
+                </span>
               </button>
             </div>
           )}

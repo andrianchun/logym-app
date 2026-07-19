@@ -1346,6 +1346,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
         modalDate={modalDate} setModalDate={setModalDate} formBio={formBio} setFormBio={setFormBio} bioData={bioData} lomealToday={lomealToday}
         handleSaveManualData={handleSaveManualData} handleDeleteBioData={handleDeleteBioData} soundEnabled={soundEnabled}
         units={units} setConfirmModal={setConfirmModal} userApiKeys={userApiKeys} keyStatuses={keyStatuses} setKeyStatuses={setKeyStatuses} setShowSettings={setShowSettings}
+        connectedApps={connectedApps}
       />
 
       {/* DETAIL BIOMETRIK MODAL */}

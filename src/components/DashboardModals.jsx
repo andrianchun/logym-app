@@ -15,9 +15,11 @@ const DashboardModals = ({
   showManualModal, setShowManualModal, manualTab, setManualTab, 
   modalDate, setModalDate, formBio, setFormBio, bioData, lomealToday,
   handleSaveManualData, handleDeleteBioData, soundEnabled, units, setConfirmModal,
-  userApiKeys, setKeyStatuses, setShowSettings, keyStatuses
+  userApiKeys, setKeyStatuses, setShowSettings, keyStatuses, connectedApps
 }) => {
   const isImp = units?.weight === 'lbs';
+  const todayStr = new Date().toLocaleDateString('en-CA');
+  const isToday = modalDate === todayStr;
 
   const [isScanning, setIsScanning] = useState(false);
   const [scanError, setScanError] = useState('');
@@ -273,68 +275,99 @@ const DashboardModals = ({
                          <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Body Score (0-100)</label><SwipeInput language={lang?.id || 'ID'} value={!formBio.bodyScore ? '' : formBio.bodyScore} onChange={(val) => setFormBio({...formBio, bodyScore: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.bodyScore, "80")} /></div>
                      </div>
                  ) : (
-                    <div className="space-y-4">
-                        {/* Group 1: Langkah, Durasi Aktif, Kalori Makanan, SpO2 (urutan sesuai kartu) */}
-                        <div className="grid grid-cols-2 gap-2.5">
-                            <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Langkah</label><SwipeInput language={lang?.id || 'ID'} value={formBio.steps || ''} onChange={(val) => setFormBio({...formBio, steps: val})} step={100} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.steps, "5000")} /></div>
-                            <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Durasi Aktif (mnt)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.activeMinutes || ''} onChange={(val) => setFormBio({...formBio, activeMinutes: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.activeMinutes, "30")} /></div>
-                            <div><label className={`flex items-center gap-1 ${t.textMuted} text-xs mb-0.5 truncate`}>Kalori Makanan {lomealToday && <span className="px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-500 text-[8px] uppercase font-bold tracking-wider">LOMEAL</span>}</label><SwipeInput language={lang?.id || 'ID'} value={lomealToday ? Math.round(lomealToday.kcal) : (formBio.nutritionCalories || '')} disabled={!!lomealToday} onChange={(val) => setFormBio({...formBio, nutritionCalories: val})} step={10} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center ${lomealToday ? 'opacity-50 cursor-not-allowed' : ''}`} placeholder={ph(bioData?.nutritionCalories, "2000")} /></div>
-                            <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>SpO2 (%)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.oxygenSaturation || ''} onChange={(val) => setFormBio({...formBio, oxygenSaturation: val})} step={1} min={0} max={100} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.oxygenSaturation, "98")} /></div>
+                    <div className="space-y-5">
+                        
+                        {/* SECTION: NUTRISI & GIZI (LOMEAL) */}
+                        <div className="bg-black/5 dark:bg-white/5 rounded-2xl p-4 border border-black/5 dark:border-white/5">
+                            <div className="flex items-center justify-between mb-3">
+                                <h4 className={`text-sm font-black ${t.textMain}`}>Nutrisi & Gizi</h4>
+                                {lomealToday && isToday && (
+                                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-500 text-[9px] uppercase font-bold tracking-wider flex items-center gap-1">
+                                        <Check size={10} /> TERKUNCI OLEH LOMEAL
+                                    </span>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-1 gap-2.5">
+                                <div>
+                                    <label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Kalori Dimakan (kcal)</label>
+                                    <SwipeInput 
+                                        language={lang?.id || 'ID'} 
+                                        value={lomealToday && isToday ? Math.round(lomealToday.kcal) : (formBio.nutritionCalories || '')} 
+                                        disabled={!!(lomealToday && isToday)} 
+                                        onChange={(val) => setFormBio({...formBio, nutritionCalories: val})} 
+                                        step={10} min={0} soundEnabled={soundEnabled} 
+                                        className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-xl outline-none font-bold text-sm text-center ${lomealToday && isToday ? 'opacity-50 cursor-not-allowed' : ''}`} 
+                                        placeholder={ph(bioData?.nutritionCalories, "2000")} 
+                                    />
+                                </div>
+                            </div>
                         </div>
 
-                        {/* Group 2: Durasi Tidur & Skor Energi */}
-                        <div className="grid grid-cols-2 gap-2.5">
-                            {/* Tidur */}
-                            <div>
-                                <label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Tidur (Jam/Menit)</label>
+                        {/* SECTION: KESEHATAN & AKTIVITAS (HEALTH CONNECT) */}
+                        <div className="bg-black/5 dark:bg-white/5 rounded-2xl p-4 border border-black/5 dark:border-white/5">
+                            <div className="flex items-center justify-between mb-3">
+                                <h4 className={`text-sm font-black ${t.textMain}`}>Kesehatan & Aktivitas</h4>
+                                {connectedApps?.healthConnect && isToday && (
+                                    <span className="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-500 text-[9px] uppercase font-bold tracking-wider flex items-center gap-1">
+                                        <Check size={10} /> TERSINKRONISASI
+                                    </span>
+                                )}
+                            </div>
+                            
+                            {/* Group 1: Langkah, Durasi Aktif, SpO2, Skor Energi */}
+                            <div className="grid grid-cols-2 gap-2.5 mb-2.5">
+                                <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Langkah</label><SwipeInput language={lang?.id || 'ID'} value={formBio.steps || ''} onChange={(val) => setFormBio({...formBio, steps: val})} step={100} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center ${connectedApps?.healthConnect && isToday ? 'opacity-50 cursor-not-allowed' : ''}`} disabled={!!(connectedApps?.healthConnect && isToday)} placeholder={ph(bioData?.steps, "5000")} /></div>
+                                <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Durasi Aktif (mnt)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.activeMinutes || ''} onChange={(val) => setFormBio({...formBio, activeMinutes: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center ${connectedApps?.healthConnect && isToday ? 'opacity-50 cursor-not-allowed' : ''}`} disabled={!!(connectedApps?.healthConnect && isToday)} placeholder={ph(bioData?.activeMinutes, "30")} /></div>
+                                <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>SpO2 (%)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.oxygenSaturation || ''} onChange={(val) => setFormBio({...formBio, oxygenSaturation: val})} step={1} min={0} max={100} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.oxygenSaturation, "98")} /></div>
+                                <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Energy Score</label><SwipeInput language={lang?.id || 'ID'} value={formBio.energyScore || ''} onChange={(val) => setFormBio({...formBio, energyScore: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.energyScore, "80")} /></div>
+                            </div>
+
+                            {/* Group 2: Tidur */}
+                            <div className="mb-2.5">
+                                <label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Tidur Malam (Jam & Menit)</label>
                                 <div className="grid grid-cols-2 gap-2">
                                     <div className="relative">
-                                        <SwipeInput language={lang?.id || 'ID'} value={sleepH || ''} onChange={handleSleepH} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center pr-4`} placeholder={ph(lastSleepH, "7")} />
+                                        <SwipeInput language={lang?.id || 'ID'} value={sleepH || ''} onChange={handleSleepH} step={1} min={0} soundEnabled={soundEnabled} disabled={!!(connectedApps?.healthConnect && isToday)} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center pr-4 ${connectedApps?.healthConnect && isToday ? 'opacity-50 cursor-not-allowed' : ''}`} placeholder={ph(lastSleepH, "7")} />
                                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-zinc-500 font-bold pointer-events-none">h</span>
                                     </div>
                                     <div className="relative">
-                                        <SwipeInput language={lang?.id || 'ID'} value={sleepM || ''} onChange={handleSleepM} step={5} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center pr-4`} placeholder={ph(lastSleepM, "0")} />
+                                        <SwipeInput language={lang?.id || 'ID'} value={sleepM || ''} onChange={handleSleepM} step={5} min={0} soundEnabled={soundEnabled} disabled={!!(connectedApps?.healthConnect && isToday)} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center pr-4 ${connectedApps?.healthConnect && isToday ? 'opacity-50 cursor-not-allowed' : ''}`} placeholder={ph(lastSleepM, "0")} />
                                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-zinc-500 font-bold pointer-events-none">m</span>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Skor Energi */}
-                            <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Energy Score</label><SwipeInput language={lang?.id || 'ID'} value={formBio.energyScore || ''} onChange={(val) => setFormBio({...formBio, energyScore: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.energyScore, "80")} /></div>
-                        </div>
+                            {/* Group 2B: Sleep Stages & HRV (Opsional) */}
+                            <div className="mb-2.5">
+                               <label className={`block ${t.textMuted} text-xs mb-1 truncate`}>Detail Tahap Tidur (mnt) & HRV</label>
+                               <div className="grid grid-cols-5 gap-2">
+                                   <SwipeInput language={lang?.id || 'ID'} value={formBio.sleepAwake || ''} onChange={(val) => setFormBio({...formBio, sleepAwake: val})} disabled={!!(connectedApps?.healthConnect && isToday)} step={5} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center ${connectedApps?.healthConnect && isToday ? 'opacity-50 cursor-not-allowed' : ''}`} placeholder="Awk" />
+                                   <SwipeInput language={lang?.id || 'ID'} value={formBio.sleepRem || ''} onChange={(val) => setFormBio({...formBio, sleepRem: val})} disabled={!!(connectedApps?.healthConnect && isToday)} step={5} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center ${connectedApps?.healthConnect && isToday ? 'opacity-50 cursor-not-allowed' : ''}`} placeholder="REM" />
+                                   <SwipeInput language={lang?.id || 'ID'} value={formBio.sleepLight || ''} onChange={(val) => setFormBio({...formBio, sleepLight: val})} disabled={!!(connectedApps?.healthConnect && isToday)} step={5} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center ${connectedApps?.healthConnect && isToday ? 'opacity-50 cursor-not-allowed' : ''}`} placeholder="Light" />
+                                   <SwipeInput language={lang?.id || 'ID'} value={formBio.sleepDeep || ''} onChange={(val) => setFormBio({...formBio, sleepDeep: val})} disabled={!!(connectedApps?.healthConnect && isToday)} step={5} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center ${connectedApps?.healthConnect && isToday ? 'opacity-50 cursor-not-allowed' : ''}`} placeholder="Deep" />
+                                   <SwipeInput language={lang?.id || 'ID'} value={formBio.hrv || ''} onChange={(val) => setFormBio({...formBio, hrv: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center`} placeholder="HRV" />
+                               </div>
+                            </div>
 
-                        {/* Group 2B: Sleep Stages & HRV (Opsional) */}
-                        <div className="mt-4">
-                           <label className={`block ${t.textMuted} text-xs mb-1 truncate`}>Detail Tahap Tidur (mnt) & HRV</label>
-                           <div className="grid grid-cols-5 gap-2">
-                               <SwipeInput language={lang?.id || 'ID'} value={formBio.sleepAwake || ''} onChange={(val) => setFormBio({...formBio, sleepAwake: val})} step={5} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center`} placeholder="Awake" />
-                               <SwipeInput language={lang?.id || 'ID'} value={formBio.sleepRem || ''} onChange={(val) => setFormBio({...formBio, sleepRem: val})} step={5} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center`} placeholder="REM" />
-                               <SwipeInput language={lang?.id || 'ID'} value={formBio.sleepLight || ''} onChange={(val) => setFormBio({...formBio, sleepLight: val})} step={5} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center`} placeholder="Light" />
-                               <SwipeInput language={lang?.id || 'ID'} value={formBio.sleepDeep || ''} onChange={(val) => setFormBio({...formBio, sleepDeep: val})} step={5} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center`} placeholder="Deep" />
-                               <SwipeInput language={lang?.id || 'ID'} value={formBio.hrv || ''} onChange={(val) => setFormBio({...formBio, hrv: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center`} placeholder="HRV" />
-                           </div>
-                        </div>
-
-                        {/* Group 3: Tensi */}
-                        <div>
-                            <label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Tensi (Sys/Dia)</label>
-                            <div className="grid grid-cols-2 gap-2">
-                                <SwipeInput language={lang?.id || 'ID'} value={bpSys || ''} onChange={handleBPSys} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(lastBpSys, "120")} />
-                                <SwipeInput language={lang?.id || 'ID'} value={bpDia || ''} onChange={handleBPDia} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(lastBpDia, "80")} />
+                            {/* Group 3: Detak Jantung & Tensi */}
+                            <div className="grid grid-cols-2 gap-2.5">
+                                <div>
+                                    <label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Detak Jantung (bpm)</label>
+                                    <div className="grid grid-cols-3 gap-1">
+                                        <SwipeInput language={lang?.id || 'ID'} value={formBio.heartRate || ''} onChange={(val) => setFormBio({...formBio, heartRate: val})} disabled={!!(connectedApps?.healthConnect && isToday)} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center ${connectedApps?.healthConnect && isToday ? 'opacity-50 cursor-not-allowed' : ''}`} placeholder="Avg" />
+                                        <SwipeInput language={lang?.id || 'ID'} value={formBio.minHeartRate || ''} onChange={(val) => setFormBio({...formBio, minHeartRate: val})} disabled={!!(connectedApps?.healthConnect && isToday)} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center ${connectedApps?.healthConnect && isToday ? 'opacity-50 cursor-not-allowed' : ''}`} placeholder="Min" />
+                                        <SwipeInput language={lang?.id || 'ID'} value={formBio.maxHeartRate || ''} onChange={(val) => setFormBio({...formBio, maxHeartRate: val})} disabled={!!(connectedApps?.healthConnect && isToday)} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center ${connectedApps?.healthConnect && isToday ? 'opacity-50 cursor-not-allowed' : ''}`} placeholder="Max" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Tensi (Sys/Dia)</label>
+                                    <div className="grid grid-cols-2 gap-1">
+                                        <SwipeInput language={lang?.id || 'ID'} value={bpSys || ''} onChange={handleBPSys} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(lastBpSys, "120")} />
+                                        <SwipeInput language={lang?.id || 'ID'} value={bpDia || ''} onChange={handleBPDia} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(lastBpDia, "80")} />
+                                    </div>
+                                </div>
                             </div>
                         </div>
-
-                        {/* Group 4: Detak Jantung (Avg / Min / Max) */}
-                        <div>
-                            <label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Detak Jantung (Avg / Min / Max)</label>
-                            <div className="grid grid-cols-3 gap-2">
-                                <SwipeInput language={lang?.id || 'ID'} value={formBio.heartRate || ''} onChange={(val) => setFormBio({...formBio, heartRate: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.heartRate, "75")} />
-                                <SwipeInput language={lang?.id || 'ID'} value={formBio.minHeartRate || ''} onChange={(val) => setFormBio({...formBio, minHeartRate: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.minHeartRate, "60")} />
-                                <SwipeInput language={lang?.id || 'ID'} value={formBio.maxHeartRate || ''} onChange={(val) => setFormBio({...formBio, maxHeartRate: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.maxHeartRate, "100")} />
-                            </div>
-                        </div>
-
-
 
                     </div>
                  )}
