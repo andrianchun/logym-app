@@ -43,7 +43,7 @@ const WorkoutTab = ({
   restTimer, setRestTimer,
   sessionToRun, setSessionToRun,
   resumeDurationSecs, setResumeDurationSecs,
-  units, userProfile, activePlanIds = [], showSupersetToast
+  units, userProfile, activePlanIds = [], showSupersetToast, tabSlideDir = 'right'
 }) => {
   
   const [detailExercise, setDetailExercise] = useState(null);
@@ -137,7 +137,19 @@ const WorkoutTab = ({
   const activeProgramsList = sourceWorkouts
     .map(w => {
       if (w.programId === 'adhoc') {
-         return { id: 'adhoc', name: w.programName || 'Ekstra', exercises: w.exercises || [], workoutId: w.id, status: w.status, log: w.log };
+         return { 
+           id: 'adhoc', 
+           name: w.programName || 'Ekstra', 
+           workoutId: w.id, 
+           status: w.status, 
+           log: w.log,
+           exercises: (w.exercises || []).map(ex => ({
+              ...ex,
+              originalId: ex.originalId || ex.id,
+              id: `${ex.id}-${w.id}`,
+              workoutId: w.id
+           }))
+         };
       }
       let p = programs.find(p => p.id === w.programId);
       
@@ -313,12 +325,26 @@ const WorkoutTab = ({
           const dayData = prev[selectedDate];
           if (!dayData) return prev;
 
-          const wIdx = (dayData.workouts || []).findIndex(w => w.id === workoutId);
-          if (wIdx === -1) return prev;
+          let wIdx = (dayData.workouts || []).findIndex(w => w.id === workoutId);
+          let w;
+          
+          if (wIdx === -1) {
+             const pWorkout = activeProgramsList.find(p => p.workoutId === workoutId);
+             if (!pWorkout) return prev;
+             wIdx = dayData.workouts ? dayData.workouts.length : 0;
+             w = {
+               id: workoutId,
+               programId: pWorkout.id === 'adhoc' ? 'adhoc' : pWorkout.id,
+               programName: pWorkout.name,
+               status: 'planned',
+               log: {}
+             };
+          } else {
+             w = dayData.workouts[wIdx];
+          }
 
           // Update secara immutable — jangan mutasi objek di dalam state React
           const replacement = { ...newEx, sets: detailExercise.sets || 3, reps: detailExercise.reps || 10, duration: detailExercise.duration || 10, id: newEx.id };
-          const w = dayData.workouts[wIdx];
           let newW = w;
 
           if (w.programId === 'adhoc') {
@@ -414,15 +440,15 @@ const WorkoutTab = ({
           
           if (day.workouts) {
             day.workouts.forEach(w => {
-              const exLogKey = `${exItem.id}-${w.id}`;
-              const targetLog = w.log && (w.log[exLogKey] || w.log[exItem.id]);
+              const baseId = exItem.originalId || (typeof exItem.id === 'string' && exItem.id.includes('-') ? exItem.id.split('-')[0] : exItem.id);
+              const targetLog = w.log && (w.log[`${baseId}-${w.id}`] || w.log[baseId] || w.log[exItem.id]);
   
               if (w.status === 'completed' && targetLog) {
                 let bestWeightInSession = 0;
                 let bestRepsAtWeight = 0;
                 
                 targetLog.forEach(s => {
-                  if (!s.skipped && s.type !== 'warmup' && s.w > 0 && s.r > 0) {
+                  if (!s.skipped && s.w > 0 && s.r > 0) {
                     const c1RM = Number(s.w) * (1 + Number(s.r) / 30);
                     const c10RM = c1RM / 1.3333;
                     if (c10RM > historyMax10RM) historyMax10RM = c10RM;
@@ -454,9 +480,9 @@ const WorkoutTab = ({
 
       // 2. Scan current session
       let currentMax10RM = 0;
-      const currentLogs = exerciseLogs[exItem.id] || getSetLogs(exItem) || [];
+      const currentLogs = exerciseLogs[exItem.id] || getSetLogs(exItem);
       currentLogs.forEach(s => {
-        if (s.done && !s.skipped && s.type !== 'warmup' && s.w > 0 && s.r > 0) {
+        if (s.done && !s.skipped && s.w > 0 && s.r > 0) {
           const c1RM = Number(s.w) * (1 + Number(s.r) / 30);
           const c10RM = c1RM / 1.3333;
           if (c10RM > currentMax10RM) currentMax10RM = c10RM;
@@ -782,18 +808,22 @@ const WorkoutTab = ({
       >
         
         {isCompletelyEmpty ? (
-          <EmptyWorkoutState 
-            t={t}
-            showProgramSelect={showProgramSelect}
-            setShowProgramSelect={setShowProgramSelect}
-            playSoundEffect={playSoundEffect}
-            soundEnabled={soundEnabled}
-            setActiveTab={setActiveTab}
-            handleAddAdhocSession={handleAddAdhocSession}
-            programs={programs}
-            handleAddProgramToToday={handleAddProgramToToday}
-            activePlanIds={activePlanIds}
-          />
+          createPortal(
+            <EmptyWorkoutState 
+              t={t}
+              showProgramSelect={showProgramSelect}
+              setShowProgramSelect={setShowProgramSelect}
+              playSoundEffect={playSoundEffect}
+              soundEnabled={soundEnabled}
+              setActiveTab={setActiveTab}
+              handleAddAdhocSession={handleAddAdhocSession}
+              programs={programs}
+              handleAddProgramToToday={handleAddProgramToToday}
+              activePlanIds={activePlanIds}
+              tabSlideDir={tabSlideDir}
+            />,
+            document.body
+          )
         ) : (
           <>
             <WorkoutHeader

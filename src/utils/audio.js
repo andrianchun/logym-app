@@ -32,12 +32,24 @@ export const playSoundEffect = (type, enabled) => {
         osc.start(now);
         osc.stop(now + 0.05);
     } else if (type === 'swipe') {
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(400, now);
-        gain.gain.setValueAtTime(0.1, now);
+        // Suara gesekan pendek (white noise / filtered)
+        // Kita pakai oscillator noise sederhana
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(200, now);
+        osc.frequency.linearRampToValueAtTime(100, now + 0.05);
+        gain.gain.setValueAtTime(0.05, now);
         gain.gain.linearRampToValueAtTime(0, now + 0.05);
         osc.start(now);
         osc.stop(now + 0.05);
+    } else if (type === 'done_set') {
+        // Suara klik + ting yang renyah untuk mencentang set
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, now);
+        osc.frequency.exponentialRampToValueAtTime(1200, now + 0.05);
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+        osc.start(now);
+        osc.stop(now + 0.1);
     } else if (type === 'timerStart') {
         osc.type = 'square';
         osc.frequency.setValueAtTime(440, now);

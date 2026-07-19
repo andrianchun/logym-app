@@ -93,18 +93,22 @@ const AlternativeExerciseModal = ({
       // Smart recommendation scoring (only matters if no strict search is hiding it)
       if (queryWords.length === 0) {
         const nameLower = ex.name.toLowerCase();
-        // 1. Name match bonus (e.g. "Smith", "Incline")
-        origWords.forEach(w => {
-          if (nameLower.includes(w)) score += 50;
-        });
-
-        // 2. Exact target match bonus
+        
+        // 1. Exact target match bonus
         const hasSameTarget = ex.target?.some(t => originalEx.target?.includes(t));
-        if (hasSameTarget) score += 30;
+        if (hasSameTarget) score += 50;
 
-        // 3. Same body part bonus
+        // 2. Same body part bonus
         const hasSameBodyPart = ex.bodyParts?.some(b => originalEx.bodyParts?.includes(b));
-        if (hasSameBodyPart) score += 10;
+        if (hasSameBodyPart) score += 20;
+
+        // 3. Name match bonus (e.g. "Smith", "Incline")
+        // Only give name bonus if it at least targets the same body part
+        if (hasSameBodyPart || hasSameTarget) {
+           origWords.forEach(w => {
+             if (nameLower.includes(w)) score += 30;
+           });
+        }
         
         // If completely unrelated, lower score but don't hide
         if (score === 0) score = 1; 

@@ -46,20 +46,20 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   // STATE KONEKSI & SINKRONISASI
   // ==========================================
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [isRaigaHidden, setIsRaigaHidden] = useState(() => localStorage.getItem('lyfit_raiga_hidden') === 'true');
+  const [isLogiHidden, setIsLogiHidden] = useState(() => localStorage.getItem('lyfit_logi_hidden') === 'true');
 
   useEffect(() => {
       const handleToggle = (e) => {
           if (e.detail?.action === 'show' || e.detail?.action === 'showAndOpen') {
-              setIsRaigaHidden(false);
+              setIsLogiHidden(false);
           } else if (e.detail?.action === 'hide') {
-              setIsRaigaHidden(true);
+              setIsLogiHidden(true);
           } else {
-              setIsRaigaHidden(prev => !prev);
+              setIsLogiHidden(prev => !prev);
           }
       };
-      window.addEventListener('toggle-raiga-float', handleToggle);
-      return () => window.removeEventListener('toggle-raiga-float', handleToggle);
+      window.addEventListener('toggle-logi-float', handleToggle);
+      return () => window.removeEventListener('toggle-logi-float', handleToggle);
   }, []);
 
 
@@ -605,10 +605,10 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
             </div>
          </div>
          <div className="flex items-center gap-2 relative z-20 h-10 -mr-1">
-            {isRaigaHidden && (
-               <button onClick={() => { playSoundEffect('click', soundEnabled); window.dispatchEvent(new CustomEvent('toggle-raiga-float', { detail: { action: 'showAndOpen' } })); }} className={`flex items-center gap-1.5 bg-blue-500/10 text-blue-500 border border-blue-500/20 rounded-full pl-1.5 pr-2.5 py-1.5 hover:bg-blue-500/20 transition-all shadow-sm animate-in zoom-in-90 duration-300`}>
+            {isLogiHidden && (
+               <button onClick={() => { playSoundEffect('click', soundEnabled); window.dispatchEvent(new CustomEvent('toggle-logi-float', { detail: { action: 'showAndOpen' } })); }} className={`flex flex-col items-center justify-center gap-0.5 bg-blue-500/10 text-blue-500 border border-blue-500/20 rounded-2xl p-1.5 hover:bg-blue-500/20 transition-all shadow-sm animate-in zoom-in-90 duration-300 min-w-[48px]`}>
                   <div className="w-7 h-7 rounded-full overflow-hidden bg-zinc-900 border border-blue-400 shrink-0" style={{backgroundImage: "url('/bg-program.webp')", backgroundSize: '450%', backgroundPosition: '52% 7%'}}></div>
-                  <span className="text-[10px] font-black tracking-wider uppercase whitespace-nowrap">Konsul Logy</span>
+                  <span className="text-[8px] font-black tracking-wide uppercase whitespace-nowrap leading-none pb-0.5">Konsul</span>
                </button>
             )}
          </div>

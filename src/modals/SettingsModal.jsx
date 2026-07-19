@@ -22,8 +22,8 @@ export default function SettingsModal({
   biometricStandard, setBiometricStandard,
   units, setUnits,
   userApiKeys, setUserApiKeys,
-  raigaPersona, setRaigaPersona, raigaCustomInstruction, setRaigaCustomInstruction,
-  raigaMemory, setRaigaMemory,
+  logiPersona, setLogiPersona, logiCustomInstruction, setLogiCustomInstruction,
+  logiMemory, setLogiMemory,
   connectedApps, setConnectedApps
 }) {
   const [activeTab, setActiveTab] = useState('preferensi');
@@ -327,10 +327,10 @@ export default function SettingsModal({
                 </div>
             </div>
 
-            {/* KEPRIBADIAN COACH RAIGA */}
+            {/* KEPRIBADIAN COACH LOGI */}
             <div className={`p-4 rounded-2xl border ${t.border} ${t.bgCard} space-y-3`}>
                 <p className={`body-md ${t.textMuted} uppercase tracking-wider mb-2 flex items-center gap-2`}>
-                  <MessageCircle size={16} /> Kepribadian Coach Raiga
+                  <MessageCircle size={16} /> Kepribadian Coach Logi
                 </p>
                 <div className="grid grid-cols-3 gap-2">
                     {[
@@ -340,9 +340,9 @@ export default function SettingsModal({
                     ].map(p => (
                         <button
                             key={p.key}
-                            onClick={() => setRaigaPersona(p.key)}
+                            onClick={() => setLogiPersona(p.key)}
                             title={PERSONA_PRESETS[p.key]?.label}
-                            className={`py-3 rounded-xl text-2xl transition-all flex items-center justify-center ${raigaPersona === p.key ? `${t.bgAccent} shadow-sm` : t.btnBg}`}
+                            className={`py-3 rounded-xl text-2xl transition-all flex items-center justify-center ${logiPersona === p.key ? `${t.bgAccent} shadow-sm` : t.btnBg}`}
                         >
                             {p.emoji}
                         </button>
@@ -350,22 +350,22 @@ export default function SettingsModal({
                 </div>
             </div>
 
-            {/* MEMORI COACH RAIGA */}
+            {/* MEMORI COACH LOGI */}
             <div className={`p-4 rounded-2xl border ${t.border} ${t.bgCard} space-y-2`}>
                 <p className={`body-md ${t.textMuted} uppercase tracking-wider mb-2 flex items-center gap-2`}>
-                  <Brain size={16} /> Memori Coach Raiga
+                  <Brain size={16} /> Memori Coach Logi
                 </p>
-                {(!raigaMemory || raigaMemory.length === 0) ? (
+                {(!logiMemory || logiMemory.length === 0) ? (
                     <p className={`text-xs ${t.textMuted} leading-relaxed`}>
-                        Belum ada memori tersimpan. Tandai pesan di chat (ikon bookmark) untuk menyimpannya ke sini. Coach Raiga akan mengingatnya.
+                        Belum ada memori tersimpan. Tandai pesan di chat (ikon bookmark) untuk menyimpannya ke sini. Coach Logi akan mengingatnya.
                     </p>
                 ) : (
                     <div className="space-y-2">
-                        {raigaMemory.map((m, i) => (
+                        {logiMemory.map((m, i) => (
                             <div key={i} className={`flex items-start gap-2 p-2.5 rounded-xl ${t.inputBg} border ${t.border}`}>
                                 <p className={`flex-1 text-xs ${t.textMain} leading-relaxed`}>{m}</p>
                                 <button
-                                    onClick={() => setRaigaMemory(raigaMemory.filter((_, idx) => idx !== i))}
+                                    onClick={() => setLogiMemory(logiMemory.filter((_, idx) => idx !== i))}
                                     className="p-1 rounded-full text-neutral-500 hover:text-rose-500 transition-colors shrink-0"
                                 >
                                     <Trash2 size={14} />

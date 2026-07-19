@@ -777,7 +777,7 @@ const ProgramTab = ({
                   )}
                   {group.isAI && (
                     <span className={`flex items-center gap-1 px-2 py-0.5 text-[9px] font-black uppercase rounded-md bg-blue-500/30 text-blue-100 backdrop-blur-md border border-blue-400/40 shadow-sm shadow-blue-500/20`}>
-                      <Brain size={10} /> Coach Raiga
+                      <Brain size={10} /> Coach Logi
                     </span>
                   )}
                 </div>
@@ -1026,7 +1026,7 @@ const ProgramTab = ({
                 onClick={() => { playSoundEffect('click', soundEnabled); openQuestionnaire(); }}
                 className={`w-full py-3.5 rounded-[14px] font-black text-black bg-white shadow-[0_0_20px_rgba(255,255,255,0.3)] active:scale-95 transition-all flex items-center justify-center text-sm`}
               >
-                Coach Raiga
+                Coach Logi
               </button>
               <button 
                 onClick={() => { 
@@ -1100,7 +1100,7 @@ const ProgramTab = ({
         />
       )}
       
-      {/* Floating Coach Raiga button moved to App.jsx for global visibility */}
+      {/* Floating Coach Logi button moved to App.jsx for global visibility */}
 
       {/* GymAIChat is now rendered globally in App.jsx; onAcceptProgram is passed down via prop */}
       

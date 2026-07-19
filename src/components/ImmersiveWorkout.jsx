@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Play, Pause, ChevronRight, ChevronLeft, Dumbbell, Check, Info, Clock, Minimize2, SkipForward, ClipboardEdit, Brain, Flame } from 'lucide-react';
+import { X, Play, Pause, ChevronRight, ChevronLeft, Dumbbell, Check, Info, Clock, Minimize2, SkipForward, ClipboardEdit, Brain, Flame, Activity, ArrowLeftRight, Square } from 'lucide-react';
 import ScrollPicker from './ScrollPicker';
 import { exerciseTypeLabels } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
@@ -80,9 +80,15 @@ const ImmersiveWorkout = ({
   });
 
   const handleSaveSetDetail = (exId, setIdx, details) => {
-    onSetChange(exId, setIdx, 'notes', details.notes);
-    onSetChange(exId, setIdx, 'rir', details.rir);
-    onSetChange(exId, setIdx, 'rpe', details.rpe);
+    if (details.isCardio) {
+      if (details.heartRate !== undefined) onSetChange(exId, setIdx, 'heartRate', details.heartRate);
+      if (details.elevation !== undefined) onSetChange(exId, setIdx, 'elevation', details.elevation);
+      if (details.incline !== undefined) onSetChange(exId, setIdx, 'incline', details.incline);
+    } else {
+      onSetChange(exId, setIdx, 'notes', details.notes);
+      onSetChange(exId, setIdx, 'rir', details.rir);
+      onSetChange(exId, setIdx, 'rpe', details.rpe);
+    }
     setActiveSetDetail(null);
   };
 
@@ -103,6 +109,51 @@ const ImmersiveWorkout = ({
     setMaxRestTimer(prev => restTimer === 0 ? 0 : Math.max(prev, restTimer));
   }, [restTimer]);
 
+  const [activeTimer, setActiveTimer] = React.useState({ idx: null, timeLeft: 0, mode: 'down' });
+
+  React.useEffect(() => {
+    let interval = null;
+    if (activeTimer.idx !== null) {
+      interval = setInterval(() => {
+        setActiveTimer(prev => {
+          if (prev.mode === 'down') {
+             if (prev.timeLeft <= 1) {
+                playSoundEffect('done', soundEnabled);
+                clearInterval(interval);
+                return { idx: null, timeLeft: 0, mode: 'down' };
+             }
+             return { ...prev, timeLeft: prev.timeLeft - 1 };
+          }
+          return { ...prev, timeLeft: prev.timeLeft + 1 };
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [activeTimer.idx, soundEnabled]);
+
+  const toggleTimer = (setIdx, duration, isCardio = false) => {
+    playSoundEffect('click', soundEnabled);
+    if (activeTimer.idx === setIdx) {
+        if (activeTimer.mode === 'up') {
+            const elapsedMins = Number((activeTimer.timeLeft / 60).toFixed(2));
+            if (isCardio) {
+                handleCardioChange('duration', elapsedMins);
+            } else {
+                onSetChange(ex.id, setIdx, 'd', activeTimer.timeLeft);
+            }
+        }
+        setActiveTimer({ idx: null, timeLeft: 0, mode: 'down' });
+    } else {
+        const d = Number(duration || 0);
+        if (d > 0) {
+           const timeInSeconds = isCardio ? Math.round(d * 60) : Math.round(d);
+           setActiveTimer({ idx: setIdx, timeLeft: timeInSeconds, mode: 'down' }); 
+        } else {
+           setActiveTimer({ idx: setIdx, timeLeft: 0, mode: 'up' }); 
+        }
+    }
+  };
+
   // 3. Current Set Logic
   const getLogsForEx = (exItem) => exerciseLogs[exItem.id] || Array.from({length: exItem.sets || 3}).map(() => ({
     w: exItem.defaultWeight || 0, r: exItem.reps || 10, d: exItem.duration || 10, done: false
@@ -122,6 +173,11 @@ const ImmersiveWorkout = ({
 
   const activeSet = logs[activeSetIdx];
   const isAllDone = ex && getLogsForEx(ex).length > 0 && getLogsForEx(ex).every(s => s.done || s.skipped);
+
+  const [isTreadmillMode, setIsTreadmillMode] = React.useState(() => (ex?.name || '').toLowerCase().includes('treadmill'));
+  React.useEffect(() => {
+    if (ex) setIsTreadmillMode((ex.name || '').toLowerCase().includes('treadmill'));
+  }, [ex?.name]);
 
   const parseMedia = (exercise) => {
     if (!exercise) return [];
@@ -149,6 +205,33 @@ const ImmersiveWorkout = ({
   React.useEffect(() => {
     setYtLoaded(false);
   }, [activeMediaIndex, currentIndex]);
+
+  // Back button protection
+  const popped = React.useRef(false);
+  
+  React.useEffect(() => {
+    window.history.pushState({ immersive: true }, '');
+
+    const handlePopState = () => {
+      if (popped.current) return;
+      popped.current = true;
+      playSoundEffect('click', soundEnabled);
+      onClose();
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
+
+  const handleMinimize = () => {
+    if (!popped.current) {
+      popped.current = true;
+      window.history.back(); // Trigger popstate or at least clean up history state
+      onClose();
+    }
+  };
 
   const activeMedia = mediaItems[activeMediaIndex];
 
@@ -218,6 +301,7 @@ const ImmersiveWorkout = ({
 
   const onRootTouchStart = (e) => {
     if (activeSetDetail !== null || showFinishConfirm) return;
+    if (e.target.closest('.no-swipe-minimize')) return;
     setRootTouchEnd(null);
     setRootTouchStart(e.targetTouches[0].clientY);
   };
@@ -230,7 +314,7 @@ const ImmersiveWorkout = ({
     const distance = rootTouchStart - rootTouchEnd;
     if (distance < -100) { // Swipe down
       playSoundEffect('click', soundEnabled);
-      onClose();
+      handleMinimize();
     }
   };
 
@@ -319,9 +403,39 @@ const ImmersiveWorkout = ({
     }
   };
 
+  const handleCardioChange = (field, val) => {
+      if (!ex) return;
+      onSetChange(ex.id, activeSetIdx, field, val);
+      const s = getLogsForEx(ex)[activeSetIdx] || {};
+      let dist = field === 'distance' ? Number(val || 0) : Number(s.distance || 0);
+      let dur = field === 'duration' ? Number(val || 0) : Number(s.duration || 0);
+      let spd = field === 'speed' ? Number(val || 0) : Number(s.speed || 0);
+
+      if (field === 'speed' && dur > 0) {
+         const newDist = (val * (dur / 60)).toFixed(2);
+         onSetChange(ex.id, activeSetIdx, 'distance', Number(newDist));
+      }
+      else if (field === 'distance' && dur > 0) {
+         const newSpd = (val / (dur / 60)).toFixed(1);
+         onSetChange(ex.id, activeSetIdx, 'speed', Number(newSpd));
+      }
+      else if (field === 'duration') {
+         if (isTreadmillMode && spd > 0) {
+            const newDist = (spd * (val / 60)).toFixed(2);
+            onSetChange(ex.id, activeSetIdx, 'distance', Number(newDist));
+         } else if (!isTreadmillMode && dist > 0) {
+            const newSpd = (dist / (val / 60)).toFixed(1);
+            onSetChange(ex.id, activeSetIdx, 'speed', Number(newSpd));
+         } else if (dist > 0 && spd === 0) {
+            const newSpd = (dist / (val / 60)).toFixed(1);
+            onSetChange(ex.id, activeSetIdx, 'speed', Number(newSpd));
+         }
+      }
+  };
+
   const handleDoneClick = () => {
     if (!ex) return;
-    playSoundEffect('success', soundEnabled);
+    playSoundEffect('done_set', soundEnabled);
     const itemLogs = getLogsForEx(ex);
     if (!itemLogs[activeSetIdx]?.done) {
       let siblingIds = null;
@@ -381,7 +495,7 @@ const ImmersiveWorkout = ({
           <button onClick={() => { playSoundEffect('click', soundEnabled); setIsPaused(!isPaused); }} className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-white/5 hover:bg-white/10' : 'bg-black/5 hover:bg-black/10'} flex items-center justify-center transition shadow-sm`} title="Play/Pause">
             {isPaused ? <Play size={18} className={`${t.textAccent}`} /> : <Pause size={18} />}
           </button>
-          <button data-close-modal="true" onClick={() => { playSoundEffect('click', soundEnabled); onClose(); }} className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-white/5 hover:bg-white/10' : 'bg-black/5 hover:bg-black/10'} flex items-center justify-center transition shadow-sm`} title="Minimize">
+          <button data-close-modal="true" onClick={() => { playSoundEffect('click', soundEnabled); handleMinimize(); }} className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-white/5 hover:bg-white/10' : 'bg-black/5 hover:bg-black/10'} flex items-center justify-center transition shadow-sm`} title="Minimize">
             <Minimize2 size={18} />
           </button>
           <button onClick={() => { playSoundEffect('click', soundEnabled); onCancelWorkout(); }} className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400' : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-500'} flex items-center justify-center transition shadow-sm`} title="Batalkan Workout">
@@ -545,7 +659,7 @@ const ImmersiveWorkout = ({
                               <div className={`w-8 h-8 rounded-full ${t.bgAccent} flex items-center justify-center shadow-lg`}>
                                 <Brain size={16} className="text-white" />
                               </div>
-                              <span className={`font-black text-[11px] tracking-widest uppercase ${t.textMain}`}>Coach Raiga</span>
+                              <span className={`font-black text-[11px] tracking-widest uppercase ${t.textMain}`}>Coach Logi</span>
                             </div>
                           </div>
                           <div className="flex flex-col items-center mt-auto pt-32 pb-2">
@@ -580,15 +694,26 @@ const ImmersiveWorkout = ({
         
 
         {/* Scroll Pickers */}
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-6 no-swipe-minimize">
           {(() => {
-            const isCardio = ex.target?.some(t => t.toLowerCase().includes('cardio') || t.toLowerCase().includes('kardio'));
+            let exType = ex?.type || 'weight';
+            const isCardioMatch = ex?.target?.some(t => t.toLowerCase().includes('cardio') || t.toLowerCase().includes('kardio')) 
+                     || (ex?.name || '').toLowerCase().includes('lari') 
+                     || (ex?.name || '').toLowerCase().includes('treadmill') 
+                     || (ex?.name || '').toLowerCase().includes('sepeda') 
+                     || (ex?.name || '').toLowerCase().includes('elliptical');
+            
+            if (exType === 'time' && isCardioMatch) {
+              exType = 'cardio';
+            }
+
+            const isCardio = exType === 'cardio';
             const itemLogs = getLogsForEx(ex);
             const itemSet = itemLogs[activeSetIdx] || itemLogs[0];
             return (
               <div key={ex.id} className="w-full flex flex-col">
                   <div className="flex items-center justify-center gap-4">
-                    {ex.type !== 'time' && (
+                    {exType === 'weight' && (
                       <div className="flex-1 flex flex-col items-center relative">
                         <div className="flex items-center gap-1.5 mb-2 relative z-20">
                            <span className="body-md uppercase">{isImp ? 'LBS' : 'KG'}</span>
@@ -601,45 +726,104 @@ const ImmersiveWorkout = ({
                     </div>
                   )}
                   
-                  {ex.type === 'time' ? (
-                    isCardio ? (
-                      <>
-                        <div className="flex-1 flex flex-col items-center">
-                          <span className="body-md mb-2 uppercase">Jarak (km)</span>
-                          <ScrollPicker 
-                            value={itemSet?.dist || 0} 
-                            onChange={(val) => onSetChange(ex.id, activeSetIdx, 'dist', val)}
-                            min={0} max={50} step={0.1} width="w-full" theme={theme} t={t}
-                          />
-                        </div>
-                        <div className="flex-1 flex flex-col items-center">
-                          <span className="body-md mb-2 uppercase">Durasi (mnt)</span>
-                          <ScrollPicker 
-                            value={itemSet?.d || 15} 
-                            onChange={(val) => onSetChange(ex.id, activeSetIdx, 'd', val)}
-                            min={1} max={300} step={1} width="w-full" theme={theme} t={t}
-                          />
-                        </div>
-                      </>
-                    ) : (
+                  {isCardio ? (
+                    (() => {
+                         const d = Number(itemSet?.distance || 0);
+                         const tMin = Number(itemSet?.duration || 0);
+                         let paceStr = '-:--';
+                         if (d > 0 && tMin > 0) {
+                             const paceTotalSeconds = (tMin * 60) / d;
+                             const pm = Math.floor(paceTotalSeconds / 60);
+                             const ps = Math.floor(paceTotalSeconds % 60);
+                             paceStr = `${pm}:${ps < 10 ? '0' : ''}${ps}`;
+                         }
+                         return (
+                           <>
+                             <div className="flex-1 flex flex-col items-center">
+                               <div className="h-8 mb-2 w-full flex items-center justify-center relative">
+                                 <span className="body-md uppercase">KM</span>
+                               </div>
+                               <ScrollPicker 
+                                 value={itemSet?.distance || 0} 
+                                 onChange={(val) => handleCardioChange('distance', val)}
+                                 min={0} max={50} step={0.1} width="w-full" theme={theme} t={t}
+                               />
+                             </div>
+                             <div className="flex-1 flex flex-col items-center">
+                               <div className="h-8 mb-2 w-full flex items-center justify-center gap-2 relative">
+                                 <span className="body-md uppercase">Mnt</span>
+                                 <button onClick={() => toggleTimer(activeSetIdx, itemSet?.duration, true)} className={`p-1.5 rounded-full text-white transition-all ${activeTimer.idx === activeSetIdx ? 'bg-rose-500 shadow-md scale-110' : t.bgAccent}`}>
+                                   {activeTimer.idx === activeSetIdx ? <Square size={12}/> : <Play size={12} className="ml-[1px]"/>}
+                                 </button>
+                               </div>
+                               {activeTimer.idx === activeSetIdx ? (
+                                  <div className={`w-full h-[120px] flex items-center justify-center text-4xl sm:text-5xl font-black ${t.textAccent}`}>
+                                     {formatTime(activeTimer.timeLeft)}
+                                  </div>
+                               ) : (
+                                  <ScrollPicker 
+                                    value={itemSet?.duration || 0} 
+                                    onChange={(val) => handleCardioChange('duration', val)}
+                                    min={0} max={300} step={1} width="w-full" theme={theme} t={t}
+                                  />
+                               )}
+                             </div>
+                             <div className="flex-1 flex flex-col items-center">
+                               <div className="h-8 mb-2 w-full flex items-center justify-center relative">
+                                 <span className="body-md uppercase">
+                                   {isTreadmillMode ? 'Kec (km/j)' : 'Pace'}
+                                 </span>
+                                 <button onClick={() => setIsTreadmillMode(!isTreadmillMode)} className={`absolute right-0 sm:right-2 p-1.5 rounded-full ${t.bgAccentSoft} ${t.textAccent} hover:scale-110 transition`} title="Ganti Mode (Treadmill / Lari)">
+                                   <ArrowLeftRight size={12} />
+                                 </button>
+                               </div>
+                               {isTreadmillMode ? (
+                                 <ScrollPicker 
+                                   value={itemSet?.speed || 0} 
+                                   onChange={(val) => handleCardioChange('speed', val)}
+                                   min={0} max={30} step={0.5} width="w-full" theme={theme} t={t}
+                                 />
+                               ) : (
+                                 <div className="w-full h-[120px] flex flex-col items-center justify-center opacity-80 pointer-events-none">
+                                   <span className={`text-3xl font-black ${t.textMain}`}>{paceStr}</span>
+                                   <span className={`text-[10px] font-bold uppercase tracking-widest ${t.textMuted}`}>mnt/km</span>
+                                 </div>
+                               )}
+                             </div>
+                           </>
+                         );
+                    })()
+                  ) : exType === 'time' ? (
+                    <div className="flex-1 flex flex-col items-center">
+                      <div className="mb-2 w-full flex items-center justify-center gap-2 relative">
+                         <span className="body-md uppercase">Durasi (dtk)</span>
+                         <button onClick={() => toggleTimer(activeSetIdx, itemSet?.d, false)} className={`p-1.5 rounded-full text-white transition-all ${activeTimer.idx === activeSetIdx ? 'bg-rose-500 shadow-md scale-110' : t.bgAccent}`}>
+                           {activeTimer.idx === activeSetIdx ? <Square size={12}/> : <Play size={12} className="ml-[1px]"/>}
+                         </button>
+                      </div>
+                      {activeTimer.idx === activeSetIdx ? (
+                         <div className={`w-full h-[120px] flex items-center justify-center text-4xl sm:text-5xl font-black ${t.textAccent}`}>
+                            {formatTime(activeTimer.timeLeft)}
+                         </div>
+                      ) : (
+                         <ScrollPicker 
+                           value={itemSet?.d === undefined ? 0 : itemSet.d} 
+                           onChange={(val) => onSetChange(ex.id, activeSetIdx, 'd', val)}
+                           min={0} max={300} step={5} width="w-full" theme={theme} t={t}
+                         />
+                      )}
+                    </div>
+                  ) : (
+                    (exType === 'weight' || exType === 'reps') && (
                       <div className="flex-1 flex flex-col items-center">
-                        <span className="body-md mb-2 uppercase">Durasi (dtk)</span>
+                        <span className="body-md mb-2 uppercase">Repetisi</span>
                         <ScrollPicker 
-                          value={itemSet?.d || 15} 
-                          onChange={(val) => onSetChange(ex.id, activeSetIdx, 'd', val)}
-                          min={5} max={300} step={5} width="w-full" theme={theme} t={t}
+                          value={itemSet?.r || 10} 
+                          onChange={(val) => onSetChange(ex.id, activeSetIdx, 'r', val)}
+                          min={1} max={50} step={1} width="w-full" theme={theme} t={t}
                         />
                       </div>
                     )
-                  ) : (
-                    <div className="flex-1 flex flex-col items-center">
-                      <span className="body-md mb-2 uppercase">Repetisi</span>
-                      <ScrollPicker 
-                        value={itemSet?.r || 10} 
-                        onChange={(val) => onSetChange(ex.id, activeSetIdx, 'r', val)}
-                        min={1} max={50} step={1} width="w-full" theme={theme} t={t}
-                      />
-                    </div>
                   )}
                 </div>
               </div>
@@ -706,16 +890,28 @@ const ImmersiveWorkout = ({
               {(() => {
                 const s = getLogsForEx(ex)[activeSetIdx] || {};
                 const isFilled = s.notes || s.rir || s.rpe;
+                const isCardioEx = ['cardio', 'time', 'distance'].includes(ex.type?.toLowerCase()) || (ex.name || '').toLowerCase().includes('lari') || (ex.name || '').toLowerCase().includes('treadmill') || (ex.name || '').toLowerCase().includes('sepeda') || (ex.name || '').toLowerCase().includes('elliptical');
+                const isCardioFilled = s.heartRate || s.elevation || s.incline;
+                
                 return (
                   <button 
                     onClick={() => {
                        playSoundEffect('click', soundEnabled);
-                       setActiveSetDetail({ setIdx: activeSetIdx, rir: s.rir !== undefined ? s.rir : '', rpe: s.rpe !== undefined ? s.rpe : '', notes: s.notes || '' });
+                       setActiveSetDetail({ 
+                         setIdx: activeSetIdx, 
+                         rir: s.rir !== undefined ? s.rir : '', 
+                         rpe: s.rpe !== undefined ? s.rpe : '', 
+                         notes: s.notes || '',
+                         heartRate: s.heartRate || '',
+                         elevation: s.elevation || '',
+                         incline: s.incline || '',
+                         isCardio: isCardioEx
+                       });
                     }}
-                    className={`w-16 sm:w-20 rounded-2xl ${isFilled ? `${t.bgAccent} text-white` : `${t.bgAccentSoft} ${t.textAccent}`} hover:opacity-80 transition flex items-center justify-center shrink-0 shadow-xl`}
-                    title="Catatan Set"
+                    className={`w-16 sm:w-20 rounded-2xl ${(isCardioEx ? isCardioFilled : isFilled) ? `${t.bgAccent} text-white` : `${t.bgAccentSoft} ${t.textAccent}`} hover:opacity-80 transition flex items-center justify-center shrink-0 shadow-xl`}
+                    title={isCardioEx ? "Data Kardio (Nadi, Elevasi)" : "Catatan Set"}
                   >
-                    <ClipboardEdit size={24} />
+                    {isCardioEx ? <Activity size={24} /> : <ClipboardEdit size={24} />}
                   </button>
                 );
               })()}
@@ -779,142 +975,184 @@ const ImmersiveWorkout = ({
               </button>
             </div>
 
-            <div className="flex gap-4">
-              {/* KIRI: Textarea & Tags */}
-              <div className="flex-1 flex flex-col gap-4">
-                
-                <div className="relative">
-                  <textarea 
-                    rows="3" 
-                    placeholder="Tulis catatan set ini (opsional)..." 
-                    value={activeSetDetail.notes} 
-                    onChange={e => setActiveSetDetail({...activeSetDetail, notes: e.target.value})} 
-                    className={`w-full p-4 pr-10 rounded-3xl bg-black/5 dark:bg-white/5 ${t.textMain} placeholder-black/30 dark:placeholder-white/30 text-base resize-none outline-none focus:ring-2 focus:${t.ringAccent}`}
+            {activeSetDetail.isCardio ? (
+              <div className="flex flex-col gap-5 w-full">
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Detak Jantung (BPM)</span>
+                  <input 
+                    type="number"
+                    value={activeSetDetail.heartRate}
+                    onChange={e => setActiveSetDetail({...activeSetDetail, heartRate: e.target.value})}
+                    placeholder="Contoh: 140"
+                    className={`w-full p-4 rounded-3xl bg-black/5 dark:bg-white/5 ${t.textMain} placeholder-black/30 dark:placeholder-white/30 text-base outline-none focus:ring-2 focus:${t.ringAccent} text-center font-black`}
                   />
-                  {activeSetDetail.notes && (
-                    <button
-                      type="button"
-                      onClick={(e) => { e.preventDefault(); playSoundEffect('click', soundEnabled); setActiveSetDetail({...activeSetDetail, notes: ''}); }}
-                      className={`absolute top-3 right-3 p-1.5 rounded-full bg-black/10 dark:bg-white/10 ${t.textMuted} hover:text-rose-500 hover:bg-rose-500/10 transition-colors`}
-                    >
-                      <X size={14} />
-                    </button>
+                </div>
+                <div className="flex w-full">
+                  {isTreadmillMode ? (
+                    <div className="flex flex-col flex-1">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2 text-center">Incline (%)</span>
+                      <input 
+                        type="number"
+                        value={activeSetDetail.incline}
+                        onChange={e => setActiveSetDetail({...activeSetDetail, incline: e.target.value})}
+                        placeholder="Contoh: 2.5"
+                        className={`w-full p-4 rounded-3xl bg-black/5 dark:bg-white/5 ${t.textMain} placeholder-black/30 dark:placeholder-white/30 text-base outline-none focus:ring-2 focus:${t.ringAccent} text-center font-black`}
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex flex-col flex-1">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2 text-center">Elevasi (m)</span>
+                      <input 
+                        type="number"
+                        value={activeSetDetail.elevation}
+                        onChange={e => setActiveSetDetail({...activeSetDetail, elevation: e.target.value})}
+                        placeholder="Contoh: 50"
+                        className={`w-full p-4 rounded-3xl bg-black/5 dark:bg-white/5 ${t.textMain} placeholder-black/30 dark:placeholder-white/30 text-base outline-none focus:ring-2 focus:${t.ringAccent} text-center font-black`}
+                      />
+                    </div>
                   )}
                 </div>
-
-                <div className="flex flex-col gap-2">
-                    {[
-                      { label: 'Terlalu Ringan', rpe: 4, rir: 6, color: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
-                      { label: 'Cukup Menantang', rpe: 7, rir: 3, color: 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20' },
-                      { label: 'Berat Banget', rpe: 9, rir: 1, color: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20' },
-                      { label: 'Gagal Angkat (Failure)', rpe: 10, rir: 0, color: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20' }
-                    ].map(tag => (
+              </div>
+            ) : (
+              <div className="flex gap-4">
+                {/* KIRI: Textarea & Tags */}
+                <div className="flex-1 flex flex-col gap-4">
+                  
+                  <div className="relative">
+                    <textarea 
+                      rows="3" 
+                      placeholder="Tulis catatan set ini (opsional)..." 
+                      value={activeSetDetail.notes} 
+                      onChange={e => setActiveSetDetail({...activeSetDetail, notes: e.target.value})} 
+                      className={`w-full p-4 pr-10 rounded-3xl bg-black/5 dark:bg-white/5 ${t.textMain} placeholder-black/30 dark:placeholder-white/30 text-base resize-none outline-none focus:ring-2 focus:${t.ringAccent}`}
+                    />
+                    {activeSetDetail.notes && (
                       <button
-                        key={tag.label}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          playSoundEffect('click', soundEnabled);
-                          setActiveSetDetail({
-                            ...activeSetDetail,
-                            notes: tag.label,
-                            rpe: tag.rpe,
-                            rir: tag.rir
-                          });
-                        }}
-                        className={`px-4 py-3 rounded-2xl text-sm font-bold border ${activeSetDetail.notes === tag.label ? tag.color + ' ring-2 ring-current' : 'bg-black/5 dark:bg-white/5 border-transparent hover:bg-black/10 dark:hover:bg-white/10'} text-left transition-all flex items-center justify-between`}
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); playSoundEffect('click', soundEnabled); setActiveSetDetail({...activeSetDetail, notes: ''}); }}
+                        className={`absolute top-3 right-3 p-1.5 rounded-full bg-black/10 dark:bg-white/10 ${t.textMuted} hover:text-rose-500 hover:bg-rose-500/10 transition-colors`}
                       >
-                        <span>{tag.label}</span>
-                        <span className="text-[10px] uppercase tracking-widest opacity-60">{rpeMode ? 'RPE ' + tag.rpe : 'RIR ' + tag.rir}</span>
+                        <X size={14} />
                       </button>
-                    ))}
+                    )}
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                      {[
+                        { label: 'Terlalu Ringan', rpe: 4, rir: 6, color: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
+                        { label: 'Cukup Menantang', rpe: 7, rir: 3, color: 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20' },
+                        { label: 'Berat Banget', rpe: 9, rir: 1, color: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20' },
+                        { label: 'Gagal Angkat (Failure)', rpe: 10, rir: 0, color: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20' }
+                      ].map(tag => (
+                        <button
+                          key={tag.label}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            playSoundEffect('click', soundEnabled);
+                            setActiveSetDetail({
+                              ...activeSetDetail,
+                              notes: tag.label,
+                              rpe: tag.rpe,
+                              rir: tag.rir
+                            });
+                          }}
+                          className={`px-4 py-3 rounded-2xl text-sm font-bold border ${activeSetDetail.notes === tag.label ? tag.color + ' ring-2 ring-current' : 'bg-black/5 dark:bg-white/5 border-transparent hover:bg-black/10 dark:hover:bg-white/10'} text-left transition-all flex items-center justify-between`}
+                        >
+                          <span>{tag.label}</span>
+                          <span className="text-[10px] uppercase tracking-widest opacity-60">{rpeMode ? 'RPE ' + tag.rpe : 'RIR ' + tag.rir}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                {/* KANAN: RPE Vertical Select */}
+                <div className="w-14 shrink-0 flex flex-col relative">
+                  <div className="flex items-center justify-center gap-1 mb-3">
+                    <button onClick={() => {
+                      const newMode = !rpeMode;
+                      setRpeMode(newMode);
+                      localStorage.setItem('logym_rpe_mode', newMode);
+                    }} className="text-[10px] font-black tracking-widest uppercase text-zinc-500 hover:text-blue-500 flex items-center gap-0.5 transition-colors">
+                      {rpeMode ? 'RPE' : 'RIR'} <ArrowLeftRight size={10} />
+                    </button>
+                    <button onClick={() => setShowIntensityInfo(!showIntensityInfo)} className="text-zinc-400 hover:text-blue-500 transition-colors"><Info size={12} /></button>
+                  </div>
+
+                  {/* POPUP INFO */}
+                  {showIntensityInfo && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setShowIntensityInfo(false); }} />
+                      <div className="absolute bottom-full right-0 mb-4 w-64 p-4 rounded-3xl bg-white/95 dark:bg-[#121a2f]/95 backdrop-blur-2xl shadow-2xl border border-black/10 dark:border-white/10 animate-in slide-in-from-bottom-2 z-50 pointer-events-none">
+                        <div className="text-xs text-zinc-600 dark:text-zinc-300 space-y-2">
+                          {rpeMode ? (
+                            <>
+                              <p><strong>RPE (Perceived Exertion):</strong> Skala 1-10 seberapa berat usaha latihan.</p>
+                              <ul className="list-disc pl-4 space-y-1">
+                                <li><strong>RPE 7-8:</strong> Ideal (sisa tenaga 2-3 rep).</li>
+                                <li><strong>RPE 9:</strong> Sangat berat (sisa tenaga 1 rep).</li>
+                                <li><strong>RPE 10:</strong> Maksimal / gagal angkat.</li>
+                              </ul>
+                            </>
+                          ) : (
+                            <>
+                              <p><strong>RIR (Reps in Reserve):</strong> Estimasi sisa tenaga / sisa repetisi sebelum gagal angkat.</p>
+                              <ul className="list-disc pl-4 space-y-1">
+                                <li><strong>RIR 2-3:</strong> Ideal (setara RPE 7-8).</li>
+                                <li><strong>RIR 1:</strong> Sangat berat (setara RPE 9).</li>
+                                <li><strong>RIR 0:</strong> Maksimal / gagal angkat.</li>
+                              </ul>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  <div className="flex-1 bg-black/10 dark:bg-white/10 rounded-[2rem] p-1 flex flex-col justify-between shadow-inner">
+                     {(rpeMode ? [10, 9, 8, 7, 6, 5, 4, 3, 2, 1] : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]).map((val) => {
+                        const isSelected = rpeMode ? activeSetDetail.rpe === val : activeSetDetail.rir === val;
+                        return (
+                          <button 
+                            key={val}
+                            onClick={() => {
+                              playSoundEffect('click', soundEnabled);
+                              const rpe = rpeMode ? val : 10 - val;
+                              const rir = rpeMode ? 10 - val : val;
+                              
+                              let notes = activeSetDetail.notes;
+                              const allTemplates = ['Terlalu Ringan', 'Cukup Menantang', 'Berat Banget', 'Gagal Angkat (Failure)'];
+                              if (!notes || allTemplates.includes(notes)) {
+                                if (rpe <= 4) notes = 'Terlalu Ringan';
+                                else if (rpe <= 7) notes = 'Cukup Menantang';
+                                else if (rpe <= 9) notes = 'Berat Banget';
+                                else notes = 'Gagal Angkat (Failure)';
+                              }
+
+                              setActiveSetDetail({...activeSetDetail, rpe, rir, notes});
+                            }}
+                            className={`flex-1 min-h-[26px] flex items-center justify-center rounded-full text-xs font-bold transition-all ${isSelected ? t.bgAccent + ' text-white shadow-md scale-110' : 'text-zinc-500 hover:bg-black/10 dark:hover:bg-white/10'} `}
+                          >
+                            {val}
+                          </button>
+                        )
+                     })}
                   </div>
                 </div>
-
-              {/* KANAN: RPE Vertical Select */}
-              <div className="w-14 shrink-0 flex flex-col relative">
-                <div className="flex items-center justify-center gap-1 mb-3">
-                  <button onClick={() => {
-                    const newMode = !rpeMode;
-                    setRpeMode(newMode);
-                    localStorage.setItem('logym_rpe_mode', newMode);
-                  }} className="text-[10px] font-black tracking-widest uppercase text-zinc-500 hover:text-blue-500 flex items-center gap-0.5 transition-colors">
-                    {rpeMode ? 'RPE' : 'RIR'} <ArrowLeftRight size={10} />
-                  </button>
-                  <button onClick={() => setShowIntensityInfo(!showIntensityInfo)} className="text-zinc-400 hover:text-blue-500 transition-colors"><Info size={12} /></button>
-                </div>
-
-                {/* POPUP INFO */}
-                {showIntensityInfo && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setShowIntensityInfo(false); }} />
-                    <div className="absolute bottom-full right-0 mb-4 w-64 p-4 rounded-3xl bg-white/95 dark:bg-[#121a2f]/95 backdrop-blur-2xl shadow-2xl border border-black/10 dark:border-white/10 animate-in slide-in-from-bottom-2 z-50 pointer-events-none">
-                      <div className="text-xs text-zinc-600 dark:text-zinc-300 space-y-2">
-                        {rpeMode ? (
-                          <>
-                            <p><strong>RPE (Perceived Exertion):</strong> Skala 1-10 seberapa berat usaha latihan.</p>
-                            <ul className="list-disc pl-4 space-y-1">
-                              <li><strong>RPE 7-8:</strong> Ideal (sisa tenaga 2-3 rep).</li>
-                              <li><strong>RPE 9:</strong> Sangat berat (sisa tenaga 1 rep).</li>
-                              <li><strong>RPE 10:</strong> Maksimal / gagal angkat.</li>
-                            </ul>
-                          </>
-                        ) : (
-                          <>
-                            <p><strong>RIR (Reps in Reserve):</strong> Estimasi sisa tenaga / sisa repetisi sebelum gagal angkat.</p>
-                            <ul className="list-disc pl-4 space-y-1">
-                              <li><strong>RIR 2-3:</strong> Ideal (setara RPE 7-8).</li>
-                              <li><strong>RIR 1:</strong> Sangat berat (setara RPE 9).</li>
-                              <li><strong>RIR 0:</strong> Maksimal / gagal angkat.</li>
-                            </ul>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                <div className="flex-1 bg-black/10 dark:bg-white/10 rounded-[2rem] p-1 flex flex-col justify-between shadow-inner">
-                   {(rpeMode ? [10, 9, 8, 7, 6, 5, 4, 3, 2, 1] : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]).map((val) => {
-                      const isSelected = rpeMode ? activeSetDetail.rpe === val : activeSetDetail.rir === val;
-                      return (
-                        <button 
-                          key={val}
-                          onClick={() => {
-                            playSoundEffect('click', soundEnabled);
-                            const rpe = rpeMode ? val : 10 - val;
-                            const rir = rpeMode ? 10 - val : val;
-                            
-                            let notes = activeSetDetail.notes;
-                            const allTemplates = ['Terlalu Ringan', 'Cukup Menantang', 'Berat Banget', 'Gagal Angkat (Failure)'];
-                            if (!notes || allTemplates.includes(notes)) {
-                              if (rpe <= 4) notes = 'Terlalu Ringan';
-                              else if (rpe <= 7) notes = 'Cukup Menantang';
-                              else if (rpe <= 9) notes = 'Berat Banget';
-                              else notes = 'Gagal Angkat (Failure)';
-                            }
-
-                            setActiveSetDetail({...activeSetDetail, rpe, rir, notes});
-                          }}
-                          className={`flex-1 min-h-[26px] flex items-center justify-center rounded-full text-xs font-bold transition-all ${isSelected ? t.bgAccent + ' text-white shadow-md scale-110' : 'text-zinc-500 hover:bg-black/10 dark:hover:bg-white/10'} `}
-                        >
-                          {val}
-                        </button>
-                      )
-                   })}
-                </div>
               </div>
-            </div>
+            )}
 
             <div className="flex gap-3 mt-6">
               <button 
                 onClick={() => {
                    playSoundEffect('click', soundEnabled);
-                   const emptyDetail = { setIdx: activeSetDetail.setIdx, notes: '', rpe: '', rir: '' };
+                   const emptyDetail = activeSetDetail.isCardio 
+                     ? { setIdx: activeSetDetail.setIdx, heartRate: '', elevation: '', incline: '', isCardio: true }
+                     : { setIdx: activeSetDetail.setIdx, notes: '', rpe: '', rir: '' };
                    handleSaveSetDetail(ex.id, activeSetDetail.setIdx, emptyDetail);
                 }} 
                 className={`flex-1 py-4 rounded-2xl border-2 border-rose-500/20 text-rose-500 font-bold text-base hover:bg-rose-500/10 transition-colors bg-rose-500/5`}
               >
-                Hapus Data
+                {activeSetDetail.isCardio ? 'Hapus Data' : 'Hapus Catatan'}
               </button>
               <button 
                 onClick={() => handleSaveSetDetail(ex.id, activeSetDetail.setIdx, activeSetDetail)} 

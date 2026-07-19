@@ -58,12 +58,19 @@ const PanoramicSlider = forwardRef(({
     setTransform(target, true);
 
     setTimeout(() => {
-      // Nonaktifkan transisi dulu, reset ke 0, lalu panggil callback
-      setTransform(0, false);
-      if (direction === 'left') onSwipeLeft?.();
-      else                      onSwipeRight?.();
-      // Sedikit delay kecil sebelum buka kembali input baru
-      setTimeout(() => { animating.current = false; }, 50);
+      import('react-dom').then(({ flushSync }) => {
+          flushSync(() => {
+             if (direction === 'left') onSwipeLeft?.();
+             else                      onSwipeRight?.();
+          });
+          setTransform(0, false);
+          setTimeout(() => { animating.current = false; }, 50);
+      }).catch(() => {
+          setTransform(0, false);
+          if (direction === 'left') onSwipeLeft?.();
+          else                      onSwipeRight?.();
+          setTimeout(() => { animating.current = false; }, 50);
+      });
     }, 280);
   };
 
@@ -117,6 +124,12 @@ const PanoramicSlider = forwardRef(({
     const d = drag.current;
     if (!d.active) return;
     d.active = false;
+
+    // Aman dari touchCancel yang tidak punya changedTouches
+    if (!e.changedTouches || e.changedTouches.length === 0) {
+       snapBack();
+       return;
+    }
 
     const t  = e.changedTouches[0];
     const dx = t.clientX - d.startX;
@@ -186,15 +199,15 @@ const PanoramicSlider = forwardRef(({
         style={{ willChange: 'transform' }}
       >
         {/* Panel kiri (prev) */}
-        <div className={`w-full absolute top-0 -left-full flex flex-col min-h-full`}>
+        <div className={`w-full absolute top-0 -left-full flex flex-col ${fillHeight ? 'h-full' : 'min-h-full'}`}>
           {renderPanel('prev')}
         </div>
         {/* Panel tengah (curr) — ini yang terlihat */}
-        <div className={`w-full relative flex flex-col min-h-full`}>
+        <div className={`w-full relative flex flex-col ${fillHeight ? 'h-full' : 'min-h-full'}`}>
           {renderPanel('curr')}
         </div>
         {/* Panel kanan (next) */}
-        <div className={`w-full absolute top-0 left-full flex flex-col min-h-full`}>
+        <div className={`w-full absolute top-0 left-full flex flex-col ${fillHeight ? 'h-full' : 'min-h-full'}`}>
           {renderPanel('next')}
         </div>
       </div>

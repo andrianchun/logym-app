@@ -2,7 +2,7 @@ export const FAQ_ITEMS = [
     { q: 'Apa itu Logym?', a: 'Logym adalah aplikasi pencatat latihan cerdas. Fokus utama kami adalah membantumu keluar dari fase "mentok" (plateau) lewat analisa data.' },
     { q: 'Bagaimana cara baca grafik volume?', a: 'Grafik volume = Total Beban (Set × Reps × Berat). Kalau grafiknya menanjak, artinya kamu sukses progressive overload. Kalau datar terus, saatnya deload atau ganti program.' },
     { q: 'Apa itu status "Mentok" (Plateau)?', a: 'Kalau beban maksimalmu di gerakan tertentu stagnan selama 3 minggu lebih, sistem akan mendeteksinya sebagai plateau. AI akan proaktif memberi usulan rotasi gerakan baru.' },
-    { q: 'Gimana cara pakai AI ini (Coach Raiga)?', a: 'Ketik aja! Minta dibikinin program Powerlifting, saran gizi bulking, atau cek gerakan mana yang lagi mentok. AI punya akses langsung ke data riwayat latihan dan biodatamu!' },
+    { q: 'Gimana cara pakai AI ini (Coach Logi)?', a: 'Ketik aja! Minta dibikinin program Powerlifting, saran gizi bulking, atau cek gerakan mana yang lagi mentok. AI punya akses langsung ke data riwayat latihan dan biodatamu!' },
     { q: 'Bagaimana cara sinkronisasi data antar HP dan laptop?', a: 'Cukup login pakai email & sandi yang sama di semua perangkat. Data otomatis tersinkron lewat cloud dalam hitungan detik, gak perlu langkah tambahan.' },
     { q: 'Bagaimana cara mengubah angka set/reps/beban dengan cepat?', a: 'Klik sekali di kolom angkanya (set, reps, atau beban), lalu geser (swipe) ke atas/bawah buat mengubah nilainya. Angka akan menyala saat berubah.' },
     { q: 'Bagaimana cara menata ulang urutan latihan atau program?', a: 'Masuk ke Mode Edit lewat ikon pensil di sebelah nama program, lalu tahan dan geser ikon titik-titik untuk mengurutkan ulang.' },

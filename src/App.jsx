@@ -13,8 +13,9 @@ import { doc, setDoc, getDoc, onSnapshot, deleteField, deleteDoc, collection, ge
 // --- IMPORT KOMPONEN UI ---
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
+import TabSlider from './components/TabSlider';
 import FloatingTimer from './components/FloatingTimer';
-import CoachRaigaFloat from './components/CoachRaigaFloat';
+import CoachLogiFloat from './components/CoachLogiFloat';
 import GymAIChat from './components/GymAIChat';
 
 // --- IMPORT HALAMAN (PAGES) ---
@@ -44,9 +45,10 @@ import { checkAchievements, ACHIEVEMENTS } from './data/achievements';
 // --- IMPORT DATA & MESIN ---
 import { playSoundEffect } from './utils/audio';
 import { fetchExercisesFromApi } from './utils/exerciseDbApi';
-import { AI_MODELS, detectPlateaus, getRaigaNotification } from './utils/aiAgent';
+import { AI_MODELS, detectPlateaus, getLogiNotification } from './utils/aiAgent';
 import { calculateReadiness } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
+import { calculateSmartWorkoutCalories } from './utils/workoutCalc';
 import useDialog from './hooks/useDialog';
 import { getLocalYMD, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos } from './data/constants';
 import { Loader2, Download, X } from 'lucide-react';
@@ -85,8 +87,12 @@ export default function App() {
     const timer = setTimeout(() => {
       setIsSplashMinTimeReached(true);
     }, 1500);
-    return () => clearTimeout(timer);
+    const slowTimer = setTimeout(() => {
+      setIsSlowLoading(true);
+    }, 4000);
+    return () => { clearTimeout(timer); clearTimeout(slowTimer); };
   }, []);
+  const [isSlowLoading, setIsSlowLoading] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
   // --- SINKRON LOMEAL (app pencatat kalori pendamping) — baca kalori dimakan hari ini +
@@ -149,9 +155,9 @@ export default function App() {
   const [activeGymId, setActiveGymId] = useState('default');
   const [userApiKeys, setUserApiKeys] = useState([]);
   const [keyStatuses, setKeyStatuses] = useState({});
-  const [raigaPersona, setRaigaPersona] = useState('santai');
-  const [raigaCustomInstruction, setRaigaCustomInstruction] = useState('');
-  const [raigaMemory, setRaigaMemory] = useState([]);
+  const [logiPersona, setLogiPersona] = useState('santai');
+  const [logiCustomInstruction, setLogiCustomInstruction] = useState('');
+  const [logiMemory, setLogiMemory] = useState([]);
   const [hasUnreadChat, setHasUnreadChat] = useState(false);
   const [activityTargets, setActivityTargets] = useState({ steps: 10000, weeklyDuration: 150, sleep: 8 });
 
@@ -354,7 +360,7 @@ export default function App() {
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
   const [activeAddModalTarget, setActiveAddModalTarget] = useState(null);
 
-  // --- GLOBAL COACH RAIGA STATE ---
+  // --- GLOBAL COACH LOGI STATE ---
   const [showAiChat, setShowAiChat] = useState(false);
   const [avatarPos, setAvatarPos] = useState(null); // {x,y} center of float avatar
   const { dialog: aiDialog, showAlert: showAiAlert } = useDialog(theme === 'dark');
@@ -379,11 +385,11 @@ export default function App() {
     return calculateReadiness(todayBioData);
   }, [history, user, activeTab]);
 
-  const scheduleRaigaPush = async (type, id, vars) => {
+  const scheduleLogiPush = async (type, id, vars) => {
     try {
       const perm = await LocalNotifications.requestPermissions();
       if (perm.display !== 'granted') return;
-      const copy = getRaigaNotification(type, raigaPersona, vars);
+      const copy = getLogiNotification(type, logiPersona, vars);
       if (!copy) return;
       const [h, m] = (defaultReminderTime || '09:00').split(':');
       const fireAt = new Date();
@@ -395,11 +401,11 @@ export default function App() {
           title: copy.title,
           body: copy.body,
           schedule: { at: fireAt },
-          largeIcon: 'coach_raiga_avatar',
+          largeIcon: 'coach_logi_avatar',
         }]
       });
     } catch (err) {
-      console.warn('Raiga push notif error:', err);
+      console.warn('Logi push notif error:', err);
     }
   };
 
@@ -422,10 +428,10 @@ export default function App() {
     const dedupVal = `${completedDates[0]}_${daysSince}`;
     if (localStorage.getItem(dedupKey) === dedupVal) return;
 
-    scheduleRaigaPush('missed', 88000000 + (daysSince % 1000), { days: daysSince })
+    scheduleLogiPush('missed', 88000000 + (daysSince % 1000), { days: daysSince })
       .then(() => localStorage.setItem(dedupKey, dedupVal));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [history, reminderEnabled, raigaPersona, defaultReminderTime, user?.uid]);
+  }, [history, reminderEnabled, logiPersona, defaultReminderTime, user?.uid]);
 
   // Plateau insight juga didorong sebagai notifikasi native, bukan cuma bubble in-app —
   // dedup terpisah dari yang dipakai GymAIChat karena tujuannya beda (push vs sesi chat).
@@ -437,10 +443,10 @@ export default function App() {
     const dedupKey = `lyfit_insight_notif_${user?.uid || 'guest'}`;
     if (localStorage.getItem(dedupKey) === insightKey) return;
 
-    scheduleRaigaPush('insight', 89000000 + (top.weeks % 1000), { exName: top.name, weeks: top.weeks, maxWeight: top.maxWeight })
+    scheduleLogiPush('insight', 89000000 + (top.weeks % 1000), { exName: top.name, weeks: top.weeks, maxWeight: top.maxWeight })
       .then(() => localStorage.setItem(dedupKey, insightKey));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [plateauInsights, reminderEnabled, raigaPersona, defaultReminderTime, user?.uid]);
+  }, [plateauInsights, reminderEnabled, logiPersona, defaultReminderTime, user?.uid]);
 
   // Global handleAcceptProgram hoisted here so GymAIChat can call it from any tab
   const handleAcceptAiProgram = React.useCallback(async (programData) => {
@@ -485,7 +491,7 @@ export default function App() {
     try {
       if (isUpdate) {
         setPrograms(prev => [...routines, ...prev.filter(p => p.planId !== planId)]);
-        await showAiAlert('Program berhasil diperbarui sesuai saran Coach Raiga!', { type: 'success' });
+        await showAiAlert('Program berhasil diperbarui sesuai saran Coach Logi!', { type: 'success' });
       } else {
         setPrograms(prev => [...routines, ...prev]);
         setActivePlanIds(prev => [...prev.filter(id => id !== 'custom'), planId]);
@@ -1088,9 +1094,9 @@ export default function App() {
 
               // Saved model IDs from older versions may no longer exist on the APIs
 
-              setRaigaPersona(parsedSettings.raigaPersona || 'santai');
-              setRaigaCustomInstruction(parsedSettings.raigaCustomInstruction || '');
-              setRaigaMemory(Array.isArray(parsedSettings.raigaMemory) ? parsedSettings.raigaMemory : []);
+              setLogiPersona(parsedSettings.logiPersona || 'santai');
+              setLogiCustomInstruction(parsedSettings.logiCustomInstruction || '');
+              setLogiMemory(Array.isArray(parsedSettings.logiMemory) ? parsedSettings.logiMemory : []);
             }
             if (data.userAchievements) setUserAchievements(data.userAchievements);
             setUser(prev => {
@@ -1209,7 +1215,7 @@ export default function App() {
           setDoc(mainDocRef, {
             programs,
             exerciseLibrary,
-            settings: { theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, userProfile, userApiKeys: (userApiKeys || []).filter(k => k && k.trim()), raigaPersona, raigaCustomInstruction, raigaMemory },
+            settings: { theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, userProfile, userApiKeys: (userApiKeys || []).filter(k => k && k.trim()), logiPersona, logiCustomInstruction, logiMemory },
             userAchievements,
             updatedAt: new Date().toISOString()
           }, { merge: true })
@@ -1224,7 +1230,7 @@ export default function App() {
 
       return () => { clearTimeout(timer); if (retryTimer) clearTimeout(retryTimer); };
     }
-  }, [programs, exerciseLibrary, theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, user?.uid, isDataLoaded, userAchievements, userProfile, userApiKeys, raigaPersona, raigaCustomInstruction, raigaMemory]);
+  }, [programs, exerciseLibrary, theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, user?.uid, isDataLoaded, userAchievements, userProfile, userApiKeys, logiPersona, logiCustomInstruction, logiMemory]);
 
   // Baseline serialisasi per tanggal — merepresentasikan kondisi terakhir yang tersimpan di server.
   // Tanggal yang serialisasinya sama dengan baseline tidak perlu dikirim ulang.
@@ -1802,33 +1808,50 @@ export default function App() {
   }, [selectedDate, activeProgramId, history, programs, isDataLoaded, isHistoryLoaded, loadedDate]);
 
   const getBaseEx = (exId) => {
-    const baseIdNum = typeof exId === 'string' && exId.includes('-') ? Number(exId.split('-')[0]) : exId;
-    const baseIdStr = typeof exId === 'string' && exId.includes('-') ? exId.split('-')[0] : exId;
+    const exIdStr = String(exId);
+    
+    // Helper function to check if an exercise matches the exId
+    const isMatch = (e) => {
+      if (!e) return false;
+      const eIdStr = String(e.id);
+      const eOrigIdStr = e.originalId ? String(e.originalId) : null;
+      return exIdStr === eIdStr || exIdStr.startsWith(eIdStr + '-') ||
+             (eOrigIdStr && (exIdStr === eOrigIdStr || exIdStr.startsWith(eOrigIdStr + '-')));
+    };
     
     // 1. Cari di history hari ini (overriddenExercises atau exercises)
     const todayData = history[selectedDate];
     if (todayData && todayData.workouts) {
        for (const w of todayData.workouts) {
-          const found = (w.overriddenExercises || w.exercises || []).find(e => 
-             e?.id === exId || e?.id === baseIdStr || e?.id === baseIdNum ||
-             e?.originalId === baseIdStr || e?.originalId === baseIdNum
-          );
+          const found = (w.overriddenExercises || w.exercises || []).find(isMatch);
           if (found) return found;
        }
     }
 
     // 2. Cari di programs & extraExercises
-    return [...programs.map(p => p.exercises || []).flat(), ...extraExercises].find(e => e?.id === exId || e?.id === baseIdNum || e?.id === baseIdStr);
+    return [...programs.map(p => p.exercises || []).flat(), ...extraExercises].find(isMatch);
   };
 
   const getSetLogs = (ex, idToCheck) => {
     if (exerciseLogs[idToCheck]) return exerciseLogs[idToCheck];
     
     // Fallback if the idToCheck is a composite ID but history was loaded with the base ID
-    const baseIdStr = typeof idToCheck === 'string' && idToCheck.includes('-') ? idToCheck.split('-')[0] : null;
-    const baseIdNum = baseIdStr ? Number(baseIdStr) : null;
-    if (baseIdStr && exerciseLogs[baseIdStr]) return exerciseLogs[baseIdStr];
-    if (baseIdNum && exerciseLogs[baseIdNum]) return exerciseLogs[baseIdNum];
+    const matchingKey = Object.keys(exerciseLogs).find(key => 
+      idToCheck && typeof idToCheck === 'string' && idToCheck.startsWith(key + '-')
+    );
+    if (matchingKey) return exerciseLogs[matchingKey];
+    
+    // Fallback to history for completed workouts
+    if (ex?.workoutId) {
+      const dayData = history[selectedDate];
+      if (dayData && dayData.workouts) {
+        const workoutEntry = dayData.workouts.find(w => w.id === ex.workoutId);
+        if (workoutEntry && workoutEntry.log) {
+          const savedLog = workoutEntry.log[ex.id] || workoutEntry.log[ex.originalId];
+          if (savedLog) return savedLog;
+        }
+      }
+    }
     
     const libMatch = exerciseLibrary.find(e => e.id === ex?.id || e.name?.toLowerCase() === ex?.name?.toLowerCase());
     const suggestedWeight = libMatch?.lastWeight || libMatch?.rm10 || ex?.defaultWeight || 0;
@@ -2307,23 +2330,64 @@ export default function App() {
       
       h[targetDateStr] = { ...dayData, workouts, _activeSession: progId === 'extra' ? { ...(dayData._activeSession || {}), extraExercises: [] } : dayData._activeSession };
       
+      // --- SINKRONISASI KALORI DENGAN LOMEAL ---
+      // Hitung kalori hari ini seketika agar langsung dikirim ke server oleh auto-save,
+      // tanpa harus pindah ke DashboardTab terlebih dahulu.
+      const currentWeight = Number(userProfile?.weight) || 70;
+      let intTodayCals = 0;
+      const todayCompletedWks = workouts.filter(w => w.status === 'completed' || w.programId === 'adhoc');
+      todayCompletedWks.forEach(w => {
+         intTodayCals += calculateSmartWorkoutCalories(currentWeight, w, w.log);
+      });
+      const bio = h[targetDateStr].bioData || {};
+      const bmrCalories = bio.bmr || 1600;
+      const stepsCalories = Math.round((Number(bio.steps || 0) * 0.04));
+      const workoutCalories = intTodayCals;
+      const totalDailyCals = bmrCalories + stepsCalories + workoutCalories;
+      const isDailyCalsManual = !!bio._manualFlags?.activityCalories;
+      const manualCals = isDailyCalsManual ? (Number(bio._manualFlags.activityCalories) || 0) : 0;
+      const dailyCals = isDailyCalsManual ? Math.max(bmrCalories, manualCals) + workoutCalories : totalDailyCals;
+      
+      h[targetDateStr].bioData = { ...bio, activityCalories: dailyCals, activityCaloriesFloor: totalDailyCals };
+
       // Update Exercise Library dengan True 10RM dari seluruh riwayat
       setExerciseLibrary(lib => {
         let newLib = [...lib];
         let libChanged = false;
-        Object.keys(cleanLogs).forEach(exId => {
+        Object.keys(cleanLogs).forEach(suffixedId => {
+           const baseIdStr = typeof suffixedId === 'string' && suffixedId.includes('-') ? suffixedId.split('-')[0] : String(suffixedId);
+           
            let true10RM = 0;
            let lastWeight = 0;
-           Object.values(h).forEach(day => {
+           let mostRecentDateMs = 0;
+
+           Object.keys(h).forEach(dateStr => {
+             const day = h[dateStr];
+             const dateMs = new Date(dateStr).getTime();
              if (day.workouts) {
                day.workouts.forEach(wk => {
-                 if (wk.status === 'completed' && wk.log && wk.log[exId]) {
-                   wk.log[exId].forEach(s => {
-                     if (!s.skipped && s.type !== 'warmup' && s.w > 0 && s.r > 0) {
-                       const c1RM = Number(s.w) * (1 + Number(s.r) / 30);
-                       const c10RM = c1RM / 1.3333;
-                       if (c10RM > true10RM) true10RM = c10RM;
-                       lastWeight = s.w;
+                 if (wk.status === 'completed' && wk.log) {
+                   const targetKeys = Object.keys(wk.log).filter(k => 
+                     String(k) === baseIdStr || (typeof k === 'string' && k.startsWith(`${baseIdStr}-`))
+                   );
+                   
+                   targetKeys.forEach(k => {
+                     let bestWeightInSession = 0;
+                     wk.log[k].forEach(s => {
+                       if (!s.skipped && s.w > 0 && s.r > 0) {
+                         const c1RM = Number(s.w) * (1 + Number(s.r) / 30);
+                         const c10RM = c1RM / 1.3333;
+                         if (c10RM > true10RM) true10RM = c10RM;
+                         if (Number(s.w) > bestWeightInSession) {
+                           bestWeightInSession = Number(s.w);
+                         }
+                       }
+                     });
+                     
+                     // If we found a valid weight, and this session is the most recent (or same day but we process it now)
+                     if (bestWeightInSession > 0 && dateMs >= mostRecentDateMs) {
+                        mostRecentDateMs = dateMs;
+                        lastWeight = bestWeightInSession;
                      }
                    });
                  }
@@ -2332,7 +2396,7 @@ export default function App() {
            });
            
            if (true10RM > 0) {
-              const existingIdx = newLib.findIndex(e => String(e.id) === String(exId));
+              const existingIdx = newLib.findIndex(e => String(e.id) === baseIdStr);
               if (existingIdx >= 0) {
                  const rounded10RM = Math.round(true10RM * 10) / 10;
                  if (newLib[existingIdx].rm10 !== rounded10RM || newLib[existingIdx].lastWeight !== lastWeight) {
@@ -2348,6 +2412,8 @@ export default function App() {
       return h;
     });
 
+    localStorage.setItem('logym_calendar_mode', 'weekly');
+    localStorage.setItem('logym_show_monthly_stats', 'true');
     setActiveTab('calendar');
   };
 
@@ -2539,10 +2605,18 @@ export default function App() {
   // ==========================================
   // RENDER PENGHALANG SAAT LOADING / CEK AUTH
   // ==========================================
-  if (isAuthChecking || (user && !isDataLoaded) || !isSplashMinTimeReached) {
+  if (isAuthChecking || (user && (!isDataLoaded || !isHistoryLoaded)) || !isSplashMinTimeReached) {
     return (
       <div className={`fixed inset-0 z-50 flex flex-col items-center justify-center p-4 transition-colors duration-300 ${theme === 'dark' ? 'bg-[#0f1115]' : 'bg-white'}`}>
          <img src={theme === 'dark' ? '/logo-dark.png' : '/logo-light.png'} alt="LOGYM Logo" className="w-40 h-40 object-contain animate-pulse drop-shadow-2xl" />
+         
+         {isSlowLoading && user && (!isDataLoaded || !isHistoryLoaded) && (
+           <div className="absolute bottom-12 left-0 right-0 px-8 flex flex-col items-center justify-center text-center animate-in fade-in slide-in-from-bottom-4 duration-700">
+             <Loader2 className={`w-5 h-5 animate-spin mb-3 ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`} />
+             <p className={`text-sm font-medium ${theme === 'dark' ? 'text-zinc-400' : 'text-zinc-500'}`}>Mengambil data dari server...</p>
+             <p className={`text-[10px] mt-1.5 leading-relaxed max-w-[250px] mx-auto ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>Koneksi mungkin sedang lambat, mohon tunggu sebentar agar data tersinkronisasi.</p>
+           </div>
+         )}
       </div>
     );
   }
@@ -2646,9 +2720,9 @@ export default function App() {
            soundEnabled={soundEnabled} setSoundEnabled={setSoundEnabled}
            userApiKeys={userApiKeys} setUserApiKeys={setUserApiKeys}
            keyStatuses={keyStatuses}
-           raigaPersona={raigaPersona} setRaigaPersona={setRaigaPersona}
-           raigaCustomInstruction={raigaCustomInstruction} setRaigaCustomInstruction={setRaigaCustomInstruction}
-           raigaMemory={raigaMemory} setRaigaMemory={setRaigaMemory}
+           logiPersona={logiPersona} setLogiPersona={setLogiPersona}
+           logiCustomInstruction={logiCustomInstruction} setLogiCustomInstruction={setLogiCustomInstruction}
+           logiMemory={logiMemory} setLogiMemory={setLogiMemory}
          defaultRestTime={defaultRestTime} setDefaultRestTime={setDefaultRestTime}
          weekStartDay={weekStartDay} setWeekStartDay={setWeekStartDay}
          defaultReminderTime={defaultReminderTime} setDefaultReminderTime={setDefaultReminderTime}
@@ -2683,6 +2757,7 @@ export default function App() {
       />
       
       <main className={`${activeTab === 'calendar' ? 'p-0 flex-1 flex flex-col min-h-0 overflow-hidden' : activeTab === 'database' ? 'px-4 pb-4 pt-0 min-h-[70vh] max-w-5xl mx-auto w-full' : 'p-4 min-h-[70vh] max-w-5xl mx-auto w-full'}`}>
+        <TabSlider activeTab={activeTab} tabIndex={['dashboard','workout','calendar','program','database'].indexOf(activeTab)} className={activeTab === 'calendar' ? 'flex-1 flex flex-col min-h-0' : ''}>
          {activeTab === 'dashboard' && (
              <DashboardTab setConfirmModal={setConfirmModal} 
                t={t} lang={lang} language={language} user={user} 
@@ -2710,6 +2785,7 @@ export default function App() {
               t={t} lang={lang} language={language} programs={programs} selectedDate={selectedDate} setSelectedDate={setSelectedDate}
               history={history} setHistory={setHistory} setActiveTab={setActiveTab}
               units={units} userProfile={userProfile}
+              tabSlideDir={tabSlideDir}
               activeProgramId={activeProgramId} setActiveProgramId={setActiveProgramId} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
                warmupVideos={warmupVideos} cooldownVideos={cooldownVideos} onOpenDetail={setGlobalDetailExercise}
                exerciseLibrary={exerciseLibrary} setExerciseLibrary={setExerciseLibrary}
@@ -2748,7 +2824,7 @@ export default function App() {
                units={units}
                activePlanIds={activePlanIds}
                userProfile={userProfile}
-               raigaPersona={raigaPersona}
+               logiPersona={logiPersona}
                activityTargets={activityTargets}
              />
          )}
@@ -2790,7 +2866,7 @@ export default function App() {
                 activeGymId={activeGymId} setActiveGymId={setActiveGymId}
              />
          )}
-
+        </TabSlider>
       </main>
 
       <FloatingTimer 
@@ -2805,9 +2881,9 @@ export default function App() {
         exerciseLogs={exerciseLogs} exerciseLibrary={exerciseLibrary}
       />
 
-      {/* === GLOBAL COACH RAIGA FLOAT === */}
+      {/* === GLOBAL COACH LOGI FLOAT === */}
       {user && (
-        <CoachRaigaFloat
+        <CoachLogiFloat
           onOpenChat={() => setShowAiChat(true)}
           plateauInsights={plateauInsights}
           hasUnreadChat={hasUnreadChat}
@@ -2832,10 +2908,10 @@ export default function App() {
         programs={programs}
         activePlanIds={activePlanIds}
         plateauInsights={plateauInsights}
-        raigaPersona={raigaPersona}
-        raigaCustomInstruction={raigaCustomInstruction}
-        raigaMemory={raigaMemory}
-        setRaigaMemory={setRaigaMemory}
+        logiPersona={logiPersona}
+        logiCustomInstruction={logiCustomInstruction}
+        logiMemory={logiMemory}
+        setLogiMemory={setLogiMemory}
         onUnreadChange={setHasUnreadChat}
         onAcceptProgram={handleAcceptAiProgram}
         user={user}

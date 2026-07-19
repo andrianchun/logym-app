@@ -6,7 +6,7 @@ import { formatNumber } from '../utils/numberFormat';
 import { parseWorkoutDurationMinutes, calculateWorkoutCalories } from '../utils/workoutCalc';
 import PanoramicSlider from '../components/PanoramicSlider';
 import { LocalNotifications } from '@capacitor/local-notifications';
-import { getRaigaNotification } from '../utils/aiAgent';
+import { getLogiNotification } from '../utils/aiAgent';
 import ActivityRings from '../components/ActivityRings';
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts';
 import { calculateAge, getHRZone } from '../utils/hrZones';
@@ -17,7 +17,7 @@ const CalendarTab = ({
   setActiveTab, soundEnabled, playSoundEffect, navigateToWorkoutDate,
   exerciseLogs, skippedExercises, handleEditPastWorkout,
   weekStartDay = 0, defaultReminderTime = "15:00", reminderEnabled = true,
-  unitSystem, setConfirmModal, activePlanIds = [], userProfile, raigaPersona = 'santai', activityTargets, sessionToRun, isWorkoutActive
+  unitSystem, setConfirmModal, activePlanIds = [], userProfile, logiPersona = 'santai', activityTargets, sessionToRun, isWorkoutActive
 }) => {
   const isImp = unitSystem === 'imperial';
   const [calendarDate, setCalendarDate] = useState(() => {
@@ -483,7 +483,7 @@ const CalendarTab = ({
       if (prepTime.getTime() >= Date.now()) {
         const id1 = Math.floor(Math.random() * 1000000);
         notifIds.push(id1);
-        const copy = getRaigaNotification('prep', raigaPersona, { program: programName });
+        const copy = getLogiNotification('prep', logiPersona, { program: programName });
         notifs.push({
           title: copy.title,
           body: copy.body,
@@ -491,14 +491,14 @@ const CalendarTab = ({
           schedule: { at: prepTime },
           actionTypeId: "",
           extra: null,
-          largeIcon: 'coach_raiga_avatar'
+          largeIcon: 'coach_logi_avatar'
         });
       }
 
       if (targetTime.getTime() >= Date.now()) {
         const id2 = Math.floor(Math.random() * 1000000);
         notifIds.push(id2);
-        const copy = getRaigaNotification('start', raigaPersona, { program: programName });
+        const copy = getLogiNotification('start', logiPersona, { program: programName });
         notifs.push({
           title: copy.title,
           body: copy.body,
@@ -506,7 +506,7 @@ const CalendarTab = ({
           schedule: { at: targetTime },
           actionTypeId: "",
           extra: null,
-          largeIcon: 'coach_raiga_avatar'
+          largeIcon: 'coach_logi_avatar'
         });
       }
 
@@ -1310,15 +1310,15 @@ const CalendarTab = ({
          </div>
 
          <div
-            ref={scrollContainerRef}
-             className="relative z-10 flex-1 min-h-0 overflow-y-auto hide-scrollbar flex flex-col"
+             className="relative z-10 flex-1 min-h-0 flex flex-col"
          >
             {/* -mx wrapper is flex-1 so it always fills the scroll container —
                 this ensures the empty area below content is still inside PanoramicSlider's
                 touch zone (swipe down/left/right all work even in empty space). */}
-            <div className="-mx-3 sm:-mx-6 flex-1 flex flex-col px-3 sm:px-6">
+             <div className="-mx-3 sm:-mx-6 flex-1 flex flex-col px-3 sm:px-6 min-h-0">
              <PanoramicSlider
-               className="flex-1 flex flex-col"
+               className="flex-1 flex flex-col min-h-0"
+               fillHeight={true}
                onSwipeLeft={() => {
                    const d = new Date(selectedDate);
                    d.setDate(d.getDate() + 1);
@@ -1367,9 +1367,10 @@ const CalendarTab = ({
                    return (
                      <div 
                         key={isCurr ? selectedDate : panelType}
-                        className={`flex flex-col min-h-full flex-1 ${isCurr && detailSlideAnim ? `anim-slide-${detailSlideAnim}` : ''}`}
+                        ref={isCurr ? scrollContainerRef : undefined}
+                        className={`flex flex-col h-full overflow-y-auto hide-scrollbar ${isCurr && detailSlideAnim ? `anim-slide-${detailSlideAnim}` : ''}`}
                      >
-                       <div ref={isCurr ? sheetContentRef : undefined} className="px-3 sm:px-6 pb-32 flex flex-col gap-3">
+                       <div ref={isCurr ? sheetContentRef : undefined} className="px-3 sm:px-6 pb-24 flex flex-col gap-3">
 
                          {showMonthlyStats ? (() => {
                              const dayData = history[targetDateStr] || {};

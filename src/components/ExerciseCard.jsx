@@ -76,9 +76,17 @@ const ExerciseCard = ({
          const newSpd = (val / (dur / 60)).toFixed(1);
          onUpdateSet(ex.id, setIdx, 'speed', Number(newSpd));
       }
-      else if (field === 'duration' && spd > 0) {
-         const newDist = (spd * (val / 60)).toFixed(2);
-         onUpdateSet(ex.id, setIdx, 'distance', Number(newDist));
+      else if (field === 'duration') {
+         if (isTreadmillMode && spd > 0) {
+            const newDist = (spd * (val / 60)).toFixed(2);
+            onUpdateSet(ex.id, setIdx, 'distance', Number(newDist));
+         } else if (!isTreadmillMode && dist > 0) {
+            const newSpd = (dist / (val / 60)).toFixed(1);
+            onUpdateSet(ex.id, setIdx, 'speed', Number(newSpd));
+         } else if (dist > 0 && spd === 0) {
+            const newSpd = (dist / (val / 60)).toFixed(1);
+            onUpdateSet(ex.id, setIdx, 'speed', Number(newSpd));
+         }
       }
   };
   const [activeSetDetail, setActiveSetDetail] = useState(null);
@@ -151,7 +159,8 @@ const ExerciseCard = ({
         // Mulai timer
         const d = Number(durationMins || 0);
         if (d > 0) {
-           setActiveTimer({ idx: setIdx, timeLeft: Math.round(d * 60), mode: 'down' }); // Hitung mundur
+           const timeInSeconds = exType === 'cardio' ? Math.round(d * 60) : Math.round(d);
+           setActiveTimer({ idx: setIdx, timeLeft: timeInSeconds, mode: 'down' }); // Hitung mundur
         } else {
            setActiveTimer({ idx: setIdx, timeLeft: 0, mode: 'up' }); // Hitung maju
         }
@@ -168,7 +177,7 @@ const ExerciseCard = ({
     <div className={`mb-6 mx-0 sm:mx-4 ${ex.supersetId ? 'rounded-l-3xl rounded-r-none sm:rounded-[2.5rem]' : 'rounded-3xl sm:rounded-[2.5rem]'} bg-white/70 backdrop-blur-2xl dark:bg-black/50 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.4)] border-y sm:border border-white/40 dark:border-white/10 overflow-hidden transition-all duration-300 ${isSkip ? 'opacity-50 grayscale scale-95' : 'opacity-100'}`}>
       
       {/* HEADER IMAGE / GIF FULL WIDTH */}
-      <div className="relative w-full h-[220px] sm:h-[260px] bg-zinc-100 dark:bg-zinc-800">
+      <div className="relative w-full h-[280px] sm:h-[320px] bg-zinc-100 dark:bg-zinc-800">
          {(() => {
             const apiExercises = getCachedExercises();
             const apiMatch = (!ex.gifUrl && !isCustom) ? apiExercises.find(e => e.name.toLowerCase() === ex.name.toLowerCase()) : null;
@@ -195,8 +204,9 @@ const ExerciseCard = ({
          })()}
          
          {/* GLASSMORPHISM CHIPS OVERLAY */}
-         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-between p-5">
-            <div className="flex justify-between items-start">
+         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent">
+            {/* Top Container */}
+            <div className="absolute top-5 left-5 right-5 flex justify-between items-start z-10">
                <div className="flex gap-1.5 flex-wrap max-w-[65%]">
                  <span className="px-2.5 py-1 rounded-xl bg-white/20 backdrop-blur-md border border-white/30 text-white text-[9px] font-black uppercase tracking-wider shadow-sm">
                    {ex.equipment || 'Lainnya'}
@@ -207,13 +217,24 @@ const ExerciseCard = ({
                      CUSTOM
                    </span>
                  )}
+
+                 {exType !== 'weight' && isSkip && (
+                     <span className="px-2.5 py-1 rounded-xl bg-rose-500/90 backdrop-blur-md border border-rose-500/50 text-white text-[9px] font-black uppercase tracking-wider shadow-sm">
+                         SKIPPED
+                     </span>
+                 )}
                </div>
                
                {/* Right Side Buttons (Floating) */}
-               <div className="flex flex-col gap-1.5 shrink-0">
+               <div className="flex flex-col gap-1.5 shrink-0 pointer-events-auto">
                  <button onClick={() => { playSoundEffect('click', soundEnabled); onOpenVideo(ex); }} className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white flex items-center justify-center hover:bg-white/40 transition-colors shadow-sm">
                     <Info size={18} />
                  </button>
+                 {exType !== 'weight' && (
+                     <button onClick={() => { playSoundEffect('click', soundEnabled); onToggleSkip(ex.id); }} className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${isSkip ? 'bg-rose-500 text-white shadow-sm' : 'bg-white/20 backdrop-blur-md border border-white/30 text-white hover:bg-white/40 shadow-sm'}`} title={isSkip ? 'Batal Skip' : 'Skip'}>
+                         <SkipForward size={18} className={isSkip ? "text-white" : ""} />
+                     </button>
+                 )}
                  {!isExtra && onReplaceClick && (
                     <button onClick={() => { playSoundEffect('click', soundEnabled); onReplaceClick(ex.id); }} className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white flex items-center justify-center hover:bg-white/40 transition-colors shadow-sm">
                         <ArrowLeftRight size={18} />
@@ -234,7 +255,8 @@ const ExerciseCard = ({
                </div>
             </div>
             
-            <div className="flex flex-col gap-1.5">
+            {/* Bottom Container */}
+            <div className="absolute bottom-5 left-5 right-5 flex flex-col gap-1.5 z-10">
                {/* MUSCLE TARGETS */}
                <div className="flex gap-1.5 flex-wrap">
                   {Array.isArray(ex.target) ? ex.target.map(m => (
@@ -262,26 +284,27 @@ const ExerciseCard = ({
       {/* BODY CONTENT (SETS) */}
       <div className={`p-4 sm:p-6 pt-5 bg-white/40 dark:bg-[#121a2f]/40`}>
          {/* Top actions toolbar (Coach, Skip, Add Warmup) */}
-         <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
-             {/* Kiri: Skip Button & Badge */}
-             <div className="flex items-center gap-2">
-                 <button onClick={() => { playSoundEffect('click', soundEnabled); onToggleSkip(ex.id); }} className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${isSkip ? 'bg-rose-500 text-white shadow-md' : 'bg-black/5 dark:bg-white/5 text-zinc-500 hover:bg-rose-500/10 hover:text-rose-500'}`} title={isSkip ? 'Batal Skip' : 'Skip'}>
-                     <SkipForward size={18} className={isSkip ? "text-white" : ""} />
-                 </button>
-                 {isSkip && (
-                     <span className="px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 dark:text-rose-400 text-[10px] font-black uppercase tracking-wider shadow-sm">
-                         SKIPPED
-                     </span>
-                 )}
-             </div>
-             
-             {/* Kanan: Warmup & Coach Buttons */}
-             <div className="flex items-center gap-2">
-                 {onAddWarmupSets && exType === 'weight' && !isSkip && (
-                      <button onClick={() => { playSoundEffect('click', soundEnabled); onAddWarmupSets(ex.id); }} className={`w-10 h-10 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 hover:bg-orange-500/20 transition-colors flex items-center justify-center`} title="Buat Set Pemanasan Otomatis">
-                          <Flame size={18} />
-                      </button>
-                 )}
+         {exType === 'weight' && (
+           <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
+               {/* Kiri: Skip Button & Badge */}
+               <div className="flex items-center gap-2">
+                   <button onClick={() => { playSoundEffect('click', soundEnabled); onToggleSkip(ex.id); }} className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${isSkip ? 'bg-rose-500 text-white shadow-md' : 'bg-black/5 dark:bg-white/5 text-zinc-500 hover:bg-rose-500/10 hover:text-rose-500'}`} title={isSkip ? 'Batal Skip' : 'Skip'}>
+                       <SkipForward size={18} className={isSkip ? "text-white" : ""} />
+                   </button>
+                   {isSkip && (
+                       <span className="px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 dark:text-rose-400 text-[10px] font-black uppercase tracking-wider shadow-sm">
+                           SKIPPED
+                       </span>
+                   )}
+               </div>
+               
+               {/* Kanan: Warmup & Coach Buttons */}
+               <div className="flex items-center gap-2">
+                   {onAddWarmupSets && exType === 'weight' && !isSkip && (
+                        <button onClick={() => { playSoundEffect('click', soundEnabled); onAddWarmupSets(ex.id); }} className={`w-10 h-10 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 hover:bg-orange-500/20 transition-colors flex items-center justify-center`} title="Buat Set Pemanasan Otomatis">
+                            <Flame size={18} />
+                        </button>
+                   )}
                  {exType === 'weight' && !isSkip && (
                     <div className="relative">
                       <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowHint(true); }} className={`w-10 h-10 rounded-full ${t.bgAccent} text-white shadow-lg hover:scale-105 transition-transform flex items-center justify-center`} title="Coach">
@@ -308,7 +331,7 @@ const ExerciseCard = ({
                               }}
                             />
                             <div className="relative z-10 flex flex-col h-full flex-1">
-                                {/* Removed Coach Raiga top badge */}
+                                {/* Removed Coach Logi top badge */}
                                 <div className="flex flex-col items-center mt-auto pt-32 pb-2">
                                   {overloadHint ? (
                                      <>
@@ -331,27 +354,29 @@ const ExerciseCard = ({
                     </div>
                  )}
              </div>
-         </div>
+          </div>
+         )}
 
          {/* DAFTAR SET LATIHAN */}
          <div className={`relative z-10 ${isSkip ? 'hidden' : ''}`}>
              {exType === 'cardio' ? (
                  <>
                      {/* HEADER KOLOM KARDIO */}
-                     <div className={`grid grid-cols-[40px_1fr_2.1fr_1fr_36px_44px] gap-1 mb-2 text-[9px] font-black text-zinc-400 uppercase tracking-widest text-center items-center`}>
+                     <div className={`grid grid-cols-[40px_1fr_2.1fr_1fr_44px] gap-1 mb-2 text-[9px] font-black text-zinc-400 uppercase tracking-widest text-center items-center`}>
                         <div></div>
                         <div>Jarak <br /><span className="normal-case text-[8px] tracking-normal font-bold">(km)</span></div>
                         <div>Waktu <br /><span className="normal-case text-[8px] tracking-normal font-bold">(mnt)</span></div>
-                        <div>{isTreadmillMode ? 'Kec.' : 'Pace'} <br /><span className="normal-case text-[8px] tracking-normal font-bold">({isTreadmillMode ? 'km/j' : '/km'})</span></div>
-                        <div className="flex justify-center">
-                            <button onClick={() => setIsTreadmillMode(!isTreadmillMode)} className={`p-1 flex items-center justify-center rounded-full text-zinc-400 hover:${t.textAccent} hover:bg-black/10 dark:hover:bg-white/10`} title="Ganti Mode (Treadmill / Lari)">
-                               <ArrowLeftRight size={14} />
-                            </button>
+                        <div className="flex items-center justify-center">
+                           <div className="text-center">{isTreadmillMode ? 'Kec.' : 'Pace'} <br /><span className="normal-case text-[8px] tracking-normal font-bold">({isTreadmillMode ? 'km/j' : 'mnt/km'})</span></div>
                         </div>
-                        <div></div>
+                        <div className="flex justify-center items-center">
+                           <button onClick={() => setIsTreadmillMode(!isTreadmillMode)} className={`p-1 flex items-center justify-center rounded-full text-zinc-400 hover:${t.textAccent} hover:bg-black/10 dark:hover:bg-white/10`} title="Ganti Mode (Treadmill / Lari)">
+                              <ArrowLeftRight size={14} />
+                           </button>
+                        </div>
                      </div>
 
-                     <div className="space-y-3">
+                     <div className="space-y-1">
                          {sets.map((s, setIdx) => {
                              const d = Number(s.distance || 0);
                              const tMin = Number(s.duration || 0);
@@ -364,8 +389,8 @@ const ExerciseCard = ({
                              }
 
                              return (
-                                 <div key={setIdx} className={`flex flex-col gap-2 transition-all ${s.skipped ? 'opacity-50' : s.done ? 'opacity-60' : ''}`}>
-                                    <div className="grid grid-cols-[40px_1fr_2.1fr_1fr_36px_44px] gap-1 items-center text-center">
+                                 <div key={setIdx} className={`flex flex-col gap-0.5 transition-all ${s.skipped ? 'opacity-50' : s.done ? 'opacity-60' : ''}`}>
+                                    <div className="grid grid-cols-[40px_1fr_2.1fr_1fr_44px] gap-1 items-center text-center">
                                        
                                        {/* Set Number & Delete Button */}
                                        <div className="flex justify-center">
@@ -389,7 +414,7 @@ const ExerciseCard = ({
 
                                        {/* Jarak */}
                                        {s.skipped ? (
-                                         <div className="col-span-4 flex items-center justify-center font-bold text-rose-500 bg-rose-500/10 rounded-2xl h-10 border border-rose-500/20 tracking-wider text-xs">
+                                         <div className="col-span-3 flex items-center justify-center font-bold text-rose-500 bg-rose-500/10 rounded-2xl h-10 border border-rose-500/20 tracking-wider text-xs">
                                            SKIPPED
                                          </div>
                                        ) : (
@@ -421,28 +446,30 @@ const ExerciseCard = ({
                                                 <div className={`w-full bg-black/5 dark:bg-white/5 h-10 rounded-xl flex items-center justify-center font-black ${t.textMain} text-sm sm:text-base pointer-events-none`}>{paceStr}</div>
                                               )}
                                            </div>
-
-                                           {/* Extras Button */}
-                                           <div className="flex justify-center">
-                                             <button 
-                                               onClick={() => { playSoundEffect('click', soundEnabled); setShowCardioExtras(prev => ({...prev, [setIdx]: !prev[setIdx]})); }}
-                                               className={`w-9 h-10 flex justify-center items-center rounded-xl transition-all ${(s.heartRate || s.elevation || s.incline) ? `${t.bgAccent} text-white shadow-md` : `text-zinc-400 bg-black/5 dark:bg-white/5 hover:${t.textAccent} hover:bg-black/10 dark:hover:bg-white/10`}`}
-                                               title="Detak Jantung & Elevasi"
-                                             >
-                                               {showCardioExtras[setIdx] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                                             </button>
-                                           </div>
                                          </>
                                        )}
 
                                        {/* Checkmark Button */}
                                        <div className="flex justify-center">
-                                         <button onClick={() => { playSoundEffect('click', soundEnabled); onToggleSet(ex.id, setIdx); }} disabled={activeTimer.idx === setIdx} className={`w-11 h-11 rounded-full flex justify-center items-center font-bold transition-all ${s.skipped ? 'bg-rose-500/20 text-rose-500 border border-rose-500/50 hover:bg-rose-500/30' : s.done ? t.bgAccent + ' text-white shadow-lg scale-105' : 'bg-transparent border-2 ' + t.borderAccentSoft + ' ' + t.textAccent + ' hover:bg-black/5 dark:hover:bg-white/5'} ${activeTimer.idx === setIdx ? 'opacity-30 cursor-not-allowed' : ''}`}>
+                                         <button onClick={() => { playSoundEffect(s.done ? 'click' : 'done_set', soundEnabled); onToggleSet(ex.id, setIdx); }} disabled={activeTimer.idx === setIdx} className={`w-11 h-11 rounded-full flex justify-center items-center font-bold transition-all ${s.skipped ? 'bg-rose-500/20 text-rose-500 border border-rose-500/50 hover:bg-rose-500/30' : s.done ? t.bgAccent + ' text-white shadow-lg scale-105' : 'bg-transparent border-2 ' + t.borderAccentSoft + ' ' + t.textAccent + ' hover:bg-black/5 dark:hover:bg-white/5'} ${activeTimer.idx === setIdx ? 'opacity-30 cursor-not-allowed' : ''}`}>
                                            {s.skipped ? <X size={18} /> : <CheckCircle size={18} />}
                                          </button>
                                        </div>
                                        
                                     </div>
+
+                                    {/* Extras Button Dipindah ke Bawah (di luar grid row 1) */}
+                                    {!s.skipped && (
+                                        <div className="flex justify-center mt-0 mb-0 relative z-10">
+                                          <button 
+                                            onClick={() => { playSoundEffect('click', soundEnabled); setShowCardioExtras(prev => ({...prev, [setIdx]: !prev[setIdx]})); }}
+                                            className={`px-4 py-0.5 flex justify-center items-center rounded-full transition-all text-xs gap-1 ${(s.heartRate || s.elevation || s.incline) ? `${t.bgAccent} text-white shadow-md` : `text-zinc-400 bg-black/5 dark:bg-white/5 hover:${t.textAccent} hover:bg-black/10 dark:hover:bg-white/10`}`}
+                                            title="Detak Jantung & Elevasi"
+                                          >
+                                            {showCardioExtras[setIdx] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                          </button>
+                                        </div>
+                                    )}
                                     
                                     {/* Extra Cardio Inputs (Baris 2) */}
                                     {showCardioExtras[setIdx] && !s.skipped && (
@@ -536,17 +563,17 @@ const ExerciseCard = ({
                        
                        {/* KHUSUS TIMER DURASI */}
                         {exType === 'time' && (
-                         <div className="flex space-x-1 items-center justify-center">
+                         <div className="flex items-center justify-center relative">
                             {activeTimer.idx === setIdx ? (
-                               <div className={`w-full bg-black/5 dark:bg-white/5 h-11 rounded-2xl flex items-center justify-center font-black ${t.textAccent} text-lg ring-2 ${t.ringAccent}`}>
+                               <div className={`w-full bg-black/5 dark:bg-white/5 h-11 ${s.done ? 'rounded-2xl' : 'rounded-l-2xl'} flex items-center justify-center font-black ${t.textAccent} text-lg ring-2 ring-inset ${t.ringAccent}`}>
                                   {formatTime(activeTimer.timeLeft)}
                                </div>
                             ) : (
-                               <SwipeInput language={lang?.id || 'ID'} value={s.d} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'd', val)} disabled={s.done} step={1} soundEnabled={soundEnabled} className={`w-full bg-black/5 dark:bg-white/5 h-11 rounded-2xl text-center font-black ${t.textMain} no-spinners transition-colors text-lg focus:bg-black/10 dark:focus:bg-white/10`} />
+                               <SwipeInput language={lang?.id || 'ID'} value={s.d || ''} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'd', val)} disabled={s.done} step={1} min={0} soundEnabled={soundEnabled} isTimeFormat={true} isSecondsFormat={true} className={`w-full bg-black/5 dark:bg-white/5 h-11 ${s.done ? 'rounded-2xl' : 'rounded-l-2xl'} text-center font-black ${t.textMain} no-spinners transition-colors text-lg focus:bg-black/10 dark:focus:bg-white/10`} />
                             )}
                             {!s.done && (
-                              <button onClick={() => toggleTimer(setIdx, s.d)} className={`h-11 w-11 shrink-0 rounded-2xl flex items-center justify-center text-white transition-all ${activeTimer.idx === setIdx ? 'bg-rose-500 shadow-md' : t.bgAccent + ' hover:opacity-80'}`}>
-                                 {activeTimer.idx === setIdx ? <Square size={18}/> : <Play size={18} className="ml-1"/>}
+                              <button onClick={() => toggleTimer(setIdx, s.d)} className={`h-11 w-12 shrink-0 rounded-r-2xl flex items-center justify-center text-white transition-all ${activeTimer.idx === setIdx ? 'bg-rose-500 shadow-md' : t.bgAccent + ' hover:opacity-80'}`}>
+                                 {activeTimer.idx === setIdx ? <Square size={18}/> : <Play size={18} className="ml-[2px]"/>}
                               </button>
                             )}
                          </div>

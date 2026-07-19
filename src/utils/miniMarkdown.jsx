@@ -18,7 +18,7 @@ function parseInline(line, keyPrefix) {
     });
 }
 
-// Lightweight markdown renderer covering just what Coach Raiga's replies actually use:
+// Lightweight markdown renderer covering just what Coach Logi's replies actually use:
 // headers (##/###), bold, unordered (-/*) and ordered (1.) lists. No tables/code/links —
 // those aren't part of the coach's output format.
 export default function renderMiniMarkdown(text) {

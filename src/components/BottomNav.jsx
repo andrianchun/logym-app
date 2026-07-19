@@ -11,9 +11,12 @@ const BottomNav = ({ t, lang, activeTab, setActiveTab, setIsEditingMode, soundEn
   ];
 
   const handleTabClick = (id) => {
-    playSoundEffect('click', soundEnabled);
-    setActiveTab(id);
-    setIsEditingMode(false);
+    if (activeTab === id && id === 'calendar') {
+        setIsEditingMode(prev => !prev);
+    } else {
+        setActiveTab(id);
+        setIsEditingMode(false);
+    }
   };
 
   return (

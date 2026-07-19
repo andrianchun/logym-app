@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
+
 const EmptyWorkoutState = ({
   t,
   showProgramSelect,
@@ -9,10 +10,44 @@ const EmptyWorkoutState = ({
   handleAddAdhocSession,
   programs,
   handleAddProgramToToday,
-  activePlanIds
+  activePlanIds,
+  tabSlideDir = 'right',
 }) => {
+  const wrapperRef = useRef(null);
+
+  // Animasi panoramic slide saat mount — sama persis dgn TabSlider
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+
+    const startX = tabSlideDir === 'right' ? '100%' : '-100%';
+
+    el.style.willChange = 'transform';
+    el.style.transition = 'none';
+    el.style.transform = `translate3d(${startX}, 0, 0)`;
+    el.style.opacity = '0.7';
+
+    // Force reflow
+    el.getBoundingClientRect();
+
+    el.style.transition = 'transform 0.28s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.18s ease';
+    el.style.transform = 'translate3d(0, 0, 0)';
+    el.style.opacity = '1';
+
+    const cleanup = setTimeout(() => {
+      if (el) {
+        el.style.willChange = 'auto';
+        el.style.transition = '';
+        el.style.transform = '';
+        el.style.opacity = '';
+      }
+    }, 300);
+
+    return () => clearTimeout(cleanup);
+  }, []);
+
   return (
-    <div className="fixed inset-0 z-[5] flex flex-col justify-end overflow-hidden bg-black touch-none">
+    <div ref={wrapperRef} className="fixed inset-0 z-[5] flex flex-col justify-end overflow-hidden bg-black touch-none">
       {/* --- Background Image Layer --- */}
       <div 
         className="absolute inset-0 z-0 pointer-events-none"

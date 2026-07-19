@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { playSoundEffect } from '../utils/audio';
 import { formatNumber, parseFormattedNumber } from '../utils/numberFormat';
 
-const SwipeInput = ({ value, onChange, disabled, step = 1, className, min = 0, max, wrap = false, soundEnabled, placeholder, language = 'ID', isTimeFormat = false, formatValue }) => {
+const SwipeInput = ({ value, onChange, disabled, step = 1, className, min = 0, max, wrap = false, soundEnabled, placeholder, language = 'ID', isTimeFormat = false, isSecondsFormat = false, formatValue }) => {
     const inputRef = useRef(null);
     const dragRef = useRef({ isDragging: false, startY: 0, startVal: 0, lastCalculatedValue: undefined });
     const [isFocused, setIsFocused] = useState(false);
@@ -120,7 +120,7 @@ const SwipeInput = ({ value, onChange, disabled, step = 1, className, min = 0, m
         if (localValue === null || localValue === undefined || localValue === '') return '';
         
         if (isTimeFormat && !isFocused) {
-            const totalSecs = Math.round(Number(localValue) * 60);
+            const totalSecs = isSecondsFormat ? Math.round(Number(localValue)) : Math.round(Number(localValue) * 60);
             if (!isNaN(totalSecs)) {
                 const h = Math.floor(totalSecs / 3600);
                 const m = Math.floor((totalSecs % 3600) / 60);

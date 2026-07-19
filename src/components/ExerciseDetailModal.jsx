@@ -94,7 +94,7 @@ const ExerciseDetailModal = ({
         
         if (completedSets.length === 0 && w.exercises) {
           const targetEx = w.exercises.find(e => e.id === initialEx.id || e.name?.trim().toLowerCase() === initialEx.name?.trim().toLowerCase());
-          if (targetEx && targetEx.sets) {
+          if (targetEx && Array.isArray(targetEx.sets)) {
             completedSets = targetEx.sets.filter(s => s.done);
           }
         }

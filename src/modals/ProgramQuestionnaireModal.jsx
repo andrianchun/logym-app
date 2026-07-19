@@ -165,7 +165,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
           weight: 72,
           dob: '1995-03-24',
           gender: 'male',
-          name: prev.name || 'Raiga'
+          name: prev.name || 'Logi'
       }));
   };
 
@@ -506,7 +506,7 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
           
           <div className="flex-1 text-center">
             <p className={`text-[14px] ${!isDark ? 'text-black font-medium' : `${t.textMain} font-medium`} mt-2 leading-snug max-w-[280px] mx-auto`}>
-              Halo, <span className="font-black">Coach Raiga</span> di sini. Aku siap bantu kamu menuju badan impian yang sehat dan kuat!
+              Halo, <span className="font-black">Coach Logi</span> di sini. Aku siap bantu kamu menuju badan impian yang sehat dan kuat!
             </p>
           </div>
 

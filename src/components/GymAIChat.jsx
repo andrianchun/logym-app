@@ -30,10 +30,10 @@ export default function GymAIChat({
     programs,
     activePlanIds,
     plateauInsights = [],
-    raigaPersona = 'santai',
-    raigaCustomInstruction = '',
-    raigaMemory = [],
-    setRaigaMemory,
+    logiPersona = 'santai',
+    logiCustomInstruction = '',
+    logiMemory = [],
+    setLogiMemory,
     onUnreadChange,
     onAcceptProgram,
     user,
@@ -222,7 +222,7 @@ export default function GymAIChat({
         const aiMsg = { role: 'model', content: text, timestamp: Date.now() };
 
         setSessions(prev => {
-            const existing = prev.find(s => s.origin === 'raiga');
+            const existing = prev.find(s => s.origin === 'logi');
             if (existing) {
                 const updated = { ...existing, messages: [...existing.messages, aiMsg], unread: true, updatedAt: Date.now() };
                 if (isOpenRef.current && activeSessionIdRef.current === existing.id) {
@@ -231,13 +231,13 @@ export default function GymAIChat({
                 }
                 return prev.map(s => s.id === existing.id ? updated : s);
             }
-            const newSession = { id: 'raiga_' + Date.now(), title: 'Coach Raiga', origin: 'raiga', unread: true, messages: [aiMsg], updatedAt: Date.now() };
+            const newSession = { id: 'logi_' + Date.now(), title: 'Coach Logi', origin: 'logi', unread: true, messages: [aiMsg], updatedAt: Date.now() };
             return [newSession, ...prev];
         });
     }, [plateauInsights]);
 
     // When the panel opens (any trigger — avatar tap, CTA, elsewhere), route straight into
-    // the dedicated Raiga session if it has something unread; otherwise leave whatever was
+    // the dedicated Logi session if it has something unread; otherwise leave whatever was
     // already active alone.
     const prevIsOpenRef = useRef(false);
     useEffect(() => {
@@ -302,7 +302,7 @@ export default function GymAIChat({
 
     const doDeleteChat = (id) => {
         const deletingSession = sessions.find(s => s.id === id);
-        if (deletingSession?.origin === 'raiga') lastDeliveredInsightKeyRef.current = null;
+        if (deletingSession?.origin === 'logi') lastDeliveredInsightKeyRef.current = null;
         const updated = sessions.filter(s => s.id !== id);
         setSessions(updated);
         if (activeSessionId === id) {
@@ -408,7 +408,7 @@ export default function GymAIChat({
             const favoriteProgramSummary = needsContext ? summarizeFavoriteProgram(history) : '';
             // Referensi cara-pakai-app juga cuma nempel kalau pesannya kelihatan nanya soal fitur/navigasi app.
             const appHelpBlock = needsAppHelpContext(userMsg.content) ? APP_HELP_REFERENCE : '';
-            const systemContent = buildSystemPrompt(userProfile, exLibStr, logsSummary, bioSummary, activeProgramsSummary, raigaPersona, raigaCustomInstruction, raigaMemory, favoriteProgramSummary, appHelpBlock);
+            const systemContent = buildSystemPrompt(userProfile, exLibStr, logsSummary, bioSummary, activeProgramsSummary, logiPersona, logiCustomInstruction, logiMemory, favoriteProgramSummary, appHelpBlock);
 
             // Keep only last 10 real messages; local error/warning bubbles never go to the API
             const recentHistory = messages.filter(m => !m.isError && !m.isSystemWarning).slice(-10);
@@ -458,9 +458,9 @@ export default function GymAIChat({
     };
 
     const handleSaveMemory = (text) => {
-        if (!setRaigaMemory) return;
+        if (!setLogiMemory) return;
         const trimmed = text.trim().slice(0, 160);
-        setRaigaMemory(prev => (prev || []).includes(trimmed) ? prev : [...(prev || []), trimmed]);
+        setLogiMemory(prev => (prev || []).includes(trimmed) ? prev : [...(prev || []), trimmed]);
     };
 
     const autoResizeInput = () => {
@@ -678,10 +678,10 @@ export default function GymAIChat({
                                 setIsSidebarOpen(false);
                                 if (session.unread) setSessions(prev => prev.map(s => s.id === session.id ? { ...s, unread: false } : s));
                             }}
-                            className={`w-full text-left p-3 rounded-xl flex items-center justify-between group cursor-pointer transition-colors ${activeSessionId === session.id ? 'bg-white/10 text-white' : session.origin === 'raiga' ? 'bg-blue-500/10 hover:bg-blue-500/15 text-blue-100' : 'hover:bg-white/5 text-neutral-400 hover:text-white'}`}
+                            className={`w-full text-left p-3 rounded-xl flex items-center justify-between group cursor-pointer transition-colors ${activeSessionId === session.id ? 'bg-white/10 text-white' : session.origin === 'logi' ? 'bg-blue-500/10 hover:bg-blue-500/15 text-blue-100' : 'hover:bg-white/5 text-neutral-400 hover:text-white'}`}
                         >
                             <div className="flex items-center gap-2 truncate pr-2">
-                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${session.origin === 'raiga' ? 'bg-blue-400' : 'bg-neutral-600'}`} />
+                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${session.origin === 'logi' ? 'bg-blue-400' : 'bg-neutral-600'}`} />
                                 <span className="truncate text-sm font-medium">{session.title}</span>
                                 {session.unread && <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />}
                             </div>
@@ -712,7 +712,7 @@ export default function GymAIChat({
                             style={{ backgroundImage: 'url(/bg-program.webp)', backgroundSize: '450%', backgroundPosition: '52% 7%' }}
                         />
                         <div>
-                            <h3 className="font-bold text-white leading-tight">Coach Raiga</h3>
+                            <h3 className="font-bold text-white leading-tight">Coach Logi</h3>
                             <div className="flex items-center gap-1 mt-1">
                                 <span className={`w-1.5 h-1.5 rounded-full animate-pulse bg-emerald-500`}></span>
                                 <span className="text-blue-400 text-[10px] font-mono">Online</span>
@@ -762,13 +762,13 @@ export default function GymAIChat({
                                     style={{ backgroundImage: 'url(/bg-program.webp)', backgroundSize: '450%', backgroundPosition: '52% 7%' }}
                                 />
                             )}
-                            {msg.role === 'user' && setRaigaMemory && (
+                            {msg.role === 'user' && setLogiMemory && (
                                 <button
                                     onClick={() => handleSaveMemory(msg.content)}
                                     title="Simpan sebagai memori"
-                                    className={`p-1.5 rounded-full transition-colors mb-1 shrink-0 ${(raigaMemory || []).includes(msg.content.trim().slice(0, 160)) ? 'text-blue-400' : 'text-neutral-600 hover:text-blue-400'}`}
+                                    className={`p-1.5 rounded-full transition-colors mb-1 shrink-0 ${(logiMemory || []).includes(msg.content.trim().slice(0, 160)) ? 'text-blue-400' : 'text-neutral-600 hover:text-blue-400'}`}
                                 >
-                                    <Bookmark size={14} fill={(raigaMemory || []).includes(msg.content.trim().slice(0, 160)) ? 'currentColor' : 'none'} />
+                                    <Bookmark size={14} fill={(logiMemory || []).includes(msg.content.trim().slice(0, 160)) ? 'currentColor' : 'none'} />
                                 </button>
                             )}
                             <div className={`max-w-[85%] rounded-2xl p-4 ${msg.role === 'user' ? 'bg-gradient-to-b from-blue-500/30 to-blue-600/15 backdrop-blur-xl saturate-150 border border-blue-400/30 shadow-lg text-white rounded-tr-sm' : 'bg-gradient-to-b from-white/15 to-white/5 backdrop-blur-xl saturate-150 text-neutral-100 border border-white/15 rounded-tl-sm shadow-lg shadow-black/20'}`}>
@@ -807,7 +807,7 @@ export default function GymAIChat({
                             value={input}
                             onChange={(e) => { setInput(e.target.value); autoResizeInput(); }}
                             onKeyDown={handleInputKeyDown}
-                            placeholder="Tanya Raiga"
+                            placeholder="Tanya Logi"
                             className="flex-1 bg-white/[0.04] backdrop-blur-sm text-white text-sm rounded-xl px-4 py-3 outline-none border border-white/5 focus:border-blue-500/50 resize-none max-h-32"
                             rows={1}
                             style={{ minHeight: '44px' }}
