@@ -57,7 +57,13 @@ export const calculateSmartWorkoutCalories = (weightKg, workout, logs, globalRes
   }
 
   const weight = Number(weightKg) || 70;
-  let totalCalories = 0;
+  const durMins = parseWorkoutDurationMinutes(workout.duration);
+  
+  // Baseline kalori selama di gym (MET 2.5: aktivitas ringan, berdiri, berjalan pelan)
+  // Memastikan durasi keseluruhan (termasuk pause/istirahat tak tercatat) ikut menyumbang kalori.
+  const baselineCalories = weight * 2.5 * (durMins / 60);
+
+  let extraCalories = 0;
   let matchedAnyExercise = false;
 
   // Ambil daftar latihan (bisa dari Override atau Adhoc)
@@ -65,9 +71,6 @@ export const calculateSmartWorkoutCalories = (weightKg, workout, logs, globalRes
 
   exercises.forEach(ex => {
     // Sesi program biasa (bukan adhoc) me-render tiap exercise dengan id gabungan
-    // `${ex.id}-${workout.id}` (lihat WorkoutTab.jsx activeProgramsList) — makanya exerciseLogs
-    // (dan w.log yang disimpan) kepakai key gabungan itu, sedangkan overriddenExercises/exercises
-    // menyimpan id ASLI (tanpa gabungan). Coba id asli dulu (adhoc/riwayat lama), baru id gabungan.
     const exLogs = logs[ex.id] || (workout.id != null ? logs[`${ex.id}-${workout.id}`] : undefined);
     if (!exLogs || !Array.isArray(exLogs)) return;
     matchedAnyExercise = true;
@@ -76,13 +79,13 @@ export const calculateSmartWorkoutCalories = (weightKg, workout, logs, globalRes
       // HANYA hitung kalori jika set benar-benar dicentang selesai
       if (set.done) {
         if (ex.type === 'time') {
-          // KARDIO (Waktu): Durasi penuh * MET 7.0 (Jogging ringan/sedang) atau dinamis berdasar jarak
+          // KARDIO (Waktu): Dinamis berdasar jarak/kecepatan
           const setDurMins = Number(set.d || ex.duration || 0);
           const distKm = Number(set.dist || 0);
           let met = 7.0;
           if (distKm > 0 && setDurMins > 0) {
               const speedKmH = distKm / (setDurMins / 60);
-              // Estimasi MET lari/jogging berdasar kecepatan (contoh sederhana)
+              // Estimasi MET lari/jogging berdasar kecepatan
               if (speedKmH <= 4) met = 3.5;
               else if (speedKmH <= 6) met = 5.0;
               else if (speedKmH <= 8) met = 8.0;
@@ -90,39 +93,40 @@ export const calculateSmartWorkoutCalories = (weightKg, workout, logs, globalRes
               else if (speedKmH <= 12) met = 11.5;
               else met = 12.0;
           }
-          totalCalories += weight * met * (setDurMins / 60);
+          // Tambahan MET (total met - 2.5 baseline)
+          extraCalories += weight * Math.max(0, met - 2.5) * (setDurMins / 60);
         } else {
           // BEBAN (Reps): Asumsi repetisi makan waktu rata-rata 4 detik per rep (TUT)
           const reps = Number(set.r || ex.reps || 10);
           const activeWorkMins = (reps * 4) / 60;
-          let setCal = weight * WORKOUT_MET * (activeWorkMins / 60); // MET 6.0 untuk angkat beban
+          
+          // Tambahan MET 3.5 (total WORKOUT_MET 6.0 - 2.5 baseline)
+          let setCal = weight * 3.5 * (activeWorkMins / 60);
 
           // Bonus kalori dari beban yang diangkat (Force x Distance -> kcal)
           const setWeight = Number(set.w || ex.defaultWeight || 0);
           if (setWeight > 0) {
              setCal += setWeight * reps * 0.006;
           }
-          totalCalories += setCal;
-
-          // Kalori pemulihan / Istirahat pasca-set (MET 2.0 santai)
-          const restSecs = Number(set.rest || ex.restTime || workout.restTime || globalRestTime);
-          const restMins = restSecs / 60;
-          totalCalories += weight * 2.0 * (restMins / 60);
+          extraCalories += setCal;
         }
       }
     });
   });
 
-  // Log beneran ada isinya (dan sudah lolos guard "logs kosong" di atas), tapi gak ada satupun
-  // exercise di overriddenExercises/exercises yang id-nya cocok sama log — biasanya riwayat lama
-  // atau sesi adhoc yang kehilangan daftar exercise-nya. Daripada nampilin 0 kcal padahal orangnya
-  // beneran latihan, fallback ke estimasi timer biasa (durasi × MET) alih-alih diam-diam jadi 0.
-  if (totalCalories === 0 && !matchedAnyExercise) {
-    const durMins = parseWorkoutDurationMinutes(workout.duration);
+  // Log beneran ada isinya, tapi gak ada satupun exercise yang id-nya cocok sama log.
+  // Fallback ke estimasi timer biasa (durasi × MET) alih-alih 0.
+  if (baselineCalories === 0 && extraCalories === 0 && !matchedAnyExercise) {
     return calculateWorkoutCalories(weight, durMins);
   }
 
-  return Math.round(totalCalories);
+  // Jika durasi 0 (lupa start timer), pastikan kalori tidak undercount drastis
+  // dengan memberikan minimal MET 6.0 untuk set yang diselesaikan.
+  if (durMins === 0 && extraCalories > 0) {
+      return Math.round(extraCalories * (6.0 / 3.5)); 
+  }
+
+  return Math.round(baselineCalories + extraCalories);
 };
 
 /**

@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Info, CheckCircle, C
 import SwipeInput from '../components/SwipeInput';
 import { getLocalYMD } from '../data/constants';
 import { formatNumber } from '../utils/numberFormat';
-import { parseWorkoutDurationMinutes, calculateWorkoutCalories } from '../utils/workoutCalc';
+import { parseWorkoutDurationMinutes, calculateWorkoutCalories, calculateSmartWorkoutCalories } from '../utils/workoutCalc';
 import PanoramicSlider from '../components/PanoramicSlider';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { getLogiNotification } from '../utils/aiAgent';
@@ -1008,7 +1008,7 @@ const CalendarTab = ({
                completedWorkouts.forEach(w => {
                  const dur = parseWorkoutDurationMinutes(w.duration) || 0;
                  totalDuration += dur;
-                 totalCalories += calculateWorkoutCalories(userProfile?.weight, dur) || 0;
+                 totalCalories += calculateSmartWorkoutCalories(userProfile?.weight, w, w.log) || 0;
                });
                
                const targetDuration = activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 7) : 45;
@@ -1382,7 +1382,7 @@ const CalendarTab = ({
                              dailyWorkouts.forEach(w => {
                                  const dur = parseWorkoutDurationMinutes(w.duration) || 0;
                                  dailyDuration += dur;
-                                 dailyCalories += calculateWorkoutCalories(userProfile?.weight, dur) || 0;
+                                 dailyCalories += calculateSmartWorkoutCalories(userProfile?.weight, w, w.log) || 0;
                              });
                              const tDuration = activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 7) : 45;
                              const tCalories = activityTargets?.calories || 400;
@@ -1652,7 +1652,7 @@ const CalendarTab = ({
                                        const estDuration = Math.round((w.overriddenExercises || prog?.exercises || []).reduce((acc, ex) => acc + (parseInt(ex.sets) || 3), 0) * (45 + (parseInt(w.restTime) || parseInt(prog?.restTime) || 90)) / 60) || 0;
                                        
                                        const actualMins = parseWorkoutDurationMinutes(w.duration);
-                                       const calBurned = calculateWorkoutCalories(userProfile?.weight, isCompleted ? actualMins : estDuration);
+                                       const calBurned = isCompleted ? calculateSmartWorkoutCalories(userProfile?.weight, w, logsToUse) : calculateWorkoutCalories(userProfile?.weight, estDuration);
 
                                        // Kartu "Selesai" pakai warna aksen biru penuh; "Terjadwal" (belum selesai)
                                        // dibikin lebih pudar supaya kelihatan beda statusnya sekilas.

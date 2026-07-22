@@ -4,7 +4,7 @@ import { X, Play, Pause, ChevronRight, ChevronLeft, Dumbbell, Check, Info, Clock
 import ScrollPicker from './ScrollPicker';
 import { exerciseTypeLabels } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
-import { calculateWorkoutCalories } from '../utils/workoutCalc';
+import { calculateWorkoutCalories, calculateLiveWorkoutCalories } from '../utils/workoutCalc';
 
 const ImmersiveWorkout = ({
   t,
@@ -102,7 +102,7 @@ const ImmersiveWorkout = ({
     return `${isNegative ? '-' : ''}${m}:${s}`;
   };
 
-  const caloriesBurned = calculateWorkoutCalories(userProfile?.weight || 70, Math.floor(workoutSeconds / 60));
+  const caloriesBurned = calculateLiveWorkoutCalories(userProfile?.weight || 70, validExercises, exerciseLogs, workoutSeconds);
 
   const [maxRestTimer, setMaxRestTimer] = useState(0);
   useEffect(() => {
