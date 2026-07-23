@@ -59,6 +59,7 @@ const ImmersiveWorkout = ({
   const [isPaused, setIsPaused] = useState(false);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
   const [showHint, setShowHint] = useState(false);
+  const isSavingRef = React.useRef(false);
 
   useEffect(() => {
     let interval;
@@ -948,8 +949,10 @@ const ImmersiveWorkout = ({
               >
                 Batal
               </button>
-              <button 
+              <button
                 onClick={() => {
+                  if (isSavingRef.current) return; // cegah double-tap bikin sesi kesimpen dobel
+                  isSavingRef.current = true;
                   playSoundEffect('success', soundEnabled);
                   onSaveWorkout();
                   setShowFinishConfirm(false);

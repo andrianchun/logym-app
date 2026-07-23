@@ -360,7 +360,7 @@ export const getAchievementContext = (history, userProfile, extraData = {}) => {
           let sessionVol = 0;
           Object.values(w.log || {}).forEach(sets => {
             sets.forEach(s => {
-              if (s.weight && s.reps) sessionVol += (parseFloat(s.weight) * parseInt(s.reps));
+              if (s.w && s.r) sessionVol += (parseFloat(s.w) * parseInt(s.r));
             });
           });
           maxVolume = Math.max(maxVolume, sessionVol);

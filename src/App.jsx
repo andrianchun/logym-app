@@ -1026,6 +1026,8 @@ export default function App() {
   // ==========================================
   const isUpdatingFromServer = useRef(false);
   const [hasParseError, setHasParseError] = useState(false);
+  const pendingMainSaveRef = useRef(null);
+  const pendingHistorySaveRef = useRef(null);
   // Kegagalan auto-save selama ini cuma nyangkut di console — user gak pernah tahu, padahal
   // gejalanya fatal: perubahan "kesimpan" di layar lalu balik sendiri begitu snapshot server
   // datang. Tampilkan di UI supaya ketahuan dan bisa dilaporkan.
@@ -1334,7 +1336,7 @@ export default function App() {
         // try/catch WAJIB: setDoc melempar SINKRON (bukan promise rejection) kalau datanya
         // mengandung undefined — .catch() saja tidak pernah kena, dan errornya lenyap tanpa jejak.
         try {
-          setDoc(mainDocRef, {
+          return setDoc(mainDocRef, {
             programs,
             exerciseLibrary,
             settings: { theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, userProfile, userApiKeys: (userApiKeys || []).filter(k => k && k.trim()), logiPersona, logiCustomInstruction, logiMemory },
@@ -1349,8 +1351,11 @@ export default function App() {
         }
       };
       const timer = setTimeout(attemptSave, 2000);
+      // Simpan supaya handleLogout bisa flush save yang masih tertunda sebelum signOut,
+      // alih-alih dibatalkan begitu saja oleh cleanup effect ini.
+      pendingMainSaveRef.current = { timer, attemptSave };
 
-      return () => { clearTimeout(timer); if (retryTimer) clearTimeout(retryTimer); };
+      return () => { clearTimeout(timer); if (retryTimer) clearTimeout(retryTimer); pendingMainSaveRef.current = null; };
     }
   }, [programs, exerciseLibrary, theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, user?.uid, isDataLoaded, userAchievements, userProfile, userApiKeys, logiPersona, logiCustomInstruction, logiMemory]);
 
@@ -1395,7 +1400,7 @@ export default function App() {
         if (dirtyYears.length === 0) return; // tidak ada perubahan — jangan tulis apa pun
 
         lastSavedHistoryJson.current = newBaseline;
-        for (const year of dirtyYears) {
+        const writes = dirtyYears.map(year => {
            const yearRef = doc(db, "users", user.uid, "history_years", year);
            // Batalkan baseline tanggal yang gagal supaya dicoba lagi pada save berikutnya
            const rollback = (err, label) => {
@@ -1409,17 +1414,23 @@ export default function App() {
            // tanpa ini baseline sudah terlanjur di-update dan tanggal itu dianggap "tersimpan"
            // selamanya padahal tidak pernah ketulis (data hilang diam-diam sampai reload).
            try {
-              setDoc(yearRef, dirtyByYear[year], { merge: true })
+              return setDoc(yearRef, dirtyByYear[year], { merge: true })
                  .then(() => setCloudSaveError(null))
                  .catch(err => rollback(err, ''));
            } catch (err) {
               rollback(err, ' (sync)');
+              return Promise.resolve();
            }
-        }
+        });
+        return Promise.all(writes);
       };
       const timer = setTimeout(attemptSave, 2000);
+      // Simpan supaya handleLogout bisa flush save history (log latihan) yang masih
+      // tertunda sebelum signOut — tanpa ini, logout langsung setelah selesai latihan
+      // bisa membatalkan timer ini dan latihan yang baru dicatat hilang tanpa jejak.
+      pendingHistorySaveRef.current = { timer, attemptSave };
 
-      return () => { clearTimeout(timer); if (retryTimer) clearTimeout(retryTimer); };
+      return () => { clearTimeout(timer); if (retryTimer) clearTimeout(retryTimer); pendingHistorySaveRef.current = null; };
     }
   }, [history, user, isDataLoaded]);
 
@@ -1428,7 +1439,11 @@ export default function App() {
   const historyRef = useRef(history);
   useEffect(() => {
     // Only run if history actually changed (new completion)
-    if (history !== historyRef.current && isDataLoaded) {
+    if (history === historyRef.current || !isDataLoaded) return;
+    // Debounce: `history` dapat reference baru tiap keystroke saat lagi ngetik reps/berat
+    // (lihat efek "REAL-TIME SYNC EXERCISE LOGS TO HISTORY"). checkAchievements scan seluruh
+    // history tahun ini — jangan jalanin scan itu di setiap ketukan, tunggu user berhenti dulu.
+    const timer = setTimeout(() => {
       const allDates = Object.keys(history).sort();
       let lastWorkout = null;
       if (allDates.length > 0) {
@@ -1451,8 +1466,9 @@ export default function App() {
           return Array.from(newSet);
         });
       }
-    }
-    historyRef.current = history;
+      historyRef.current = history;
+    }, 800);
+    return () => clearTimeout(timer);
   }, [history, isDataLoaded, userAchievements, soundEnabled]);
 
   // ==========================================
@@ -1493,7 +1509,9 @@ export default function App() {
   const activeSessionRestored = useRef(false);
   useEffect(() => { activeSessionRestored.current = false; }, [user?.uid]); // reset saat ganti akun
   useEffect(() => {
-    if (!isDataLoaded || !user?.uid || activeSessionRestored.current) return;
+    // Tunggu isHistoryLoaded (bukan cuma isDataLoaded) — itu tanda snapshot history tahun ini
+    // sudah datang sekali (ada isinya atau tidak), jadi efek ini gak nunggu selamanya.
+    if (!isDataLoaded || !isHistoryLoaded || !user?.uid || activeSessionRestored.current) return;
     try {
       const raw = localStorage.getItem(`lyfit_active_session_${user.uid}`);
       if (!raw) { activeSessionRestored.current = true; return; }
@@ -1504,13 +1522,14 @@ export default function App() {
         activeSessionRestored.current = true;
         return;
       }
-      // Tunggu sampai data hari tsb tersedia dari snapshot history (efek ini re-run tiap history berubah)
-      const dayData = history[saved.date];
-      if (!dayData || !dayData.workouts) return;
       activeSessionRestored.current = true;
       setHistory(prev => {
-        const day = prev[saved.date];
-        if (!day || !day.workouts) return prev;
+        // Kalau harinya belum ada sama sekali di history (scaffold "workouts" belum sempat
+        // ke-flush ke Firestore sebelum app di-force-close), buat scaffold kosong di sini —
+        // jangan nunggu Firestore yang bisa jadi memang tidak pernah menerima tulisan itu,
+        // karena itu bikin _activeSession di localStorage nyangkut selamanya, gak pernah
+        // ke-restore ke layar meskipun datanya aman.
+        const day = prev[saved.date] || { workouts: [] };
         return {
           ...prev,
           [saved.date]: {
@@ -1526,7 +1545,7 @@ export default function App() {
     } catch {
       activeSessionRestored.current = true;
     }
-  }, [isDataLoaded, user?.uid, history]);
+  }, [isDataLoaded, isHistoryLoaded, user?.uid]);
 
   // ==========================================
   // 3.7. BACKFILL: BEKUKAN EXERCISE KE RIWAYAT LAMA
@@ -1704,6 +1723,19 @@ export default function App() {
   const handleLogout = async () => {
     playSoundEffect('click', soundEnabled);
     try {
+      // Flush save yang masih menunggu debounce (2 detik) sebelum signOut — kalau tidak,
+      // effect auto-save akan membatalkan timernya begitu user jadi null dan perubahan
+      // (mis. latihan yang baru selesai dicatat) hilang tanpa pernah sampai ke Firestore.
+      if (pendingMainSaveRef.current) {
+        clearTimeout(pendingMainSaveRef.current.timer);
+        await pendingMainSaveRef.current.attemptSave();
+        pendingMainSaveRef.current = null;
+      }
+      if (pendingHistorySaveRef.current) {
+        clearTimeout(pendingHistorySaveRef.current.timer);
+        await pendingHistorySaveRef.current.attemptSave();
+        pendingHistorySaveRef.current = null;
+      }
       setActiveAddModalTarget(null);
       setShowProfileModal(false);
       setShowSettings(false);
@@ -2784,7 +2816,11 @@ export default function App() {
 
   // JIKA USER BELUM LOGIN
   if (!user) {
-    return <AuthPage t={t} theme={theme} soundEnabled={soundEnabled} onLogin={setUser} />;
+    {/* onLogin sengaja no-op: setUser hanya boleh terjadi lewat onAuthStateChanged
+        di atas, karena itu satu-satunya jalur yang me-reset isDataLoaded/isHistoryLoaded.
+        Kalau AuthPage langsung setUser sendiri, race dengan reset itu bikin UI render
+        data lama/kosong sebelum onSnapshot sempat narik data user baru. */}
+    return <AuthPage t={t} theme={theme} soundEnabled={soundEnabled} onLogin={() => {}} />;
   }
 
   // JIKA USER SUDAH LOGIN
