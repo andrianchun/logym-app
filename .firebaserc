@@ -9,6 +9,13 @@
           "logym"
         ]
       }
+    },
+    "logym-id": {
+      "hosting": {
+        "logym": [
+          "logym-id"
+        ]
+      }
     }
   },
   "etags": {}
