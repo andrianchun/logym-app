@@ -15,7 +15,7 @@ export default function UserProfileModal({ profileUserId, profileUserName, profi
     if (!profileUserId) return;
     const fetchProfile = async () => {
       try {
-        const userRef = doc(db, 'community_users', profileUserId);
+        const userRef = doc(db, 'logym_community_users', profileUserId);
         const userSnap = await getDoc(userRef);
         if (userSnap.exists()) {
           setUserProfileData(userSnap.data());

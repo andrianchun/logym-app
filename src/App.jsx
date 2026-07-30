@@ -102,7 +102,7 @@ export default function App() {
   const [lomealTargets, setLomealTargets] = useState(null);
   useEffect(() => {
     if (!user?.uid) { setLomealToday(null); setLomealTargets(null); return; }
-    const unsub = onSnapshot(doc(db, 'users', user.uid), (snap) => {
+    const unsub = onSnapshot(doc(db, 'logym_users', user.uid), (snap) => {
       setLomealToday(snap.data()?.lomealSync?.today || null);
       setLomealTargets(snap.data()?.lomealSync?.targets || null);
     });
@@ -370,7 +370,7 @@ export default function App() {
                      historyChanged = true;
                      
                      // Sync individual day to firestore
-                     const yearRef = doc(db, 'users', user.uid, 'history_years', '2026');
+                     const yearRef = doc(db, 'logym_users', user.uid, 'history_years', '2026');
                      setDoc(yearRef, { [TARGET_DATE]: newHistory[TARGET_DATE] }, { merge: true });
                  }
              });
@@ -464,7 +464,7 @@ export default function App() {
         } else {
           // likely a username
           try {
-            const usernameRef = doc(db, 'usernames', u.toLowerCase());
+            const usernameRef = doc(db, 'logym_usernames', u.toLowerCase());
             const snap = await getDoc(usernameRef);
             if (snap.exists() && snap.data().uid) {
               openUserProfile(snap.data().uid);
@@ -878,7 +878,7 @@ export default function App() {
 
     // Immediately write onboardingCompleted flag to Firebase so it syncs across devices
     if (user?.uid) {
-      setDoc(doc(db, 'users', user.uid), { onboardingCompleted: true }, { merge: true }).catch(() => {});
+      setDoc(doc(db, 'logym_users', user.uid), { onboardingCompleted: true }, { merge: true }).catch(() => {});
     }
 
     setTimeout(() => {
@@ -1045,8 +1045,8 @@ export default function App() {
     if (user) {
 
       const currentYear = new Date().getFullYear().toString();
-      const mainDocRef = doc(db, "users", user.uid);
-      const historyDocRef = doc(db, "users", user.uid, "history_years", currentYear);
+      const mainDocRef = doc(db, "logym_users", user.uid);
+      const historyDocRef = doc(db, "logym_users", user.uid, "history_years", currentYear);
 
       unsubscribeMain = onSnapshot(mainDocRef, async (docSnap) => {
         if (docSnap.exists()) {
@@ -1105,7 +1105,7 @@ export default function App() {
               });
               
               for (const year of Object.keys(historyByYear)) {
-                 const yearRef = doc(db, "users", user.uid, "history_years", year);
+                 const yearRef = doc(db, "logym_users", user.uid, "history_years", year);
                  await setDoc(yearRef, historyByYear[year], { merge: true });
               }
               
@@ -1276,7 +1276,14 @@ export default function App() {
              
              if (Date.now() - lastLocalHistoryWriteAt.current > 5000) {
                  setHistory(prev => {
-                    const newState = { ...prev, ...data };
+                    const newState = { ...prev };
+                    Object.keys(data).forEach(d => {
+                       const existingDay = newState[d] || {};
+                       newState[d] = {
+                          ...data[d],
+                          ...(existingDay._activeSession ? { _activeSession: existingDay._activeSession } : {})
+                       };
+                    });
                     return JSON.stringify(prev) === JSON.stringify(newState) ? prev : newState;
                  });
              } else {
@@ -1330,7 +1337,7 @@ export default function App() {
           console.warn('[Auto-save] Programs masih default — skip save, tunggu load Firestore selesai.');
           return;
         }
-        const mainDocRef = doc(db, "users", user.uid);
+        const mainDocRef = doc(db, "logym_users", user.uid);
 
         // Simpan Profil & Program ke Dokumen Utama.
         // try/catch WAJIB: setDoc melempar SINKRON (bukan promise rejection) kalau datanya
@@ -1401,7 +1408,7 @@ export default function App() {
 
         lastSavedHistoryJson.current = newBaseline;
         const writes = dirtyYears.map(year => {
-           const yearRef = doc(db, "users", user.uid, "history_years", year);
+           const yearRef = doc(db, "logym_users", user.uid, "history_years", year);
            // Batalkan baseline tanggal yang gagal supaya dicoba lagi pada save berikutnya
            const rollback = (err, label) => {
               console.error(`Auto-save History ${year} gagal${label}:`, err);
@@ -1756,23 +1763,23 @@ export default function App() {
     };
 
     // Subkoleksi history per tahun
-    refsToDelete.push(...(await safeGetDocs(collection(db, 'users', uid, 'history_years'))).map(d => d.ref));
+    refsToDelete.push(...(await safeGetDocs(collection(db, 'logym_users', uid, 'history_years'))).map(d => d.ref));
     // Postingan komunitas milik user
-    refsToDelete.push(...(await safeGetDocs(query(collection(db, 'community_posts'), where('userId', '==', uid)))).map(d => d.ref));
+    refsToDelete.push(...(await safeGetDocs(query(collection(db, 'logym_community_posts'), where('userId', '==', uid)))).map(d => d.ref));
     // Notifikasi untuk user
-    refsToDelete.push(...(await safeGetDocs(query(collection(db, 'notifications'), where('toUserId', '==', uid)))).map(d => d.ref));
+    refsToDelete.push(...(await safeGetDocs(query(collection(db, 'logym_notifications'), where('toUserId', '==', uid)))).map(d => d.ref));
     // Relasi follow & block dua arah
-    refsToDelete.push(...(await safeGetDocs(query(collection(db, 'follows'), where('followerId', '==', uid)))).map(d => d.ref));
-    refsToDelete.push(...(await safeGetDocs(query(collection(db, 'follows'), where('followingId', '==', uid)))).map(d => d.ref));
-    refsToDelete.push(...(await safeGetDocs(query(collection(db, 'blocks'), where('blockerId', '==', uid)))).map(d => d.ref));
-    refsToDelete.push(...(await safeGetDocs(query(collection(db, 'blocks'), where('blockedId', '==', uid)))).map(d => d.ref));
+    refsToDelete.push(...(await safeGetDocs(query(collection(db, 'logym_follows'), where('followerId', '==', uid)))).map(d => d.ref));
+    refsToDelete.push(...(await safeGetDocs(query(collection(db, 'logym_follows'), where('followingId', '==', uid)))).map(d => d.ref));
+    refsToDelete.push(...(await safeGetDocs(query(collection(db, 'logym_blocks'), where('blockerId', '==', uid)))).map(d => d.ref));
+    refsToDelete.push(...(await safeGetDocs(query(collection(db, 'logym_blocks'), where('blockedId', '==', uid)))).map(d => d.ref));
     // Profil komunitas, dokumen utama, dan dokumen legacy 'userData'
-    refsToDelete.push(doc(db, 'community_users', uid));
-    refsToDelete.push(doc(db, 'users', uid));
-    refsToDelete.push(doc(db, 'userData', uid));
+    refsToDelete.push(doc(db, 'logym_community_users', uid));
+    refsToDelete.push(doc(db, 'logym_users', uid));
+    refsToDelete.push(doc(db, 'logym_userData', uid));
     // Lepaskan reservasi username supaya tidak nyangkut selamanya di akun yang sudah dihapus
     if (userProfile?.username) {
-      refsToDelete.push(doc(db, 'usernames', userProfile.username));
+      refsToDelete.push(doc(db, 'logym_usernames', userProfile.username));
     }
 
     // WriteBatch maksimal 500 operasi — pecah per 450
@@ -2075,15 +2082,28 @@ export default function App() {
       }
 
       if (isDoneNow && !currentLogs[setIdx].skipped) {
-        // --- UPDATE LAST WEIGHT ONLY ---
+        // --- UPDATE LAST WEIGHT AND RM10 ONLY ---
         const weight = Number(currentLogs[setIdx].w) || 0;
+        const reps = Number(currentLogs[setIdx].r) || 0;
         if (ex && weight > 0 && (!ex.type || ex.type === 'weight' || ex.type === 'reps')) {
+           const c1RM = weight * (1 + reps / 30);
+           const c10RM = Math.round((c1RM / 1.3333) * 10) / 10;
+           
            setExerciseLibrary(lib => {
               const existingIdx = lib.findIndex(e => e.name?.toLowerCase() === ex.name?.toLowerCase() || e.id === ex.id);
-              if (existingIdx >= 0 && lib[existingIdx].lastWeight !== weight) {
+              if (existingIdx >= 0) {
+                  const existingRm = lib[existingIdx].rm10 || 0;
                   const newLib = [...lib];
-                  newLib[existingIdx] = { ...newLib[existingIdx], lastWeight: weight };
-                  return newLib;
+                  let updated = false;
+                  if (lib[existingIdx].lastWeight !== weight) {
+                     newLib[existingIdx] = { ...newLib[existingIdx], lastWeight: weight };
+                     updated = true;
+                  }
+                  if (c10RM > existingRm) {
+                     newLib[existingIdx] = { ...newLib[existingIdx], rm10: c10RM };
+                     updated = true;
+                  }
+                  if (updated) return newLib;
               }
               return lib;
            });
@@ -2422,6 +2442,12 @@ export default function App() {
             if (!frozenExercises || frozenExercises.length === 0) {
               const srcProg = programs.find(pr => pr.id === realProgramId);
               if (srcProg?.exercises?.length > 0) frozenExercises = JSON.parse(JSON.stringify(srcProg.exercises));
+              else frozenExercises = [];
+            }
+            if (extraExercises && extraExercises.length > 0) {
+                const existingIds = new Set(frozenExercises.map(e => e.id));
+                const newExtras = extraExercises.filter(e => !existingIds.has(e.id));
+                frozenExercises = [...frozenExercises, ...JSON.parse(JSON.stringify(newExtras))];
             }
 
             // Proteksi agar durasi tidak kereset, bisanya cuma nambah
@@ -2476,6 +2502,12 @@ export default function App() {
               if (!frozenExercises || frozenExercises.length === 0) {
                 const srcProg = programs.find(pr => pr.id === realProgramId);
                 if (srcProg?.exercises?.length > 0) frozenExercises = JSON.parse(JSON.stringify(srcProg.exercises));
+                else frozenExercises = [];
+              }
+              if (extraExercises && extraExercises.length > 0) {
+                  const existingIds = new Set(frozenExercises.map(e => e.id));
+                  const newExtras = extraExercises.filter(e => !existingIds.has(e.id));
+                  frozenExercises = [...frozenExercises, ...JSON.parse(JSON.stringify(newExtras))];
               }
               let existingSecs = 0;
               if (existingW.duration) {
@@ -2521,7 +2553,7 @@ export default function App() {
         }
       }
       
-      h[targetDateStr] = { ...dayData, workouts, _activeSession: progId === 'extra' ? { ...(dayData._activeSession || {}), extraExercises: [] } : dayData._activeSession };
+      h[targetDateStr] = { ...dayData, workouts, _activeSession: { ...(dayData._activeSession || {}), extraExercises: [] } };
       
       // --- SINKRONISASI KALORI DENGAN LOMEAL ---
       // Hitung kalori hari ini seketika agar langsung dikirim ke server oleh auto-save,
@@ -2872,7 +2904,7 @@ export default function App() {
            }
            // Persist to Firebase so it syncs across all devices
            if (user?.uid) {
-             setDoc(doc(db, 'users', user.uid), { onboardingCompleted: true }, { merge: true }).catch(() => {});
+             setDoc(doc(db, 'logym_users', user.uid), { onboardingCompleted: true }, { merge: true }).catch(() => {});
            }
          }}
          onComplete={handleApplyRecommendedPlan}

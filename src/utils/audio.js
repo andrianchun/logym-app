@@ -42,14 +42,14 @@ export const playSoundEffect = (type, enabled) => {
         osc.start(now);
         osc.stop(now + 0.05);
     } else if (type === 'done_set') {
-        // Suara klik + ting yang renyah untuk mencentang set
+        // Suara klik / centang yang elegan (soft modern pop)
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(800, now);
-        osc.frequency.exponentialRampToValueAtTime(1200, now + 0.05);
-        gain.gain.setValueAtTime(0.3, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+        osc.frequency.setValueAtTime(600, now);
+        osc.frequency.exponentialRampToValueAtTime(150, now + 0.03);
+        gain.gain.setValueAtTime(0.4, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
         osc.start(now);
-        osc.stop(now + 0.1);
+        osc.stop(now + 0.04);
     } else if (type === 'timerStart') {
         osc.type = 'square';
         osc.frequency.setValueAtTime(440, now);

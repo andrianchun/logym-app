@@ -28,14 +28,14 @@ export default function AdminDashboardModal({ showModal, setShowModal, user }) {
         setIsLoading(true);
         try {
             if (tab === 'ai_inbox') {
-                const q = query(collection(db, 'ai_inbox'), orderBy('timestamp', 'desc'));
+                const q = query(collection(db, 'logym_ai_inbox'), orderBy('timestamp', 'desc'));
                 const snap = await getDocs(q);
                 setInboxItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
             } else if (tab === 'banned') {
                 const users = await getBannedUsers();
                 setBannedUsers(users);
             } else if (tab === 'bugs') {
-                const q = query(collection(db, 'bug_reports'), orderBy('timestamp', 'desc'));
+                const q = query(collection(db, 'logym_bug_reports'), orderBy('timestamp', 'desc'));
                 const snap = await getDocs(q);
                 setBugReports(snap.docs.map(d => ({ id: d.id, ...d.data() })));
             }
@@ -66,7 +66,7 @@ export default function AdminDashboardModal({ showModal, setShowModal, user }) {
     const handleDeleteInbox = async (id) => {
         if (!window.confirm("Hapus pertanyaan ini dari inbox?")) return;
         try {
-            await deleteDoc(doc(db, 'ai_inbox', id));
+            await deleteDoc(doc(db, 'logym_ai_inbox', id));
             setInboxItems(prev => prev.filter(i => i.id !== id));
         } catch (e) {
             showAlert("Gagal menghapus.", { type: 'error' });
@@ -76,7 +76,7 @@ export default function AdminDashboardModal({ showModal, setShowModal, user }) {
     const handleMarkBugResolved = async (id, currentStatus) => {
         const newStatus = currentStatus === 'resolved' ? 'open' : 'resolved';
         try {
-            await updateDoc(doc(db, 'bug_reports', id), { status: newStatus });
+            await updateDoc(doc(db, 'logym_bug_reports', id), { status: newStatus });
             setBugReports(prev => prev.map(b => b.id === id ? { ...b, status: newStatus } : b));
         } catch (e) {
             showAlert("Gagal mengupdate status.", { type: 'error' });
@@ -86,7 +86,7 @@ export default function AdminDashboardModal({ showModal, setShowModal, user }) {
     const handleDeleteBug = async (id) => {
         if (!window.confirm("Hapus laporan bug ini?")) return;
         try {
-            await deleteDoc(doc(db, 'bug_reports', id));
+            await deleteDoc(doc(db, 'logym_bug_reports', id));
             setBugReports(prev => prev.filter(b => b.id !== id));
         } catch (e) {
             showAlert("Gagal menghapus.", { type: 'error' });

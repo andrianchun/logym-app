@@ -29,7 +29,7 @@ export default function FollowListModal({ currentUser, type, isDark, t, onClose,
         const [myFollowing, myBlocked] = await Promise.all([
           getFollowingIds(currentUser.uid),
           (async () => {
-            const snap = await getDocs(query(collection(db, 'blocks'), where('blockerId', '==', currentUser.uid)));
+            const snap = await getDocs(query(collection(db, 'logym_blocks'), where('blockerId', '==', currentUser.uid)));
             return snap.docs.map(d => d.data().blockedId);
           })()
         ]);
@@ -50,8 +50,8 @@ export default function FollowListModal({ currentUser, type, isDark, t, onClose,
           for (let i = 0; i < allUids.length; i += 30) chunks.push(allUids.slice(i, i + 30));
           for (const chunk of chunks) {
             const [uSnap, cSnap] = await Promise.all([
-              getDocs(query(collection(db, 'users'), where(documentId(), 'in', chunk))),
-              getDocs(query(collection(db, 'community_users'), where(documentId(), 'in', chunk)))
+              getDocs(query(collection(db, 'logym_users'), where(documentId(), 'in', chunk))),
+              getDocs(query(collection(db, 'logym_community_users'), where(documentId(), 'in', chunk)))
             ]);
             uSnap.docs.forEach(d => { profiles[d.id] = { ...profiles[d.id], ...d.data() }; });
             cSnap.docs.forEach(d => { profiles[d.id] = { ...profiles[d.id], ...d.data() }; });

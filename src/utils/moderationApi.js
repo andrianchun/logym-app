@@ -48,10 +48,10 @@ export const censorBadWords = (text) => {
 
 export const reportPost = async (postId, reporterId, reason) => {
     try {
-        await addDoc(collection(db, 'community_reports'), {
+        await addDoc(collection(db, 'logym_community_reports'), {
             type: 'post', targetId: postId, reporterId, reason, timestamp: serverTimestamp()
         });
-        const postRef = doc(db, 'community_posts', postId);
+        const postRef = doc(db, 'logym_community_posts', postId);
         const postSnap = await getDoc(postRef);
         if (postSnap.exists()) {
             const currentReports = (postSnap.data().reportCount || 0) + 1;
@@ -73,7 +73,7 @@ export const reportPost = async (postId, reporterId, reason) => {
 
 export const banUserGlobal = async (userId) => {
     try {
-        const userRef = doc(db, 'users', userId);
+        const userRef = doc(db, 'logym_users', userId);
         await setDoc(userRef, {
             isBanned: true,
             hasBeenBanned: true,
@@ -81,7 +81,7 @@ export const banUserGlobal = async (userId) => {
         }, { merge: true });
 
         // Hide all posts from this user
-        const q = query(collection(db, 'community_posts'), where('userId', '==', userId));
+        const q = query(collection(db, 'logym_community_posts'), where('userId', '==', userId));
         const snap = await getDocs(q);
         const batch = writeBatch(db);
         snap.docs.forEach(doc => {
@@ -98,7 +98,7 @@ export const banUserGlobal = async (userId) => {
 
 export const unbanUserGlobal = async (userId) => {
     try {
-        const userRef = doc(db, 'users', userId);
+        const userRef = doc(db, 'logym_users', userId);
         await setDoc(userRef, {
             isBanned: false
         }, { merge: true });
@@ -111,7 +111,7 @@ export const unbanUserGlobal = async (userId) => {
 
 export const getBannedUsers = async () => {
     try {
-        const q = query(collection(db, 'users'), where('hasBeenBanned', '==', true));
+        const q = query(collection(db, 'logym_users'), where('hasBeenBanned', '==', true));
         const snap = await getDocs(q);
         return snap.docs.map(d => ({ id: d.id, ...d.data() }));
     } catch (error) {
@@ -122,7 +122,7 @@ export const getBannedUsers = async () => {
 
 export const reportUser = async (targetUserId, reporterId, reason) => {
     try {
-        await addDoc(collection(db, 'community_reports'), {
+        await addDoc(collection(db, 'logym_community_reports'), {
             type: 'user', targetId: targetUserId, reporterId, reason, timestamp: serverTimestamp()
         });
         const localBlocked = JSON.parse(localStorage.getItem('lyfit_blocked_users_local') || '[]');

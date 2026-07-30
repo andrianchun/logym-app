@@ -31,20 +31,25 @@ const ExerciseCard = ({
   const isAllDone = doneCount === totalSets && totalSets > 0;
   const progressPercent = totalSets > 0 ? (doneCount / totalSets) * 100 : 0;
   const [showHint, setShowHint] = useState(false);
+  const [canCloseHint, setCanCloseHint] = useState(false);
   const playedRecordSound = React.useRef(false);
 
   useEffect(() => {
     if (!ex) return;
     const hint = overloadHint;
     if (hint?.isNewRecord) {
-      if (!playedRecordSound.current) {
+      if (!window.logymShownRecords) window.logymShownRecords = new Set();
+      
+      if (!playedRecordSound.current && !window.logymShownRecords.has(ex.id)) {
         if (soundEnabled) {
           const audio = new Audio('/success.wav');
           audio.volume = 1.0;
           audio.play().catch(() => {});
         }
         playedRecordSound.current = true;
+        window.logymShownRecords.add(ex.id);
         setShowHint(true); // Auto-show the gamified popup
+        setTimeout(() => setCanCloseHint(true), 2500); // Wait 2.5s before allowing close
       }
     }
   }, [ex, overloadHint, soundEnabled]);
@@ -56,7 +61,12 @@ const ExerciseCard = ({
   // ==========================================
   // LOGIKA COUNTDOWN TIMER UNTUK DURASI
   // ==========================================
-  const [activeTimer, setActiveTimer] = useState({ idx: null, timeLeft: 0, mode: 'down' });
+  const [activeTimer, setActiveTimer] = useState(() => {
+     if (window.logymActiveTimer && window.logymActiveTimer.exId === ex?.id) {
+         return window.logymActiveTimer.timer;
+     }
+     return { idx: null, timeLeft: 0, mode: 'down' };
+  });
   const [deletingSetIdx, setDeletingSetIdx] = useState(null);
   const [showCardioExtras, setShowCardioExtras] = useState({});
   const [isTreadmillMode, setIsTreadmillMode] = useState(() => (ex.name || '').toLowerCase().includes('treadmill'));
@@ -138,8 +148,18 @@ const ExerciseCard = ({
         });
       }, 1000);
     }
-    return () => clearInterval(interval);
-  }, [activeTimer.idx, ex.id, onToggleSet, sets, soundEnabled]);
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [activeTimer.idx, ex?.id, sets, onToggleSet, soundEnabled]);
+
+  useEffect(() => {
+    if (activeTimer.idx !== null) {
+       window.logymActiveTimer = { exId: ex?.id, timer: activeTimer };
+    } else if (window.logymActiveTimer?.exId === ex?.id) {
+       window.logymActiveTimer = null;
+    }
+  }, [activeTimer, ex?.id]);
 
   const toggleTimer = (setIdx, durationMins) => {
     playSoundEffect('click', soundEnabled);
@@ -311,9 +331,8 @@ const ExerciseCard = ({
                           <Brain size={18} className="animate-pulse" />
                       </button>
                       {showHint && createPortal(
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => setShowHint(false)}>
-                          <div className="absolute inset-0 bg-black/60 backdrop-blur-md animate-in fade-in" />
-                          <div className={`relative w-[90%] max-w-[340px] min-h-[480px] p-6 flex flex-col justify-between rounded-[32px] z-10 text-center leading-snug animate-in fade-in zoom-in-95 duration-300`}>
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300" onClick={() => { if (canCloseHint || !overloadHint?.isNewRecord) setShowHint(false); }}>
+                          <div className={`relative w-[90%] max-w-[340px] min-h-[480px] p-6 flex flex-col justify-between rounded-[32px] z-10 text-center leading-snug animate-in fade-in zoom-in-95 duration-300 ${overloadHint?.isNewRecord ? 'bg-zinc-900 border border-blue-500/50' : 'bg-zinc-900 border border-white/10'}`}>
                             {overloadHint?.isNewRecord && (
                               <div className="absolute top-0 inset-x-0 h-full w-full pointer-events-none z-0">
                                  <div className="absolute -top-[20%] -left-[20%] w-[140%] h-[140%] bg-[radial-gradient(ellipse_at_center,rgba(59,130,246,0.25)_0%,transparent_70%)] animate-spin-slow"></div>

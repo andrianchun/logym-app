@@ -898,7 +898,7 @@ export async function chatWithAI(messages, userApiKeys = [], setKeyStatuses = nu
 
     // Tanpa key pribadi, atau semua key pribadi gagal: pakai backend proxy (shared keys di server)
     try {
-        const call = httpsCallable(functions, 'aiChat', { timeout: 120000 });
+        const call = httpsCallable(functions, 'logymAiChat', { timeout: 120000 });
         const res = await call({ messages });
         return res.data?.text || '';
     } catch (backendErr) {

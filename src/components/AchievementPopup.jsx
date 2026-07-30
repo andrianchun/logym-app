@@ -3,9 +3,16 @@ import { X, Share2 } from 'lucide-react';
 import { shareAchievementToFeed } from '../utils/communityApi';
 
 const AchievementPopup = ({ achievements, onClose, soundEnabled, playSoundEffect, theme, t, user, onShareComplete }) => {
+  const [canClose, setCanClose] = React.useState(false);
+
   useEffect(() => {
     if (achievements && achievements.length > 0) {
       playSoundEffect('success', soundEnabled);
+      setCanClose(false);
+      const timer = setTimeout(() => {
+        setCanClose(true);
+      }, 2000);
+      return () => clearTimeout(timer);
     }
   }, [achievements]);
 
@@ -16,6 +23,7 @@ const AchievementPopup = ({ achievements, onClose, soundEnabled, playSoundEffect
   const ach = achievements[0];
 
   const handleShare = async () => {
+    if (!canClose) return;
     playSoundEffect('click', soundEnabled);
     if (user) {
       const postId = await shareAchievementToFeed(
@@ -30,6 +38,7 @@ const AchievementPopup = ({ achievements, onClose, soundEnabled, playSoundEffect
   };
 
   const handleClose = () => {
+    if (!canClose) return;
     playSoundEffect('click', soundEnabled);
     onClose(ach.id);
   };
@@ -39,18 +48,20 @@ const AchievementPopup = ({ achievements, onClose, soundEnabled, playSoundEffect
   const btnShadow = t?.bgAccent ? '' : 'shadow-[#3b82f6]/30';
 
   return (
-    <div className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm flex flex-col justify-center p-4 animate-in fade-in slide-in-from-bottom-8 duration-500">
-      <div className={`w-full max-w-sm mx-auto relative rounded-3xl overflow-hidden ${isDark ? 'bg-slate-900 border border-white/10' : 'bg-white border border-black/10'} shadow-2xl`}>
+    <div className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm flex flex-col justify-center p-4 animate-in fade-in slide-in-from-bottom-8 duration-500" onClick={handleClose}>
+      <div className={`w-full max-w-sm mx-auto relative rounded-3xl overflow-hidden ${isDark ? 'bg-slate-900 border border-white/10' : 'bg-white border border-black/10'} shadow-2xl`} onClick={e => e.stopPropagation()}>
         
         {/* Glow Background */}
         <div className={`absolute top-0 left-0 right-0 h-40 ${ach.bg} opacity-50 blur-3xl rounded-full translate-y-[-50%] pointer-events-none`} />
 
-        <button
-          onClick={handleClose}
-          className="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-black/20 text-white hover:bg-black/40 transition-colors"
-        >
-          <X size={18} />
-        </button>
+        {canClose && (
+          <button
+            onClick={handleClose}
+            className="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-black/20 text-white hover:bg-black/40 transition-colors animate-in fade-in zoom-in-95"
+          >
+            <X size={18} />
+          </button>
+        )}
 
         <div className="p-8 flex flex-col items-center text-center relative z-10">
           <div className="mb-2 uppercase tracking-widest text-[10px] font-black text-white/60 bg-black/20 px-3 py-1 rounded-full">
@@ -72,14 +83,16 @@ const AchievementPopup = ({ achievements, onClose, soundEnabled, playSoundEffect
           <div className="flex flex-col gap-2 w-full">
             <button
               onClick={handleShare}
-              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-2 font-black text-white ${btnBg} shadow-lg ${btnShadow} hover:opacity-90 active:scale-[0.98] transition-all`}
+              disabled={!canClose}
+              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-2 font-black text-white ${btnBg} shadow-lg ${btnShadow} transition-all ${!canClose ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90 active:scale-[0.98]'}`}
             >
               <Share2 size={20} />
               Bagikan ke Komunitas
             </button>
             <button
               onClick={handleClose}
-              className={`w-full py-3 rounded-2xl flex items-center justify-center gap-2 font-bold ${isDark ? 'text-white/60 hover:text-white bg-white/5' : 'text-black/60 hover:text-black bg-black/5'} transition-colors`}
+              disabled={!canClose}
+              className={`w-full py-3 rounded-2xl flex items-center justify-center gap-2 font-bold transition-colors ${!canClose ? 'opacity-50 cursor-not-allowed' : (isDark ? 'text-white/60 hover:text-white bg-white/5' : 'text-black/60 hover:text-black bg-black/5')}`}
             >
               Nanti Saja
             </button>

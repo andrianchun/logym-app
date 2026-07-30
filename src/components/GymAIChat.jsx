@@ -110,7 +110,7 @@ export default function GymAIChat({
         (async () => {
             let loadedSessions = [];
             try {
-                const snap = await getDocs(collection(db, 'users', uid, 'ai_sessions'));
+                const snap = await getDocs(collection(db, 'logym_users', uid, 'ai_sessions'));
                 loadedSessions = snap.docs.map(d => d.data());
             } catch (err) {
                 console.warn('Gagal memuat sesi chat dari cloud, pakai cache lokal:', err);
@@ -137,7 +137,7 @@ export default function GymAIChat({
                     }
                 }
                 loadedSessions.forEach(s => {
-                    setDoc(doc(db, 'users', uid, 'ai_sessions', s.id), s).catch(err => console.warn('Migrasi sesi chat ke cloud gagal:', err));
+                    setDoc(doc(db, 'logym_users', uid, 'ai_sessions', s.id), s).catch(err => console.warn('Migrasi sesi chat ke cloud gagal:', err));
                 });
             }
 
@@ -185,12 +185,12 @@ export default function GymAIChat({
                 const json = JSON.stringify(s);
                 newBaseline[s.id] = json;
                 if (baseline[s.id] === json) return; // tidak berubah sejak save terakhir
-                setDoc(doc(db, 'users', user.uid, 'ai_sessions', s.id), s).catch(err => console.error('Sync sesi chat gagal:', err));
+                setDoc(doc(db, 'logym_users', user.uid, 'ai_sessions', s.id), s).catch(err => console.error('Sync sesi chat gagal:', err));
             });
 
             Object.keys(baseline).forEach(id => {
                 if (!currentIds.has(id)) {
-                    deleteDoc(doc(db, 'users', user.uid, 'ai_sessions', id)).catch(err => console.error('Hapus sesi chat cloud gagal:', err));
+                    deleteDoc(doc(db, 'logym_users', user.uid, 'ai_sessions', id)).catch(err => console.error('Hapus sesi chat cloud gagal:', err));
                 }
             });
 
@@ -375,7 +375,7 @@ export default function GymAIChat({
         // Rekam pertanyaan user ke inbox AI (jika cukup panjang) untuk kurasi FAQ
         if (userMsg.content.length > 15 && uid) {
             try {
-                addDoc(collection(db, 'ai_inbox'), {
+                addDoc(collection(db, 'logym_ai_inbox'), {
                     uid: uid,
                     email: userProfile?.email || 'unknown',
                     question: userMsg.content,

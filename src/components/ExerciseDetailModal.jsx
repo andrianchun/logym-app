@@ -26,16 +26,6 @@ const ExerciseDetailModal = ({
   if (initialExType === 'time' && isCardioMatch) {
     initialExType = 'cardio';
   }
-  const existingLibEx = exerciseLibrary?.find(e => e.name?.toLowerCase() === initialEx.name?.toLowerCase() || e.id === initialEx.id);
-  const stored10RM = existingLibEx?.rm10 || 0;
-  const storedLastWeight = existingLibEx?.lastWeight || 0;
-
-  const [activeTab, setActiveTab] = useState('info'); // info, history, calc
-  const [calcWeight, setCalcWeight] = useState(stored10RM || storedLastWeight || 50);
-  const [calcReps, setCalcReps] = useState(10);
-  const [showRmInfo, setShowRmInfo] = useState(false);
-  const [isRmSaved, setIsRmSaved] = useState(false);
-
   const historyData = useMemo(() => {
     if (!fullHistory || !initialEx) return [];
     const logs = [];
@@ -116,7 +106,32 @@ const ExerciseDetailModal = ({
       });
     });
     return logs.sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [fullHistory, initialEx]);
+  }, [fullHistory, initialEx, programs]);
+
+  const historyMax10RM = useMemo(() => {
+    let max = 0;
+    historyData.forEach(day => {
+      day.sets.forEach(s => {
+        if (s.w > 0 && s.r > 0) {
+           const c1RM = s.w * (1 + s.r / 30);
+           const c10RM = c1RM / 1.3333;
+           if (c10RM > max) max = c10RM;
+        }
+      });
+    });
+    return Math.round(max * 10) / 10;
+  }, [historyData]);
+
+  const existingLibEx = exerciseLibrary?.find(e => e.name?.toLowerCase() === initialEx.name?.toLowerCase() || e.id === initialEx.id);
+  const stored10RM = existingLibEx?.rm10 || 0;
+  const storedLastWeight = existingLibEx?.lastWeight || 0;
+  const best10RM = Math.max(historyMax10RM, stored10RM);
+
+  const [activeTab, setActiveTab] = useState('info'); // info, history, calc
+  const [calcWeight, setCalcWeight] = useState(best10RM || storedLastWeight || 50);
+  const [calcReps, setCalcReps] = useState(10);
+  const [showRmInfo, setShowRmInfo] = useState(false);
+  const [isRmSaved, setIsRmSaved] = useState(false);
 
   const formatDate = (dateStr) => {
     if (!dateStr) return '';
@@ -204,7 +219,7 @@ const ExerciseDetailModal = ({
                       src={`https://www.youtube.com/embed/${vid.videoId}?enablejsapi=1&controls=1&modestbranding=1&playsinline=1&rel=0`}
                       title="YouTube video player" 
                       frameBorder="0" 
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; compute-pressure" 
                       allowFullScreen
                       className="absolute top-0 left-0 w-full h-full"
                     ></iframe>
@@ -362,6 +377,7 @@ const ExerciseDetailModal = ({
                                 src={`https://www.youtube.com/embed/${videoId}?enablejsapi=1&autoplay=${idx === activeMediaIndex ? '1' : '0'}&mute=1&controls=0&modestbranding=1&playsinline=1&rel=0&disablekb=1&iv_load_policy=3`}
                                 title="YouTube video player" 
                                 frameBorder="0" 
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; compute-pressure"
                                 onLoad={handleIframeLoad}
                                 className={`exercise-video-iframe absolute w-[150%] h-[150%] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 max-w-none pointer-events-none transition-opacity duration-700 ${isVideoReady || idx !== activeMediaIndex ? 'opacity-100' : 'opacity-0'}`}
                               ></iframe>
@@ -629,9 +645,7 @@ const ExerciseDetailModal = ({
                           {showRmInfo && (
                              <div className={`p-3.5 rounded-xl ${t.bgCard} border ${t.border} text-left text-xs ${t.textMuted} space-y-2 shadow-lg mb-4`}>
                                 <p>Kalkulator RM (Repetition Maximum) digunakan untuk mengestimasi beban maksimal yang bisa kamu angkat berdasarkan set terbaikmu.</p>
-                                <p>Jika kamu sudah tahu kapasitas bebanmu (misal: "saya biasa angkat 50kg, 8 repetisi"), masukkan angkanya di bawah lalu <b>Simpan</b> sebagai baseline 10RM.</p>
-                                <p>Jika kamu belum tahu kapasitas beban, silakan dicoba dengan beban ringan terlebih dahulu, naikkan bebannya bertahap sampai cukup untuk 10 repetisi.</p>
-                                <p>Aplikasi LOGYM mencatat rekor 10RM otomatis selama kamu latihan, jadi kamu tidak wajib input manual di sini.</p>
+                                <p>Aplikasi LOGYM secara otomatis membaca rekor 10RM kamu dari riwayat (<b>{best10RM} {isImp ? 'lbs' : 'kg'}</b>). Jika kamu ingin mengubahnya secara manual sebagai acuan (misal baru kembali dari jeda lama), sesuaikan angkanya lalu <b>Simpan</b>.</p>
                              </div>
                           )}
    
@@ -674,10 +688,10 @@ const ExerciseDetailModal = ({
                             
                             <button 
                               onClick={handleSave10RM}
-                              disabled={isRmSaved || calculated10RM === stored10RM}
-                              className={`w-full py-2.5 font-black body-lg rounded-xl shadow-md transition-all ${isRmSaved ? t.bgAccent : (calculated10RM === stored10RM ? 'bg-white/20 text-white/50 cursor-not-allowed' : 'bg-white text-black hover:bg-zinc-100 active:scale-95')}`}
+                              disabled={isRmSaved || calculated10RM === stored10RM || calculated10RM === best10RM}
+                              className={`w-full py-2.5 font-black body-lg rounded-xl shadow-md transition-all ${isRmSaved ? t.bgAccent : (calculated10RM === stored10RM || calculated10RM === best10RM ? 'bg-white/20 text-white/50 cursor-not-allowed' : 'bg-white text-black hover:bg-zinc-100 active:scale-95')}`}
                             >
-                              {isRmSaved ? 'Tersimpan ✓' : 'Simpan'}
+                              {isRmSaved ? 'Tersimpan ✓' : (calculated10RM === best10RM ? 'Otomatis Tersimpan' : 'Simpan Acuan Baru')}
                             </button>
                           </div>
                        </div>

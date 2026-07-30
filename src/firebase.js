@@ -5,15 +5,16 @@ import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager
 import { getStorage } from "firebase/storage";
 import { getFunctions } from "firebase/functions";
 
-// TODO: Nanti kamu harus mengganti teks "KODE_RAHASIA_..." ini 
-// dengan kode asli dari akun Firebase Console milikmu.
+// Logym dimigrasi dari project sendiri (logym-id) ke hexa-life — project Firebase yang sama
+// kayak Darka/Domus/Lomeal, biar "seamless" dalam 1 database (1 identitas Auth bareng Lomeal,
+// gak perlu jembatan bridgeLomealAuth lagi). Data lama Logym disalin ke collection prefix `logym_*`.
 const firebaseConfig = {
-  apiKey: "AIzaSyAYCQIrZXFB_J7zp4CkiUQ4OYljw5qaGWo",
-  authDomain: "logym-id.firebaseapp.com",
-  projectId: "logym-id",
-  storageBucket: "logym-id.firebasestorage.app",
-  messagingSenderId: "883134437221",
-  appId: "1:883134437221:web:8a6579be8747a78b62b38c"
+  apiKey: 'AIzaSyBeeFfLIqvDEZFyY8fknqnV_IoQj6Z9M1s',
+  authDomain: 'hexa-life.firebaseapp.com',
+  projectId: 'hexa-life',
+  storageBucket: 'hexa-life.firebasestorage.app',
+  messagingSenderId: '545194651453',
+  appId: '1:545194651453:web:03ba7d49e200467ffb1f54',
 };
 
 // Menyalakan Mesin

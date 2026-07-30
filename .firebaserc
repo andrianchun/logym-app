@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "logym-id"
-  }
+  },
+  "targets": {
+    "hexa-life": {
+      "hosting": {
+        "logym": [
+          "logym"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

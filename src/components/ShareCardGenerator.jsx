@@ -55,7 +55,7 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
         
         const timer = setTimeout(() => {
             if (!user?.uid) return;
-            const userRef = doc(db, 'users', user.uid);
+            const userRef = doc(db, 'logym_users', user.uid);
             updateDoc(userRef, { customCardSettings: currentSettings }).catch(console.error);
             initialSettingsStr.current = JSON.stringify(currentSettings);
             if (setUser) setUser(prev => ({ ...prev, customCardSettings: currentSettings }));
@@ -456,7 +456,7 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
             }
 
             setBgImage(downloadUrl);
-            const userRef = doc(db, 'users', user.uid);
+            const userRef = doc(db, 'logym_users', user.uid);
             const newUploads = { date: todayStr, count: currentUploads.count + (isNewUpload ? 1 : 0) };
             
             const newUploadedBackgrounds = { ...(user?.uploadedBackgrounds || {}) };
@@ -489,7 +489,7 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
             setBgZoom(100);
             setBgRotate(0);
             setBgOffset({x: 0, y: 0});
-            const userRef = doc(db, 'users', user.uid);
+            const userRef = doc(db, 'logym_users', user.uid);
             await updateDoc(userRef, { customCardBg: null, customCardSettings: null });
             if (setUser) setUser(prev => ({ ...prev, customCardBg: null, customCardSettings: null }));
             showToast("Foto background dihapus.");

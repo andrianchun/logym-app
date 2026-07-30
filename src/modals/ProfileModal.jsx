@@ -258,7 +258,7 @@ export default function ProfileModal({
             photoURL = photoURL.includes('?') ? `${photoURL}&v=${Date.now()}` : `${photoURL}?v=${Date.now()}`;
 
             await updateProfile(auth.currentUser, { photoURL });
-            const userRef = doc(db, 'users', user.uid);
+            const userRef = doc(db, 'logym_users', user.uid);
             const now = Date.now();
 
             await setDoc(userRef, { photoURL, lastPhotoUpdate: now }, { merge: true });
@@ -685,7 +685,7 @@ export default function ProfileModal({
                                             let isUsernameUpdated = false;
 
                                             if (!isUsernameLocked && newUsername !== oldUsername) {
-                                                const usernameRef = doc(db, 'usernames', newUsername);
+                                                const usernameRef = doc(db, 'logym_usernames', newUsername);
                                                 await runTransaction(db, async (transaction) => {
                                                     const snap = await transaction.get(usernameRef);
                                                     if (snap.exists() && snap.data().uid !== user.uid) {
@@ -715,7 +715,7 @@ export default function ProfileModal({
                                                 calculateAge(editDob) ?? undefined
                                             );
                                             
-                                            const userRef = doc(db, 'users', user.uid);
+                                            const userRef = doc(db, 'logym_users', user.uid);
                                             const updatedProfile = { ...(userProfile || {}), gender: editGender, dob: editDob, name: safeName, username: newUsername };
                                             
                                             const updatePayload = {

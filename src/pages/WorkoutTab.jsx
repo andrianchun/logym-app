@@ -183,43 +183,74 @@ const WorkoutTab = ({
 
   const [isClosingImmersive, setIsClosingImmersive] = React.useState(false);
 
-  const smartScrollTo = (el, offset = 100) => {
+  const smartScrollTo = (el, offset = 100, force = false, instant = false) => {
     if (!el) return;
     const rect = el.getBoundingClientRect();
     const isTopVisible = rect.top >= 80 && rect.top <= (window.innerHeight || document.documentElement.clientHeight) - 120;
-    if (!isTopVisible) {
+    if (!isTopVisible || force) {
       const y = rect.top + window.scrollY - offset;
-      window.scrollTo({ top: y, behavior: 'smooth' });
+      window.scrollTo({ top: y, behavior: instant ? 'auto' : 'smooth' });
     }
   };
 
-  const scrollToFirstIncompleteExercise = (wId, ignoreExId = null) => {
+  const scrollToFirstIncompleteExercise = (wId, ignoreExId = null, instant = false) => {
     let targetExId = null;
+    let forceScroll = false;
     let list = wId === 'extra' ? extraExercises : activeProgramsList.find(p => p.workoutId === wId || p.id === wId)?.exercises;
     if (list) {
-      for (const ex of list) {
-         if (!skippedExercises[ex.id] && ex.id !== ignoreExId) {
-            const logs = exerciseLogs[ex.id];
-            if (!logs || logs.some(s => !s.done)) {
-               targetExId = ex.id;
-               break;
-            }
+      let startIndex = 0;
+      if (ignoreExId) {
+         startIndex = list.findIndex(e => e.id === ignoreExId);
+         if (startIndex !== -1) startIndex += 1;
+         else startIndex = 0;
+         forceScroll = true; // force scroll when advancing to next exercise
+      } else if (window.logymLastInteractedExId) {
+         // if opening tab, try to find the last interacted exercise
+         const lastExIdx = list.findIndex(e => e.id === window.logymLastInteractedExId);
+         if (lastExIdx !== -1) {
+            targetExId = window.logymLastInteractedExId;
          }
+      }
+      
+      if (!targetExId) {
+          for (let i = startIndex; i < list.length; i++) {
+             const ex = list[i];
+             if (!skippedExercises[ex.id] && ex.id !== ignoreExId) {
+                const logs = exerciseLogs[ex.id];
+                if (!logs || logs.some(s => !s.done)) {
+                   targetExId = ex.id;
+                   break;
+                }
+             }
+          }
       }
     }
     if (targetExId) {
       const el = document.getElementById(`exercise-card-${targetExId}`);
       if (el) {
-         smartScrollTo(el, 100);
+         smartScrollTo(el, 100, forceScroll, instant);
          return;
       }
     }
-    // fallback to session
-    const sel = document.getElementById(`session-${wId}`);
-    if (sel) {
-      smartScrollTo(sel, 80);
+    // fallback to session ONLY IF not triggered from a set completion
+    if (!ignoreExId) {
+      const sel = document.getElementById(`session-${wId}`);
+      if (sel) {
+        smartScrollTo(sel, 80, false, instant);
+      }
     }
   };
+  const prevExtraLen = React.useRef(extraExercises.length);
+  React.useEffect(() => {
+    if (extraExercises.length > prevExtraLen.current) {
+      setExpandedSessions({ 'extra': true });
+      setTimeout(() => {
+        const el = document.getElementById('session-extra');
+        smartScrollTo(el, 80);
+      }, 150);
+    }
+    prevExtraLen.current = extraExercises.length;
+  }, [extraExercises.length]);
 
   React.useEffect(() => {
     if (focusWorkoutId && !scrolledTargets[focusWorkoutId]) {
@@ -233,10 +264,6 @@ const WorkoutTab = ({
         scrollToFirstIncompleteExercise(targetWorkoutId);
       }, 150);
       setScrolledTargets(prev => ({ ...prev, [focusWorkoutId]: true }));
-      // Tandai juga di sini — kalau tidak, saat user collapse manual sesi ini nanti,
-      // effect ini re-run (expandedSessions ada di deps) dan jatuh ke cabang else-if
-      // di bawah yang masih pikir "belum pernah auto-expand", lalu maksa buka lagi
-      // sesi yang baru saja user tutup (butuh 2x klik baru benar-benar collapse).
       hasAutoExpanded.current = true;
     } else if (activeProgramsList.length > 0 && Object.keys(expandedSessions).length === 0 && !hasAutoExpanded.current) {
       setExpandedSessions({ [activeProgramsList[0].workoutId]: true });
@@ -250,7 +277,12 @@ const WorkoutTab = ({
     if (isNowExpanded) {
       setTimeout(() => {
         const el = document.getElementById(`session-${id}`);
-        smartScrollTo(el, 80);
+        if (el && typeof smartScrollTo === 'function') {
+           smartScrollTo(el, 80);
+        } else if (el) {
+           const y = el.getBoundingClientRect().top + window.scrollY - 80;
+           window.scrollTo({ top: y, behavior: 'smooth' });
+        }
       }, 150);
     }
   };
@@ -491,9 +523,11 @@ const WorkoutTab = ({
       
       historyMax10RM = Math.round(historyMax10RM * 10) / 10;
       currentMax10RM = Math.round(currentMax10RM * 10) / 10;
+      const stored10RM = Number(exItem.rm10) || 0;
+      const base10RM = Math.max(historyMax10RM, stored10RM);
       
-      const true10RM = Math.max(historyMax10RM, currentMax10RM);
-      const isNewRecord = currentMax10RM > historyMax10RM && historyMax10RM > 0;
+      const true10RM = Math.max(base10RM, currentMax10RM);
+      const isNewRecord = currentMax10RM > base10RM && base10RM > 0;
       
       if (isNewRecord) {
         return {
@@ -731,8 +765,14 @@ const WorkoutTab = ({
           skippedExercises={skippedExercises}
           exerciseLogs={exerciseLogs}
           onSetChange={onSetChange}
-          onToggleSet={onToggleSet}
-          onSkipSet={onSkipSet}
+          onToggleSet={(exId, setIdx, siblingIds) => {
+            window.logymLastInteractedExId = exId;
+            onToggleSet(exId, setIdx, siblingIds);
+          }}
+          onSkipSet={(exId, setIdx) => {
+            window.logymLastInteractedExId = exId;
+            onSkipSet(exId, setIdx);
+          }}
           userProfile={userProfile}
           onClose={() => {
             playSoundEffect('click', soundEnabled);
@@ -740,9 +780,6 @@ const WorkoutTab = ({
             setTimeout(() => {
               setIsClosingImmersive(false);
               setIsImmersiveMode(false);
-              setTimeout(() => {
-                 scrollToFirstIncompleteExercise(sessionToRun);
-              }, 50);
             }, 300);
           }}
           onSaveWorkout={() => {
@@ -891,25 +928,13 @@ const WorkoutTab = ({
                                   onSetChange(exId, setIdx, field, val);
                                 }} 
                                 onToggleSet={(exId, setIdx) => {
+                                  window.logymLastInteractedExId = exId;
                                   setSessionToRun(prog.workoutId);
                                   let siblingIds = null;
                                   if (ex.supersetId) {
                                     siblingIds = prog.exercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
                                   }
                                   onToggleSet(exId, setIdx, siblingIds);
-                                  
-                                  // Auto-scroll ke latihan berikutnya jika latihan ini selesai
-                                  setTimeout(() => {
-                                      const logs = exerciseLogs[exId];
-                                      // Cek apakah dengan toggle ini, semua set sekarang completed (artinya yg sebelumnya belum done 1, sekarang jadi 0)
-                                      if (logs) {
-                                          const setsLainSelesai = logs.filter((s, i) => i !== setIdx).every(s => s.done);
-                                          const setIniJadiSelesai = !logs[setIdx].done; // karena belum terupdate di closure setTimeout
-                                          if (setsLainSelesai && setIniJadiSelesai) {
-                                              scrollToFirstIncompleteExercise(prog.workoutId, exId);
-                                          }
-                                      }
-                                  }, 50);
                                 }}  
                                 onAddSet={(exId) => {
                                   setSessionToRun(prog.workoutId);
@@ -983,6 +1008,7 @@ const WorkoutTab = ({
                                   onSetChange(exId, setIdx, field, val);
                                 }} 
                                 onToggleSet={(exId, setIdx) => {
+                                  window.logymLastInteractedExId = exId;
                                   setSessionToRun('extra');
                                   let siblingIds = null;
                                   if (ex.supersetId) {

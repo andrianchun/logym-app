@@ -10,7 +10,7 @@ const Header = ({ t, theme, user, showSettings, setShowSettings, setShowProfileM
 
   useEffect(() => {
     if (!user?.uid) return;
-    const q = query(collection(db, 'notifications'), where('toUserId', '==', user.uid), where('read', '==', false));
+    const q = query(collection(db, 'logym_notifications'), where('toUserId', '==', user.uid), where('read', '==', false));
     const unsubscribe = onSnapshot(q, (snap) => {
       setUnreadCount(snap.docs.length);
       // Optional: if we want to show a browser push notification, we could do it here

@@ -43,6 +43,10 @@ const ImmersiveWorkout = ({
   }, [activeProgramsList, activeProgramId, programs, extraExercises, skippedExercises]);
 
   const [currentIndex, setCurrentIndex] = useState(() => {
+    if (window.logymLastInteractedExId) {
+       const idx = validExercises.findIndex(ex => ex.id === window.logymLastInteractedExId);
+       if (idx !== -1) return idx;
+    }
     for (let i = 0; i < validExercises.length; i++) {
       const eItem = validExercises[i];
       const logs = exerciseLogs[eItem.id];
@@ -55,7 +59,9 @@ const ImmersiveWorkout = ({
   const ex = validExercises[currentIndex];
 
   // 2. Workout Timer (Total Duration)
-  const [workoutSeconds, setWorkoutSeconds] = useState(0);
+  const [workoutSeconds, setWorkoutSeconds] = useState(() => {
+    return workoutStartTime ? Math.floor((Date.now() - workoutStartTime) / 1000) : 0;
+  });
   const [isPaused, setIsPaused] = useState(false);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
   const [showHint, setShowHint] = useState(false);
@@ -64,7 +70,8 @@ const ImmersiveWorkout = ({
   useEffect(() => {
     let interval;
     if (!isPaused && workoutStartTime) {
-      // Calculate delta to survive background sleeping
+      // Calculate delta immediately to avoid 1s delay if workoutStartTime changes
+      setWorkoutSeconds(Math.floor((Date.now() - workoutStartTime) / 1000));
       interval = setInterval(() => {
         setWorkoutSeconds(Math.floor((Date.now() - workoutStartTime) / 1000));
       }, 1000);
@@ -110,7 +117,32 @@ const ImmersiveWorkout = ({
     setMaxRestTimer(prev => restTimer === 0 ? 0 : Math.max(prev, restTimer));
   }, [restTimer]);
 
-  const [activeTimer, setActiveTimer] = React.useState({ idx: null, timeLeft: 0, mode: 'down' });
+  // 3. Current Set Logic
+  const getLogsForEx = (exItem) => exerciseLogs[exItem.id] || Array.from({length: exItem.sets || 3}).map(() => ({
+    w: exItem.defaultWeight || 0, r: exItem.reps || 10, d: exItem.duration || 10, done: false
+  }));
+
+  const logs = ex ? getLogsForEx(ex) : [];
+
+  let activeSetIdx = 0;
+  if (ex) {
+     const incompleteIdx = getLogsForEx(ex).findIndex(s => !s.done);
+     if (incompleteIdx !== -1) {
+       activeSetIdx = incompleteIdx;
+     } else {
+       activeSetIdx = Math.max(0, getLogsForEx(ex).length - 1);
+     }
+  }
+
+  const activeSet = logs[activeSetIdx];
+  const isAllDone = ex && getLogsForEx(ex).length > 0 && getLogsForEx(ex).every(s => s.done || s.skipped);
+
+  const [activeTimer, setActiveTimer] = React.useState(() => {
+     if (window.logymActiveTimer && window.logymActiveTimer.exId === ex?.id) {
+         return window.logymActiveTimer.timer;
+     }
+     return { idx: null, timeLeft: 0, mode: 'down' };
+  });
 
   React.useEffect(() => {
     let interval = null;
@@ -119,7 +151,7 @@ const ImmersiveWorkout = ({
         setActiveTimer(prev => {
           if (prev.mode === 'down') {
              if (prev.timeLeft <= 1) {
-                playSoundEffect('done', soundEnabled);
+                playSoundEffect('timerEnd', soundEnabled);
                 clearInterval(interval);
                 return { idx: null, timeLeft: 0, mode: 'down' };
              }
@@ -129,8 +161,18 @@ const ImmersiveWorkout = ({
         });
       }, 1000);
     }
-    return () => clearInterval(interval);
-  }, [activeTimer.idx, soundEnabled]);
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [activeTimer.idx, ex?.id, logs, onToggleSet, soundEnabled]);
+
+  React.useEffect(() => {
+    if (activeTimer.idx !== null) {
+       window.logymActiveTimer = { exId: ex?.id, timer: activeTimer };
+    } else if (window.logymActiveTimer?.exId === ex?.id) {
+       window.logymActiveTimer = null;
+    }
+  }, [activeTimer, ex?.id]);
 
   const toggleTimer = (setIdx, duration, isCardio = false) => {
     playSoundEffect('click', soundEnabled);
@@ -155,26 +197,6 @@ const ImmersiveWorkout = ({
     }
   };
 
-  // 3. Current Set Logic
-  const getLogsForEx = (exItem) => exerciseLogs[exItem.id] || Array.from({length: exItem.sets || 3}).map(() => ({
-    w: exItem.defaultWeight || 0, r: exItem.reps || 10, d: exItem.duration || 10, done: false
-  }));
-
-  const logs = ex ? getLogsForEx(ex) : [];
-
-  let activeSetIdx = 0;
-  if (ex) {
-     const incompleteIdx = getLogsForEx(ex).findIndex(s => !s.done);
-     if (incompleteIdx !== -1) {
-       activeSetIdx = incompleteIdx;
-     } else {
-       activeSetIdx = Math.max(0, getLogsForEx(ex).length - 1);
-     }
-  }
-
-  const activeSet = logs[activeSetIdx];
-  const isAllDone = ex && getLogsForEx(ex).length > 0 && getLogsForEx(ex).every(s => s.done || s.skipped);
-
   const [isTreadmillMode, setIsTreadmillMode] = React.useState(() => (ex?.name || '').toLowerCase().includes('treadmill'));
   React.useEffect(() => {
     if (ex) setIsTreadmillMode((ex.name || '').toLowerCase().includes('treadmill'));
@@ -196,6 +218,13 @@ const ImmersiveWorkout = ({
 
   const mediaItems = React.useMemo(() => parseMedia(ex), [ex]);
   const [ytLoaded, setYtLoaded] = React.useState(false);
+  const [activeExerciseIdx, setActiveExerciseIdx] = React.useState(() => {
+    if (window.logymLastInteractedExId && validExercises) {
+      const idx = validExercises.findIndex(e => e.id === window.logymLastInteractedExId);
+      if (idx !== -1) return idx;
+    }
+    return 0;
+  });
   const [activeMediaIndex, setActiveMediaIndex] = React.useState(0);
   
   React.useEffect(() => {
@@ -557,7 +586,7 @@ const ImmersiveWorkout = ({
                             title="YouTube video player" 
                             frameBorder="0" 
                             onLoad={handleIframeLoad}
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; compute-pressure" 
                             className={`immersive-video-iframe w-[160%] h-[160%] max-w-none pointer-events-none scale-[1.4] sm:scale-[1.3] transition-opacity duration-700 ${ytLoaded || idx !== activeMediaIndex ? 'opacity-100' : 'opacity-0'}`}
                           ></iframe>
                         </>

@@ -186,7 +186,7 @@ For sleep, use "Hh Mm" format (e.g., "7h 30m").
 
     // Tanpa key pribadi, atau semua key pribadi gagal: pakai backend proxy (shared keys di server)
     try {
-        const call = httpsCallable(functions, 'aiVision', { timeout: 120000 });
+        const call = httpsCallable(functions, 'logymAiVision', { timeout: 120000 });
         const res = await call({
             imageBase64: base64Image,
             mimeType: mimeType || 'image/jpeg',

@@ -19,7 +19,7 @@ export default function ModerationPanel({ isDark, t, onClose, onNavigateToPost, 
   const fetchReports = async () => {
     setIsLoading(true);
     try {
-      const q = query(collection(db, 'community_reports'), orderBy('timestamp', 'desc'));
+      const q = query(collection(db, 'logym_community_reports'), orderBy('timestamp', 'desc'));
       const snap = await getDocs(q);
       setReports(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (err) {
@@ -38,7 +38,7 @@ export default function ModerationPanel({ isDark, t, onClose, onNavigateToPost, 
   const handleDismissReport = async (reportId) => {
     if (!window.confirm("Abaikan laporan ini?")) return;
     try {
-      await deleteDoc(doc(db, 'community_reports', reportId));
+      await deleteDoc(doc(db, 'logym_community_reports', reportId));
       setReports(prev => prev.filter(r => r.id !== reportId));
     } catch (e) {
       alert("Gagal menghapus laporan.");
@@ -48,11 +48,11 @@ export default function ModerationPanel({ isDark, t, onClose, onNavigateToPost, 
   const handleDeletePost = async (reportId, postId) => {
     if (!window.confirm("Hapus postingan ini secara permanen dari server?")) return;
     try {
-      await deleteDoc(doc(db, 'community_posts', postId));
+      await deleteDoc(doc(db, 'logym_community_posts', postId));
       
       const relatedReports = reports.filter(r => r.targetId === postId);
       for (const r of relatedReports) {
-        await deleteDoc(doc(db, 'community_reports', r.id));
+        await deleteDoc(doc(db, 'logym_community_reports', r.id));
       }
       
       setReports(prev => prev.map(r => r.targetId === postId ? { ...r, isDeleted: true } : r));
@@ -95,7 +95,7 @@ export default function ModerationPanel({ isDark, t, onClose, onNavigateToPost, 
   const seedLeaderboard = async () => {
     try {
       const weekId = getCurrentWeekId();
-      const lbRef = doc(db, 'leaderboards', weekId);
+      const lbRef = doc(db, 'logym_leaderboards', weekId);
       
       const dummies = [
         { id: 'dummy_1', name: 'Budi Santoso', photo: '', score: 120 },

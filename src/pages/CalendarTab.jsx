@@ -422,7 +422,10 @@ const CalendarTab = ({
     const historical = history[dateStr]?.workouts || [];
     
     const validHistorical = historical.filter(w => {
-      if (w.status === 'completed' || w.programId === 'adhoc') return true; 
+      if (w.status === 'completed' || w.programId === 'adhoc') {
+          if (w.programId === 'adhoc' && (!w.exercises || w.exercises.length === 0)) return false;
+          return true; 
+      }
       
       const p = programs.find(prog => prog.id === w.programId);
       if (!p) return false; // Hapus dari history jika program aslinya (planned) sudah dihapus
@@ -1370,7 +1373,7 @@ const CalendarTab = ({
                         ref={isCurr ? scrollContainerRef : undefined}
                         className={`flex flex-col h-full overflow-y-auto hide-scrollbar ${isCurr && detailSlideAnim ? `anim-slide-${detailSlideAnim}` : ''}`}
                      >
-                       <div ref={isCurr ? sheetContentRef : undefined} className="px-3 sm:px-6 pb-24 flex flex-col gap-3">
+                       <div ref={isCurr ? sheetContentRef : undefined} className={`px-3 sm:px-6 flex flex-col gap-3 ${isWorkoutActive ? 'pb-40' : 'pb-24'}`}>
 
                          {showMonthlyStats ? (() => {
                              const dayData = history[targetDateStr] || {};

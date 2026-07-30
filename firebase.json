@@ -1,17 +1,14 @@
 {
-  "firestore": {
-    "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json"
-  },
   "functions": [
     {
       "source": "functions",
-      "codebase": "default",
+      "codebase": "logym",
       "ignore": ["node_modules", ".git", "*.log"],
       "predeploy": ["node ../copy-env.cjs"]
     }
   ],
   "hosting": {
+    "target": "logym",
     "public": "dist",
     "ignore": [
       "firebase.json",

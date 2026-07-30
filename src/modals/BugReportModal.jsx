@@ -48,7 +48,7 @@ export default function BugReportModal({ showModal, setShowModal, user }) {
                 imageUrl = await uploadImageToFirebase(selectedFile, path);
             }
 
-            await addDoc(collection(db, 'bug_reports'), {
+            await addDoc(collection(db, 'logym_bug_reports'), {
                 uid: user?.uid || 'anonymous',
                 email: user?.email || 'unknown',
                 description: description.trim(),
