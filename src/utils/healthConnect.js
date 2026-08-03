@@ -1,9 +1,11 @@
 // ============================================================
-// ORCHESTRATOR HEALTH CONNECT via @capgo/capacitor-health (baca + backfill histori)
+// ORCHESTRATOR HEALTH CONNECT via @capgo/capacitor-health (baca + tulis + backfill histori)
 // Baca: steps, kalori aktif, detak jantung, berat/tinggi, body fat, oksigen, tekanan darah,
-// tidur (dengan breakdown stage kalau perangkatnya nyediain). Cuma BACA — plugin ini gak
-// nyediain cara nulis sesi latihan (Exercise) ke Health Connect, jadi Logym belum bisa
-// nge-push data latihannya sendiri buat keliatan di app lain lewat Health Connect.
+// tidur (dengan breakdown stage kalau perangkatnya nyediain).
+// Tulis: kalori terbakar per sesi latihan (ActiveCaloriesBurnedRecord, rentang waktu = durasi
+// sesi). Plugin ini TIDAK punya jalur nulis sesi latihan formal (ExerciseSessionRecord) — cuma
+// baca (queryWorkouts) — jadi Logym belum bisa bikin entry "Workout" yang dikenali app lain,
+// tapi kalori + rentang waktunya tetap kepush dan kebaca app lain lewat Health Connect.
 // Hanya aktif di platform native Android (Capacitor).
 // ============================================================
 import { Capacitor } from '@capacitor/core';
@@ -25,6 +27,7 @@ export const hcAvailable = async () => {
 };
 
 const READ_TYPES = ['steps', 'calories', 'heartRate', 'weight', 'height', 'sleep', 'bodyFat', 'oxygenSaturation', 'bloodPressure'];
+const WRITE_TYPES = ['calories'];
 
 // Android gak nge-throw kalau user pencet "Tolak" di dialog izin — tetap resolve normal
 // dengan readAuthorized kosong. Lempar di sini kalau BENERAN nihil, biar caller yang udah
@@ -33,11 +36,26 @@ const READ_TYPES = ['steps', 'calories', 'heartRate', 'weight', 'height', 'sleep
 // terakhir, backfill histori yang lebih lama gak akan dapat apa-apa.
 export const hcRequestPermissions = async () => {
   const H = await getPlugin();
-  const result = await H.requestAuthorization({ read: READ_TYPES, requestHistoryAccess: true });
-  if (!result?.readAuthorized?.length) {
+  const result = await H.requestAuthorization({ read: READ_TYPES, write: WRITE_TYPES, requestHistoryAccess: true });
+  if (!result?.readAuthorized?.length && !result?.writeAuthorized?.length) {
     throw new Error('Izin ditolak — buka Pengaturan Android > Aplikasi > Health Connect > Aplikasi terhubung untuk memberi akses manual.');
   }
   return result;
+};
+
+// Tulis kalori terbakar satu sesi latihan yang baru selesai. startDate/endDate = rentang waktu
+// sesi (jadi durasinya ikut kebawa lewat rentang record, bukan cuma angka kalori polos) — app
+// lain yang baca ActiveCaloriesBurnedRecord dari Health Connect akan lihat kapan & berapa lama.
+export const hcWriteWorkoutCalories = async (startDate, endDate, kcal) => {
+  if (!isNative() || !kcal || kcal <= 0) return false;
+  try {
+    const H = await getPlugin();
+    await H.saveSample({ dataType: 'calories', startDate, endDate, value: Math.round(kcal) });
+    return true;
+  } catch (e) {
+    console.warn('hcWriteWorkoutCalories gagal:', e);
+    return false;
+  }
 };
 
 const ymdOf = (isoStr) => isoStr.slice(0, 10);

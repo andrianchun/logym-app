@@ -48,8 +48,8 @@ import { fetchExercisesFromApi } from './utils/exerciseDbApi';
 import { AI_MODELS, detectPlateaus, getLogiNotification } from './utils/aiAgent';
 import { calculateReadiness } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
-import { calculateSmartWorkoutCalories } from './utils/workoutCalc';
-import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory } from './utils/healthConnect';
+import { calculateWorkoutCalories, calculateSmartWorkoutCalories } from './utils/workoutCalc';
+import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcWriteWorkoutCalories } from './utils/healthConnect';
 import useDialog from './hooks/useDialog';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import UpdaterAlert from './components/UpdaterAlert';
@@ -2497,6 +2497,10 @@ export default function App() {
   const handleSaveWorkout = (progId) => {
     playSoundEffect('success', soundEnabled);
     const durationSecs = workoutStartTime ? Math.floor((Date.now() - workoutStartTime) / 1000) : 0;
+    if (healthConnectEnabled && workoutStartTime && durationSecs > 60) {
+      const kcal = calculateWorkoutCalories(userProfile?.weight, durationSecs / 60);
+      hcWriteWorkoutCalories(new Date(workoutStartTime).toISOString(), new Date().toISOString(), kcal);
+    }
     const formatDur = (secs) => {
       const h = Math.floor(secs / 3600);
       const m = Math.floor((secs % 3600) / 60);

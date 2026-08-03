@@ -50,6 +50,16 @@
     <uses-permission android:name="android.permission.health.READ_SLEEP" />
     <uses-permission android:name="android.permission.health.READ_WEIGHT" />
     <uses-permission android:name="android.permission.health.READ_BODY_FAT" />
+    <!-- 4 izin ini dulu KETINGGALAN padahal healthConnect.js sudah minta tipe-tipe ini di
+         READ_TYPES — akibatnya calories/height/oxygenSaturation/bloodPressure selalu balik
+         kosong walau kodenya kelihatan benar (Health Connect gak bisa kasih izin utk tipe
+         yang gak dideklarasikan manifest-nya, sama seperti READ_HEALTH_DATA_HISTORY di bawah). -->
+    <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" />
+    <uses-permission android:name="android.permission.health.READ_HEIGHT" />
+    <uses-permission android:name="android.permission.health.READ_OXYGEN_SATURATION" />
+    <uses-permission android:name="android.permission.health.READ_BLOOD_PRESSURE" />
+    <!-- Buat nulis kalori terbakar per sesi latihan (lihat hcWriteWorkoutCalories) -->
+    <uses-permission android:name="android.permission.health.WRITE_ACTIVE_CALORIES_BURNED" />
     <!-- Tanpa ini, Health Connect cuma kasih akses baca 30 hari terakhir — backfill histori
          yang lebih lama gak akan dapat apa-apa. Plugin @capgo/capacitor-health minta ini lewat
          requestHistoryAccess:true (lihat utils/healthConnect.js), tapi izinnya sendiri WAJIB
