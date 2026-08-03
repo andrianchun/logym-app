@@ -8,7 +8,11 @@ buildscript {
     dependencies {
         classpath 'com.android.tools.build:gradle:8.13.0'
         classpath 'com.google.gms:google-services:4.4.4'
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.24"
+        // Samain persis versi yang dipakai @capgo/capacitor-health sendiri (lihat
+        // node_modules/@capgo/capacitor-health/android/build.gradle) — 1.9.24 lalu 2.0.0
+        // masih ketinggalan, compiler-nya gak bisa baca metadata kotlin-stdlib 2.4.x yang
+        // dibawa plugin itu ("Class 'kotlin.Unit' was compiled with an incompatible version").
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.10"
     }
 }
 
@@ -21,13 +25,25 @@ allprojects {
     }
     
     // --- SUNTIKAN DIKTATOR ULTIMATE: PAKSA SEMUA PLUGIN & KOTLIN KE JAVA 17 ---
+    // @capgo/capacitor-health sengaja DIKECUALIKAN dari paksaan ini — dia declare
+    // VERSION_21 di Java DAN Kotlin-nya sendiri secara konsisten (lihat android/build.gradle
+    // plugin itu di node_modules), dan @capgo/capacitor-updater (plugin OTA, beda dari ini)
+    // justru BUTUH javac 21 buat syntax "qualified enum switch case label"-nya — MEMAKSA
+    // javac plugin itu turun ke 17 malah bikin GAGAL compile, bukan cuma capacitor-health.
+    // Jadi override task-level ini dibiarkan seperti semula (efeknya emang gak konsisten
+    // kepasang ke javac tiap modul, tapi itu pas kebetulan yang bikin semua modul lain
+    // beres kompail di versi Java masing-masing tanpa bentrok) — cuma KotlinCompile
+    // capgo-capacitor-health yang perlu DIBIARKAN 21 juga (skip dari force 17), biar
+    // Java & Kotlin plugin itu konsisten sama-sama 21, bukan malah 17 vs 21.
     afterEvaluate { project ->
         project.tasks.withType(JavaCompile).configureEach {
             sourceCompatibility = JavaVersion.VERSION_17
             targetCompatibility = JavaVersion.VERSION_17
         }
-        project.tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
-            kotlinOptions.jvmTarget = "17"
+        if (project.name != 'capgo-capacitor-health') {
+            project.tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+                kotlinOptions.jvmTarget = "17"
+            }
         }
     }
 }

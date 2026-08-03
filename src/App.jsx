@@ -49,6 +49,7 @@ import { AI_MODELS, detectPlateaus, getLogiNotification } from './utils/aiAgent'
 import { calculateReadiness } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
 import { calculateSmartWorkoutCalories } from './utils/workoutCalc';
+import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory } from './utils/healthConnect';
 import useDialog from './hooks/useDialog';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import UpdaterAlert from './components/UpdaterAlert';
@@ -244,6 +245,7 @@ export default function App() {
   const { dialog: otaDialog, showAlert: showOtaAlert } = useDialog(theme === 'dark');
   const [language, setLanguage] = useState('ID');
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [healthConnectEnabled, setHealthConnectEnabled] = useState(false);
   const [defaultRestTime, setDefaultRestTime] = useState(120);
   const [warmupVideos, setWarmupVideos] = useState(defaultWarmupVideos);
   const [cooldownVideos, setCooldownVideos] = useState(defaultCooldownVideos);
@@ -301,7 +303,60 @@ export default function App() {
      if (!isExecutingSnapshot.current) lastLocalHistoryWriteAt.current = Date.now();
      _setHistory(val);
   };
-  
+
+  // --- Health Connect: baca live (hari ini) + backfill histori ---
+  const [healthAvailable, setHealthAvailable] = useState(false);
+  useEffect(() => { hcAvailable().then(setHealthAvailable); }, []);
+
+  // Field yang boleh diisi backfill/live-sync — TIDAK PERNAH nimpa field yang udah manual
+  // (_manualFlags, lihat handleSaveManualData di DashboardTab.jsx) atau yang udah ada isinya
+  // dari sumber lain (mis. activityCalories hasil hitung workout Logym sendiri).
+  const HC_FIELDS = ['steps', 'activityCalories', 'heartRate', 'minHeartRate', 'maxHeartRate', 'weight', 'height', 'bodyFat', 'oxygenSaturation', 'bloodPressure', 'sleep', 'sleepAwake', 'sleepRem', 'sleepLight', 'sleepDeep'];
+  const mergeHcDayData = (ymd, hcData) => {
+    setHistory(prev => {
+      const existingBio = prev[ymd]?.bioData || {};
+      const manualFlags = existingBio._manualFlags || {};
+      const patch = {};
+      HC_FIELDS.forEach((k) => {
+        if (hcData[k] === undefined) return;
+        if (manualFlags[k] !== undefined) return;
+        const existingVal = existingBio[k];
+        if (existingVal !== undefined && existingVal !== null && existingVal !== '' && existingVal !== 0) return;
+        patch[k] = hcData[k];
+      });
+      if (Object.keys(patch).length === 0) return prev;
+      return { ...prev, [ymd]: { ...(prev[ymd] || {}), bioData: { ...existingBio, ...patch } } };
+    });
+  };
+
+  useEffect(() => {
+    if (!healthConnectEnabled || !isDataLoaded) return;
+    const todayYmd = getLocalYMD(new Date());
+    hcReadRange(todayYmd, todayYmd).then((byDay) => {
+      const today = byDay[todayYmd];
+      if (today) mergeHcDayData(todayYmd, today);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [healthConnectEnabled, isDataLoaded]);
+
+  // Sinkron histori N hari ke belakang sekaligus — dipanggil otomatis abis konek pertama kali
+  // (lihat handleToggleHealthConnect), atau lewat tombol "Sinkron ulang" manual di Settings.
+  const handleHcBackfill = async (days = 30) => {
+    await hcBackfillHistory(days, () => false, (ymd, summary) => mergeHcDayData(ymd, summary));
+  };
+
+  const handleToggleHealthConnect = async () => {
+    if (healthConnectEnabled) { setHealthConnectEnabled(false); return; }
+    try {
+      await hcRequestPermissions();
+      setHealthConnectEnabled(true);
+      handleHcBackfill(30);
+    } catch (e) {
+      await showOtaAlert('Gagal menyambungkan Health Connect: ' + e.message);
+    }
+  };
+
+
   const [activeTab, _setActiveTab] = useState('dashboard');
   const [tabSlideDir, setTabSlideDir] = useState('');
 
@@ -1269,6 +1324,7 @@ export default function App() {
               // pernah ketemu di muscleDictionary (keys-nya 'EN'/'ID' uppercase).
               if (parsedSettings.language) setLanguage(parsedSettings.language.toUpperCase());
               if (parsedSettings.soundEnabled !== undefined) setSoundEnabled(parsedSettings.soundEnabled);
+              if (parsedSettings.healthConnectEnabled !== undefined) setHealthConnectEnabled(parsedSettings.healthConnectEnabled);
               if (parsedSettings.defaultRestTime) setDefaultRestTime(parsedSettings.defaultRestTime);
               if (parsedSettings.warmupVideos) setWarmupVideos(parsedSettings.warmupVideos);
               if (parsedSettings.cooldownVideos) setCooldownVideos(parsedSettings.cooldownVideos);
@@ -1449,7 +1505,7 @@ export default function App() {
           return setDoc(mainDocRef, {
             programs,
             exerciseLibrary,
-            settings: { theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, userProfile, userApiKeys: (userApiKeys || []).filter(k => k && k.trim()), logiPersona, logiCustomInstruction, logiMemory },
+            settings: { theme, language, soundEnabled, healthConnectEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, userProfile, userApiKeys: (userApiKeys || []).filter(k => k && k.trim()), logiPersona, logiCustomInstruction, logiMemory },
             userAchievements,
             updatedAt: new Date().toISOString()
           }, { merge: true })
@@ -1467,7 +1523,7 @@ export default function App() {
 
       return () => { clearTimeout(timer); if (retryTimer) clearTimeout(retryTimer); pendingMainSaveRef.current = null; };
     }
-  }, [programs, exerciseLibrary, theme, language, soundEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, user?.uid, isDataLoaded, userAchievements, userProfile, userApiKeys, logiPersona, logiCustomInstruction, logiMemory]);
+  }, [programs, exerciseLibrary, theme, language, soundEnabled, healthConnectEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, user?.uid, isDataLoaded, userAchievements, userProfile, userApiKeys, logiPersona, logiCustomInstruction, logiMemory]);
 
   // Baseline serialisasi per tanggal — merepresentasikan kondisi terakhir yang tersimpan di server.
   // Tanggal yang serialisasinya sama dengan baseline tidak perlu dikirim ulang.
@@ -3121,6 +3177,8 @@ export default function App() {
          connectedApps={connectedApps} setConnectedApps={setConnectedApps}
          otaAvailable={!!otaState.version && otaState.version !== currentVer}
          otaState={otaState} currentVer={currentVer} onUpdateApp={handleUpdateApp} downloadProgress={downloadProgress}
+         healthConnectEnabled={healthConnectEnabled} onToggleHealthConnect={handleToggleHealthConnect}
+         healthAvailable={healthAvailable} onHcBackfill={handleHcBackfill}
       />
 
       <Header

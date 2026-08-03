@@ -1,7 +1,9 @@
 // ============================================================
-// ORCHESTRATOR HEALTH CONNECT (Fase 10) — dua arah (read/write)
-// Baca : kalori terbakar & langkah (smartwatch dsb.)
-// Tulis: total kalori & makro yang dimakan + hidrasi
+// ORCHESTRATOR HEALTH CONNECT via @capgo/capacitor-health (baca + backfill histori)
+// Baca: steps, kalori aktif, detak jantung, berat/tinggi, body fat, oksigen, tekanan darah,
+// tidur (dengan breakdown stage kalau perangkatnya nyediain). Cuma BACA — plugin ini gak
+// nyediain cara nulis sesi latihan (Exercise) ke Health Connect, jadi Logym belum bisa
+// nge-push data latihannya sendiri buat keliatan di app lain lewat Health Connect.
 // Hanya aktif di platform native Android (Capacitor).
 // ============================================================
 import { Capacitor } from '@capacitor/core';
@@ -9,93 +11,160 @@ import { Capacitor } from '@capacitor/core';
 const isNative = () => Capacitor.isNativePlatform();
 
 const getPlugin = async () => {
-  const { HealthConnect } = await import('capacitor-health-connect');
-  return HealthConnect;
+  const { Health } = await import('@capgo/capacitor-health');
+  return Health;
 };
 
 export const hcAvailable = async () => {
   if (!isNative()) return false;
   try {
-    const HC = await getPlugin();
-    const res = await HC.checkAvailability();
-    return res?.availability === 'Available';
+    const H = await getPlugin();
+    const res = await H.isAvailable();
+    return !!res?.available;
   } catch { return false; }
 };
 
-const READ_TYPES = ['ActiveCaloriesBurned', 'TotalCaloriesBurned', 'Steps', 'Weight'];
-const WRITE_TYPES = ['Nutrition', 'Hydration'];
+const READ_TYPES = ['steps', 'calories', 'heartRate', 'weight', 'height', 'sleep', 'bodyFat', 'oxygenSaturation', 'bloodPressure'];
 
+// Android gak nge-throw kalau user pencet "Tolak" di dialog izin — tetap resolve normal
+// dengan readAuthorized kosong. Lempar di sini kalau BENERAN nihil, biar caller yang udah
+// punya try/catch otomatis kebenerin tanpa perlu diubah manual satu-satu.
+// requestHistoryAccess:true — tanpa ini Health Connect cuma kasih akses baca 30 hari
+// terakhir, backfill histori yang lebih lama gak akan dapat apa-apa.
 export const hcRequestPermissions = async () => {
-  const HC = await getPlugin();
-  return HC.requestHealthPermissions({ read: READ_TYPES, write: WRITE_TYPES });
+  const H = await getPlugin();
+  const result = await H.requestAuthorization({ read: READ_TYPES, requestHistoryAccess: true });
+  if (!result?.readAuthorized?.length) {
+    throw new Error('Izin ditolak — buka Pengaturan Android > Aplikasi > Health Connect > Aplikasi terhubung untuk memberi akses manual.');
+  }
+  return result;
 };
 
-// Baca kalori aktif terbakar untuk satu tanggal (YYYY-MM-DD)
-export const hcReadBurnedCalories = async (ymd) => {
-  if (!isNative()) return null;
-  try {
-    const HC = await getPlugin();
-    const start = new Date(`${ymd}T00:00:00`);
-    const end = new Date(`${ymd}T23:59:59`);
-    const res = await HC.readRecords({
-      type: 'ActiveCaloriesBurned',
-      timeRangeFilter: { type: 'between', startTime: start.toISOString(), endTime: end.toISOString() },
-    });
-    const records = res?.records || [];
-    const totalKcal = records.reduce((sum, r) => sum + (r.energy?.value || r.energy || 0), 0);
-    // Plugin memakai satuan kilokalori pada energy.unit 'kilocalories' umumnya
-    return Math.round(totalKcal);
-  } catch (e) {
-    console.warn('hcReadBurnedCalories gagal:', e);
-    return null;
+const ymdOf = (isoStr) => isoStr.slice(0, 10);
+
+// Kelompokkan sample "titik waktu" (berat, tinggi, body fat, oksigen, tekanan darah — bukan
+// yang dijumlah per hari) berdasarkan tanggal, ambil yang PALING BARU per hari.
+const latestPerDay = (samples, mapValue) => {
+  const byDay = {};
+  for (const s of samples) {
+    const ymd = ymdOf(s.startDate);
+    if (!byDay[ymd] || new Date(s.startDate) > new Date(byDay[ymd]._at)) {
+      byDay[ymd] = { ...mapValue(s), _at: s.startDate };
+    }
   }
+  Object.values(byDay).forEach((v) => delete v._at);
+  return byDay;
 };
 
-// Tulis ringkasan nutrisi harian yang dimakan user ke Health Connect
-export const hcWriteNutrition = async (ymd, totals) => {
-  if (!isNative()) return false;
-  try {
-    const HC = await getPlugin();
-    const start = new Date(`${ymd}T12:00:00`);
-    const end = new Date(`${ymd}T12:01:00`);
-    await HC.insertRecords({
-      records: [{
-        type: 'Nutrition',
-        startTime: start.toISOString(),
-        endTime: end.toISOString(),
-        energy: { unit: 'kilocalories', value: Math.round(totals.kcal || 0) },
-        protein: { unit: 'grams', value: Math.round(totals.protein || 0) },
-        totalCarbohydrate: { unit: 'grams', value: Math.round(totals.carbs || 0) },
-        totalFat: { unit: 'grams', value: Math.round(totals.fat || 0) },
-        sodium: { unit: 'milligrams', value: Math.round(totals.sodium || 0) },
-        sugar: { unit: 'grams', value: Math.round(totals.sugar || 0) },
-        mealType: 4, // unknown/total harian
-      }],
-    });
-    return true;
-  } catch (e) {
-    console.warn('hcWriteNutrition gagal:', e);
-    return false;
+// Jumlahkan durasi tidur per stage per hari (dikelompokkan dari TANGGAL MULAI sesi tidur —
+// sesi yang lewat tengah malam tetap dihitung di hari sesi itu MULAI, bukan berakhir).
+const sleepPerDay = (samples) => {
+  const byDay = {};
+  for (const s of samples) {
+    const ymd = ymdOf(s.startDate);
+    if (!byDay[ymd]) byDay[ymd] = { totalMinutes: 0, awake: 0, rem: 0, light: 0, deep: 0 };
+    if (s.hasStageData && s.stages?.length) {
+      s.stages.forEach((stage) => {
+        byDay[ymd].totalMinutes += stage.durationMinutes;
+        if (stage.stage in byDay[ymd]) byDay[ymd][stage.stage] += stage.durationMinutes;
+      });
+    } else {
+      byDay[ymd].totalMinutes += (new Date(s.endDate) - new Date(s.startDate)) / 60000;
+    }
   }
+  const out = {};
+  Object.entries(byDay).forEach(([ymd, d]) => {
+    out[ymd] = {
+      sleep: Number((d.totalMinutes / 60).toFixed(1)),
+      sleepAwake: String(Math.round(d.awake)),
+      sleepRem: String(Math.round(d.rem)),
+      sleepLight: String(Math.round(d.light)),
+      sleepDeep: String(Math.round(d.deep)),
+    };
+  });
+  return out;
 };
 
-export const hcWriteHydration = async (ymd, ml) => {
-  if (!isNative() || !ml) return false;
-  try {
-    const HC = await getPlugin();
-    const start = new Date(`${ymd}T12:00:00`);
-    const end = new Date(`${ymd}T12:01:00`);
-    await HC.insertRecords({
-      records: [{
-        type: 'Hydration',
-        startTime: start.toISOString(),
-        endTime: end.toISOString(),
-        volume: { unit: 'milliliters', value: Math.round(ml) },
-      }],
-    });
-    return true;
-  } catch (e) {
-    console.warn('hcWriteHydration gagal:', e);
-    return false;
-  }
+// Tarik ringkasan kesehatan sehari-hari dalam SATU rentang tanggal sekaligus (bukan loop
+// per-hari — tiap query native ada overhead round-trip, jadi 1 query lebar jauh lebih murah
+// daripada N query sempit). Dipakai baik buat "hari ini" (range 1 hari) maupun backfill
+// (range N hari) — bentuknya sama, cuma rentang tanggalnya beda.
+// Hasil: { 'YYYY-MM-DD': { steps, activityCalories, heartRate, minHeartRate, maxHeartRate,
+//          weight, height, bodyFat, oxygenSaturation, bloodPressure, sleep, sleepAwake,
+//          sleepRem, sleepLight, sleepDeep } }
+export const hcReadRange = async (startYmd, endYmd) => {
+  if (!isNative()) return {};
+  const H = await getPlugin();
+  const startISO = new Date(`${startYmd}T00:00:00`).toISOString();
+  const endISO = new Date(`${endYmd}T23:59:59`).toISOString();
+  const byDay = {};
+  const put = (ymd, patch) => { byDay[ymd] = { ...(byDay[ymd] || {}), ...patch }; };
+
+  await Promise.all([
+    H.queryAggregated({ dataType: 'steps', startDate: startISO, endDate: endISO, bucket: 'day', aggregation: 'sum' })
+      .then((res) => (res?.samples || []).forEach((s) => { if (s.value > 0) put(ymdOf(s.startDate), { steps: Math.round(s.value) }); }))
+      .catch((e) => console.warn('hcReadRange steps gagal:', e)),
+
+    H.queryAggregated({ dataType: 'calories', startDate: startISO, endDate: endISO, bucket: 'day', aggregation: 'sum' })
+      .then((res) => (res?.samples || []).forEach((s) => { if (s.value > 0) put(ymdOf(s.startDate), { activityCalories: Math.round(s.value) }); }))
+      .catch((e) => console.warn('hcReadRange calories gagal:', e)),
+
+    H.queryAggregated({ dataType: 'heartRate', startDate: startISO, endDate: endISO, bucket: 'day', aggregation: ['average', 'min', 'max'] })
+      .then((res) => (res?.samples || []).forEach((s) => put(ymdOf(s.startDate), {
+        ...(s.values?.average != null && { heartRate: Math.round(s.values.average) }),
+        ...(s.values?.min != null && { minHeartRate: Math.round(s.values.min) }),
+        ...(s.values?.max != null && { maxHeartRate: Math.round(s.values.max) }),
+      })))
+      .catch((e) => console.warn('hcReadRange heartRate gagal:', e)),
+
+    H.readSamples({ dataType: 'weight', startDate: startISO, endDate: endISO, limit: 1000, ascending: true })
+      .then((res) => Object.entries(latestPerDay(res?.samples || [], (s) => ({ weight: Number(s.value.toFixed(1)) })))
+        .forEach(([ymd, v]) => put(ymd, v)))
+      .catch((e) => console.warn('hcReadRange weight gagal:', e)),
+
+    H.readSamples({ dataType: 'height', startDate: startISO, endDate: endISO, limit: 1000, ascending: true })
+      .then((res) => Object.entries(latestPerDay(res?.samples || [], (s) => ({ height: Math.round(s.value) })))
+        .forEach(([ymd, v]) => put(ymd, v)))
+      .catch((e) => console.warn('hcReadRange height gagal:', e)),
+
+    H.readSamples({ dataType: 'bodyFat', startDate: startISO, endDate: endISO, limit: 1000, ascending: true })
+      .then((res) => Object.entries(latestPerDay(res?.samples || [], (s) => ({ bodyFat: Number(s.value.toFixed(1)) })))
+        .forEach(([ymd, v]) => put(ymd, v)))
+      .catch((e) => console.warn('hcReadRange bodyFat gagal:', e)),
+
+    H.readSamples({ dataType: 'oxygenSaturation', startDate: startISO, endDate: endISO, limit: 1000, ascending: true })
+      .then((res) => Object.entries(latestPerDay(res?.samples || [], (s) => ({ oxygenSaturation: Math.round(s.value) })))
+        .forEach(([ymd, v]) => put(ymd, v)))
+      .catch((e) => console.warn('hcReadRange oxygenSaturation gagal:', e)),
+
+    H.readSamples({ dataType: 'bloodPressure', startDate: startISO, endDate: endISO, limit: 1000, ascending: true })
+      .then((res) => Object.entries(latestPerDay(res?.samples || [], (s) => ({ bloodPressure: `${Math.round(s.systolic)}/${Math.round(s.diastolic)}` })))
+        .forEach(([ymd, v]) => put(ymd, v)))
+      .catch((e) => console.warn('hcReadRange bloodPressure gagal:', e)),
+
+    // Sleep gak bisa di-aggregate (batasan plugin) — jumlah manual dari sample mentah.
+    H.readSamples({ dataType: 'sleep', startDate: startISO, endDate: endISO, limit: 1000, ascending: true })
+      .then((res) => Object.entries(sleepPerDay(res?.samples || []))
+        .forEach(([ymd, v]) => put(ymd, v)))
+      .catch((e) => console.warn('hcReadRange sleep gagal:', e)),
+  ]);
+
+  return byDay;
+};
+
+// Backfill: isi kekosongan histori N hari ke belakang. `hasOtherSource(ymd)` mengembalikan
+// true kalau hari itu udah punya data manual/sumber lain (jangan ditimpa). `onDayResult(ymd,
+// summary)` dipanggil per hari yang berhasil diisi — caller yang nulis ke Firestore.
+export const hcBackfillHistory = async (days, hasOtherSource, onDayResult) => {
+  if (!isNative()) return;
+  const end = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - days);
+  const startYmd = start.toISOString().slice(0, 10);
+  const endYmd = end.toISOString().slice(0, 10);
+  const byDay = await hcReadRange(startYmd, endYmd);
+  Object.entries(byDay).forEach(([ymd, summary]) => {
+    if (hasOtherSource(ymd)) return;
+    onDayResult(ymd, summary);
+  });
 };

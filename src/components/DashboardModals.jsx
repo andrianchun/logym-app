@@ -6,11 +6,7 @@ import SwipeInput from './SwipeInput';
 import { extractBiometricsFromImage } from '../utils/aiVision';
 import { checkOverallAIStatus } from '../utils/aiAgent';
 
-// --- IMPORT CAPACITOR & HEALTH CONNECT BARU ---
-import { Capacitor } from '@capacitor/core';
-import { HealthConnect } from 'capacitor-health-connect';
-
-const DashboardModals = ({ 
+const DashboardModals = ({
   t, lang, theme,
   showManualModal, setShowManualModal, manualTab, setManualTab, 
   modalDate, setModalDate, formBio, setFormBio, bioData, lomealToday,

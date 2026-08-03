@@ -26,7 +26,9 @@ export default function SettingsModal({
   logiMemory, setLogiMemory,
   connectedApps, setConnectedApps,
   otaAvailable, otaState, currentVer, onUpdateApp, downloadProgress,
+  healthConnectEnabled, onToggleHealthConnect, healthAvailable, onHcBackfill,
 }) {
+  const [hcBackfilling, setHcBackfilling] = useState(false);
   const [activeTab, setActiveTab] = useState('preferensi');
   const [openFaqIndex, setOpenFaqIndex] = useState(null);
   const [prevShowSettings, setPrevShowSettings] = useState(showSettings);
@@ -303,6 +305,37 @@ export default function SettingsModal({
                     style={{ width: `${downloadProgress}%` }}
                   />
                 </div>
+              )}
+            </div>
+
+            {/* KONEKSI DATA KESEHATAN */}
+            <div className={`p-4 rounded-2xl border ${t.border} ${t.bgCard} space-y-3`}>
+              <p className={`body-md ${t.textMuted} uppercase tracking-wider mb-2 flex items-center gap-2`}>
+                <Activity size={16} /> Health Connect
+              </p>
+              <div className="flex items-center justify-between">
+                <span className={`font-bold text-sm ${t.textMain}`}>Sinkron Steps, Tidur, Detak Jantung, dsb.</span>
+                <button
+                  onClick={onToggleHealthConnect}
+                  className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${healthConnectEnabled ? `${t.bgAccent} text-white shadow-sm` : `${t.btnBg} ${t.textMuted}`}`}
+                >
+                  {healthConnectEnabled ? 'Terhubung' : 'Hubungkan'}
+                </button>
+              </div>
+              {!healthAvailable && (
+                <p className={`text-[10px] ${t.textMuted} leading-tight`}>Aktif di aplikasi Android (Capacitor) — belum tersedia di browser web.</p>
+              )}
+              {healthConnectEnabled && (
+                <button
+                  disabled={hcBackfilling}
+                  onClick={async () => {
+                    setHcBackfilling(true);
+                    try { await onHcBackfill(30); } finally { setHcBackfilling(false); }
+                  }}
+                  className={`w-full py-2.5 rounded-xl border border-dashed ${t.border} ${t.btnBg} ${t.textMain} font-bold text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50`}
+                >
+                  {hcBackfilling ? 'Menyinkronkan histori 30 hari...' : 'Sinkron Ulang Histori 30 Hari'}
+                </button>
               )}
             </div>
 
