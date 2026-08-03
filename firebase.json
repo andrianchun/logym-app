@@ -20,6 +20,30 @@
         "source": "**",
         "destination": "/index.html"
       }
+    ],
+    "headers": [
+      {
+        "comment": "Default no-cache: semua rute SPA di-rewrite ke index.html, jadi glob *.html tidak kena. Aturan yang lebih spesifik di bawah menimpa ini.",
+        "source": "**",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-cache" }
+        ]
+      },
+      {
+        "comment": "Nama file sudah di-hash Rollup, aman di-cache selamanya.",
+        "source": "/assets/**",
+        "headers": [
+          { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+        ]
+      },
+      {
+        "comment": "Access-Control-Allow-Origin wajib — WebView Capacitor native fetch() dari origin https://localhost, BUKAN https://logym-id.web.app, jadi cek OTA di APK itu cross-origin. Tanpa header ini browser/WebView nolak fetch()-nya (TypeError: Failed to fetch) SEBELUM kode sempat baca respons apa pun — APK jadi permanen mengira sudah versi terbaru padahal cek-nya gagal diam-diam (bug nyata yang kejadian di Lomeal, lihat AGENTS.md lomeal-app). version.json/zip publik & tanpa kredensial, jadi wildcard aman.",
+        "source": "/ota/**",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
+          { "key": "Access-Control-Allow-Origin", "value": "*" }
+        ]
+      }
     ]
   }
 }

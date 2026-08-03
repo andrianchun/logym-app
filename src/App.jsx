@@ -40,7 +40,6 @@ import HelpModal from './modals/HelpModal';
 const ProfileModal = React.lazy(() => import('./modals/ProfileModal'));
 const ProgramQuestionnaireModal = React.lazy(() => import('./modals/ProgramQuestionnaireModal'));
 import AchievementPopup from './components/AchievementPopup';
-import PwaUpdater from './components/PwaUpdater';
 import { checkAchievements, ACHIEVEMENTS } from './data/achievements';
 
 // --- IMPORT DATA & MESIN ---
@@ -51,6 +50,8 @@ import { calculateReadiness } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
 import { calculateSmartWorkoutCalories } from './utils/workoutCalc';
 import useDialog from './hooks/useDialog';
+import { CapacitorUpdater } from '@capgo/capacitor-updater';
+import UpdaterAlert from './components/UpdaterAlert';
 import { getLocalYMD, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos } from './data/constants';
 import { Loader2, Download, X } from 'lucide-react';
 
@@ -138,8 +139,109 @@ export default function App() {
     };
   }, []);
 
+  // --- OTA / AUTO-UPDATE (port dari lomeal-app, lihat OTA-TEMPLATE.md di sana) ---
+  // Gantikan PwaUpdater lama (vite-plugin-pwa registerSW prompt): itu cuma nangkep event SW
+  // di web, gak pernah tahu nomor versi, dan gak bisa dipakai di APK native sama sekali.
+  // Sekarang PWA & APK sama-sama baca /ota/version.json — satu jalur, satu sumber kebenaran.
+  // (showOtaAlert didefinisikan di bawah, sesudah state `theme` — lihat komentar di situ.)
+  const [otaState, setOtaState] = useState({ open: false, force: false, url: '', version: '', notes: '' });
+  // __APP_VERSION__ di-inject vite dari package.json (lihat vite.config.js).
+  const [currentVer, setCurrentVer] = useState(__APP_VERSION__);
+  const [downloadProgress, setDownloadProgress] = useState(null);
+
+  useEffect(() => {
+    const isNative = Capacitor.isNativePlatform();
+    // Path relatif di web (dev tidak punya /ota -> 404, aman); native butuh URL absolut,
+    // karena WebView Capacitor jalan dari origin https://localhost, bukan domain hosting asli.
+    const otaUrl = isNative ? 'https://logym-id.web.app/ota/version.json' : '/ota/version.json';
+
+    const checkOta = async () => {
+      try {
+        const installedVer = __APP_VERSION__;
+        setCurrentVer(installedVer);
+
+        const res = await fetch(`${otaUrl}?t=${Date.now()}`, { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          // Sengaja !== bukan >: mem-publish versi lama = rollback, dan itu harus ikut terkirim.
+          if (data.ota_version && data.ota_version !== installedVer) {
+            const dismissed = localStorage.getItem('logym_dismissed_ota');
+            if (!data.is_forced && dismissed === data.ota_version) {
+              setOtaState(prev => ({ ...prev, open: false, force: data.is_forced, url: data.ota_url, version: data.ota_version, notes: data.release_notes }));
+            } else {
+              setOtaState({ open: true, force: data.is_forced, url: data.ota_url, version: data.ota_version, notes: data.release_notes });
+            }
+          } else {
+            setOtaState(prev => ({ ...prev, open: false }));
+          }
+        }
+      } catch (err) {
+        console.error('Failed to check OTA', err);
+      }
+    };
+
+    checkOta();
+
+    // Tiga pemicu supaya update muncul sendiri tanpa user refresh/hapus cache: saat dibuka,
+    // saat kembali ke foreground, dan tiap 5 menit selama app terbuka.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') checkOta();
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('online', checkOta);
+    const poll = setInterval(checkOta, 5 * 60 * 1000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('online', checkOta);
+      clearInterval(poll);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    let dlListener;
+    CapacitorUpdater.addListener('download', (info) => {
+      setDownloadProgress(Math.round(info.percent));
+    }).then(l => dlListener = l);
+    return () => { if (dlListener) dlListener.remove(); };
+  }, []);
+
+  const handleUpdateApp = async () => {
+    localStorage.removeItem('logym_dismissed_ota');
+
+    // Web: index.html di-serve NetworkFirst (lihat vite.config.js), jadi reload biasa
+    // sudah pasti dapat HTML + chunk baru. Tidak ada yang perlu diunduh manual.
+    if (!Capacitor.isNativePlatform()) {
+      setDownloadProgress(0);
+      const reg = await navigator.serviceWorker?.getRegistration();
+      if (reg?.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      window.location.reload();
+      return;
+    }
+
+    try {
+      // Kartu/modal sengaja TIDAK ditutup: progress bar-nya tampil di situ, karena
+      // bundle-nya puluhan MB dan tanpa indikator user ngira tombolnya macet.
+      setDownloadProgress(0);
+      const bundle = await CapacitorUpdater.download({ url: otaState.url, version: otaState.version });
+      await CapacitorUpdater.set(bundle); // destroy JS context — baris setelah ini tidak jalan
+    } catch (err) {
+      console.error('OTA Update failed:', err);
+      setDownloadProgress(null);
+      if (otaState.force) {
+        showOtaAlert('Gagal mengunduh pembaruan. Periksa koneksi internetmu lalu coba lagi.', { title: 'Update gagal' });
+      } else {
+        showOtaAlert('Gagal mengunduh pembaruan.', { type: 'error' });
+      }
+    }
+  };
+
   // --- STATE UTAMA ---
   const [theme, setTheme] = useState('dark');
+  // Dipakai handleUpdateApp di atas (closure — aman, baru benar-benar dipanggil user
+  // belakangan, bukan saat didefinisikan) buat nampilin error unduh OTA.
+  const { dialog: otaDialog, showAlert: showOtaAlert } = useDialog(theme === 'dark');
   const [language, setLanguage] = useState('ID');
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [defaultRestTime, setDefaultRestTime] = useState(120);
@@ -3017,9 +3119,11 @@ export default function App() {
          user={user} handleLogout={handleLogout} handleDeleteAccount={handleDeleteAccount}
          setConfirmModal={setConfirmModal}
          connectedApps={connectedApps} setConnectedApps={setConnectedApps}
+         otaAvailable={!!otaState.version && otaState.version !== currentVer}
+         otaState={otaState} currentVer={currentVer} onUpdateApp={handleUpdateApp} downloadProgress={downloadProgress}
       />
 
-      <Header 
+      <Header
         setConfirmModal={setConfirmModal} t={t} theme={theme} user={user} 
         showSettings={showSettings} setShowSettings={setShowSettings} 
         setShowProfileModal={setShowProfileModal} 
@@ -3219,7 +3323,21 @@ export default function App() {
         </div>
       )}
       {/* OVERLAYS & NOTIFICATIONS */}
-      <PwaUpdater t={t} isDark={theme === 'dark'} />
+      {otaDialog}
+      <UpdaterAlert
+        open={otaState.open}
+        force={otaState.force}
+        releaseNotes={otaState.notes}
+        theme={t}
+        currentVersion={currentVer}
+        newVersion={otaState.version}
+        progress={downloadProgress}
+        onUpdate={handleUpdateApp}
+        onClose={() => {
+          localStorage.setItem('logym_dismissed_ota', otaState.version);
+          setOtaState(prev => ({ ...prev, open: false }));
+        }}
+      />
       {/* Achievement Popup */}
       <AchievementPopup 
         achievements={unlockedAchievementsPopup} 

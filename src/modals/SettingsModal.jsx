@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Moon, Sun, Globe, Volume2, VolumeX, Timer, Download, Upload, CalendarDays, Bell, BellOff, Clock, Activity, Scale, Ruler, Thermometer, Database, Trash2, Plus, MessageCircle, Brain, HelpCircle, ChevronDown } from 'lucide-react';
+import { X, Moon, Sun, Globe, Volume2, VolumeX, Timer, Download, DownloadCloud, Upload, CalendarDays, Bell, BellOff, Clock, Activity, Scale, Ruler, Thermometer, Database, Trash2, Plus, MessageCircle, Brain, HelpCircle, ChevronDown } from 'lucide-react';
 import SwipeInput from '../components/SwipeInput';
 import { AI_MODELS, PERSONA_PRESETS } from '../utils/aiAgent';
 import { FAQ_ITEMS } from '../utils/faqData';
@@ -24,7 +24,8 @@ export default function SettingsModal({
   userApiKeys, setUserApiKeys,
   logiPersona, setLogiPersona, logiCustomInstruction, setLogiCustomInstruction,
   logiMemory, setLogiMemory,
-  connectedApps, setConnectedApps
+  connectedApps, setConnectedApps,
+  otaAvailable, otaState, currentVer, onUpdateApp, downloadProgress,
 }) {
   const [activeTab, setActiveTab] = useState('preferensi');
   const [openFaqIndex, setOpenFaqIndex] = useState(null);
@@ -264,6 +265,47 @@ export default function SettingsModal({
         {/* TAB 3: LANJUTAN */}
         {activeTab === 'lanjutan' && (
           <div className="space-y-4 animate-in fade-in duration-300">
+            {/* PEMBARUAN APLIKASI */}
+            <div className={`p-4 rounded-2xl border ${t.border} ${t.bgCard} space-y-3`}>
+              <p className={`body-md ${t.textMuted} uppercase tracking-wider mb-2 flex items-center gap-2`}>
+                <DownloadCloud size={16} /> Pembaruan Aplikasi
+              </p>
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <span className={`font-bold text-sm ${t.textMain}`}>LOGYM v{currentVer}</span>
+                  {otaAvailable && (
+                    <span className="text-[10px] font-bold text-rose-500">
+                      Versi {otaState.version} Tersedia!
+                    </span>
+                  )}
+                </div>
+                {otaAvailable && downloadProgress === null ? (
+                  <button
+                    onClick={onUpdateApp}
+                    className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${t.bgAccent} text-white shadow-sm active:scale-95`}
+                  >
+                    Update
+                  </button>
+                ) : downloadProgress !== null && downloadProgress !== undefined ? (
+                  <button disabled className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${t.btnBg} ${t.textMuted}`}>
+                    Mengunduh {downloadProgress}%
+                  </button>
+                ) : (
+                  <button disabled className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${t.btnBg} ${t.textMuted} opacity-70`}>
+                    Terbaru
+                  </button>
+                )}
+              </div>
+              {downloadProgress !== null && downloadProgress !== undefined && (
+                <div className="w-full bg-black/10 dark:bg-white/10 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className={`${t.bgAccent} h-1.5 rounded-full transition-all duration-200 ease-out`}
+                    style={{ width: `${downloadProgress}%` }}
+                  />
+                </div>
+              )}
+            </div>
+
             {/* API UNTUK AI */}
             <div id="ai-agent-settings" className={`p-4 rounded-2xl border ${t.border} ${t.bgCard} space-y-3`}>
                 <p className={`body-md ${t.textMuted} uppercase tracking-wider mb-2 flex items-center gap-2`}>

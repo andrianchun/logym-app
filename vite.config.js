@@ -1,10 +1,17 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import fs from 'fs'
+
+const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf8'))
 
 // https://vitejs.dev/config/
 export default defineConfig({
   envDir: '../',
+  // Dibaca App.jsx buat bandingkan versi bundle yang BENERAN jalan vs /ota/version.json
+  // (lihat OTA-TEMPLATE.md di lomeal-app) — jangan pakai CapacitorUpdater.current(), itu cuma
+  // label saat download, bisa beda dari isi bundle.
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   plugins: [
     react(),
     VitePWA({
@@ -37,6 +44,18 @@ export default defineConfig({
         // tapi dinaikkan sedikit untuk jaga-jaga total payload gabungan).
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         cleanupOutdatedCaches: true,
+        // WAJIB — tanpa ini Workbox memetakan '/' ke entri precache index.html (directoryIndex,
+        // default aktif) karena globPatterns di atas ikut match .html. Selama itu terjadi,
+        // reload berapa kali pun tetap menyajikan versi lama, header HTTP gak ngaruh sama
+        // sekali karena request-nya gak pernah sampai jaringan — inilah yang bikin user
+        // "harus hapus cache/data" biar update kelihatan. Lihat OTA-TEMPLATE.md jebakan #1.
+        navigateFallback: null,
+        globIgnores: ['index.html'],
+        runtimeCaching: [{
+          urlPattern: ({ request }) => request.mode === 'navigate',
+          handler: 'NetworkFirst',
+          options: { cacheName: 'html', networkTimeoutSeconds: 3, expiration: { maxEntries: 1 } },
+        }],
       },
     }),
   ],
