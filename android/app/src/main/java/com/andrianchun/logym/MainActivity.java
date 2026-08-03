@@ -1,4 +1,4 @@
-package com.andrianchun.lyfit;
+package com.andrianchun.logym;
 
 import android.os.Bundle;
 import android.view.Window;
@@ -10,7 +10,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        
+
         Window window = getWindow();
         WindowCompat.setDecorFitsSystemWindows(window, false);
         window.setStatusBarColor(Color.TRANSPARENT);

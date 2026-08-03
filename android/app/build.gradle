@@ -2,7 +2,7 @@ apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android' // SUNTIKAN: Memanggil mesin Kotlin di modul aplikasi
 
 android {
-    namespace = "com.andrianchun.lyfit"
+    namespace = "com.andrianchun.logym"
     compileSdk = rootProject.ext.compileSdkVersion
 
     // --- SUNTIKAN: MENYAMAKAN MESIN JAVA & KOTLIN KE VERSI 17 ---
@@ -16,7 +16,7 @@ android {
     // -------------------------------------------------------------
 
     defaultConfig {
-        applicationId "com.andrianchun.lyfit"
+        applicationId "com.andrianchun.logym"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
