@@ -1,6 +1,6 @@
 {
   "appId": "com.andrianchun.lyfit",
-  "appName": "LyFit",
+  "appName": "LOGYM",
   "webDir": "dist",
   "plugins": {
     "FirebaseAuthentication": {
