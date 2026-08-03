@@ -1,0 +1,221 @@
+import { useState, useEffect } from 'react';
+import { ChevronRight, ChevronLeft, Check } from 'lucide-react';
+
+import useSwipeStep from '../hooks/useSwipeStep';
+import { getSharedSteps, SharedStepRenderer, isValidAge } from '../components/SharedSteps';
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '../firebase';
+import { hcAvailable, hcRequestPermissions } from '../utils/healthConnect';
+
+// Naikkan tanggal ini tiap teks consent direvisi
+const CONSENT_VERSION = '2026-08-03';
+
+const OnboardingFlow = ({ t, theme, onComplete }) => {
+  const [step, setStep] = useState(0);
+  const isDark = theme === 'dark';
+
+  const STEPS = getSharedSteps(t);
+
+  const [fromLomeal, setFromLomeal] = useState(false);
+
+  // State untuk menyimpan jawaban dari SharedSteps
+  const [answers, setAnswers] = useState({
+    name: '',
+    dob: '',
+    height: 165,
+    weight: 60,
+    gender: 'male',
+    consents: { tos: false, data: false, ai: false, research: false }
+  });
+
+  useEffect(() => {
+    const fetchGlobalProfile = async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+      try {
+        const snap = await getDoc(doc(db, 'logym_users', user.uid));
+        if (snap.exists()) {
+          const p = snap.data();
+          setAnswers(prev => ({
+            ...prev,
+            name: p.name || prev.name,
+            gender: p.physical?.gender || p.gender || prev.gender,
+            dob: p.physical?.dob || p.dob || prev.dob,
+            height: p.physical?.height || p.height || prev.height,
+            weight: p.physical?.weight || p.weight || prev.weight,
+          }));
+          
+          if (p.physical?.fromLomeal) {
+            setFromLomeal(true);
+          }
+        }
+      } catch (err) {
+        console.error("Gagal menarik profil global:", err);
+      }
+    };
+    fetchGlobalProfile();
+  }, []);
+
+  const handleHealthConnect = async () => {
+    try {
+      const isAvail = await hcAvailable();
+      if (!isAvail) {
+        alert('Health Connect belum tersedia atau belum di-install di perangkat ini.');
+        return;
+      }
+      await hcRequestPermissions();
+      alert('Berhasil terhubung ke Health Connect!');
+    } catch (e) {
+      alert('Gagal menghubungkan ke Health Connect.');
+      console.error(e);
+    }
+  };
+
+  const handleAppleHealth = () => {
+    alert('Integrasi Apple Health saat ini belum tersedia untuk versi Web/Android.');
+  };
+
+  const canProceed = () => {
+    const s = STEPS[step];
+    if (!s) return false;
+
+    if (s.key === 'consent') {
+      const c = answers.consents || { tos: false, data: false, ai: false };
+      return c.tos && c.data && c.ai;
+    }
+    if (s.key === 'connect') return true;
+    if (s.key === 'identity') return answers.name?.trim().length > 0 && answers.gender;
+    if (s.key === 'biometrics') return isValidAge(answers.dob) && answers.height > 0 && answers.weight > 0;
+
+    return true;
+  };
+
+  const finish = async () => {
+    // Save to Firestore globally
+    if (auth.currentUser) {
+      try {
+        const userRef = doc(db, 'logym_users', auth.currentUser.uid);
+        const docSnap = await getDoc(userRef);
+        const payload = {
+          onboardingCompleted: true, // Lock for Logym
+          name: answers.name,
+          gender: answers.gender,
+          dob: answers.dob,
+          weight: Number(answers.weight),
+          height: Number(answers.height),
+          activityLevel: docSnap.exists() && docSnap.data().activityLevel ? docSnap.data().activityLevel : 'moderate',
+          physical: {
+            dob: answers.dob,
+            gender: answers.gender,
+            height: Number(answers.height),
+            weight: Number(answers.weight),
+            fromLomeal
+          },
+          consents: { 
+            ...(answers.consents || {}), 
+            version: CONSENT_VERSION, 
+            agreedAt: new Date().toISOString() 
+          },
+          lastUpdated: serverTimestamp()
+        };
+
+        if (docSnap.exists()) {
+          await updateDoc(userRef, payload);
+        } else {
+          await setDoc(userRef, { ...payload, createdAt: serverTimestamp() });
+        }
+      } catch (e) {
+        console.error("Gagal menyimpan profil:", e);
+      }
+    }
+
+    onComplete(answers);
+  };
+
+  const handleNext = () => {
+    if (step === STEPS.length - 1) finish();
+    else setStep((s) => s + 1);
+  };
+  const handleBack = () => setStep((s) => Math.max(0, s - 1));
+
+  const { handleTouchStart, handleTouchMove, handleTouchEnd } = useSwipeStep({
+    step, maxStep: STEPS.length, canProceed, onNext: handleNext, onBack: handleBack,
+  });
+
+  return (
+    <div className={`fixed inset-0 z-[100] flex flex-col bg-[url('/bg-program.webp')] bg-cover bg-center`}>
+      <div className={`absolute inset-0 ${isDark ? 'bg-gradient-to-t from-black via-black/40 to-transparent' : 'bg-gradient-to-t from-black/80 via-black/20 to-transparent'}`}></div>
+      <div className="relative z-10 flex flex-col h-full">
+      <div className="flex justify-center items-center p-5 pb-2 shrink-0 pt-[max(env(safe-area-inset-top),2rem)]">
+        <p className={`text-sm font-medium text-center max-w-[280px] text-white drop-shadow-md`}>
+          Halo! <span className="font-black">Coach Logy</span> siap bantu melacak dan memaksimalkan rutinitas latihanmu.
+        </p>
+      </div>
+
+      <div
+        className="flex-1 flex flex-col justify-end pb-8 sm:pb-12 overflow-y-auto p-6 pt-0 hide-scrollbar relative"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        <div className="relative w-full max-w-lg mx-auto h-[480px] sm:h-[500px]">
+          {step > 0 && (
+            <button onClick={handleBack} className={`absolute left-4 sm:left-6 bottom-4 sm:bottom-6 z-[150] p-3 rounded-full ${t.bgCard} shadow-lg border ${t.border} active:scale-95 transition-all`}>
+              <ChevronLeft size={24} className={t.textMain} />
+            </button>
+          )}
+          {canProceed() && (
+            <button onClick={handleNext} className={`absolute right-4 sm:right-6 bottom-4 sm:bottom-6 z-[150] p-3 rounded-full shadow-lg border ${t.bgCard} ${t.border} active:scale-95 transition-all`}>
+              {step === STEPS.length - 1 ? <Check size={24} className={t.textMain} /> : <ChevronRight size={24} className={t.textMain} />}
+            </button>
+          )}
+
+          {STEPS.map((s, idx) => {
+            const offset = idx - step;
+            const isPast = idx < step;
+            if (offset > 2 || offset < -1) return null;
+
+            return (
+              <div
+                key={s.key}
+                className={`absolute inset-0 flex flex-col justify-center transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] p-6 sm:p-8 rounded-[2.5rem] border ${isDark ? 'border-white/10 bg-white/[0.045]' : 'border-black/5 bg-white/80'} backdrop-blur-2xl shadow-2xl overflow-hidden`}
+                style={{
+                  zIndex: 50 - idx,
+                  transform: isPast ? 'translateX(-100%) scale(0.9) rotate(-5deg)' : `translateX(${offset * 24}px) translateY(${offset * 4}px) scale(${1 - offset * 0.05})`,
+                  opacity: isPast ? 0 : 1 - offset * 0.3,
+                  pointerEvents: idx === step ? 'auto' : 'none',
+                  visibility: isPast && offset < -1 ? 'hidden' : 'visible',
+                }}
+              >
+                <div className="flex flex-col items-center text-center mb-5 shrink-0">
+                  <h2 className={`text-xl sm:text-2xl font-black leading-tight ${t.textMain}`}>{s.title}</h2>
+                </div>
+
+                <div className="flex-1 flex flex-col overflow-y-auto hide-scrollbar content-start">
+                  <SharedStepRenderer 
+                    stepKey={s.key} 
+                    answers={answers} 
+                    setAnswers={setAnswers} 
+                    t={t} 
+                    isDark={isDark}
+                    handleNext={handleNext}
+                    onHealthConnect={handleHealthConnect}
+                    onAppleHealth={handleAppleHealth}
+                    fromLogym={fromLomeal} // We pass fromLomeal as fromLogym prop internally for the text
+                  />
+                </div>
+                <div className="mt-auto pt-4 flex justify-center shrink-0">
+                  <p className={`text-xs font-bold ${t.textMuted}`}>Langkah {idx + 1} dari {STEPS.length}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      </div>
+    </div>
+  );
+};
+
+export default OnboardingFlow;
+

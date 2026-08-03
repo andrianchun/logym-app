@@ -20,6 +20,7 @@ import GymAIChat from './components/GymAIChat';
 
 // --- IMPORT HALAMAN (PAGES) ---
 import AuthPage from './pages/AuthPage';
+import OnboardingFlow from './pages/OnboardingFlow';
 import DashboardTab from './pages/DashboardTab';
 import WorkoutTab from './pages/WorkoutTab';
 import EditModeTab from './pages/EditModeTab';
@@ -1797,11 +1798,15 @@ export default function App() {
       // 1. Delete user data from firestore (dokumen utama + history + data komunitas)
       await deleteAllUserData(user.uid);
 
-      // 2. Delete user from auth
-      await deleteUser(auth.currentUser);
-
-      // 3. Clear local storage
+      // 2. Clear local storage SEKARANG, bukan sesudah deleteUser — deleteUser sering gagal
+      // (auth/requires-recent-login) kalau sesinya gak baru, dan kalau localStorage.clear()
+      // nunggu di bawahnya, flag `lyfit_onboarding_completed_${uid}` nyangkut 'true' selamanya
+      // walau profil Firestore-nya udah kehapus di step 1 — bikin akun yang "gagal" dihapus
+      // keliatan udah onboarded lagi pas login ulang, padahal datanya kosong.
       localStorage.clear();
+
+      // 3. Delete user from auth
+      await deleteUser(auth.currentUser);
 
       // 4. Reset UI state & refresh
       setActiveAddModalTarget(null);
@@ -2855,7 +2860,54 @@ export default function App() {
     return <AuthPage t={t} theme={theme} soundEnabled={soundEnabled} onLogin={() => {}} />;
   }
 
-  // JIKA USER SUDAH LOGIN
+  // JIKA USER SUDAH LOGIN TAPI BELUM ONBOARDING
+  //
+  // Ada 3 penanda "sudah onboarding" yang beda-beda dari beberapa generasi kode:
+  // - userProfile.hasCompletedOnboarding (alur lama, field di settings.userProfile)
+  // - localStorage lyfit_onboarding_completed_{uid} (di-mirror dari field FLAT Firestore
+  //   `onboardingCompleted` di logym_users/{uid} tiap snapshot masuk — lihat useEffect
+  //   snapshot di atas)
+  // Dulu di sini cuma dicek `userProfile.onboardingCompleted` — field itu TIDAK PERNAH
+  // ditulis oleh kode manapun (beda nama sama `hasCompletedOnboarding`, beda tempat dari
+  // field flat), jadi selalu falsy dan SEMUA user — baru maupun lama yang udah pernah
+  // selesai onboarding — kejebak di layar ini selamanya, gak ada jalan balik ke app.
+  // Juga dulu ada 2 blok kondisi yang kondisi pertama superset dari kedua (selalu duluan
+  // kena, `onComplete` no-op) — blok kedua yang beneran nutup gate gak pernah kepanggil.
+  const isOnboarded = !!(
+    userProfile?.hasCompletedOnboarding ||
+    userProfile?.onboardingCompleted ||
+    (user?.uid && localStorage.getItem(`lyfit_onboarding_completed_${user.uid}`) === 'true')
+  );
+  if (user && isDataLoaded && !isOnboarded) {
+    return (
+      <OnboardingFlow
+        t={t}
+        theme={theme}
+        onComplete={(answers) => {
+          // Update optimistic lokal — OnboardingFlow.finish() sendiri yang nulis ke
+          // Firestore (logym_users/{uid}), ini cuma biar gate-nya langsung ketutup
+          // tanpa nunggu snapshot round-trip balik.
+          // PENTING: argumen `answers` sebelumnya DIBUANG di sini — OnboardingFlow.finish()
+          // udah bener ngirim onComplete(answers) berisi name/gender/dob/weight/height,
+          // tapi gate ini gak pernah nampung, jadi `userProfile` (satu-satunya state yang
+          // dibaca ProgramQuestionnaireModal & fitur lain) tetap kosong walau onboarding
+          // udah selesai — makanya kuesioner berikutnya nunjukin nama/dob/dst kosong lagi.
+          if (user?.uid) localStorage.setItem(`lyfit_onboarding_completed_${user.uid}`, 'true');
+          setUserProfile((prev) => ({
+            ...(prev || {}),
+            hasCompletedOnboarding: true,
+            name: answers?.name ?? prev?.name,
+            gender: answers?.gender ?? prev?.gender,
+            dob: answers?.dob ?? prev?.dob,
+            weight: answers?.weight ?? prev?.weight,
+            height: answers?.height ?? prev?.height,
+            activityLevel: prev?.activityLevel || 'moderate',
+          }));
+        }}
+      />
+    );
+  }
+
   return (
     <>
       <div 

@@ -42,7 +42,8 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
     activityLevel: userProfile?.activityLevel || null,
     days: [],
     equipment: null,
-    duration: null
+    duration: null,
+    consents: userProfile?.consents || { tos: false, data: false, ai: false }
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [recommendedPlan, setRecommendedPlan] = useState(null);
@@ -57,22 +58,23 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
   const [touchEnd, setTouchEnd] = useState(null);
 
   const canProceed = () => {
-    if (step === 0) return true;
-    if (step === 1) return answers.gender && isValidAge(answers.dob) && answers.name?.trim().length > 0;
-    if (step === 2) {
+    const currentStep = steps[step];
+    if (!currentStep) return false;
+    const key = currentStep.key;
+
+    if (key === 'consent') {
+      return answers.consents?.tos && answers.consents?.data && answers.consents?.ai;
+    }
+    if (key === 'connect') return true; // opsional
+    if (key === 'identity') return answers.gender && isValidAge(answers.dob) && answers.name?.trim().length > 0;
+    if (key === 'biometrics') {
       const isHeightValid = isImpHeight ? (answers.heightFt && answers.heightIn) : answers.height;
       return isHeightValid && answers.weight && answers.targetWeight;
     }
-    // step 8 is injuries (optional)
-    if (step === 8) return true;
-    if (step === 6) return answers.days.length > 0;
+    if (key === 'injuries') return true; // opsional
+    if (key === 'days') return answers.days.length > 0;
     
-    if (step >= 3 && step <= 9 && step !== 6 && step !== 8) {
-      const currentStep = steps[step];
-      const key = currentStep.key;
-      return !!answers[key];
-    }
-    return false;
+    return !!answers[key];
   };
 
   const handleTouchStart = (e) => {
@@ -126,7 +128,8 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
           activityLevel: userProfile?.activityLevel || null, 
           days: [], 
           equipment: null, 
-          duration: null 
+          duration: null,
+          consents: userProfile?.consents || { tos: false, data: false, ai: false }
       });
       setIsGenerating(false);
       setRecommendedPlan(null);
@@ -135,7 +138,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
 
   const handleCloseClick = async () => {
     playSoundEffect('click', soundEnabled);
-    if (step < 8) {
+    if (step < 10) {
       const confirm = await showConfirm('Apakah kamu yakin ingin melewati analisis sekarang?', {
         title: 'Keluar Kuesioner',
         confirmText: 'Lewati',
@@ -352,12 +355,6 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
   // --- STEPS CONFIGURATION ---
   const steps = [
     {
-      // Step 0: Sync Option
-      title: "Sinkronisasi Data Kesehatan",
-      key: 'sync',
-      icon: <Smartphone className={`${t.textAccent} mb-4`} size={40} />
-    },
-    {
       // Step 1: Gender & DOB
       title: "Identitas Diri",
       key: 'identity',
@@ -533,21 +530,21 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
             </button>
           )}
 
-          {step < 9 && canProceed() && (
+          {step <= 10 && canProceed() && (
             <button 
               onClick={() => {
-                if (step === 8) generateProgram(answers);
+                if (step === 10) generateProgram(answers);
                 else {
-                  if (step === 0) playSoundEffect('click', soundEnabled);
+                  if (step === 1) playSoundEffect('click', soundEnabled);
                   setStep(step + 1);
                 }
               }} 
               className={`absolute right-4 sm:right-6 bottom-4 sm:bottom-6 z-[150] p-3 rounded-full shadow-lg border transition-all active:scale-95 ${t.bgCard} ${isDark ? 'border-white/10' : 'border-black/10'} hover:opacity-80`}
             >
-              {step === 8 ? <Check size={24} className={t.textMain} /> : <ChevronRight size={24} className={t.textMain} />}
+              {step === 10 ? <Check size={24} className={t.textMain} /> : <ChevronRight size={24} className={t.textMain} />}
             </button>
           )}
-            {step < 9 && [0, 1, 2, 3, 4, 5, 6, 7, 8].map((idx) => {
+            {step <= 8 && [0, 1, 2, 3, 4, 5, 6, 7, 8].map((idx) => {
               const isPast = idx < step;
               const isActive = idx === step;
               const isFuture = idx > step;
@@ -574,65 +571,10 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
                     <h2 className={`text-xl sm:text-2xl font-black ${!isDark ? 'text-black' : t.textMain} leading-tight`}>
                       {steps[idx].title}
                     </h2>
-                    {idx === 6 && <p className={`text-xs sm:text-sm font-medium mt-1 ${!isDark ? 'text-black/80' : 'text-slate-300'}`}>Pilih hari sesuai jadwal luang kamu.</p>}
+                    {idx === 5 && <p className={`text-xs sm:text-sm font-medium mt-1 ${!isDark ? 'text-black/80' : 'text-slate-300'}`}>Pilih hari sesuai jadwal luang kamu.</p>}
                   </div>
-
-                  
 
               {idx === 0 ? (
-                // CUSTOM SYNC SELECTOR
-                <div className="flex-1 flex flex-col pb-2 space-y-4 mt-4 overflow-y-auto hide-scrollbar">
-                  <div>
-                     <div className={`flex flex-col p-4 rounded-2xl border-2 transition-all ${isAiReady ? (isDark ? 'border-sky-500/50 bg-sky-500/10' : 'border-sky-500 bg-sky-50') : (isDark ? 'border-rose-500/50 bg-rose-500/10' : 'border-rose-500 bg-rose-50')}`}>
-                        <div className={`font-black text-base ${!isDark ? 'text-black' : t.textMain} mb-1`}>
-                            {isAiReady ? 'AI Siap Digunakan!' : 'Server AI Sedang Penuh'}
-                        </div>
-                        <p className={`text-xs ${!isDark ? 'text-black/60' : 'text-white/60'} leading-relaxed`}>
-                            {isAiReady 
-                                ? 'Program latihan Anda akan dirancang secara cerdas dan spesifik oleh AI.' 
-                                : 'Aplikasi akan menggunakan algoritma standar. Jika Anda tetap ingin menggunakan AI, silakan gunakan API pribadi.'}
-                        </p>
-                        {!isAiReady && (
-                            <button 
-                                onClick={() => { if (setShowSettings) setShowSettings('lanjutan'); }} 
-                                className={`mt-3 py-2 px-4 text-xs font-bold rounded-lg text-white ${t.bgAccent} active:scale-95 transition-all w-max`}
-                            >
-                                Buka Pengaturan API
-                            </button>
-                        )}
-                     </div>
-                  </div>
-
-                  <div className="pt-2 border-t border-neutral-500/20">
-                     <p className={`text-xs font-bold mb-3 ${t.textMuted} text-center`}>Sinkronisasi data kesehatan (Opsional):</p>
-                     <div className="grid grid-cols-2 gap-3">
-                        <button
-                          onClick={() => handleHealthSync('Health Connect')}
-                          className={`p-3 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all duration-200 active:scale-95 ${
-                              connectedHealthApps.includes('Health Connect')
-                                  ? 'border-sky-500 bg-sky-500/10 shadow-[0_0_15px_rgba(14,165,233,0.3)]'
-                                  : isDark ? 'border-white/10 bg-white/5 hover:bg-white/10' : 'border-black/5 bg-white hover:bg-black/5 shadow-sm'
-                          }`}
-                        >
-                          <img src="/health-connect.webp" alt="Health Connect" className="w-8 h-8 shrink-0 rounded-[22%] object-cover" />
-                          <span className={`font-black text-xs ${connectedHealthApps.includes('Health Connect') ? 'text-sky-500' : (!isDark ? 'text-black' : t.textMain)}`}>Health Connect</span>
-                        </button>
-
-                        <button
-                          onClick={() => handleHealthSync('Apple Health')}
-                          className={`p-3 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all duration-200 active:scale-95 ${
-                              connectedHealthApps.includes('Apple Health')
-                                  ? 'border-sky-500 bg-sky-500/10 shadow-[0_0_15px_rgba(14,165,233,0.3)]'
-                                  : isDark ? 'border-white/10 bg-white/5 hover:bg-white/10' : 'border-black/5 bg-white hover:bg-black/5 shadow-sm'
-                          }`}
-                        >
-                          <img src="/apple-health.webp" alt="Apple Health" className="w-8 h-8 shrink-0" />
-                          <span className={`font-black text-xs ${connectedHealthApps.includes('Apple Health') ? 'text-sky-500' : (!isDark ? 'text-black' : t.textMain)}`}>Apple Health</span>
-                        </button>
-                     </div>
-                  </div>
-                </div>
-              ) : idx === 1 ? (
                 // CUSTOM GENDER & DOB & NAME
                 <div className="flex flex-col pb-2 space-y-4">
                   <div>
@@ -673,7 +615,7 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
                       )}
                   </div>
                 </div>
-              ) : idx === 2 ? (
+              ) : idx === 1 ? (
                 // CUSTOM BIOMETRICS
                 <div className="flex flex-col pb-2 space-y-2 w-full max-w-md mx-auto">
                   <div className="grid grid-cols-3 gap-2 sm:gap-4 w-full">
@@ -767,7 +709,7 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
                       );
                   })()}
                 </div>
-              ) : idx === 8 ? (
+              ) : idx === 7 ? (
                 // CUSTOM INJURIES SELECTOR
                 <div className="w-full flex flex-col gap-4 pb-2 h-[45vh] overflow-y-auto hide-scrollbar">
                     <div>
@@ -836,7 +778,7 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
                         </div>
                     </div>
                 </div>
-              ) : idx !== 6 ? (
+              ) : idx !== 5 ? (
                 // STANDARD OPTIONS
                 <div className="space-y-2 pb-2">
                     {steps[idx].options.map((opt) => {
@@ -861,7 +803,7 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
                     })}
                 </div>
               ) : (
-                // CUSTOM DAYS SELECTOR (Step 5)
+                // CUSTOM DAYS SELECTOR
                 <div className="flex flex-col pb-2">
                   <div className="flex flex-wrap gap-2 justify-center mb-3">
                     {DAYS_OF_WEEK.map(day => {
@@ -1013,3 +955,4 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
 };
 
 export default ProgramQuestionnaireModal;
+
