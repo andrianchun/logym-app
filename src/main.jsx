@@ -1,7 +1,17 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import { Capacitor } from '@capacitor/core'
+import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import App from './App.jsx'
 import './index.css'
+
+// WAJIB dipanggil dalam appReadyTimeout Capgo (default 10 DETIK) sesudah bundle OTA
+// baru boot, atau Capgo mengira update-nya gagal/nge-crash dan ROLLBACK OTOMATIS ke
+// bundle sebelumnya di peluncuran berikutnya — diam-diam, tanpa error yang kelihatan.
+// Dipanggil di sini, paling awal mungkin, SEBELUM nunggu apa pun (lihat main.jsx Lomeal).
+if (Capacitor.isNativePlatform()) {
+  CapacitorUpdater.notifyAppReady();
+}
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
