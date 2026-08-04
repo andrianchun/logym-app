@@ -9,6 +9,10 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // Plugin lokal: menulis sesi latihan ke Health Connect. @capgo/capacitor-health cuma
+        // bisa MEMBACA sesi latihan, jadi tanpa ini latihan Logym tidak pernah muncul sebagai
+        // "Workout" di aplikasi lain. Harus didaftarkan SEBELUM super.onCreate().
+        registerPlugin(ExerciseWriterPlugin.class);
         super.onCreate(savedInstanceState);
 
         Window window = getWindow();

@@ -49,7 +49,7 @@ import { AI_MODELS, detectPlateaus, getLogiNotification } from './utils/aiAgent'
 import { calculateReadiness } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
 import { calculateWorkoutCalories, calculateSmartWorkoutCalories, parseWorkoutDurationMinutes } from './utils/workoutCalc';
-import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcWriteWorkoutCalories, hcCheckStatus, hcInventory } from './utils/healthConnect';
+import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcWriteWorkoutCalories, hcCheckStatus, hcInventory, hcReadWorkouts, hcWriteWorkoutSession, hcRequestWorkoutWritePermission } from './utils/healthConnect';
 import useDialog from './hooks/useDialog';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import UpdaterAlert from './components/UpdaterAlert';
@@ -311,7 +311,28 @@ export default function App() {
   // Field yang boleh diisi backfill/live-sync — TIDAK PERNAH nimpa field yang udah manual
   // (_manualFlags, lihat handleSaveManualData di DashboardTab.jsx) atau yang udah ada isinya
   // dari sumber lain (mis. activityCalories hasil hitung workout Logym sendiri).
-  const HC_FIELDS = ['steps', 'activityCalories', 'heartRate', 'minHeartRate', 'maxHeartRate', 'weight', 'height', 'bodyFat', 'oxygenSaturation', 'bloodPressure', 'sleep', 'sleepAwake', 'sleepRem', 'sleepLight', 'sleepDeep'];
+  const HC_FIELDS = ['steps', 'activityCalories', 'heartRate', 'minHeartRate', 'maxHeartRate', 'restingHeartRate', 'weight', 'height', 'bodyFat', 'oxygenSaturation', 'bloodPressure', 'sleep', 'sleepAwake', 'sleepRem', 'sleepLight', 'sleepDeep', 'distance', 'bmr'];
+
+  // Gabungkan sesi latihan dari aplikasi lain (Samsung Health, Hevy, dsb) ke riwayat Logym.
+  // Dicocokkan lewat id (turunan platformId Health Connect), jadi impor berulang tidak
+  // menggandakan. Sesi yang dicatat sendiri di Logym tidak pernah disentuh.
+  const mergeHcWorkouts = (byDay) => {
+    let added = 0;
+    setHistory(prev => {
+      const next = { ...prev };
+      Object.entries(byDay).forEach(([ymd, list]) => {
+        const day = next[ymd] || { workouts: [] };
+        const existing = day.workouts || [];
+        const ids = new Set(existing.map((w) => w.id));
+        const fresh = list.filter((w) => !ids.has(w.id));
+        if (fresh.length === 0) return;
+        added += fresh.length;
+        next[ymd] = { ...day, workouts: [...existing, ...fresh] };
+      });
+      return added > 0 ? next : prev;
+    });
+    return added;
+  };
   const mergeHcDayData = (ymd, hcData) => {
     setHistory(prev => {
       const existingBio = prev[ymd]?.bioData || {};
@@ -352,17 +373,25 @@ export default function App() {
     let filled = 0;
     await hcBackfillHistory(days, () => false, (ymd, summary) => { filled++; mergeHcDayData(ymd, summary); });
 
+    // Impor sesi latihan dari aplikasi lain supaya riwayat Logym tidak bolong.
+    const imported = mergeHcWorkouts(await hcReadWorkouts(days));
+
     // Arah sebaliknya: dorong histori latihan Logym (kalori terbakar) ke Health Connect.
     // Health Connect menerima record bertanggal lampau — yang dibatasi cuma MEMBACA data
     // lama (butuh READ_HEALTH_DATA_HISTORY), menulis ke belakang tidak dibatasi.
     // Aman diulang: tiap sesi dicatat lewat dedupeKey (id sesi), jadi tidak pernah dobel.
     let pushed = 0;
+    let sessions = 0;
+    const canWriteSession = await hcRequestWorkoutWritePermission();
     for (let i = 0; i <= days; i++) {
       const d = new Date();
       d.setDate(d.getDate() - i);
       const ymd = getLocalYMD(d);
       for (const w of history[ymd]?.workouts || []) {
         if (w.status !== 'completed') continue;
+        // JANGAN kirim balik sesi yang justru berasal dari Health Connect — itu bikin
+        // lingkaran duplikat (impor -> kirim balik -> terbaca lagi sebagai sesi baru).
+        if (w.source === 'healthconnect') continue;
         const mins = parseWorkoutDurationMinutes(w.duration);
         if (mins <= 0) continue;
         const kcal = calculateSmartWorkoutCalories(userProfile?.weight, w, w.log);
@@ -370,6 +399,13 @@ export default function App() {
         const end = new Date(`${ymd}T${w.timestamp && /^\d{2}:\d{2}$/.test(w.timestamp) ? w.timestamp : '12:00'}:00`);
         const start = new Date(end.getTime() - mins * 60000);
         if (await hcWriteWorkoutCalories(start.toISOString(), end.toISOString(), kcal, w.id)) pushed++;
+        if (canWriteSession && await hcWriteWorkoutSession({
+          startDate: start.toISOString(),
+          endDate: end.toISOString(),
+          exerciseType: 'strengthTraining',
+          title: w.programName || 'Latihan',
+          dedupeKey: w.id,
+        })) sessions++;
       }
     }
 
@@ -382,7 +418,7 @@ export default function App() {
         (denied.length ? ` Ditolak: ${denied.join(', ')}.` : '') +
         // Tanpa pembagi: rentangnya inklusif dua ujung (hari ini + N hari ke belakang = N+1)
         // dan beda zona waktu bisa nambah satu lagi, jadi "32/30" bikin bingung.
-        ` Histori masuk: ${filled} hari. Sesi latihan terkirim ke Health Connect: ${pushed}.`
+        ` Histori masuk: ${filled} hari. Sesi dari app lain diimpor: ${imported}. Terkirim ke Health Connect: ${pushed} kalori, ${sessions} sesi latihan.`
       );
     }
   };
@@ -2541,7 +2577,14 @@ export default function App() {
     const durationSecs = workoutStartTime ? Math.floor((Date.now() - workoutStartTime) / 1000) : 0;
     if (healthConnectEnabled && workoutStartTime && durationSecs > 60) {
       const kcal = calculateWorkoutCalories(userProfile?.weight, durationSecs / 60);
-      hcWriteWorkoutCalories(new Date(workoutStartTime).toISOString(), new Date().toISOString(), kcal);
+      const startISO = new Date(workoutStartTime).toISOString();
+      const endISO = new Date().toISOString();
+      hcWriteWorkoutCalories(startISO, endISO, kcal);
+      // Sesi latihan formal (jenis olahraga + durasi) supaya kebaca app lain sebagai "Workout",
+      // bukan cuma angka kalori. Lewat plugin lokal ExerciseWriterPlugin.kt.
+      hcRequestWorkoutWritePermission().then((ok) => {
+        if (ok) hcWriteWorkoutSession({ startDate: startISO, endDate: endISO, exerciseType: 'strengthTraining', title: 'Latihan Logym' });
+      });
     }
     const formatDur = (secs) => {
       const h = Math.floor(secs / 3600);

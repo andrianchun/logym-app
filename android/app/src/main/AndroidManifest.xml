@@ -63,6 +63,10 @@
     <uses-permission android:name="android.permission.health.READ_BLOOD_PRESSURE" />
     <!-- Buat nulis kalori terbakar per sesi latihan (lihat hcWriteWorkoutCalories) -->
     <uses-permission android:name="android.permission.health.WRITE_ACTIVE_CALORIES_BURNED" />
+    <!-- Buat nulis SESI LATIHAN lengkap dengan jenis olahraga, lewat plugin lokal
+         ExerciseWriterPlugin.kt. Satu-satunya izin health yang tidak dibawa plugin capgo,
+         karena plugin itu memang tidak punya jalur menulis sesi latihan. -->
+    <uses-permission android:name="android.permission.health.WRITE_EXERCISE" />
     <!-- Tanpa ini, Health Connect cuma kasih akses baca 30 hari terakhir — backfill histori
          yang lebih lama gak akan dapat apa-apa. Plugin @capgo/capacitor-health minta ini lewat
          requestHistoryAccess:true (lihat utils/healthConnect.js), tapi izinnya sendiri WAJIB

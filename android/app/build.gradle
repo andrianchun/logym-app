@@ -5,13 +5,18 @@ android {
     namespace = "com.andrianchun.logym"
     compileSdk = rootProject.ext.compileSdkVersion
 
-    // --- SUNTIKAN: MENYAMAKAN MESIN JAVA & KOTLIN KE VERSI 17 ---
+    // --- MENYAMAKAN MESIN JAVA & KOTLIN ---
+    // Dulu 17, tapi begitu modul app punya kode Kotlin sendiri (ExerciseWriterPlugin.kt),
+    // build gagal: "Inconsistent JVM-target ... 'compileDebugJavaWithJavac' (21) dan
+    // 'compileDebugKotlin' (17)". Javac di modul ini nyatanya jalan di 21 (setelan 17 di sini
+    // kalah sama toolchain AGP), jadi Kotlin-nya yang disamakan ke 21 — bukan sebaliknya.
+    // Modul ':app' juga dikecualikan dari paksaan jvmTarget 17 di android/build.gradle.
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
     }
     kotlinOptions {
-        jvmTarget = '17'
+        jvmTarget = '21'
     }
     // -------------------------------------------------------------
 
@@ -48,6 +53,10 @@ dependencies {
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
+    // Dipakai ExerciseWriterPlugin.kt (menulis sesi latihan ke Health Connect). Versi
+    // disamakan persis dengan yang dipakai @capgo/capacitor-health biar tidak ada dua versi
+    // connect-client yang bentrok di satu APK.
+    implementation 'androidx.health.connect:connect-client:1.1.0'
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"

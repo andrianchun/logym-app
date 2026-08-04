@@ -8,7 +8,7 @@
 // tapi kalori + rentang waktunya tetap kepush dan kebaca app lain lewat Health Connect.
 // Hanya aktif di platform native Android (Capacitor).
 // ============================================================
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 // Import STATIS, jangan diganti dynamic import lewat fungsi async — plugin Capacitor itu
 // Proxy yang menganggap SEMUA akses property sebagai method native, termasuk `.then` yang
 // diakses otomatis saat promise me-resolve nilai balikan fungsi async. Hasilnya panggilan
@@ -30,7 +30,7 @@ export const hcAvailable = async () => {
 // 'totalCalories' ikut diminta karena banyak sumber (mis. Samsung Health) cuma nulis
 // TotalCaloriesBurned dan TIDAK pernah nulis ActiveCaloriesBurned — tanpa ini, query
 // 'calories' balik kosong terus walau Health Connect penuh data (kejadian nyata).
-const READ_TYPES = ['steps', 'calories', 'totalCalories', 'heartRate', 'weight', 'height', 'sleep', 'bodyFat', 'oxygenSaturation', 'bloodPressure'];
+const READ_TYPES = ['steps', 'calories', 'totalCalories', 'heartRate', 'restingHeartRate', 'weight', 'height', 'sleep', 'bodyFat', 'oxygenSaturation', 'bloodPressure', 'distance', 'basalCalories'];
 const WRITE_TYPES = ['calories'];
 
 // Android gak nge-throw kalau user pencet "Tolak" di dialog izin — tetap resolve normal
@@ -127,6 +127,98 @@ export const hcInventory = async (days = 90) => {
   return found;
 };
 
+// Nama jenis latihan Health Connect -> label Indonesia. Yang tidak terdaftar dipakai apa
+// adanya (dipisah dari camelCase), jadi jenis baru tetap tampil masuk akal tanpa perlu diurus.
+const WORKOUT_LABEL = {
+  runningTreadmill: 'Lari Treadmill', running: 'Lari', walking: 'Jalan Kaki', hiking: 'Hiking',
+  cycling: 'Sepeda', bikingStationary: 'Sepeda Statis', swimming: 'Renang', swimmingPool: 'Renang Kolam',
+  strengthTraining: 'Angkat Beban', traditionalStrengthTraining: 'Angkat Beban',
+  functionalStrengthTraining: 'Latihan Fungsional', weightlifting: 'Angkat Beban',
+  highIntensityIntervalTraining: 'HIIT', elliptical: 'Elliptical', rowingMachine: 'Mesin Dayung',
+  stairClimbing: 'Naik Tangga', stairClimbingMachine: 'Mesin Tangga', yoga: 'Yoga',
+  pilates: 'Pilates', stretching: 'Peregangan', calisthenics: 'Kalistenik', boxing: 'Tinju',
+  martialArts: 'Bela Diri', badminton: 'Bulu Tangkis', basketball: 'Basket', soccer: 'Sepak Bola',
+  tennis: 'Tenis', tableTennis: 'Tenis Meja', dancing: 'Menari', jumpRope: 'Lompat Tali',
+  coreTraining: 'Latihan Core', bootCamp: 'Boot Camp', crossTraining: 'Cross Training',
+  exerciseClass: 'Kelas Olahraga', other: 'Latihan Lain',
+};
+const workoutLabel = (t) => WORKOUT_LABEL[t] || String(t || 'Latihan').replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase()).trim();
+
+// Baca sesi latihan yang dicatat APLIKASI LAIN (Samsung Health, Hevy, Google Fit, dsb) supaya
+// riwayat Logym tidak bolong. Hanya BACA — plugin ini tidak punya jalur menulis sesi latihan
+// (lihat catatan di atas). Hasil: { 'YYYY-MM-DD': [ {..} ] } sudah dalam bentuk siap pakai
+// buat history[ymd].workouts, ditandai source:'healthconnect' biar bisa dibedakan dari sesi
+// yang dicatat sendiri di Logym.
+export const hcReadWorkouts = async (days = 30) => {
+  if (!isNative()) return {};
+  const end = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - days);
+  try {
+    const res = await Health.queryWorkouts({ startDate: start.toISOString(), endDate: end.toISOString(), limit: 500, ascending: true });
+    const byDay = {};
+    for (const w of res?.workouts || []) {
+      const ymd = ymdOf(w.startDate);
+      const mins = Math.round((w.duration || 0) / 60);
+      if (mins <= 0) continue;
+      const endD = new Date(w.endDate);
+      (byDay[ymd] ||= []).push({
+        // platformId = id unik record Health Connect, jadi impor berulang tidak menggandakan.
+        id: `hc_${w.platformId || `${w.startDate}_${w.workoutType}`}`,
+        programId: 'healthconnect',
+        programName: workoutLabel(w.workoutType),
+        status: 'completed',
+        source: 'healthconnect',
+        sourceName: w.sourceName || '',
+        workoutType: w.workoutType,
+        duration: mins,
+        caloriesBurned: w.totalEnergyBurned ? Math.round(w.totalEnergyBurned) : undefined,
+        distanceKm: w.totalDistance ? Number((w.totalDistance / 1000).toFixed(2)) : undefined,
+        timestamp: `${String(endD.getHours()).padStart(2, '0')}:${String(endD.getMinutes()).padStart(2, '0')}`,
+        log: {},
+        exercises: [],
+      });
+    }
+    return byDay;
+  } catch (e) {
+    console.warn('hcReadWorkouts gagal:', e);
+    return {};
+  }
+};
+
+// --- Menulis SESI LATIHAN (jenis olahraga + durasi), lewat plugin lokal ExerciseWriterPlugin.kt.
+// @capgo/capacitor-health cuma bisa MEMBACA sesi latihan, jadi tanpa ini latihan Logym cuma
+// muncul sebagai angka kalori polos di app lain, bukan sebagai "Workout" seperti Samsung Health.
+const ExerciseWriter = registerPlugin('ExerciseWriter');
+
+export const hcRequestWorkoutWritePermission = async () => {
+  if (!isNative()) return false;
+  try {
+    const res = await ExerciseWriter.requestPermission();
+    return !!res?.granted;
+  } catch (e) {
+    // Wajar gagal di APK lama yang belum punya plugin native ini — jangan bikin sinkron berhenti.
+    console.warn('izin tulis sesi latihan gagal:', e);
+    return false;
+  }
+};
+
+// `dedupeKey` sama seperti hcWriteWorkoutCalories: Health Connect tidak bisa hapus/ubah record
+// lewat plugin, jadi sesi yang sama tidak boleh terkirim dua kali.
+export const hcWriteWorkoutSession = async ({ startDate, endDate, exerciseType, title, dedupeKey }) => {
+  if (!isNative()) return false;
+  const memo = dedupeKey ? `hc_session_written_${dedupeKey}` : null;
+  if (memo && localStorage.getItem(memo)) return false;
+  try {
+    await ExerciseWriter.saveWorkout({ startDate, endDate, exerciseType, title });
+    if (memo) localStorage.setItem(memo, '1');
+    return true;
+  } catch (e) {
+    console.warn('hcWriteWorkoutSession gagal:', e);
+    return false;
+  }
+};
+
 const ymdOf = (isoStr) => isoStr.slice(0, 10);
 
 // Kelompokkan sample "titik waktu" (berat, tinggi, body fat, oksigen, tekanan darah — bukan
@@ -191,6 +283,25 @@ export const hcReadRange = async (startYmd, endYmd) => {
     H.queryAggregated({ dataType: 'steps', startDate: startISO, endDate: endISO, bucket: 'day', aggregation: 'sum' })
       .then((res) => (res?.samples || []).forEach((s) => { if (s.value > 0) put(ymdOf(s.startDate), { steps: Math.round(s.value) }); }))
       .catch((e) => console.warn('hcReadRange steps gagal:', e)),
+
+    // Jarak: plugin kasih meter, Logym nyimpen km. distanceCycling SENGAJA gak dipakai —
+    // plugin memetakannya ke DistanceRecord yang SAMA, jadi angkanya duplikat persis, bukan
+    // jarak bersepeda terpisah (terbukti di diagnosa: nilainya identik dengan distance).
+    H.queryAggregated({ dataType: 'distance', startDate: startISO, endDate: endISO, bucket: 'day', aggregation: 'sum' })
+      .then((res) => (res?.samples || []).forEach((s) => { if (s.value > 0) put(ymdOf(s.startDate), { distance: Number((s.value / 1000).toFixed(2)) }); }))
+      .catch((e) => console.warn('hcReadRange distance gagal:', e)),
+
+    H.readSamples({ dataType: 'restingHeartRate', startDate: startISO, endDate: endISO, limit: 1000, ascending: true })
+      .then((res) => Object.entries(latestPerDay(res?.samples || [], (s) => ({ restingHeartRate: Math.round(s.value) })))
+        .forEach(([ymd, v]) => put(ymd, v)))
+      .catch((e) => console.warn('hcReadRange restingHeartRate gagal:', e)),
+
+    // BMR terukur dari Samsung Health/Google Fit — angka asli, lebih tepat daripada
+    // hasil hitungan rumus Logym sendiri.
+    H.readSamples({ dataType: 'basalCalories', startDate: startISO, endDate: endISO, limit: 1000, ascending: true })
+      .then((res) => Object.entries(latestPerDay(res?.samples || [], (s) => ({ bmr: Math.round(s.value) })))
+        .forEach(([ymd, v]) => put(ymd, v)))
+      .catch((e) => console.warn('hcReadRange basalCalories gagal:', e)),
 
     // Fallback dua tipe: 'calories' (ActiveCaloriesBurned, bisa di-aggregate langsung) dulu;
     // kalau kosong, baru 'totalCalories' (TotalCaloriesBurned) yang HARUS dibaca mentah lalu

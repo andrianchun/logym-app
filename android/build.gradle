@@ -40,7 +40,10 @@ allprojects {
             sourceCompatibility = JavaVersion.VERSION_17
             targetCompatibility = JavaVersion.VERSION_17
         }
-        if (project.name != 'capgo-capacitor-health') {
+        // ':app' juga dikecualikan sejak modul itu punya kode Kotlin sendiri
+        // (ExerciseWriterPlugin.kt): javac-nya nyatanya jalan di 21, jadi Kotlin-nya harus
+        // ikut 21 — bukan dipaksa turun ke 17. Lihat komentar di app/build.gradle.
+        if (project.name != 'capgo-capacitor-health' && project.name != 'app') {
             project.tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
                 kotlinOptions.jvmTarget = "17"
             }
