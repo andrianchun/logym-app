@@ -53,7 +53,9 @@ output.on('close', function() {
   // OTA_FORCE/OTA_NOTES di-set oleh scripts/release.js (`npm run release force "catatan"`).
   fs.writeFileSync(path.join(otaPath, 'version.json'), JSON.stringify({
     ota_version: version,
-    ota_url: `https://logym-id.web.app/ota/${zipName}`,
+    // Domain produksi asli itu logym.web.app (project hexa-life) — logym-id.web.app project
+    // beda yang gak pernah dipakai siapa pun, APK yang download dari situ selalu 404.
+    ota_url: `https://logym.web.app/ota/${zipName}`,
     is_forced: process.env.OTA_FORCE === '1',
     release_notes: process.env.OTA_NOTES || `Pembaruan v${version}`
   }, null, 2));
