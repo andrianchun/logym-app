@@ -26,3 +26,7 @@ functions/.env
 *.njsproj
 *.sln
 *.sw?
+
+# Cache unggah Firebase Hosting — jangan di-commit, versi basi bikin /ota/** raib
+# dari hosting saat deploy (lihat scripts/release.js).
+.firebase/
