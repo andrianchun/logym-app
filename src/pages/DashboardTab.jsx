@@ -97,9 +97,17 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   };
 
   const parseSleepHours = (str) => {
-      const parts = (str || '').match(/(\d+)h\s*(\d+)m/);
+      // Nilai dari Health Connect berupa ANGKA jam (mis. 7.4), sedangkan input manual lama
+      // berupa teks "7h 30m". Dulu cuma teks yang ditangani, jadi begitu data tidur otomatis
+      // masuk, `.match` dipanggil pada angka dan seluruh dasbor crash
+      // ("(se || '').match is not a function").
+      if (typeof str === 'number') return isNaN(str) ? 0 : str;
+      if (str == null) return 0;
+      const s = String(str);
+      const parts = s.match(/(\d+)h\s*(\d+)m/);
       if (parts) return parseInt(parts[1]) + (parseInt(parts[2]) / 60);
-      return 0;
+      const plain = parseFloat(s);
+      return isNaN(plain) ? 0 : plain;
   };
   const [isKomposisiExpanded, setIsKomposisiExpanded] = useState(() => {
       try {
@@ -1107,10 +1115,17 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                                      </>
                                  );
                              }
+                             // Health Connect memberi angka jam desimal (mis. 7.4) — tampilkan
+                             // sebagai "7 jam 24 mnt", bukan "7.4 jam".
+                             const totalH = parseFloat(sleepStr);
+                             const jam = Math.floor(totalH);
+                             const menit = Math.round((totalH % 1) * 60);
                              return (
                                  <>
-                                     <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>{sleepStr}</span>
-                                     <span className={`body-lg font-bold ${t.textMuted}`}>jam</span>
+                                     <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>{jam}</span>
+                                     <span className={`body-lg font-bold ${t.textMuted} mr-1`}>jam</span>
+                                     <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>{menit}</span>
+                                     <span className={`body-lg font-bold ${t.textMuted}`}>mnt</span>
                                  </>
                              );
                          })()}

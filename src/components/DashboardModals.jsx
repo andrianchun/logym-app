@@ -136,8 +136,17 @@ const DashboardModals = ({
   };
 
   const parseSleep = (str) => {
-      const parts = (str || '').match(/(\d+)h\s*(\d+)m/);
+      // Nilai dari Health Connect berupa ANGKA jam (mis. 7.4), input manual lama berupa teks
+      // "7h 30m". Tanpa penanganan angka, `.match` dipanggil pada angka dan modal-nya crash.
+      if (typeof str === 'number' && !isNaN(str)) {
+          return { h: Math.floor(str), m: Math.round((str % 1) * 60) };
+      }
+      if (str == null) return { h: 0, m: 0 };
+      const s = String(str);
+      const parts = s.match(/(\d+)h\s*(\d+)m/);
       if (parts) return { h: parseInt(parts[1]) || 0, m: parseInt(parts[2]) || 0 };
+      const plain = parseFloat(s);
+      if (!isNaN(plain)) return { h: Math.floor(plain), m: Math.round((plain % 1) * 60) };
       return { h: 0, m: 0 };
   };
   const { h: sleepH, m: sleepM } = parseSleep(formBio.sleep);
