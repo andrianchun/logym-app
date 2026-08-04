@@ -24,7 +24,6 @@ export default function SettingsModal({
   userApiKeys, setUserApiKeys,
   logiPersona, setLogiPersona, logiCustomInstruction, setLogiCustomInstruction,
   logiMemory, setLogiMemory,
-  connectedApps, setConnectedApps,
   otaAvailable, otaState, currentVer, onUpdateApp, downloadProgress,
   healthConnectEnabled, onToggleHealthConnect, healthAvailable, onHcBackfill,
 }) {
@@ -56,14 +55,6 @@ export default function SettingsModal({
   }
 
   if (!showSettings) return null;
-
-  const handleToggleApp = (appKey) => {
-     setConnectedApps(prev => {
-         const next = { ...prev, [appKey]: !prev[appKey] };
-         localStorage.setItem('lyfit_connectedApps', JSON.stringify(next));
-         return next;
-     });
-  };
 
   return (
     <div className={`fixed inset-0 z-[999] ${t.bgApp} flex flex-col animate-in slide-in-from-bottom-full duration-300`}>
@@ -481,33 +472,6 @@ export default function SettingsModal({
                 </div>
                 </div>
             </div>
-
-            {/* INTEGRASI KESEHATAN */}
-            <div className={`p-4 rounded-2xl border ${t.border} ${t.bgCard} space-y-3`}>
-                <p className={`body-md ${t.textMuted} uppercase tracking-wider mb-2 flex items-center gap-2`}><Activity size={16}/> Koneksi Data Kesehatan</p>
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                        <span className={`font-bold ${t.textMain}`}>Health Connect</span>
-                        <button 
-                            onClick={() => handleToggleApp('healthconnect')}
-                            className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${connectedApps?.healthconnect ? t.bgAccent + ' text-white shadow-sm' : t.btnBg + ' ' + t.textMuted}`}
-                        >
-                            {connectedApps?.healthconnect ? 'Terhubung' : 'Hubungkan'}
-                        </button>
-                    </div>
-                    
-                    <div className="flex items-center justify-between border-t border-black/5 dark:border-white/5 pt-3">
-                        <span className={`font-bold ${t.textMain}`}>Apple Health</span>
-                        <button 
-                            onClick={() => handleToggleApp('applehealth')}
-                            className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${connectedApps?.applehealth ? t.bgAccent + ' text-white shadow-sm' : t.btnBg + ' ' + t.textMuted}`}
-                        >
-                            {connectedApps?.applehealth ? 'Terhubung' : 'Hubungkan'}
-                        </button>
-                    </div>
-                </div>
-            </div>
-
 
             {/* FITUR EXPORT / IMPORT JSON */}
             <div className={`p-4 rounded-2xl border ${t.border} ${t.bgCard} space-y-3`}>
