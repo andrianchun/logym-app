@@ -48,7 +48,7 @@ import { fetchExercisesFromApi } from './utils/exerciseDbApi';
 import { AI_MODELS, detectPlateaus, getLogiNotification } from './utils/aiAgent';
 import { calculateReadiness } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
-import { calculateWorkoutCalories, calculateSmartWorkoutCalories } from './utils/workoutCalc';
+import { calculateWorkoutCalories, calculateSmartWorkoutCalories, parseWorkoutDurationMinutes } from './utils/workoutCalc';
 import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcWriteWorkoutCalories, hcCheckStatus } from './utils/healthConnect';
 import useDialog from './hooks/useDialog';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
@@ -350,6 +350,28 @@ export default function App() {
     const status = await hcCheckStatus();
     let filled = 0;
     await hcBackfillHistory(days, () => false, (ymd, summary) => { filled++; mergeHcDayData(ymd, summary); });
+
+    // Arah sebaliknya: dorong histori latihan Logym (kalori terbakar) ke Health Connect.
+    // Health Connect menerima record bertanggal lampau — yang dibatasi cuma MEMBACA data
+    // lama (butuh READ_HEALTH_DATA_HISTORY), menulis ke belakang tidak dibatasi.
+    // Aman diulang: tiap sesi dicatat lewat dedupeKey (id sesi), jadi tidak pernah dobel.
+    let pushed = 0;
+    for (let i = 0; i <= days; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const ymd = getLocalYMD(d);
+      for (const w of history[ymd]?.workouts || []) {
+        if (w.status !== 'completed') continue;
+        const mins = parseWorkoutDurationMinutes(w.duration);
+        if (mins <= 0) continue;
+        const kcal = calculateSmartWorkoutCalories(userProfile?.weight, w, w.log);
+        // timestamp cuma "HH:MM" jam selesai; kalau tidak ada, taruh di siang hari.
+        const end = new Date(`${ymd}T${w.timestamp && /^\d{2}:\d{2}$/.test(w.timestamp) ? w.timestamp : '12:00'}:00`);
+        const start = new Date(end.getTime() - mins * 60000);
+        if (await hcWriteWorkoutCalories(start.toISOString(), end.toISOString(), kcal, w.id)) pushed++;
+      }
+    }
+
     if (status) {
       const denied = [...(status.readDenied || []), ...(status.writeDenied || [])];
       // Sengaja gak di-await — tombol yang manggil ini harus langsung balik normal begitu
@@ -359,7 +381,7 @@ export default function App() {
         (denied.length ? ` Ditolak: ${denied.join(', ')}.` : '') +
         // Tanpa pembagi: rentangnya inklusif dua ujung (hari ini + N hari ke belakang = N+1)
         // dan beda zona waktu bisa nambah satu lagi, jadi "32/30" bikin bingung.
-        ` Histori terisi: ${filled} hari.`
+        ` Histori masuk: ${filled} hari. Sesi latihan terkirim ke Health Connect: ${pushed}.`
       );
     }
   };

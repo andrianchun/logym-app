@@ -70,11 +70,18 @@ export const hcCheckStatus = async () => {
 // Tulis kalori terbakar satu sesi latihan yang baru selesai. startDate/endDate = rentang waktu
 // sesi (jadi durasinya ikut kebawa lewat rentang record, bukan cuma angka kalori polos) — app
 // lain yang baca ActiveCaloriesBurnedRecord dari Health Connect akan lihat kapan & berapa lama.
-export const hcWriteWorkoutCalories = async (startDate, endDate, kcal) => {
+// `dedupeKey` (opsional) — id sesi latihan. Health Connect MENJUMLAHKAN semua record dan
+// plugin ini tidak punya delete/update, jadi sesi yang sama tidak boleh terkirim dua kali
+// (mis. saat mendorong histori berulang kali). Sesi yang sudah terkirim dicatat di
+// localStorage dan dilewati di panggilan berikutnya.
+export const hcWriteWorkoutCalories = async (startDate, endDate, kcal, dedupeKey) => {
   if (!isNative() || !kcal || kcal <= 0) return false;
+  const memo = dedupeKey ? `hc_workout_written_${dedupeKey}` : null;
+  if (memo && localStorage.getItem(memo)) return false;
   try {
     const H = Health;
     await H.saveSample({ dataType: 'calories', startDate, endDate, value: Math.round(kcal) });
+    if (memo) localStorage.setItem(memo, '1');
     return true;
   } catch (e) {
     console.warn('hcWriteWorkoutCalories gagal:', e);
