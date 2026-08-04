@@ -609,6 +609,54 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          }
      }));
   }, [activityTargets?.nutritionGoal, activityTargets?.calorieDelta, activityTargets?.tdee, activeDate, todayStr]);
+  const [sleepPointWidth, setSleepPointWidth] = useState(40);
+  const sleepScrollRef = useRef(null);
+  const sleepTouchState = useRef({ initialDist: 0, initialPointWidth: 40, pinchRatio: 0, scrollRelCenterX: 0 });
+  const sleepScrollTarget = useRef(null);
+
+  const handleSleepTouchStart = (e) => {
+      if (e.touches.length === 2 && sleepScrollRef.current) {
+          const dist = Math.hypot(
+              e.touches[0].clientX - e.touches[1].clientX,
+              e.touches[0].clientY - e.touches[1].clientY
+          );
+          const pinchCenterX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+          const rect = sleepScrollRef.current.getBoundingClientRect();
+          const scrollRelCenterX = pinchCenterX - rect.left;
+          const currentScrollLeft = sleepScrollRef.current.scrollLeft;
+          const currentSleepBio = history[activeDate]?.bioData || {};
+          const sleepDataLength = (currentSleepBio.sleepLog && Array.isArray(currentSleepBio.sleepLog)) ? currentSleepBio.sleepLog.length : 0;
+          const currentChartWidth = Math.max(sleepDataLength * sleepPointWidth, window.innerWidth - 64);
+          const pinchRatio = (scrollRelCenterX + currentScrollLeft) / currentChartWidth;
+          sleepTouchState.current = { initialDist: dist, initialPointWidth: sleepPointWidth, pinchRatio, scrollRelCenterX };
+      }
+  };
+
+  const handleSleepTouchMove = (e) => {
+      if (e.touches.length === 2 && sleepScrollRef.current) {
+          const dist = Math.hypot(
+              e.touches[0].clientX - e.touches[1].clientX,
+              e.touches[0].clientY - e.touches[1].clientY
+          );
+          const scale = dist / sleepTouchState.current.initialDist;
+          let newWidth = sleepTouchState.current.initialPointWidth * scale;
+          if (newWidth < 15) newWidth = 15;
+          if (newWidth > 200) newWidth = 200;
+          setSleepPointWidth(newWidth);
+          const currentSleepBio = history[activeDate]?.bioData || {};
+          const sleepDataLength = (currentSleepBio.sleepLog && Array.isArray(currentSleepBio.sleepLog)) ? currentSleepBio.sleepLog.length : 0;
+          const nextChartWidth = Math.max(sleepDataLength * newWidth, window.innerWidth - 64);
+          const newPinchAbsX = sleepTouchState.current.pinchRatio * nextChartWidth;
+          sleepScrollTarget.current = newPinchAbsX - sleepTouchState.current.scrollRelCenterX;
+      }
+  };
+
+  useEffect(() => {
+     if (sleepScrollTarget.current !== null && sleepScrollRef.current) {
+         sleepScrollRef.current.scrollLeft = sleepScrollTarget.current;
+         sleepScrollTarget.current = null;
+     }
+  }, [sleepPointWidth]);
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300 pb-6 overflow-x-hidden">
@@ -1333,7 +1381,13 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                                                     <div className={`h-px w-full ${t.borderDashed} border-b`}></div>
                                                     <div className={`h-px w-full ${t.borderDashed} border-b`}></div>
                                                 </div>
-                                                <div className="absolute left-12 right-0 top-0 bottom-0">
+                                                <div 
+                                                    className="absolute left-12 right-0 top-0 bottom-0 overflow-x-auto scrollbar-hide touch-pan-x"
+                                                    ref={sleepScrollRef}
+                                                    onTouchStartCapture={handleSleepTouchStart}
+                                                    onTouchMoveCapture={handleSleepTouchMove}
+                                                    style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}
+                                                >
                                                     {(() => {
                                                         const sleepData = (sleepBio.sleepLog && Array.isArray(sleepBio.sleepLog) && sleepBio.sleepLog.length > 1) 
                                                             ? sleepBio.sleepLog 
@@ -1348,7 +1402,9 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                                                             );
                                                         }
                                                         
+                                                        const currentChartWidth = Math.max(sleepData.length * sleepPointWidth, window.innerWidth - 64);
                                                         return (
+                                                          <div style={{ width: `${currentChartWidth}px`, height: '100%', paddingRight: '20px' }}>
                                                             <ResponsiveContainer width="100%" height="100%">
                                                                 <AreaChart data={sleepData} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
                                                                     <defs>
@@ -1379,6 +1435,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                                                                     />
                                                                 </AreaChart>
                                                             </ResponsiveContainer>
+                                                          </div>
                                                         );
                                                     })()}
                                                 </div>
