@@ -45,7 +45,11 @@ run('npm run build:ota', { OTA_FORCE: forced ? '1' : '0', OTA_NOTES: notes || ''
 // selamanya. Kejadian 4x di Logym; hapus cache selalu memperbaikinya. Deploy jadi sedikit
 // lebih lama karena semua file diunggah ulang — murah dibanding rilis yang tidak sampai.
 fs.rmSync('.firebase', { recursive: true, force: true });
-run('firebase deploy --only hosting');
+// --project EKSPLISIT: default .firebaserc nunjuk ke "logym-id", tapi domain produksi asli
+// (logym.web.app) itu site "logym" di project "hexa-life" — beda project sama sekali. Tanpa
+// --project, deploy diam-diam sukses ke logym-id.web.app (situs yang gak dipakai siapa pun)
+// dan logym.web.app gak pernah ke-update. Kejadian nyata: rilis v1.0.22 awalnya salah sasaran.
+run('firebase deploy --only hosting --project hexa-life');
 run('git add -A');
 run(`git commit -m "release v${version}"`);
 run('git push');
