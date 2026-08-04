@@ -28,6 +28,7 @@ export default function SettingsModal({
   healthConnectEnabled, onToggleHealthConnect, healthAvailable, onHcBackfill,
 }) {
   const [hcBackfilling, setHcBackfilling] = useState(false);
+  const [hcConnecting, setHcConnecting] = useState(false);
   const [activeTab, setActiveTab] = useState('preferensi');
   const [openFaqIndex, setOpenFaqIndex] = useState(null);
   const [prevShowSettings, setPrevShowSettings] = useState(showSettings);
@@ -307,10 +308,14 @@ export default function SettingsModal({
               <div className="flex items-center justify-between">
                 <span className={`font-bold text-sm ${t.textMain}`}>Sinkron Steps, Tidur, Detak Jantung, dsb.</span>
                 <button
-                  onClick={onToggleHealthConnect}
-                  className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${healthConnectEnabled ? `${t.bgAccent} text-white shadow-sm` : `${t.btnBg} ${t.textMuted}`}`}
+                  disabled={hcConnecting}
+                  onClick={async () => {
+                    setHcConnecting(true);
+                    try { await onToggleHealthConnect(); } finally { setHcConnecting(false); }
+                  }}
+                  className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all disabled:opacity-50 ${healthConnectEnabled ? `${t.bgAccent} text-white shadow-sm` : `${t.btnBg} ${t.textMuted}`}`}
                 >
-                  {healthConnectEnabled ? 'Terhubung' : 'Hubungkan'}
+                  {hcConnecting ? 'Menghubungkan...' : (healthConnectEnabled ? 'Terhubung' : 'Hubungkan')}
                 </button>
               </div>
               {!healthAvailable && (
