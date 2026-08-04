@@ -12,9 +12,9 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
       { key: 'visceralFat', label: 'Lemak Visceral', color: theme === 'dark' ? '#2dd4bf' : '#0d9488' }, // Teal
       { key: 'bmr', label: 'BMR', color: theme === 'dark' ? '#94a3b8' : '#64748b' }, // Slate
       { key: 'waist', label: 'Lingkar Perut', color: theme === 'dark' ? '#3b82f6' : '#1d4ed8' }, // Blue
-      { key: 'bpSys', label: 'Tensi', color: theme === 'dark' ? '#a78bfa' : '#7c3aed' }, // Soft Purple
-      { key: 'heartRate', label: 'Nadi', color: theme === 'dark' ? '#06b6d4' : '#0891b2' }, // Cyan
-      { key: 'oxygenSaturation', label: 'SpO2', color: theme === 'dark' ? '#93c5fd' : '#1e3a8a' }, // Very Light Blue
+      // Tensi/Nadi/SpO2 dipindah ke kartu Aktivitas Harian (grafik VitalsChart, detail per jam
+      // dari Health Connect) — di sini cuma satu angka ringkasan per hari, kurang berguna
+      // buat data yang aslinya beresolusi tinggi.
   ];
 
   const [activeChartMetrics, setActiveChartMetrics] = useState(() => {
@@ -327,7 +327,7 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
                        itemStyle={{ padding: 0, margin: 0, marginTop: '4px' }} 
                        labelStyle={{ color: theme === 'dark' ? '#a1a1aa' : '#71717a', marginBottom: '4px', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }} 
                     />
-                    <XAxis dataKey="name" stroke={theme === 'dark' ? '#a1a1aa' : '#64748b'} fontSize={10} tickLine={false} axisLine={false} />
+                    <XAxis dataKey="name" stroke={theme === 'dark' ? '#a1a1aa' : '#64748b'} fontSize={10} tickLine={false} axisLine={false} interval={Math.max(0, Math.ceil(50 / pointWidth) - 1)} />
                     {chartMetricsList.map(metric => {
                         if (!activeChartMetrics.includes(metric.key)) return null;
                         const isFirstActive = activeChartMetrics[0] === metric.key;
@@ -337,7 +337,7 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
                     })}
                     {chartMetricsList.map(metric => (
                         activeChartMetrics.includes(metric.key) && 
-                        <Line key={metric.key} yAxisId={metric.key} type="linear" name={metric.label} dataKey={metric.key} stroke={metric.color} strokeWidth={1.5} dot={false} activeDot={{ r: 5, strokeWidth: 0, fill: metric.color }} connectNulls={true} isAnimationActive={false} />
+                        <Line key={metric.key} yAxisId={metric.key} type="monotone" name={metric.label} dataKey={metric.key} stroke={metric.color} strokeWidth={1.5} dot={false} activeDot={{ r: 5, strokeWidth: 0, fill: metric.color }} connectNulls={true} isAnimationActive={false} />
                     ))}
                  </LineChart>
              </div>

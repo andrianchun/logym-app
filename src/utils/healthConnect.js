@@ -236,7 +236,13 @@ export const hcWriteWorkoutSession = async ({ startDate, endDate, exerciseType, 
   }
 };
 
-const ymdOf = (isoStr) => isoStr.slice(0, 10);
+// slice(0,10) di ISO string ngasih tanggal UTC, bukan tanggal lokal — buat user WIB (UTC+7),
+// sample yang jam lokalnya dini hari (00:00-07:00) masih "kemarin" di UTC, jadi kesplit ke
+// hari yang salah (tidur semalam kepotong, sebagian nyasar ke tanggal sebelumnya).
+const ymdOf = (isoStr) => {
+  const d = new Date(isoStr);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 
 // Kelompokkan sample "titik waktu" (berat, tinggi, body fat, oksigen, tekanan darah — bukan
 // yang dijumlah per hari) berdasarkan tanggal, ambil yang PALING BARU per hari.
@@ -249,6 +255,21 @@ const latestPerDay = (samples, mapValue) => {
     }
   }
   Object.values(byDay).forEach((v) => delete v._at);
+  return byDay;
+};
+
+// Kelompokkan sample "titik waktu" APA ADANYA (semua titik, bukan cuma yang terbaru) jadi log
+// intraday per hari — dipakai buat grafik detail per jam (nadi, tensi, SpO2), beda dari
+// latestPerDay yang cuma nyimpen satu angka ringkasan per hari.
+const logPerDay = (samples, mapValue) => {
+  const byDay = {};
+  for (const s of samples) {
+    const ymd = ymdOf(s.startDate);
+    if (!byDay[ymd]) byDay[ymd] = [];
+    const ts = new Date(s.startDate).getTime();
+    byDay[ymd].push({ time: new Date(ts).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }), ts, ...mapValue(s) });
+  }
+  Object.values(byDay).forEach((list) => list.sort((a, b) => a.ts - b.ts));
   return byDay;
 };
 
@@ -381,6 +402,13 @@ export const hcReadRange = async (startYmd, endYmd) => {
       })))
       .catch((e) => console.warn('hcReadRange heartRate gagal:', e)),
 
+    // Log detail per jam (nadi/tensi/SpO2) — dipakai grafik intraday di kartu Aktivitas
+    // Harian, terpisah dari angka ringkasan harian di atas yang dipakai kartu Komposisi Tubuh.
+    H.readSamples({ dataType: 'heartRate', startDate: startISO, endDate: endISO, limit: 5000, ascending: true })
+      .then((res) => Object.entries(logPerDay(res?.samples || [], (s) => ({ value: Math.round(s.value) })))
+        .forEach(([ymd, log]) => put(ymd, { heartRateLog: log })))
+      .catch((e) => console.warn('hcReadRange heartRateLog gagal:', e)),
+
     H.readSamples({ dataType: 'weight', startDate: startISO, endDate: endISO, limit: 1000, ascending: true })
       .then((res) => Object.entries(latestPerDay(res?.samples || [], (s) => ({ weight: Number(s.value.toFixed(1)) })))
         .forEach(([ymd, v]) => put(ymd, v)))
@@ -396,14 +424,24 @@ export const hcReadRange = async (startYmd, endYmd) => {
         .forEach(([ymd, v]) => put(ymd, v)))
       .catch((e) => console.warn('hcReadRange bodyFat gagal:', e)),
 
-    H.readSamples({ dataType: 'oxygenSaturation', startDate: startISO, endDate: endISO, limit: 1000, ascending: true })
-      .then((res) => Object.entries(latestPerDay(res?.samples || [], (s) => ({ oxygenSaturation: Math.round(s.value) })))
-        .forEach(([ymd, v]) => put(ymd, v)))
+    H.readSamples({ dataType: 'oxygenSaturation', startDate: startISO, endDate: endISO, limit: 5000, ascending: true })
+      .then((res) => {
+        const samples = res?.samples || [];
+        Object.entries(latestPerDay(samples, (s) => ({ oxygenSaturation: Math.round(s.value) })))
+          .forEach(([ymd, v]) => put(ymd, v));
+        Object.entries(logPerDay(samples, (s) => ({ value: Math.round(s.value) })))
+          .forEach(([ymd, log]) => put(ymd, { oxygenSaturationLog: log }));
+      })
       .catch((e) => console.warn('hcReadRange oxygenSaturation gagal:', e)),
 
-    H.readSamples({ dataType: 'bloodPressure', startDate: startISO, endDate: endISO, limit: 1000, ascending: true })
-      .then((res) => Object.entries(latestPerDay(res?.samples || [], (s) => ({ bloodPressure: `${Math.round(s.systolic)}/${Math.round(s.diastolic)}` })))
-        .forEach(([ymd, v]) => put(ymd, v)))
+    H.readSamples({ dataType: 'bloodPressure', startDate: startISO, endDate: endISO, limit: 5000, ascending: true })
+      .then((res) => {
+        const samples = res?.samples || [];
+        Object.entries(latestPerDay(samples, (s) => ({ bloodPressure: `${Math.round(s.systolic)}/${Math.round(s.diastolic)}` })))
+          .forEach(([ymd, v]) => put(ymd, v));
+        Object.entries(logPerDay(samples, (s) => ({ sys: Math.round(s.systolic), dia: Math.round(s.diastolic) })))
+          .forEach(([ymd, log]) => put(ymd, { bloodPressureLog: log }));
+      })
       .catch((e) => console.warn('hcReadRange bloodPressure gagal:', e)),
 
     // Sleep gak bisa di-aggregate (batasan plugin) — jumlah manual dari sample mentah.

@@ -210,9 +210,12 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
         return Number(num).toLocaleString('id-ID');
     };
     const parseSleepHours = (sleepStr) => {
+        // Nilai dari Health Connect berupa ANGKA jam (mis. 7.4), input manual lama berupa teks
+        // "7h 30m" — tanpa penanganan angka, `.match` dipanggil pada angka dan crash.
+        if (typeof sleepStr === 'number') return isNaN(sleepStr) ? 0 : sleepStr;
         if (!sleepStr) return 0;
-        const parts = sleepStr.match(/(\d+)\s*h\s*(\d+)?\s*m?/);
-        if (!parts) return 0;
+        const parts = String(sleepStr).match(/(\d+)\s*h\s*(\d+)?\s*m?/);
+        if (!parts) return parseFloat(sleepStr) || 0;
         const h = parseInt(parts[1] || 0, 10);
         const m = parseInt(parts[2] || 0, 10);
         return h + (m / 60);

@@ -5,6 +5,7 @@ import { getLocalYMD } from '../data/constants';
 import DashboardModals from '../components/DashboardModals';
 import DashboardChart from '../components/DashboardChart';
 import ActivityChart from '../components/ActivityChart';
+import VitalsChart, { VITALS_METRICS } from '../components/VitalsChart';
 import ProgressTab from './ProgressTab';
 import { MuscleProgress } from '../components/MuscleProgress';
 import SwipeInput from '../components/SwipeInput';
@@ -145,7 +146,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
       localStorage.setItem('lyfit_sleep_expanded', JSON.stringify(isSleepExpanded));
   }, [isSleepExpanded]);
 
-  const [sleepSubTab, setSleepSubTab] = useState('stages');
+  const [sleepSubTab, setSleepSubTab] = useState('durasi');
   // Navigasi tanggal KHUSUS kartu tidur (0 = hari ini, 1 = kemarin, dst). Turunannya
   // (sleepDate/sleepBio) didefinisikan SESUDAH bioData di bawah — bukan di sini — karena
   // membacanya sebelum itu bikin error "Cannot access before initialization" saat render.
@@ -166,25 +167,32 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   const [formBio, setFormBio] = useState({ ...emptyBio });
 
   const { bioData, bioDataDate } = useMemo(() => {
+     let todayDailyData = history[activeDate]?.bioData || {};
+     const sortedDates = Object.keys(history).filter(d => d <= activeDate).sort((a,b) => b.localeCompare(a));
+
+     // Komposisi tubuh dibaca dari SATU hari snapshot (bukan campur per-field dari tanggal
+     // beda-beda) — biar "Data dari: X" akurat, semua angka yang tampil beneran dari tanggal
+     // itu, bukan gado-gado field lama+baru yang bikin labelnya menyesatkan. Pemicunya WAJIB
+     // mencakup semua field komposisi (termasuk waist) — dulu cuma cek 5 field dan waist gak
+     // pernah bisa jadi pemicu, jadi entri "cuma isi lingkar perut hari ini" ketimpa balik
+     // snapshot hari lama yang gak punya lingkar perut sama sekali.
+     const COMPOSITION_FIELDS = ['weight', 'bodyFat', 'musclePercent', 'muscleMass', 'boneMass', 'visceralFat', 'waterPercent', 'proteinPercent', 'bodyAge', 'bmr', 'bodyScore', 'waist'];
      let latestBodyData = null;
      let bodyDataDate = null;
-     let todayDailyData = history[activeDate]?.bioData || {};
-     
-     const sortedDates = Object.keys(history).filter(d => d <= activeDate).sort((a,b) => b.localeCompare(a));
-     for (let date of sortedDates) {
+     for (const date of sortedDates) {
          const dayBio = history[date]?.bioData;
-         if (dayBio && (Number(dayBio.weight) > 0 || Number(dayBio.bodyFat) > 0 || Number(dayBio.musclePercent) > 0 || Number(dayBio.bmr) > 0 || Number(dayBio.bodyScore) > 0)) {
+         if (dayBio && COMPOSITION_FIELDS.some(f => Number(dayBio[f]) > 0)) {
              latestBodyData = dayBio;
              bodyDataDate = date;
              break;
          }
      }
-     
+
      const mergedData = {
          ...emptyBio,
-         height: userProfile?.height || null, 
+         height: userProfile?.height || null,
          weight: userProfile?.weight || null,
-         ...(latestBodyData || {}),
+         ...latestBodyData,
          steps: todayDailyData.steps !== undefined ? todayDailyData.steps : (emptyBio.steps || 0),
          activeMinutes: todayDailyData.activeMinutes !== undefined ? todayDailyData.activeMinutes : (emptyBio.activeMinutes || 0),
          activityCalories: todayDailyData.activityCalories !== undefined ? todayDailyData.activityCalories : (emptyBio.activityCalories || 0),
@@ -206,14 +214,9 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          weeklyDuration: todayDailyData.weeklyDuration !== undefined ? todayDailyData.weeklyDuration : (emptyBio.weeklyDuration || 0),
          weeklySessions: todayDailyData.weeklySessions !== undefined ? todayDailyData.weeklySessions : (emptyBio.weeklySessions || 0),
          weeklyCalories: todayDailyData.weeklyCalories !== undefined ? todayDailyData.weeklyCalories : (emptyBio.weeklyCalories || 0),
-         _manualFlags: (() => {
-             const inherited = { ...(latestBodyData?._manualFlags || {}) };
-             ['steps', 'activeMinutes', 'activityCalories', 'nutritionCalories', 'sleep', 'energyScore', 'heartRate', 'minHeartRate', 'maxHeartRate', 'bloodPressure', 'oxygenSaturation', 'waterIntake', 'sleepAwake', 'sleepRem', 'sleepLight', 'sleepDeep', 'hrv'].forEach(k => delete inherited[k]);
-             return {
-                 ...inherited,
-                 ...(todayDailyData?._manualFlags || {})
-             };
-         })()
+         // _manualFlags composition (weight/bodyFat/dst) gak pernah dibaca logic apa pun — cuma
+         // dipakai buat gate activityCalories/nutritionCalories, dan itu selalu dari hari ini.
+         _manualFlags: { ...(todayDailyData?._manualFlags || {}) }
      };
      
      // Auto-calculate BMI for dashboard display if weight and height exist
@@ -419,7 +422,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                      if (newBio._manualFlags) delete newBio._manualFlags[k];
                  });
              } else {
-                 ['steps', 'activeMinutes', 'activityCalories', 'nutritionCalories', 'sleep', 'sleepLog', 'heartRate', 'minHeartRate', 'maxHeartRate', 'bloodPressure', 'oxygenSaturation', 'waterIntake', 'weeklyDuration', 'weeklySessions', 'weeklyCalories', 'sleepAwake', 'sleepRem', 'sleepLight', 'sleepDeep', 'hrv', 'energyScore'].forEach(k => { 
+                 ['steps', 'activeMinutes', 'activityCalories', 'nutritionCalories', 'sleep', 'sleepLog', 'heartRate', 'minHeartRate', 'maxHeartRate', 'bloodPressure', 'oxygenSaturation', 'heartRateLog', 'bloodPressureLog', 'oxygenSaturationLog', 'waterIntake', 'weeklyDuration', 'weeklySessions', 'weeklyCalories', 'sleepAwake', 'sleepRem', 'sleepLight', 'sleepDeep', 'hrv', 'energyScore'].forEach(k => {
                      newBio[k] = null;
                      if (newBio._manualFlags) delete newBio._manualFlags[k];
                  });
@@ -1002,11 +1005,17 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
           <div id="aktivitas-subcard" className={`grid relative z-10 transition-all duration-300 ease-in-out ${isAktivitasExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
              <div className="overflow-hidden">
                <div className={`rounded-b-2xl border border-t-0 ${t.border} ${t.bgSunken} shadow-inner relative z-10 no-swipe`} onTouchStart={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
-                 <ActivityChart 
-                    t={t} theme={theme} history={history} 
-                    soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
+                 <ActivityChart
+                    t={t} theme={theme} history={history}
+                    soundEnabled={soundEnabled} playSoundEffect={playSoundEffect}
                     onPointClick={navigateToWorkoutDate}
                     language={language}
+                    lomealToday={lomealToday}
+                    metricKeys={['steps', 'calories', 'activeMinutes']}
+                    extraTabs={VITALS_METRICS(theme)}
+                    renderExtra={(key) => (
+                       <VitalsChart t={t} theme={theme} history={history} language={language} activeMetric={key} />
+                    )}
                  />
                </div>
              </div>
@@ -1109,14 +1118,14 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                  maskImage: 'linear-gradient(to bottom, black 75%, transparent 100%)',
                  WebkitMaskImage: 'linear-gradient(to bottom, black 75%, transparent 100%)'
              }}>
-                 <img src="/bg-empty.webp" alt="" className="absolute -right-72 top-2 w-[48rem] max-w-[170%] h-auto drop-shadow-xl transition-transform duration-500 ease-out" />
+                 <img src="/bg-empty.webp" alt="" className="absolute -right-52 top-2 w-[44rem] max-w-[170%] h-auto drop-shadow-xl transition-transform duration-500 ease-out" />
              </div>
           </div>
 
           <div className="relative z-20 flex flex-col mt-10 pb-4 px-6 pt-4">
              <div className="flex items-center justify-between mb-4">
                  <div>
-                     <h3 className={`h2 ${t.textMain}`}>Tidur & Pemulihan</h3>
+                     <h3 className={`h2 ${t.textMain}`}>Pemulihan</h3>
                      <span className={`text-[10px] font-bold ${t.textMuted}`}>{sleepDateLabel}</span>
                  </div>
                  <div className="flex items-center gap-2">
@@ -1186,21 +1195,21 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                              if (sleepHrs <= 0) return null;
                              
                              let text = 'Sangat Kurang';
-                             let color = 'bg-rose-500/15 text-rose-500 border-rose-500/20';
+                             let color = 'bg-rose-500/90 text-white border-rose-500/20';
                              if (sleepHrs >= 9) {
                                  text = 'Berlebih';
-                                 color = 'bg-amber-500/15 text-amber-500 border-amber-500/20';
+                                 color = 'bg-amber-500/90 text-white border-amber-500/20';
                              } else if (sleepHrs >= 7) {
                                  text = 'Optimal';
-                                 color = 'bg-emerald-500/15 text-emerald-500 border-emerald-500/20';
+                                 color = 'bg-emerald-500/90 text-white border-emerald-500/20';
                              } else if (sleepHrs >= 6) {
                                  text = 'Cukup';
-                                 color = 'bg-sky-500/15 text-sky-500 border-sky-500/20';
+                                 color = 'bg-sky-500/90 text-white border-sky-500/20';
                              } else if (sleepHrs >= 4) {
                                  text = 'Kurang';
-                                 color = 'bg-amber-500/15 text-amber-500 border-amber-500/20';
+                                 color = 'bg-amber-500/90 text-white border-amber-500/20';
                              }
-                             return <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider ${color} border`}>{text}</span>;
+                             return <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider ${color} border backdrop-blur-md shadow-sm`}>{text}</span>;
                          })()}
                      </div>
                  </div>
@@ -1219,23 +1228,23 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                              if (score <= 0) return null;
                              
                              let text = 'Butuh Perhatian';
-                             let color = 'bg-rose-500/15 text-rose-500 border-rose-500/20';
+                             let color = 'bg-rose-500/90 text-white border-rose-500/20';
                              if (score >= 85) {
                                  text = 'Sangat Baik';
-                                 color = 'bg-emerald-500/15 text-emerald-500 border-emerald-500/20';
+                                 color = 'bg-emerald-500/90 text-white border-emerald-500/20';
                              } else if (score >= 70) {
                                  text = 'Baik';
-                                 color = 'bg-sky-500/15 text-sky-500 border-sky-500/20';
+                                 color = 'bg-sky-500/90 text-white border-sky-500/20';
                              } else if (score >= 60) {
                                  text = 'Cukup';
-                                 color = 'bg-amber-500/15 text-amber-500 border-amber-500/20';
+                                 color = 'bg-amber-500/90 text-white border-amber-500/20';
                              }
-                             return <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider ${color} border`}>{text}</span>;
+                             return <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider ${color} border backdrop-blur-md shadow-sm`}>{text}</span>;
                          })()}
                      </div>
                  </div>
              </div>
-             
+
              <button
                   onClick={() => {
                       playSoundEffect('click', soundEnabled);
@@ -1265,14 +1274,26 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
         
         <div id="sleep-subcard" className={`grid relative z-10 transition-all duration-300 ease-in-out ${isSleepExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
           <div className="overflow-hidden">
-            <div className={`rounded-b-2xl border border-t-0 ${t.border} ${t.bgSunken} shadow-inner relative z-10 p-6`}>
+            <div className={`rounded-b-2xl border border-t-0 ${t.border} ${t.bgSunken} shadow-inner relative z-10 p-6 no-swipe`} onTouchStart={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
                 <div className={`relative flex w-full p-1.5 rounded-full ${t.btnBg} mb-6`} style={{ zIndex: 10 }}>
-                     <div className={`absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] rounded-full transition-transform duration-300 ease-out ${t.bgAccent} shadow-sm`} style={{ transform: sleepSubTab === 'stages' ? 'translateX(0)' : 'translateX(100%)', left: '6px', zIndex: 1 }}></div>
-                     <button onClick={() => { playSoundEffect('click', soundEnabled); setSleepSubTab('stages'); }} className={`flex-1 py-2.5 rounded-full body-md font-black relative transition-colors duration-300 ${sleepSubTab === 'stages' ? 'text-white' : t.textMuted}`} style={{ zIndex: 2 }}>Tahap Tidur</button>
+                     <div className={`absolute top-1.5 bottom-1.5 w-[calc(33.333%-5px)] rounded-full transition-transform duration-300 ease-out ${t.bgAccent} shadow-sm`} style={{ transform: sleepSubTab === 'durasi' ? 'translateX(0)' : sleepSubTab === 'detail' ? 'translateX(100%)' : 'translateX(200%)', left: '6px', zIndex: 1 }}></div>
+                     <button onClick={() => { playSoundEffect('click', soundEnabled); setSleepSubTab('durasi'); }} className={`flex-1 py-2.5 rounded-full body-md font-black relative transition-colors duration-300 ${sleepSubTab === 'durasi' ? 'text-white' : t.textMuted}`} style={{ zIndex: 2 }}>Durasi</button>
+                     <button onClick={() => { playSoundEffect('click', soundEnabled); setSleepSubTab('detail'); }} className={`flex-1 py-2.5 rounded-full body-md font-black relative transition-colors duration-300 ${sleepSubTab === 'detail' ? 'text-white' : t.textMuted}`} style={{ zIndex: 2 }}>Detail</button>
                      <button onClick={() => { playSoundEffect('click', soundEnabled); setSleepSubTab('somnogram'); }} className={`flex-1 py-2.5 rounded-full body-md font-black relative transition-colors duration-300 ${sleepSubTab === 'somnogram' ? 'text-white' : t.textMuted}`} style={{ zIndex: 2 }}>Hipnogram</button>
                 </div>
-                
-                {(() => {
+
+                {sleepSubTab === 'durasi' && (
+                  <ActivityChart
+                     t={t} theme={theme} history={history}
+                     soundEnabled={soundEnabled} playSoundEffect={playSoundEffect}
+                     onPointClick={navigateToWorkoutDate}
+                     language={language}
+                     metricKeys={['sleep', 'energyScore']}
+                     storageKey="lyfit_sleep_chart"
+                  />
+                )}
+
+                {sleepSubTab !== 'durasi' && (() => {
                     const sAwake = parseFloat(sleepBio.sleepAwake);
                     const sRem = parseFloat(sleepBio.sleepRem);
                     const sLight = parseFloat(sleepBio.sleepLight);
@@ -1382,7 +1403,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
 
                     return (
                         <div className="flex flex-col mt-2">
-                            {sleepSubTab === 'stages' ? (
+                            {sleepSubTab === 'detail' ? (
                                 <>
                                     {/* Awake: 5-10% */}
                                     {renderSleepBar('Awake (Tidur Ayam)', sAwake, 5, 10, 'bg-zinc-400')}

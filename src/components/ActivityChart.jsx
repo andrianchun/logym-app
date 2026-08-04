@@ -3,8 +3,16 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recha
 import { getLocalYMD } from '../data/constants';
 import { formatNumber } from '../utils/numberFormat';
 
-const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPointClick, language }) => {
-  const chartMetricsList = [
+// metricKeys: subset opsional dari metrik di bawah yang mau ditampilin — dipakai buat misahin
+// grafik Aktivitas Harian (langkah/kalori/durasi) dari grafik Tidur & Pemulihan (tidur/skor
+// energi), dua instance komponen yang sama dengan localStorage key beda (storageKey) biar
+// pilihan tab-nya gak saling timpa.
+// extraTabs/renderExtra: tab TAMBAHAN yang ikut nempel di baris toggle yang sama (mis. Nadi/
+// Tensi/SpO2 di sebelah Durasi Aktif) tapi visualisasinya beda total (bukan bar per-hari) —
+// pas tab itu aktif, seluruh area chart bar diganti sama renderExtra(key), baris toggle-nya
+// tetap satu biar gak makan tempat vertikal buat tab row kedua.
+const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPointClick, language, lomealToday, metricKeys, storageKey = 'lyfit_activity_chart', extraTabs, renderExtra }) => {
+  const allMetrics = [
       { key: 'steps', label: 'Langkah', color: theme === 'dark' ? '#38bdf8' : '#0284c7', type: 'single' }, // Sky Blue
       { key: 'calories', label: 'Kalori', color: theme === 'dark' ? '#818cf8' : '#4f46e5', type: 'grouped',  // Indigo
         subMetrics: [
@@ -16,19 +24,23 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
       { key: 'sleep', label: 'Tidur', color: theme === 'dark' ? '#a78bfa' : '#7c3aed', type: 'single' }, // Soft Purple
       { key: 'energyScore', label: 'Skor Energi', color: theme === 'dark' ? '#94a3b8' : '#64748b', type: 'single' }, // Slate
   ];
+  const chartMetricsList = [
+      ...(metricKeys ? allMetrics.filter(m => metricKeys.includes(m.key)) : allMetrics),
+      ...(extraTabs || []).map(m => ({ ...m, isExtra: true })),
+  ];
 
   const [activeMetric, setActiveMetric] = useState(() => {
       try {
-          const saved = localStorage.getItem('lyfit_activity_chart');
-          if (saved) return saved;
+          const saved = localStorage.getItem(storageKey);
+          if (saved && chartMetricsList.some(m => m.key === saved)) return saved;
       } catch(e) {}
-      return 'steps';
+      return chartMetricsList[0]?.key;
   });
 
   const toggleChartMetric = (key) => {
       playSoundEffect('click', soundEnabled);
       setActiveMetric(key);
-      localStorage.setItem('lyfit_activity_chart', key);
+      localStorage.setItem(storageKey, key);
   };
 
   const multiChartData = useMemo(() => {
@@ -45,17 +57,23 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
       }
       bioEntries.sort((a, b) => a.dateStr.localeCompare(b.dateStr));
 
+      // Buat hari ini, bioData.nutritionCalories bisa telat/ketimpa balik oleh autosave Logym
+      // sendiri (round-trip Firestore) — lomealToday didorong live dari Lomeal jadi dipakai
+      // duluan, sama seperti kartu "Kalori Dimakan" (lihat DashboardTab.jsx).
+      const lomealFresh = lomealToday?.ymd === todayStr ? lomealToday : null;
+
       bioEntries.forEach(entry => {
           const d = new Date(entry.dateStr);
           const histBio = entry.bioData;
-          
+
           let actCals = Number(histBio?.activityCalories || 0);
-          
+          const nutritionKcal = entry.dateStr === todayStr && lomealFresh ? lomealFresh.kcal : histBio?.nutritionCalories;
+
           data.push({
               name: d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }),
               dateFull: entry.dateStr,
               steps: histBio?.steps ? Number(histBio.steps) : null,
-              nutritionCalories: histBio?.nutritionCalories ? Number(histBio.nutritionCalories) : null,
+              nutritionCalories: nutritionKcal ? Number(nutritionKcal) : null,
               activityCalories: actCals > 0 ? actCals : null,
               activeMinutes: histBio?.activeMinutes ? Number(histBio.activeMinutes) : null,
               sleep: histBio?.sleep ? Number(histBio.sleep) : null,
@@ -63,7 +81,7 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
           });
       });
       return data;
-  }, [history]);
+  }, [history, lomealToday]);
 
   const scrollRef = useRef(null);
 
@@ -96,16 +114,17 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
 
   const updateYDomain = useCallback(() => {
       if (!scrollRef.current || multiChartData.length === 0) return;
+      const activeObj = chartMetricsList.find(m => m.key === activeMetric);
+      if (!activeObj || activeObj.isExtra) return;
       const { scrollLeft, clientWidth } = scrollRef.current;
       const pw = pointWidthRef.current;
-      
+
       const startIndex = Math.max(0, Math.floor(scrollLeft / pw));
       const endIndex = Math.min(multiChartData.length - 1, Math.ceil((scrollLeft + clientWidth) / pw));
       const visibleData = multiChartData.slice(startIndex, endIndex + 1);
-      
+
       let min = Infinity;
       let max = -Infinity;
-      const activeObj = chartMetricsList.find(m => m.key === activeMetric);
 
       const findMinMax = (dataList) => {
           dataList.forEach(d => {
@@ -201,11 +220,12 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
 
   return (
     <div className="p-5">
-         <div ref={scrollRef} 
+       {activeObj?.isExtra ? renderExtra(activeMetric) : (
+         <div ref={scrollRef}
               onScroll={handleScroll}
-              onTouchStartCapture={handleTouchStart} 
+              onTouchStartCapture={handleTouchStart}
               onTouchMoveCapture={handleTouchMove}
-              className="w-full overflow-x-auto scrollbar-hide mb-4 touch-pan-x pt-2 flex" 
+              className="w-full overflow-x-auto scrollbar-hide mb-4 touch-pan-x pt-2 flex"
               style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}>
              <div style={{ width: `${chartWidth}px`, height: '224px', marginLeft: (multiChartData.length * pointWidth) < (window.innerWidth - 64) ? 'auto' : '0' }} className="cursor-crosshair relative shrink-0">
                  <svg className="absolute inset-0 w-full h-full pointer-events-none z-0" style={{ padding: '10px 0 30px 0' }}>
@@ -214,10 +234,10 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
                      ))}
                  </svg>
 
-                 <BarChart 
+                 <BarChart
                     width={chartWidth}
                     height={224}
-                    data={multiChartData} 
+                    data={multiChartData}
                     style={{ outline: 'none' }}
                     onClick={(e) => {
                         if(e && e.activePayload && e.activePayload.length > 0) {
@@ -226,7 +246,7 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
                     }}
                  >
                     <defs>
-                        {chartMetricsList.map(metric => (
+                        {chartMetricsList.filter(m => !m.isExtra).map(metric => (
                             metric.type === 'single' ? (
                                 <linearGradient key={metric.key} id={`gradient-${metric.key}`} x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="5%" stopColor={metric.color} stopOpacity={1}/>
@@ -255,7 +275,7 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
                        itemStyle={{ padding: 0, margin: 0, marginTop: '4px' }} 
                        labelStyle={{ color: theme === 'dark' ? '#a1a1aa' : '#71717a', marginBottom: '4px', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }} 
                     />
-                    <XAxis dataKey="name" stroke={theme === 'dark' ? '#a1a1aa' : '#64748b'} fontSize={10} tickLine={false} axisLine={false} />
+                    <XAxis dataKey="name" stroke={theme === 'dark' ? '#a1a1aa' : '#64748b'} fontSize={10} tickLine={false} axisLine={false} interval={Math.max(0, Math.ceil(50 / pointWidth) - 1)} />
                     <YAxis domain={yDomain} hide={true} />
                     
                     {activeObj.type === 'single' ? (
@@ -283,7 +303,8 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
                  </BarChart>
              </div>
          </div>
-         
+       )}
+
          <div className="flex gap-2 overflow-x-auto pb-4 hide-scrollbar snap-x" style={{ WebkitOverflowScrolling: 'touch' }}>
             {chartMetricsList.map(metric => {
                 const isActive = activeMetric === metric.key;
