@@ -30,12 +30,12 @@ const CalendarTab = ({
   
   const [isTablet, setIsTablet] = useState(window.innerWidth >= 640);
   const [calendarMode, setCalendarMode] = useState(() => {
-    return localStorage.getItem('logym_calendar_mode') || 'weekly';
+    return localStorage.getItem('Logym_calendar_mode') || 'weekly';
   });
 
   useEffect(() => {
     if (calendarMode === 'weekly' || calendarMode === 'monthly') {
-      localStorage.setItem('logym_calendar_mode', calendarMode);
+      localStorage.setItem('Logym_calendar_mode', calendarMode);
     }
   }, [calendarMode]);
   const [showBottomSheet, setShowBottomSheet] = useState(false);
@@ -624,7 +624,7 @@ const CalendarTab = ({
     }
 
     const title = `Workout: ${programName}`;
-    const details = `Sesi latihan LOGYM: ${programName}${exList}`;
+    const details = `Sesi latihan Logym: ${programName}${exList}`;
     
     const pad = n => String(n).padStart(2, '0');
     const startGcal = `${startD.getUTCFullYear()}${pad(startD.getUTCMonth()+1)}${pad(startD.getUTCDate())}T${pad(startD.getUTCHours())}${pad(startD.getUTCMinutes())}00Z`;

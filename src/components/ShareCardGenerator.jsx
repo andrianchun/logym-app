@@ -524,7 +524,7 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
 
                 const blob = await (await fetch(dataUrl)).blob();
                 if (blob) {
-                    files.push(new File([blob], `LOGYM-${templates[i]}-${Date.now()}.png`, { type: 'image/png' }));
+                    files.push(new File([blob], `Logym-${templates[i]}-${Date.now()}.png`, { type: 'image/png' }));
                 }
             }
             
@@ -559,7 +559,7 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
             const image = await toPng(cardRef.current, { pixelRatio: 3, skipAutoScale: true, cacheBust: false, filter: el => !el.classList?.contains('ignore-download') });
             const link = document.createElement('a');
             link.href = image;
-            link.download = `LOGYM-${activeTemplate}-${Date.now()}.png`;
+            link.download = `Logym-${activeTemplate}-${Date.now()}.png`;
             link.click();
         } catch (err) {
             console.error("Error generating image:", err);
@@ -591,13 +591,13 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                     setIsSharing(false);
                     return;
                 }
-                const file = new File([blob], `LOGYM-${activeTemplate}-${Date.now()}.png`, { type: 'image/png' });
+                const file = new File([blob], `Logym-${activeTemplate}-${Date.now()}.png`, { type: 'image/png' });
                 
                 if (navigator.canShare({ files: [file] })) {
                     try {
                         await navigator.share({
-                            title: 'Status LOGYM Saya',
-                            text: 'Cek progres latihanku di LOGYM!',
+                            title: 'Status Logym Saya',
+                            text: 'Cek progres latihanku di Logym!',
                             files: [file]
                         });
                     } catch (e) {
@@ -725,7 +725,7 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
 
                     {/* Logo Overlay */}
                     <div className="absolute top-4 right-4 z-20">
-                        <img src="/logo-white.webp" alt="LOGYM" className="w-10 h-10 object-contain opacity-100 drop-shadow-lg" crossOrigin="anonymous"/>
+                        <img src="/logo-white.webp" alt="Logym" className="w-10 h-10 object-contain opacity-100 drop-shadow-lg" crossOrigin="anonymous"/>
                     </div>
 
                     <div className="relative z-10 flex-1 flex flex-col text-white">
@@ -1221,9 +1221,9 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                     onClick={handleShareToCommunity}
                     disabled={isGenerating || isSharing}
                     className="flex shrink-0 items-center justify-center p-3 rounded-2xl bg-[#3b82f6] text-white font-black shadow-xl hover:shadow-[#3b82f6]/30 transition-all active:scale-95 disabled:opacity-50"
-                    title="Bagikan ke Komunitas LOGYM"
+                    title="Bagikan ke Komunitas Logym"
                 >
-                    {isSharing ? <Loader2 className="animate-spin" size={20}/> : <img src="/logo-white.webp" alt="LOGYM" className="w-6 h-6 object-contain" />}
+                    {isSharing ? <Loader2 className="animate-spin" size={20}/> : <img src="/logo-white.webp" alt="Logym" className="w-6 h-6 object-contain" />}
                 </button>
                 <button 
                     onClick={handleShare}

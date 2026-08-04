@@ -1,6 +1,6 @@
 {
   "appId": "com.andrianchun.logym",
-  "appName": "LOGYM",
+  "appName": "Logym",
   "webDir": "dist",
   "plugins": {
     "FirebaseAuthentication": {

@@ -25,7 +25,7 @@ import useDialog from '../hooks/useDialog';
 const FILTERS = ['Semua', 'Diikuti', 'Teman'];
 const SOURCE_FILTERS = [
   { id: 'all', label: 'Semua App' },
-  { id: 'logym', label: 'Logym' },
+  { id: 'Logym', label: 'Logym' },
   { id: 'lomeal', label: 'Lomeal' },
 ];
 
@@ -323,12 +323,12 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
     try {
       const el = postRefs.current[post.id];
       const shareUrl = `${window.location.origin}/?p=${post.id}`;
-      const text = post.text ? `${post.userName} di LOGYM: "${post.text}" - ${shareUrl}` : `Postingan dari ${post.userName} di LOGYM - ${shareUrl}`;
+      const text = post.text ? `${post.userName} di Logym: "${post.text}" - ${shareUrl}` : `Postingan dari ${post.userName} di Logym - ${shareUrl}`;
       
       if (el && navigator.share) {
         const dataUrl = await toJpeg(el, { quality: 0.95, backgroundColor: isDark ? '#0f172a' : '#f1f5f9' });
         const blob = await (await fetch(dataUrl)).blob();
-        const file = new File([blob], `logym-post-${post.id}.jpg`, { type: 'image/jpeg' });
+        const file = new File([blob], `Logym-post-${post.id}.jpg`, { type: 'image/jpeg' });
         
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           await navigator.share({ title: post.userName, text, files: [file] });
@@ -340,7 +340,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
         await navigator.share({ title: post.userName, text, url: shareUrl });
       } else {
         const link = document.createElement('a');
-        link.download = `logym-post-${post.userName}.jpg`;
+        link.download = `Logym-post-${post.userName}.jpg`;
         if (el) {
           const dataUrl = await toJpeg(el, { quality: 0.95, backgroundColor: isDark ? '#0f172a' : '#f1f5f9' });
           link.href = dataUrl;

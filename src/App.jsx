@@ -256,7 +256,7 @@ export default function App() {
   const [unitSystem, setUnitSystem] = useState('metric'); // deprecated, kept for safety during transition
   const [units, setUnits] = useState({ weight: 'kg', height: 'cm', distance: 'km', temp: 'c' });
   const [userProfile, setUserProfile] = useState({ goal: null, experience: null });
-  const [gymProfiles, setGymProfiles] = useState([{ id: 'default', name: 'LOGYM', equipment: 'all', config: {} }]);
+  const [gymProfiles, setGymProfiles] = useState([{ id: 'default', name: 'Logym', equipment: 'all', config: {} }]);
   const [activeGymId, setActiveGymId] = useState('default');
   const [userApiKeys, setUserApiKeys] = useState([]);
   const [keyStatuses, setKeyStatuses] = useState({});
@@ -318,13 +318,36 @@ export default function App() {
   // menggandakan. Sesi yang dicatat sendiri di Logym tidak pernah disentuh.
   const mergeHcWorkouts = (byDay) => {
     let added = 0;
+    // Ambil semua startTime sesi yang sudah Logym push ke HC sendiri,
+    // supaya saat tarik balik dari HC sesi tersebut tidak ping-pong masuk lagi.
+    let logymPushedStarts;
+    try {
+      logymPushedStarts = new Set(JSON.parse(localStorage.getItem('logym_hc_pushed_starts') || '[]'));
+    } catch (_) {
+      logymPushedStarts = new Set();
+    }
+
     setHistory(prev => {
       const next = { ...prev };
       Object.entries(byDay).forEach(([ymd, list]) => {
         const day = next[ymd] || { workouts: [] };
         const existing = day.workouts || [];
         const ids = new Set(existing.map((w) => w.id));
-        const fresh = list.filter((w) => !ids.has(w.id));
+
+        const isLogymOrigin = (hcW) => {
+          // 1. startDate-nya sama persis dengan sesi yang Logym pernah push ke HC
+          if (hcW._startDate && logymPushedStarts.has(hcW._startDate)) return true;
+          // 2. Sudah ada sesi Logym asli di hari yang sama dengan window waktu ±45 menit
+          return existing.some(exW => {
+            if (exW.id.startsWith('hc_')) return false; // skip sesama HC import
+            if (!exW.timestamp || !hcW.timestamp) return false;
+            const [exH, exM] = exW.timestamp.split(':').map(Number);
+            const [hcH, hcM] = hcW.timestamp.split(':').map(Number);
+            return Math.abs((exH * 60 + exM) - (hcH * 60 + hcM)) < 45;
+          });
+        };
+
+        const fresh = list.filter((w) => !ids.has(w.id) && !isLogymOrigin(w));
         if (fresh.length === 0) return;
         added += fresh.length;
         next[ymd] = { ...day, workouts: [...existing, ...fresh] };
@@ -1176,7 +1199,7 @@ export default function App() {
     const timeout = setTimeout(() => {
       // Waktu istirahat habis!
       if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification("LOGYM Workout", { 
+        new Notification("Logym Workout", { 
           body: "Waktu istirahat habis! Lanjut ke set berikutnya.",
           icon: "/lyfit-logo.png" // Fallback if logo doesn't exist
         });
@@ -1212,7 +1235,7 @@ export default function App() {
           notifications: [{
             id: NOTIF_ID,
             title: '🏋️ Workout Sedang Berjalan',
-            body: `Durasi: ${formatNotifTime(elapsed)} — Ketuk untuk kembali ke LOGYM`,
+            body: `Durasi: ${formatNotifTime(elapsed)} — Ketuk untuk kembali ke Logym`,
             ongoing: true,
             autoCancel: false,
             smallIcon: 'ic_launcher',
@@ -1256,7 +1279,7 @@ export default function App() {
         setUser({ 
            uid: currentUser.uid, 
            email: currentUser.email, 
-           name: currentUser.displayName || 'Sobat LOGYM',
+           name: currentUser.displayName || 'Sobat Logym',
            photoURL: currentUser.photoURL
         });
       } else {
@@ -1282,7 +1305,7 @@ export default function App() {
         setSoundEnabled(true);
         setDefaultRestTime(60);
         setUnits({ weight: 'kg', height: 'cm', distance: 'km', temp: 'c' });
-        setGymProfiles([{ id: 'default', name: 'LOGYM', equipment: 'all', config: {} }]);
+        setGymProfiles([{ id: 'default', name: 'Logym', equipment: 'all', config: {} }]);
         setActiveGymId('default');
         setActivityTargets({ steps: 10000, weeklyDuration: 150, sleep: 8 });
         setActivePlanIds(['custom']);
@@ -1458,7 +1481,7 @@ export default function App() {
               if (parsedSettings.gymProfiles) {
                   const migratedProfiles = parsedSettings.gymProfiles.map(g => {
                       if (g.id === 'default' && g.name === 'Lyfit Gym') {
-                          return { ...g, name: 'LOGYM' };
+                          return { ...g, name: 'Logym' };
                       }
                       return g;
                   });
@@ -1866,6 +1889,55 @@ export default function App() {
   }, [isDataLoaded, history, programs]);
 
   // ==========================================
+  // 3.8. ONE-TIME CLEANUP: HAPUS SESI HC PING-PONG
+  // Sesi HC kosong (programId='healthconnect', exercises=[], log={}) yang berada di hari
+  // yang sama dengan sesi Logym asli (non-hc_) dalam window ±45 menit adalah duplikat
+  // ping-pong (Logym → HC → Logym). Bersihkan sekali saat history sudah loaded.
+  // ==========================================
+  const hcPingPongCleanupDone = useRef(false);
+  useEffect(() => { hcPingPongCleanupDone.current = false; }, [user?.uid]);
+  useEffect(() => {
+    if (!isHistoryLoaded || hcPingPongCleanupDone.current) return;
+    if (Object.keys(history).length === 0) return;
+    hcPingPongCleanupDone.current = true;
+
+    setHistory(prev => {
+      let changed = false;
+      const next = { ...prev };
+      Object.keys(prev).forEach(dateStr => {
+        const day = prev[dateStr];
+        if (!day?.workouts || day.workouts.length < 2) return;
+
+        // Kumpulkan sesi Logym asli (bukan dari HC import)
+        const nativeWorkouts = day.workouts.filter(w => !w.id?.startsWith('hc_'));
+        if (nativeWorkouts.length === 0) return;
+
+        const filtered = day.workouts.filter(w => {
+          if (!w.id?.startsWith('hc_')) return true; // selalu pertahankan sesi Logym asli
+          // Hanya hapus kalau sesi HC ini benar-benar kosong (ping-pong ghost)
+          const isEmpty = (!w.exercises || w.exercises.length === 0) && (!w.log || Object.keys(w.log).length === 0);
+          if (!isEmpty) return true; // pertahankan sesi HC yang punya data nyata (dari Samsung Health dll)
+          // Cek apakah ada sesi Logym asli dalam window ±45 menit
+          const [hcH, hcM] = (w.timestamp || '00:00').split(':').map(Number);
+          const isDuplicate = nativeWorkouts.some(nat => {
+            if (!nat.timestamp) return false;
+            const [nH, nM] = nat.timestamp.split(':').map(Number);
+            return Math.abs((hcH * 60 + hcM) - (nH * 60 + nM)) < 45;
+          });
+          return !isDuplicate; // hapus kalau duplikat
+        });
+
+        if (filtered.length !== day.workouts.length) {
+          changed = true;
+          next[dateStr] = { ...day, workouts: filtered };
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [isHistoryLoaded, user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
+
+
+  // ==========================================
   // 4. PENAHAN TOMBOL BACK (UNIVERSAL)
   // ==========================================
   useEffect(() => {
@@ -1978,7 +2050,7 @@ export default function App() {
       const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url; a.download = `LOGYM_Backup_${getLocalYMD(new Date())}.json`;
+      a.href = url; a.download = `Logym_Backup_${getLocalYMD(new Date())}.json`;
       a.click();
   };
 
@@ -2611,7 +2683,7 @@ export default function App() {
   const handleSaveWorkout = (progId) => {
     playSoundEffect('success', soundEnabled);
     const durationSecs = workoutStartTime ? Math.floor((Date.now() - workoutStartTime) / 1000) : 0;
-    if (healthConnectEnabled && workoutStartTime && durationSecs > 60) {
+    if (healthConnectEnabled && workoutStartTime && durationSecs >= 60) {
       const kcal = calculateWorkoutCalories(userProfile?.weight, durationSecs / 60);
       const startISO = new Date(workoutStartTime).toISOString();
       const endISO = new Date().toISOString();
@@ -2623,6 +2695,15 @@ export default function App() {
       const srcProg = programs.find((pr) => pr.id === (progId || '').toString().replace('projected_', '').split('_')[0]);
       const sessionExercises = [...(srcProg?.exercises || []), ...(extraExercises || [])];
       const sessionTitle = progId === 'extra' ? 'Ekstra' : (srcProg?.name || 'Latihan Logym');
+      // Tandai startTime sesi ini sebagai "milik Logym" di localStorage. Saat HC read-back,
+      // mergeHcWorkouts akan skip sesi dengan startTime yang cocok supaya tidak ping-pong.
+      try {
+        const pushed = JSON.parse(localStorage.getItem('logym_hc_pushed_starts') || '[]');
+        pushed.push(startISO);
+        // Simpan maks 200 entri agar localStorage tidak membengkak seumur hidup
+        if (pushed.length > 200) pushed.splice(0, pushed.length - 200);
+        localStorage.setItem('logym_hc_pushed_starts', JSON.stringify(pushed));
+      } catch (_) {}
       hcRequestWorkoutWritePermission().then((ok) => {
         if (ok) hcWriteWorkoutSession({
           startDate: startISO,
@@ -2650,15 +2731,15 @@ export default function App() {
 
     const targetDateStr = selectedDate;
 
-    const cleanLogs = {};
-    if (exerciseLogs) {
-      Object.keys(exerciseLogs).forEach(id => {
-        if (Array.isArray(exerciseLogs[id])) {
-          cleanLogs[id] = exerciseLogs[id];
-        } else {
-          cleanLogs[id] = exerciseLogs[id];
-        }
-      });
+    let cleanLogs = {};
+    let cleanSkipped = {};
+    let cleanExtra = [];
+    try {
+      cleanLogs = JSON.parse(JSON.stringify(exerciseLogs || {}));
+      cleanSkipped = JSON.parse(JSON.stringify(skippedExercises || {}));
+      cleanExtra = JSON.parse(JSON.stringify(extraExercises || []));
+    } catch (e) {
+      console.warn("Failed to sanitize workout logs", e);
     }
 
     setHistory(prev => {
@@ -2674,8 +2755,8 @@ export default function App() {
             ...existingW,
             status: 'completed',
             log: cleanLogs,
-            skipped: skippedExercises,
-            exercises: extraExercises,
+            skipped: cleanSkipped,
+            exercises: cleanExtra,
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             duration: formatDur(durationSecs)
           };
@@ -2698,8 +2779,8 @@ export default function App() {
                 ...existingW,
                 status: 'completed',
                 log: cleanLogs,
-                skipped: skippedExercises,
-                exercises: extraExercises,
+                skipped: cleanSkipped,
+                exercises: cleanExtra,
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 duration: formatDur(finalSecs)
               };
@@ -2710,8 +2791,8 @@ export default function App() {
                 programName: 'Ekstra',
                 status: 'completed',
                 log: cleanLogs,
-                skipped: skippedExercises,
-                exercises: extraExercises,
+                skipped: cleanSkipped,
+                exercises: cleanExtra,
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 duration: formatDur(durationSecs)
               });
@@ -2769,7 +2850,7 @@ export default function App() {
               programId: realProgramId,
               status: 'completed',
               log: cleanLogs,
-              skipped: skippedExercises,
+              skipped: cleanSkipped,
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
               duration: formatDur(finalSecs),
               ...(frozenExercises ? { overriddenExercises: frozenExercises } : {})
@@ -2822,7 +2903,8 @@ export default function App() {
                 programId: realProgramId,
                 status: 'completed',
                 log: cleanLogs,
-                skipped: skippedExercises,
+                skipped: cleanSkipped,
+                exercises: cleanExtra,
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 duration: formatDur(finalSecs),
                 ...(frozenExercises ? { overriddenExercises: frozenExercises } : {})
@@ -3131,7 +3213,7 @@ export default function App() {
   if (isAuthChecking || (user && (!isDataLoaded || !isHistoryLoaded)) || !isSplashMinTimeReached) {
     return (
       <div className={`fixed inset-0 z-50 flex flex-col items-center justify-center p-4 transition-colors duration-300 ${theme === 'dark' ? 'bg-[#0f1115]' : 'bg-white'}`}>
-         <img src={theme === 'dark' ? '/logo-dark.png' : '/logo-light.png'} alt="LOGYM Logo" className="w-40 h-40 object-contain animate-pulse drop-shadow-2xl" />
+         <img src={theme === 'dark' ? '/logo-dark.png' : '/logo-light.png'} alt="Logym Logo" className="w-40 h-40 object-contain animate-pulse drop-shadow-2xl" />
          
          {isSlowLoading && user && (!isDataLoaded || !isHistoryLoaded) && (
            <div className="absolute bottom-12 left-0 right-0 px-8 flex flex-col items-center justify-center text-center animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -3555,9 +3637,9 @@ export default function App() {
       {showInstallPrompt && (
         <div className="fixed inset-0 z-[200] flex items-end justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
           <div className={`w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col items-center text-center animate-in slide-in-from-bottom-8 duration-300 ${t.bgCard} ${t.border} border`}>
-             <img src="/icon-192.png" className="w-20 h-20 rounded-2xl mb-4 shadow-xl border border-white/10" alt="LOGYM Logo" />
-             <h3 className={`text-xl font-black ${t.textMain} mb-2`}>Install LOGYM App</h3>
-             <p className={`text-sm ${t.textMuted} mb-6`}>Install aplikasi LOGYM di perangkatmu untuk akses lebih cepat, latihan offline, dan pengalaman yang lebih mulus.</p>
+             <img src="/icon-192.png" className="w-20 h-20 rounded-2xl mb-4 shadow-xl border border-white/10" alt="Logym Logo" />
+             <h3 className={`text-xl font-black ${t.textMain} mb-2`}>Install Logym App</h3>
+             <p className={`text-sm ${t.textMuted} mb-6`}>Install aplikasi Logym di perangkatmu untuk akses lebih cepat, latihan offline, dan pengalaman yang lebih mulus.</p>
              <div className="flex flex-col w-full gap-3">
                 <button 
                   className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 text-white ${t.bgAccent} shadow-md`}

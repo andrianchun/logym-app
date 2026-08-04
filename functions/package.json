@@ -1,6 +1,6 @@
 {
   "name": "lyfit-functions",
-  "description": "Backend proxy untuk AI chat & vision LOGYM",
+  "description": "Backend proxy untuk AI chat & vision Logym",
   "main": "index.js",
   "engines": {
     "node": "22"

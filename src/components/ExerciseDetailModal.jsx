@@ -645,7 +645,7 @@ const ExerciseDetailModal = ({
                           {showRmInfo && (
                              <div className={`p-3.5 rounded-xl ${t.bgCard} border ${t.border} text-left text-xs ${t.textMuted} space-y-2 shadow-lg mb-4`}>
                                 <p>Kalkulator RM (Repetition Maximum) digunakan untuk mengestimasi beban maksimal yang bisa kamu angkat berdasarkan set terbaikmu.</p>
-                                <p>Aplikasi LOGYM secara otomatis membaca rekor 10RM kamu dari riwayat (<b>{best10RM} {isImp ? 'lbs' : 'kg'}</b>). Jika kamu ingin mengubahnya secara manual sebagai acuan (misal baru kembali dari jeda lama), sesuaikan angkanya lalu <b>Simpan</b>.</p>
+                                <p>Aplikasi Logym secara otomatis membaca rekor 10RM kamu dari riwayat (<b>{best10RM} {isImp ? 'lbs' : 'kg'}</b>). Jika kamu ingin mengubahnya secara manual sebagai acuan (misal baru kembali dari jeda lama), sesuaikan angkanya lalu <b>Simpan</b>.</p>
                              </div>
                           )}
    

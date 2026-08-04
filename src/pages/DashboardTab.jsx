@@ -419,7 +419,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                      if (newBio._manualFlags) delete newBio._manualFlags[k];
                  });
              } else {
-                 ['steps', 'energyScore', 'activeMinutes', 'activityCalories', 'nutritionCalories', 'sleep', 'sleepLog', 'heartRate', 'minHeartRate', 'maxHeartRate', 'bloodPressure', 'oxygenSaturation', 'waterIntake', 'weeklyDuration', 'weeklySessions', 'weeklyCalories', 'sleepAwake', 'sleepRem', 'sleepLight', 'sleepDeep', 'hrv'].forEach(k => { 
+                 ['steps', 'activeMinutes', 'activityCalories', 'nutritionCalories', 'sleep', 'sleepLog', 'heartRate', 'minHeartRate', 'maxHeartRate', 'bloodPressure', 'oxygenSaturation', 'waterIntake', 'weeklyDuration', 'weeklySessions', 'weeklyCalories', 'sleepAwake', 'sleepRem', 'sleepLight', 'sleepDeep', 'hrv', 'energyScore'].forEach(k => { 
                      newBio[k] = null;
                      if (newBio._manualFlags) delete newBio._manualFlags[k];
                  });
@@ -615,6 +615,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   const sleepScrollTarget = useRef(null);
 
   const handleSleepTouchStart = (e) => {
+      e.stopPropagation();
       if (e.touches.length === 2 && sleepScrollRef.current) {
           const dist = Math.hypot(
               e.touches[0].clientX - e.touches[1].clientX,
@@ -633,6 +634,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   };
 
   const handleSleepTouchMove = (e) => {
+      e.stopPropagation();
       if (e.touches.length === 2 && sleepScrollRef.current) {
           const dist = Math.hypot(
               e.touches[0].clientX - e.touches[1].clientX,
@@ -671,7 +673,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                <span className={`text-[10px] ${t.textMuted}`}>•</span>
                <div className={`flex items-center gap-1 ${t.textMuted}`}>
                  <Dumbbell size={12} />
-                 <span className="body-md font-bold text-[13px]">{gymProfiles?.find(g => g.id === activeGymId)?.name || 'LOGYM'}</span>
+                 <span className="body-md font-bold text-[13px]">{gymProfiles?.find(g => g.id === activeGymId)?.name || 'Logym'}</span>
                </div>
             </div>
          </div>
@@ -935,7 +937,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                              <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{mergedDailyCalories > 0 ? formatNumber(mergedDailyCalories, language) : '-'}</span>
                          </div>
                          <div className={`font-medium ${t.textMuted} truncate flex items-center justify-end gap-1.5`} style={{fontSize: '0.65rem'}}>
-                           <span className="px-1 py-0.5 rounded bg-sky-500/20 text-sky-500 text-[8px] uppercase font-bold tracking-wider">LOGYM</span>
+                           <span className="px-1 py-0.5 rounded bg-sky-500/20 text-sky-500 text-[8px] uppercase font-bold tracking-wider">Logym</span>
                            {mergedDailySessions || 0} latihan
                          </div>
                      </div>
@@ -1107,7 +1109,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                  maskImage: 'linear-gradient(to bottom, black 75%, transparent 100%)',
                  WebkitMaskImage: 'linear-gradient(to bottom, black 75%, transparent 100%)'
              }}>
-                 <img src="/bg-empty.webp" alt="" className="absolute -right-36 top-2 w-[44rem] max-w-[170%] h-auto drop-shadow-xl transition-transform duration-500 ease-out" />
+                 <img src="/bg-empty.webp" alt="" className="absolute -right-72 top-2 w-[48rem] max-w-[170%] h-auto drop-shadow-xl transition-transform duration-500 ease-out" />
              </div>
           </div>
 
@@ -1141,58 +1143,95 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                  </div>
              </div>
 
-             <div className="flex justify-between items-end mb-2 mt-4">
+             <div className="flex flex-col mb-2 mt-4 space-y-4 relative z-20">
                  <div>
-                     <span className={`text-[10px] font-bold uppercase tracking-widest ${t.textMuted}`}>Durasi Tidur</span>
-                     <div className="flex items-baseline space-x-1 mt-1">
-                         {(() => {
-                             const sleepStr = sleepBio.sleep;
-                             if (!sleepStr || parseFloat(sleepStr) <= 0) {
-                                 return <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>-</span>;
-                             }
-                             if (typeof sleepStr === 'string' && sleepStr.includes('h')) {
-                                 const parts = sleepStr.split(' ');
-                                 const h = parts[0]?.replace('h', '') || '0';
-                                 const m = parts[1]?.replace('m', '') || '0';
+                     <div className="flex items-center space-x-2">
+                         <span className={`text-[10px] font-bold uppercase tracking-widest ${t.textMuted}`}>Kualitas & Durasi Tidur</span>
+                     </div>
+                     <div className="flex items-baseline space-x-3 mt-1">
+                         <div className="flex items-baseline space-x-1">
+                             {(() => {
+                                 const sleepStr = sleepBio.sleep;
+                                 if (!sleepStr || parseFloat(sleepStr) <= 0) {
+                                     return <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>-</span>;
+                                 }
+                                 if (typeof sleepStr === 'string' && sleepStr.includes('h')) {
+                                     const parts = sleepStr.split(' ');
+                                     const h = parts[0]?.replace('h', '') || '0';
+                                     const m = parts[1]?.replace('m', '') || '0';
+                                     return (
+                                         <>
+                                             <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>{h}</span>
+                                             <span className={`body-lg font-bold ${t.textMuted} mr-1`}>jam</span>
+                                             <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>{m}</span>
+                                             <span className={`body-lg font-bold ${t.textMuted}`}>mnt</span>
+                                         </>
+                                     );
+                                 }
+                                 const totalH = parseFloat(sleepStr);
+                                 const jam = Math.floor(totalH);
+                                 const menit = Math.round((totalH % 1) * 60);
                                  return (
                                      <>
-                                         <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>{h}</span>
+                                         <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>{jam}</span>
                                          <span className={`body-lg font-bold ${t.textMuted} mr-1`}>jam</span>
-                                         <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>{m}</span>
+                                         <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>{menit}</span>
                                          <span className={`body-lg font-bold ${t.textMuted}`}>mnt</span>
                                      </>
                                  );
+                             })()}
+                         </div>
+                         {(() => {
+                             const sleepHrs = parseFloat(sleepBio.sleep) || 0;
+                             if (sleepHrs <= 0) return null;
+                             
+                             let text = 'Sangat Kurang';
+                             let color = 'bg-rose-500/15 text-rose-500 border-rose-500/20';
+                             if (sleepHrs >= 9) {
+                                 text = 'Berlebih';
+                                 color = 'bg-amber-500/15 text-amber-500 border-amber-500/20';
+                             } else if (sleepHrs >= 7) {
+                                 text = 'Optimal';
+                                 color = 'bg-emerald-500/15 text-emerald-500 border-emerald-500/20';
+                             } else if (sleepHrs >= 6) {
+                                 text = 'Cukup';
+                                 color = 'bg-sky-500/15 text-sky-500 border-sky-500/20';
+                             } else if (sleepHrs >= 4) {
+                                 text = 'Kurang';
+                                 color = 'bg-amber-500/15 text-amber-500 border-amber-500/20';
                              }
-                             // Health Connect memberi angka jam desimal (mis. 7.4) — tampilkan
-                             // sebagai "7 jam 24 mnt", bukan "7.4 jam".
-                             const totalH = parseFloat(sleepStr);
-                             const jam = Math.floor(totalH);
-                             const menit = Math.round((totalH % 1) * 60);
-                             return (
-                                 <>
-                                     <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>{jam}</span>
-                                     <span className={`body-lg font-bold ${t.textMuted} mr-1`}>jam</span>
-                                     <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>{menit}</span>
-                                     <span className={`body-lg font-bold ${t.textMuted}`}>mnt</span>
-                                 </>
-                             );
+                             return <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider ${color} border`}>{text}</span>;
                          })()}
                      </div>
                  </div>
-             </div>
 
-             <div className="flex justify-between items-end mb-2 mt-2">
-                 <div>
-                     <span className={`text-[10px] font-bold uppercase tracking-widest ${t.textMuted}`}>Skor Energi</span>
-                     <div className="flex items-baseline space-x-1 mt-1">
-                         <span className={`text-3xl font-black tracking-tighter ${t.textMain}`}>{parseFloat(bioData.energyScore) > 0 ? formatNumber(bioData.energyScore, language) : '-'}</span>
-                         <span className={`text-sm font-bold ${t.textMuted}`}>/ 100</span>
+                 <div className="pb-1">
+                     <div className="flex items-center space-x-2">
+                         <span className={`text-[10px] font-bold uppercase tracking-widest ${t.textMuted}`}>Skor Energi</span>
                      </div>
-                 </div>
-                 <div className="text-right pb-1">
-                     <span className={`text-[10px] font-bold uppercase tracking-widest ${t.textMuted}`}>Kualitas</span>
-                     <div className={`text-lg font-black ${parseFloat(sleepBio.sleep) >= 7 ? 'text-emerald-500' : (parseFloat(sleepBio.sleep) > 0 ? 'text-amber-500' : t.textMuted)}`}>
-                         {parseFloat(sleepBio.sleep) >= 7 ? 'Optimal' : (parseFloat(sleepBio.sleep) > 0 ? 'Kurang' : '-')}
+                     <div className="flex items-baseline space-x-3 mt-1">
+                         <div className="flex items-baseline space-x-1">
+                             <span className={`text-3xl font-black tracking-tighter ${t.textMain}`}>{parseFloat(sleepBio.energyScore) > 0 ? formatNumber(sleepBio.energyScore, language) : '-'}</span>
+                             <span className={`text-sm font-bold ${t.textMuted}`}>/ 100</span>
+                         </div>
+                         {(() => {
+                             const score = parseFloat(sleepBio.energyScore) || 0;
+                             if (score <= 0) return null;
+                             
+                             let text = 'Butuh Perhatian';
+                             let color = 'bg-rose-500/15 text-rose-500 border-rose-500/20';
+                             if (score >= 85) {
+                                 text = 'Sangat Baik';
+                                 color = 'bg-emerald-500/15 text-emerald-500 border-emerald-500/20';
+                             } else if (score >= 70) {
+                                 text = 'Baik';
+                                 color = 'bg-sky-500/15 text-sky-500 border-sky-500/20';
+                             } else if (score >= 60) {
+                                 text = 'Cukup';
+                                 color = 'bg-amber-500/15 text-amber-500 border-amber-500/20';
+                             }
+                             return <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider ${color} border`}>{text}</span>;
+                         })()}
                      </div>
                  </div>
              </div>
@@ -1382,7 +1421,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                                                     <div className={`h-px w-full ${t.borderDashed} border-b`}></div>
                                                 </div>
                                                 <div 
-                                                    className="absolute left-12 right-0 top-0 bottom-0 overflow-x-auto scrollbar-hide touch-pan-x"
+                                                    className="absolute left-12 right-0 top-0 bottom-0 overflow-x-auto scrollbar-hide touch-pan-x no-swipe"
                                                     ref={sleepScrollRef}
                                                     onTouchStartCapture={handleSleepTouchStart}
                                                     onTouchMoveCapture={handleSleepTouchMove}
@@ -1486,7 +1525,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                    <div className="flex items-center space-x-2">
                        <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-500"><Activity size={12}/></div>
                        <div className="flex flex-col">
-                           <span className={`text-[10px] font-bold ${t.textMain}`}>LOGYM Analysis</span>
+                           <span className={`text-[10px] font-bold ${t.textMain}`}>Logym Analysis</span>
                            <div className="relative flex items-center w-max cursor-pointer">
                                <span className={`text-[8px] ${t.textAccent} underline decoration-dashed underline-offset-2 mt-0.5`}>{new Date(modalDate || Date.now()).toLocaleDateString(lang.workout === 'Latihan' ? 'id-ID' : 'en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</span>
                                <input type="date" value={modalDate} onChange={(e) => setModalDate(e.target.value)} onClick={(e) => { try { e.target.showPicker() } catch(err){} }} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />

@@ -1,0 +1,6 @@
+{
+  "ota_version": "1.0.21",
+  "ota_url": "",
+  "is_forced": false,
+  "release_notes": "Perbaikan: kalori push ke Health Connect, anti ping-pong sesi latihan dari HC, cleanup otomatis duplikat HC, nama Logym seragam di seluruh app."
+}

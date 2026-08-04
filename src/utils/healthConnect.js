@@ -165,6 +165,10 @@ export const hcReadWorkouts = async (days = 30) => {
       (byDay[ymd] ||= []).push({
         // platformId = id unik record Health Connect, jadi impor berulang tidak menggandakan.
         id: `hc_${w.platformId || `${w.startDate}_${w.workoutType}`}`,
+        // _startDate dipakai mergeHcWorkouts untuk mendeteksi sesi yang berasal dari Logym sendiri
+        // (anti ping-pong): saat Logym push sesi ke HC, startISO-nya disimpan di localStorage
+        // 'logym_hc_pushed_starts', dan di sini kita tag balik agar bisa dicocokkan.
+        _startDate: w.startDate,
         programId: 'healthconnect',
         programName: workoutLabel(w.workoutType),
         status: 'completed',

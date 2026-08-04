@@ -19,8 +19,8 @@ export default defineConfig({
       registerType: 'prompt',
       injectRegister: 'auto',
       manifest: {
-        name: 'LOGYM Tracker',
-        short_name: 'LOGYM',
+        name: 'Logym Tracker',
+        short_name: 'Logym',
         description: 'Aplikasi pelacak progres fitness harian',
         start_url: '/',
         display: 'standalone',

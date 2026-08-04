@@ -40,6 +40,9 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
               bioEntries.push({ dateStr, bioData: history[dateStr].bioData });
           }
       });
+      if (!bioEntries.some(e => e.dateStr === todayStr)) {
+          bioEntries.push({ dateStr: todayStr, bioData: history[todayStr]?.bioData || {} });
+      }
       bioEntries.sort((a, b) => a.dateStr.localeCompare(b.dateStr));
 
       bioEntries.forEach(entry => {
@@ -73,41 +76,14 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
      if(scrollRef.current && multiChartData.length > 0) {
         const data = multiChartData;
         const activeObj = chartMetricsList.find(m => m.key === activeMetric);
-        
-        let latestIdxWithData = -1;
-        for (let i = data.length - 1; i >= 0; i--) {
-            const hasData = activeObj.type === 'single' 
-                ? (data[i][activeMetric] !== undefined && data[i][activeMetric] !== null)
-                : (data[i].nutritionCalories !== null || data[i].activityCalories !== null);
-
-            if (hasData) {
-                latestIdxWithData = i;
-                break;
-            }
-        }
-        
-        if (latestIdxWithData !== -1) {
-             const latestDateObj = new Date(data[latestIdxWithData].dateFull);
-             const oneMonthAgo = new Date(latestDateObj.getTime() - 30 * 24 * 60 * 60 * 1000);
-             const oneMonthAgoStr = getLocalYMD(oneMonthAgo);
-
-             let startIdx = latestIdxWithData;
-             while (startIdx > 0 && data[startIdx - 1].dateFull >= oneMonthAgoStr) {
-                 startIdx--;
-             }
-
-             const numPoints = latestIdxWithData - startIdx + 1;
-             const clientW = scrollRef.current.clientWidth || (window.innerWidth - 64);
-             
-             let newPointWidth = clientW / Math.max(1.5, numPoints);
+        if (data.length > 0) {
+             const clientW = scrollRef.current?.clientWidth || (window.innerWidth - 64);
+             let newPointWidth = clientW / Math.max(1.5, data.length);
              if (newPointWidth > 200) newPointWidth = 200;
              if (newPointWidth < 25) newPointWidth = 25;
-
              setPointWidth(newPointWidth);
-             scrollTarget.current = startIdx * newPointWidth;
-        } else {
-             const clientW = scrollRef.current.clientWidth || (window.innerWidth - 64);
-             scrollTarget.current = Math.max(0, ((data.length - 1) * pointWidth) - (clientW / 2));
+
+             scrollTarget.current = Math.max(0, ((data.length) * newPointWidth) - clientW);
         }
      }
   }, [multiChartData, activeMetric]);
@@ -229,9 +205,9 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
               onScroll={handleScroll}
               onTouchStartCapture={handleTouchStart} 
               onTouchMoveCapture={handleTouchMove}
-              className="w-full overflow-x-auto scrollbar-hide mb-4 touch-pan-x pt-2" 
+              className="w-full overflow-x-auto scrollbar-hide mb-4 touch-pan-x pt-2 flex" 
               style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}>
-             <div style={{ width: `${chartWidth}px`, height: '224px' }} className="cursor-crosshair relative">
+             <div style={{ width: `${chartWidth}px`, height: '224px', marginLeft: (multiChartData.length * pointWidth) < (window.innerWidth - 64) ? 'auto' : '0' }} className="cursor-crosshair relative shrink-0">
                  <svg className="absolute inset-0 w-full h-full pointer-events-none z-0" style={{ padding: '10px 0 30px 0' }}>
                      {[0, 25, 50, 75, 100].map((pct, i) => (
                          <line key={i} x1="0" y1={`${pct}%`} x2="100%" y2={`${pct}%`} stroke={theme === 'dark' ? '#3f3f46' : '#cbd5e1'} strokeDasharray="3 3" strokeWidth="1" />

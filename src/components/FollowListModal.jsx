@@ -62,7 +62,7 @@ export default function FollowListModal({ currentUser, type, isDark, t, onClose,
           const r = rawList.find(x => x.uid === uid) || {};
           return {
             uid,
-            name: profiles[uid]?.name || r.followerName || r.followingName || 'Sobat LOGYM',
+            name: profiles[uid]?.name || r.followerName || r.followingName || 'Sobat Logym',
             photo: profiles[uid]?.photoURL || profiles[uid]?.photoUrl || r.followerPhoto || r.followingPhoto || null,
           };
         });

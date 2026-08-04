@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">LOGYM</string>
-    <string name="title_activity_main">LOGYM</string>
+    <string name="app_name">Logym</string>
+    <string name="title_activity_main">Logym</string>
     <string name="package_name">com.andrianchun.logym</string>
     <string name="custom_url_scheme">com.andrianchun.logym</string>
 </resources>

@@ -2,25 +2,25 @@ const fs = require('fs');
 const path = require('path');
 
 const replacements = [
-    { from: /Sobat LyFit/g, to: 'Sobat LOGYM' },
-    { from: /Sobat Lyfit/g, to: 'Sobat LOGYM' },
-    { from: /Lyfit Coach/g, to: 'LOGYM Coach' },
-    { from: /Aplikasi LyFit/g, to: 'Aplikasi LOGYM' },
-    { from: /Logo LyFit/g, to: 'Logo LOGYM' },
-    { from: /LyFit Logo/g, to: 'LOGYM Logo' },
-    { from: /Lyfit Logo/g, to: 'LOGYM Logo' },
-    { from: /LyFit-/g, to: 'LOGYM-' },
-    { from: /latihanku di LyFit!/g, to: 'latihanku di LOGYM!' },
-    { from: /Komunitas Lyfit/g, to: 'Komunitas LOGYM' },
-    { from: /di LyFit!/g, to: 'di LOGYM!' },
-    { from: /Keluar dari LyFit/g, to: 'Keluar dari LOGYM' },
-    { from: /alt="Lyfit"/g, to: 'alt="LOGYM"' },
-    { from: /alt="LyFit"/g, to: 'alt="LOGYM"' },
-    { from: /'LyFit'/g, to: "'LOGYM'" },
-    { from: /"LyFit"/g, to: '"LOGYM"' },
-    { from: /LyFit Gym/g, to: 'LOGYM' },
-    { from: /Lyfit Gym/g, to: 'LOGYM' },
-    { from: /"Lyfit"/g, to: '"LOGYM"' }
+    { from: /Sobat LyFit/g, to: 'Sobat Logym' },
+    { from: /Sobat Lyfit/g, to: 'Sobat Logym' },
+    { from: /Lyfit Coach/g, to: 'Logym Coach' },
+    { from: /Aplikasi LyFit/g, to: 'Aplikasi Logym' },
+    { from: /Logo LyFit/g, to: 'Logo Logym' },
+    { from: /LyFit Logo/g, to: 'Logym Logo' },
+    { from: /Lyfit Logo/g, to: 'Logym Logo' },
+    { from: /LyFit-/g, to: 'Logym-' },
+    { from: /latihanku di LyFit!/g, to: 'latihanku di Logym!' },
+    { from: /Komunitas Lyfit/g, to: 'Komunitas Logym' },
+    { from: /di LyFit!/g, to: 'di Logym!' },
+    { from: /Keluar dari LyFit/g, to: 'Keluar dari Logym' },
+    { from: /alt="Lyfit"/g, to: 'alt="Logym"' },
+    { from: /alt="LyFit"/g, to: 'alt="Logym"' },
+    { from: /'LyFit'/g, to: "'Logym'" },
+    { from: /"LyFit"/g, to: '"Logym"' },
+    { from: /LyFit Gym/g, to: 'Logym' },
+    { from: /Lyfit Gym/g, to: 'Logym' },
+    { from: /"Lyfit"/g, to: '"Logym"' }
 ];
 
 function processDir(dir) {

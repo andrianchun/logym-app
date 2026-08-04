@@ -100,7 +100,7 @@ export default function SharedProfileView({
 
   const handleShareProfile = async () => {
     const shareUrl = `${window.location.origin}/?u=${userProfileData?.username || profileUserId}`;
-    const text = `Lihat profil ${profileUserName} di LOGYM! ${shareUrl}`;
+    const text = `Lihat profil ${profileUserName} di Logym! ${shareUrl}`;
     
     if (navigator.share) {
       try {
