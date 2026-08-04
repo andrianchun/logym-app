@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Activity, Zap, Brain, Footprints, HeartPulse, Moon, Droplets, Droplet, Dumbbell, Scale, RefreshCw, Trophy, Link2, Pencil, Settings, Info, X, ChevronDown, ChevronUp, Wind, Utensils, Flame, Clock } from 'lucide-react';
+import { Activity, Zap, Brain, Footprints, HeartPulse, Moon, Droplets, Droplet, Dumbbell, Scale, RefreshCw, Trophy, Link2, Pencil, Settings, Info, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Wind, Utensils, Flame, Clock } from 'lucide-react';
 import { getLocalYMD } from '../data/constants';
 import DashboardModals from '../components/DashboardModals';
 import DashboardChart from '../components/DashboardChart';
@@ -138,6 +138,10 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   }, [isSleepExpanded]);
 
   const [sleepSubTab, setSleepSubTab] = useState('stages');
+  // Navigasi tanggal KHUSUS kartu tidur (0 = hari ini, 1 = kemarin, dst). Turunannya
+  // (sleepDate/sleepBio) didefinisikan SESUDAH bioData di bawah — bukan di sini — karena
+  // membacanya sebelum itu bikin error "Cannot access before initialization" saat render.
+  const [sleepOffset, setSleepOffset] = useState(0);
 
   // Parallax removed for performance
 
@@ -235,6 +239,19 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          bioDataDate: bodyDataDate
      };
   }, [history, activeDate, todayStr]);
+
+  // Turunan navigasi kartu tidur — harus SESUDAH bioData di atas.
+  const sleepDate = useMemo(() => {
+    const d = new Date(`${activeDate}T12:00:00`);
+    d.setDate(d.getDate() - sleepOffset);
+    return getLocalYMD(d);
+  }, [activeDate, sleepOffset]);
+  // Hari ini pakai bioData hasil merge (sudah termasuk warisan & input manual); hari lain
+  // dibaca langsung dari riwayat.
+  const sleepBio = sleepOffset === 0 ? bioData : (history[sleepDate]?.bioData || {});
+  const sleepDateLabel = sleepOffset === 0
+    ? 'Semalam'
+    : new Date(`${sleepDate}T12:00:00`).toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' });
 
   // ==========================================
   // FUNGSI AKSI (TOMBOL & FORM)
@@ -1042,9 +1059,27 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
              <div className="flex items-center justify-between mb-4">
                  <div>
                      <h3 className={`h2 ${t.textMain}`}>Tidur & Pemulihan</h3>
+                     <span className={`text-[10px] font-bold ${t.textMuted}`}>{sleepDateLabel}</span>
                  </div>
-                 <div className="flex gap-2">
-                     <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(activeDate); setManualTab('harian'); setShowManualModal(true); }} className={`p-2 rounded-full bg-indigo-500/10 dark:bg-indigo-500/20 backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border} transition-all relative z-20`}>
+                 <div className="flex items-center gap-2">
+                     {/* Mundur dibatasi 30 hari — sejauh backfill Health Connect mengisi. */}
+                     <button
+                        onClick={() => { playSoundEffect('click', soundEnabled); setSleepOffset((o) => Math.min(30, o + 1)); }}
+                        disabled={sleepOffset >= 30}
+                        className={`p-2 rounded-full ${t.btnBg} shadow-sm ${t.textMuted} border ${t.border} transition-all relative z-20 disabled:opacity-30`}
+                        aria-label="Tidur hari sebelumnya"
+                     >
+                         <ChevronLeft size={16} />
+                     </button>
+                     <button
+                        onClick={() => { playSoundEffect('click', soundEnabled); setSleepOffset((o) => Math.max(0, o - 1)); }}
+                        disabled={sleepOffset === 0}
+                        className={`p-2 rounded-full ${t.btnBg} shadow-sm ${t.textMuted} border ${t.border} transition-all relative z-20 disabled:opacity-30`}
+                        aria-label="Tidur hari berikutnya"
+                     >
+                         <ChevronRight size={16} />
+                     </button>
+                     <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(sleepDate); setManualTab('harian'); setShowManualModal(true); }} className={`p-2 rounded-full bg-indigo-500/10 dark:bg-indigo-500/20 backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border} transition-all relative z-20`}>
                          <Pencil size={16} />
                      </button>
                  </div>
@@ -1055,7 +1090,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                      <span className={`text-[10px] font-bold uppercase tracking-widest ${t.textMuted}`}>Durasi Tidur</span>
                      <div className="flex items-baseline space-x-1 mt-1">
                          {(() => {
-                             const sleepStr = bioData.sleep;
+                             const sleepStr = sleepBio.sleep;
                              if (!sleepStr || parseFloat(sleepStr) <= 0) {
                                  return <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>-</span>;
                              }
@@ -1093,8 +1128,8 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                  </div>
                  <div className="text-right pb-1">
                      <span className={`text-[10px] font-bold uppercase tracking-widest ${t.textMuted}`}>Kualitas</span>
-                     <div className={`text-lg font-black ${parseFloat(bioData.sleep) >= 7 ? 'text-emerald-500' : (parseFloat(bioData.sleep) > 0 ? 'text-amber-500' : t.textMuted)}`}>
-                         {parseFloat(bioData.sleep) >= 7 ? 'Optimal' : (parseFloat(bioData.sleep) > 0 ? 'Kurang' : '-')}
+                     <div className={`text-lg font-black ${parseFloat(sleepBio.sleep) >= 7 ? 'text-emerald-500' : (parseFloat(sleepBio.sleep) > 0 ? 'text-amber-500' : t.textMuted)}`}>
+                         {parseFloat(sleepBio.sleep) >= 7 ? 'Optimal' : (parseFloat(sleepBio.sleep) > 0 ? 'Kurang' : '-')}
                      </div>
                  </div>
              </div>
@@ -1136,11 +1171,11 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                 </div>
                 
                 {(() => {
-                    const sAwake = parseFloat(bioData.sleepAwake);
-                    const sRem = parseFloat(bioData.sleepRem);
-                    const sLight = parseFloat(bioData.sleepLight);
-                    const sDeep = parseFloat(bioData.sleepDeep);
-                    const sHrv = parseFloat(bioData.hrv);
+                    const sAwake = parseFloat(sleepBio.sleepAwake);
+                    const sRem = parseFloat(sleepBio.sleepRem);
+                    const sLight = parseFloat(sleepBio.sleepLight);
+                    const sDeep = parseFloat(sleepBio.sleepDeep);
+                    const sHrv = parseFloat(sleepBio.hrv);
                     
                     const hasStages = !isNaN(sAwake) || !isNaN(sRem) || !isNaN(sLight) || !isNaN(sDeep) || !isNaN(sHrv);
                     

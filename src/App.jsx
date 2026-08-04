@@ -49,7 +49,7 @@ import { AI_MODELS, detectPlateaus, getLogiNotification } from './utils/aiAgent'
 import { calculateReadiness } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
 import { calculateWorkoutCalories, calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType } from './utils/workoutCalc';
-import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcWriteWorkoutCalories, hcCheckStatus, hcInventory, hcReadWorkouts, hcWriteWorkoutSession, hcRequestWorkoutWritePermission } from './utils/healthConnect';
+import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcWriteWorkoutCalories, hcCheckStatus, hcInventory, hcReadWorkouts, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission } from './utils/healthConnect';
 import useDialog from './hooks/useDialog';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import UpdaterAlert from './components/UpdaterAlert';
@@ -350,28 +350,28 @@ export default function App() {
     });
   };
 
-  useEffect(() => {
+  // Sinkron dua arah dengan Health Connect.
+  //
+  // `silent` (dipakai sinkron OTOMATIS): tidak pernah memunculkan dialog izin dan tidak
+  // menampilkan popup hasil — cuma memakai izin yang sudah ada. Minta izin cuma boleh saat
+  // user memang menekan tombol/menyambungkan, bukan tiba-tiba pas app dibuka.
+  const hcSyncing = useRef(false);
+  const hcLastSync = useRef(0);
+  const runHcSync = async ({ days = 30, silent = true } = {}) => {
     if (!healthConnectEnabled || !isDataLoaded) return;
-    const todayYmd = getLocalYMD(new Date());
-    hcReadRange(todayYmd, todayYmd).then((byDay) => {
-      const today = byDay[todayYmd];
-      if (today) mergeHcDayData(todayYmd, today);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [healthConnectEnabled, isDataLoaded]);
-
-  // Sinkron histori N hari ke belakang sekaligus — dipanggil otomatis abis konek pertama kali
-  // (lihat handleToggleHealthConnect), atau lewat tombol "Sinkron ulang" manual di Settings.
-  const handleHcBackfill = async (days = 30) => {
-    // Idempoten: kalau semua izin udah ada, plugin resolve langsung tanpa munculin dialog.
-    // Perlu di sini supaya tipe yang BARU ditambahkan (mis. totalCalories) tetap keminta
-    // walau user udah "Terhubung" dari versi sebelumnya — tanpa ini dia diam-diam gak punya
-    // izin buat tipe baru itu dan hasilnya selalu kosong.
-    try { await hcRequestPermissions(); } catch (e) { console.warn('re-request izin gagal:', e); }
+    if (hcSyncing.current) return; // cegah dua sinkron tumpang tindih (dobel tulis)
+    hcSyncing.current = true;
+    try {
+    if (!silent) {
+      // Idempoten: kalau semua izin sudah ada, plugin resolve langsung tanpa dialog.
+      // Perlu supaya tipe yang BARU ditambahkan (mis. totalCalories) tetap diminta walau
+      // user sudah "Terhubung" sejak versi sebelumnya.
+      try { await hcRequestPermissions(); } catch (e) { console.warn('re-request izin gagal:', e); }
+    }
     // hcInventory(90) sengaja TIDAK dipanggil di sini — 25 kueri sekaligus tiap sinkron itu
     // mahal. Fungsinya masih ada di utils/healthConnect.js buat dipanggil manual kalau perlu
     // mendiagnosa isi Health Connect lagi (hasilnya di-log dengan prefix HC_INVENTORY).
-    const status = await hcCheckStatus();
+    const status = silent ? null : await hcCheckStatus();
     let filled = 0;
     await hcBackfillHistory(days, () => false, (ymd, summary) => { filled++; mergeHcDayData(ymd, summary); });
 
@@ -384,7 +384,10 @@ export default function App() {
     // Aman diulang: tiap sesi dicatat lewat dedupeKey (id sesi), jadi tidak pernah dobel.
     let pushed = 0;
     let sessions = 0;
-    const canWriteSession = await hcRequestWorkoutWritePermission();
+    // Saat silent, jangan minta izin (bisa memunculkan dialog tiba-tiba) — cukup pakai yang
+    // sudah ada. Kalau belum diberikan, sesi latihan dilewati dan akan terkirim di sinkron
+    // manual berikutnya.
+    const canWriteSession = silent ? await hcCheckWorkoutWritePermission() : await hcRequestWorkoutWritePermission();
     for (let i = 0; i <= days; i++) {
       const d = new Date();
       d.setDate(d.getDate() - i);
@@ -423,12 +426,43 @@ export default function App() {
         ` Histori masuk: ${filled} hari. Sesi dari app lain diimpor: ${imported}. Terkirim ke Health Connect: ${pushed} kalori, ${sessions} sesi latihan.`
       );
     }
+    } finally {
+      hcSyncing.current = false;
+      hcLastSync.current = Date.now();
+    }
   };
+
+  // Tombol "Sinkron Ulang" di Pengaturan — dengan dialog izin & popup hasil.
+  const handleHcBackfill = (days = 30) => runHcSync({ days, silent: false });
+
+  // SINKRON OTOMATIS: begitu tersambung, user tidak perlu menekan apa pun lagi.
+  // Jalan saat app dibuka, tiap kembali ke depan (mis. habis buka Samsung Health), dan tiap
+  // 30 menit selama app terbuka — dibatasi minimal 10 menit sekali biar tidak boros baterai.
+  useEffect(() => {
+    if (!healthConnectEnabled || !isDataLoaded) return;
+    const sync = (days) => {
+      if (Date.now() - hcLastSync.current < 10 * 60 * 1000) return;
+      runHcSync({ days, silent: true });
+    };
+    runHcSync({ days: 30, silent: true }); // pertama kali: langsung, tanpa jeda
+    const onVisible = () => { if (document.visibilityState === 'visible') sync(7); };
+    document.addEventListener('visibilitychange', onVisible);
+    const poll = setInterval(() => sync(7), 30 * 60 * 1000);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      clearInterval(poll);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [healthConnectEnabled, isDataLoaded]);
 
   const handleToggleHealthConnect = async () => {
     if (healthConnectEnabled) { setHealthConnectEnabled(false); return; }
     try {
       await hcRequestPermissions();
+      // Izin menulis sesi latihan diminta sekalian di sini — satu-satunya izin yang tidak
+      // ikut dalam permintaan di atas (dia lewat plugin lokal ExerciseWriterPlugin.kt).
+      // Diminta sekarang supaya sinkron otomatis setelahnya tidak perlu memunculkan dialog.
+      await hcRequestWorkoutWritePermission();
       setHealthConnectEnabled(true);
       handleHcBackfill(30);
     } catch (e) {

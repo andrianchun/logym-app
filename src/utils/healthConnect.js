@@ -194,6 +194,16 @@ export const hcReadWorkouts = async (days = 30) => {
 // muncul sebagai angka kalori polos di app lain, bukan sebagai "Workout" seperti Samsung Health.
 const ExerciseWriter = registerPlugin('ExerciseWriter');
 
+// Cek tanpa memunculkan dialog — dipakai sinkron otomatis, yang tidak boleh tiba-tiba
+// menampilkan permintaan izin saat user cuma membuka app.
+export const hcCheckWorkoutWritePermission = async () => {
+  if (!isNative()) return false;
+  try {
+    const res = await ExerciseWriter.checkPermission();
+    return !!res?.granted;
+  } catch { return false; }
+};
+
 export const hcRequestWorkoutWritePermission = async () => {
   if (!isNative()) return false;
   try {
@@ -238,12 +248,15 @@ const latestPerDay = (samples, mapValue) => {
   return byDay;
 };
 
-// Jumlahkan durasi tidur per stage per hari (dikelompokkan dari TANGGAL MULAI sesi tidur —
-// sesi yang lewat tengah malam tetap dihitung di hari sesi itu MULAI, bukan berakhir).
+// Jumlahkan durasi tidur per stage per hari, dikelompokkan dari TANGGAL BANGUN (akhir sesi),
+// bukan tanggal mulai. Tidur 3 Agu 23:00 -> 4 Agu 07:00 itu "tidurnya tanggal 4" — begitu cara
+// Samsung Health/Fitbit menampilkannya, dan sesuai akal sehat: pagi ini kita lihat tidur
+// semalam. Dulu dikelompokkan dari tanggal MULAI, akibatnya dasbor hari ini selalu kosong
+// karena tidur semalam tercatat di tanggal kemarin.
 const sleepPerDay = (samples) => {
   const byDay = {};
   for (const s of samples) {
-    const ymd = ymdOf(s.startDate);
+    const ymd = ymdOf(s.endDate || s.startDate);
     if (!byDay[ymd]) byDay[ymd] = { totalMinutes: 0, awake: 0, rem: 0, light: 0, deep: 0 };
     if (s.hasStageData && s.stages?.length) {
       s.stages.forEach((stage) => {
