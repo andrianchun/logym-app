@@ -595,7 +595,12 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
              }
          }));
      }
-  }, [mergedDailyCalories, mergedDailyCaloriesFloor, activeDate, todayStr]);
+  // bioData.activityCalories/Floor WAJIB ikut deps: badan efek ini membacanya buat deteksi
+  // perubahan. Tanpa keduanya, begitu snapshot server masuk membawa angka LAMA, bioData
+  // berubah tapi mergedDailyCalories tetap sama — deps gak berubah, efek gak jalan lagi, dan
+  // angka lama itu nempel selamanya. Satu-satunya yang memulihkan cuma remount DashboardTab
+  // (pindah tab lalu balik), persis gejala "PWA baru update setelah keluar-masuk tab di APK".
+  }, [mergedDailyCalories, mergedDailyCaloriesFloor, activeDate, todayStr, bioData.activityCalories, bioData.activityCaloriesFloor]);
 
   // Snapshot target/fase diet hari ini — di-refresh terus selama activeDate === todayStr,
   // otomatis membeku jadi arsip begitu tanggalnya lewat (efek ini gak pernah nyentuh hari lain).
