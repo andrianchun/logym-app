@@ -20,15 +20,23 @@ class ErrorBoundary extends React.Component {
   }
 
   static getDerivedStateFromError(error) {
-    // Handle Vite chunk load errors gracefully
-    if (error && error.message && (
-      error.message.includes('Failed to fetch dynamically imported module') ||
-      error.message.includes('Importing a module script failed')
-    )) {
-      if (!sessionStorage.getItem('app-updated-reload')) {
-        sessionStorage.setItem('app-updated-reload', 'true');
-        window.location.reload(true);
-      }
+    // Crash apa pun (bukan cuma gagal fetch chunk) bisa berarti PWA masih ngunci bundle LAMA
+    // di service worker cache — app rusak sebelum sempat nampilin modal update sendiri
+    // (lihat checkOta di App.jsx), jadi user macet gak bisa keluar dari layar merah ini.
+    // Coba SEKALI: unregister semua SW + hapus cache Workbox, baru hard-reload — biar reload
+    // itu benar-benar ambil ulang index.html + bundle terbaru dari server, bukan dari cache.
+    // Guard sessionStorage biar gak reload berulang kalau bundle terbarunya sendiri yang crash.
+    if (error && !sessionStorage.getItem('app-updated-reload')) {
+      sessionStorage.setItem('app-updated-reload', 'true');
+      (async () => {
+        try {
+          const regs = await navigator.serviceWorker?.getRegistrations?.();
+          await Promise.all((regs || []).map(r => r.unregister()));
+          const keys = await caches?.keys?.();
+          await Promise.all((keys || []).map(k => caches.delete(k)));
+        } catch (e) { /* best-effort — tetap reload walau gagal bersih-bersih */ }
+        window.location.reload();
+      })();
     }
     return { hasError: true, error };
   }
