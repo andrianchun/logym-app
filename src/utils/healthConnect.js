@@ -257,14 +257,39 @@ const sleepPerDay = (samples) => {
   const byDay = {};
   for (const s of samples) {
     const ymd = ymdOf(s.endDate || s.startDate);
-    if (!byDay[ymd]) byDay[ymd] = { totalMinutes: 0, awake: 0, rem: 0, light: 0, deep: 0 };
+    if (!byDay[ymd]) byDay[ymd] = { totalMinutes: 0, awake: 0, rem: 0, light: 0, deep: 0, sleepLog: [] };
+    
+    let currentEpoch = new Date(s.startDate).getTime();
+    
     if (s.hasStageData && s.stages?.length) {
       s.stages.forEach((stage) => {
         byDay[ymd].totalMinutes += stage.durationMinutes;
         if (stage.stage in byDay[ymd]) byDay[ymd][stage.stage] += stage.durationMinutes;
+        
+        // Map string stages to chart numeric values (3=Awake, 2=REM, 1=Light, 0=Deep)
+        let numStage = 1; // default Light
+        const stg = stage.stage?.toLowerCase() || '';
+        if (stg.includes('awake') || stg.includes('out') || stg === 'awake') numStage = 3;
+        else if (stg.includes('rem') || stg === 'rem') numStage = 2;
+        else if (stg.includes('deep') || stg === 'deep') numStage = 0;
+        
+        const timeStr = new Date(currentEpoch).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit', hour12: false});
+        byDay[ymd].sleepLog.push({ time: timeStr, stage: numStage });
+        
+        currentEpoch += (stage.durationMinutes * 60000);
       });
+      // Add closing point for the area chart
+      const endTimeStr = new Date(currentEpoch).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit', hour12: false});
+      const lastStage = byDay[ymd].sleepLog.length > 0 ? byDay[ymd].sleepLog[byDay[ymd].sleepLog.length - 1].stage : 1;
+      byDay[ymd].sleepLog.push({ time: endTimeStr, stage: lastStage });
     } else {
-      byDay[ymd].totalMinutes += (new Date(s.endDate) - new Date(s.startDate)) / 60000;
+      const durMins = (new Date(s.endDate) - new Date(s.startDate)) / 60000;
+      byDay[ymd].totalMinutes += durMins;
+      
+      const timeStr = new Date(currentEpoch).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit', hour12: false});
+      const endTimeStr = new Date(currentEpoch + (durMins * 60000)).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit', hour12: false});
+      byDay[ymd].sleepLog.push({ time: timeStr, stage: 1 });
+      byDay[ymd].sleepLog.push({ time: endTimeStr, stage: 1 });
     }
   }
   const out = {};
@@ -275,6 +300,7 @@ const sleepPerDay = (samples) => {
       sleepRem: String(Math.round(d.rem)),
       sleepLight: String(Math.round(d.light)),
       sleepDeep: String(Math.round(d.deep)),
+      sleepLog: d.sleepLog
     };
   });
   return out;

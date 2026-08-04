@@ -1335,19 +1335,19 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                                                 </div>
                                                 <div className="absolute left-12 right-0 top-0 bottom-0">
                                                     {(() => {
-                                                        const sleepData = [
-                                                            { time: '22:00', stage: 3 },
-                                                            { time: '22:30', stage: 1 },
-                                                            { time: '23:00', stage: 0 },
-                                                            { time: '00:00', stage: 1 },
-                                                            { time: '01:00', stage: 2 },
-                                                            { time: '01:30', stage: 1 },
-                                                            { time: '02:30', stage: 0 },
-                                                            { time: '03:30', stage: 1 },
-                                                            { time: '04:00', stage: 2 },
-                                                            { time: '05:00', stage: 1 },
-                                                            { time: '06:00', stage: 3 }
-                                                        ];
+                                                        const sleepData = (sleepBio.sleepLog && Array.isArray(sleepBio.sleepLog) && sleepBio.sleepLog.length > 1) 
+                                                            ? sleepBio.sleepLog 
+                                                            : null;
+                                                        
+                                                        if (!sleepData) {
+                                                            return (
+                                                                <div className="w-full h-full flex flex-col items-center justify-center text-center">
+                                                                    <span className={`text-xs font-bold ${t.textMuted}`}>Tidak Cukup Data Tahap Tidur</span>
+                                                                    <span className={`text-[9px] mt-1 opacity-70 ${t.textMuted}`}>Sinkronkan dengan Health Connect untuk melihat grafik.</span>
+                                                                </div>
+                                                            );
+                                                        }
+                                                        
                                                         return (
                                                             <ResponsiveContainer width="100%" height="100%">
                                                                 <AreaChart data={sleepData} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>

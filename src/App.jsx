@@ -311,7 +311,7 @@ export default function App() {
   // Field yang boleh diisi backfill/live-sync — TIDAK PERNAH nimpa field yang udah manual
   // (_manualFlags, lihat handleSaveManualData di DashboardTab.jsx) atau yang udah ada isinya
   // dari sumber lain (mis. activityCalories hasil hitung workout Logym sendiri).
-  const HC_FIELDS = ['steps', 'activityCalories', 'heartRate', 'minHeartRate', 'maxHeartRate', 'restingHeartRate', 'weight', 'height', 'bodyFat', 'oxygenSaturation', 'bloodPressure', 'sleep', 'sleepAwake', 'sleepRem', 'sleepLight', 'sleepDeep', 'distance', 'bmr'];
+  const HC_FIELDS = ['steps', 'activityCalories', 'heartRate', 'minHeartRate', 'maxHeartRate', 'restingHeartRate', 'weight', 'height', 'bodyFat', 'oxygenSaturation', 'bloodPressure', 'sleep', 'sleepAwake', 'sleepRem', 'sleepLight', 'sleepDeep', 'sleepLog', 'distance', 'bmr'];
 
   // Gabungkan sesi latihan dari aplikasi lain (Samsung Health, Hevy, dsb) ke riwayat Logym.
   // Dicocokkan lewat id (turunan platformId Health Connect), jadi impor berulang tidak
