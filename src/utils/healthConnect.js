@@ -43,6 +43,20 @@ export const hcRequestPermissions = async () => {
   return result;
 };
 
+// Cek izin yang BENERAN aktif sekarang (tanpa munculin dialog) — beda dari hcRequestPermissions,
+// ini buat diagnosa: app bisa aja "nangkring" di daftar Health Connect padahal izin per-tipenya
+// belum tentu ke-grant semua (khususnya tipe yang baru ditambahkan setelah user connect duluan).
+export const hcCheckStatus = async () => {
+  if (!isNative()) return null;
+  try {
+    const H = await getPlugin();
+    return await H.checkAuthorization({ read: READ_TYPES, write: WRITE_TYPES });
+  } catch (e) {
+    console.warn('hcCheckStatus gagal:', e);
+    return null;
+  }
+};
+
 // Tulis kalori terbakar satu sesi latihan yang baru selesai. startDate/endDate = rentang waktu
 // sesi (jadi durasinya ikut kebawa lewat rentang record, bukan cuma angka kalori polos) — app
 // lain yang baca ActiveCaloriesBurnedRecord dari Health Connect akan lihat kapan & berapa lama.

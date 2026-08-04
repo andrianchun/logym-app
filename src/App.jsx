@@ -49,7 +49,7 @@ import { AI_MODELS, detectPlateaus, getLogiNotification } from './utils/aiAgent'
 import { calculateReadiness } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
 import { calculateWorkoutCalories, calculateSmartWorkoutCalories } from './utils/workoutCalc';
-import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcWriteWorkoutCalories } from './utils/healthConnect';
+import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcWriteWorkoutCalories, hcCheckStatus } from './utils/healthConnect';
 import useDialog from './hooks/useDialog';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import UpdaterAlert from './components/UpdaterAlert';
@@ -342,7 +342,17 @@ export default function App() {
   // Sinkron histori N hari ke belakang sekaligus — dipanggil otomatis abis konek pertama kali
   // (lihat handleToggleHealthConnect), atau lewat tombol "Sinkron ulang" manual di Settings.
   const handleHcBackfill = async (days = 30) => {
-    await hcBackfillHistory(days, () => false, (ymd, summary) => mergeHcDayData(ymd, summary));
+    const status = await hcCheckStatus();
+    let filled = 0;
+    await hcBackfillHistory(days, () => false, (ymd, summary) => { filled++; mergeHcDayData(ymd, summary); });
+    if (status) {
+      const denied = [...(status.readDenied || []), ...(status.writeDenied || [])];
+      await showOtaAlert(
+        `Izin Health Connect — baca: ${status.readAuthorized?.length || 0} tipe, tulis: ${status.writeAuthorized?.length || 0} tipe.` +
+        (denied.length ? ` Ditolak: ${denied.join(', ')}.` : '') +
+        ` Histori terisi: ${filled}/${days} hari.`
+      );
+    }
   };
 
   const handleToggleHealthConnect = async () => {
