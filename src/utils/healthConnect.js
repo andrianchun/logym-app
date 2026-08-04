@@ -89,6 +89,44 @@ export const hcWriteWorkoutCalories = async (startDate, endDate, kcal, dedupeKey
   }
 };
 
+// DIAGNOSA: cek semua tipe yang didukung plugin, laporkan mana yang benar-benar ada isinya
+// di Health Connect perangkat ini dan dari aplikasi mana. Dipakai buat memutuskan data apa
+// saja yang layak ditarik ke Logym — bukan menebak dari dokumentasi.
+const ALL_READABLE = [
+  'steps', 'distance', 'distanceCycling', 'flightsClimbed',
+  'calories', 'totalCalories', 'basalCalories',
+  'heartRate', 'restingHeartRate', 'heartRateVariability', 'vo2Max',
+  'weight', 'height', 'bodyFat',
+  'sleep', 'mindfulness',
+  'oxygenSaturation', 'respiratoryRate', 'bloodPressure', 'bloodGlucose',
+  'bodyTemperature', 'basalBodyTemperature',
+  'dietaryWater', 'dietaryEnergyConsumed',
+];
+
+export const hcInventory = async (days = 90) => {
+  if (!isNative()) return null;
+  const end = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - days);
+  const startISO = start.toISOString();
+  const endISO = end.toISOString();
+  const found = {};
+  await Promise.all(ALL_READABLE.map(async (dataType) => {
+    try {
+      const res = await Health.readSamples({ dataType, startDate: startISO, endDate: endISO, limit: 200, ascending: false });
+      const s = res?.samples || [];
+      if (s.length) found[dataType] = { jumlah: s.length, sumber: [...new Set(s.map((x) => x.sourceName).filter(Boolean))].join(', '), contoh: s[0].value };
+    } catch (e) { found[dataType] = { error: String(e?.message || e) }; }
+  }));
+  try {
+    const w = await Health.queryWorkouts({ startDate: startISO, endDate: endISO, limit: 200 });
+    const list = w?.workouts || [];
+    if (list.length) found.workouts = { jumlah: list.length, sumber: [...new Set(list.map((x) => x.sourceName).filter(Boolean))].join(', '), jenis: [...new Set(list.map((x) => x.workoutType).filter(Boolean))].join(', ') };
+  } catch (e) { found.workouts = { error: String(e?.message || e) }; }
+  console.log('HC_INVENTORY ' + JSON.stringify(found));
+  return found;
+};
+
 const ymdOf = (isoStr) => isoStr.slice(0, 10);
 
 // Kelompokkan sample "titik waktu" (berat, tinggi, body fat, oksigen, tekanan darah — bukan

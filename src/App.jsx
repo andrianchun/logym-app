@@ -49,7 +49,7 @@ import { AI_MODELS, detectPlateaus, getLogiNotification } from './utils/aiAgent'
 import { calculateReadiness } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
 import { calculateWorkoutCalories, calculateSmartWorkoutCalories, parseWorkoutDurationMinutes } from './utils/workoutCalc';
-import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcWriteWorkoutCalories, hcCheckStatus } from './utils/healthConnect';
+import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcWriteWorkoutCalories, hcCheckStatus, hcInventory } from './utils/healthConnect';
 import useDialog from './hooks/useDialog';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import UpdaterAlert from './components/UpdaterAlert';
@@ -347,6 +347,7 @@ export default function App() {
     // walau user udah "Terhubung" dari versi sebelumnya — tanpa ini dia diam-diam gak punya
     // izin buat tipe baru itu dan hasilnya selalu kosong.
     try { await hcRequestPermissions(); } catch (e) { console.warn('re-request izin gagal:', e); }
+    await hcInventory(90);
     const status = await hcCheckStatus();
     let filled = 0;
     await hcBackfillHistory(days, () => false, (ymd, summary) => { filled++; mergeHcDayData(ymd, summary); });
