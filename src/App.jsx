@@ -347,7 +347,9 @@ export default function App() {
     await hcBackfillHistory(days, () => false, (ymd, summary) => { filled++; mergeHcDayData(ymd, summary); });
     if (status) {
       const denied = [...(status.readDenied || []), ...(status.writeDenied || [])];
-      await showOtaAlert(
+      // Sengaja gak di-await — tombol yang manggil ini harus langsung balik normal begitu
+      // proses selesai, gak boleh nunggu user tekan OK di popup buat lepas loading state-nya.
+      showOtaAlert(
         `Izin Health Connect — baca: ${status.readAuthorized?.length || 0} tipe, tulis: ${status.writeAuthorized?.length || 0} tipe.` +
         (denied.length ? ` Ditolak: ${denied.join(', ')}.` : '') +
         ` Histori terisi: ${filled}/${days} hari.`
@@ -362,7 +364,7 @@ export default function App() {
       setHealthConnectEnabled(true);
       handleHcBackfill(30);
     } catch (e) {
-      await showOtaAlert('Gagal menyambungkan Health Connect: ' + e.message);
+      showOtaAlert('Gagal menyambungkan Health Connect: ' + e.message);
     }
   };
 
