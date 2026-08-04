@@ -21,6 +21,42 @@ export const parseWorkoutDurationMinutes = (duration) => {
   return 0;
 };
 
+// Kata kunci nama latihan -> jenis olahraga Health Connect. Dipakai hanya kalau sesinya
+// MURNI kardio; sesi yang mengandung latihan beban selalu dianggap latihan beban.
+const CARDIO_KEYWORDS = [
+  [/treadmill/i, 'runningTreadmill'],
+  [/\b(lari|run|jog)/i, 'running'],
+  [/(sepeda|cycl|bike|spinning)/i, 'cycling'],
+  [/(jalan|walk)/i, 'walking'],
+  [/(dayung|row)/i, 'rowingMachine'],
+  [/(elliptical|eliptik)/i, 'elliptical'],
+  [/(renang|swim)/i, 'swimming'],
+  [/(tangga|stair)/i, 'stairClimbing'],
+  [/(lompat tali|jump rope|skipping)/i, 'highIntensityIntervalTraining'],
+];
+
+/**
+ * Tebak jenis olahraga sebuah sesi untuk ditulis ke Health Connect.
+ *
+ * Aturannya sengaja sederhana dan bisa diterka: sesi yang mengandung latihan beban selalu
+ * jadi 'strengthTraining' — termasuk sesi CAMPURAN (mis. beban + treadmill sebagai pemanasan),
+ * karena bagian bebannya yang jadi inti sesi. Hanya sesi yang SEMUA latihannya berbasis waktu
+ * (kardio) yang dipetakan ke jenis kardio, ditebak dari nama latihannya.
+ *
+ * @param {Array} exercises - daftar latihan pada sesi (exercises / overriddenExercises)
+ * @returns {string} nama jenis olahraga yang dikenali ExerciseWriterPlugin.kt
+ */
+export const guessWorkoutType = (exercises) => {
+  const list = Array.isArray(exercises) ? exercises : [];
+  if (list.length === 0) return 'strengthTraining';
+  const cardio = list.filter((e) => e?.type === 'time');
+  // Ada latihan beban (murni atau campuran) -> latihan beban.
+  if (cardio.length < list.length) return 'strengthTraining';
+  const names = cardio.map((e) => e?.name || '').join(' ');
+  for (const [re, type] of CARDIO_KEYWORDS) if (re.test(names)) return type;
+  return 'running'; // kardio tapi namanya tidak dikenali
+};
+
 /**
  * Estimasi kalori terbakar untuk satu sesi latihan berdasarkan berat badan & durasi.
  * @param {number} weightKg - berat badan pengguna (kg). Fallback ke 70kg kalau belum diisi.

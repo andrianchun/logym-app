@@ -48,7 +48,7 @@ import { fetchExercisesFromApi } from './utils/exerciseDbApi';
 import { AI_MODELS, detectPlateaus, getLogiNotification } from './utils/aiAgent';
 import { calculateReadiness } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
-import { calculateWorkoutCalories, calculateSmartWorkoutCalories, parseWorkoutDurationMinutes } from './utils/workoutCalc';
+import { calculateWorkoutCalories, calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType } from './utils/workoutCalc';
 import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcWriteWorkoutCalories, hcCheckStatus, hcInventory, hcReadWorkouts, hcWriteWorkoutSession, hcRequestWorkoutWritePermission } from './utils/healthConnect';
 import useDialog from './hooks/useDialog';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
@@ -368,7 +368,9 @@ export default function App() {
     // walau user udah "Terhubung" dari versi sebelumnya — tanpa ini dia diam-diam gak punya
     // izin buat tipe baru itu dan hasilnya selalu kosong.
     try { await hcRequestPermissions(); } catch (e) { console.warn('re-request izin gagal:', e); }
-    await hcInventory(90);
+    // hcInventory(90) sengaja TIDAK dipanggil di sini — 25 kueri sekaligus tiap sinkron itu
+    // mahal. Fungsinya masih ada di utils/healthConnect.js buat dipanggil manual kalau perlu
+    // mendiagnosa isi Health Connect lagi (hasilnya di-log dengan prefix HC_INVENTORY).
     const status = await hcCheckStatus();
     let filled = 0;
     await hcBackfillHistory(days, () => false, (ymd, summary) => { filled++; mergeHcDayData(ymd, summary); });
@@ -402,7 +404,7 @@ export default function App() {
         if (canWriteSession && await hcWriteWorkoutSession({
           startDate: start.toISOString(),
           endDate: end.toISOString(),
-          exerciseType: 'strengthTraining',
+          exerciseType: guessWorkoutType(w.overriddenExercises || w.exercises),
           title: w.programName || 'Latihan',
           dedupeKey: w.id,
         })) sessions++;
@@ -2582,8 +2584,18 @@ export default function App() {
       hcWriteWorkoutCalories(startISO, endISO, kcal);
       // Sesi latihan formal (jenis olahraga + durasi) supaya kebaca app lain sebagai "Workout",
       // bukan cuma angka kalori. Lewat plugin lokal ExerciseWriterPlugin.kt.
+      // Daftar latihan dirakit sama seperti yang nanti dibekukan ke riwayat di bawah, biar
+      // jenis olahraganya (kardio vs beban) ditebak dari isi sesi yang sebenarnya.
+      const srcProg = programs.find((pr) => pr.id === (progId || '').toString().replace('projected_', '').split('_')[0]);
+      const sessionExercises = [...(srcProg?.exercises || []), ...(extraExercises || [])];
+      const sessionTitle = progId === 'extra' ? 'Ekstra' : (srcProg?.name || 'Latihan Logym');
       hcRequestWorkoutWritePermission().then((ok) => {
-        if (ok) hcWriteWorkoutSession({ startDate: startISO, endDate: endISO, exerciseType: 'strengthTraining', title: 'Latihan Logym' });
+        if (ok) hcWriteWorkoutSession({
+          startDate: startISO,
+          endDate: endISO,
+          exerciseType: guessWorkoutType(sessionExercises),
+          title: sessionTitle,
+        });
       });
     }
     const formatDur = (secs) => {

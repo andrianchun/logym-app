@@ -170,10 +170,13 @@ export const hcReadWorkouts = async (days = 30) => {
         status: 'completed',
         source: 'healthconnect',
         sourceName: w.sourceName || '',
-        workoutType: w.workoutType,
+        workoutType: w.workoutType || 'other',
         duration: mins,
-        caloriesBurned: w.totalEnergyBurned ? Math.round(w.totalEnergyBurned) : undefined,
-        distanceKm: w.totalDistance ? Number((w.totalDistance / 1000).toFixed(2)) : undefined,
+        // Pakai spread bersyarat, JANGAN `: undefined` — Firestore menolak field bernilai
+        // undefined ("Unsupported field value: undefined") dan SELURUH penyimpanan riwayat
+        // ke cloud jadi gagal, bukan cuma sesi ini.
+        ...(w.totalEnergyBurned ? { caloriesBurned: Math.round(w.totalEnergyBurned) } : {}),
+        ...(w.totalDistance ? { distanceKm: Number((w.totalDistance / 1000).toFixed(2)) } : {}),
         timestamp: `${String(endD.getHours()).padStart(2, '0')}:${String(endD.getMinutes()).padStart(2, '0')}`,
         log: {},
         exercises: [],
