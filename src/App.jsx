@@ -342,6 +342,11 @@ export default function App() {
   // Sinkron histori N hari ke belakang sekaligus — dipanggil otomatis abis konek pertama kali
   // (lihat handleToggleHealthConnect), atau lewat tombol "Sinkron ulang" manual di Settings.
   const handleHcBackfill = async (days = 30) => {
+    // Idempoten: kalau semua izin udah ada, plugin resolve langsung tanpa munculin dialog.
+    // Perlu di sini supaya tipe yang BARU ditambahkan (mis. totalCalories) tetap keminta
+    // walau user udah "Terhubung" dari versi sebelumnya — tanpa ini dia diam-diam gak punya
+    // izin buat tipe baru itu dan hasilnya selalu kosong.
+    try { await hcRequestPermissions(); } catch (e) { console.warn('re-request izin gagal:', e); }
     const status = await hcCheckStatus();
     let filled = 0;
     await hcBackfillHistory(days, () => false, (ymd, summary) => { filled++; mergeHcDayData(ymd, summary); });

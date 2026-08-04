@@ -55,6 +55,9 @@
          kosong walau kodenya kelihatan benar (Health Connect gak bisa kasih izin utk tipe
          yang gak dideklarasikan manifest-nya, sama seperti READ_HEALTH_DATA_HISTORY di bawah). -->
     <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" />
+    <!-- Banyak sumber (mis. Samsung Health) cuma nulis TotalCaloriesBurned, gak pernah
+         ActiveCaloriesBurned — tanpa izin ini query kalori balik kosong terus. -->
+    <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED" />
     <uses-permission android:name="android.permission.health.READ_HEIGHT" />
     <uses-permission android:name="android.permission.health.READ_OXYGEN_SATURATION" />
     <uses-permission android:name="android.permission.health.READ_BLOOD_PRESSURE" />

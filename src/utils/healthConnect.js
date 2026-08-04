@@ -27,7 +27,10 @@ export const hcAvailable = async () => {
   } catch { return false; }
 };
 
-const READ_TYPES = ['steps', 'calories', 'heartRate', 'weight', 'height', 'sleep', 'bodyFat', 'oxygenSaturation', 'bloodPressure'];
+// 'totalCalories' ikut diminta karena banyak sumber (mis. Samsung Health) cuma nulis
+// TotalCaloriesBurned dan TIDAK pernah nulis ActiveCaloriesBurned — tanpa ini, query
+// 'calories' balik kosong terus walau Health Connect penuh data (kejadian nyata).
+const READ_TYPES = ['steps', 'calories', 'totalCalories', 'heartRate', 'weight', 'height', 'sleep', 'bodyFat', 'oxygenSaturation', 'bloodPressure'];
 const WRITE_TYPES = ['calories'];
 
 // Android gak nge-throw kalau user pencet "Tolak" di dialog izin — tetap resolve normal
@@ -144,9 +147,29 @@ export const hcReadRange = async (startYmd, endYmd) => {
       .then((res) => (res?.samples || []).forEach((s) => { if (s.value > 0) put(ymdOf(s.startDate), { steps: Math.round(s.value) }); }))
       .catch((e) => console.warn('hcReadRange steps gagal:', e)),
 
-    H.queryAggregated({ dataType: 'calories', startDate: startISO, endDate: endISO, bucket: 'day', aggregation: 'sum' })
-      .then((res) => (res?.samples || []).forEach((s) => { if (s.value > 0) put(ymdOf(s.startDate), { activityCalories: Math.round(s.value) }); }))
-      .catch((e) => console.warn('hcReadRange calories gagal:', e)),
+    // Fallback dua tipe: 'calories' (ActiveCaloriesBurned, bisa di-aggregate langsung) dulu;
+    // kalau kosong, baru 'totalCalories' (TotalCaloriesBurned) yang HARUS dibaca mentah lalu
+    // dijumlah manual — queryAggregated plugin ini gak dukung tipe itu (lihat aggregateMetrics
+    // di HealthManager.kt). Sumber macam Samsung Health cuma nulis yang kedua.
+    (async () => {
+      try {
+        const res = await H.queryAggregated({ dataType: 'calories', startDate: startISO, endDate: endISO, bucket: 'day', aggregation: 'sum' });
+        const hit = (res?.samples || []).filter((s) => s.value > 0);
+        if (hit.length > 0) {
+          hit.forEach((s) => put(ymdOf(s.startDate), { activityCalories: Math.round(s.value) }));
+          return;
+        }
+      } catch (e) { console.warn('hcReadRange calories gagal:', e); }
+      try {
+        const res = await H.readSamples({ dataType: 'totalCalories', startDate: startISO, endDate: endISO, limit: 5000, ascending: true });
+        const byDay = {};
+        (res?.samples || []).forEach((s) => {
+          const ymd = ymdOf(s.startDate);
+          byDay[ymd] = (byDay[ymd] || 0) + (s.value || 0);
+        });
+        Object.entries(byDay).forEach(([ymd, kcal]) => { if (kcal > 0) put(ymd, { activityCalories: Math.round(kcal) }); });
+      } catch (e) { console.warn('hcReadRange totalCalories gagal:', e); }
+    })(),
 
     H.queryAggregated({ dataType: 'heartRate', startDate: startISO, endDate: endISO, bucket: 'day', aggregation: ['average', 'min', 'max'] })
       .then((res) => (res?.samples || []).forEach((s) => put(ymdOf(s.startDate), {
