@@ -1665,6 +1665,9 @@ export default function App() {
   // Baseline serialisasi per tanggal — merepresentasikan kondisi terakhir yang tersimpan di server.
   // Tanggal yang serialisasinya sama dengan baseline tidak perlu dikirim ulang.
   const lastSavedHistoryJson = useRef(null);
+  // maxWait buat debounce di bawah — lihat komentar di titik pemakaiannya.
+  const historyBurstStart = useRef(0);
+  const HISTORY_SAVE_MAX_WAIT = 8000;
 
   useEffect(() => {
     if (user && isDataLoaded && !hasParseError) {
@@ -1725,9 +1728,20 @@ export default function App() {
               return Promise.resolve();
            }
         });
+        historyBurstStart.current = 0;
         return Promise.all(writes);
       };
-      const timer = setTimeout(attemptSave, 2000);
+      // Debounce dengan maxWait: efek ini ngulang tiap `history` dapat reference baru, dan
+      // reset timer 2 detiknya tiap kali. Kalau `history` terus berubah lebih cepat dari 2
+      // detik antar perubahan (mis. sync HC yang narik heartRateLog/bloodPressureLog/
+      // oxygenSaturationLog — banyak promise readSamples native yang resolve bergantian dalam
+      // rentang beberapa detik), timer-nya nggak pernah dapat jeda tenang buat nembak —
+      // livelock, data ketumpuk lokal tapi nggak pernah nyampe Firestore. Tanpa maxWait ini,
+      // "keluar-masuk tab" doang yang kelihatan mancingnya, karena kebetulan itu momen HC
+      // sync-nya udah selesai dan history akhirnya diam.
+      if (!historyBurstStart.current) historyBurstStart.current = Date.now();
+      const elapsed = Date.now() - historyBurstStart.current;
+      const timer = setTimeout(attemptSave, elapsed >= HISTORY_SAVE_MAX_WAIT ? 0 : 2000);
       // Simpan supaya handleLogout bisa flush save history (log latihan) yang masih
       // tertunda sebelum signOut — tanpa ini, logout langsung setelah selesai latihan
       // bisa membatalkan timer ini dan latihan yang baru dicatat hilang tanpa jejak.
