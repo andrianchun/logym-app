@@ -9,18 +9,19 @@
 // Hanya aktif di platform native Android (Capacitor).
 // ============================================================
 import { Capacitor } from '@capacitor/core';
+// Import STATIS, jangan diganti dynamic import lewat fungsi async — plugin Capacitor itu
+// Proxy yang menganggap SEMUA akses property sebagai method native, termasuk `.then` yang
+// diakses otomatis saat promise me-resolve nilai balikan fungsi async. Hasilnya panggilan
+// native "Health.then()" yang gak ada → promise gak pernah selesai → semua pemanggil
+// nge-hang diam-diam selamanya. (Bug nyata: tombol "Hubungkan" macet di "Menghubungkan...".)
+import { Health } from '@capgo/capacitor-health';
 
 const isNative = () => Capacitor.isNativePlatform();
-
-const getPlugin = async () => {
-  const { Health } = await import('@capgo/capacitor-health');
-  return Health;
-};
 
 export const hcAvailable = async () => {
   if (!isNative()) return false;
   try {
-    const H = await getPlugin();
+    const H = Health;
     const res = await H.isAvailable();
     return !!res?.available;
   } catch { return false; }
@@ -35,7 +36,7 @@ const WRITE_TYPES = ['calories'];
 // requestHistoryAccess:true — tanpa ini Health Connect cuma kasih akses baca 30 hari
 // terakhir, backfill histori yang lebih lama gak akan dapat apa-apa.
 export const hcRequestPermissions = async () => {
-  const H = await getPlugin();
+  const H = Health;
   // Race pakai timeout — tanpa ini, kalau dialog izin native gagal muncul/nyangkut, tombol
   // "Hubungkan" nge-freeze diam-diam selamanya (gak ada error, gak ada dialog) dan user gak
   // tau apa yang salah.
@@ -55,7 +56,7 @@ export const hcRequestPermissions = async () => {
 export const hcCheckStatus = async () => {
   if (!isNative()) return null;
   try {
-    const H = await getPlugin();
+    const H = Health;
     return await H.checkAuthorization({ read: READ_TYPES, write: WRITE_TYPES });
   } catch (e) {
     console.warn('hcCheckStatus gagal:', e);
@@ -69,7 +70,7 @@ export const hcCheckStatus = async () => {
 export const hcWriteWorkoutCalories = async (startDate, endDate, kcal) => {
   if (!isNative() || !kcal || kcal <= 0) return false;
   try {
-    const H = await getPlugin();
+    const H = Health;
     await H.saveSample({ dataType: 'calories', startDate, endDate, value: Math.round(kcal) });
     return true;
   } catch (e) {
@@ -132,7 +133,7 @@ const sleepPerDay = (samples) => {
 //          sleepRem, sleepLight, sleepDeep } }
 export const hcReadRange = async (startYmd, endYmd) => {
   if (!isNative()) return {};
-  const H = await getPlugin();
+  const H = Health;
   const startISO = new Date(`${startYmd}T00:00:00`).toISOString();
   const endISO = new Date(`${endYmd}T23:59:59`).toISOString();
   const byDay = {};
