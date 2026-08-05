@@ -194,7 +194,7 @@ const ExerciseCard = ({
   };
 
   return (
-    <div className={`mb-6 mx-0 sm:mx-4 ${ex.supersetId ? 'rounded-l-3xl rounded-r-none sm:rounded-[2.5rem]' : 'rounded-3xl sm:rounded-[2.5rem]'} bg-white/70 backdrop-blur-2xl dark:bg-black/50 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.4)] border-y sm:border border-white/40 dark:border-white/10 overflow-hidden transition-all duration-300 ${isSkip ? 'opacity-50 grayscale scale-95' : 'opacity-100'}`}>
+    <div className={`mb-6 mx-0 sm:mx-4 ${ex.supersetId ? 'rounded-l-3xl rounded-r-none sm:rounded-[2.5rem]' : 'rounded-3xl sm:rounded-[2.5rem]'} bg-white/90 dark:bg-black/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.4)] border-y sm:border border-white/40 dark:border-white/10 overflow-hidden transition-all duration-300 ${isSkip ? 'opacity-50 grayscale scale-95' : 'opacity-100'}`}>
       
       {/* HEADER IMAGE / GIF FULL WIDTH */}
       <div className="relative w-full h-[280px] sm:h-[320px] bg-zinc-100 dark:bg-zinc-800">
@@ -228,18 +228,18 @@ const ExerciseCard = ({
             {/* Top Container */}
             <div className="absolute top-5 left-5 right-5 flex justify-between items-start z-10">
                <div className="flex gap-1.5 flex-wrap max-w-[65%]">
-                 <span className="px-2.5 py-1 rounded-xl bg-white/20 backdrop-blur-md border border-white/30 text-white text-[9px] font-black uppercase tracking-wider shadow-sm">
+                 <span className="px-2.5 py-1 rounded-xl bg-white/20 border border-white/30 text-white text-[9px] font-black uppercase tracking-wider shadow-sm">
                    {ex.equipment || 'Lainnya'}
                  </span>
 
                  {isCustom && (
-                   <span className="px-2.5 py-1 rounded-xl bg-emerald-500/80 backdrop-blur-md border border-emerald-400/50 text-white text-[9px] font-black uppercase tracking-wider shadow-sm">
+                   <span className="px-2.5 py-1 rounded-xl bg-emerald-500/80 border border-emerald-400/50 text-white text-[9px] font-black uppercase tracking-wider shadow-sm">
                      CUSTOM
                    </span>
                  )}
 
                  {exType !== 'weight' && isSkip && (
-                     <span className="px-2.5 py-1 rounded-xl bg-rose-500/90 backdrop-blur-md border border-rose-500/50 text-white text-[9px] font-black uppercase tracking-wider shadow-sm">
+                     <span className="px-2.5 py-1 rounded-xl bg-rose-500/90 border border-rose-500/50 text-white text-[9px] font-black uppercase tracking-wider shadow-sm">
                          SKIPPED
                      </span>
                  )}
@@ -247,28 +247,28 @@ const ExerciseCard = ({
                
                {/* Right Side Buttons (Floating) */}
                <div className="flex flex-col gap-1.5 shrink-0 pointer-events-auto">
-                 <button onClick={() => { playSoundEffect('click', soundEnabled); onOpenVideo(ex); }} className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white flex items-center justify-center hover:bg-white/40 transition-colors shadow-sm">
+                 <button onClick={() => { playSoundEffect('click', soundEnabled); onOpenVideo(ex); }} className="w-10 h-10 rounded-full bg-white/20 border border-white/30 text-white flex items-center justify-center hover:bg-white/40 transition-colors shadow-sm">
                     <Info size={18} />
                  </button>
                  {exType !== 'weight' && (
-                     <button onClick={() => { playSoundEffect('click', soundEnabled); onToggleSkip(ex.id); }} className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${isSkip ? 'bg-rose-500 text-white shadow-sm' : 'bg-white/20 backdrop-blur-md border border-white/30 text-white hover:bg-white/40 shadow-sm'}`} title={isSkip ? 'Batal Skip' : 'Skip'}>
+                     <button onClick={() => { playSoundEffect('click', soundEnabled); onToggleSkip(ex.id); }} className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${isSkip ? 'bg-rose-500 text-white shadow-sm' : 'bg-white/20 border border-white/30 text-white hover:bg-white/40 shadow-sm'}`} title={isSkip ? 'Batal Skip' : 'Skip'}>
                          <SkipForward size={18} className={isSkip ? "text-white" : ""} />
                      </button>
                  )}
                  {!isExtra && onReplaceClick && (
-                    <button onClick={() => { playSoundEffect('click', soundEnabled); onReplaceClick(ex.id); }} className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white flex items-center justify-center hover:bg-white/40 transition-colors shadow-sm">
+                    <button onClick={() => { playSoundEffect('click', soundEnabled); onReplaceClick(ex.id); }} className="w-10 h-10 rounded-full bg-white/20 border border-white/30 text-white flex items-center justify-center hover:bg-white/40 transition-colors shadow-sm">
                         <ArrowLeftRight size={18} />
                     </button>
                  )}
                  {isExtra && (
-                    <button onClick={() => onRemoveExtra(ex.id)} className="w-10 h-10 rounded-full bg-rose-500/80 backdrop-blur-md border border-rose-500/50 text-white flex items-center justify-center hover:bg-rose-500 transition-colors shadow-sm">
+                    <button onClick={() => onRemoveExtra(ex.id)} className="w-10 h-10 rounded-full bg-rose-500/80 border border-rose-500/50 text-white flex items-center justify-center hover:bg-rose-500 transition-colors shadow-sm">
                         <X size={18} />
                     </button>
                  )}
                  {/* Exercise dari program cuma bisa dihapus permanen saat ngedit sesi yang SUDAH SELESAI
                      (koreksi riwayat lewat Kalender) — bukan saat mengubah rutinitas yang masih aktif. */}
                  {!isExtra && canDeleteCompleted && (
-                    <button onClick={() => onRemoveProgramExercise(ex)} className="w-10 h-10 rounded-full bg-rose-500/80 backdrop-blur-md border border-rose-500/50 text-white flex items-center justify-center hover:bg-rose-500 transition-colors shadow-sm">
+                    <button onClick={() => onRemoveProgramExercise(ex)} className="w-10 h-10 rounded-full bg-rose-500/80 border border-rose-500/50 text-white flex items-center justify-center hover:bg-rose-500 transition-colors shadow-sm">
                         <X size={18} />
                     </button>
                  )}
@@ -280,9 +280,9 @@ const ExerciseCard = ({
                {/* MUSCLE TARGETS */}
                <div className="flex gap-1.5 flex-wrap">
                   {Array.isArray(ex.target) ? ex.target.map(m => (
-                    <span key={m} className="px-2 py-0.5 rounded-lg bg-black/40 backdrop-blur-md border border-white/10 text-white/90 text-[9px] font-bold tracking-wider">{formatTarget(m, lang?.id)}</span>
+                    <span key={m} className="px-2 py-0.5 rounded-lg bg-black/40 border border-white/10 text-white/90 text-[9px] font-bold tracking-wider">{formatTarget(m, lang?.id)}</span>
                   )) : ex.target && (
-                    <span className="px-2 py-0.5 rounded-lg bg-black/40 backdrop-blur-md border border-white/10 text-white/90 text-[9px] font-bold tracking-wider">{formatTarget(ex.target, lang?.id)}</span>
+                    <span className="px-2 py-0.5 rounded-lg bg-black/40 border border-white/10 text-white/90 text-[9px] font-bold tracking-wider">{formatTarget(ex.target, lang?.id)}</span>
                   )}
                   {ex.supersetId && (
                      <span className={`px-2 py-0.5 rounded-lg ${t.bgAccent} border border-white/20 text-white shadow-lg text-[9px] font-black tracking-widest`}>SUPERSET</span>
