@@ -49,7 +49,7 @@ import { AI_MODELS, detectPlateaus, getLogiNotification } from './utils/aiAgent'
 import { calculateReadiness } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
 import { calculateWorkoutCalories, calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType } from './utils/workoutCalc';
-import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcWriteWorkoutCalories, hcCheckStatus, hcInventory, hcReadWorkouts, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission } from './utils/healthConnect';
+import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcWriteWorkoutCalories, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission } from './utils/healthConnect';
 import useDialog from './hooks/useDialog';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import UpdaterAlert from './components/UpdaterAlert';
@@ -72,6 +72,26 @@ const serializeDay = (val) => {
     return stableStringify(dayData);
   }
   return stableStringify(val ?? null);
+};
+
+// Terapkan update dari snapshot Firestore, tapi tunda kalau device ini baru aja nulis lokal
+// (dalam WRITE_COOLDOWN_MS terakhir) — supaya update server yang datang bareng edit lokal
+// yang belum sempat ke-upload tidak saling nimpa. Dicek ulang tiap kali window itu abis
+// (bukan cuma sekali lalu dibuang permanen), dan dibatalkan kalau ada snapshot lebih baru
+// yang sudah lewat (currentSeqRef berubah), biar retry yang telat tidak nimpa data lebih fresh.
+const WRITE_COOLDOWN_MS = 5000;
+const applyWhenCool = (lastWriteAtRef, currentSeqRef, mySeq, apply, label) => {
+  const tryApply = () => {
+    if (currentSeqRef.current !== mySeq) return; // sudah ada snapshot lebih baru, batalkan
+    const remaining = WRITE_COOLDOWN_MS - (Date.now() - lastWriteAtRef.current);
+    if (remaining <= 0) {
+      apply();
+    } else {
+      console.log(`[Sync] Menunda update ${label} — masih dalam window local-write, coba lagi ${remaining}ms lagi`);
+      setTimeout(tryApply, remaining + 50);
+    }
+  };
+  tryApply();
 };
 
 export default function App() {
@@ -331,80 +351,6 @@ export default function App() {
   // dari sumber lain (mis. activityCalories hasil hitung workout Logym sendiri).
   const HC_FIELDS = ['steps', 'activityCalories', 'heartRate', 'minHeartRate', 'maxHeartRate', 'restingHeartRate', 'weight', 'height', 'bodyFat', 'oxygenSaturation', 'bloodPressure', 'sleep', 'sleepAwake', 'sleepRem', 'sleepLight', 'sleepDeep', 'sleepLog', 'distance', 'bmr', 'heartRateLog', 'oxygenSaturationLog', 'bloodPressureLog'];
 
-  // Gabungkan sesi latihan dari aplikasi lain (Samsung Health, Hevy, dsb) ke riwayat Logym.
-  // Dicocokkan lewat id (turunan platformId Health Connect), jadi impor berulang tidak
-  // menggandakan. Sesi yang dicatat sendiri di Logym tidak pernah disentuh.
-  const mergeHcWorkouts = (byDay) => {
-    let added = 0;
-    // Ambil semua startTime sesi yang sudah Logym push ke HC sendiri,
-    // supaya saat tarik balik dari HC sesi tersebut tidak ping-pong masuk lagi.
-    let logymPushedStarts;
-    try {
-      logymPushedStarts = new Set(JSON.parse(localStorage.getItem('logym_hc_pushed_starts') || '[]'));
-    } catch (_) {
-      logymPushedStarts = new Set();
-    }
-
-    setHistory(prev => {
-      const next = { ...prev };
-      Object.entries(byDay).forEach(([ymd, list]) => {
-        const day = next[ymd] || { workouts: [] };
-        const existing = day.workouts || [];
-        
-        const parseTime = (t) => {
-          if (!t) return null;
-          const match = t.toString().match(/(\d+)[^\d]+(\d+)/);
-          if (!match) return null;
-          let h = parseInt(match[1], 10);
-          let m = parseInt(match[2], 10);
-          if (t.toLowerCase().includes('pm') && h < 12) h += 12;
-          if (t.toLowerCase().includes('am') && h === 12) h = 0;
-          return h * 60 + m;
-        };
-
-        // Cleanup: Hapus duplikat HC lama yang lolos karena bug timestamp sebelumnya
-        const cleanExisting = existing.filter(exW => {
-           if (!exW.id.startsWith('hc_')) return true;
-           const hcMins = parseTime(exW.timestamp);
-           const isDuplicate = existing.some(lW => {
-              if (lW.id.startsWith('hc_')) return false;
-              if (lW.programName !== exW.programName) return false;
-              const lMins = parseTime(lW.timestamp);
-              if (lMins === null || hcMins === null) return false;
-              return Math.abs(lMins - hcMins) < 45;
-           });
-           if (isDuplicate) added++; // Paksa setHistory menyimpan perubahan (hacky tp efektif)
-           return !isDuplicate;
-        });
-
-        const ids = new Set(cleanExisting.map((w) => w.id));
-
-        const isLogymOrigin = (hcW) => {
-          if (hcW._startDate) {
-             const hcTime = new Date(hcW._startDate).getTime();
-             for (const pushedISO of logymPushedStarts) {
-                if (Math.abs(new Date(pushedISO).getTime() - hcTime) < 10000) return true;
-             }
-          }
-          return cleanExisting.some(exW => {
-            if (exW.id.startsWith('hc_')) return false;
-            const exMins = parseTime(exW.timestamp);
-            const hcMins = parseTime(hcW.timestamp);
-            if (exMins === null || hcMins === null) return false;
-            return Math.abs(exMins - hcMins) < 45;
-          });
-        };
-
-        const fresh = list.filter((w) => !ids.has(w.id) && !isLogymOrigin(w));
-        if (fresh.length > 0) added += fresh.length;
-        if (cleanExisting.length !== existing.length || fresh.length > 0) {
-           next[ymd] = { ...day, workouts: [...cleanExisting, ...fresh] };
-        }
-      });
-      return added > 0 ? next : prev;
-    });
-    return added;
-  };
   const mergeHcDayData = (ymd, hcData) => {
     setHistory(prev => {
       const existingBio = prev[ymd]?.bioData || {};
@@ -447,8 +393,10 @@ export default function App() {
     let filled = 0;
     await hcBackfillHistory(days, () => false, (ymd, summary) => { filled++; mergeHcDayData(ymd, summary); });
 
-    // Impor sesi latihan dari aplikasi lain supaya riwayat Logym tidak bolong.
-    const imported = mergeHcWorkouts(await hcReadWorkouts(days));
+    // SENGAJA gak baca balik sesi latihan dari Health Connect (hcReadWorkouts/mergeHcWorkouts
+    // dihapus) — kayak app lain pada umumnya, Logym cuma jadi PENULIS buat sesi latihannya
+    // sendiri. Baca balik bikin ping-pong: sesi yang Logym push ke HC bisa ke-tarik lagi jadi
+    // "sesi baru" kalau heuristik dedup timestamp-nya meleset (lihat riwayat bug: 2026-08-05).
 
     // Arah sebaliknya: dorong histori latihan Logym (kalori terbakar) ke Health Connect.
     // Health Connect menerima record bertanggal lampau — yang dibatasi cuma MEMBACA data
@@ -495,7 +443,7 @@ export default function App() {
         (denied.length ? ` Ditolak: ${denied.join(', ')}.` : '') +
         // Tanpa pembagi: rentangnya inklusif dua ujung (hari ini + N hari ke belakang = N+1)
         // dan beda zona waktu bisa nambah satu lagi, jadi "32/30" bikin bingung.
-        ` Histori masuk: ${filled} hari. Sesi dari app lain diimpor: ${imported}. Terkirim ke Health Connect: ${pushed} kalori, ${sessions} sesi latihan.`
+        ` Histori masuk: ${filled} hari. Terkirim ke Health Connect: ${pushed} kalori, ${sessions} sesi latihan.`
       );
     }
     } finally {
@@ -1267,6 +1215,8 @@ export default function App() {
   // auto-save boleh jalan, supaya kita selalu nulis di atas baseline server yang valid.
   const hasSyncedMainRef = useRef(false);
   const hasSyncedHistoryRef = useRef(false);
+  const mainSnapshotSeq = useRef(0);
+  const historySnapshotSeq = useRef(0);
   // Kegagalan auto-save selama ini cuma nyangkut di console — user gak pernah tahu, padahal
   // gejalanya fatal: perubahan "kesimpan" di layar lalu balik sendiri begitu snapshot server
   // datang. Tampilkan di UI supaya ketahuan dan bisa dilaporkan.
@@ -1304,6 +1254,7 @@ export default function App() {
           isExecutingSnapshot.current = true;
           try {
             const data = docSnap.data();
+            const mySeq = ++mainSnapshotSeq.current;
 
             // --- Cek Global Ban ---
             if (data.isBanned) {
@@ -1382,11 +1333,9 @@ export default function App() {
                   (ex.id === 101 && ex.name === 'Incline Smith Machine Press') ? { ...ex, name: 'Smith Machine Incline Bench Press' } : ex
                 ) : []
               }));
-              if (Date.now() - lastLocalWriteAt.current > 5000) {
+              applyWhenCool(lastLocalWriteAt, mainSnapshotSeq, mySeq, () => {
                  setPrograms(prev => JSON.stringify(prev) === JSON.stringify(migratedPrograms) ? prev : migratedPrograms);
-              } else {
-                 console.log('[Sync] Skipping programs update from server due to recent local write');
-              }
+              }, 'programs');
             }
             if (data.exerciseLibrary) {
               const parsedLib = typeof data.exerciseLibrary === 'string' ? JSON.parse(data.exerciseLibrary) : data.exerciseLibrary;
@@ -1402,11 +1351,9 @@ export default function App() {
                   }
               });
 
-              if (Date.now() - lastLocalWriteAt.current > 5000) {
+              applyWhenCool(lastLocalWriteAt, mainSnapshotSeq, mySeq, () => {
                  setExerciseLibrary(prev => JSON.stringify(prev) === JSON.stringify(migratedLib) ? prev : migratedLib);
-              } else {
-                 console.log('[Sync] Skipping exerciseLibrary update from server due to recent local write');
-              }
+              }, 'exerciseLibrary');
             }
             if (data.settings) {
               const parsedSettings = typeof data.settings === 'string' ? JSON.parse(data.settings) : data.settings;
@@ -1445,13 +1392,11 @@ export default function App() {
               if (parsedSettings.activeGymId) setActiveGymId(parsedSettings.activeGymId);
               if (parsedSettings.activityTargets) setActivityTargets(parsedSettings.activityTargets);
               
-              if (Date.now() - lastLocalWriteAt.current > 5000) {
+              applyWhenCool(lastLocalWriteAt, mainSnapshotSeq, mySeq, () => {
                  if (parsedSettings.activePlanIds) setActivePlanIds(parsedSettings.activePlanIds);
                  else if (parsedSettings.activePlanId) setActivePlanIds([parsedSettings.activePlanId]);
                  else setActivePlanIds(['custom']); // default: always activate the built-in default plan
-              } else {
-                 console.log('[Sync] Skipping activePlanIds update from server due to recent local write');
-              }
+              }, 'activePlanIds');
               
               if (parsedSettings.userProfile) setUserProfile(parsedSettings.userProfile);
               else setUserProfile(null);
@@ -1521,13 +1466,14 @@ export default function App() {
            isExecutingSnapshot.current = true;
            try {
              const data = docSnap.data();
+             const mySeq = ++historySnapshotSeq.current;
              // Seed baseline diff: tanggal yang datang dari server dianggap sudah tersimpan,
              // sehingga auto-save berikutnya hanya mengirim tanggal yang benar-benar berubah.
              const base = { ...(lastSavedHistoryJson.current || {}) };
              Object.keys(data).forEach(d => { base[d] = serializeDay(data[d]); });
              lastSavedHistoryJson.current = base;
              
-             if (Date.now() - lastLocalHistoryWriteAt.current > 5000) {
+             applyWhenCool(lastLocalHistoryWriteAt, historySnapshotSeq, mySeq, () => {
                  setHistory(prev => {
                     const newState = { ...prev };
                     Object.keys(data).forEach(d => {
@@ -1541,9 +1487,7 @@ export default function App() {
                     localStorage.setItem('__CACHED_HISTORY', JSON.stringify(finalState));
                     return finalState;
                  });
-             } else {
-                 console.log('[Sync] Skipping history update from server due to recent local write');
-             }
+             }, 'history');
            } catch (err) {
              console.error("Parse Error saat load history tahun ini:", err);
              setHasParseError(true);
@@ -1592,7 +1536,7 @@ export default function App() {
         // pas buka app) bisa kepush ke server duluan sebelum sempat direkonsiliasi, nimpa
         // perubahan yang barusan masuk dari device lain.
         if (!hasSyncedMainRef.current) {
-          console.warn('[Auto-save] Belum sinkron dari server — skip save, tunggu snapshot pertama selesai.');
+          console.log('[Auto-save] Belum sinkron dari server — skip save, tunggu snapshot pertama selesai.');
           return;
         }
         // SAFETY: Jangan simpan ke Firestore jika programs masih sama dengan defaultPrograms —
@@ -1649,7 +1593,7 @@ export default function App() {
         // SAFETY: sama seperti auto-save dokumen utama — jangan kirim diff apa pun sebelum
         // snapshot history server pertama nyampe, supaya baseline diff-nya bukan cache basi.
         if (!hasSyncedHistoryRef.current) {
-          console.warn('[Auto-save] History belum sinkron dari server — skip save.');
+          console.log('[Auto-save] History belum sinkron dari server — skip save.');
           return;
         }
 
@@ -2687,15 +2631,6 @@ export default function App() {
       const srcProg = programs.find((pr) => pr.id === (progId || '').toString().replace('projected_', '').split('_')[0]);
       const sessionExercises = [...(srcProg?.exercises || []), ...(extraExercises || [])];
       const sessionTitle = progId === 'extra' ? 'Ekstra' : (srcProg?.name || 'Latihan Logym');
-      // Tandai startTime sesi ini sebagai "milik Logym" di localStorage. Saat HC read-back,
-      // mergeHcWorkouts akan skip sesi dengan startTime yang cocok supaya tidak ping-pong.
-      try {
-        const pushed = JSON.parse(localStorage.getItem('logym_hc_pushed_starts') || '[]');
-        pushed.push(startISO);
-        // Simpan maks 200 entri agar localStorage tidak membengkak seumur hidup
-        if (pushed.length > 200) pushed.splice(0, pushed.length - 200);
-        localStorage.setItem('logym_hc_pushed_starts', JSON.stringify(pushed));
-      } catch (_) {}
       hcRequestWorkoutWritePermission().then((ok) => {
         if (ok) hcWriteWorkoutSession({
           startDate: startISO,
