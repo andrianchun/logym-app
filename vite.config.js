@@ -61,6 +61,13 @@ export default defineConfig({
   ],
   server: {
     port: Number(process.env.PORT) || 5173,
+    headers: {
+      // Firebase Auth pakai popup (signInWithPopup) yang butuh window.closed untuk
+      // deteksi saat user selesai login. COOP default 'same-origin' memblokir ini
+      // → auth gagal silent → Firestore permission denied.
+      // 'same-origin-allow-popups' mengizinkan popup Firebase sambil tetap aman.
+      'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+    },
   },
   build: {
     rollupOptions: {

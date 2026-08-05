@@ -77,23 +77,19 @@ const serializeDay = (val) => {
 export default function App() {
   // --- STATE AUTH & LOADING ---
   const __previewUser = JSON.parse(localStorage.getItem('__PREVIEW_USER') || 'null');
-  const [user, setUser] = useState(__previewUser);
+  const __cachedUid = localStorage.getItem('__CACHED_UID');
+  const __cachedUser = __cachedUid ? { uid: __cachedUid, name: 'Sobat Logym' } : null;
+  const [user, setUser] = useState(__previewUser || __cachedUser);
   const [isAuthChecking, setIsAuthChecking] = useState(!__previewUser);
-  const [isDataLoaded, setIsDataLoaded] = useState(!!__previewUser);
-  // Listener history (tahun ini) terpisah dari listener dokumen utama di atas — isDataLoaded
-  // bisa true duluan sementara history masih kosong, bikin efek load-tanggal di bawah kepancing
-  // jalan dengan history={} dan mengunci loadedDate padahal _activeSession-nya belum sempat masuk.
-  const [isHistoryLoaded, setIsHistoryLoaded] = useState(!!__previewUser);
-  const [isSplashMinTimeReached, setIsSplashMinTimeReached] = useState(false);
-
+  const __cachedHistory = JSON.parse(localStorage.getItem('__CACHED_HISTORY') || '{}');
+  const __cachedProfile = JSON.parse(localStorage.getItem('__CACHED_PROFILE') || 'null');
+  const [isDataLoaded, setIsDataLoaded] = useState(!!__previewUser || !!__cachedUser);
+  const [isHistoryLoaded, setIsHistoryLoaded] = useState(!!__previewUser || !!__cachedUser);
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsSplashMinTimeReached(true);
-    }, 1500);
     const slowTimer = setTimeout(() => {
       setIsSlowLoading(true);
     }, 4000);
-    return () => { clearTimeout(timer); clearTimeout(slowTimer); };
+    return () => { clearTimeout(slowTimer); };
   }, []);
   const [isSlowLoading, setIsSlowLoading] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -255,7 +251,12 @@ export default function App() {
   const [biometricStandard, setBiometricStandard] = useState('asia'); // 'asia' | 'western'
   const [unitSystem, setUnitSystem] = useState('metric'); // deprecated, kept for safety during transition
   const [units, setUnits] = useState({ weight: 'kg', height: 'cm', distance: 'km', temp: 'c' });
-  const [userProfile, setUserProfile] = useState({ goal: null, experience: null });
+  const [userProfile, setUserProfile] = useState(__previewUser ? null : __cachedProfile);
+
+  useEffect(() => {
+    localStorage.setItem('__CACHED_PROFILE', JSON.stringify(userProfile));
+  }, [userProfile]);
+
   const [gymProfiles, setGymProfiles] = useState([{ id: 'default', name: 'Logym', equipment: 'all', config: {} }]);
   const [activeGymId, setActiveGymId] = useState('default');
   const [userApiKeys, setUserApiKeys] = useState([]);
@@ -283,21 +284,34 @@ export default function App() {
   const [userAchievements, setUserAchievements] = useState([]);
   const [unlockedAchievementsPopup, setUnlockedAchievementsPopup] = useState([]);
 
-  const [exerciseLibrary, _setExerciseLibrary] = useState(defaultMasterExercises);
+  const __cachedExerciseLibrary = JSON.parse(localStorage.getItem('__CACHED_EXERCISE_LIBRARY') || 'null');
+  const [exerciseLibrary, _setExerciseLibrary] = useState(__previewUser ? defaultMasterExercises : (__cachedExerciseLibrary || defaultMasterExercises));
+  useEffect(() => {
+    localStorage.setItem('__CACHED_EXERCISE_LIBRARY', JSON.stringify(exerciseLibrary));
+  }, [exerciseLibrary]);
   const setExerciseLibrary = (val) => {
       if (!isExecutingSnapshot.current) lastLocalWriteAt.current = Date.now();
       _setExerciseLibrary(val);
   };
-  const [programs, _setPrograms] = useState(defaultPrograms);
+  const __cachedPrograms = JSON.parse(localStorage.getItem('__CACHED_PROGRAMS') || 'null');
+  const [programs, _setPrograms] = useState(__previewUser ? defaultPrograms : (__cachedPrograms || defaultPrograms));
+  useEffect(() => {
+    localStorage.setItem('__CACHED_PROGRAMS', JSON.stringify(programs));
+  }, [programs]);
   const lastLocalWriteAt = useRef(0);
   const isExecutingSnapshot = useRef(false);
-  
+
   const setPrograms = (val) => {
       if (!isExecutingSnapshot.current) lastLocalWriteAt.current = Date.now();
       _setPrograms(val);
   };
 
-  const [history, _setHistory] = useState({});
+  // --- HISTORY & STATS (dokumen terpisah per tahun) ---
+  const [history, _setHistory] = useState(__previewUser ? {} : __cachedHistory);
+  useEffect(() => {
+    localStorage.setItem('__CACHED_HISTORY', JSON.stringify(history));
+  }, [history]);
+  
   const lastLocalHistoryWriteAt = useRef(0);
   const setHistory = (val) => {
      if (!isExecutingSnapshot.current) lastLocalHistoryWriteAt.current = Date.now();
@@ -332,25 +346,56 @@ export default function App() {
       Object.entries(byDay).forEach(([ymd, list]) => {
         const day = next[ymd] || { workouts: [] };
         const existing = day.workouts || [];
-        const ids = new Set(existing.map((w) => w.id));
+        
+        const parseTime = (t) => {
+          if (!t) return null;
+          const match = t.toString().match(/(\d+)[^\d]+(\d+)/);
+          if (!match) return null;
+          let h = parseInt(match[1], 10);
+          let m = parseInt(match[2], 10);
+          if (t.toLowerCase().includes('pm') && h < 12) h += 12;
+          if (t.toLowerCase().includes('am') && h === 12) h = 0;
+          return h * 60 + m;
+        };
+
+        // Cleanup: Hapus duplikat HC lama yang lolos karena bug timestamp sebelumnya
+        const cleanExisting = existing.filter(exW => {
+           if (!exW.id.startsWith('hc_')) return true;
+           const hcMins = parseTime(exW.timestamp);
+           const isDuplicate = existing.some(lW => {
+              if (lW.id.startsWith('hc_')) return false;
+              if (lW.programName !== exW.programName) return false;
+              const lMins = parseTime(lW.timestamp);
+              if (lMins === null || hcMins === null) return false;
+              return Math.abs(lMins - hcMins) < 45;
+           });
+           if (isDuplicate) added++; // Paksa setHistory menyimpan perubahan (hacky tp efektif)
+           return !isDuplicate;
+        });
+
+        const ids = new Set(cleanExisting.map((w) => w.id));
 
         const isLogymOrigin = (hcW) => {
-          // 1. startDate-nya sama persis dengan sesi yang Logym pernah push ke HC
-          if (hcW._startDate && logymPushedStarts.has(hcW._startDate)) return true;
-          // 2. Sudah ada sesi Logym asli di hari yang sama dengan window waktu ±45 menit
-          return existing.some(exW => {
-            if (exW.id.startsWith('hc_')) return false; // skip sesama HC import
-            if (!exW.timestamp || !hcW.timestamp) return false;
-            const [exH, exM] = exW.timestamp.split(':').map(Number);
-            const [hcH, hcM] = hcW.timestamp.split(':').map(Number);
-            return Math.abs((exH * 60 + exM) - (hcH * 60 + hcM)) < 45;
+          if (hcW._startDate) {
+             const hcTime = new Date(hcW._startDate).getTime();
+             for (const pushedISO of logymPushedStarts) {
+                if (Math.abs(new Date(pushedISO).getTime() - hcTime) < 10000) return true;
+             }
+          }
+          return cleanExisting.some(exW => {
+            if (exW.id.startsWith('hc_')) return false;
+            const exMins = parseTime(exW.timestamp);
+            const hcMins = parseTime(hcW.timestamp);
+            if (exMins === null || hcMins === null) return false;
+            return Math.abs(exMins - hcMins) < 45;
           });
         };
 
         const fresh = list.filter((w) => !ids.has(w.id) && !isLogymOrigin(w));
-        if (fresh.length === 0) return;
-        added += fresh.length;
-        next[ymd] = { ...day, workouts: [...existing, ...fresh] };
+        if (fresh.length > 0) added += fresh.length;
+        if (cleanExisting.length !== existing.length || fresh.length > 0) {
+           next[ymd] = { ...day, workouts: [...cleanExisting, ...fresh] };
+        }
       });
       return added > 0 ? next : prev;
     });
@@ -364,8 +409,8 @@ export default function App() {
       HC_FIELDS.forEach((k) => {
         if (hcData[k] === undefined) return;
         if (manualFlags[k] !== undefined) return;
-        const existingVal = existingBio[k];
-        if (existingVal !== undefined && existingVal !== null && existingVal !== '' && existingVal !== 0) return;
+        // JANGAN DIBLOKIR: Health Connect bersifat kumulatif (contoh: langkah nambah terus).
+        // Kalau diblokir saat existingVal !== 0, data cuma narik sekali di pagi hari lalu nyangkut selamanya.
         patch[k] = hcData[k];
       });
       if (Object.keys(patch).length === 0) return prev;
@@ -1271,9 +1316,12 @@ export default function App() {
   useEffect(() => {
     if (localStorage.getItem('__PREVIEW_USER')) return;
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      const cached = localStorage.getItem('__CACHED_UID');
       if (currentUser) {
-        setIsDataLoaded(false);
-        setIsHistoryLoaded(false);
+        if (currentUser.uid !== cached) {
+          setIsDataLoaded(false);
+          setIsHistoryLoaded(false);
+        }
         lastLocalWriteAt.current = 0;
         lastLocalHistoryWriteAt.current = 0;
         setUser({ 
@@ -1282,10 +1330,12 @@ export default function App() {
            name: currentUser.displayName || 'Sobat Logym',
            photoURL: currentUser.photoURL
         });
+        localStorage.setItem('__CACHED_UID', currentUser.uid);
       } else {
+        localStorage.removeItem('__CACHED_UID');
         setUser(null);
-        setIsDataLoaded(false);
-        setIsHistoryLoaded(false);
+        setIsDataLoaded(true);
+        setIsHistoryLoaded(true);
         setHistory({});
         setPrograms(defaultPrograms);
         setExerciseLibrary(defaultMasterExercises);
@@ -1337,11 +1387,20 @@ export default function App() {
 
     if (localStorage.getItem('__PREVIEW_USER')) { setIsDataLoaded(true); setIsHistoryLoaded(true); return; }
 
-    if (user) {
+    const activeUid = user?.uid;
+
+    // JANGAN PERNAH subscribe Firestore sebelum Firebase Auth selesai (isAuthChecking = true).
+    // Jika kita paksa subscribe tanpa token Auth, Firestore akan melempar error
+    // "Missing or insufficient permissions" dan memblokir data selamanya!
+    if (isAuthChecking || !activeUid) {
+       return;
+    }
+
+    if (activeUid) {
 
       const currentYear = new Date().getFullYear().toString();
-      const mainDocRef = doc(db, "logym_users", user.uid);
-      const historyDocRef = doc(db, "logym_users", user.uid, "history_years", currentYear);
+      const mainDocRef = doc(db, "logym_users", activeUid);
+      const historyDocRef = doc(db, "logym_users", activeUid, "history_years", currentYear);
 
       unsubscribeMain = onSnapshot(mainDocRef, async (docSnap) => {
         if (docSnap.exists()) {
@@ -1349,7 +1408,7 @@ export default function App() {
           isExecutingSnapshot.current = true;
           try {
             const data = docSnap.data();
-            
+
             // --- Cek Global Ban ---
             if (data.isBanned) {
               localStorage.setItem('lyfit_banned_msg', 'Akun Anda telah dinonaktifkan secara permanen karena melanggar panduan komunitas kami.');
@@ -1580,7 +1639,9 @@ export default function App() {
                           ...(existingDay._activeSession ? { _activeSession: existingDay._activeSession } : {})
                        };
                     });
-                    return JSON.stringify(prev) === JSON.stringify(newState) ? prev : newState;
+                    const finalState = JSON.stringify(prev) === JSON.stringify(newState) ? prev : newState;
+                    localStorage.setItem('__CACHED_HISTORY', JSON.stringify(finalState));
+                    return finalState;
                  });
              } else {
                  console.log('[Sync] Skipping history update from server due to recent local write');
@@ -1616,6 +1677,7 @@ export default function App() {
   //  - 3b: history — diff per tanggal, hanya tanggal yang berubah yang dikirim
   // ==========================================
   useEffect(() => {
+    // Gunakan user?.uid langsung karena autosave gak butuh ngebut di detik 0 (isAuthChecking)
     if (user && isDataLoaded && !hasParseError) {
       let retryTimer = null;
       // Jika onSnapshot sedang menulis data dari server saat timer ini berbunyi, JANGAN
@@ -2076,6 +2138,9 @@ export default function App() {
           try {
               const data = JSON.parse(event.target.result);
               saveStateToHistory(); 
+              setUserProfile(data.userProfile || {});
+              localStorage.setItem('__CACHED_PROFILE', JSON.stringify(data.userProfile || {}));
+
               if(data.history) setHistory(data.history);
               if(data.programs) setPrograms(data.programs);
               if(data.exerciseLibrary) setExerciseLibrary(data.exerciseLibrary);
@@ -2771,7 +2836,7 @@ export default function App() {
             log: cleanLogs,
             skipped: cleanSkipped,
             exercises: cleanExtra,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            timestamp: `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`,
             duration: formatDur(durationSecs)
           };
         } else {
@@ -2795,7 +2860,7 @@ export default function App() {
                 log: cleanLogs,
                 skipped: cleanSkipped,
                 exercises: cleanExtra,
-                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                timestamp: `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`,
                 duration: formatDur(finalSecs)
               };
           } else {
@@ -2807,7 +2872,7 @@ export default function App() {
                 log: cleanLogs,
                 skipped: cleanSkipped,
                 exercises: cleanExtra,
-                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                timestamp: `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`,
                 duration: formatDur(durationSecs)
               });
           }
@@ -2865,7 +2930,7 @@ export default function App() {
               status: 'completed',
               log: cleanLogs,
               skipped: cleanSkipped,
-              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              timestamp: `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`,
               duration: formatDur(finalSecs),
               ...(frozenExercises ? { overriddenExercises: frozenExercises } : {})
             };
@@ -2919,7 +2984,7 @@ export default function App() {
                 log: cleanLogs,
                 skipped: cleanSkipped,
                 exercises: cleanExtra,
-                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                timestamp: `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`,
                 duration: formatDur(finalSecs),
                 ...(frozenExercises ? { overriddenExercises: frozenExercises } : {})
               };
@@ -2939,7 +3004,7 @@ export default function App() {
                  status: 'completed',
                  log: cleanLogs,
                  skipped: skippedExercises,
-                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                 timestamp: `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`,
                  duration: durationSecs > 0 ? formatDur(durationSecs) : '00:00',
                  ...(p?.exercises?.length > 0 ? { overriddenExercises: JSON.parse(JSON.stringify(p.exercises)) } : {})
               });
@@ -3224,7 +3289,10 @@ export default function App() {
   // ==========================================
   // RENDER PENGHALANG SAAT LOADING / CEK AUTH
   // ==========================================
-  if (isAuthChecking || (user && (!isDataLoaded || !isHistoryLoaded)) || !isSplashMinTimeReached) {
+  const __cachedUidRender = localStorage.getItem('__CACHED_UID');
+  const isWaitingForAuth = isAuthChecking && !__cachedUidRender;
+  
+  if (isWaitingForAuth || (user && (!isDataLoaded || !isHistoryLoaded))) {
     return (
       <div className={`fixed inset-0 z-50 flex flex-col items-center justify-center p-4 transition-colors duration-300 ${theme === 'dark' ? 'bg-[#0f1115]' : 'bg-white'}`}>
          <img src={theme === 'dark' ? '/logo-dark.png' : '/logo-light.png'} alt="Logym Logo" className="w-40 h-40 object-contain animate-pulse drop-shadow-2xl" />

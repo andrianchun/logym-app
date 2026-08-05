@@ -171,8 +171,15 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
                     if (ex && ex.id) exLookup[ex.id] = ex;
                 });
 
-                if (!workout.log) continue;
-                for (const [exIdStr, sets] of Object.entries(workout.log)) {
+                let log = workout.log || {};
+                if (Object.keys(log).length === 0 && dayData?._activeSession?.exerciseLogs) {
+                    log = dayData._activeSession.exerciseLogs;
+                }
+                const eLogs = log.exerciseLogs ? log.exerciseLogs : log;
+
+                if (Object.keys(eLogs).length === 0) continue;
+                
+                for (const [exIdStr, sets] of Object.entries(eLogs)) {
                     const baseId = typeof exIdStr === 'string' && exIdStr.includes('-') ? Number(exIdStr.split('-')[0]) : Number(exIdStr);
                     const ex = exLookup[baseId];
                     if (ex && sets) {

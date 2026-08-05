@@ -65,15 +65,15 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
     Object.entries(history).forEach(([dateStr, data]) => {
       if (dateStr >= startStr && data?.workouts) {
         data.workouts.filter(w => w.status === 'completed').forEach(w => {
-           filteredHistory.push({ dateStr, dayData: w });
+           filteredHistory.push({ dateStr, dayData: w, fullDay: data });
         });
       } else if (dateStr >= startStr && data?.status === 'completed') {
-        filteredHistory.push({ dateStr, dayData: data });
+        filteredHistory.push({ dateStr, dayData: data, fullDay: data });
       }
       
       // Tambahkan progress aktif (sementara) yang sedang berjalan hari ini / terpilih
       if (dateStr >= startStr && data?._activeSession?.exerciseLogs && Object.keys(data._activeSession.exerciseLogs).length > 0) {
-        filteredHistory.push({ dateStr, dayData: { log: data._activeSession.exerciseLogs } });
+        filteredHistory.push({ dateStr, dayData: { log: data._activeSession.exerciseLogs }, fullDay: data });
       }
     });
     filteredHistory.sort((a, b) => a.dateStr.localeCompare(b.dateStr));
@@ -82,7 +82,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
 
     const aggregatedByDate = {};
 
-    filteredHistory.forEach(({dateStr, dayData}) => {
+    filteredHistory.forEach(({dateStr, dayData, fullDay}) => {
       const dateObj = new Date(dateStr);
       const dateLabel = dateObj.toLocaleDateString(language==='ID'?'id-ID':'en-US', { day: 'numeric', month: 'short' });
 
@@ -91,7 +91,11 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
       }
       const point = aggregatedByDate[dateStr];
 
-      const log = dayData.log || {};
+      // FIX: Cek `dayData.log` dulu. Kalau kosong, baca dari `fullDay._activeSession.exerciseLogs`.
+      let log = dayData.log || {};
+      if (Object.keys(log).length === 0 && fullDay?._activeSession?.exerciseLogs) {
+          log = fullDay._activeSession.exerciseLogs;
+      }
       const eLogs = log.exerciseLogs ? log.exerciseLogs : log; 
 
       Object.keys(eLogs).forEach(exIdStr => {
@@ -256,14 +260,13 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
              if (newPointWidth < 15) newPointWidth = 15;
 
              setPointWidth(newPointWidth);
-             scrollTarget.current = startIdx * newPointWidth;
+             // Scroll ke ujung kanan data terbaru (bukan ke awal range)
+             scrollTarget.current = (latestIdxWithData + 1) * newPointWidth - clientW;
+             if (scrollTarget.current < 0) scrollTarget.current = 0;
         } else {
-             // Fallback
-             const targetDate = selectedDate || getLocalYMD(new Date());
-             let idx = data.findIndex(d => d.rawDate === targetDate);
-             if (idx === -1) idx = data.length - 1;
-             
-             scrollTarget.current = Math.max(0, (idx * pointWidth) - (scrollRef.current.clientWidth / 2));
+             // Fallback: scroll ke kanan penuh
+             const clientW = scrollRef.current.clientWidth || (window.innerWidth - 40);
+             scrollTarget.current = Math.max(0, (data.length * pointWidth) - clientW);
         }
      }
   }, [chartDataObj, selectedDate, activeChartLines]);
@@ -582,7 +585,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
             ) : ( 
               <div className="w-full h-72 flex flex-col items-center justify-center body-md opacity-60 text-center px-4">
                  <span>Tidak ada data, atur program dan rekam latihanmu sekarang.</span>
-              </div> 
+              </div>
             )}
           </div>
         </div>

@@ -1,6 +1,6 @@
 {
-  "ota_version": "1.0.21",
-  "ota_url": "https://logym.web.app/ota/logym-1.0.21.zip",
+  "ota_version": "1.0.26",
+  "ota_url": "https://logym.web.app/ota/logym-1.0.26.zip",
   "is_forced": false,
-  "release_notes": "Perbaikan: kalori push ke Health Connect, anti ping-pong sesi latihan dari HC, cleanup otomatis duplikat HC, nama Logym seragam di seluruh app."
+  "release_notes": "Grafik progress latihan & aktivitas kini langsung menampilkan data terbaru di kanan, zoom default 30 hari terakhir."
 }

@@ -112,10 +112,12 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
              if (newPointWidth < 15) newPointWidth = 15;
 
              setPointWidth(newPointWidth);
-             scrollTarget.current = startIdx * newPointWidth;
+             // Scroll ke ujung kanan data terbaru (bukan ke awal range)
+             scrollTarget.current = (latestIdxWithData + 1) * newPointWidth - clientW;
+             if (scrollTarget.current < 0) scrollTarget.current = 0;
         } else {
              const clientW = scrollRef.current.clientWidth || (window.innerWidth - 64);
-             scrollTarget.current = Math.max(0, ((data.length - 1) * pointWidth) - (clientW / 2));
+             scrollTarget.current = Math.max(0, ((data.length) * pointWidth) - clientW);
         }
      }
   }, [multiChartData, activeChartMetrics]);

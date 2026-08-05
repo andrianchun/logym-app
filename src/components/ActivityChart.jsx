@@ -89,20 +89,32 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
   const [pointWidth, setPointWidth] = useState(45);
   const touchState = useRef({ initialDist: 0, initialPointWidth: 45, pinchRatio: 0, scrollRelCenterX: 0 });
 
-  // Auto scroll ke tengah titik data terbaru
+  // Auto scroll ke data terbaru, default zoom 30 hari terakhir
   useEffect(() => {
      if(scrollRef.current && multiChartData.length > 0) {
         const data = multiChartData;
-        const activeObj = chartMetricsList.find(m => m.key === activeMetric);
-        if (data.length > 0) {
-             const clientW = scrollRef.current?.clientWidth || (window.innerWidth - 64);
-             let newPointWidth = clientW / Math.max(1.5, data.length);
-             if (newPointWidth > 200) newPointWidth = 200;
-             if (newPointWidth < 25) newPointWidth = 25;
-             setPointWidth(newPointWidth);
+        const clientW = scrollRef.current?.clientWidth || (window.innerWidth - 64);
 
-             scrollTarget.current = Math.max(0, ((data.length) * newPointWidth) - clientW);
+        // Hitung window 30 hari terakhir dari data point paling akhir
+        const latestIdx = data.length - 1;
+        const latestDate = new Date(data[latestIdx].dateFull);
+        const oneMonthAgo = new Date(latestDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+        const oneMonthAgoStr = getLocalYMD(oneMonthAgo);
+
+        let startIdx = latestIdx;
+        while (startIdx > 0 && data[startIdx - 1].dateFull >= oneMonthAgoStr) {
+            startIdx--;
         }
+
+        const numPoints = latestIdx - startIdx + 1;
+        let newPointWidth = clientW / Math.max(1.5, numPoints);
+        if (newPointWidth > 200) newPointWidth = 200;
+        if (newPointWidth < 25) newPointWidth = 25;
+        setPointWidth(newPointWidth);
+
+        // Scroll ke ujung kanan data terbaru
+        scrollTarget.current = (latestIdx + 1) * newPointWidth - clientW;
+        if (scrollTarget.current < 0) scrollTarget.current = 0;
      }
   }, [multiChartData, activeMetric]);
   const scrollTarget = useRef(null);
