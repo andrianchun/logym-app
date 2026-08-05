@@ -79,13 +79,19 @@ const serializeDay = (val) => {
 // yang belum sempat ke-upload tidak saling nimpa. Dicek ulang tiap kali window itu abis
 // (bukan cuma sekali lalu dibuang permanen), dan dibatalkan kalau ada snapshot lebih baru
 // yang sudah lewat (currentSeqRef berubah), biar retry yang telat tidak nimpa data lebih fresh.
+// executingRef WAJIB di-set true persis saat apply() dipanggil, termasuk saat dipanggil telat
+// lewat retry (bukan cuma sinkron di dalam handler onSnapshot) — kalau tidak, setPrograms/
+// setHistory (wrapped setter) mengira ini edit lokal baru dan me-refresh cooldown-nya sendiri,
+// yang bikin update dari device lain berikutnya ketunda lagi tanpa henti (livelock).
 const WRITE_COOLDOWN_MS = 5000;
-const applyWhenCool = (lastWriteAtRef, currentSeqRef, mySeq, apply, label) => {
+const applyWhenCool = (lastWriteAtRef, currentSeqRef, mySeq, apply, label, executingRef) => {
   const tryApply = () => {
     if (currentSeqRef.current !== mySeq) return; // sudah ada snapshot lebih baru, batalkan
     const remaining = WRITE_COOLDOWN_MS - (Date.now() - lastWriteAtRef.current);
     if (remaining <= 0) {
-      apply();
+      const prevExecuting = executingRef.current;
+      executingRef.current = true;
+      try { apply(); } finally { executingRef.current = prevExecuting; }
     } else {
       console.log(`[Sync] Menunda update ${label} — masih dalam window local-write, coba lagi ${remaining}ms lagi`);
       setTimeout(tryApply, remaining + 50);
@@ -1335,7 +1341,7 @@ export default function App() {
               }));
               applyWhenCool(lastLocalWriteAt, mainSnapshotSeq, mySeq, () => {
                  setPrograms(prev => JSON.stringify(prev) === JSON.stringify(migratedPrograms) ? prev : migratedPrograms);
-              }, 'programs');
+              }, 'programs', isExecutingSnapshot);
             }
             if (data.exerciseLibrary) {
               const parsedLib = typeof data.exerciseLibrary === 'string' ? JSON.parse(data.exerciseLibrary) : data.exerciseLibrary;
@@ -1353,7 +1359,7 @@ export default function App() {
 
               applyWhenCool(lastLocalWriteAt, mainSnapshotSeq, mySeq, () => {
                  setExerciseLibrary(prev => JSON.stringify(prev) === JSON.stringify(migratedLib) ? prev : migratedLib);
-              }, 'exerciseLibrary');
+              }, 'exerciseLibrary', isExecutingSnapshot);
             }
             if (data.settings) {
               const parsedSettings = typeof data.settings === 'string' ? JSON.parse(data.settings) : data.settings;
@@ -1396,7 +1402,7 @@ export default function App() {
                  if (parsedSettings.activePlanIds) setActivePlanIds(parsedSettings.activePlanIds);
                  else if (parsedSettings.activePlanId) setActivePlanIds([parsedSettings.activePlanId]);
                  else setActivePlanIds(['custom']); // default: always activate the built-in default plan
-              }, 'activePlanIds');
+              }, 'activePlanIds', isExecutingSnapshot);
               
               if (parsedSettings.userProfile) setUserProfile(parsedSettings.userProfile);
               else setUserProfile(null);
@@ -1487,7 +1493,7 @@ export default function App() {
                     localStorage.setItem('__CACHED_HISTORY', JSON.stringify(finalState));
                     return finalState;
                  });
-             }, 'history');
+             }, 'history', isExecutingSnapshot);
            } catch (err) {
              console.error("Parse Error saat load history tahun ini:", err);
              setHasParseError(true);
