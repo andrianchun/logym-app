@@ -74,32 +74,6 @@ const serializeDay = (val) => {
   return stableStringify(val ?? null);
 };
 
-// Terapkan update dari snapshot Firestore, tapi tunda kalau device ini baru aja nulis lokal
-// (dalam WRITE_COOLDOWN_MS terakhir) — supaya update server yang datang bareng edit lokal
-// yang belum sempat ke-upload tidak saling nimpa. Dicek ulang tiap kali window itu abis
-// (bukan cuma sekali lalu dibuang permanen), dan dibatalkan kalau ada snapshot lebih baru
-// yang sudah lewat (currentSeqRef berubah), biar retry yang telat tidak nimpa data lebih fresh.
-// executingRef WAJIB di-set true persis saat apply() dipanggil, termasuk saat dipanggil telat
-// lewat retry (bukan cuma sinkron di dalam handler onSnapshot) — kalau tidak, setPrograms/
-// setHistory (wrapped setter) mengira ini edit lokal baru dan me-refresh cooldown-nya sendiri,
-// yang bikin update dari device lain berikutnya ketunda lagi tanpa henti (livelock).
-const WRITE_COOLDOWN_MS = 5000;
-const applyWhenCool = (lastWriteAtRef, currentSeqRef, mySeq, apply, label, executingRef) => {
-  const tryApply = () => {
-    if (currentSeqRef.current !== mySeq) return; // sudah ada snapshot lebih baru, batalkan
-    const remaining = WRITE_COOLDOWN_MS - (Date.now() - lastWriteAtRef.current);
-    if (remaining <= 0) {
-      const prevExecuting = executingRef.current;
-      executingRef.current = true;
-      try { apply(); } finally { executingRef.current = prevExecuting; }
-    } else {
-      console.log(`[Sync] Menunda update ${label} — masih dalam window local-write, coba lagi ${remaining}ms lagi`);
-      setTimeout(tryApply, remaining + 50);
-    }
-  };
-  tryApply();
-};
-
 export default function App() {
   // --- STATE AUTH & LOADING ---
   const __previewUser = JSON.parse(localStorage.getItem('__PREVIEW_USER') || 'null');
@@ -1221,8 +1195,6 @@ export default function App() {
   // auto-save boleh jalan, supaya kita selalu nulis di atas baseline server yang valid.
   const hasSyncedMainRef = useRef(false);
   const hasSyncedHistoryRef = useRef(false);
-  const mainSnapshotSeq = useRef(0);
-  const historySnapshotSeq = useRef(0);
   // Kegagalan auto-save selama ini cuma nyangkut di console — user gak pernah tahu, padahal
   // gejalanya fatal: perubahan "kesimpan" di layar lalu balik sendiri begitu snapshot server
   // datang. Tampilkan di UI supaya ketahuan dan bisa dilaporkan.
@@ -1260,7 +1232,6 @@ export default function App() {
           isExecutingSnapshot.current = true;
           try {
             const data = docSnap.data();
-            const mySeq = ++mainSnapshotSeq.current;
 
             // --- Cek Global Ban ---
             if (data.isBanned) {
@@ -1339,9 +1310,7 @@ export default function App() {
                   (ex.id === 101 && ex.name === 'Incline Smith Machine Press') ? { ...ex, name: 'Smith Machine Incline Bench Press' } : ex
                 ) : []
               }));
-              applyWhenCool(lastLocalWriteAt, mainSnapshotSeq, mySeq, () => {
-                 setPrograms(prev => JSON.stringify(prev) === JSON.stringify(migratedPrograms) ? prev : migratedPrograms);
-              }, 'programs', isExecutingSnapshot);
+              setPrograms(prev => JSON.stringify(prev) === JSON.stringify(migratedPrograms) ? prev : migratedPrograms);
             }
             if (data.exerciseLibrary) {
               const parsedLib = typeof data.exerciseLibrary === 'string' ? JSON.parse(data.exerciseLibrary) : data.exerciseLibrary;
@@ -1357,9 +1326,7 @@ export default function App() {
                   }
               });
 
-              applyWhenCool(lastLocalWriteAt, mainSnapshotSeq, mySeq, () => {
-                 setExerciseLibrary(prev => JSON.stringify(prev) === JSON.stringify(migratedLib) ? prev : migratedLib);
-              }, 'exerciseLibrary', isExecutingSnapshot);
+              setExerciseLibrary(prev => JSON.stringify(prev) === JSON.stringify(migratedLib) ? prev : migratedLib);
             }
             if (data.settings) {
               const parsedSettings = typeof data.settings === 'string' ? JSON.parse(data.settings) : data.settings;
@@ -1398,11 +1365,9 @@ export default function App() {
               if (parsedSettings.activeGymId) setActiveGymId(parsedSettings.activeGymId);
               if (parsedSettings.activityTargets) setActivityTargets(parsedSettings.activityTargets);
               
-              applyWhenCool(lastLocalWriteAt, mainSnapshotSeq, mySeq, () => {
-                 if (parsedSettings.activePlanIds) setActivePlanIds(parsedSettings.activePlanIds);
-                 else if (parsedSettings.activePlanId) setActivePlanIds([parsedSettings.activePlanId]);
-                 else setActivePlanIds(['custom']); // default: always activate the built-in default plan
-              }, 'activePlanIds', isExecutingSnapshot);
+              if (parsedSettings.activePlanIds) setActivePlanIds(parsedSettings.activePlanIds);
+              else if (parsedSettings.activePlanId) setActivePlanIds([parsedSettings.activePlanId]);
+              else setActivePlanIds(['custom']); // default: always activate the built-in default plan
               
               if (parsedSettings.userProfile) setUserProfile(parsedSettings.userProfile);
               else setUserProfile(null);
@@ -1472,28 +1437,25 @@ export default function App() {
            isExecutingSnapshot.current = true;
            try {
              const data = docSnap.data();
-             const mySeq = ++historySnapshotSeq.current;
              // Seed baseline diff: tanggal yang datang dari server dianggap sudah tersimpan,
              // sehingga auto-save berikutnya hanya mengirim tanggal yang benar-benar berubah.
              const base = { ...(lastSavedHistoryJson.current || {}) };
              Object.keys(data).forEach(d => { base[d] = serializeDay(data[d]); });
              lastSavedHistoryJson.current = base;
              
-             applyWhenCool(lastLocalHistoryWriteAt, historySnapshotSeq, mySeq, () => {
-                 setHistory(prev => {
-                    const newState = { ...prev };
-                    Object.keys(data).forEach(d => {
-                       const existingDay = newState[d] || {};
-                       newState[d] = {
-                          ...data[d],
-                          ...(existingDay._activeSession ? { _activeSession: existingDay._activeSession } : {})
-                       };
-                    });
-                    const finalState = JSON.stringify(prev) === JSON.stringify(newState) ? prev : newState;
-                    localStorage.setItem('__CACHED_HISTORY', JSON.stringify(finalState));
-                    return finalState;
-                 });
-             }, 'history', isExecutingSnapshot);
+             setHistory(prev => {
+                const newState = { ...prev };
+                Object.keys(data).forEach(d => {
+                   const existingDay = newState[d] || {};
+                   newState[d] = {
+                      ...data[d],
+                      ...(existingDay._activeSession ? { _activeSession: existingDay._activeSession } : {})
+                   };
+                });
+                const finalState = JSON.stringify(prev) === JSON.stringify(newState) ? prev : newState;
+                localStorage.setItem('__CACHED_HISTORY', JSON.stringify(finalState));
+                return finalState;
+             });
            } catch (err) {
              console.error("Parse Error saat load history tahun ini:", err);
              setHasParseError(true);
