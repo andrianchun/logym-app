@@ -725,13 +725,13 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                    )}
                </div>
                <div className="flex items-center space-x-2">
-                   <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(bioDataDate || activeDate); setShowDetailsModal(true); }} className={`p-2 rounded-full bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Info size={16}/></button>
-                   <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(activeDate); setManualTab('komposisi'); setShowManualModal(true); }} className={`p-2 rounded-full bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Pencil size={16}/></button>
+                   <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(bioDataDate || activeDate); setShowDetailsModal(true); }} className={`p-2 rounded-full bg-blue-500/10 dark:bg-blue-500/20 shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Info size={16}/></button>
+                   <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(activeDate); setManualTab('komposisi'); setShowManualModal(true); }} className={`p-2 rounded-full bg-blue-500/10 dark:bg-blue-500/20 shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Pencil size={16}/></button>
                </div>
            </div>
            
            <div className="flex justify-between items-end w-full relative z-10 mb-1 flex-1">
-                <div className={`w-[calc(50%-4px)] flex flex-col space-y-1 justify-end h-full p-3 rounded-2xl bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md`}>
+                <div className={`w-[calc(50%-4px)] flex flex-col space-y-1 justify-end h-full p-3 rounded-2xl bg-blue-500/10 dark:bg-blue-500/20`}>
                    {/* Fisik */}
                    <div className="flex flex-col">
                        <span className={`text-[10px] ${t.textMuted} mb-0.5 font-bold`}>Fisik</span>
@@ -771,7 +771,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
 
                <div className="flex flex-col justify-end items-end pb-1 pr-1">
                     <div className="relative w-24 h-24 shrink-0 flex items-center justify-center">
-                       <div className={`absolute inset-1 rounded-full ${theme === 'dark' ? 'bg-black/60' : 'bg-white/60'} backdrop-blur-md border ${t.border} z-0`} />
+                       <div className={`absolute inset-1 rounded-full ${theme === 'dark' ? 'bg-black/60' : 'bg-white/60'} border ${t.border} z-0`} />
                       <svg className="absolute inset-0 -rotate-90 z-10" viewBox="0 0 96 96">
                          <circle cx="48" cy="48" r={scoreRadius} fill="none" strokeWidth="5" strokeLinecap="round" strokeDasharray="1.5 6.2" className={theme === 'dark' ? 'stroke-white/15' : 'stroke-black/10'} />
                          <circle cx="48" cy="48" r={scoreRadius} fill="none" stroke={scoreArcColor} strokeWidth="5" strokeLinecap="round" strokeDasharray={scoreCircumference} strokeDashoffset={scoreDashOffset} style={{ transition: 'stroke-dashoffset 0.6s ease' }} />
@@ -785,15 +785,15 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
            </div>
   
            <div className={`grid grid-cols-4 gap-2 relative z-10 mt-1`}>
-                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{dispMainMuscle} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">{isImp ? 'lbs' : 'kg'}</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Massa<br/>Otot</span></div>
-                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.musclePercent, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Otot</span></div>
-                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.proteinPercent, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Protein</span></div>
-                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.waterPercent, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Air</span></div>
+                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{dispMainMuscle} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">{isImp ? 'lbs' : 'kg'}</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Massa<br/>Otot</span></div>
+                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.musclePercent, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Otot</span></div>
+                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.proteinPercent, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Protein</span></div>
+                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.waterPercent, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Air</span></div>
                 
-                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.visceralFat, language) || '-'}</span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Lemak<br/>Visceral</span></div>
-                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{dispMainWaist} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">{isImp ? 'in' : 'cm'}</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Lingkar<br/>Perut</span></div>
-                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.boneMass, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Mineral<br/>Tulang</span></div>
-                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.bodyAge, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">th</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Usia<br/>Tubuh</span></div>
+                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.visceralFat, language) || '-'}</span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Lemak<br/>Visceral</span></div>
+                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{dispMainWaist} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">{isImp ? 'in' : 'cm'}</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Lingkar<br/>Perut</span></div>
+                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.boneMass, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Mineral<br/>Tulang</span></div>
+                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.bodyAge, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">th</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Usia<br/>Tubuh</span></div>
             </div>
            
            <button
@@ -816,7 +816,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                        }
                    }, 320);
                }}
-               className={`self-center mt-3 p-2 rounded-full bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border} transition-all relative z-20`}
+               className={`self-center mt-3 p-2 rounded-full bg-blue-500/10 dark:bg-blue-500/20 shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border} transition-all relative z-20`}
            >
                {isKomposisiExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
            </button>
@@ -863,8 +863,8 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                  </div>
                  <div className="flex space-x-2">
 
-                     <button onClick={() => { playSoundEffect('click', soundEnabled); setShowTargetModal(true); }} className={`p-2 rounded-full bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Settings size={16}/></button>
-                     <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(activeDate); setManualTab('harian'); setShowManualModal(true); }} className={`p-2 rounded-full bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Pencil size={16}/></button>
+                     <button onClick={() => { playSoundEffect('click', soundEnabled); setShowTargetModal(true); }} className={`p-2 rounded-full bg-blue-500/10 dark:bg-blue-500/20 shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Settings size={16}/></button>
+                     <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(activeDate); setManualTab('harian'); setShowManualModal(true); }} className={`p-2 rounded-full bg-blue-500/10 dark:bg-blue-500/20 shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Pencil size={16}/></button>
                  </div>
              </div>
 
@@ -910,7 +910,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                      </div>
                  </div>
 
-                 <div className={`py-4 px-5 -mx-4 w-[calc(100%+2rem)] ${t.bgBox} backdrop-blur-md border-y border-x-0 ${t.border}`}>
+                 <div className={`py-4 px-5 -mx-4 w-[calc(100%+2rem)] ${t.bgBox} border-y border-x-0 ${t.border}`}>
                      <div className="grid grid-cols-2 gap-x-5 gap-y-5 h-full content-between">
                          {/* Kalori Dimakan */}
                          <div className="flex flex-col h-full">
@@ -1000,7 +1000,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                          }
                      }, 320);
                  }}
-                 className={`self-center mt-4 p-2 rounded-full bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border} transition-all relative z-20`}
+                 className={`self-center mt-4 p-2 rounded-full bg-blue-500/10 dark:bg-blue-500/20 shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border} transition-all relative z-20`}
              >
                  {isAktivitasExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
              </button>
@@ -1087,7 +1087,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                          }
                      }, 320);
                  }}
-                 className={`self-center mt-3 mb-2 p-2 rounded-full bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border} transition-all relative z-20`}
+                 className={`self-center mt-3 mb-2 p-2 rounded-full bg-blue-500/10 dark:bg-blue-500/20 shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border} transition-all relative z-20`}
              >
                  {isProgressExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
              </button>
@@ -1151,7 +1151,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                      >
                          <ChevronRight size={16} />
                      </button>
-                     <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(sleepDate); setManualTab('harian'); setShowManualModal(true); }} className={`p-2 rounded-full bg-indigo-500/10 dark:bg-indigo-500/20 backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border} transition-all relative z-20`}>
+                     <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(sleepDate); setManualTab('harian'); setShowManualModal(true); }} className={`p-2 rounded-full bg-indigo-500/10 dark:bg-indigo-500/20 shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border} transition-all relative z-20`}>
                          <Pencil size={16} />
                      </button>
                  </div>
@@ -1214,7 +1214,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                                  text = 'Kurang';
                                  color = 'bg-amber-500/90 text-white border-amber-500/20';
                              }
-                             return <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider ${color} border backdrop-blur-md shadow-sm`}>{text}</span>;
+                             return <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider ${color} border shadow-sm`}>{text}</span>;
                          })()}
                      </div>
                  </div>
@@ -1244,7 +1244,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                                  text = 'Cukup';
                                  color = 'bg-amber-500/90 text-white border-amber-500/20';
                              }
-                             return <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider ${color} border backdrop-blur-md shadow-sm`}>{text}</span>;
+                             return <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider ${color} border shadow-sm`}>{text}</span>;
                          })()}
                      </div>
                  </div>
@@ -1270,7 +1270,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                           }
                       }, 320);
                   }}
-                  className={`self-center mt-6 mb-2 p-2 rounded-full bg-indigo-500/10 dark:bg-indigo-500/20 backdrop-blur-md shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border} transition-all relative z-20`}
+                  className={`self-center mt-6 mb-2 p-2 rounded-full bg-indigo-500/10 dark:bg-indigo-500/20 shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border} transition-all relative z-20`}
               >
                   {isSleepExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
               </button>
