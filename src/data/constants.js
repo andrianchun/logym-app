@@ -132,10 +132,22 @@ export const formatTarget = (t, language = 'ID') => {
 };
 
 export const getLocalYMD = (date) => {
-  const y = date.getFullYear(); 
-  const m = String(date.getMonth() + 1).padStart(2, '0'); 
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
+};
+
+// Kartu "terjadwal" di WorkoutTab/CalendarTab dibikin dengan id komposit
+// `projected_${programId}_${YYYY-MM-DD}`. Sebelumnya di-parse balik pakai
+// `.replace('projected_','').split('_')[0]` — itu ngambil cuma SEGMEN PERTAMA sebelum
+// underscore, jadi rusak buat program bikinan AI yang id-nya sendiri punya underscore
+// (mis. `routine_ai_1783708143704_0` jadi kepotong cuma `routine`). Regex ini strip
+// prefix & suffix tanggal SAJA, id di tengahnya (apa pun isinya) tetap utuh.
+export const resolveProjectedProgramId = (id) => {
+  return String(id || '')
+    .replace(/^projected_/, '')
+    .replace(/_\d{4}-\d{2}-\d{2}$/, '');
 };
 
 export const getVideoId = (url) => {

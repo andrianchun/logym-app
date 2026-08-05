@@ -53,7 +53,7 @@ import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcWr
 import useDialog from './hooks/useDialog';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import UpdaterAlert from './components/UpdaterAlert';
-import { getLocalYMD, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos } from './data/constants';
+import { getLocalYMD, resolveProjectedProgramId, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos } from './data/constants';
 import { Loader2, Download, X } from 'lucide-react';
 
 // Serialisasi kanonik (key di-sort) supaya perbandingan tidak terpengaruh urutan key
@@ -250,29 +250,61 @@ export default function App() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [healthConnectEnabled, setHealthConnectEnabled] = useState(false);
   const [defaultRestTime, setDefaultRestTime] = useState(120);
-  const [warmupVideos, setWarmupVideos] = useState(defaultWarmupVideos);
-  const [cooldownVideos, setCooldownVideos] = useState(defaultCooldownVideos);
+  const [warmupVideos, _setWarmupVideos] = useState(defaultWarmupVideos);
+  const setWarmupVideos = (val) => {
+      if (!isExecutingSnapshot.current) lastLocalWriteAt.current = Date.now();
+      _setWarmupVideos(val);
+  };
+  const [cooldownVideos, _setCooldownVideos] = useState(defaultCooldownVideos);
+  const setCooldownVideos = (val) => {
+      if (!isExecutingSnapshot.current) lastLocalWriteAt.current = Date.now();
+      _setCooldownVideos(val);
+  };
   const [weekStartDay, setWeekStartDay] = useState(0); // 0: Sunday, 1: Monday
   const [defaultReminderTime, setDefaultReminderTime] = useState("15:00");
   const [reminderEnabled, setReminderEnabled] = useState(true);
   const [biometricStandard, setBiometricStandard] = useState('asia'); // 'asia' | 'western'
   const [unitSystem, setUnitSystem] = useState('metric'); // deprecated, kept for safety during transition
   const [units, setUnits] = useState({ weight: 'kg', height: 'cm', distance: 'km', temp: 'c' });
-  const [userProfile, setUserProfile] = useState(__previewUser ? null : __cachedProfile);
+  const [userProfile, _setUserProfile] = useState(__previewUser ? null : __cachedProfile);
+  const setUserProfile = (val) => {
+      if (!isExecutingSnapshot.current) lastLocalWriteAt.current = Date.now();
+      _setUserProfile(val);
+  };
 
   useEffect(() => {
     localStorage.setItem('__CACHED_PROFILE', JSON.stringify(userProfile));
   }, [userProfile]);
 
-  const [gymProfiles, setGymProfiles] = useState([{ id: 'default', name: 'Logym', equipment: 'all', config: {} }]);
-  const [activeGymId, setActiveGymId] = useState('default');
-  const [userApiKeys, setUserApiKeys] = useState([]);
+  const [gymProfiles, _setGymProfiles] = useState([{ id: 'default', name: 'Logym', equipment: 'all', config: {} }]);
+  const setGymProfiles = (val) => {
+      if (!isExecutingSnapshot.current) lastLocalWriteAt.current = Date.now();
+      _setGymProfiles(val);
+  };
+  const [activeGymId, _setActiveGymId] = useState('default');
+  const setActiveGymId = (val) => {
+      if (!isExecutingSnapshot.current) lastLocalWriteAt.current = Date.now();
+      _setActiveGymId(val);
+  };
+  const [userApiKeys, _setUserApiKeys] = useState([]);
+  const setUserApiKeys = (val) => {
+      if (!isExecutingSnapshot.current) lastLocalWriteAt.current = Date.now();
+      _setUserApiKeys(val);
+  };
   const [keyStatuses, setKeyStatuses] = useState({});
   const [logiPersona, setLogiPersona] = useState('santai');
   const [logiCustomInstruction, setLogiCustomInstruction] = useState('');
-  const [logiMemory, setLogiMemory] = useState([]);
+  const [logiMemory, _setLogiMemory] = useState([]);
+  const setLogiMemory = (val) => {
+      if (!isExecutingSnapshot.current) lastLocalWriteAt.current = Date.now();
+      _setLogiMemory(val);
+  };
   const [hasUnreadChat, setHasUnreadChat] = useState(false);
-  const [activityTargets, setActivityTargets] = useState({ steps: 10000, weeklyDuration: 150, sleep: 8 });
+  const [activityTargets, _setActivityTargets] = useState({ steps: 10000, weeklyDuration: 150, sleep: 8 });
+  const setActivityTargets = (val) => {
+      if (!isExecutingSnapshot.current) lastLocalWriteAt.current = Date.now();
+      _setActivityTargets(val);
+  };
 
   // TDEE hidup — dihitung ulang tiap biometrik/activityLevel berubah (termasuk dari sinkron
   // Lomeal), bukan dibekukan sejak onboarding kayak sebelumnya. Tunggu isDataLoaded biar gak
@@ -553,11 +585,21 @@ export default function App() {
   const [activeProgramId, setActiveProgramId] = useState(defaultPrograms[0]?.id || null);
   const [focusWorkoutId, setFocusWorkoutId] = useState(null);
 
-  // Self-healing: Hapus duplikat ID pada latihan (menghindari error DndKit dari state lama)
+  // Self-healing: Hapus duplikat ID pada program & latihan (menghindari React key warning /
+  // error DndKit dari state lama — mis. sisa duplikat dari bug sinkron yang sempat nulis
+  // dobel sebelum ke-perbaiki).
   useEffect(() => {
     if (!programs || programs.length === 0) return;
     let changed = false;
-    const newProgs = programs.map(p => {
+
+    const seenProgIds = new Set();
+    let dedupedPrograms = programs.filter(p => {
+       if (seenProgIds.has(p.id)) { changed = true; return false; }
+       seenProgIds.add(p.id);
+       return true;
+    });
+
+    const newProgs = dedupedPrograms.map(p => {
        if (!p.exercises || p.exercises.length === 0) return p;
        
        let pChanged = false;
@@ -1349,8 +1391,8 @@ export default function App() {
               if (parsedSettings.soundEnabled !== undefined) setSoundEnabled(parsedSettings.soundEnabled);
               if (parsedSettings.healthConnectEnabled !== undefined) setHealthConnectEnabled(parsedSettings.healthConnectEnabled);
               if (parsedSettings.defaultRestTime) setDefaultRestTime(parsedSettings.defaultRestTime);
-              if (parsedSettings.warmupVideos) setWarmupVideos(parsedSettings.warmupVideos);
-              if (parsedSettings.cooldownVideos) setCooldownVideos(parsedSettings.cooldownVideos);
+              if (parsedSettings.warmupVideos && !isRecentLocalWrite(lastLocalWriteAt)) setWarmupVideos(parsedSettings.warmupVideos);
+              if (parsedSettings.cooldownVideos && !isRecentLocalWrite(lastLocalWriteAt)) setCooldownVideos(parsedSettings.cooldownVideos);
               if (parsedSettings.weekStartDay !== undefined) setWeekStartDay(parsedSettings.weekStartDay);
               if (parsedSettings.defaultReminderTime) setDefaultReminderTime(parsedSettings.defaultReminderTime);
               if (parsedSettings.reminderEnabled !== undefined) setReminderEnabled(parsedSettings.reminderEnabled);
@@ -1364,7 +1406,7 @@ export default function App() {
                   }
               }
               if (parsedSettings.units) setUnits(parsedSettings.units);
-              if (parsedSettings.gymProfiles) {
+              if (parsedSettings.gymProfiles && !isRecentLocalWrite(lastLocalWriteAt)) {
                   const migratedProfiles = parsedSettings.gymProfiles.map(g => {
                       if (g.id === 'default' && g.name === 'Lyfit Gym') {
                           return { ...g, name: 'Logym' };
@@ -1373,8 +1415,8 @@ export default function App() {
                   });
                   setGymProfiles(migratedProfiles);
               }
-              if (parsedSettings.activeGymId) setActiveGymId(parsedSettings.activeGymId);
-              if (parsedSettings.activityTargets) setActivityTargets(parsedSettings.activityTargets);
+              if (parsedSettings.activeGymId && !isRecentLocalWrite(lastLocalWriteAt)) setActiveGymId(parsedSettings.activeGymId);
+              if (parsedSettings.activityTargets && !isRecentLocalWrite(lastLocalWriteAt)) setActivityTargets(parsedSettings.activityTargets);
               
               if (!isRecentLocalWrite(lastLocalWriteAt)) {
                  if (parsedSettings.activePlanIds) setActivePlanIds(parsedSettings.activePlanIds);
@@ -1382,8 +1424,10 @@ export default function App() {
                  else setActivePlanIds(['custom']); // default: always activate the built-in default plan
               }
               
-              if (parsedSettings.userProfile) setUserProfile(parsedSettings.userProfile);
-              else setUserProfile(null);
+              if (!isRecentLocalWrite(lastLocalWriteAt)) {
+                 if (parsedSettings.userProfile) setUserProfile(parsedSettings.userProfile);
+                 else setUserProfile(null);
+              }
               
               // Migrate old single keys to the new array
               let migratedKeys = parsedSettings.userApiKeys || [];
@@ -1394,13 +1438,13 @@ export default function App() {
               // Buang entri kosong yang kepencet "+ Tambah" tapi gak jadi diisi — biar gak
               // nyangkut sebagai baris kosong yang "muncul lagi" tiap kali data di-refresh.
               migratedKeys = migratedKeys.filter(k => k && k.trim());
-              setUserApiKeys(migratedKeys);
+              if (!isRecentLocalWrite(lastLocalWriteAt)) setUserApiKeys(migratedKeys);
 
               // Saved model IDs from older versions may no longer exist on the APIs
 
               setLogiPersona(parsedSettings.logiPersona || 'santai');
               setLogiCustomInstruction(parsedSettings.logiCustomInstruction || '');
-              setLogiMemory(Array.isArray(parsedSettings.logiMemory) ? parsedSettings.logiMemory : []);
+              if (!isRecentLocalWrite(lastLocalWriteAt)) setLogiMemory(Array.isArray(parsedSettings.logiMemory) ? parsedSettings.logiMemory : []);
             }
             if (data.userAchievements) setUserAchievements(data.userAchievements);
             setUser(prev => {
@@ -2617,7 +2661,7 @@ export default function App() {
       // bukan cuma angka kalori. Lewat plugin lokal ExerciseWriterPlugin.kt.
       // Daftar latihan dirakit sama seperti yang nanti dibekukan ke riwayat di bawah, biar
       // jenis olahraganya (kardio vs beban) ditebak dari isi sesi yang sebenarnya.
-      const srcProg = programs.find((pr) => pr.id === (progId || '').toString().replace('projected_', '').split('_')[0]);
+      const srcProg = programs.find((pr) => pr.id === resolveProjectedProgramId(progId));
       const sessionExercises = [...(srcProg?.exercises || []), ...(extraExercises || [])];
       const sessionTitle = progId === 'extra' ? 'Ekstra' : (srcProg?.name || 'Latihan Logym');
       hcRequestWorkoutWritePermission().then((ok) => {
@@ -2726,7 +2770,7 @@ export default function App() {
             isTargetFound = true;
             let realProgramId = w.programId;
             if (realProgramId && realProgramId.startsWith('projected_')) {
-                realProgramId = realProgramId.replace('projected_', '').split('_')[0];
+                realProgramId = resolveProjectedProgramId(realProgramId);
             }
 
             // Bekukan daftar exercise yang benar-benar dikerjakan ke dalam riwayat ini.
@@ -2780,9 +2824,9 @@ export default function App() {
             // This catches cases where focusWorkoutId mismatches but the correct session exists
             let resolvedProgId = progId;
             if (focusWorkoutId && focusWorkoutId.startsWith('projected_')) {
-                resolvedProgId = focusWorkoutId.replace('projected_','').split('_')[0];
+                resolvedProgId = resolveProjectedProgramId(focusWorkoutId);
             } else if (progId && progId.startsWith('projected_')) {
-                resolvedProgId = progId.replace('projected_','').split('_')[0];
+                resolvedProgId = resolveProjectedProgramId(progId);
             }
 
             const secondPassIdx = workouts.findIndex(w => 

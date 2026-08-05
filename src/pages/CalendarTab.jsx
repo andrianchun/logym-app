@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Info, CheckCircle, CalendarDays, Edit2, PlayCircle, X, Copy, Repeat, Plus, Clock, Bell, CalendarPlus, CalendarCheck, BellOff, BellRing, ToggleLeft, ToggleRight, Flame, Check, Activity } from 'lucide-react';
 import SwipeInput from '../components/SwipeInput';
-import { getLocalYMD } from '../data/constants';
+import { getLocalYMD, resolveProjectedProgramId } from '../data/constants';
 import { formatNumber } from '../utils/numberFormat';
 import { parseWorkoutDurationMinutes, calculateWorkoutCalories, calculateSmartWorkoutCalories } from '../utils/workoutCalc';
 import PanoramicSlider from '../components/PanoramicSlider';
@@ -463,7 +463,16 @@ const CalendarTab = ({
             });
         }
     }
-    
+
+    // Pengaman render: buang id kembar (mis. sisa program duplikat di `programs` yang belum
+    // sempat ke-upload bersih) — daftar yang di-render dijamin gak pernah punya key ganda.
+    const seenIds = new Set();
+    result = result.filter(w => {
+       if (seenIds.has(w.id)) return false;
+       seenIds.add(w.id);
+       return true;
+    });
+
     return result;
 
 
@@ -778,7 +787,7 @@ const CalendarTab = ({
           let newWorkouts = d.workouts && Array.isArray(d.workouts) ? [...d.workouts] : [];
           
           if (String(workoutId).startsWith('projected_')) {
-              const progId = String(workoutId).split('_')[1];
+              const progId = resolveProjectedProgramId(workoutId);
               if (!newDeletedProjected.includes(progId)) {
                   newDeletedProjected.push(progId);
               }

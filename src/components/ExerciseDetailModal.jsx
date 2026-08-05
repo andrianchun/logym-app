@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Dumbbell, History, Calculator, Replace, Video, Info, ChevronLeft, ChevronRight, Loader2, Play } from 'lucide-react';
-import { formatTarget } from '../data/constants';
+import { formatTarget, resolveProjectedProgramId } from '../data/constants';
 import SwipeInput from './SwipeInput';
 
 const ExerciseDetailModal = ({ 
@@ -39,7 +39,7 @@ const ExerciseDetailModal = ({
         let completedSets = [];
         let realProgId = w.programId;
         if (realProgId && realProgId.startsWith('projected_')) {
-            realProgId = realProgId.replace('projected_', '').split('_')[0];
+            realProgId = resolveProjectedProgramId(realProgId);
         }
         
         let pName = w.name || w.programName || 'Sesi Latihan';

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Plus, Wind, Play, CalendarDays, X, CheckCircle, ChevronDown, ChevronUp, Dumbbell, Share2, Flame, Brain } from 'lucide-react';
 import { fetchExercisesFromApi } from '../utils/exerciseDbApi';
 import { shareWorkoutToFeed } from '../utils/communityApi';
-import { normalizeMuscleKey } from '../data/constants';
+import { normalizeMuscleKey, resolveProjectedProgramId } from '../data/constants';
 
 // Import Komponen Pecahan
 import WorkoutHeader from '../components/WorkoutHeader';
@@ -105,8 +105,7 @@ const WorkoutTab = ({
     if (!isAlreadyInSource) {
       let progId = sessionToRun;
       if (sessionToRun.startsWith('projected_')) {
-         const parts = sessionToRun.split('_');
-         progId = parts[1];
+         progId = resolveProjectedProgramId(sessionToRun);
       }
       
       if (progId === 'extra') {
@@ -132,6 +131,18 @@ const WorkoutTab = ({
          }
       }
     }
+  }
+
+  // Pengaman render: buang entri dengan id kembar (mis. sisa program duplikat di `programs`
+  // yang belum sempat ke-upload bersih) — apa pun sumber duplikatnya, daftar yang di-render
+  // dijamin gak pernah punya key ganda.
+  {
+    const seenIds = new Set();
+    sourceWorkouts = sourceWorkouts.filter(w => {
+       if (seenIds.has(w.id)) return false;
+       seenIds.add(w.id);
+       return true;
+    });
   }
 
   const activeProgramsList = sourceWorkouts
