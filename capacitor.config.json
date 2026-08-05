@@ -10,6 +10,9 @@
     "LocalNotifications": {
       "smallIcon": "ic_launcher",
       "iconColor": "#3B82F6"
+    },
+    "CapacitorUpdater": {
+      "autoUpdate": false
     }
   }
 }

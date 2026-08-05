@@ -1,6 +1,6 @@
 {
   "projects": {
-    "default": "logym-id"
+    "default": "hexa-life"
   },
   "targets": {
     "hexa-life": {
