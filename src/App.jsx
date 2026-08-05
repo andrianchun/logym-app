@@ -74,6 +74,13 @@ const serializeDay = (val) => {
   return stableStringify(val ?? null);
 };
 
+// Kalau device ini baru aja nulis lokal (dalam LOCAL_WRITE_GUARD_MS terakhir), skip snapshot
+// yang masuk SEKALI SAJA — jangan diretry. Tulisan lokal yang masih pending bakal ke-upload
+// sendiri sebentar lagi dan memicu snapshot baru yang sudah benar; retry di sini yang dulu
+// bikin livelock (device saling nunda ke device lain tanpa henti).
+const LOCAL_WRITE_GUARD_MS = 3000;
+const isRecentLocalWrite = (lastWriteAtRef) => (Date.now() - lastWriteAtRef.current) <= LOCAL_WRITE_GUARD_MS;
+
 export default function App() {
   // --- STATE AUTH & LOADING ---
   const __previewUser = JSON.parse(localStorage.getItem('__PREVIEW_USER') || 'null');
@@ -1310,7 +1317,9 @@ export default function App() {
                   (ex.id === 101 && ex.name === 'Incline Smith Machine Press') ? { ...ex, name: 'Smith Machine Incline Bench Press' } : ex
                 ) : []
               }));
-              setPrograms(prev => JSON.stringify(prev) === JSON.stringify(migratedPrograms) ? prev : migratedPrograms);
+              if (!isRecentLocalWrite(lastLocalWriteAt)) {
+                 setPrograms(prev => JSON.stringify(prev) === JSON.stringify(migratedPrograms) ? prev : migratedPrograms);
+              }
             }
             if (data.exerciseLibrary) {
               const parsedLib = typeof data.exerciseLibrary === 'string' ? JSON.parse(data.exerciseLibrary) : data.exerciseLibrary;
@@ -1326,7 +1335,9 @@ export default function App() {
                   }
               });
 
-              setExerciseLibrary(prev => JSON.stringify(prev) === JSON.stringify(migratedLib) ? prev : migratedLib);
+              if (!isRecentLocalWrite(lastLocalWriteAt)) {
+                 setExerciseLibrary(prev => JSON.stringify(prev) === JSON.stringify(migratedLib) ? prev : migratedLib);
+              }
             }
             if (data.settings) {
               const parsedSettings = typeof data.settings === 'string' ? JSON.parse(data.settings) : data.settings;
@@ -1365,9 +1376,11 @@ export default function App() {
               if (parsedSettings.activeGymId) setActiveGymId(parsedSettings.activeGymId);
               if (parsedSettings.activityTargets) setActivityTargets(parsedSettings.activityTargets);
               
-              if (parsedSettings.activePlanIds) setActivePlanIds(parsedSettings.activePlanIds);
-              else if (parsedSettings.activePlanId) setActivePlanIds([parsedSettings.activePlanId]);
-              else setActivePlanIds(['custom']); // default: always activate the built-in default plan
+              if (!isRecentLocalWrite(lastLocalWriteAt)) {
+                 if (parsedSettings.activePlanIds) setActivePlanIds(parsedSettings.activePlanIds);
+                 else if (parsedSettings.activePlanId) setActivePlanIds([parsedSettings.activePlanId]);
+                 else setActivePlanIds(['custom']); // default: always activate the built-in default plan
+              }
               
               if (parsedSettings.userProfile) setUserProfile(parsedSettings.userProfile);
               else setUserProfile(null);
@@ -1443,19 +1456,21 @@ export default function App() {
              Object.keys(data).forEach(d => { base[d] = serializeDay(data[d]); });
              lastSavedHistoryJson.current = base;
              
-             setHistory(prev => {
-                const newState = { ...prev };
-                Object.keys(data).forEach(d => {
-                   const existingDay = newState[d] || {};
-                   newState[d] = {
-                      ...data[d],
-                      ...(existingDay._activeSession ? { _activeSession: existingDay._activeSession } : {})
-                   };
+             if (!isRecentLocalWrite(lastLocalHistoryWriteAt)) {
+                setHistory(prev => {
+                   const newState = { ...prev };
+                   Object.keys(data).forEach(d => {
+                      const existingDay = newState[d] || {};
+                      newState[d] = {
+                         ...data[d],
+                         ...(existingDay._activeSession ? { _activeSession: existingDay._activeSession } : {})
+                      };
+                   });
+                   const finalState = JSON.stringify(prev) === JSON.stringify(newState) ? prev : newState;
+                   localStorage.setItem('__CACHED_HISTORY', JSON.stringify(finalState));
+                   return finalState;
                 });
-                const finalState = JSON.stringify(prev) === JSON.stringify(newState) ? prev : newState;
-                localStorage.setItem('__CACHED_HISTORY', JSON.stringify(finalState));
-                return finalState;
-             });
+             }
            } catch (err) {
              console.error("Parse Error saat load history tahun ini:", err);
              setHasParseError(true);
