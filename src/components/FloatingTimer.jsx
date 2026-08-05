@@ -1,34 +1,47 @@
 import React, { useEffect } from 'react';
 import { Clock, X, Flame } from 'lucide-react';
 import { playSoundEffect } from '../utils/audio';
-import { calculateLiveCaloriesFromLogs } from '../utils/workoutCalc';
+import { calculateLiveWorkoutCalories } from '../utils/workoutCalc';
+import { Capacitor } from '@capacitor/core';
+import { WorkoutTimerPlugin } from '../App';
 
 const FloatingTimer = ({
-  restTimer, setRestTimer, defaultRestTime, t, soundEnabled,
+  restTargetTime, defaultRestTime, t, soundEnabled,
   isWorkoutActive, activeTab, setActiveTab, workoutStartTime,
   isImmersiveMode, setIsImmersiveMode, sessionToRun, focusWorkoutId, setFocusWorkoutId,
-  userProfile, exerciseLogs, exerciseLibrary
+  userProfile, exerciseLogs, sessionExercises
 }) => {
   
   const [workoutSeconds, setWorkoutSeconds] = React.useState(0);
 
+  const [localRestTimer, setLocalRestTimer] = React.useState(0);
+
   useEffect(() => {
-    let timeout;
-    if (restTimer !== 0) {
-      // Play start sound only when timer begins exactly at defaultRestTime
-      // (This might trigger again if user manually sets it to exactly defaultRestTime, which is fine)
-      timeout = setTimeout(() => {
-        setRestTimer(prev => {
-          if (prev === 4) playSoundEffect('timerTick', soundEnabled);
-          if (prev === 3) playSoundEffect('timerTick', soundEnabled);
-          if (prev === 2) playSoundEffect('timerTick', soundEnabled);
-          if (prev === 1) playSoundEffect('timerEnd', soundEnabled);
-          return prev - 1;
-        });
-      }, 1000);
+    if (isWorkoutActive && Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+      WorkoutTimerPlugin.requestOverlayPermission().catch(() => {});
     }
-    return () => clearTimeout(timeout);
-  }, [restTimer, defaultRestTime, soundEnabled, setRestTimer]);
+  }, [isWorkoutActive]);
+
+  useEffect(() => {
+    let interval;
+    if (restTargetTime !== null) {
+      const updateTimer = () => {
+        const remaining = Math.ceil((restTargetTime - Date.now()) / 1000);
+        setLocalRestTimer(prev => {
+          if (prev === 4 && remaining === 3) playSoundEffect('timerTick', soundEnabled);
+          if (prev === 3 && remaining === 2) playSoundEffect('timerTick', soundEnabled);
+          if (prev === 2 && remaining === 1) playSoundEffect('timerTick', soundEnabled);
+          if (prev === 1 && remaining === 0) playSoundEffect('timerEnd', soundEnabled);
+          return remaining;
+        });
+      };
+      updateTimer();
+      interval = setInterval(updateTimer, 500); // 500ms for more responsive UI
+    } else {
+      setLocalRestTimer(0);
+    }
+    return () => clearInterval(interval);
+  }, [restTargetTime, soundEnabled]);
 
   useEffect(() => {
     let interval;
@@ -44,7 +57,7 @@ const FloatingTimer = ({
   // Jika sedang immersive, ImmersiveWorkout.jsx akan merender bar-nya sendiri.
   if (isImmersiveMode || !isWorkoutActive) return null;
 
-  const showTimer = restTimer !== 0;
+  const showTimer = restTargetTime !== null;
 
   const handleClick = () => {
     setActiveTab('workout');
@@ -69,7 +82,10 @@ const FloatingTimer = ({
     return isNegative ? `-${text}` : text;
   };
 
-  const caloriesBurned = calculateLiveCaloriesFromLogs(userProfile?.weight || 70, exerciseLogs, exerciseLibrary, workoutSeconds);
+  // Pakai rumus & cakupan yang sama persis dengan ImmersiveWorkout: HANYA latihan di sesi yang
+  // lagi jalan. exerciseLogs isinya log SELURUH hari (semua sesi digabung), jadi menyapu seluruh
+  // key-nya bikin set dari sesi lain ikut kehitung — itu sumber lompatan kalori pas di-minimize.
+  const caloriesBurned = calculateLiveWorkoutCalories(userProfile?.weight || 70, sessionExercises, exerciseLogs, workoutSeconds);
 
   return (
     <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 pointer-events-none flex justify-center animate-in slide-in-from-bottom-8 fade-in duration-300">
@@ -94,9 +110,9 @@ const FloatingTimer = ({
             <span className="text-[10px] font-black uppercase text-white/70 tracking-widest mr-1">
                REST
             </span>
-            <Clock size={16} className={`animate-pulse ${restTimer < 0 ? 'text-rose-300' : 'text-white'}`} />
-            <span className={`font-mono font-black h2 ${restTimer < 0 ? 'text-rose-300' : 'text-white'}`}>
-              {formatTime(restTimer)}
+            <Clock size={16} className={`animate-pulse ${localRestTimer < 0 ? 'text-rose-300' : 'text-white'}`} />
+            <span className={`font-mono font-black h2 ${localRestTimer < 0 ? 'text-rose-300' : 'text-white'}`}>
+              {formatTime(localRestTimer)}
             </span>
           </div>
         )}

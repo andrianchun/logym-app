@@ -37,12 +37,21 @@
             android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
+
+        <service 
+            android:name=".WorkoutTimerService" 
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="Workout Timer" />
+        </service>
     </application>
 
     <!-- Permissions Bawaan -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <!-- Surat Izin Akses Data Kesehatan Health Connect -->
     <uses-permission android:name="android.permission.health.READ_STEPS" />
@@ -50,6 +59,8 @@
     <uses-permission android:name="android.permission.health.READ_SLEEP" />
     <uses-permission android:name="android.permission.health.READ_WEIGHT" />
     <uses-permission android:name="android.permission.health.READ_BODY_FAT" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- 4 izin ini dulu KETINGGALAN padahal healthConnect.js sudah minta tipe-tipe ini di
          READ_TYPES — akibatnya calories/height/oxygenSaturation/bloodPressure selalu balik
          kosong walau kodenya kelihatan benar (Health Connect gak bisa kasih izin utk tipe

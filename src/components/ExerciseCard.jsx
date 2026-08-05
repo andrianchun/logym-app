@@ -61,9 +61,17 @@ const ExerciseCard = ({
   // ==========================================
   // LOGIKA COUNTDOWN TIMER UNTUK DURASI
   // ==========================================
+  // window.logymActiveTimer dipakai bareng ImmersiveWorkout buat oper timer yang lagi jalan saat
+  // pindah tampilan. Formatnya WAJIB pakai jam dinding (targetTime/startTime) — punya Immersive —
+  // karena itu satu-satunya yang tetap akurat kalau app di-background. Kartu ini internalnya
+  // menghitung mundur pakai `timeLeft` (detik), jadi konversi di dua titik pertukaran ini.
   const [activeTimer, setActiveTimer] = useState(() => {
-     if (window.logymActiveTimer && window.logymActiveTimer.exId === ex?.id) {
-         return window.logymActiveTimer.timer;
+     const shared = window.logymActiveTimer?.exId === ex?.id ? window.logymActiveTimer.timer : null;
+     if (shared && shared.idx !== null && shared.idx !== undefined) {
+        const timeLeft = shared.mode === 'down'
+          ? Math.max(0, Math.ceil((shared.targetTime - Date.now()) / 1000))
+          : Math.max(0, Math.floor((Date.now() - shared.startTime) / 1000));
+        if (Number.isFinite(timeLeft)) return { idx: shared.idx, timeLeft, mode: shared.mode };
      }
      return { idx: null, timeLeft: 0, mode: 'down' };
   });
@@ -155,7 +163,13 @@ const ExerciseCard = ({
 
   useEffect(() => {
     if (activeTimer.idx !== null) {
-       window.logymActiveTimer = { exId: ex?.id, timer: activeTimer };
+       // Ekspor dalam format jam dinding yang dimengerti ImmersiveWorkout (lihat catatan di atas).
+       window.logymActiveTimer = {
+         exId: ex?.id,
+         timer: activeTimer.mode === 'down'
+           ? { idx: activeTimer.idx, mode: 'down', targetTime: Date.now() + activeTimer.timeLeft * 1000, startTime: null }
+           : { idx: activeTimer.idx, mode: 'up', startTime: Date.now() - activeTimer.timeLeft * 1000, targetTime: null }
+       };
     } else if (window.logymActiveTimer?.exId === ex?.id) {
        window.logymActiveTimer = null;
     }
@@ -166,12 +180,12 @@ const ExerciseCard = ({
     if (activeTimer.idx === setIdx) {
         // Matikan timer
         if (activeTimer.mode === 'up') {
-           // Simpan waktu berjalan ke durasi (dalam pecahan menit agar presisi)
-           const elapsedMins = Number((activeTimer.timeLeft / 60).toFixed(2));
+           // Satuannya beda: set kardio menyimpan MENIT, set 'time' (plank dsb) menyimpan DETIK
+           // — sama seperti yang dibaca input & kalkulator kalori.
            if (exType === 'cardio') {
-               handleCardioChange(setIdx, 'duration', elapsedMins);
+               handleCardioChange(setIdx, 'duration', Number((activeTimer.timeLeft / 60).toFixed(2)));
            } else {
-               onUpdateSet(ex.id, setIdx, 'd', elapsedMins);
+               onUpdateSet(ex.id, setIdx, 'd', Math.round(activeTimer.timeLeft));
            }
         }
         setActiveTimer({ idx: null, timeLeft: 0, mode: 'down' });

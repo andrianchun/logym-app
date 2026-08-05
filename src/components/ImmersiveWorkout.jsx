@@ -5,6 +5,113 @@ import ScrollPicker from './ScrollPicker';
 import { exerciseTypeLabels } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
 import { calculateWorkoutCalories, calculateLiveWorkoutCalories } from '../utils/workoutCalc';
+import { WorkoutTimerPlugin } from '../App';
+
+const LiveWorkoutStats = ({ workoutStartTime, isPaused, userProfile, validExercises, exerciseLogs, t, formatTime, currentExerciseName }) => {
+  const [workoutSeconds, setWorkoutSeconds] = useState(() => {
+    return workoutStartTime ? Math.floor((Date.now() - workoutStartTime) / 1000) : 0;
+  });
+
+  useEffect(() => {
+    let interval;
+    if (!isPaused && workoutStartTime) {
+      setWorkoutSeconds(Math.floor((Date.now() - workoutStartTime) / 1000));
+      interval = setInterval(() => {
+        setWorkoutSeconds(Math.floor((Date.now() - workoutStartTime) / 1000));
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isPaused, workoutStartTime]);
+
+  const caloriesBurned = calculateLiveWorkoutCalories(userProfile?.weight || 70, validExercises, exerciseLogs, workoutSeconds);
+
+  useEffect(() => {
+    if (window.Capacitor?.isNativePlatform() && window.Capacitor?.getPlatform() === 'android') {
+      WorkoutTimerPlugin.updateTimer({ 
+        calories: caloriesBurned.toString(),
+        exerciseName: currentExerciseName || ''
+      }).catch(() => {});
+    }
+  }, [caloriesBurned, currentExerciseName]);
+
+  return (
+    <div className="flex flex-col">
+      <span className={`text-[10px] font-black uppercase ${t.textMuted} tracking-widest`}>
+        Durasi Latihan
+      </span>
+      <span className={`h2 ${t.textAccent} flex items-baseline gap-1.5`}>
+        <span className="tabular-nums tracking-tight">{formatTime(workoutSeconds)}</span>
+        {caloriesBurned > 0 && <span className="opacity-80 text-[11px] font-semibold flex items-center gap-0.5"><Flame size={12} className={`${t.textAccent}`} strokeWidth={2.5} /> {caloriesBurned} kcal</span>}
+      </span>
+    </div>
+  );
+};
+
+const LiveSetTimer = ({ timer, onTimerEnd, formatTime, soundEnabled, playSoundEffect }) => {
+  const [timeLeft, setTimeLeft] = useState(() => {
+    if (timer.mode === 'down') return Math.max(0, Math.ceil((timer.targetTime - Date.now()) / 1000));
+    return Math.floor((Date.now() - timer.startTime) / 1000);
+  });
+
+  useEffect(() => {
+    if (timer.idx === null) return;
+    const interval = setInterval(() => {
+      if (timer.mode === 'down') {
+        const remaining = Math.ceil((timer.targetTime - Date.now()) / 1000);
+        if (remaining <= 0) {
+          playSoundEffect('timerEnd', soundEnabled);
+          onTimerEnd();
+        } else {
+          setTimeLeft(remaining);
+        }
+      } else {
+        setTimeLeft(Math.floor((Date.now() - timer.startTime) / 1000));
+      }
+    }, 500);
+    return () => clearInterval(interval);
+  }, [timer, onTimerEnd, soundEnabled, playSoundEffect]);
+
+  return <>{formatTime(timeLeft)}</>;
+};
+
+const LiveRestStats = ({ restTargetTime, setRestTargetTime, isAllDone, theme, t, formatTime }) => {
+  const [restTimer, setRestTimer] = useState(0);
+
+  useEffect(() => {
+    let interval;
+    if (restTargetTime !== null) {
+      const updateTimer = () => {
+        setRestTimer(Math.max(0, Math.ceil((restTargetTime - Date.now()) / 1000)));
+      };
+      updateTimer();
+      interval = setInterval(updateTimer, 500);
+    } else {
+      setRestTimer(0);
+    }
+    return () => clearInterval(interval);
+  }, [restTargetTime]);
+
+  if (isAllDone || restTargetTime === null) return null;
+
+  return (
+    <div className="flex-1 flex justify-center items-center gap-2 border-x border-black/5 dark:border-white/5">
+      <div className={`p-2 rounded-xl ${theme === 'dark' ? 'bg-white/10' : 'bg-black/5'}`}>
+         <Clock size={16} className={t.textMuted} />
+      </div>
+      <div className="flex flex-col">
+        <span className="text-[10px] font-black uppercase tracking-wider opacity-50">
+          Istirahat
+        </span>
+        <span className={`text-lg font-black ${restTimer === 0 ? 'text-green-500' : t.text}`}>
+          {formatTime(restTimer)}
+        </span>
+      </div>
+      {restTimer === 0 && (
+        <button onClick={() => setRestTargetTime(null)} className="ml-2 px-3 py-1 bg-green-500/10 text-green-500 rounded-lg text-xs font-bold active:scale-95 transition-transform">Tutup</button>
+      )}
+    </div>
+  );
+};
 
 const ImmersiveWorkout = ({
   t,
@@ -15,6 +122,7 @@ const ImmersiveWorkout = ({
   extraExercises,
   skippedExercises,
   exerciseLogs,
+  exerciseLibrary,
   onSetChange,
   onToggleSet,
   onSkipSet,
@@ -25,15 +133,15 @@ const ImmersiveWorkout = ({
   onOpenDetail,
   isClosing,
   workoutStartTime,
-  restTimer,
-  setRestTimer,
+  restTargetTime,
+  setRestTargetTime,
   gymProfiles,
   activeGymId,
-  setRestTargetTime,
   showSupersetToast,
   getOverloadHint,
   userProfile
 }) => {
+
   // 1. Gather all active exercise groups
   const validExercises = useMemo(() => {
     const baseExercises = activeProgramsList 
@@ -58,26 +166,10 @@ const ImmersiveWorkout = ({
   
   const ex = validExercises[currentIndex];
 
-  // 2. Workout Timer (Total Duration)
-  const [workoutSeconds, setWorkoutSeconds] = useState(() => {
-    return workoutStartTime ? Math.floor((Date.now() - workoutStartTime) / 1000) : 0;
-  });
   const [isPaused, setIsPaused] = useState(false);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const isSavingRef = React.useRef(false);
-
-  useEffect(() => {
-    let interval;
-    if (!isPaused && workoutStartTime) {
-      // Calculate delta immediately to avoid 1s delay if workoutStartTime changes
-      setWorkoutSeconds(Math.floor((Date.now() - workoutStartTime) / 1000));
-      interval = setInterval(() => {
-        setWorkoutSeconds(Math.floor((Date.now() - workoutStartTime) / 1000));
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [isPaused, workoutStartTime]);
 
   // Rest Timer will be handled globally in App.jsx but we can display it here if passed as prop
 
@@ -110,17 +202,37 @@ const ImmersiveWorkout = ({
     return `${isNegative ? '-' : ''}${m}:${s}`;
   };
 
-  const caloriesBurned = calculateLiveWorkoutCalories(userProfile?.weight || 70, validExercises, exerciseLogs, workoutSeconds);
+
+  const [localRestTimer, setLocalRestTimer] = useState(0);
+
+  useEffect(() => {
+    let interval;
+    if (restTargetTime !== null) {
+      const updateTimer = () => {
+        setLocalRestTimer(Math.max(0, Math.ceil((restTargetTime - Date.now()) / 1000)));
+      };
+      updateTimer();
+      interval = setInterval(updateTimer, 500);
+    } else {
+      setLocalRestTimer(0);
+    }
+    return () => clearInterval(interval);
+  }, [restTargetTime]);
 
   const [maxRestTimer, setMaxRestTimer] = useState(0);
   useEffect(() => {
-    setMaxRestTimer(prev => restTimer === 0 ? 0 : Math.max(prev, restTimer));
-  }, [restTimer]);
+    setMaxRestTimer(prev => localRestTimer === 0 ? 0 : Math.max(prev, localRestTimer));
+  }, [localRestTimer]);
 
   // 3. Current Set Logic
-  const getLogsForEx = (exItem) => exerciseLogs[exItem.id] || Array.from({length: exItem.sets || 3}).map(() => ({
-    w: exItem.defaultWeight || 0, r: exItem.reps || 10, d: exItem.duration || 10, done: false
-  }));
+  const getLogsForEx = (exItem) => {
+    if (exerciseLogs[exItem.id]) return exerciseLogs[exItem.id];
+    const libMatch = exerciseLibrary?.find(e => e.id === exItem.originalId || e.id === exItem.id || e.name?.toLowerCase() === exItem.name?.toLowerCase());
+    const suggestedWeight = libMatch?.lastWeight || libMatch?.rm10 || exItem.defaultWeight || 0;
+    return Array.from({length: exItem.sets || 3}).map(() => ({
+      w: suggestedWeight, r: exItem.reps || 10, d: exItem.duration || 10, done: false
+    }));
+  };
 
   const logs = ex ? getLogsForEx(ex) : [];
 
@@ -141,30 +253,12 @@ const ImmersiveWorkout = ({
      if (window.logymActiveTimer && window.logymActiveTimer.exId === ex?.id) {
          return window.logymActiveTimer.timer;
      }
-     return { idx: null, timeLeft: 0, mode: 'down' };
+     return { idx: null, targetTime: null, startTime: null, mode: 'down' };
   });
 
-  React.useEffect(() => {
-    let interval = null;
-    if (activeTimer.idx !== null) {
-      interval = setInterval(() => {
-        setActiveTimer(prev => {
-          if (prev.mode === 'down') {
-             if (prev.timeLeft <= 1) {
-                playSoundEffect('timerEnd', soundEnabled);
-                clearInterval(interval);
-                return { idx: null, timeLeft: 0, mode: 'down' };
-             }
-             return { ...prev, timeLeft: prev.timeLeft - 1 };
-          }
-          return { ...prev, timeLeft: prev.timeLeft + 1 };
-        });
-      }, 1000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [activeTimer.idx, ex?.id, logs, onToggleSet, soundEnabled]);
+  const handleTimerEnd = React.useCallback(() => {
+     setActiveTimer({ idx: null, targetTime: null, startTime: null, mode: 'down' });
+  }, []);
 
   React.useEffect(() => {
     if (activeTimer.idx !== null) {
@@ -178,21 +272,22 @@ const ImmersiveWorkout = ({
     playSoundEffect('click', soundEnabled);
     if (activeTimer.idx === setIdx) {
         if (activeTimer.mode === 'up') {
-            const elapsedMins = Number((activeTimer.timeLeft / 60).toFixed(2));
+            const elapsed = Math.floor((Date.now() - activeTimer.startTime) / 1000);
+            const elapsedMins = Number((elapsed / 60).toFixed(2));
             if (isCardio) {
                 handleCardioChange('duration', elapsedMins);
             } else {
-                onSetChange(ex.id, setIdx, 'd', activeTimer.timeLeft);
+                onSetChange(ex.id, setIdx, 'd', elapsed);
             }
         }
-        setActiveTimer({ idx: null, timeLeft: 0, mode: 'down' });
+        setActiveTimer({ idx: null, targetTime: null, startTime: null, mode: 'down' });
     } else {
         const d = Number(duration || 0);
         if (d > 0) {
            const timeInSeconds = isCardio ? Math.round(d * 60) : Math.round(d);
-           setActiveTimer({ idx: setIdx, timeLeft: timeInSeconds, mode: 'down' }); 
+           setActiveTimer({ idx: setIdx, targetTime: Date.now() + timeInSeconds * 1000, mode: 'down' }); 
         } else {
-           setActiveTimer({ idx: setIdx, timeLeft: 0, mode: 'up' }); 
+           setActiveTimer({ idx: setIdx, startTime: Date.now(), mode: 'up' }); 
         }
     }
   };
@@ -509,15 +604,16 @@ const ImmersiveWorkout = ({
         
         {/* Durasi Group */}
         <div className="flex items-center gap-4">
-          <div className="flex flex-col">
-            <span className="text-[10px] font-black uppercase ${t.textMuted} tracking-widest">
-              Durasi Latihan
-            </span>
-            <span className="h2 ${t.textAccent} flex items-baseline gap-1.5">
-              <span className="tabular-nums tracking-tight">{formatTime(workoutSeconds)}</span>
-              {caloriesBurned > 0 && <span className="opacity-80 text-[11px] font-semibold flex items-center gap-0.5"><Flame size={12} className={`${t.textAccent}`} strokeWidth={2.5} /> {caloriesBurned} kcal</span>}
-            </span>
-          </div>
+          <LiveWorkoutStats 
+            workoutStartTime={workoutStartTime} 
+            isPaused={isPaused} 
+            userProfile={userProfile} 
+            validExercises={validExercises} 
+            exerciseLogs={exerciseLogs} 
+            t={t} 
+            formatTime={formatTime} 
+            currentExerciseName={ex?.exercise?.name || ex?.name || ''}
+          />
         </div>
 
         {/* Controls */}
@@ -788,7 +884,7 @@ const ImmersiveWorkout = ({
                                </div>
                                {activeTimer.idx === activeSetIdx ? (
                                   <div className={`w-full h-[120px] flex items-center justify-center text-4xl sm:text-5xl font-black ${t.textAccent}`}>
-                                     {formatTime(activeTimer.timeLeft)}
+                                     <LiveSetTimer timer={activeTimer} onTimerEnd={handleTimerEnd} formatTime={formatTime} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} />
                                   </div>
                                ) : (
                                   <ScrollPicker 
@@ -833,7 +929,7 @@ const ImmersiveWorkout = ({
                       </div>
                       {activeTimer.idx === activeSetIdx ? (
                          <div className={`w-full h-[120px] flex items-center justify-center text-4xl sm:text-5xl font-black ${t.textAccent}`}>
-                            {formatTime(activeTimer.timeLeft)}
+                            <LiveSetTimer timer={activeTimer} onTimerEnd={handleTimerEnd} formatTime={formatTime} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} />
                          </div>
                       ) : (
                          <ScrollPicker 
@@ -899,21 +995,21 @@ const ImmersiveWorkout = ({
 
         {/* Actions Row (Full Width) */}
         <div className="w-full relative">
-          {restTimer !== 0 && !isAllDone ? (
+          {localRestTimer !== 0 && !isAllDone ? (
             <div className={`w-full relative flex items-stretch justify-between rounded-2xl shadow-xl transition-colors overflow-hidden border ${
-              restTimer < 0 ? 'bg-rose-500 border-rose-500' : `${t.bgAccentSoft} ${t.borderAccent}`
+              localRestTimer < 0 ? 'bg-rose-500 border-rose-500' : `${t.bgAccentSoft} ${t.borderAccent}`
             }`}>
-              {restTimer > 0 && maxRestTimer > 0 && (
+              {localRestTimer > 0 && maxRestTimer > 0 && (
                 <div 
                   className={`absolute top-0 left-0 h-full transition-all duration-1000 ease-linear pointer-events-none ${theme === 'dark' ? 'bg-white/25' : 'bg-black/25'}`}
-                  style={{ width: `${Math.min(100, Math.max(0, ((maxRestTimer - restTimer) / maxRestTimer) * 100))}%` }}
+                  style={{ width: `${Math.min(100, Math.max(0, ((maxRestTimer - localRestTimer) / maxRestTimer) * 100))}%` }}
                 />
               )}
-              <button onClick={(e) => { e.stopPropagation(); setRestTimer(prev => prev - 5); }} className={`relative z-10 w-16 sm:w-20 flex items-center justify-center bg-transparent ${theme === 'dark' ? 'hover:bg-white/10 active:bg-white/20 border-white/20' : 'hover:bg-black/10 active:bg-black/20 border-black/10'} ${t.textMain} font-black transition-colors border-r h2`}>-5</button>
-              <button onClick={() => setRestTimer(0)} className={`relative z-10 flex-1 py-4 flex items-center justify-center font-black h2 ${t.textMain} ${theme === 'dark' ? 'active:bg-white/10' : 'active:bg-black/10'} transition-colors`}>
-                REST: {formatTime(restTimer)}
+              <button onClick={(e) => { e.stopPropagation(); setRestTargetTime(prev => (prev || Date.now()) - 5000); }} className={`relative z-10 w-16 sm:w-20 flex items-center justify-center bg-transparent ${theme === 'dark' ? 'hover:bg-white/10 active:bg-white/20 border-white/20' : 'hover:bg-black/10 active:bg-black/20 border-black/10'} ${t.textMain} font-black transition-colors border-r h2`}>-5</button>
+              <button onClick={() => setRestTargetTime(null)} className={`relative z-10 flex-1 py-4 flex items-center justify-center font-black h2 ${t.textMain} ${theme === 'dark' ? 'active:bg-white/10' : 'active:bg-black/10'} transition-colors`}>
+                REST: {formatTime(localRestTimer)}
               </button>
-              <button onClick={(e) => { e.stopPropagation(); setRestTimer(prev => prev + 5); }} className={`relative z-10 w-16 sm:w-20 flex items-center justify-center bg-transparent ${theme === 'dark' ? 'hover:bg-white/10 active:bg-white/20 border-white/20' : 'hover:bg-black/10 active:bg-black/20 border-black/10'} ${t.textMain} font-black transition-colors border-l h2`}>+5</button>
+              <button onClick={(e) => { e.stopPropagation(); setRestTargetTime(prev => (prev || Date.now()) + 5000); }} className={`relative z-10 w-16 sm:w-20 flex items-center justify-center bg-transparent ${theme === 'dark' ? 'hover:bg-white/10 active:bg-white/20 border-white/20' : 'hover:bg-black/10 active:bg-black/20 border-black/10'} ${t.textMain} font-black transition-colors border-l h2`}>+5</button>
             </div>
           ) : !isAllDone ? (
             <div className="flex gap-2 w-full">

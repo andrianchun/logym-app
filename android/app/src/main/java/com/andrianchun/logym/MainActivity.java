@@ -13,6 +13,7 @@ public class MainActivity extends BridgeActivity {
         // bisa MEMBACA sesi latihan, jadi tanpa ini latihan Logym tidak pernah muncul sebagai
         // "Workout" di aplikasi lain. Harus didaftarkan SEBELUM super.onCreate().
         registerPlugin(ExerciseWriterPlugin.class);
+        registerPlugin(WorkoutTimerPlugin.class);
         super.onCreate(savedInstanceState);
 
         Window window = getWindow();

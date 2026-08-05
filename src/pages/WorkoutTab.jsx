@@ -40,8 +40,8 @@ const WorkoutTab = ({
 
   // Library
   isImmersiveMode, setIsImmersiveMode,
-  restTimer, setRestTimer,
-  sessionToRun, setSessionToRun,
+
+  sessionToRun, setSessionToRun, onSessionExercises,
   resumeDurationSecs, setResumeDurationSecs,
   units, userProfile, activePlanIds = [], showSupersetToast, tabSlideDir = 'right'
 }) => {
@@ -187,6 +187,21 @@ const WorkoutTab = ({
       } : null;
     })
     .filter(Boolean);
+
+  // Isi sesi yang lagi dijalankan. Dipakai ImmersiveWorkout, dan dilaporkan ke App supaya
+  // FloatingTimer (pill saat di-minimize) menghitung kalori dari sesi yang SAMA — bukan dari
+  // seluruh log hari itu. Satu turunan, satu angka.
+  const sessionPrograms = sessionToRun === 'extra' ? [] : activeProgramsList.filter(p => p.workoutId === sessionToRun || p.id === sessionToRun);
+  const sessionExtras = sessionToRun === 'extra' ? extraExercises : [];
+  const sessionExercises = [...sessionPrograms.flatMap(p => p.exercises || []), ...sessionExtras]
+    .filter(ex => !skippedExercises[ex.id]);
+
+  // activeProgramsList dirakit ulang tiap render, jadi kunci efeknya pakai daftar id (stabil)
+  // supaya tidak setState tanpa henti.
+  const sessionExerciseIds = sessionExercises.map(ex => ex.id).join(',');
+  React.useEffect(() => {
+    onSessionExercises?.(sessionExercises);
+  }, [sessionExerciseIds, onSessionExercises]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const hasAutoExpanded = React.useRef(false);
 
@@ -439,8 +454,11 @@ const WorkoutTab = ({
     }
 
     // 3. Default: empty template
+    const libMatch = exerciseLibrary?.find(e => e.id === ex?.originalId || e.id === ex?.id || e.name?.toLowerCase() === ex?.name?.toLowerCase());
+    const suggestedWeight = libMatch?.lastWeight || libMatch?.rm10 || ex?.defaultWeight || 0;
+
     return Array.from({length: ex.sets || 3}).map(() => ({
-        w: ex.defaultWeight || 0,
+        w: suggestedWeight,
         r: ex.reps || 10,
         d: ex.duration || 10,
         done: false,
@@ -668,7 +686,7 @@ const WorkoutTab = ({
              setIsWorkoutActive(false);
              setWorkoutStartTime(null);
              if (setRestTargetTime) setRestTargetTime(null);
-             if (setRestTimer) setRestTimer(0);
+
              setTimeout(doStart, 100);
           },
           discardText: 'Buang Perubahan'
@@ -771,10 +789,11 @@ const WorkoutTab = ({
           units={units}
           programs={programs}
           activeProgramId={activeProgramId}
-          activeProgramsList={sessionToRun === 'extra' ? [] : activeProgramsList.filter(p => p.workoutId === sessionToRun || p.id === sessionToRun)}
-          extraExercises={sessionToRun === 'extra' ? extraExercises : []}
+          activeProgramsList={sessionPrograms}
+          extraExercises={sessionExtras}
           skippedExercises={skippedExercises}
           exerciseLogs={exerciseLogs}
+          exerciseLibrary={exerciseLibrary}
           onSetChange={onSetChange}
           onToggleSet={(exId, setIdx, siblingIds) => {
             window.logymLastInteractedExId = exId;
@@ -815,11 +834,9 @@ const WorkoutTab = ({
           soundEnabled={soundEnabled}
           onOpenDetail={handleOpenDetail}
           workoutStartTime={workoutStartTime}
-          restTimer={restTimer}
-          setRestTimer={setRestTimer}
+          restTargetTime={restTargetTime} 
           setRestTargetTime={setRestTargetTime}
           showSupersetToast={showSupersetToast}
-          exerciseLibrary={exerciseLibrary}
           getOverloadHint={getOverloadHint}
         />
       )}

@@ -1,9 +1,13 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 
 // --- IMPORT CAPACITOR (FULLSCREEN) ---
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { StatusBar } from '@capacitor/status-bar';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { App as CapApp } from '@capacitor/app';
+
+export const WorkoutTimerPlugin = registerPlugin('WorkoutTimer');
+
 
 // --- IMPORT MESIN FIREBASE ---
 import { auth, db } from './firebase';
@@ -48,31 +52,14 @@ import { fetchExercisesFromApi } from './utils/exerciseDbApi';
 import { AI_MODELS, detectPlateaus, getLogiNotification } from './utils/aiAgent';
 import { calculateReadiness } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
-import { calculateWorkoutCalories, calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType } from './utils/workoutCalc';
+import { calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType } from './utils/workoutCalc';
 import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcWriteWorkoutCalories, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission } from './utils/healthConnect';
 import useDialog from './hooks/useDialog';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import UpdaterAlert from './components/UpdaterAlert';
 import { getLocalYMD, resolveProjectedProgramId, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos } from './data/constants';
+import { serializeDay, reconcileHistory, workoutsToMap, workoutIdsFromBaseline, diffFields } from './utils/historySync';
 import { Loader2, Download, X } from 'lucide-react';
-
-// Serialisasi kanonik (key di-sort) supaya perbandingan tidak terpengaruh urutan key
-// antara objek buatan lokal vs hasil decode Firestore.
-const stableStringify = (val) => {
-  if (val === null || typeof val !== 'object') return JSON.stringify(val) ?? 'null';
-  if (Array.isArray(val)) return '[' + val.map(v => stableStringify(v === undefined ? null : v)).join(',') + ']';
-  const keys = Object.keys(val).filter(k => val[k] !== undefined).sort();
-  return '{' + keys.map(k => JSON.stringify(k) + ':' + stableStringify(val[k])).join(',') + '}';
-};
-
-// Serialisasi satu hari history untuk diff auto-save (tanpa _activeSession yang per-device)
-const serializeDay = (val) => {
-  if (val && typeof val === 'object') {
-    const { _activeSession, ...dayData } = val;
-    return stableStringify(dayData);
-  }
-  return stableStringify(val ?? null);
-};
 
 // Kalau device ini baru aja nulis lokal (dalam LOCAL_WRITE_GUARD_MS terakhir), skip snapshot
 // yang masuk SEKALI SAJA — jangan diretry. Tulisan lokal yang masih pending bakal ke-upload
@@ -342,7 +329,13 @@ export default function App() {
     localStorage.setItem('__CACHED_PROGRAMS', JSON.stringify(programs));
   }, [programs]);
   const lastLocalWriteAt = useRef(0);
-  const isExecutingSnapshot = useRef(false);
+  // COUNTER, bukan boolean. Ada dua listener onSnapshot yang jalan bersamaan dan listener
+  // dokumen utama itu async (ada await di jalur migrasi) — dengan boolean, listener history
+  // yang selesai duluan menyetelnya ke false di TENGAH await milik listener utama, sehingga
+  // setter yang jalan setelah await dikira "tulisan lokal user" dan memblokir snapshot
+  // berikutnya. Angka 0 tetap falsy, jadi semua pengecekan `if (!isExecutingSnapshot.current)`
+  // di setter-setter di bawah tidak perlu diubah.
+  const isExecutingSnapshot = useRef(0);
 
   const setPrograms = (val) => {
       if (!isExecutingSnapshot.current) lastLocalWriteAt.current = Date.now();
@@ -355,11 +348,13 @@ export default function App() {
     localStorage.setItem('__CACHED_HISTORY', JSON.stringify(history));
   }, [history]);
   
-  const lastLocalHistoryWriteAt = useRef(0);
-  const setHistory = (val) => {
-     if (!isExecutingSnapshot.current) lastLocalHistoryWriteAt.current = Date.now();
-     _setHistory(val);
-  };
+  // Dulu di sini ada lastLocalHistoryWriteAt: tiap setHistory menaikkan stempel waktu, dan
+  // listener history membuang snapshot server kalau stempelnya < 3 detik. Masalahnya yang
+  // memanggil setHistory bukan cuma aksi user — tiap ketukan angka reps, tiap hari yang
+  // di-merge dari Health Connect (30 panggilan beruntun) ikut menaikkannya, jadi selama sesi
+  // latihan atau sinkron HC guard-nya tidak pernah lepas dan device buta terhadap server.
+  // Diganti rekonsiliasi berbasis ISI di listener history (lihat komentar di sana).
+  const setHistory = _setHistory;
 
   // --- Health Connect: baca live (hari ini) + backfill histori ---
   const [healthAvailable, setHealthAvailable] = useState(false);
@@ -370,20 +365,31 @@ export default function App() {
   // dari sumber lain (mis. activityCalories hasil hitung workout Logym sendiri).
   const HC_FIELDS = ['steps', 'activityCalories', 'heartRate', 'minHeartRate', 'maxHeartRate', 'restingHeartRate', 'weight', 'height', 'bodyFat', 'oxygenSaturation', 'bloodPressure', 'sleep', 'sleepAwake', 'sleepRem', 'sleepLight', 'sleepDeep', 'sleepLog', 'distance', 'bmr', 'heartRateLog', 'oxygenSaturationLog', 'bloodPressureLog'];
 
-  const mergeHcDayData = (ymd, hcData) => {
+  // SATU setHistory untuk seluruh hasil sinkron, bukan satu per hari. Versi lama memanggilnya
+  // 30x beruntun (sekali per hari) — 30 render seluruh app per sinkron, dan dulu itu juga yang
+  // membuat guard "baru saja menulis lokal" tidak pernah lepas sepanjang sinkron.
+  const mergeHcDays = (byDay) => {
     setHistory(prev => {
-      const existingBio = prev[ymd]?.bioData || {};
-      const manualFlags = existingBio._manualFlags || {};
-      const patch = {};
-      HC_FIELDS.forEach((k) => {
-        if (hcData[k] === undefined) return;
-        if (manualFlags[k] !== undefined) return;
-        // JANGAN DIBLOKIR: Health Connect bersifat kumulatif (contoh: langkah nambah terus).
-        // Kalau diblokir saat existingVal !== 0, data cuma narik sekali di pagi hari lalu nyangkut selamanya.
-        patch[k] = hcData[k];
+      const next = { ...prev };
+      let changed = false;
+      Object.entries(byDay).forEach(([ymd, hcData]) => {
+        const existingBio = prev[ymd]?.bioData || {};
+        const manualFlags = existingBio._manualFlags || {};
+        const patch = {};
+        HC_FIELDS.forEach((k) => {
+          if (hcData[k] === undefined) return;
+          if (manualFlags[k] !== undefined) return;
+          // JANGAN DIBLOKIR: Health Connect bersifat kumulatif (contoh: langkah nambah terus).
+          // Kalau diblokir saat existingVal !== 0, data cuma narik sekali di pagi hari lalu nyangkut selamanya.
+          // Menulis ulang nilai yang sama juga tidak bikin boros: auto-save membandingkan isi,
+          // jadi hari yang nilainya tidak berubah tidak pernah dikirim ke Firestore.
+          if (existingBio[k] !== hcData[k]) patch[k] = hcData[k];
+        });
+        if (Object.keys(patch).length === 0) return;
+        next[ymd] = { ...(prev[ymd] || {}), bioData: { ...existingBio, ...patch } };
+        changed = true;
       });
-      if (Object.keys(patch).length === 0) return prev;
-      return { ...prev, [ymd]: { ...(prev[ymd] || {}), bioData: { ...existingBio, ...patch } } };
+      return changed ? next : prev;
     });
   };
 
@@ -410,7 +416,9 @@ export default function App() {
     // mendiagnosa isi Health Connect lagi (hasilnya di-log dengan prefix HC_INVENTORY).
     const status = silent ? null : await hcCheckStatus();
     let filled = 0;
-    await hcBackfillHistory(days, () => false, (ymd, summary) => { filled++; mergeHcDayData(ymd, summary); });
+    const hcByDay = {};
+    await hcBackfillHistory(days, () => false, (ymd, summary) => { filled++; hcByDay[ymd] = summary; });
+    if (filled > 0) mergeHcDays(hcByDay);
 
     // SENGAJA gak baca balik sesi latihan dari Health Connect (hcReadWorkouts/mergeHcWorkouts
     // dihapus) — kayak app lain pada umumnya, Logym cuma jadi PENULIS buat sesi latihannya
@@ -473,6 +481,16 @@ export default function App() {
 
   // Tombol "Sinkron Ulang" di Pengaturan — dengan dialog izin & popup hasil.
   const handleHcBackfill = (days = 30) => runHcSync({ days, silent: false });
+
+  // Dorong sesi yang baru selesai ke Health Connect, setelah sesinya benar-benar masuk
+  // `history` (id-nya baru ada di situ, dan id itulah dedupeKey-nya). Lihat catatan panjang
+  // di handleSaveWorkout: ini satu-satunya jalur penulisan sesi ke HC.
+  const hcPushAfterSave = useRef(false);
+  useEffect(() => {
+    if (!hcPushAfterSave.current) return;
+    hcPushAfterSave.current = false;
+    runHcSync({ days: 1, silent: true }); // sengaja lewat throttle 10 menit — ini dipicu user
+  }, [history]);
 
   // SINKRON OTOMATIS: begitu tersambung, user tidak perlu menekan apa pun lagi.
   // Jalan saat app dibuka, tiap kembali ke depan (mis. habis buka Samsung Health), dan tiap
@@ -557,7 +575,7 @@ export default function App() {
 
   const [focusRoutineId, setFocusRoutineId] = useState(null);
   const [isEditingMode, setIsEditingMode] = useState(false);
-  const [restTimer, setRestTimer] = useState(0); // Legacy, might be replaced by restTargetTime
+
 
   // --- GLOBAL WORKOUT STATE ---
   const [isWorkoutActive, setIsWorkoutActive] = useState(false);
@@ -734,6 +752,45 @@ export default function App() {
     }
   };
 
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const scheduleDailyReminder = async () => {
+      try {
+        await LocalNotifications.cancel({ notifications: [{ id: 8888 }] });
+        if (!reminderEnabled) return;
+
+        const perm = await LocalNotifications.checkPermissions();
+        if (perm.display !== 'granted') return;
+
+        const copy = getLogiNotification('start', logiPersona, { program: 'Latihan hari ini' });
+        if (!copy) return;
+
+        const [h, m] = (defaultReminderTime || '09:00').split(':');
+        
+        await LocalNotifications.schedule({
+          notifications: [{
+            id: 8888,
+            title: copy.title,
+            body: copy.body,
+            schedule: { 
+              on: {
+                hour: parseInt(h, 10),
+                minute: parseInt(m, 10)
+              },
+              repeats: true,
+              allowWhileIdle: true
+            },
+            largeIcon: 'coach_logi_avatar',
+          }]
+        });
+      } catch (err) {
+        console.warn('Daily reminder error:', err);
+      }
+    };
+    scheduleDailyReminder();
+  }, [reminderEnabled, defaultReminderTime, logiPersona]);
+
+
   // Nudge kalau user belum latihan N hari — dijadwalkan ulang tiap hari count-nya berubah,
   // tapi cuma sekali per hari yang sama (dedup via localStorage) supaya tidak spam tiap app dibuka.
   useEffect(() => {
@@ -835,6 +892,9 @@ export default function App() {
   const [exerciseLogs, setExerciseLogs] = useState({});
   const [skippedExercises, setSkippedExercises] = useState({});
   const [extraExercises, setExtraExercises] = useState([]);
+  // Daftar latihan sesi yang lagi jalan, dilaporkan oleh WorkoutTab (satu-satunya tempat id
+  // gabungan `${ex.id}-${workoutId}` dirakit). FloatingTimer butuh ini biar kalorinya sama.
+  const [sessionExercises, setSessionExercises] = useState([]);
 
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
@@ -1097,6 +1157,17 @@ export default function App() {
   // REST TIMER NOTIFICATION LOGIC
   // ==========================================
   useEffect(() => {
+    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+      const sub = CapApp.addListener('appStateChange', ({ isActive }) => {
+        WorkoutTimerPlugin.setAppState({ isActive }).catch(() => {});
+      });
+      return () => {
+        sub.then(listener => listener.remove());
+      };
+    }
+  }, []);
+
+  useEffect(() => {
     if (!restTargetTime) return;
     
     const timeRemainingMs = restTargetTime - Date.now();
@@ -1105,18 +1176,39 @@ export default function App() {
     if (timeRemainingMs <= 0) return;
 
     const timeout = setTimeout(() => {
-      // Waktu istirahat habis!
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification("Logym Workout", { 
-          body: "Waktu istirahat habis! Lanjut ke set berikutnya.",
-          icon: "/lyfit-logo.png" // Fallback if logo doesn't exist
-        });
+      if (soundEnabled) {
+        if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 500]);
       }
-      playSoundEffect('success', soundEnabled); // Use success or a new 'bell' sound
+      playSoundEffect('success', soundEnabled);
+
+      if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+        WorkoutTimerPlugin.updateTimer({ 
+            isResting: false, 
+            targetTime: 0, 
+            workoutName: programs?.find(p => p.id === activeProgramId)?.name || 'Sesi Latihan Aktif' 
+        }).catch(console.warn);
+      }
     }, timeRemainingMs);
 
-    return () => clearTimeout(timeout);
-  }, [restTargetTime, soundEnabled]);
+    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+        WorkoutTimerPlugin.updateTimer({ 
+            isResting: true, 
+            targetTime: restTargetTime, 
+            workoutName: programs?.find(p => p.id === activeProgramId)?.name || 'Sesi Latihan Aktif' 
+        }).catch(console.warn);
+    }
+
+    return () => {
+        clearTimeout(timeout);
+        if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+            WorkoutTimerPlugin.updateTimer({ 
+                isResting: false, 
+                targetTime: 0, 
+                workoutName: programs?.find(p => p.id === activeProgramId)?.name || 'Sesi Latihan Aktif' 
+            }).catch(console.warn);
+        }
+    };
+  }, [restTargetTime, soundEnabled, activeProgramId, programs]);
 
   // ==========================================
   // PERSISTENT WORKOUT NOTIFICATION (Android)
@@ -1126,31 +1218,12 @@ export default function App() {
     
     const NOTIF_ID = 9999;
 
-    const formatNotifTime = (secs) => {
-      const h = Math.floor(secs / 3600);
-      const m = Math.floor((secs % 3600) / 60);
-      const s = Math.floor(secs % 60);
-      return h > 0 ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}` : `${m}:${s.toString().padStart(2, '0')}`;
-    };
-
     const showNotification = async () => {
       try {
-        const perm = await LocalNotifications.requestPermissions();
-        if (perm.display !== 'granted') return;
-
-        const elapsed = workoutStartTime ? Math.floor((Date.now() - workoutStartTime) / 1000) : 0;
-        await LocalNotifications.schedule({
-          notifications: [{
-            id: NOTIF_ID,
-            title: '🏋️ Workout Sedang Berjalan',
-            body: `Durasi: ${formatNotifTime(elapsed)} — Ketuk untuk kembali ke Logym`,
-            ongoing: true,
-            autoCancel: false,
-            smallIcon: 'ic_launcher',
-            sound: null,
-            schedule: { at: new Date(Date.now() + 100) },
-          }]
-        });
+        if (Capacitor.getPlatform() === 'android') {
+           const workoutName = programs?.find(p => p.id === activeProgramId)?.name || 'Sesi Latihan Aktif';
+           await WorkoutTimerPlugin.startTimer({ startTime: workoutStartTime || Date.now(), workoutName });
+        }
       } catch (err) {
         console.warn('Notification error:', err);
       }
@@ -1158,17 +1231,17 @@ export default function App() {
 
     const cancelNotification = async () => {
       try {
-        await LocalNotifications.cancel({ notifications: [{ id: NOTIF_ID }] });
+        if (Capacitor.getPlatform() === 'android') {
+           await WorkoutTimerPlugin.stopTimer();
+        }
       } catch (err) {
         console.warn('Cancel notification error:', err);
       }
     };
 
-    if (isWorkoutActive && workoutStartTime) {
+    if (isWorkoutActive) {
       showNotification();
-      const interval = setInterval(() => showNotification(), 30000); // Update setiap 30 detik
       return () => {
-        clearInterval(interval);
         // Jangan cancel di sini — cancel hanya saat workout benar-benar selesai
       };
     } else {
@@ -1184,10 +1257,14 @@ export default function App() {
         if (currentUser.uid !== cached) {
           setIsDataLoaded(false);
           setIsHistoryLoaded(false);
+          // Akun berganti: cache & baseline milik akun sebelumnya tidak boleh dipakai sebagai
+          // pembanding untuk data akun ini (bisa menimpa data orang lain / menahan data sendiri).
+          setHistoryBaseline(null);
+          setMainBaseline(null);
+          localStorage.removeItem('__CACHED_HISTORY');
         }
         lastLocalWriteAt.current = 0;
-        lastLocalHistoryWriteAt.current = 0;
-        setUser({ 
+        setUser({
            uid: currentUser.uid, 
            email: currentUser.email, 
            name: currentUser.displayName || 'Sobat Logym',
@@ -1196,6 +1273,8 @@ export default function App() {
         localStorage.setItem('__CACHED_UID', currentUser.uid);
       } else {
         localStorage.removeItem('__CACHED_UID');
+        setHistoryBaseline(null);
+        setMainBaseline(null);
         setUser(null);
         setIsDataLoaded(true);
         setIsHistoryLoaded(true);
@@ -1205,8 +1284,7 @@ export default function App() {
         // PENTING: Reset timestamp debounce supaya reset state ini tidak 
         // dianggap sebagai "perubahan lokal baru" yang memblokir sinkronisasi onSnapshot
         lastLocalWriteAt.current = 0;
-        lastLocalHistoryWriteAt.current = 0;
-        
+
         setExerciseLogs({});
         setExtraExercises([]);
         setSkippedExercises({});
@@ -1249,12 +1327,28 @@ export default function App() {
   // datang. Tampilkan di UI supaya ketahuan dan bisa dilaporkan.
   const [cloudSaveError, setCloudSaveError] = useState(null);
 
+  // Baseline per-field dokumen utama — kondisi terakhir yang diketahui tersimpan di server.
+  // Ikut persist dengan alasan yang sama seperti baseline history: kalau mulai kosong tiap
+  // boot, save pertama mengirim SELURUH isi dokumen lagi dan kita kembali ke perilaku
+  // "device terakhir menang" yang justru mau dihilangkan.
+  const mainBaselineRef = useRef(JSON.parse(localStorage.getItem('__CACHED_MAIN_BASE') || 'null'));
+  const setMainBaseline = (next) => {
+     mainBaselineRef.current = next;
+     try {
+        if (next) localStorage.setItem('__CACHED_MAIN_BASE', JSON.stringify(next));
+        else localStorage.removeItem('__CACHED_MAIN_BASE');
+     } catch { /* storage penuh — kembali ke perilaku lama, tidak fatal */ }
+  };
+
   useEffect(() => {
     let unsubscribeMain = null;
     let unsubscribeHistory = null;
 
-    // Baseline diff milik user sebelumnya tidak berlaku lagi
-    lastSavedHistoryJson.current = null;
+    // CATATAN: baseline history SENGAJA tidak di-reset di sini. Effect ini juga jalan di
+    // setiap boot biasa, dan baseline yang ikut persist bareng __CACHED_HISTORY justru harus
+    // bertahan lintas restart supaya rekonsiliasi bisa membedakan "perubahan lokal belum
+    // terkirim" dari "salinan basi". Resetnya dilakukan di onAuthStateChanged, hanya saat
+    // akunnya benar-benar berganti.
     hasSyncedMainRef.current = false;
     hasSyncedHistoryRef.current = false;
 
@@ -1278,7 +1372,7 @@ export default function App() {
       unsubscribeMain = onSnapshot(mainDocRef, async (docSnap) => {
         if (docSnap.exists()) {
           isUpdatingFromServer.current = true;
-          isExecutingSnapshot.current = true;
+          isExecutingSnapshot.current++;
           try {
             const data = docSnap.data();
 
@@ -1322,7 +1416,7 @@ export default function App() {
               // Seed baseline diff dari hasil migrasi (jalur ini menulis year docs sendiri di bawah)
               const migratedBase = {};
               Object.keys(migratedHistory).forEach(d => { migratedBase[d] = serializeDay(migratedHistory[d]); });
-              lastSavedHistoryJson.current = migratedBase;
+              setHistoryBaseline(migratedBase);
 
               const historyByYear = {};
               Object.keys(migratedHistory).forEach(dateStr => {
@@ -1467,9 +1561,12 @@ export default function App() {
           } catch (err) {
             console.error("Parse Error saat load data utama (MENCEGAH AUTO-SAVE UNTUK MENGHINDARI DATA HILANG):", err);
             setHasParseError(true);
+          } finally {
+            // finally, BUKAN setelah blok try: jalur `return` awal (akun kena ban) dulu
+            // melewati baris ini dan meninggalkan counter tidak pernah turun.
+            isExecutingSnapshot.current--;
           }
 
-          isExecutingSnapshot.current = false;
           setIsDataLoaded(true);
           hasSyncedMainRef.current = true;
           setTimeout(() => { isUpdatingFromServer.current = false; }, 3000); // diperpanjang untuk cegah race condition auto-save
@@ -1483,49 +1580,43 @@ export default function App() {
           hasSyncedMainRef.current = true;
         }
       }, (error) => {
-        console.error("Gagal menarik data utama:", error);
-        setHasParseError(true);
+        // BUKAN parse error. Ini kegagalan transport (jaringan putus, izin sesaat, listener
+        // dilepas) — datanya di server baik-baik saja. Dulu di sini setHasParseError(true),
+        // yang mematikan KEDUA auto-save untuk seumur sesi tanpa pernah di-reset dan tanpa
+        // tanda apa pun di layar: user terus latihan dan tidak ada satu pun yang tersimpan.
+        // Auto-save dibiarkan hidup — Firestore sendiri yang antre offline dan mengirim ulang.
+        console.error("Gagal menarik data utama (transport):", error);
+        setCloudSaveError(`Koneksi ke cloud bermasalah: ${error?.message || error}. Perubahan disimpan lokal dan dikirim ulang otomatis.`);
         setIsDataLoaded(true);
       });
 
       unsubscribeHistory = onSnapshot(historyDocRef, (docSnap) => {
         if (docSnap.exists()) {
            isUpdatingFromServer.current = true;
-           isExecutingSnapshot.current = true;
+           isExecutingSnapshot.current++;
            try {
              const data = docSnap.data();
-             // Seed baseline diff: tanggal yang datang dari server dianggap sudah tersimpan,
-             // sehingga auto-save berikutnya hanya mengirim tanggal yang benar-benar berubah.
-             const base = { ...(lastSavedHistoryJson.current || {}) };
-             Object.keys(data).forEach(d => { base[d] = serializeDay(data[d]); });
-             lastSavedHistoryJson.current = base;
-             
-             if (!isRecentLocalWrite(lastLocalHistoryWriteAt)) {
-                setHistory(prev => {
-                   const newState = { ...prev };
-                   Object.keys(data).forEach(d => {
-                      const existingDay = newState[d] || {};
-                      newState[d] = {
-                         ...data[d],
-                         ...(existingDay._activeSession ? { _activeSession: existingDay._activeSession } : {})
-                      };
-                   });
-                   const finalState = JSON.stringify(prev) === JSON.stringify(newState) ? prev : newState;
-                   localStorage.setItem('__CACHED_HISTORY', JSON.stringify(finalState));
-                   return finalState;
-                });
-             }
+
+             // Rekonsiliasi per tanggal berbasis ISI, bukan waktu — lihat utils/historySync.js
+             // untuk alasan lengkapnya dan tesnya.
+             setHistory(prev => {
+                const { next, baseline, kept } = reconcileHistory(prev, data, lastSavedHistoryJson.current);
+                setHistoryBaseline(baseline);
+                if (kept.length > 0) console.log('[Sync] Perubahan lokal dipertahankan, belum terkirim:', kept);
+                return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+             });
            } catch (err) {
              console.error("Parse Error saat load history tahun ini:", err);
              setHasParseError(true);
            }
-           isExecutingSnapshot.current = false;
+           isExecutingSnapshot.current--;
            setTimeout(() => { isUpdatingFromServer.current = false; }, 3000);
         }
         hasSyncedHistoryRef.current = true;
         setIsHistoryLoaded(true);
       }, (error) => {
-         console.error("Gagal menarik history tahun ini:", error);
+         console.error("Gagal menarik history tahun ini (transport):", error);
+         setCloudSaveError(`Koneksi ke cloud bermasalah: ${error?.message || error}. Perubahan disimpan lokal dan dikirim ulang otomatis.`);
          setIsHistoryLoaded(true);
       });
 
@@ -1572,31 +1663,57 @@ export default function App() {
           console.log('[Auto-save] Belum sinkron dari server — skip save, tunggu snapshot pertama selesai.');
           return;
         }
-        // SAFETY: Jangan simpan ke Firestore jika programs masih sama dengan defaultPrograms —
-        // ini indikasi data user belum selesai di-load dari server (race condition).
-        // Biarkan onSnapshot selesai dulu, baru auto-save boleh jalan.
-        if (JSON.stringify(programs) === JSON.stringify(defaultPrograms)) {
-          console.warn('[Auto-save] Programs masih default — skip save, tunggu load Firestore selesai.');
-          return;
-        }
+        // Dulu di sini ada guard `programs === defaultPrograms` yang maksudnya mencegah nulis
+        // sebelum data server datang. Itu SUDAH dikerjakan hasSyncedMainRef di atas, sementara
+        // guard lamanya memblokir SELURUH dokumen ini — bukan cuma programs, tapi juga
+        // exerciseLibrary, userAchievements, dan seluruh settings (gymProfiles, userProfile,
+        // units, dst). Akun yang programnya kebetulan masih persis default jadi tidak pernah
+        // bisa menyimpan gym baru atau preferensi apa pun. Dibuang, jangan dihidupkan lagi.
         const mainDocRef = doc(db, "logym_users", user.uid);
 
         // Simpan Profil & Program ke Dokumen Utama.
         // try/catch WAJIB: setDoc melempar SINKRON (bukan promise rejection) kalau datanya
         // mengandung undefined — .catch() saja tidak pernah kena, dan errornya lenyap tanpa jejak.
+        // Kirim HANYA field yang berubah di device ini. Dulu seluruh isi dokumen dikirim tiap
+        // kali menyimpan — termasuk field yang device ini tidak pernah sentuh — jadi device
+        // terakhir yang menyimpan selalu menang untuk SEMUA setting sekaligus. Itu yang bikin
+        // gym baru di satu device lenyap gara-gara device lain sekadar mengubah tema.
+        // `settings` dikirim sebagai map parsial: setDoc merge menggabungkan map bersarang,
+        // jadi key settings yang tidak disebut tetap utuh di server.
+        const localMain = {
+          programs, exerciseLibrary, userAchievements,
+          theme, language, soundEnabled, healthConnectEnabled, defaultRestTime, warmupVideos,
+          cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard,
+          unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, userProfile,
+          userApiKeys: (userApiKeys || []).filter(k => k && k.trim()),
+          logiPersona, logiCustomInstruction, logiMemory
+        };
+        const { changed, nextBaseline, changedKeys } = diffFields(localMain, mainBaselineRef.current);
+        if (changedKeys.length === 0) return; // tidak ada yang berubah — jangan tulis apa pun
+
+        const { programs: pChanged, exerciseLibrary: lChanged, userAchievements: aChanged, ...settingsChanged } = changed;
+        const payload = { updatedAt: new Date().toISOString() };
+        if (pChanged !== undefined) payload.programs = pChanged;
+        if (lChanged !== undefined) payload.exerciseLibrary = lChanged;
+        if (aChanged !== undefined) payload.userAchievements = aChanged;
+        if (Object.keys(settingsChanged).length > 0) payload.settings = settingsChanged;
+
+        const prevBaseline = mainBaselineRef.current;
+        setMainBaseline(nextBaseline);
+        // try/catch WAJIB: setDoc melempar SINKRON (bukan promise rejection) kalau datanya
+        // mengandung undefined — .catch() saja tidak pernah kena, dan errornya lenyap tanpa jejak.
         try {
-          return setDoc(mainDocRef, {
-            programs,
-            exerciseLibrary,
-            settings: { theme, language, soundEnabled, healthConnectEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, userProfile, userApiKeys: (userApiKeys || []).filter(k => k && k.trim()), logiPersona, logiCustomInstruction, logiMemory },
-            userAchievements,
-            updatedAt: new Date().toISOString()
-          }, { merge: true })
+          return setDoc(mainDocRef, payload, { merge: true })
             .then(() => setCloudSaveError(null))
-            .catch(err => { console.error("Auto-save Cloud gagal:", err); setCloudSaveError(err?.message || String(err)); });
+            .catch(err => {
+              console.error("Auto-save Cloud gagal:", err);
+              setCloudSaveError(err?.message || String(err));
+              setMainBaseline(prevBaseline); // gagal kirim — jangan anggap tersimpan
+            });
         } catch (err) {
           console.error("Auto-save Cloud gagal (sync):", err);
           setCloudSaveError(err?.message || String(err));
+          setMainBaseline(prevBaseline);
         }
       };
       const timer = setTimeout(attemptSave, 2000);
@@ -1610,7 +1727,20 @@ export default function App() {
 
   // Baseline serialisasi per tanggal — merepresentasikan kondisi terakhir yang tersimpan di server.
   // Tanggal yang serialisasinya sama dengan baseline tidak perlu dikirim ulang.
-  const lastSavedHistoryJson = useRef(null);
+  //
+  // WAJIB ikut persist bareng __CACHED_HISTORY. Rekonsiliasi di listener history memakai
+  // baseline untuk membedakan "lokal punya perubahan yang belum terkirim" dari "lokal cuma
+  // salinan basi". Kalau baseline mulai kosong tiap boot sementara cache sudah terisi, SEMUA
+  // tanggal cache terlihat seperti perubahan lokal dan snapshot server selalu ditolak —
+  // persis kebalikan dari yang kita mau.
+  const lastSavedHistoryJson = useRef(JSON.parse(localStorage.getItem('__CACHED_HISTORY_BASE') || 'null'));
+  const setHistoryBaseline = (next) => {
+     lastSavedHistoryJson.current = next;
+     try {
+        if (next) localStorage.setItem('__CACHED_HISTORY_BASE', JSON.stringify(next));
+        else localStorage.removeItem('__CACHED_HISTORY_BASE');
+     } catch { /* storage penuh — baseline balik ke perilaku lama, tidak fatal */ }
+  };
   // maxWait buat debounce di bawah — lihat komentar di titik pemakaiannya.
   const historyBurstStart = useRef(0);
   const HISTORY_SAVE_MAX_WAIT = 8000;
@@ -1633,6 +1763,7 @@ export default function App() {
         const baseline = lastSavedHistoryJson.current || {};
         const newBaseline = { ...baseline };
         const dirtyByYear = {};
+        const deletedDates = [];
 
         Object.keys(history).forEach(dateStr => {
            const json = serializeDay(history[dateStr]);
@@ -1643,11 +1774,28 @@ export default function App() {
 
            if (history[dateStr] && history[dateStr]._delete) {
                dirtyByYear[year][dateStr] = deleteField();
+               deletedDates.push(dateStr);
            } else if (history[dateStr] && typeof history[dateStr] === 'object') {
                // _activeSession adalah state sementara per-device — JANGAN sinkron ke cloud.
                // deleteField() sekaligus membersihkan salinan lama yang terlanjur tersimpan di server.
                const { _activeSession, ...dayData } = history[dateStr];
-               dirtyByYear[year][dateStr] = { ...dayData, _activeSession: deleteField() };
+               dirtyByYear[year][dateStr] = {
+                  ...dayData,
+                  // ARRAY -> MAP ber-key id. Array tidak bisa di-merge Firestore: menulis
+                  // seluruh array berarti device ini memutuskan nasib SEMUA sesi hari itu,
+                  // termasuk yang dibuat device lain dan belum pernah dia lihat. Sebagai map,
+                  // Firestore menggabungkan per-sesi. Sesi yang memang dihapus user harus
+                  // disebut eksplisit lewat deleteField(), karena key yang tidak disebut
+                  // sekarang dibiarkan hidup.
+                  ...(dayData.workouts !== undefined ? {
+                     workouts: workoutsToMap(
+                        dayData.workouts,
+                        workoutIdsFromBaseline(baseline[dateStr]),
+                        deleteField()
+                     )
+                  } : {}),
+                  _activeSession: deleteField()
+               };
            } else {
                dirtyByYear[year][dateStr] = history[dateStr];
            }
@@ -1657,15 +1805,22 @@ export default function App() {
         const dirtyYears = Object.keys(dirtyByYear);
         if (dirtyYears.length === 0) return; // tidak ada perubahan — jangan tulis apa pun
 
-        lastSavedHistoryJson.current = newBaseline;
+        setHistoryBaseline(newBaseline);
+        const failedYears = new Set();
         const writes = dirtyYears.map(year => {
            const yearRef = doc(db, "logym_users", user.uid, "history_years", year);
            // Batalkan baseline tanggal yang gagal supaya dicoba lagi pada save berikutnya
            const rollback = (err, label) => {
+              failedYears.add(year);
               console.error(`Auto-save History ${year} gagal${label}:`, err);
               setCloudSaveError(err?.message || String(err));
               if (lastSavedHistoryJson.current) {
-                 Object.keys(dirtyByYear[year]).forEach(d => { delete lastSavedHistoryJson.current[d]; });
+                 const rolled = { ...lastSavedHistoryJson.current };
+                 Object.keys(dirtyByYear[year]).forEach(d => { delete rolled[d]; });
+                 // Lewat helper, bukan mutasi langsung — kalau tidak, salinan yang di
+                 // localStorage tetap menganggap tanggal itu sudah tersimpan, dan setelah
+                 // restart tanggal yang gagal kirim itu tidak pernah dicoba lagi.
+                 setHistoryBaseline(rolled);
               }
            };
            // try/catch WAJIB: setDoc melempar SINKRON kalau data mengandung undefined —
@@ -1681,7 +1836,26 @@ export default function App() {
            }
         });
         historyBurstStart.current = 0;
-        return Promise.all(writes);
+        return Promise.all(writes).then(() => {
+           // Penanda {_delete:true} dulu menetap selamanya di state DAN di __CACHED_HISTORY.
+           // Tiap boot berikutnya baseline kosong untuk tanggal itu, jadi dianggap berubah dan
+           // deleteField() dikirim LAGI — kalau sementara itu device lain membuat data baru di
+           // tanggal itu, device ini menghapusnya. Setelah benar-benar terkirim, buang.
+           // HANYA yang tulisannya sukses. rollback() menelan error-nya supaya Promise.all
+           // tetap resolve, jadi tanpa cek ini penanda bisa terbuang padahal tanggalnya belum
+           // pernah benar-benar terhapus di server.
+           const sent = deletedDates.filter(d => !failedYears.has(d.substring(0, 4)));
+           if (sent.length === 0) return;
+           setHistory(prev => {
+              const next = { ...prev };
+              let changed = false;
+              sent.forEach(d => { if (next[d]?._delete) { delete next[d]; changed = true; } });
+              return changed ? next : prev;
+           });
+           const cleaned = { ...(lastSavedHistoryJson.current || {}) };
+           sent.forEach(d => { delete cleaned[d]; });
+           setHistoryBaseline(cleaned);
+        });
       };
       // Debounce dengan maxWait: efek ini ngulang tiap `history` dapat reference baru, dan
       // reset timer 2 detiknya tiap kali. Kalau `history` terus berubah lebih cepat dari 2
@@ -2428,23 +2602,39 @@ export default function App() {
         }
         // --- END UPDATE LAST WEIGHT ---
 
+        const activateWorkoutFromCard = () => {
+           let prevSecsToUse = resumeDurationSecs || 0;
+           if (!prevSecsToUse) {
+              const todayData = history[selectedDate];
+              if (todayData && todayData.workouts) {
+                 const progId = sessionToRun || activeProgramId;
+                 const wInHistory = todayData.workouts.find(w => w.programId === progId || w.id === progId || (progId === 'extra' && w.programId === 'adhoc'));
+                 if (wInHistory && wInHistory.duration) {
+                    if (typeof wInHistory.duration === 'number') prevSecsToUse = wInHistory.duration * 60;
+                    else if (typeof wInHistory.duration === 'string') {
+                       const parts = wInHistory.duration.split(':').map(Number);
+                       if (parts.length === 3) prevSecsToUse = (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
+                       else if (parts.length === 2) prevSecsToUse = (parts[0] || 0) * 60 + (parts[1] || 0);
+                    }
+                 }
+              }
+           }
+           setSessionSnapshot({ exerciseLogs: JSON.parse(JSON.stringify(exerciseLogs)), skippedExercises: JSON.parse(JSON.stringify(skippedExercises)), extraExercises: JSON.parse(JSON.stringify(extraExercises)) });
+           setIsWorkoutActive(true);
+           setWorkoutStartTime(Date.now() - (prevSecsToUse * 1000));
+           setResumeDurationSecs(0);
+        };
+
         if (!isSuperset || isSupersetComplete) {
-          setRestTimer(programRestTime); // Legacy fallback
           setRestTargetTime(Date.now() + (programRestTime * 1000));
           if (!isWorkoutActive) {
-            setSessionSnapshot({ exerciseLogs: JSON.parse(JSON.stringify(exerciseLogs)), skippedExercises: JSON.parse(JSON.stringify(skippedExercises)), extraExercises: JSON.parse(JSON.stringify(extraExercises)) });
-            setIsWorkoutActive(true);
-            setWorkoutStartTime(Date.now() - (resumeDurationSecs * 1000));
-            setResumeDurationSecs(0);
+            activateWorkoutFromCard();
           }
         } else if (isSuperset) {
           setShowSupersetToast(true);
           setTimeout(() => setShowSupersetToast(false), 3000);
           if (!isWorkoutActive) {
-            setSessionSnapshot({ exerciseLogs: JSON.parse(JSON.stringify(exerciseLogs)), skippedExercises: JSON.parse(JSON.stringify(skippedExercises)), extraExercises: JSON.parse(JSON.stringify(extraExercises)) });
-            setIsWorkoutActive(true);
-            setWorkoutStartTime(Date.now() - (resumeDurationSecs * 1000));
-            setResumeDurationSecs(0);
+            activateWorkoutFromCard();
           }
         }
       }
@@ -2614,8 +2804,7 @@ export default function App() {
             setIsWorkoutActive(false);
             setWorkoutStartTime(null);
             setRestTargetTime(null);
-            setRestTimer(0);
-              const targetDateStr = selectedDate;
+            const targetDateStr = selectedDate;
             
             let restoredLogs = {};
             let restoredSkipped = {};
@@ -2652,26 +2841,22 @@ export default function App() {
   const handleSaveWorkout = (progId) => {
     playSoundEffect('success', soundEnabled);
     const durationSecs = workoutStartTime ? Math.floor((Date.now() - workoutStartTime) / 1000) : 0;
+    // Penulisan ke Health Connect SENGAJA tidak dilakukan di sini.
+    //
+    // Dulu di titik ini sesi ditulis langsung ke HC TANPA dedupeKey, padahal runHcSync juga
+    // menulis sesi yang sama dengan dedupeKey: w.id. Memo dedupe-nya belum ada (yang pertama
+    // tidak menaruh memo), jadi sinkron berikutnya menulisnya LAGI — dua record untuk satu
+    // sesi, dan HC tidak bisa menghapus record lewat plugin ini, jadi duplikatnya permanen.
+    // Lebih buruk lagi keduanya memakai rumus berbeda: yang di sini calculateWorkoutCalories
+    // (durasi x MET, kasar), yang di runHcSync calculateSmartWorkoutCalories (berbasis set,
+    // sama dengan yang ditampilkan UI) — jadi angka di Samsung Health tidak pernah cocok
+    // dengan angka di Logym, dan ada dua-duanya.
+    //
+    // Sekarang satu penulis saja: runHcSync. Dia butuh sesinya sudah masuk `history` dulu
+    // (id-nya baru ada setelah setHistory di bawah), makanya ditandai di sini dan dieksekusi
+    // oleh efek yang menunggu history berubah.
     if (healthConnectEnabled && workoutStartTime && durationSecs >= 60) {
-      const kcal = calculateWorkoutCalories(userProfile?.weight, durationSecs / 60);
-      const startISO = new Date(workoutStartTime).toISOString();
-      const endISO = new Date().toISOString();
-      hcWriteWorkoutCalories(startISO, endISO, kcal);
-      // Sesi latihan formal (jenis olahraga + durasi) supaya kebaca app lain sebagai "Workout",
-      // bukan cuma angka kalori. Lewat plugin lokal ExerciseWriterPlugin.kt.
-      // Daftar latihan dirakit sama seperti yang nanti dibekukan ke riwayat di bawah, biar
-      // jenis olahraganya (kardio vs beban) ditebak dari isi sesi yang sebenarnya.
-      const srcProg = programs.find((pr) => pr.id === resolveProjectedProgramId(progId));
-      const sessionExercises = [...(srcProg?.exercises || []), ...(extraExercises || [])];
-      const sessionTitle = progId === 'extra' ? 'Ekstra' : (srcProg?.name || 'Latihan Logym');
-      hcRequestWorkoutWritePermission().then((ok) => {
-        if (ok) hcWriteWorkoutSession({
-          startDate: startISO,
-          endDate: endISO,
-          exerciseType: guessWorkoutType(sessionExercises),
-          title: sessionTitle,
-        });
-      });
+      hcPushAfterSave.current = true;
     }
     const formatDur = (secs) => {
       const h = Math.floor(secs / 3600);
@@ -2683,10 +2868,12 @@ export default function App() {
     setIsWorkoutActive(false);
     setWorkoutStartTime(null);
     setRestTargetTime(null);
-    setRestTimer(0);
+
     // setExerciseLogs({});
     // setSkippedExercises({});
-    setExtraExercises([]);
+    // Latihan ekstra milik sesi adhoc ("Ekstra"), bukan sesi program. Menyelesaikan sesi program
+    // tidak boleh ikut menghapusnya — dulu itu bikin kartu Ekstra lenyap sebelum sempat disimpan.
+    if (progId === 'extra') setExtraExercises([]);
     setSessionSnapshot(null);
 
     const targetDateStr = selectedDate;
@@ -2721,8 +2908,12 @@ export default function App() {
             duration: formatDur(durationSecs)
           };
         } else {
-          // Check if there's an already completed adhoc session being edited (focusWorkoutId)
-          const completedAdhocIdx = workouts.findIndex(w => w.id === focusWorkoutId && w.programId === 'adhoc');
+          // Sesi adhoc yang sudah 'completed' lalu ditambah lagi di hari yang sama.
+          // focusWorkoutId untuk adhoc selalu bernilai 'extra' (lihat handleResume/handleStart),
+          // bukan id aslinya (`adhoc_123…`) — mencocokkan w.id saja tidak pernah kena, dan
+          // hasilnya entri adhoc kedua yang isinya log yang sama persis (riwayat & kalori dobel).
+          const isSameAdhoc = (w) => w.programId === 'adhoc' && (w.id === focusWorkoutId || focusWorkoutId === 'extra');
+          const completedAdhocIdx = workouts.map((w, i) => (isSameAdhoc(w) ? i : -1)).filter(i => i >= 0).pop() ?? -1;
           if (completedAdhocIdx >= 0) {
               const existingW = workouts[completedAdhocIdx];
               let existingSecs = 0;
@@ -2783,11 +2974,9 @@ export default function App() {
               if (srcProg?.exercises?.length > 0) frozenExercises = JSON.parse(JSON.stringify(srcProg.exercises));
               else frozenExercises = [];
             }
-            if (extraExercises && extraExercises.length > 0) {
-                const existingIds = new Set(frozenExercises.map(e => e.id));
-                const newExtras = extraExercises.filter(e => !existingIds.has(e.id));
-                frozenExercises = [...frozenExercises, ...JSON.parse(JSON.stringify(newExtras))];
-            }
+            // Latihan ekstra TIDAK digabung ke sini: WorkoutTab tidak pernah mengikutkannya ke
+            // sesi program (lihat prop extraExercises), jadi menyerapnya ke riwayat program
+            // cuma bikin kartu "Ekstra" hilang tanpa jejak. Extras disimpan lewat sesi adhoc.
 
             // Proteksi agar durasi tidak kereset, bisanya cuma nambah
             let existingSecs = 0;
@@ -2843,11 +3032,6 @@ export default function App() {
                 if (srcProg?.exercises?.length > 0) frozenExercises = JSON.parse(JSON.stringify(srcProg.exercises));
                 else frozenExercises = [];
               }
-              if (extraExercises && extraExercises.length > 0) {
-                  const existingIds = new Set(frozenExercises.map(e => e.id));
-                  const newExtras = extraExercises.filter(e => !existingIds.has(e.id));
-                  frozenExercises = [...frozenExercises, ...JSON.parse(JSON.stringify(newExtras))];
-              }
               let existingSecs = 0;
               if (existingW.duration) {
                 if (typeof existingW.duration === 'number') existingSecs = existingW.duration * 60;
@@ -2864,7 +3048,6 @@ export default function App() {
                 status: 'completed',
                 log: cleanLogs,
                 skipped: cleanSkipped,
-                exercises: cleanExtra,
                 timestamp: `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`,
                 duration: formatDur(finalSecs),
                 ...(frozenExercises ? { overriddenExercises: frozenExercises } : {})
@@ -2884,7 +3067,7 @@ export default function App() {
                  programName: pName,
                  status: 'completed',
                  log: cleanLogs,
-                 skipped: skippedExercises,
+                 skipped: cleanSkipped,
                  timestamp: `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`,
                  duration: durationSecs > 0 ? formatDur(durationSecs) : '00:00',
                  ...(p?.exercises?.length > 0 ? { overriddenExercises: JSON.parse(JSON.stringify(p.exercises)) } : {})
@@ -2893,7 +3076,15 @@ export default function App() {
         }
       }
       
-      h[targetDateStr] = { ...dayData, workouts, _activeSession: { ...(dayData._activeSession || {}), extraExercises: [] } };
+      // Sama seperti state di atas: extras cuma dikosongkan kalau sesi Ekstra-nya yang diselesaikan.
+      h[targetDateStr] = {
+        ...dayData,
+        workouts,
+        _activeSession: {
+          ...(dayData._activeSession || {}),
+          ...(progId === 'extra' ? { extraExercises: [] } : {})
+        }
+      };
       
       // --- SINKRONISASI KALORI DENGAN LOMEAL ---
       // Hitung kalori hari ini seketika agar langsung dikirim ke server oleh auto-save,
@@ -3068,7 +3259,7 @@ export default function App() {
              setIsWorkoutActive(false);
              setWorkoutStartTime(null);
              setRestTargetTime(null);
-             setRestTimer(0);
+
              setTimeout(doEdit, 100);
           },
           discardText: 'Buang Perubahan'
@@ -3255,15 +3446,26 @@ export default function App() {
     >
       <ConfirmModal confirmModal={confirmModal} setConfirmModal={setConfirmModal} t={t} lang={lang} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} />
 
-      {cloudSaveError && (
+      {/* hasParseError mematikan KEDUA auto-save sampai app dibuka ulang. Dulu itu terjadi
+          diam-diam — layar terlihat normal padahal tidak ada yang tersimpan. Sekarang wajib
+          kelihatan, dan sengaja TIDAK bisa ditutup selama kondisinya masih aktif. */}
+      {(hasParseError || cloudSaveError) && (
         <div className="fixed top-[calc(1rem+env(safe-area-inset-top,0px))] left-1/2 -translate-x-1/2 z-[9999] w-[92%] max-w-md p-3 px-4 rounded-2xl bg-rose-600 text-white shadow-2xl flex items-start gap-2.5 animate-in slide-in-from-top-4 fade-in duration-300">
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-black mb-0.5">Gagal menyimpan ke cloud</p>
-            <p className="text-[11px] leading-snug text-white/85 break-words">{cloudSaveError}</p>
+            <p className="text-xs font-black mb-0.5">
+              {hasParseError ? 'Perubahan TIDAK tersimpan' : 'Gagal menyimpan ke cloud'}
+            </p>
+            <p className="text-[11px] leading-snug text-white/85 break-words">
+              {hasParseError
+                ? 'Data dari server tidak terbaca, jadi penyimpanan otomatis dimatikan supaya data lamamu tidak tertimpa. Tutup dan buka ulang app. Jangan latihan dulu sebelum pesan ini hilang.'
+                : cloudSaveError}
+            </p>
           </div>
-          <button onClick={() => setCloudSaveError(null)} className="shrink-0 p-1 rounded-full text-white/70 hover:text-white hover:bg-white/10">
-            <X size={14} />
-          </button>
+          {!hasParseError && (
+            <button onClick={() => setCloudSaveError(null)} className="shrink-0 p-1 rounded-full text-white/70 hover:text-white hover:bg-white/10">
+              <X size={14} />
+            </button>
+          )}
         </div>
       )}
       <AddExerciseModal t={t} lang={lang} activeAddModalTarget={activeAddModalTarget} setActiveAddModalTarget={setActiveAddModalTarget} exerciseLibrary={exerciseLibrary} onAddExerciseTarget={addExerciseTarget} setActiveTab={setActiveTab} />
@@ -3426,8 +3628,8 @@ export default function App() {
                workoutStartTime={workoutStartTime} setWorkoutStartTime={setWorkoutStartTime}
                restTargetTime={restTargetTime} setRestTargetTime={setRestTargetTime}
                isImmersiveMode={isImmersiveMode} setIsImmersiveMode={setIsImmersiveMode}
-               restTimer={restTimer} setRestTimer={setRestTimer}
                sessionToRun={sessionToRun} setSessionToRun={setSessionToRun}
+               onSessionExercises={setSessionExercises}
                resumeDurationSecs={resumeDurationSecs} setResumeDurationSecs={setResumeDurationSecs}
                showSupersetToast={showSupersetToast}
                
@@ -3494,7 +3696,7 @@ export default function App() {
       </main>
 
       <FloatingTimer 
-        restTimer={restTimer} setRestTimer={setRestTimer} defaultRestTime={defaultRestTime} 
+        restTargetTime={restTargetTime} setRestTargetTime={setRestTargetTime} defaultRestTime={defaultRestTime} 
         t={t} soundEnabled={soundEnabled} 
         isWorkoutActive={isWorkoutActive} activeTab={activeTab} 
         setActiveTab={setActiveTab} workoutStartTime={workoutStartTime}
@@ -3502,7 +3704,7 @@ export default function App() {
         sessionToRun={sessionToRun} setSessionToRun={setSessionToRun}
         userProfile={userProfile}
         focusWorkoutId={focusWorkoutId} setFocusWorkoutId={setFocusWorkoutId}
-        exerciseLogs={exerciseLogs} exerciseLibrary={exerciseLibrary}
+        exerciseLogs={exerciseLogs} sessionExercises={sessionExercises}
       />
 
       {/* === GLOBAL COACH LOGI FLOAT === */}

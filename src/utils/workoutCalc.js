@@ -21,6 +21,55 @@ export const parseWorkoutDurationMinutes = (duration) => {
   return 0;
 };
 
+/**
+ * Ambil [durasi menit, jarak km] dari satu set, apapun bentuk penyimpanannya.
+ *
+ * Set KARDIO (ImmersiveWorkout/ExerciseCard mode cardio) menyimpan { duration: MENIT, distance: KM }.
+ * Set TIME non-kardio (plank dsb, label UI "Durasi (dtk)") menyimpan { d: DETIK }.
+ * Kalau set-nya kosong JANGAN jatuh ke ex.duration: itu default library (Treadmill 15 mnt,
+ * Sepeda/Renang 30 mnt) yang bikin satu centang setelah 20 detik dihitung ~150 kcal.
+ */
+const setDurationKm = (set) => {
+  if (set?.duration != null) return [Number(set.duration) || 0, Number(set.distance) || 0];
+  if (set?.d != null) return [(Number(set.d) || 0) / 60, Number(set.distance) || 0];
+  return [0, 0];
+};
+
+// Latihan berbasis waktu. Library punya dua penamaan ('time' & 'cardio'), keduanya bukan set beban.
+const isTimeBased = (ex) => ex?.type === 'time' || ex?.type === 'cardio';
+
+// MET kardio berdasar kecepatan rata-rata. Tanpa data jarak, pakai default sedang (7.0).
+const cardioMet = (durationMins, distKm) => {
+  if (!(distKm > 0) || !(durationMins > 0)) return 7.0;
+  const speedKmH = distKm / (durationMins / 60);
+  if (speedKmH <= 4) return 3.5;
+  if (speedKmH <= 6) return 5.0;
+  if (speedKmH <= 8) return 8.0;
+  if (speedKmH <= 10) return 9.8;
+  if (speedKmH <= 12) return 11.5;
+  return 12.0;
+};
+
+/**
+ * Kalori tambahan (di atas baseline MET 2.5) dari satu set yang sudah dicentang selesai.
+ * Dipakai sama persis oleh perhitungan live maupun riwayat supaya angkanya tidak beda antar layar.
+ */
+const setExtraCalories = (weight, ex, set) => {
+  if (isTimeBased(ex)) {
+    const [setDurMins, distKm] = setDurationKm(set);
+    return weight * Math.max(0, cardioMet(setDurMins, distKm) - 2.5) * (setDurMins / 60);
+  }
+  // BEBAN (Reps): Asumsi repetisi makan waktu rata-rata 4 detik per rep (TUT)
+  const reps = Number(set.r || ex.reps || 10);
+  const activeWorkMins = (reps * 4) / 60;
+  // Tambahan MET 3.5 (total WORKOUT_MET 6.0 - 2.5 baseline)
+  let setCal = weight * 3.5 * (activeWorkMins / 60);
+  // Bonus kalori dari beban yang diangkat (Force x Distance -> kcal)
+  const setWeight = Number(set.w || ex.defaultWeight || 0);
+  if (setWeight > 0) setCal += setWeight * reps * 0.006;
+  return setCal;
+};
+
 // Kata kunci nama latihan -> jenis olahraga Health Connect. Dipakai hanya kalau sesinya
 // MURNI kardio; sesi yang mengandung latihan beban selalu dianggap latihan beban.
 const CARDIO_KEYWORDS = [
@@ -49,7 +98,7 @@ const CARDIO_KEYWORDS = [
 export const guessWorkoutType = (exercises) => {
   const list = Array.isArray(exercises) ? exercises : [];
   if (list.length === 0) return 'strengthTraining';
-  const cardio = list.filter((e) => e?.type === 'time');
+  const cardio = list.filter(isTimeBased);
   // Ada latihan beban (murni atau campuran) -> latihan beban.
   if (cardio.length < list.length) return 'strengthTraining';
   const names = cardio.map((e) => e?.name || '').join(' ');
@@ -113,40 +162,7 @@ export const calculateSmartWorkoutCalories = (weightKg, workout, logs, globalRes
 
     exLogs.forEach(set => {
       // HANYA hitung kalori jika set benar-benar dicentang selesai
-      if (set.done) {
-        if (ex.type === 'time') {
-          // KARDIO (Waktu): Dinamis berdasar jarak/kecepatan
-          const setDurMins = Number(set.d || ex.duration || 0);
-          const distKm = Number(set.dist || 0);
-          let met = 7.0;
-          if (distKm > 0 && setDurMins > 0) {
-              const speedKmH = distKm / (setDurMins / 60);
-              // Estimasi MET lari/jogging berdasar kecepatan
-              if (speedKmH <= 4) met = 3.5;
-              else if (speedKmH <= 6) met = 5.0;
-              else if (speedKmH <= 8) met = 8.0;
-              else if (speedKmH <= 10) met = 9.8;
-              else if (speedKmH <= 12) met = 11.5;
-              else met = 12.0;
-          }
-          // Tambahan MET (total met - 2.5 baseline)
-          extraCalories += weight * Math.max(0, met - 2.5) * (setDurMins / 60);
-        } else {
-          // BEBAN (Reps): Asumsi repetisi makan waktu rata-rata 4 detik per rep (TUT)
-          const reps = Number(set.r || ex.reps || 10);
-          const activeWorkMins = (reps * 4) / 60;
-          
-          // Tambahan MET 3.5 (total WORKOUT_MET 6.0 - 2.5 baseline)
-          let setCal = weight * 3.5 * (activeWorkMins / 60);
-
-          // Bonus kalori dari beban yang diangkat (Force x Distance -> kcal)
-          const setWeight = Number(set.w || ex.defaultWeight || 0);
-          if (setWeight > 0) {
-             setCal += setWeight * reps * 0.006;
-          }
-          extraCalories += setCal;
-        }
-      }
+      if (set.done) extraCalories += setExtraCalories(weight, ex, set);
     });
   });
 
@@ -182,83 +198,10 @@ export const calculateLiveWorkoutCalories = (weightKg, exercises, logs, currentD
       if (!exLogs || !Array.isArray(exLogs)) return;
 
       exLogs.forEach(set => {
-        if (set.done) {
-          if (ex.type === 'time') {
-            const setDurMins = Number(set.d || ex.duration || 0);
-            const distKm = Number(set.dist || 0);
-            let met = 7.0;
-            if (distKm > 0 && setDurMins > 0) {
-                const speedKmH = distKm / (setDurMins / 60);
-                if (speedKmH <= 4) met = 3.5;
-                else if (speedKmH <= 6) met = 5.0;
-                else if (speedKmH <= 8) met = 8.0;
-                else if (speedKmH <= 10) met = 9.8;
-                else if (speedKmH <= 12) met = 11.5;
-                else met = 12.0;
-            }
-            // Tambahan MET (total met - 2.5 baseline)
-            extraCalories += weight * Math.max(0, met - 2.5) * (setDurMins / 60);
-          } else {
-            const reps = Number(set.r || ex.reps || 10);
-            const activeWorkMins = (reps * 4) / 60;
-            // Tambahan MET 3.5 (total WORKOUT_MET 6.0 - 2.5 baseline)
-            let setCal = weight * 3.5 * (activeWorkMins / 60);
-            
-            const setWeight = Number(set.w || ex.defaultWeight || 0);
-            if (setWeight > 0) {
-               setCal += setWeight * reps * 0.006;
-            }
-            extraCalories += setCal;
-          }
-        }
+        if (set.done) extraCalories += setExtraCalories(weight, ex, set);
       });
     });
   }
 
   return Math.round(baselineCalories + extraCalories);
 };
-
-/**
- * Estimasi kalori terbakar saat sesi LIVE berlangsung, dikhususkan untuk Card Mode (FloatingTimer).
- * Mengekstrak informasi exercise langsung dari exerciseLibrary berdasarkan kunci log.
- */
-export const calculateLiveCaloriesFromLogs = (weightKg, logs, exerciseLibrary, currentDurationSecs) => {
-  const weight = Number(weightKg) || 70;
-  const baselineCalories = weight * 2.5 * (currentDurationSecs / 3600);
-  
-  let extraCalories = 0;
-  
-  if (logs && exerciseLibrary) {
-    Object.keys(logs).forEach(logKey => {
-      const exLogs = logs[logKey];
-      if (!Array.isArray(exLogs)) return;
-
-      // logKey might be "101" or "101-prog-1". Extract the base ID:
-      const baseIdStr = logKey.split('-')[0];
-      const baseId = isNaN(parseInt(baseIdStr)) ? baseIdStr : parseInt(baseIdStr);
-      const ex = exerciseLibrary.find(e => e.id === baseId) || {};
-
-      exLogs.forEach(set => {
-        if (set.done) {
-          if (ex.type === 'time') {
-            const setDurMins = Number(set.d || ex.duration || 0);
-            extraCalories += weight * 4.5 * (setDurMins / 60);
-          } else {
-            const reps = Number(set.r || ex.reps || 10);
-            const activeWorkMins = (reps * 4) / 60;
-            let setCal = weight * 3.5 * (activeWorkMins / 60);
-            
-            const setWeight = Number(set.w || ex.defaultWeight || 0);
-            if (setWeight > 0) {
-               setCal += setWeight * reps * 0.006;
-            }
-            extraCalories += setCal;
-          }
-        }
-      });
-    });
-  }
-
-  return Math.round(baselineCalories + extraCalories);
-};
-
