@@ -1301,7 +1301,17 @@ export default function App() {
   // Ikut persist dengan alasan yang sama seperti baseline history: kalau mulai kosong tiap
   // boot, save pertama mengirim SELURUH isi dokumen lagi dan kita kembali ke perilaku
   // "device terakhir menang" yang justru mau dihilangkan.
-  const mainBaselineRef = useRef(JSON.parse(localStorage.getItem('__CACHED_MAIN_BASE') || 'null'));
+  // SENGAJA in-memory, TIDAK persist. Baseline hanya sah kalau state lokal yang dibandingkan
+  // ikut bertahan lintas reload. History memenuhi itu (__CACHED_HISTORY). Dokumen utama TIDAK:
+  // gymProfiles, activeGymId, activityTargets, dan userApiKeys tidak punya cache lokal dan
+  // balik ke default tiap boot. Kalau baselinenya persist, selisih "default vs terakhir
+  // disimpan" salah dibaca sebagai editan lokal baru — server ditolak, lalu daftar default
+  // dikirim menimpa data asli. Itu yang menghapus gym.
+  //
+  // Mulai null tiap boot berarti snapshot pertama selalu menang (benar: kita memang belum
+  // menyimpan apa pun sesi ini), dan save pertama sesudahnya idempoten karena state sudah
+  // sama dengan server.
+  const mainBaselineRef = useRef(null);
   // Boleh ambil nilai server untuk field ini? Ya, kalau nilai lokal masih sama dengan baseline
   // (tidak ada perubahan lokal yang belum terkirim). WAJIB dipanggil dari bentuk functional
   // setState: closure listener onSnapshot dibuat sekali saja (deps [user?.uid, isAuthChecking]),
@@ -1311,13 +1321,9 @@ export default function App() {
      if (base === undefined) return true; // belum pernah device ini simpan — server yang berlaku
      return stableStringify(prev) === base;
   };
-  const setMainBaseline = (next) => {
-     mainBaselineRef.current = next;
-     try {
-        if (next) localStorage.setItem('__CACHED_MAIN_BASE', JSON.stringify(next));
-        else localStorage.removeItem('__CACHED_MAIN_BASE');
-     } catch { /* storage penuh — kembali ke perilaku lama, tidak fatal */ }
-  };
+  const setMainBaseline = (next) => { mainBaselineRef.current = next; };
+  // Buang sisa kunci dari versi yang sempat mem-persist baseline ini (lihat catatan di atas).
+  try { localStorage.removeItem('__CACHED_MAIN_BASE'); } catch { /* diabaikan */ }
 
   useEffect(() => {
     let unsubscribeMain = null;
