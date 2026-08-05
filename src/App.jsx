@@ -58,15 +58,24 @@ import useDialog from './hooks/useDialog';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import UpdaterAlert from './components/UpdaterAlert';
 import { getLocalYMD, resolveProjectedProgramId, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos } from './data/constants';
-import { serializeDay, reconcileHistory, workoutsToMap, workoutIdsFromBaseline, diffFields } from './utils/historySync';
+import { serializeDay, reconcileHistory, workoutsToMap, workoutIdsFromBaseline, diffFields, stableStringify } from './utils/historySync';
 import { Loader2, Download, X } from 'lucide-react';
 
 // Kalau device ini baru aja nulis lokal (dalam LOCAL_WRITE_GUARD_MS terakhir), skip snapshot
 // yang masuk SEKALI SAJA — jangan diretry. Tulisan lokal yang masih pending bakal ke-upload
 // sendiri sebentar lagi dan memicu snapshot baru yang sudah benar; retry di sini yang dulu
 // bikin livelock (device saling nunda ke device lain tanpa henti).
-const LOCAL_WRITE_GUARD_MS = 3000;
-const isRecentLocalWrite = (lastWriteAtRef) => (Date.now() - lastWriteAtRef.current) <= LOCAL_WRITE_GUARD_MS;
+// Dulu di sini ada guard berbasis waktu (isRecentLocalWrite): snapshot server dibuang kalau
+// device ini menulis dalam 3 detik terakhir. Sama seperti di history, itu salah — dan di
+// dokumen utama akibatnya lebih halus tapi sama merusaknya: efek BMR memanggil
+// setActivityTargets (salah satu setter terjaga) tepat setelah snapshot memuat userProfile,
+// jadi stempelnya naik TANPA aksi user. Snapshot berikutnya membuang semua field terjaga,
+// termasuk gymProfiles — yang tidak punya cache lokal, jadi state-nya tinggal daftar default,
+// lalu terkirim menimpa gym asli di server. Itu penyebab "gym baru hilang".
+//
+// Penggantinya: putuskan per field berdasarkan ISI. Ambil nilai server kalau nilai lokal
+// masih sama dengan baseline (tidak ada perubahan lokal yang belum terkirim); kalau berbeda,
+// pertahankan yang lokal.
 
 export default function App() {
   // --- STATE AUTH & LOADING ---
@@ -238,15 +247,9 @@ export default function App() {
   const [healthConnectEnabled, setHealthConnectEnabled] = useState(false);
   const [defaultRestTime, setDefaultRestTime] = useState(120);
   const [warmupVideos, _setWarmupVideos] = useState(defaultWarmupVideos);
-  const setWarmupVideos = (val) => {
-      if (!isExecutingSnapshot.current) lastLocalWriteAt.current = Date.now();
-      _setWarmupVideos(val);
-  };
+  const setWarmupVideos = _setWarmupVideos;
   const [cooldownVideos, _setCooldownVideos] = useState(defaultCooldownVideos);
-  const setCooldownVideos = (val) => {
-      if (!isExecutingSnapshot.current) lastLocalWriteAt.current = Date.now();
-      _setCooldownVideos(val);
-  };
+  const setCooldownVideos = _setCooldownVideos;
   const [weekStartDay, setWeekStartDay] = useState(0); // 0: Sunday, 1: Monday
   const [defaultReminderTime, setDefaultReminderTime] = useState("15:00");
   const [reminderEnabled, setReminderEnabled] = useState(true);
@@ -254,44 +257,26 @@ export default function App() {
   const [unitSystem, setUnitSystem] = useState('metric'); // deprecated, kept for safety during transition
   const [units, setUnits] = useState({ weight: 'kg', height: 'cm', distance: 'km', temp: 'c' });
   const [userProfile, _setUserProfile] = useState(__previewUser ? null : __cachedProfile);
-  const setUserProfile = (val) => {
-      if (!isExecutingSnapshot.current) lastLocalWriteAt.current = Date.now();
-      _setUserProfile(val);
-  };
+  const setUserProfile = _setUserProfile;
 
   useEffect(() => {
     localStorage.setItem('__CACHED_PROFILE', JSON.stringify(userProfile));
   }, [userProfile]);
 
   const [gymProfiles, _setGymProfiles] = useState([{ id: 'default', name: 'Logym', equipment: 'all', config: {} }]);
-  const setGymProfiles = (val) => {
-      if (!isExecutingSnapshot.current) lastLocalWriteAt.current = Date.now();
-      _setGymProfiles(val);
-  };
+  const setGymProfiles = _setGymProfiles;
   const [activeGymId, _setActiveGymId] = useState('default');
-  const setActiveGymId = (val) => {
-      if (!isExecutingSnapshot.current) lastLocalWriteAt.current = Date.now();
-      _setActiveGymId(val);
-  };
+  const setActiveGymId = _setActiveGymId;
   const [userApiKeys, _setUserApiKeys] = useState([]);
-  const setUserApiKeys = (val) => {
-      if (!isExecutingSnapshot.current) lastLocalWriteAt.current = Date.now();
-      _setUserApiKeys(val);
-  };
+  const setUserApiKeys = _setUserApiKeys;
   const [keyStatuses, setKeyStatuses] = useState({});
   const [logiPersona, setLogiPersona] = useState('santai');
   const [logiCustomInstruction, setLogiCustomInstruction] = useState('');
   const [logiMemory, _setLogiMemory] = useState([]);
-  const setLogiMemory = (val) => {
-      if (!isExecutingSnapshot.current) lastLocalWriteAt.current = Date.now();
-      _setLogiMemory(val);
-  };
+  const setLogiMemory = _setLogiMemory;
   const [hasUnreadChat, setHasUnreadChat] = useState(false);
   const [activityTargets, _setActivityTargets] = useState({ steps: 10000, weeklyDuration: 150, sleep: 8 });
-  const setActivityTargets = (val) => {
-      if (!isExecutingSnapshot.current) lastLocalWriteAt.current = Date.now();
-      _setActivityTargets(val);
-  };
+  const setActivityTargets = _setActivityTargets;
 
   // TDEE hidup — dihitung ulang tiap biometrik/activityLevel berubah (termasuk dari sinkron
   // Lomeal), bukan dibekukan sejak onboarding kayak sebelumnya. Tunggu isDataLoaded biar gak
@@ -319,28 +304,18 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('__CACHED_EXERCISE_LIBRARY', JSON.stringify(exerciseLibrary));
   }, [exerciseLibrary]);
-  const setExerciseLibrary = (val) => {
-      if (!isExecutingSnapshot.current) lastLocalWriteAt.current = Date.now();
-      _setExerciseLibrary(val);
-  };
+  const setExerciseLibrary = _setExerciseLibrary;
   const __cachedPrograms = JSON.parse(localStorage.getItem('__CACHED_PROGRAMS') || 'null');
   const [programs, _setPrograms] = useState(__previewUser ? defaultPrograms : (__cachedPrograms || defaultPrograms));
   useEffect(() => {
     localStorage.setItem('__CACHED_PROGRAMS', JSON.stringify(programs));
   }, [programs]);
-  const lastLocalWriteAt = useRef(0);
-  // COUNTER, bukan boolean. Ada dua listener onSnapshot yang jalan bersamaan dan listener
-  // dokumen utama itu async (ada await di jalur migrasi) — dengan boolean, listener history
-  // yang selesai duluan menyetelnya ke false di TENGAH await milik listener utama, sehingga
-  // setter yang jalan setelah await dikira "tulisan lokal user" dan memblokir snapshot
-  // berikutnya. Angka 0 tetap falsy, jadi semua pengecekan `if (!isExecutingSnapshot.current)`
-  // di setter-setter di bawah tidak perlu diubah.
-  const isExecutingSnapshot = useRef(0);
-
-  const setPrograms = (val) => {
-      if (!isExecutingSnapshot.current) lastLocalWriteAt.current = Date.now();
-      _setPrograms(val);
-  };
+  // Dulu di sini ada isExecutingSnapshot: penanda "sedang menerapkan data server" supaya
+  // setter tidak salah dianggap tulisan lokal user. Ikut hilang bersama guard waktunya —
+  // sekarang lokal vs server dibedakan dari ISI (baseline), bukan dari siapa yang memanggil
+  // setter atau kapan. Kalau butuh membedakan asal perubahan lagi, bandingkan ke baseline;
+  // jangan hidupkan lagi penanda global seperti ini.
+  const setPrograms = _setPrograms;
 
   // --- HISTORY & STATS (dokumen terpisah per tahun) ---
   const [history, _setHistory] = useState(__previewUser ? {} : __cachedHistory);
@@ -596,10 +571,7 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('__CACHED_ACTIVE_PLAN_IDS', JSON.stringify(activePlanIds));
   }, [activePlanIds]);
-  const setActivePlanIds = (val) => {
-      if (!isExecutingSnapshot.current) lastLocalWriteAt.current = Date.now();
-      _setActivePlanIds(val);
-  };
+  const setActivePlanIds = _setActivePlanIds;
   const [activeProgramId, setActiveProgramId] = useState(defaultPrograms[0]?.id || null);
   const [focusWorkoutId, setFocusWorkoutId] = useState(null);
 
@@ -1263,7 +1235,6 @@ export default function App() {
           setMainBaseline(null);
           localStorage.removeItem('__CACHED_HISTORY');
         }
-        lastLocalWriteAt.current = 0;
         setUser({
            uid: currentUser.uid, 
            email: currentUser.email, 
@@ -1283,7 +1254,6 @@ export default function App() {
         setExerciseLibrary(defaultMasterExercises);
         // PENTING: Reset timestamp debounce supaya reset state ini tidak 
         // dianggap sebagai "perubahan lokal baru" yang memblokir sinkronisasi onSnapshot
-        lastLocalWriteAt.current = 0;
 
         setExerciseLogs({});
         setExtraExercises([]);
@@ -1332,6 +1302,15 @@ export default function App() {
   // boot, save pertama mengirim SELURUH isi dokumen lagi dan kita kembali ke perilaku
   // "device terakhir menang" yang justru mau dihilangkan.
   const mainBaselineRef = useRef(JSON.parse(localStorage.getItem('__CACHED_MAIN_BASE') || 'null'));
+  // Boleh ambil nilai server untuk field ini? Ya, kalau nilai lokal masih sama dengan baseline
+  // (tidak ada perubahan lokal yang belum terkirim). WAJIB dipanggil dari bentuk functional
+  // setState: closure listener onSnapshot dibuat sekali saja (deps [user?.uid, isAuthChecking]),
+  // jadi variabel state yang ditangkapnya basi — hanya `prev` yang selalu terkini.
+  const takeServer = (key, prev) => {
+     const base = mainBaselineRef.current?.[key];
+     if (base === undefined) return true; // belum pernah device ini simpan — server yang berlaku
+     return stableStringify(prev) === base;
+  };
   const setMainBaseline = (next) => {
      mainBaselineRef.current = next;
      try {
@@ -1372,7 +1351,6 @@ export default function App() {
       unsubscribeMain = onSnapshot(mainDocRef, async (docSnap) => {
         if (docSnap.exists()) {
           isUpdatingFromServer.current = true;
-          isExecutingSnapshot.current++;
           try {
             const data = docSnap.data();
 
@@ -1453,9 +1431,7 @@ export default function App() {
                   (ex.id === 101 && ex.name === 'Incline Smith Machine Press') ? { ...ex, name: 'Smith Machine Incline Bench Press' } : ex
                 ) : []
               }));
-              if (!isRecentLocalWrite(lastLocalWriteAt)) {
-                 setPrograms(prev => JSON.stringify(prev) === JSON.stringify(migratedPrograms) ? prev : migratedPrograms);
-              }
+              setPrograms(prev => (!takeServer('programs', prev) || JSON.stringify(prev) === JSON.stringify(migratedPrograms)) ? prev : migratedPrograms);
             }
             if (data.exerciseLibrary) {
               const parsedLib = typeof data.exerciseLibrary === 'string' ? JSON.parse(data.exerciseLibrary) : data.exerciseLibrary;
@@ -1471,9 +1447,7 @@ export default function App() {
                   }
               });
 
-              if (!isRecentLocalWrite(lastLocalWriteAt)) {
-                 setExerciseLibrary(prev => JSON.stringify(prev) === JSON.stringify(migratedLib) ? prev : migratedLib);
-              }
+              setExerciseLibrary(prev => (!takeServer('exerciseLibrary', prev) || JSON.stringify(prev) === JSON.stringify(migratedLib)) ? prev : migratedLib);
             }
             if (data.settings) {
               const parsedSettings = typeof data.settings === 'string' ? JSON.parse(data.settings) : data.settings;
@@ -1485,8 +1459,8 @@ export default function App() {
               if (parsedSettings.soundEnabled !== undefined) setSoundEnabled(parsedSettings.soundEnabled);
               if (parsedSettings.healthConnectEnabled !== undefined) setHealthConnectEnabled(parsedSettings.healthConnectEnabled);
               if (parsedSettings.defaultRestTime) setDefaultRestTime(parsedSettings.defaultRestTime);
-              if (parsedSettings.warmupVideos && !isRecentLocalWrite(lastLocalWriteAt)) setWarmupVideos(parsedSettings.warmupVideos);
-              if (parsedSettings.cooldownVideos && !isRecentLocalWrite(lastLocalWriteAt)) setCooldownVideos(parsedSettings.cooldownVideos);
+              if (parsedSettings.warmupVideos) setWarmupVideos(prev => takeServer('warmupVideos', prev) ? parsedSettings.warmupVideos : prev);
+              if (parsedSettings.cooldownVideos) setCooldownVideos(prev => takeServer('cooldownVideos', prev) ? parsedSettings.cooldownVideos : prev);
               if (parsedSettings.weekStartDay !== undefined) setWeekStartDay(parsedSettings.weekStartDay);
               if (parsedSettings.defaultReminderTime) setDefaultReminderTime(parsedSettings.defaultReminderTime);
               if (parsedSettings.reminderEnabled !== undefined) setReminderEnabled(parsedSettings.reminderEnabled);
@@ -1500,28 +1474,29 @@ export default function App() {
                   }
               }
               if (parsedSettings.units) setUnits(parsedSettings.units);
-              if (parsedSettings.gymProfiles && !isRecentLocalWrite(lastLocalWriteAt)) {
+              if (parsedSettings.gymProfiles) {
                   const migratedProfiles = parsedSettings.gymProfiles.map(g => {
                       if (g.id === 'default' && g.name === 'Lyfit Gym') {
                           return { ...g, name: 'Logym' };
                       }
                       return g;
                   });
-                  setGymProfiles(migratedProfiles);
+                  setGymProfiles(prev => takeServer('gymProfiles', prev) ? migratedProfiles : prev);
               }
-              if (parsedSettings.activeGymId && !isRecentLocalWrite(lastLocalWriteAt)) setActiveGymId(parsedSettings.activeGymId);
-              if (parsedSettings.activityTargets && !isRecentLocalWrite(lastLocalWriteAt)) setActivityTargets(parsedSettings.activityTargets);
-              
-              if (!isRecentLocalWrite(lastLocalWriteAt)) {
-                 if (parsedSettings.activePlanIds) setActivePlanIds(parsedSettings.activePlanIds);
-                 else if (parsedSettings.activePlanId) setActivePlanIds([parsedSettings.activePlanId]);
-                 else setActivePlanIds(['custom']); // default: always activate the built-in default plan
-              }
-              
-              if (!isRecentLocalWrite(lastLocalWriteAt)) {
-                 if (parsedSettings.userProfile) setUserProfile(parsedSettings.userProfile);
-                 else setUserProfile(null);
-              }
+              if (parsedSettings.activeGymId) setActiveGymId(prev => takeServer('activeGymId', prev) ? parsedSettings.activeGymId : prev);
+              if (parsedSettings.activityTargets) setActivityTargets(prev => takeServer('activityTargets', prev) ? parsedSettings.activityTargets : prev);
+
+              setActivePlanIds(prev => {
+                 if (!takeServer('activePlanIds', prev)) return prev;
+                 if (parsedSettings.activePlanIds) return parsedSettings.activePlanIds;
+                 if (parsedSettings.activePlanId) return [parsedSettings.activePlanId];
+                 return ['custom']; // default: always activate the built-in default plan
+              });
+
+              setUserProfile(prev => {
+                 if (!takeServer('userProfile', prev)) return prev;
+                 return parsedSettings.userProfile || null;
+              });
               
               // Migrate old single keys to the new array
               let migratedKeys = parsedSettings.userApiKeys || [];
@@ -1532,13 +1507,13 @@ export default function App() {
               // Buang entri kosong yang kepencet "+ Tambah" tapi gak jadi diisi — biar gak
               // nyangkut sebagai baris kosong yang "muncul lagi" tiap kali data di-refresh.
               migratedKeys = migratedKeys.filter(k => k && k.trim());
-              if (!isRecentLocalWrite(lastLocalWriteAt)) setUserApiKeys(migratedKeys);
+              setUserApiKeys(prev => takeServer('userApiKeys', prev) ? migratedKeys : prev);
 
               // Saved model IDs from older versions may no longer exist on the APIs
 
               setLogiPersona(parsedSettings.logiPersona || 'santai');
               setLogiCustomInstruction(parsedSettings.logiCustomInstruction || '');
-              if (!isRecentLocalWrite(lastLocalWriteAt)) setLogiMemory(Array.isArray(parsedSettings.logiMemory) ? parsedSettings.logiMemory : []);
+              setLogiMemory(prev => takeServer('logiMemory', prev) ? (Array.isArray(parsedSettings.logiMemory) ? parsedSettings.logiMemory : []) : prev);
             }
             if (data.userAchievements) setUserAchievements(data.userAchievements);
             setUser(prev => {
@@ -1561,10 +1536,6 @@ export default function App() {
           } catch (err) {
             console.error("Parse Error saat load data utama (MENCEGAH AUTO-SAVE UNTUK MENGHINDARI DATA HILANG):", err);
             setHasParseError(true);
-          } finally {
-            // finally, BUKAN setelah blok try: jalur `return` awal (akun kena ban) dulu
-            // melewati baris ini dan meninggalkan counter tidak pernah turun.
-            isExecutingSnapshot.current--;
           }
 
           setIsDataLoaded(true);
@@ -1593,7 +1564,6 @@ export default function App() {
       unsubscribeHistory = onSnapshot(historyDocRef, (docSnap) => {
         if (docSnap.exists()) {
            isUpdatingFromServer.current = true;
-           isExecutingSnapshot.current++;
            try {
              const data = docSnap.data();
 
@@ -1609,7 +1579,6 @@ export default function App() {
              console.error("Parse Error saat load history tahun ini:", err);
              setHasParseError(true);
            }
-           isExecutingSnapshot.current--;
            setTimeout(() => { isUpdatingFromServer.current = false; }, 3000);
         }
         hasSyncedHistoryRef.current = true;
