@@ -281,7 +281,11 @@ export default function App() {
     setActivityTargets(prev => (prev.tdee === tdee ? prev : { ...prev, tdee }));
   }, [userProfile?.weight, userProfile?.height, userProfile?.dob, userProfile?.gender, userProfile?.activityLevel, isDataLoaded]);
 
-  const [userAchievements, setUserAchievements] = useState([]);
+  const __cachedAchievements = JSON.parse(localStorage.getItem('__CACHED_ACHIEVEMENTS') || 'null');
+  const [userAchievements, setUserAchievements] = useState(__previewUser ? [] : (__cachedAchievements || []));
+  useEffect(() => {
+    localStorage.setItem('__CACHED_ACHIEVEMENTS', JSON.stringify(userAchievements));
+  }, [userAchievements]);
   const [unlockedAchievementsPopup, setUnlockedAchievementsPopup] = useState([]);
 
   const __cachedExerciseLibrary = JSON.parse(localStorage.getItem('__CACHED_EXERCISE_LIBRARY') || 'null');
@@ -602,135 +606,17 @@ export default function App() {
 
   const [selectedDate, setSelectedDate] = useState(getLocalYMD(new Date()));
   const [loadedDate, setLoadedDate] = useState(null);
-  const [activePlanIds, _setActivePlanIds] = useState(['custom']);
+  const __cachedActivePlanIds = JSON.parse(localStorage.getItem('__CACHED_ACTIVE_PLAN_IDS') || 'null');
+  const [activePlanIds, _setActivePlanIds] = useState(__previewUser ? ['custom'] : (__cachedActivePlanIds || ['custom']));
+  useEffect(() => {
+    localStorage.setItem('__CACHED_ACTIVE_PLAN_IDS', JSON.stringify(activePlanIds));
+  }, [activePlanIds]);
   const setActivePlanIds = (val) => {
       if (!isExecutingSnapshot.current) lastLocalWriteAt.current = Date.now();
       _setActivePlanIds(val);
   };
   const [activeProgramId, setActiveProgramId] = useState(defaultPrograms[0]?.id || null);
   const [focusWorkoutId, setFocusWorkoutId] = useState(null);
-
-  // Temporary auto-patch for misplaced workout sessions (V10 - Generic Fix for ALL DATES)
-  useEffect(() => {
-    if (user?.uid === 'scCcIIS2TDUgIQOMoWH58jXoGp22' && !localStorage.getItem('patch_applied_v10')) {
-      const runAutoPatch = async () => {
-        try {
-          if (!programs || programs.length === 0) return;
-          const DAY_MAP = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-
-          setHistory(prevHistory => {
-             let historyChanged = false;
-             const newHistory = { ...prevHistory };
-             const datesToFix = Object.keys(newHistory);
-
-             datesToFix.forEach(TARGET_DATE => {
-                 const dayData = newHistory[TARGET_DATE];
-                 if (!dayData || !dayData.workouts) return;
-
-                 const workouts = [...dayData.workouts];
-                 
-                 // Cari target program untuk hari ini
-                 const dayOfWeek = new Date(TARGET_DATE).getDay();
-                 const dayName = DAY_MAP[dayOfWeek];
-                 const targetProgram = programs.find(p => p.assignedDays && p.assignedDays.includes(dayName));
-                 if (!targetProgram) return;
-
-                 // Cari sesi adhoc yang punya durasi
-                 const adhocIdx = workouts.findIndex(w => 
-                    w.status === 'completed' && 
-                    w.duration && w.duration !== '00:00' && w.duration !== '0' &&
-                    w.programId !== targetProgram.id
-                 );
-
-                 // Cari cangkang kosong target program
-                 const zeroDurTargetIdx = workouts.findIndex(w => w.programId === targetProgram.id && (!w.duration || w.duration === '00:00' || w.duration === '0'));
-
-                 // Jika ada adhoc, merge. Jika tidak ada adhoc tapi targetProgram butuh fix log, kita fix.
-                 let dayChanged = false;
-                 
-                 let patchedWorkouts = workouts;
-                 
-                 if (adhocIdx !== -1) {
-                     const adhocW = workouts[adhocIdx];
-                     patchedWorkouts = workouts.filter((w, i) => i !== zeroDurTargetIdx).map(w => {
-                         if (w.id === adhocW.id) {
-                             return {
-                                 ...w,
-                                 id: `completed_${Date.now()}_${TARGET_DATE}`,
-                                 programId: targetProgram.id,
-                                 programName: targetProgram.name,
-                                 status: 'completed',
-                                 overriddenExercises: targetProgram.exercises || []
-                             };
-                         }
-                         return w;
-                     });
-                     dayChanged = true;
-                 }
-
-                 // Fix logs untuk target program yang udah di-merge atau udah ada
-                 patchedWorkouts = patchedWorkouts.map(w => {
-                     if (w.programId === targetProgram.id && w.status === 'completed' && w.overriddenExercises) {
-                         const newLog = { ...w.log };
-                         const newSkipped = { ...w.skipped };
-                         let fixed = false;
-
-                         w.overriddenExercises.forEach(ex => {
-                             const exId = ex.id;
-                             const expectedKey = `${exId}-${w.id}`;
-                             
-                             if (w.log && !w.log[expectedKey] && !w.log[exId]) {
-                                 const matchingKey = Object.keys(w.log).find(k => k.startsWith(exId));
-                                 if (matchingKey && matchingKey !== expectedKey) {
-                                     newLog[expectedKey] = w.log[matchingKey];
-                                     delete newLog[matchingKey];
-                                     fixed = true;
-                                 }
-                             }
-                             if (w.skipped && !w.skipped[expectedKey] && !w.skipped[exId]) {
-                                 const matchingKey = Object.keys(w.skipped).find(k => k.startsWith(exId));
-                                 if (matchingKey && matchingKey !== expectedKey) {
-                                     newSkipped[expectedKey] = w.skipped[matchingKey];
-                                     delete newSkipped[matchingKey];
-                                     fixed = true;
-                                 }
-                             }
-                         });
-
-                         if (fixed) {
-                             dayChanged = true;
-                             return { ...w, log: newLog, skipped: newSkipped };
-                         }
-                     }
-                     return w;
-                 });
-
-                 if (dayChanged) {
-                     newHistory[TARGET_DATE] = { ...dayData, workouts: patchedWorkouts };
-                     historyChanged = true;
-                     
-                     // Sync individual day to firestore
-                     const yearRef = doc(db, 'logym_users', user.uid, 'history_years', '2026');
-                     setDoc(yearRef, { [TARGET_DATE]: newHistory[TARGET_DATE] }, { merge: true });
-                 }
-             });
-
-             if (historyChanged) {
-                 localStorage.setItem('patch_applied_v10', 'true');
-                 setTimeout(() => window.location.reload(), 1500);
-                 return newHistory;
-             } else {
-                 localStorage.setItem('patch_applied_v10', 'true');
-                 return prevHistory;
-             }
-          });
-        } catch (err) {
-          console.error("Auto patch V10 error:", err);
-        }
-      };
-      runAutoPatch();
-    }
-  }, [user, programs]);
 
   // Self-healing: Hapus duplikat ID pada latihan (menghindari error DndKit dari state lama)
   useEffect(() => {
@@ -1373,6 +1259,14 @@ export default function App() {
   const [hasParseError, setHasParseError] = useState(false);
   const pendingMainSaveRef = useRef(null);
   const pendingHistorySaveRef = useRef(null);
+  // Cache lokal (__CACHED_*) bikin isDataLoaded/isHistoryLoaded true SEBELUM snapshot server
+  // pertama nyampe (biar gak flash kosong pas buka app). Tapi itu artinya auto-save effect
+  // di bawah bisa nyoba nulis ke Firestore pakai data cache yang mungkin basi (device lain
+  // sempat nambah data baru) SEBELUM sempat direkonsiliasi dengan data server — nimpa
+  // perubahan dari device lain. Dua flag ini WAJIB true dulu (di-set di onSnapshot) sebelum
+  // auto-save boleh jalan, supaya kita selalu nulis di atas baseline server yang valid.
+  const hasSyncedMainRef = useRef(false);
+  const hasSyncedHistoryRef = useRef(false);
   // Kegagalan auto-save selama ini cuma nyangkut di console — user gak pernah tahu, padahal
   // gejalanya fatal: perubahan "kesimpan" di layar lalu balik sendiri begitu snapshot server
   // datang. Tampilkan di UI supaya ketahuan dan bisa dilaporkan.
@@ -1384,6 +1278,8 @@ export default function App() {
 
     // Baseline diff milik user sebelumnya tidak berlaku lagi
     lastSavedHistoryJson.current = null;
+    hasSyncedMainRef.current = false;
+    hasSyncedHistoryRef.current = false;
 
     if (localStorage.getItem('__PREVIEW_USER')) { setIsDataLoaded(true); setIsHistoryLoaded(true); return; }
 
@@ -1602,6 +1498,7 @@ export default function App() {
 
           isExecutingSnapshot.current = false;
           setIsDataLoaded(true);
+          hasSyncedMainRef.current = true;
           setTimeout(() => { isUpdatingFromServer.current = false; }, 3000); // diperpanjang untuk cegah race condition auto-save
         } else {
           // No Firebase data yet — only show questionnaire if not already completed
@@ -1610,6 +1507,7 @@ export default function App() {
             setIsFreshAccount(true);
           }
           setIsDataLoaded(true);
+          hasSyncedMainRef.current = true;
         }
       }, (error) => {
         console.error("Gagal menarik data utama:", error);
@@ -1653,6 +1551,7 @@ export default function App() {
            isExecutingSnapshot.current = false;
            setTimeout(() => { isUpdatingFromServer.current = false; }, 3000);
         }
+        hasSyncedHistoryRef.current = true;
         setIsHistoryLoaded(true);
       }, (error) => {
          console.error("Gagal menarik history tahun ini:", error);
@@ -1686,6 +1585,14 @@ export default function App() {
       const attemptSave = () => {
         if (isUpdatingFromServer.current) {
           retryTimer = setTimeout(attemptSave, 500);
+          return;
+        }
+        // SAFETY: Jangan simpan ke Firestore sebelum snapshot server PERTAMA nyampe sesi ini —
+        // tanpa ini, data cache lokal (__CACHED_PROGRAMS/dst, dipakai biar gak flash kosong
+        // pas buka app) bisa kepush ke server duluan sebelum sempat direkonsiliasi, nimpa
+        // perubahan yang barusan masuk dari device lain.
+        if (!hasSyncedMainRef.current) {
+          console.warn('[Auto-save] Belum sinkron dari server — skip save, tunggu snapshot pertama selesai.');
           return;
         }
         // SAFETY: Jangan simpan ke Firestore jika programs masih sama dengan defaultPrograms —
@@ -1737,6 +1644,12 @@ export default function App() {
       const attemptSave = () => {
         if (isUpdatingFromServer.current) {
           retryTimer = setTimeout(attemptSave, 500);
+          return;
+        }
+        // SAFETY: sama seperti auto-save dokumen utama — jangan kirim diff apa pun sebelum
+        // snapshot history server pertama nyampe, supaya baseline diff-nya bukan cache basi.
+        if (!hasSyncedHistoryRef.current) {
+          console.warn('[Auto-save] History belum sinkron dari server — skip save.');
           return;
         }
 
