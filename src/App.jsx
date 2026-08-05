@@ -1479,7 +1479,13 @@ export default function App() {
       if (unsubscribeMain) unsubscribeMain();
       if (unsubscribeHistory) unsubscribeHistory();
     };
-  }, [user?.uid]);
+  // isAuthChecking WAJIB ikut deps — cache-first (__CACHED_UID) bikin user.uid sudah keisi
+  // SEBELUM Firebase Auth asli selesai resolve, jadi effect ini kena guard "isAuthChecking"
+  // dan return duluan. Tanpa isAuthChecking di sini, begitu auth asli resolve (isAuthChecking
+  // jadi false) dengan uid yang SAMA PERSIS seperti cache, effect ini tidak pernah dijalankan
+  // ulang — listener Firestore tidak pernah terpasang sepanjang sesi itu, dua arah (baca
+  // maupun tulis) buntu total sampai user logout-login paksa uid berubah.
+  }, [user?.uid, isAuthChecking]);
 
   // ==========================================
   // 3. SISTEM AUTO-SAVE KE CLOUD (DEBOUNCE)
