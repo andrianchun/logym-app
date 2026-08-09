@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Plus, Wind, Play, CalendarDays, X, CheckCircle, ChevronDown, ChevronUp, Dumbbell, Share2, Flame, Brain } from 'lucide-react';
 import { fetchExercisesFromApi } from '../utils/exerciseDbApi';
 import { shareWorkoutToFeed } from '../utils/communityApi';
-import { normalizeMuscleKey, resolveProjectedProgramId } from '../data/constants';
+import { normalizeMuscleKey, resolveProjectedProgramId, getDayWorkouts } from '../data/constants';
 
 // Import Komponen Pecahan
 import WorkoutHeader from '../components/WorkoutHeader';
@@ -55,7 +55,6 @@ const WorkoutTab = ({
   const isDark = t?.bgCard !== 'bg-white';
   const { dialog, showAlert } = useDialog(isDark);
 
-  const DAY_MAP = { 0: 'Min', 1: 'Sen', 2: 'Sel', 3: 'Rab', 4: 'Kam', 5: 'Jum', 6: 'Sab' };
   const getLocalYMD = (d) => {
     const offset = d.getTimezoneOffset();
     return new Date(d.getTime() - (offset*60*1000)).toISOString().split('T')[0];
@@ -63,41 +62,7 @@ const WorkoutTab = ({
 
   const todayStr = getLocalYMD(new Date());
 
-  let sourceWorkouts = [...(history[selectedDate]?.workouts || [])];
-  
-  // Filter out 'planned' workouts if their parent plan is inactive
-  sourceWorkouts = sourceWorkouts.filter(w => {
-     if (w.status === 'completed' || w.programId === 'adhoc') return true;
-     const prog = programs.find(p => p.id === w.programId);
-     if (!prog) return false; // Hide planned workouts if program is deleted
-     const pPlanId = prog.planId || 'custom';
-     return activePlanIds.includes(pPlanId);
-  });
-
-  if (activePlanIds.length > 0) {
-    const planRoutines = programs.filter(p => activePlanIds.includes(p.planId || 'custom'));
-    if (planRoutines.length > 0) {
-      const dateObj = new Date(selectedDate);
-      const dayName = DAY_MAP[dateObj.getDay()];
-      
-      const projectedRoutines = planRoutines.filter(r => r.assignedDays && r.assignedDays.includes(dayName));
-      if (projectedRoutines.length > 0) {
-        projectedRoutines.forEach(pr => {
-          const alreadyInHistory = sourceWorkouts.some(w => w.programId === pr.id);
-          if (!alreadyInHistory) {
-            sourceWorkouts.push({
-              id: `projected_${pr.id}_${selectedDate}`,
-              programId: pr.id,
-              programName: pr.name,
-              status: 'planned',
-              isProjected: true,
-              log: {}
-            });
-          }
-        });
-      }
-    }
-  }
+  let sourceWorkouts = getDayWorkouts(history, programs, activePlanIds, selectedDate);
 
   // FORCE INJECT ACTIVE WORKOUT (If it's running but not found in sourceWorkouts, e.g. started from past date)
   if (isWorkoutActive && sessionToRun) {

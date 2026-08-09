@@ -150,6 +150,73 @@ export const resolveProjectedProgramId = (id) => {
     .replace(/_\d{4}-\d{2}-\d{2}$/, '');
 };
 
+// Satu-satunya sumber daftar sesi per tanggal. WorkoutTab & CalendarTab dulu punya
+// salinan logika ini masing-masing dan sudah keburu beda: versi WorkoutTab lupa baca
+// `deletedProjected`, jadi sesi yang dihapus di kalender tetap nongol di tab latihan.
+// Semua penambahan aturan harus di sini, jangan disalin lagi ke halaman.
+const DAY_MAP = { 0: 'Min', 1: 'Sen', 2: 'Sel', 3: 'Rab', 4: 'Kam', 5: 'Jum', 6: 'Sab' };
+
+// `deletedProjected` = penanda "sesi terjadwal ini sudah dihapus user" per tanggal.
+// Bentuknya MAP ber-key programId (nilai `true`), alasannya sama persis dengan `workouts`:
+// array tidak bisa di-merge Firestore, jadi dua device yang menghapus sesi berbeda di tanggal
+// yang sama akan saling menimpa. Sebagai map, Firestore menggabungkan per-key.
+// Data lama berbentuk array masih dibaca — normalisasi cuma di dua fungsi ini.
+// Konsekuensi merge map: key yang tidak disebut dibiarkan hidup. Kalau nanti ada fitur
+// "batalkan hapus", key-nya harus dikirim eksplisit sebagai deleteField(), sama seperti sesi.
+export const deletedProjectedMap = (dp) => {
+  if (Array.isArray(dp)) return Object.fromEntries(dp.map(id => [String(id), true]));
+  if (dp && typeof dp === 'object') return { ...dp };
+  return {};
+};
+
+export const hasDeletedProjected = (dayData) =>
+  Object.keys(deletedProjectedMap(dayData?.deletedProjected)).length > 0;
+
+export const getDayWorkouts = (history, programs, activePlanIds, dateStr) => {
+  const dData = history?.[dateStr] || {};
+  const historical = Array.isArray(dData.workouts) ? dData.workouts : [];
+  const deletedProjected = deletedProjectedMap(dData.deletedProjected);
+
+  const validHistorical = historical.filter(w => {
+    if (w.status === 'completed' || w.programId === 'adhoc') {
+      if (w.programId === 'adhoc' && (!w.exercises || w.exercises.length === 0)) return false;
+      return true;
+    }
+    const p = programs.find(prog => prog.id === w.programId);
+    if (!p) return false; // program aslinya sudah dihapus
+    return activePlanIds.includes(p.planId || 'custom');
+  });
+
+  const result = [...validHistorical];
+
+  if (activePlanIds.length > 0) {
+    const dayName = DAY_MAP[new Date(dateStr).getDay()];
+    programs
+      .filter(p => activePlanIds.includes(p.planId || 'custom'))
+      .filter(r => r.assignedDays && r.assignedDays.includes(dayName))
+      .forEach(pr => {
+        if (deletedProjected[String(pr.id)]) return;
+        if (validHistorical.some(w => w.programId === pr.id)) return;
+        result.push({
+          id: `projected_${pr.id}_${dateStr}`,
+          programId: pr.id,
+          programName: pr.name,
+          status: 'planned',
+          isProjected: true,
+          log: {}
+        });
+      });
+  }
+
+  // Pengaman render: buang id kembar (sisa program duplikat yang belum ke-upload bersih).
+  const seen = new Set();
+  return result.filter(w => {
+    if (seen.has(w.id)) return false;
+    seen.add(w.id);
+    return true;
+  });
+};
+
 export const getVideoId = (url) => {
   if (!url) return null;
   try {

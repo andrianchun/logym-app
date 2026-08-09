@@ -1782,6 +1782,13 @@ export default function App() {
 
         setHistoryBaseline(newBaseline);
         const failedYears = new Set();
+        // history_years/<tahun> itu dokumen blob: SEMUA tanggal di tahun itu ada di satu dokumen,
+        // tiap tanggal berisi map bersarang (workouts, exerciseLogs, deletedProjected). Firestore
+        // mengindeks tiap key map sebagai field path tersendiri, jadi index entry per dokumen
+        // menumpuk sepanjang tahun sampai menabrak batas 40.000 → tulisan ditolak dengan
+        // "too many index entries for entity". Dokumen ini tidak pernah di-query (selalu getDoc
+        // per ID), jadi indeksnya murni beban: dimatikan lewat fieldOverrides wildcard di
+        // firestore.indexes.json. Kalau error itu muncul lagi, cek exemption-nya masih ter-deploy.
         const writes = dirtyYears.map(year => {
            const yearRef = doc(db, "logym_users", user.uid, "history_years", year);
            // Batalkan baseline tanggal yang gagal supaya dicoba lagi pada save berikutnya

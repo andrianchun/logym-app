@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Info, CheckCircle, CalendarDays, Edit2, PlayCircle, X, Copy, Repeat, Plus, Clock, Bell, CalendarPlus, CalendarCheck, BellOff, BellRing, ToggleLeft, ToggleRight, Flame, Check, Activity } from 'lucide-react';
 import SwipeInput from '../components/SwipeInput';
-import { getLocalYMD, resolveProjectedProgramId } from '../data/constants';
+import { getLocalYMD, resolveProjectedProgramId, getDayWorkouts as sharedGetDayWorkouts, deletedProjectedMap, hasDeletedProjected } from '../data/constants';
 import { formatNumber } from '../utils/numberFormat';
 import { parseWorkoutDurationMinutes, calculateWorkoutCalories, calculateSmartWorkoutCalories } from '../utils/workoutCalc';
 import PanoramicSlider from '../components/PanoramicSlider';
@@ -414,69 +414,7 @@ const CalendarTab = ({
     }
   }, [selectedDate, calendarMode]);
 
-  const DAY_MAP = {
-    0: 'Min', 1: 'Sen', 2: 'Sel', 3: 'Rab', 4: 'Kam', 5: 'Jum', 6: 'Sab'
-  };
-
-  const getDayWorkouts = (dateStr) => {
-    const historical = history[dateStr]?.workouts || [];
-    
-    const validHistorical = historical.filter(w => {
-      if (w.status === 'completed' || w.programId === 'adhoc') {
-          if (w.programId === 'adhoc' && (!w.exercises || w.exercises.length === 0)) return false;
-          return true; 
-      }
-      
-      const p = programs.find(prog => prog.id === w.programId);
-      if (!p) return false; // Hapus dari history jika program aslinya (planned) sudah dihapus
-      
-      const wPlanId = p.planId || 'custom';
-      
-      if (!activePlanIds.includes(wPlanId)) return false;
-      return true;
-    });
-
-    let result = [...validHistorical];
-    const todayStr = getLocalYMD(new Date());
-
-    if (activePlanIds.length > 0) {
-        const planRoutines = programs.filter(p => activePlanIds.includes(p.planId || 'custom'));
-        if (planRoutines.length > 0) {
-            const dateObj = new Date(dateStr);
-            const dayName = DAY_MAP[dateObj.getDay()];
-            const projectedRoutines = planRoutines.filter(r => r.assignedDays && r.assignedDays.includes(dayName));
-            
-            projectedRoutines.forEach(pr => {
-                if (!validHistorical.some(w => w.programId === pr.id)) {
-                    const dData = history[dateStr] || {};
-                    if (!dData.deletedProjected?.includes(pr.id)) {
-                        result.push({
-                            id: `projected_${pr.id}_${dateStr}`,
-                            programId: pr.id,
-                            programName: pr.name,
-                            status: 'planned',
-                            isProjected: true,
-                            log: {}
-                        });
-                    }
-                }
-            });
-        }
-    }
-
-    // Pengaman render: buang id kembar (mis. sisa program duplikat di `programs` yang belum
-    // sempat ke-upload bersih) — daftar yang di-render dijamin gak pernah punya key ganda.
-    const seenIds = new Set();
-    result = result.filter(w => {
-       if (seenIds.has(w.id)) return false;
-       seenIds.add(w.id);
-       return true;
-    });
-
-    return result;
-
-
-  };
+  const getDayWorkouts = (dateStr) => sharedGetDayWorkouts(history, programs, activePlanIds, dateStr);
 
   const scheduleWorkoutNotification = async (workoutId, programName, dateStr, timeStr) => {
     if (!reminderEnabled || !timeStr || typeof Capacitor === 'undefined' || !Capacitor.isNativePlatform()) return null;
@@ -782,15 +720,12 @@ const CalendarTab = ({
           const h = { ...prev };
           const d = h[dateStr] || {};
 
-          let newDeletedProjected = [...(d.deletedProjected || [])];
+          const newDeletedProjected = deletedProjectedMap(d.deletedProjected);
           let newActiveSession = { ...(d._activeSession || {}) };
           let newWorkouts = d.workouts && Array.isArray(d.workouts) ? [...d.workouts] : [];
           
           if (String(workoutId).startsWith('projected_')) {
-              const progId = resolveProjectedProgramId(workoutId);
-              if (!newDeletedProjected.includes(progId)) {
-                  newDeletedProjected.push(progId);
-              }
+              newDeletedProjected[String(resolveProjectedProgramId(workoutId))] = true;
           }
           
           if (workoutId === 'virtual_adhoc') {
@@ -816,8 +751,8 @@ const CalendarTab = ({
                       console.error('Error during log cleanup:', err);
                   }
                   
-                  if (workoutToRemove.programId && !newDeletedProjected.includes(workoutToRemove.programId)) {
-                      newDeletedProjected.push(workoutToRemove.programId);
+                  if (workoutToRemove.programId) {
+                      newDeletedProjected[String(workoutToRemove.programId)] = true;
                   }
                   
                   newWorkouts = newWorkouts.filter(w => String(w.id) !== String(workoutId));
@@ -833,7 +768,7 @@ const CalendarTab = ({
 
           // Jika setelah dihapus hari itu benar-benar kosong dan bukan adhoc, tandai untuk dihapus agar auto-save membersihkannya
           if (h[dateStr] && Array.isArray(h[dateStr].workouts) && h[dateStr].workouts.length === 0 && (!h[dateStr]._activeSession || Object.keys(h[dateStr]._activeSession).length === 0)) {
-              if (!h[dateStr].deletedProjected || h[dateStr].deletedProjected.length === 0) {
+              if (!hasDeletedProjected(h[dateStr])) {
                   h[dateStr] = { _delete: true };
               }
           }
@@ -1360,16 +1295,7 @@ const CalendarTab = ({
                    if (panelType === 'prev') d.setDate(d.getDate() - 1);
                    else if (panelType === 'next') d.setDate(d.getDate() + 1);
                    const targetDateStr = getLocalYMD(d);
-                   let panelWorkouts = getSelectedWorkoutsForDate(targetDateStr);
-                   // Filter out 'planned' workouts if their parent plan is inactive
-                   panelWorkouts = panelWorkouts.filter(w => {
-                      if (w.status === 'completed' || w.programId === 'adhoc') return true;
-                      const prog = programs.find(p => p.id === w.programId);
-                      if (!prog) return false; // Hide planned workouts if program is deleted
-                      const pPlanId = prog.planId || 'custom';
-                      return activePlanIds.includes(pPlanId);
-                   });
-
+                   const panelWorkouts = getSelectedWorkoutsForDate(targetDateStr);
 
                    const isTargetPastOrToday = d <= new Date(); // roughly check if target date is in past/today for hasCompleted/hasPlanned
                    const hasTargetCompleted = panelWorkouts.some(w => checkIsCompletedStrict(w, targetDateStr));

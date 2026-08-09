@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Activity, Zap, Brain, Footprints, HeartPulse, Moon, Droplets, Droplet, Dumbbell, Scale, RefreshCw, Trophy, Link2, Pencil, Settings, Info, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Wind, Utensils, Flame, Clock } from 'lucide-react';
-import { getLocalYMD } from '../data/constants';
+import { getLocalYMD, hasDeletedProjected } from '../data/constants';
 import DashboardModals from '../components/DashboardModals';
 import DashboardChart from '../components/DashboardChart';
 import ActivityChart from '../components/ActivityChart';
@@ -431,7 +431,9 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
              const isCompletelyEmpty = Object.values(newBio).every(v => v === null || v === undefined || v === '');
              
              if (isCompletelyEmpty) {
-                 if (!newHistory[modalDate].programId && !newHistory[modalDate].status && (!newHistory[modalDate].workouts || newHistory[modalDate].workouts.length === 0)) {
+                 // deletedProjected wajib ikut dicek: itu satu-satunya jejak "sesi terjadwal ini
+                 // sudah dihapus user". Buang harinya = sesi yang dihapus muncul lagi.
+                 if (!newHistory[modalDate].programId && !newHistory[modalDate].status && !hasDeletedProjected(newHistory[modalDate]) && (!newHistory[modalDate].workouts || newHistory[modalDate].workouts.length === 0)) {
                      newHistory[modalDate] = { _delete: true };
                  } else {
                      newHistory[modalDate] = { ...newHistory[modalDate], bioData: null };
