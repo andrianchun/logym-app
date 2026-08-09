@@ -148,8 +148,12 @@ class ExerciseWriterPlugin : Plugin() {
                             endZoneOffset = zone.rules.getOffset(end),
                             exerciseType = type,
                             title = title,
+                            // manualEntry(clientRecordId, clientRecordVersion, device?) — BUKAN
+                            // manualEntryWithId, yang parameter keduanya `Device?` dan tidak punya
+                            // versi sama sekali. Tanpa versi, koreksi sesi tidak pernah bisa
+                            // menggantikan record lama.
                             metadata = if (clientRecordId == null) Metadata.manualEntry()
-                                       else Metadata.manualEntryWithId(clientRecordId, version)
+                                       else Metadata.manualEntry(clientRecordId, version)
                         )
                     )
                 )
