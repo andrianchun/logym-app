@@ -338,7 +338,7 @@ export default function App() {
   // Field yang boleh diisi backfill/live-sync — TIDAK PERNAH nimpa field yang udah manual
   // (_manualFlags, lihat handleSaveManualData di DashboardTab.jsx) atau yang udah ada isinya
   // dari sumber lain (mis. activityCalories hasil hitung workout Logym sendiri).
-  const HC_FIELDS = ['steps', 'activityCalories', 'heartRate', 'minHeartRate', 'maxHeartRate', 'restingHeartRate', 'weight', 'height', 'bodyFat', 'oxygenSaturation', 'bloodPressure', 'sleep', 'sleepAwake', 'sleepRem', 'sleepLight', 'sleepDeep', 'sleepLog', 'distance', 'bmr', 'heartRateLog', 'oxygenSaturationLog', 'bloodPressureLog'];
+  const HC_FIELDS = ['steps', 'stepMinutes', 'activityCalories', 'heartRate', 'minHeartRate', 'maxHeartRate', 'restingHeartRate', 'weight', 'height', 'bodyFat', 'oxygenSaturation', 'bloodPressure', 'sleep', 'sleepAwake', 'sleepRem', 'sleepLight', 'sleepDeep', 'sleepLog', 'distance', 'bmr', 'heartRateLog', 'oxygenSaturationLog', 'bloodPressureLog'];
 
   // SATU setHistory untuk seluruh hasil sinkron, bukan satu per hari. Versi lama memanggilnya
   // 30x beruntun (sekali per hari) — 30 render seluruh app per sinkron, dan dulu itu juga yang

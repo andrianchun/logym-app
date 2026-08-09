@@ -30,6 +30,60 @@ const MetricBox = ({ label, value, unit, icon, color, t, theme }) => (
     </div>
 );
 
+// Warna per SUMBER data, dipakai sama persis di bar Durasi Aktif maupun Kalori Dibakar — jadi
+// "biru itu langkah" berlaku di kedua bar, tidak perlu dihafal dua kali.
+const PART_COLORS = {
+    bmr:     { bar: 'bg-zinc-400 dark:bg-zinc-500', dot: 'bg-zinc-400 dark:bg-zinc-500' },
+    manual:  { bar: 'bg-zinc-400 dark:bg-zinc-500', dot: 'bg-zinc-400 dark:bg-zinc-500' },
+    langkah: { bar: 'bg-blue-500', dot: 'bg-blue-500' },
+    latihan: { bar: 'bg-emerald-500', dot: 'bg-emerald-500' },
+};
+
+// Empat kotak di kartu Aktivitas Harian bottom-align isinya (`justify-end`), jadi angka besarnya
+// baru sebaris kalau yang DI BAWAHNYA sama tinggi. Tinggi bar + baris keterangan dikunci lewat
+// dua konstanta ini supaya kotak yang tidak punya rincian (Langkah Kaki, Kalori Dimakan) bisa
+// memesan tinggi yang sama persis — kalau angkanya diketik ulang di tiap kotak, satu kotak
+// diubah sedikit langsung bikin angkanya berjenjang lagi.
+// NUM_ROW = jarak dari angka besar ke bar di bawahnya. Dulu baris atas pakai mb-2 dan baris
+// bawah mb-0.5, jadi dua bar itu menggantung beda tinggi dari angkanya masing-masing.
+const NUM_ROW = 'mb-2';
+const BAR_ROW = 'h-1.5 mb-1.5';
+// Tinggi baris keterangan dikunci DUA baris walau isinya cuma satu: kotaknya selebar setengah
+// layar, jadi rincian tiga sumber (BMR/Langkah/Latihan) pasti melipat. Kalau tingginya dibiarkan
+// mengikuti isi, kotak yang melipat mendorong angka besarnya naik dan tidak lagi sebaris dengan
+// tetangganya. Dipesan tetap = tata letaknya juga tidak lompat saat angkanya berubah.
+const LEGEND_ROW = 'h-8 items-start content-start';
+
+// Bar bertumpuk + keterangan bertitik warna. `basis` = pembagi lebar segmen: target harian buat
+// Durasi Aktif, total buat Kalori Dibakar (yang tidak punya target).
+//
+// Nama sumber ikut ditulis, bukan cuma titik warna: begitu tinggal satu segmen (mis. kalori
+// diisi manual), titik + angka telanjang tidak memberi tahu apa-apa soal asal angkanya.
+// Segmen bernilai 0 dibuang dari keterangan, bukan cuma dari bar: "0" tidak menambah informasi
+// apa pun tapi memakan lebar yang justru bikin barisnya melipat lebih cepat.
+const StackedBar = ({ parts, basis, language, align = 'left' }) => {
+    const safeBasis = basis > 0 ? basis : 1;
+    const shown = parts.filter(p => p.value > 0);
+    return (
+        <>
+            <div className={`w-full ${BAR_ROW} bg-black/10 dark:bg-white/10 rounded-full overflow-hidden shrink-0 flex ${align === 'right' ? 'justify-end' : ''}`}>
+                {shown.map(p => (
+                    <div key={p.key} className={`h-full ${PART_COLORS[p.key].bar} transition-all duration-500 first:rounded-l-full last:rounded-r-full`}
+                         style={{ width: `${Math.min(100, (p.value / safeBasis) * 100)}%` }} />
+                ))}
+            </div>
+            <div className={`flex flex-wrap gap-x-2 ${LEGEND_ROW} ${align === 'right' ? 'justify-end' : ''}`}>
+                {shown.map(p => (
+                    <span key={p.key} className="flex items-center gap-1 whitespace-nowrap text-[9px] text-zinc-500 dark:text-zinc-400">
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${PART_COLORS[p.key].dot}`} />
+                        {p.label} {formatNumber(p.value, language)}
+                    </span>
+                ))}
+            </div>
+        </>
+    );
+};
+
 const MiniBox = ({ label, value, unit, t, theme }) => (
     <div className={`p-3 rounded-xl flex flex-col items-center justify-center text-center ${t.bgCardSoft} border ${t.border} transition-transform duration-300 active:scale-[0.98]`}>
         <span className={`h2 ${t.textMain}`}>{value || '-'}</span>
@@ -468,7 +522,10 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   const dispMainWaist = units?.height === 'ft' && bioData.waist ? Number((bioData.waist * 0.393701).toFixed(1)) : bioData.waist || '-';
 
   // Smart Merge Deduplication (LyFit Internal + BioData/HealthConnect)
-  const { mergedDailyActiveMinutes, mergedDailyCalories, mergedDailyCaloriesFloor, mergedDailySessions, mergedWeeklyActiveMinutes, mergedWeeklyWorkoutDuration, mergedWeeklySessions, mergedWeeklyCardio, mergedWeeklyWeight, mergedWeeklyCalories } = useMemo(() => {
+  // mergedDailySessions/mergedWeeklyCardio/mergedWeeklyWeight sengaja tidak diambil: baris
+  // "Minggu ini: N Beban • N Kardio" dan "LOGYM • N latihan" digantikan rincian bar bertumpuk.
+  // Nilainya masih dihitung di useMemo, tinggal ditambahkan lagi di sini kalau mau dipakai.
+  const { mergedDailyActiveMinutes, mergedDurationParts, mergedCalorieParts, mergedDailyCalories, mergedDailyCaloriesFloor, mergedWeeklyActiveMinutes, mergedWeeklySessions, mergedWeeklyCalories } = useMemo(() => {
      const currentWeight = Number(bioData.weight) || 70; // Asumsi 70kg jika tidak ada data
      let dailyActive = Number(bioData.activeMinutes || 0);
      const isDailyCalsManual = !!bioData._manualFlags?.activityCalories;
@@ -493,7 +550,17 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          }
      });
      
-     dailyActive = Math.max(dailyActive, intTodayDur);
+     // Durasi Aktif = jalan + latihan. Menit jalan diturunkan dari sebaran langkah per jam di
+     // Health Connect (lihat stepMinutesFromHourly) — HC sendiri tidak punya metrik "menit aktif".
+     // Input manual tetap menang sebagai lantai, sama seperti sebelumnya.
+     // ponytail: langkah saat treadmill/kardio di gym terhitung di DUA segmen sekaligus, jadi
+     // totalnya bisa sedikit menggelembung. Sesi menyimpan `timestamp` (jam selesai) + `duration`,
+     // jadi kalau kelak terasa mengganggu, jam yang tertutup sesi tinggal dikecualikan dari
+     // bucket per jam sebelum dijumlah.
+     const stepMinutes = Math.round(Number(bioData.stepMinutes || 0));
+     const autoActive = stepMinutes + intTodayDur;
+     const manualActive = dailyActive;
+     dailyActive = Math.max(manualActive, autoActive);
 
      // Kalori Dibakar = BMR + Langkah Kaki + Workout — bmr Mifflin-St Jeor asli (sudah
      // dihitung di atas buat kartu Komposisi Tubuh), fallback 1600 nyamain konvensi Lomeal
@@ -565,6 +632,31 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      
      return {
          mergedDailyActiveMinutes: dailyActive,
+         // Rincian buat bar bertumpuk di kartu Aktivitas Harian. Segmennya WAJIB berjumlah persis
+         // sama dengan angka besar di atasnya — makanya dirakit di sini, di tempat cabang manual
+         // masih kelihatan, bukan dihitung ulang di JSX. Saat kalori diset manual, basis BMR+langkah
+         // memang diganti satu angka manual, jadi segmennya pun ikut jadi satu.
+         mergedDurationParts: manualActive > autoActive
+             ? [
+                 // Input manual menang: kalau tetap dirinci "Langkah + Latihan", segmennya
+                 // berjumlah lebih kecil dari angka besarnya (mis. besar 30, rincian 0+0).
+                 { key: 'manual', label: 'Manual', value: manualActive - intTodayDur },
+                 { key: 'latihan', label: 'Latihan', value: intTodayDur },
+               ]
+             : [
+                 { key: 'langkah', label: 'Langkah', value: stepMinutes },
+                 { key: 'latihan', label: 'Latihan', value: intTodayDur },
+               ],
+         mergedCalorieParts: isDailyCalsManual
+             ? [
+                 { key: 'manual', label: 'Manual', value: Math.max(bmrCalories, manualCals) },
+                 { key: 'latihan', label: 'Latihan', value: workoutCalories },
+               ]
+             : [
+                 { key: 'bmr', label: 'BMR', value: bmrCalories },
+                 { key: 'langkah', label: 'Langkah', value: stepsCalories },
+                 { key: 'latihan', label: 'Latihan', value: workoutCalories },
+               ],
          mergedDailyCalories: dailyCals,
          mergedDailyCaloriesFloor: totalDailyCals,
          mergedDailySessions: intTodayExercises,
@@ -877,14 +969,16 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                          <div className="flex flex-col h-full">
                      <div className="flex items-center space-x-1.5 mb-1"><span className="w-5 h-5 rounded-full bg-blue-500/15 text-blue-500 flex items-center justify-center shrink-0"><Footprints size={11}/></span> <span className={`caption ${t.textMuted} capitalize`}>Langkah Kaki</span></div>
                      <div className="flex flex-col flex-1 justify-end">
-                         <div className="flex items-baseline space-x-1 mb-2">
+                         <div className={`flex items-baseline space-x-1 ${NUM_ROW}`}>
                              <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{bioData.steps > 0 ? formatNumber(bioData.steps, language) : '-'}</span>
                              <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold whitespace-nowrap">/ {formatNumber(activityTargets?.steps || 10000, language)}</span>
                          </div>
-                         <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full mb-1 overflow-hidden shrink-0">
+                         <div className={`w-full ${BAR_ROW} bg-black/10 dark:bg-white/10 rounded-full overflow-hidden shrink-0`}>
                              <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Number(bioData.steps || 0) / (activityTargets?.steps || 10000)) * 100)}%` }}></div>
                          </div>
-                         <span className="text-[9px] invisible whitespace-nowrap">{formatNumber(mergedWeeklySessions, language)} Sesi ({formatNumber(mergedWeeklyWorkoutDuration, language)} menit)</span>
+                         {/* Kotak ini tidak punya rincian, tapi tetap memesan tinggi baris keterangan
+                             supaya angkanya sebaris dengan Durasi Aktif di sebelahnya. */}
+                         <div className={LEGEND_ROW} />
                      </div>
                  </div>
                  
@@ -892,19 +986,15 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                   {(() => {
                       const todayDur = mergedDailyActiveMinutes;
                       const targetDur = activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 5) : 30;
-                      const progress = Math.min(100, (todayDur / targetDur) * 100);
                       return (
                           <div className="flex flex-col h-full text-right items-end">
                               <div className="flex items-center justify-end space-x-1.5 mb-1"><span className={`caption ${t.textMuted} capitalize`}>Durasi Aktif</span> <span className={`w-5 h-5 rounded-full ${t.bgAccentSoft} ${t.textAccent} flex items-center justify-center shrink-0`}><Clock size={11}/></span></div>
                               <div className="flex flex-col flex-1 justify-end w-full">
-                                  <div className="flex items-baseline justify-end space-x-1 mb-2">
+                                  <div className={`flex items-baseline justify-end space-x-1 ${NUM_ROW}`}>
                                       <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{todayDur > 0 ? formatNumber(todayDur, language) : '-'}</span>
                                       <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold whitespace-nowrap">/ {targetDur} mnt</span>
                                   </div>
-                                  <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full mb-1 overflow-hidden shrink-0 flex justify-end">
-                                      <div className={`h-full ${t.bgAccent} rounded-full transition-all duration-500`} style={{ width: `${progress}%` }}></div>
-                                  </div>
-                                  <span className="text-[9px] text-zinc-500 dark:text-zinc-400 whitespace-nowrap">Minggu ini: {mergedWeeklyWeight} Beban • {mergedWeeklyCardio} Kardio</span>
+                                  <StackedBar parts={mergedDurationParts} basis={targetDur} language={language} align="right" />
                               </div>
                           </div>
                       );
@@ -925,15 +1015,23 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                        const foodTarget = lomealTargets?.kcal || 2000;
                        return (
                          <div className="flex flex-col flex-1 justify-end">
-                             <div className="flex items-baseline space-x-1 mb-0.5">
+                             <div className={`flex items-baseline space-x-1 ${NUM_ROW}`}>
                                  <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{formatNumber(nutritionCalories, language) || '-'}</span>
                              </div>
-                             {lomealFresh && (
-                                <div className={`font-medium ${t.textMuted} truncate flex items-center gap-1.5`} style={{fontSize: '0.65rem'}}>
-                                  <span className="px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-500 text-[8px] uppercase font-bold tracking-wider">LOMEAL</span>
-                                  {lomealFresh.mealsCount || 0} konsumsi
-                                </div>
-                             )}
+                             {/* Bar progres ke target makan — targetnya (`foodTarget`) sudah ada di sini
+                                 sejak dulu tapi belum pernah dipakai. Sekalian menyamakan tinggi kotak
+                                 ini dengan Kalori Dibakar di sebelahnya, biar angkanya sebaris. */}
+                             <div className={`w-full ${BAR_ROW} bg-black/10 dark:bg-white/10 rounded-full overflow-hidden shrink-0`}>
+                                 <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Number(nutritionCalories || 0) / foodTarget) * 100)}%` }}></div>
+                             </div>
+                             <div className={`flex ${LEGEND_ROW}`}>
+                                {lomealFresh && (
+                                  <div className={`font-medium ${t.textMuted} truncate flex items-center gap-1.5`} style={{fontSize: '0.65rem'}}>
+                                    <span className="px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-500 text-[8px] uppercase font-bold tracking-wider">LOMEAL</span>
+                                    {lomealFresh.mealsCount || 0} konsumsi
+                                  </div>
+                                )}
+                             </div>
                          </div>
                        );
                      })()}
@@ -943,13 +1041,10 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                  <div className="flex flex-col h-full text-right items-end">
                      <div className="flex items-center justify-end space-x-1.5 mb-1"><span className={`caption ${t.textMuted} capitalize`}>Kalori Dibakar</span> <span className="w-5 h-5 rounded-full bg-blue-500/15 text-blue-500 flex items-center justify-center shrink-0"><Flame size={11}/></span></div>
                      <div className="flex flex-col flex-1 justify-end w-full">
-                         <div className="flex items-baseline justify-end mb-0.5">
+                         <div className={`flex items-baseline justify-end ${NUM_ROW}`}>
                              <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{mergedDailyCalories > 0 ? formatNumber(mergedDailyCalories, language) : '-'}</span>
                          </div>
-                         <div className={`font-medium ${t.textMuted} truncate flex items-center justify-end gap-1.5`} style={{fontSize: '0.65rem'}}>
-                           <span className="px-1 py-0.5 rounded bg-sky-500/20 text-sky-500 text-[8px] uppercase font-bold tracking-wider">Logym</span>
-                           {mergedDailySessions || 0} latihan
-                         </div>
+                         <StackedBar parts={mergedCalorieParts} basis={mergedDailyCalories} language={language} align="right" />
                      </div>
                  </div>
                      </div>

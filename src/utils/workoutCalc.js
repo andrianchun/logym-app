@@ -5,6 +5,23 @@
 // berbasis detak jantung (mis. Samsung Health) biasanya menghasilkan angka lebih tinggi.
 const WORKOUT_MET = 6.0;
 
+// Kadensi jalan (langkah per menit) buat menaksir BERAPA LAMA user bergerak dari BERAPA BANYAK
+// langkahnya. Health Connect tidak menyimpan durasi langkah — cuma jumlah — jadi angkanya harus
+// diturunkan. 100 spm itu kadensi jalan santai-sedang orang dewasa; sengaja dibikin konstanta
+// bernama karena ini knob kalibrasi: kadensi tiap orang beda (tinggi badan, kebiasaan), dan
+// kalau durasinya terasa meleset yang perlu disetel cuma angka ini.
+const KADENSI_JALAN = 100;
+
+/**
+ * Taksir menit aktif dari langkah per JAM (bukan total harian) — dijumlah per jam lalu tiap jam
+ * di-cap 60 menit, supaya satu jam dengan 12.000 langkah tidak jadi "120 menit dalam sejam".
+ * Total harian tidak dipakai justru karena cap itu: cap-nya cuma bermakna kalau sebarannya tahu.
+ * @param {number[]} hourlySteps langkah tiap bucket satu jam
+ * @returns {number} menit aktif, dibulatkan
+ */
+export const stepMinutesFromHourly = (hourlySteps) =>
+  Math.round((hourlySteps || []).reduce((sum, steps) => sum + Math.min(60, (Number(steps) || 0) / KADENSI_JALAN), 0));
+
 /**
  * Mengubah field `duration` workout (bisa berupa angka menit, atau string "H:MM:SS"/"MM:SS")
  * menjadi jumlah menit. Angka numerik selalu diperlakukan sebagai MENIT (bukan detik) —

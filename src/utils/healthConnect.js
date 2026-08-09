@@ -15,6 +15,7 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 // native "Health.then()" yang gak ada → promise gak pernah selesai → semua pemanggil
 // nge-hang diam-diam selamanya. (Bug nyata: tombol "Hubungkan" macet di "Menghubungkan...".)
 import { Health } from '@capgo/capacitor-health';
+import { stepMinutesFromHourly } from './workoutCalc';
 
 const isNative = () => Capacitor.isNativePlatform();
 
@@ -269,7 +270,7 @@ const sleepPerDay = (samples) => {
 // per-hari — tiap query native ada overhead round-trip, jadi 1 query lebar jauh lebih murah
 // daripada N query sempit). Dipakai baik buat "hari ini" (range 1 hari) maupun backfill
 // (range N hari) — bentuknya sama, cuma rentang tanggalnya beda.
-// Hasil: { 'YYYY-MM-DD': { steps, activityCalories, heartRate, minHeartRate, maxHeartRate,
+// Hasil: { 'YYYY-MM-DD': { steps, stepMinutes, activityCalories, heartRate, minHeartRate, maxHeartRate,
 //          weight, height, bodyFat, oxygenSaturation, bloodPressure, sleep, sleepAwake,
 //          sleepRem, sleepLight, sleepDeep } }
 export const hcReadRange = async (startYmd, endYmd) => {
@@ -281,9 +282,32 @@ export const hcReadRange = async (startYmd, endYmd) => {
   const put = (ymd, patch) => { byDay[ymd] = { ...(byDay[ymd] || {}), ...patch }; };
 
   await Promise.all([
-    H.queryAggregated({ dataType: 'steps', startDate: startISO, endDate: endISO, bucket: 'day', aggregation: 'sum' })
-      .then((res) => (res?.samples || []).forEach((s) => { if (s.value > 0) put(ymdOf(s.startDate), { steps: Math.round(s.value) }); }))
-      .catch((e) => console.warn('hcReadRange steps gagal:', e)),
+    // Langkah diambil per JAM, bukan per hari: totalnya sama persis, tapi sebarannya dibutuhkan
+    // buat menaksir DURASI jalan (lihat stepMinutesFromHourly — cap 60 menit/jam cuma bermakna
+    // kalau sebaran per jamnya tahu). Kalau agregasi per jam gagal/kosong, jatuh balik ke bucket
+    // harian: durasinya hilang, tapi jumlah langkahnya JANGAN sampai ikut hilang.
+    (async () => {
+      try {
+        const res = await H.queryAggregated({ dataType: 'steps', startDate: startISO, endDate: endISO, bucket: 'hour', aggregation: 'sum' });
+        const perDay = {};
+        (res?.samples || []).forEach((s) => {
+          if (!(s.value > 0)) return;
+          const ymd = ymdOf(s.startDate);
+          (perDay[ymd] = perDay[ymd] || []).push(s.value);
+        });
+        if (Object.keys(perDay).length > 0) {
+          Object.entries(perDay).forEach(([ymd, hours]) => put(ymd, {
+            steps: Math.round(hours.reduce((a, b) => a + b, 0)),
+            stepMinutes: stepMinutesFromHourly(hours),
+          }));
+          return;
+        }
+      } catch (e) { console.warn('hcReadRange steps per jam gagal:', e); }
+      try {
+        const res = await H.queryAggregated({ dataType: 'steps', startDate: startISO, endDate: endISO, bucket: 'day', aggregation: 'sum' });
+        (res?.samples || []).forEach((s) => { if (s.value > 0) put(ymdOf(s.startDate), { steps: Math.round(s.value) }); });
+      } catch (e) { console.warn('hcReadRange steps gagal:', e); }
+    })(),
 
     // Jarak: plugin kasih meter, Logym nyimpen km. distanceCycling SENGAJA gak dipakai —
     // plugin memetakannya ke DistanceRecord yang SAMA, jadi angkanya duplikat persis, bukan
