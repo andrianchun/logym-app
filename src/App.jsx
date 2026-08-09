@@ -52,12 +52,12 @@ import { fetchExercisesFromApi } from './utils/exerciseDbApi';
 import { AI_MODELS, detectPlateaus, getLogiNotification } from './utils/aiAgent';
 import { calculateReadiness } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
-import { calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate } from './utils/workoutCalc';
+import { calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds } from './utils/workoutCalc';
 import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcReadHeartRateWindow, hcWriteWorkoutCalories, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission } from './utils/healthConnect';
 import useDialog from './hooks/useDialog';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import UpdaterAlert from './components/UpdaterAlert';
-import { getLocalYMD, resolveProjectedProgramId, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos } from './data/constants';
+import { getLocalYMD, resolveProjectedProgramId, isLomealOwned, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos } from './data/constants';
 import { serializeDay, reconcileHistory, workoutsToMap, workoutIdsFromBaseline, diffFields, stableStringify } from './utils/historySync';
 import { Loader2, Download, X } from 'lucide-react';
 
@@ -366,6 +366,21 @@ export default function App() {
       });
       return changed ? next : prev;
     });
+  };
+
+  // Buang field milik Lomeal dari bioData yang mau dikirim ke Firestore. Logym cuma MENAMPILKAN
+  // dua angka ini; Lomeal yang menulisnya, untuk hari mana pun, kapan pun user mengedit.
+  //
+  // `_manualFlags` ikut dibersihkan dari kunci yang sama: kalau flag-nya tetap dikirim sementara
+  // nilainya tidak, hari itu bisa berakhir bertanda "punya Lomeal" padahal angkanya milik Logym.
+  const stripLomealOwned = (bioData) => {
+    const owned = ['nutritionCalories', 'activityCalories'].filter(f => isLomealOwned(bioData, f));
+    if (owned.length === 0) return bioData;
+    const clean = { ...bioData };
+    const flags = { ...(clean._manualFlags || {}) };
+    owned.forEach(f => { delete clean[f]; delete flags[f]; });
+    if (Object.keys(flags).length > 0) clean._manualFlags = flags; else delete clean._manualFlags;
+    return clean;
   };
 
   // Isi nadi asli (dari jam tangan, lewat Health Connect) ke sesi latihan yang belum punya,
@@ -1864,6 +1879,12 @@ export default function App() {
                         deleteField()
                      )
                   } : {}),
+                  // Field yang PEMILIKNYA Lomeal dibuang dari kiriman. `bioData` dikirim utuh
+                  // sebagai map, dan merge Firestore menggabungkan per key — jadi tanpa ini
+                  // salinan LAMA milik Logym menimpa balik angka yang baru saja ditulis Lomeal.
+                  // Itulah sebabnya mengedit makanan kemarin di Lomeal tidak pernah terlihat di
+                  // grafik Logym: datanya masuk, lalu ditimpa lagi oleh sinkron Logym berikutnya.
+                  ...(dayData.bioData ? { bioData: stripLomealOwned(dayData.bioData) } : {}),
                   _activeSession: deleteField()
                };
            } else {
@@ -2025,6 +2046,63 @@ export default function App() {
       }));
     } catch { /* storage penuh/diblokir — abaikan, sesi tetap jalan di memori */ }
   }, [exerciseLogs, skippedExercises, extraExercises, selectedDate, user?.uid, isDataLoaded]);
+
+  // ==========================================
+  // 3.6b. PERSIST JAM MULAI SESI KE LOCALSTORAGE
+  // Set yang sudah dipencet done sudah aman (efek 3.6 di atas), tapi DURASI dulu tidak:
+  // workoutStartTime cuma state di memori dan tidak pernah ditulis sebagian di tengah sesi, jadi
+  // force-close di menit ke-40 bikin timer mulai lagi dari nol — set-nya utuh, 40 menitnya hilang.
+  // Ikut hilang juga kalori kardio dan `startedAt` (jendela nadi), karena keduanya turunan durasi.
+  //
+  // Kuncinya TERPISAH dari sesi aktif: kunci sesi aktif sengaja tidak dihapus saat latihan selesai
+  // (baru kedaluwarsa 24 jam), jadi kalau numpang di sana, timer sesi yang sudah kelar ikut hidup
+  // lagi. Di sini `workoutStartTime` jadi null begitu latihan berakhir, dan efek ini menghapusnya.
+  // ==========================================
+  const TIMER_KEY = user?.uid ? `lyfit_active_timer_${user.uid}` : null;
+  useEffect(() => {
+    if (!TIMER_KEY) return;
+    if (!isWorkoutActive || !workoutStartTime) { localStorage.removeItem(TIMER_KEY); return; }
+    // `savedAt` = kapan app terakhir diketahui hidup. Diperbarui berkala, bukan sekali di awal:
+    // tanpa denyut ini, waktu mati tidak bisa dibedakan dari waktu latihan.
+    //
+    // Selang denyut = seberapa banyak durasi yang paling banyak hilang saat crash, karena waktu
+    // mati memang tidak dihitung. 15 detik: cukup rapat supaya kehilangannya tidak terasa, dan
+    // menulis ~100 byte ke localStorage setiap 15 detik itu murah. Ini knob kalibrasi.
+    const beat = () => {
+      try {
+        localStorage.setItem(TIMER_KEY, JSON.stringify({ startTime: workoutStartTime, savedAt: Date.now(), date: selectedDate }));
+      } catch { /* storage penuh/diblokir — sesi tetap jalan di memori */ }
+    };
+    beat();
+    const id = setInterval(beat, 15 * 1000);
+    return () => clearInterval(id);
+  }, [isWorkoutActive, workoutStartTime, selectedDate, TIMER_KEY]);
+
+  // Pulihkan durasi setelah crash. Tidak mengaktifkan latihan sendiri — cukup mengisi
+  // `resumeDurationSecs`, yang memang sudah jadi jalur "lanjutkan durasi sebelumnya" di
+  // WorkoutTab & activateWorkoutFromCard. Tidak ada mesin baru.
+  //
+  // Waktu selama app mati TIDAK dihitung sama sekali (keputusan user) — lihat
+  // recoveredWorkoutSeconds untuk alasannya.
+  const timerRestored = useRef(false);
+  useEffect(() => {
+    if (!TIMER_KEY || timerRestored.current || !isDataLoaded) return;
+    timerRestored.current = true;
+    try {
+      const raw = localStorage.getItem(TIMER_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      const startTime = Number(saved?.startTime) || 0;
+      const savedAt = Number(saved?.savedAt) || 0;
+      if (!startTime || !savedAt || saved.date !== getLocalYMD(new Date())) {
+        localStorage.removeItem(TIMER_KEY);
+        return;
+      }
+      const secs = recoveredWorkoutSeconds(startTime, savedAt);
+      if (secs > 0) setResumeDurationSecs(secs);
+    } catch { localStorage.removeItem(TIMER_KEY); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDataLoaded, TIMER_KEY]);
 
   const activeSessionRestored = useRef(false);
   useEffect(() => { activeSessionRestored.current = false; }, [user?.uid]); // reset saat ganti akun

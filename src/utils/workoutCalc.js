@@ -72,6 +72,26 @@ export const workoutWindow = (workout, ymd) => {
 };
 
 /**
+ * Berapa detik durasi latihan yang boleh dipulihkan setelah app mati mendadak.
+ *
+ * `savedAt` = denyut terakhir yang menandakan app masih hidup. Durasi dihitung sampai denyut itu
+ * saja; waktu SELAMA app mati tidak pernah ikut dihitung, berapa pun lamanya. Konsekuensinya
+ * durasi selalu sedikit lebih pendek dari kenyataan (paling banyak satu selang denyut), dan itu
+ * arah meleset yang benar: kalau waktu mati ikut dihitung, HP yang mati semalam mengubah sesi 40
+ * menit jadi 8 jam, dan angka itu merembet merusak kalori serta jendela nadi yang berangkat dari
+ * durasi. `now` tidak dipakai sama sekali — sengaja, supaya jelas jamnya tidak pernah berjalan
+ * saat app tidak hidup.
+ *
+ * @returns {number} detik, tidak pernah negatif
+ */
+export const recoveredWorkoutSeconds = (startTime, savedAt) => {
+  const start = Number(startTime) || 0;
+  const beat = Number(savedAt) || 0;
+  if (start <= 0 || beat <= 0) return 0;
+  return Math.max(0, Math.floor((beat - start) / 1000));
+};
+
+/**
  * Ringkas deret nadi mentah jadi kurva pendek + angka ringkasan.
  *
  * WAJIB diringkas sebelum disimpan: nadi dari jam tangan itu ~1 sampel/detik (sejam = 3.600
@@ -180,6 +200,71 @@ const setExtraCalories = (weight, ex, set) => {
   const setWeight = Number(set.w || ex.defaultWeight || 0);
   if (setWeight > 0) setCal += setWeight * reps * 0.006;
   return setCal;
+};
+
+/**
+ * Apakah SATU latihan tergolong kardio. Per-latihan, bukan per-sesi — sesi campuran (program
+ * beban yang ditutup treadmill) harus terbelah benar.
+ *
+ * `type === 'time'` saja TIDAK cukup: plank juga berbasis waktu tapi itu kerja inti, bukan kardio.
+ * Aturannya disamakan dengan yang sudah dipakai kartu riwayat kalender supaya tidak ada dua
+ * definisi "kardio" yang bisa berbeda jawaban untuk latihan yang sama.
+ */
+export const isCardioExercise = (ex) => {
+  if (ex?.type === 'cardio') return true;
+  const hay = `${ex?.name || ''} ${Array.isArray(ex?.target) ? ex.target.join(' ') : ''}`.toLowerCase();
+  return hay.includes('cardio') || hay.includes('kardio');
+};
+
+/**
+ * Pecah kalori satu sesi jadi { kardio, beban }.
+ *
+ * Jumlah keduanya DIJAMIN sama persis dengan calculateSmartWorkoutCalories untuk sesi yang sama:
+ * totalnya diambil dari fungsi itu, lalu dibagi menurut porsi — bukan dihitung ulang dari nol.
+ * Kalau dihitung ulang, pembulatan di dua tempat bikin rincian meleset dari angka besarnya, dan
+ * itu jenis ketidakcocokan yang paling bikin user hilang percaya pada angkanya.
+ *
+ * ponytail: porsinya diambil dari kalori-EKSTRA tiap kategori, jadi baseline "waktu di gym"
+ * (MET 2,5 × durasi) ikut terbagi proporsional. Baseline itu memang tidak dimiliki latihan mana
+ * pun — pembagian ini taksiran. Jalur naiknya: catat durasi per latihan, lalu bagi baseline
+ * menurut waktu sebenarnya.
+ */
+export const splitWorkoutCalories = (weightKg, workout, logs, globalRestTime = 90) => {
+  const total = calculateSmartWorkoutCalories(weightKg, workout, logs, globalRestTime);
+  if (!(total > 0)) return { kardio: 0, beban: 0 };
+
+  const weight = Number(weightKg) || 70;
+  const exercises = workout?.overriddenExercises || workout?.exercises || [];
+  let extraCardio = 0;
+  let extraBeban = 0;
+
+  exercises.forEach((ex) => {
+    // Pencocokan log sama persis dengan calculateSmartWorkoutCalories — sesi program me-render
+    // tiap latihan dengan id gabungan `${ex.id}-${workout.id}`.
+    const exLogs = (logs || {})[ex.id] || (workout?.id != null ? (logs || {})[`${ex.id}-${workout.id}`] : undefined);
+    if (!Array.isArray(exLogs)) return;
+    const isCardio = isCardioExercise(ex);
+    exLogs.forEach((set) => {
+      if (!set.done) return;
+      const cal = setExtraCalories(weight, ex, set);
+      if (isCardio) extraCardio += cal; else extraBeban += cal;
+    });
+  });
+
+  const extraTotal = extraCardio + extraBeban;
+  let share;
+  if (extraTotal > 0) {
+    share = extraCardio / extraTotal;
+  } else {
+    // Tidak ada set tercatat (riwayat lama, atau kalori datang dari `caloriesBurned` wearable):
+    // jatuh ke penggolongan tingkat SESI — kardio kalau semua latihannya kardio.
+    share = exercises.length > 0 && exercises.every(isCardioExercise) ? 1 : 0;
+  }
+
+  // Satu sisi dibulatkan, sisanya diambil dari pengurangan — dengan begitu jumlahnya tidak pernah
+  // meleset satu kalori dari total karena dua pembulatan terpisah.
+  const kardio = Math.round(total * share);
+  return { kardio, beban: total - kardio };
 };
 
 // Kata kunci nama latihan -> jenis olahraga Health Connect. Dipakai hanya kalau sesinya

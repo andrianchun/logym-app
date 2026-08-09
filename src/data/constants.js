@@ -172,6 +172,28 @@ export const deletedProjectedMap = (dp) => {
 export const hasDeletedProjected = (dayData) =>
   Object.keys(deletedProjectedMap(dayData?.deletedProjected)).length > 0;
 
+// Field bioData yang PEMILIKNYA Lomeal, bukan Logym. Lomeal menulis langsung ke history_years
+// Logym (lihat lomeal-app/src/utils/biometricSync.js) untuk SEMUA hari yang berubah, termasuk hari
+// lampau — jadi salurannya sudah benar dan Logym cukup berhenti menimpanya.
+//
+// Tanda tangannya: Lomeal menaruh boolean `true` di _manualFlags, sedangkan simpanan manual Logym
+// sendiri menaruh ANGKA yang diketik user (lihat handleSaveManualData di DashboardTab). Perbedaan
+// itulah yang dipakai membedakan pemiliknya tanpa perlu mengubah repo Lomeal.
+//
+// Kalau hari itu TIDAK dimiliki Lomeal, isian manual Logym tetap hidup — itu jalur untuk sumber
+// lain (mis. MyFitnessPal lewat Health Connect).
+export const isLomealOwned = (bioData, field) => bioData?._manualFlags?.[field] === true;
+
+// Basis angka manual sebuah field, apa pun yang menuliskannya. Logym menyimpan angkanya di
+// _manualFlags; Lomeal cuma menyimpan `true` di situ dan angkanya di bioData. Tanpa pembedaan ini
+// `Number(true)` = 1, dan override kalori dari Lomeal runtuh jadi 1 kkal.
+export const manualFieldValue = (bioData, field) => {
+  const flag = bioData?._manualFlags?.[field];
+  if (flag === undefined) return 0;
+  if (flag === true) return Number(bioData?.[field]) || 0;
+  return Number(flag) || 0;
+};
+
 export const getDayWorkouts = (history, programs, activePlanIds, dateStr) => {
   const dData = history?.[dateStr] || {};
   const historical = Array.isArray(dData.workouts) ? dData.workouts : [];

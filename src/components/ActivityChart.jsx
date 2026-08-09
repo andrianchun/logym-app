@@ -1,7 +1,12 @@
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip } from 'recharts';
 import { getLocalYMD } from '../data/constants';
-import { formatNumber } from '../utils/numberFormat';
+import { formatNumber, formatSleepDuration } from '../utils/numberFormat';
+import { splitWorkoutCalories } from '../utils/workoutCalc';
+
+// Warna garis target, disamakan persis dengan grafik Lomeal (NutritionChart.jsx) supaya "garis
+// kuning = target" berarti sama di kedua app.
+const TARGET_COLOR = (theme) => (theme === 'dark' ? '#facc15' : '#eab308');
 
 // metricKeys: subset opsional dari metrik di bawah yang mau ditampilin — dipakai buat misahin
 // grafik Aktivitas Harian (langkah/kalori/durasi) dari grafik Tidur & Pemulihan (tidur/skor
@@ -11,18 +16,36 @@ import { formatNumber } from '../utils/numberFormat';
 // Tensi/SpO2 di sebelah Durasi Aktif) tapi visualisasinya beda total (bukan bar per-hari) —
 // pas tab itu aktif, seluruh area chart bar diganti sama renderExtra(key), baris toggle-nya
 // tetap satu biar gak makan tempat vertikal buat tab row kedua.
-const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPointClick, language, lomealToday, metricKeys, storageKey = 'lyfit_activity_chart', extraTabs, renderExtra }) => {
+const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPointClick, language, lomealToday, metricKeys, storageKey = 'lyfit_activity_chart', extraTabs, renderExtra, activityTargets, lomealTargets, userWeight }) => {
+  // `stackId` = batang bertumpuk (rincian satu angka), tanpa itu = batang berdampingan.
+  // Kalori: "Masuk" berdiri sendiri di sebelah tumpukan "Dibakar" yang dirinci per sumber.
+  // Tidur: satu tumpukan tahapan; `total` cuma dipakai hari yang sumbernya tidak merinci tahapan.
   const allMetrics = [
-      { key: 'steps', label: 'Langkah', color: theme === 'dark' ? '#38bdf8' : '#0284c7', type: 'single' }, // Sky Blue
+      { key: 'steps', label: 'Langkah', color: theme === 'dark' ? '#38bdf8' : '#0284c7', type: 'single', target: 'targetSteps' }, // Sky Blue
       { key: 'calories', label: 'Kalori', color: theme === 'dark' ? '#818cf8' : '#4f46e5', type: 'grouped',  // Indigo
+        target: 'targetCalories',
         subMetrics: [
             { key: 'nutritionCalories', label: 'Masuk', color: theme === 'dark' ? '#34d399' : '#059669' },
-            { key: 'activityCalories', label: 'Dibakar', color: theme === 'dark' ? '#60a5fa' : '#2563eb' }
+            { key: 'calBmr', label: 'BMR', color: theme === 'dark' ? '#a1a1aa' : '#71717a', stackId: 'burn' },
+            { key: 'calSteps', label: 'Langkah', color: theme === 'dark' ? '#60a5fa' : '#2563eb', stackId: 'burn' },
+            { key: 'calCardio', label: 'Kardio', color: theme === 'dark' ? '#fb923c' : '#ea580c', stackId: 'burn' },
+            { key: 'calWeights', label: 'Beban', color: theme === 'dark' ? '#34d399' : '#059669', stackId: 'burn', top: true },
         ]
       },
-      { key: 'activeMinutes', label: 'Durasi Aktif', color: theme === 'dark' ? '#3b82f6' : '#1d4ed8', type: 'single' }, // Blue
-      { key: 'sleep', label: 'Tidur', color: theme === 'dark' ? '#a78bfa' : '#7c3aed', type: 'single' }, // Soft Purple
-      { key: 'energyScore', label: 'Skor Energi', color: theme === 'dark' ? '#94a3b8' : '#64748b', type: 'single' }, // Slate
+      { key: 'activeMinutes', label: 'Durasi Aktif', color: theme === 'dark' ? '#3b82f6' : '#1d4ed8', type: 'single', target: 'targetActiveMinutes' }, // Blue
+      { key: 'sleep', label: 'Tidur', color: theme === 'dark' ? '#a78bfa' : '#7c3aed', type: 'grouped', target: 'targetSleep',
+        subMetrics: [
+            { key: 'sleepDeepH', label: 'Deep', color: theme === 'dark' ? '#6d28d9' : '#5b21b6', stackId: 'sleep' },
+            { key: 'sleepLightH', label: 'Light', color: theme === 'dark' ? '#a78bfa' : '#7c3aed', stackId: 'sleep' },
+            { key: 'sleepRemH', label: 'REM', color: theme === 'dark' ? '#38bdf8' : '#0284c7', stackId: 'sleep' },
+            // `top` = potongan yang BISA jadi paling atas, jadi sudut membulatnya benar di dua
+            // keadaan: hari yang punya rincian tahapan (Bangun paling atas) dan hari yang tidak
+            // (sleepTotalOnly). Keduanya tidak pernah muncul bersamaan.
+            { key: 'sleepAwakeH', label: 'Bangun', color: theme === 'dark' ? '#f87171' : '#dc2626', stackId: 'sleep', top: true },
+            { key: 'sleepTotalOnly', label: 'Tidur', color: theme === 'dark' ? '#a78bfa' : '#7c3aed', stackId: 'sleep', top: true },
+        ]
+      },
+      { key: 'energyScore', label: 'Skor Energi', color: theme === 'dark' ? '#94a3b8' : '#64748b', type: 'single' }, // Slate — tidak punya target
   ];
   const chartMetricsList = [
       ...(metricKeys ? allMetrics.filter(m => metricKeys.includes(m.key)) : allMetrics),
@@ -62,12 +85,49 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
       // duluan, sama seperti kartu "Kalori Dimakan" (lihat DashboardTab.jsx).
       const lomealFresh = lomealToday?.ymd === todayStr ? lomealToday : null;
 
+      const dayWeight = Number(userWeight) || 70;
+      const targetSteps = activityTargets?.steps || null;
+      // Target durasi HARIAN diturunkan dari target mingguan dengan pembagi yang sama dengan
+      // kartu Durasi Aktif (5 hari latihan seminggu) — kalau beda, garis di grafik tidak akan
+      // cocok dengan angka target di kartunya.
+      const targetActive = activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 5) : null;
+      const targetSleepH = activityTargets?.sleep || null;
+      const targetBurn = activityTargets?.activityCalories || null;
+
       bioEntries.forEach(entry => {
           const d = new Date(entry.dateStr);
           const histBio = entry.bioData;
 
-          let actCals = Number(histBio?.activityCalories || 0);
+          const actCals = Number(histBio?.activityCalories || 0);
           const nutritionKcal = entry.dateStr === todayStr && lomealFresh ? lomealFresh.kcal : histBio?.nutritionCalories;
+
+          // Rincian kalori dibakar, rumusnya sama dengan kartu utama: BMR + langkah + latihan,
+          // dengan latihan dipecah kardio/beban PER LATIHAN (splitWorkoutCalories).
+          const bmr = Number(histBio?.bmr || 0);
+          const stepCals = Math.round(Number(histBio?.steps || 0) * 0.04);
+          let cardioCals = 0;
+          let weightCals = 0;
+          (history[entry.dateStr]?.workouts || [])
+              .filter(w => w.status === 'completed' || w.programId === 'adhoc')
+              .forEach(w => {
+                  const s = splitWorkoutCalories(Number(histBio?.weight) || dayWeight, w, w.log);
+                  cardioCals += s.kardio;
+                  weightCals += s.beban;
+              });
+          // Hari yang tidak punya rincian sama sekali (mis. angka dibakar datang dari override
+          // Lomeal/alat lain) tetap ditampilkan utuh sebagai satu balok, bukan hilang: sisanya
+          // dimasukkan ke BMR. Tanpa ini batangnya menyusut diam-diam dan tidak cocok dengan kartu.
+          const rinci = bmr + stepCals + cardioCals + weightCals;
+          const bmrShown = rinci > 0 ? bmr + Math.max(0, actCals - rinci) : actCals;
+
+          // Tahapan tidur tersimpan dalam MENIT (string) — grafiknya berskala jam.
+          const stageH = (v) => { const n = parseFloat(v); return Number.isFinite(n) && n > 0 ? n / 60 : 0; };
+          const deepH = stageH(histBio?.sleepDeep);
+          const lightH = stageH(histBio?.sleepLight);
+          const remH = stageH(histBio?.sleepRem);
+          const awakeH = stageH(histBio?.sleepAwake);
+          const totalSleep = histBio?.sleep ? Number(histBio.sleep) : null;
+          const adaTahapan = deepH + lightH + remH + awakeH > 0;
 
           data.push({
               name: d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }),
@@ -75,13 +135,28 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
               steps: histBio?.steps ? Number(histBio.steps) : null,
               nutritionCalories: nutritionKcal ? Number(nutritionKcal) : null,
               activityCalories: actCals > 0 ? actCals : null,
+              calBmr: actCals > 0 ? bmrShown || null : null,
+              calSteps: stepCals > 0 ? stepCals : null,
+              calCardio: cardioCals > 0 ? cardioCals : null,
+              calWeights: weightCals > 0 ? weightCals : null,
               activeMinutes: histBio?.activeMinutes ? Number(histBio.activeMinutes) : null,
-              sleep: histBio?.sleep ? Number(histBio.sleep) : null,
+              sleep: totalSleep,
+              // Sumber yang tidak merinci tahapan tetap dapat satu balok utuh lewat sleepTotalOnly,
+              // jadi hari lama tidak berubah jadi batang kosong.
+              sleepDeepH: adaTahapan ? deepH || null : null,
+              sleepLightH: adaTahapan ? lightH || null : null,
+              sleepRemH: adaTahapan ? remH || null : null,
+              sleepAwakeH: adaTahapan ? awakeH || null : null,
+              sleepTotalOnly: !adaTahapan ? totalSleep : null,
               energyScore: histBio?.energyScore ? Number(histBio.energyScore) : null,
+              targetSteps,
+              targetActiveMinutes: targetActive,
+              targetSleep: targetSleepH,
+              targetCalories: lomealTargets?.kcal || targetBurn || null,
           });
       });
       return data;
-  }, [history, lomealToday]);
+  }, [history, lomealToday, activityTargets, lomealTargets, userWeight]);
 
   const scrollRef = useRef(null);
 
@@ -140,21 +215,28 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
 
       const findMinMax = (dataList) => {
           dataList.forEach(d => {
+              const consider = (val) => {
+                  if (val === null || val === undefined) return;
+                  if (val < min) min = val;
+                  if (val > max) max = val;
+              };
               if (activeObj.type === 'single') {
-                  let val = d[activeMetric];
-                  if (val !== null && val !== undefined) {
-                      if (val < min) min = val;
-                      if (val > max) max = val;
-                  }
+                  consider(d[activeMetric]);
               } else {
+                  // Batang bertumpuk diukur dari JUMLAH satu tumpukan, bukan tiap potongnya —
+                  // pakai nilai per potong, puncak grafiknya kepotong setinggi potongan terbesar.
+                  const stacks = {};
                   activeObj.subMetrics.forEach(sub => {
-                      let val = d[sub.key];
-                      if (val !== null && val !== undefined) {
-                          if (val < min) min = val;
-                          if (val > max) max = val;
-                      }
+                      const val = d[sub.key];
+                      if (val === null || val === undefined) return;
+                      if (sub.stackId) stacks[sub.stackId] = (stacks[sub.stackId] || 0) + val;
+                      else consider(val);
                   });
+                  Object.values(stacks).forEach(consider);
               }
+              // Garis target ikut diperhitungkan, kalau tidak ia bisa jatuh di luar layar persis
+              // saat paling berguna: waktu targetnya jauh di atas capaian.
+              if (activeObj.target) consider(d[activeObj.target]);
           });
       };
 
@@ -246,7 +328,7 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
                      ))}
                  </svg>
 
-                 <BarChart
+                 <ComposedChart
                     width={chartWidth}
                     height={224}
                     data={multiChartData}
@@ -274,12 +356,17 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
                             )
                         ))}
                     </defs>
-                    <Tooltip 
+                    <Tooltip
                        formatter={(value, name, props) => {
+                           const k = props.dataKey;
+                           // Tidur ditulis "5 jam 18 mnt", bukan "5,3 h" — jam desimal itu tidak
+                           // pernah jadi cara orang membaca durasi tidur.
+                           if (k === 'sleep' || k?.startsWith('sleep')) return [formatSleepDuration(value), name];
+                           if (k === 'targetSleep') return [formatSleepDuration(value), 'Target'];
+                           if (k?.startsWith('target')) return [`${formatNumber(value, language)}${k === 'targetActiveMinutes' ? ' m' : k === 'targetSteps' ? '' : ' kcal'}`, 'Target'];
                            let unit = '';
-                           if (props.dataKey === 'sleep') unit = ' h';
-                           else if (props.dataKey === 'nutritionCalories' || props.dataKey === 'activityCalories') unit = ' kcal';
-                           else if (props.dataKey === 'activeMinutes') unit = ' m';
+                           if (k === 'nutritionCalories' || k === 'activityCalories' || k?.startsWith('cal')) unit = ' kcal';
+                           else if (k === 'activeMinutes') unit = ' m';
                            return [`${formatNumber(value, language)}${unit}`, name];
                        }}
                        cursor={{ fill: theme === 'dark' ? '#27272a' : '#f4f4f5' }} 
@@ -291,28 +378,46 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
                     <YAxis domain={yDomain} hide={true} />
                     
                     {activeObj.type === 'single' ? (
-                        <Bar 
-                            dataKey={activeMetric} 
-                            name={activeObj.label} 
+                        <Bar
+                            dataKey={activeMetric}
+                            name={activeObj.label}
                             fill={`url(#gradient-${activeMetric})`}
-                            radius={[50, 50, 0, 0]} 
-                            isAnimationActive={false} 
+                            radius={[50, 50, 0, 0]}
+                            isAnimationActive={false}
                             maxBarSize={30}
                         />
                     ) : (
                         activeObj.subMetrics.map(sub => (
-                            <Bar 
+                            <Bar
                                 key={sub.key}
-                                dataKey={sub.key} 
-                                name={sub.label} 
+                                dataKey={sub.key}
+                                name={sub.label}
+                                stackId={sub.stackId}
                                 fill={`url(#gradient-${sub.key})`}
-                                radius={[50, 50, 0, 0]} 
+                                // Sudut membulat cuma di potongan PALING ATAS tiap tumpukan —
+                                // kalau semua potongan dibulatkan, tumpukannya terlihat terputus.
+                                radius={!sub.stackId || sub.top ? [50, 50, 0, 0] : [0, 0, 0, 0]}
                                 isAnimationActive={false}
-                                maxBarSize={15}
+                                maxBarSize={sub.stackId ? 22 : 15}
                             />
                         ))
                     )}
-                 </BarChart>
+
+                    {/* Garis target — gaya sama persis dengan grafik Lomeal. Per-hari (bukan garis
+                        datar) supaya tetap benar kalau targetnya nanti disimpan per tanggal. */}
+                    {activeObj.target && (
+                        <Line
+                            type="bumpX"
+                            dataKey={activeObj.target}
+                            name="Target"
+                            stroke={TARGET_COLOR(theme)}
+                            strokeWidth={2}
+                            dot={false}
+                            isAnimationActive={false}
+                            connectNulls
+                        />
+                    )}
+                 </ComposedChart>
              </div>
          </div>
        )}

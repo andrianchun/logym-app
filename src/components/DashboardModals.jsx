@@ -9,13 +9,16 @@ import { checkOverallAIStatus } from '../utils/aiAgent';
 const DashboardModals = ({
   t, lang, theme,
   showManualModal, setShowManualModal, manualTab, setManualTab, 
-  modalDate, setModalDate, formBio, setFormBio, bioData, lomealToday,
+  modalDate, setModalDate, formBio, setFormBio, bioData, lomealToday, lomealOwnsNutrition,
   handleSaveManualData, handleDeleteBioData, soundEnabled, units, setConfirmModal,
   userApiKeys, setKeyStatuses, setShowSettings, keyStatuses, connectedApps
 }) => {
   const isImp = units?.weight === 'lbs';
   const todayStr = new Date().toLocaleDateString('en-CA');
   const isToday = modalDate === todayStr;
+  // Hari ini terkunci begitu Lomeal mengirim ringkasan live-nya; hari lain terkunci kalau Lomeal
+  // sudah pernah menulis kalori hari itu (ditandai di _manualFlags — lihat isLomealOwned).
+  const lomealLocked = !!(lomealToday && isToday) || !!lomealOwnsNutrition;
 
   const [isScanning, setIsScanning] = useState(false);
   const [scanError, setScanError] = useState('');
@@ -286,7 +289,12 @@ const DashboardModals = ({
                         <div className="bg-black/5 dark:bg-white/5 rounded-2xl p-4 border border-black/5 dark:border-white/5">
                             <div className="flex items-center justify-between mb-3">
                                 <h4 className={`text-sm font-black ${t.textMain}`}>Nutrisi & Gizi</h4>
-                                {lomealToday && isToday && (
+                                {/* Terkunci untuk hari APA PUN yang datanya sudah ditulis Lomeal, bukan
+                                    cuma hari ini — Lomeal mengirim tiap hari yang diedit, termasuk yang
+                                    lampau, jadi mengetik manual di hari itu cuma akan tertimpa. Hari
+                                    yang Lomeal tidak punya tetap bisa diisi tangan (jalur untuk sumber
+                                    lain, mis. MyFitnessPal lewat Health Connect). */}
+                                {lomealLocked && (
                                     <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-500 text-[9px] uppercase font-bold tracking-wider flex items-center gap-1">
                                         <Check size={10} /> TERKUNCI OLEH LOMEAL
                                     </span>
@@ -295,15 +303,18 @@ const DashboardModals = ({
                             <div className="grid grid-cols-1 gap-2.5">
                                 <div>
                                     <label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Kalori Dimakan (kcal)</label>
-                                    <SwipeInput 
-                                        language={lang?.id || 'ID'} 
-                                        value={lomealToday && isToday ? Math.round(lomealToday.kcal) : (formBio.nutritionCalories || '')} 
-                                        disabled={!!(lomealToday && isToday)} 
-                                        onChange={(val) => setFormBio({...formBio, nutritionCalories: val})} 
-                                        step={10} min={0} soundEnabled={soundEnabled} 
-                                        className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-xl outline-none font-bold text-sm text-center ${lomealToday && isToday ? 'opacity-50 cursor-not-allowed' : ''}`} 
-                                        placeholder={ph(bioData?.nutritionCalories, "2000")} 
+                                    <SwipeInput
+                                        language={lang?.id || 'ID'}
+                                        value={lomealToday && isToday ? Math.round(lomealToday.kcal) : (formBio.nutritionCalories || '')}
+                                        disabled={lomealLocked}
+                                        onChange={(val) => setFormBio({...formBio, nutritionCalories: val})}
+                                        step={10} min={0} soundEnabled={soundEnabled}
+                                        className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-xl outline-none font-bold text-sm text-center ${lomealLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                        placeholder={ph(bioData?.nutritionCalories, "2000")}
                                     />
+                                    {lomealLocked && (
+                                      <p className={`${t.textMuted} text-[10px] mt-1 text-center`}>Diatur dari Lomeal — ubah di sana, angkanya ikut di sini.</p>
+                                    )}
                                 </div>
                             </div>
                         </div>

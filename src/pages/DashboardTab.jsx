@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Activity, Zap, Brain, Footprints, HeartPulse, Moon, Droplets, Droplet, Dumbbell, Scale, RefreshCw, Trophy, Link2, Pencil, Settings, Info, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Wind, Utensils, Flame, Clock } from 'lucide-react';
-import { getLocalYMD, hasDeletedProjected } from '../data/constants';
+import { getLocalYMD, hasDeletedProjected, isLomealOwned, manualFieldValue } from '../data/constants';
 import DashboardModals from '../components/DashboardModals';
 import DashboardChart from '../components/DashboardChart';
 import ActivityChart from '../components/ActivityChart';
@@ -9,8 +9,8 @@ import VitalsChart, { VITALS_METRICS } from '../components/VitalsChart';
 import ProgressTab from './ProgressTab';
 import { MuscleProgress } from '../components/MuscleProgress';
 import SwipeInput from '../components/SwipeInput';
-import { formatNumber } from '../utils/numberFormat';
-import { parseWorkoutDurationMinutes, calculateWorkoutCalories, calculateSmartWorkoutCalories } from '../utils/workoutCalc';
+import { formatNumber, sleepHoursToParts } from '../utils/numberFormat';
+import { parseWorkoutDurationMinutes, calculateWorkoutCalories, calculateSmartWorkoutCalories, splitWorkoutCalories } from '../utils/workoutCalc';
 import { calcBMR } from '../utils/bmr';
 import { AreaChart, Area, ResponsiveContainer, YAxis } from 'recharts';
 
@@ -37,6 +37,10 @@ const PART_COLORS = {
     manual:  { bar: 'bg-zinc-400 dark:bg-zinc-500', dot: 'bg-zinc-400 dark:bg-zinc-500' },
     langkah: { bar: 'bg-blue-500', dot: 'bg-blue-500' },
     latihan: { bar: 'bg-emerald-500', dot: 'bg-emerald-500' },
+    // Warna kardio/beban disamakan dengan grafik subcard (ActivityChart) supaya satu warna
+    // berarti satu hal di seluruh dasbor.
+    kardio:  { bar: 'bg-orange-500', dot: 'bg-orange-500' },
+    beban:   { bar: 'bg-emerald-500', dot: 'bg-emerald-500' },
 };
 
 // Empat kotak di kartu Aktivitas Harian bottom-align isinya (`justify-end`), jadi angka besarnya
@@ -535,12 +539,19 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      
      let intTodayDur = 0;
      let intTodayCals = 0;
+     let intTodayCardio = 0;
+     let intTodayWeights = 0;
      let intTodayExercises = 0;
      todayCompletedWks.forEach(w => {
          const wDuration = parseWorkoutDurationMinutes(w.duration);
          intTodayDur += wDuration;
          intTodayCals += calculateSmartWorkoutCalories(currentWeight, w, w.log);
-         
+         // Pecahan kardio/beban dijumlahkan per sesi, dan splitWorkoutCalories menjamin
+         // kardio+beban tiap sesi = total sesi itu — jadi totalnya tetap cocok.
+         const s = splitWorkoutCalories(currentWeight, w, w.log);
+         intTodayCardio += s.kardio;
+         intTodayWeights += s.beban;
+
          if (w.exercises && Array.isArray(w.exercises)) {
              intTodayExercises += w.exercises.length;
          } else if (w.log && typeof w.log === 'object') {
@@ -576,7 +587,12 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      // (field itu ditimpa hasil hitung tiap render oleh efek auto-save di bawah) — kalau dari situ,
      // workoutCalories bakal numpuk dobel tiap render karena basisnya sendiri sudah kebawa workout
      // hasil render sebelumnya. Ini juga yang bikin bug "ratchet" versi sebelumnya (Math.max lawas).
-     const manualCals = isDailyCalsManual ? (Number(bioData._manualFlags.activityCalories) || 0) : 0;
+     //
+     // Lomeal menandai override-nya dengan boolean `true`, bukan angka (biometricSync.js:
+     // pushActivityOverrideToLogym) — `Number(true)` = 1, jadi dulu basisnya runtuh jadi
+     // Math.max(BMR, 1) = BMR dan angka override Lomeal hilang tanpa jejak. Itu sebabnya kartunya
+     // menampilkan "Manual" senilai BMR persis. manualFieldValue menangani dua bentuk itu.
+     const manualCals = isDailyCalsManual ? manualFieldValue(bioData, 'activityCalories') : 0;
      const dailyCals = isDailyCalsManual ? Math.max(bmrCalories, manualCals) + workoutCalories : totalDailyCals;
      
      let weeklyDur = 0;
@@ -620,7 +636,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          weeklyWorkoutDur += intDur;
          // Sama seperti dailyCals di atas: kalau manual, tambahkan tetap workout hari itu (intCal)
          // di atas basis manual (bukan extCal, yang bisa sudah ketimpa hasil hitung otomatis).
-         weeklyCals += isDayCalManual ? (Number(dayData.bioData?._manualFlags?.activityCalories) || 0) + intCal : Math.max(extCal, intCal);
+         weeklyCals += isDayCalManual ? manualFieldValue(dayData.bioData, 'activityCalories') + intCal : Math.max(extCal, intCal);
      }
      
      // Override with manual weekly if user explicitly saved a modified value in the modal
@@ -655,7 +671,11 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
              : [
                  { key: 'bmr', label: 'BMR', value: bmrCalories },
                  { key: 'langkah', label: 'Langkah', value: stepsCalories },
-                 { key: 'latihan', label: 'Latihan', value: workoutCalories },
+                 // Latihan dipecah per LATIHAN, bukan per sesi — sesi beban yang ditutup treadmill
+                 // menyumbang ke dua-duanya. Jumlah keduanya = workoutCalories, dijamin
+                 // splitWorkoutCalories, jadi rinciannya tidak pernah meleset dari angka besarnya.
+                 { key: 'kardio', label: 'Kardio', value: intTodayCardio },
+                 { key: 'beban', label: 'Beban', value: intTodayWeights },
                ],
          mergedDailyCalories: dailyCals,
          mergedDailyCaloriesFloor: totalDailyCals,
@@ -676,16 +696,27 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   // kalau manual pernah kesetel/kehapus jadi di bawah lantai, ini nyembuhin balik ke lantai.
   // activityCaloriesFloor juga ikut ditulis (lantai mentah, TANPA manual) — biar Lomeal bisa
   // baca lantainya sendiri sebelum push koreksi, gak cuma ngandelin Logym nyembuhin belakangan.
+  // Hari yang override-nya milik Lomeal DIKECUALIKAN dari penulisan activityCalories. Bukan cuma
+  // soal sopan santun kepemilikan — kalau ditulis, angkanya jadi berputar: manualFieldValue
+  // membaca bioData.activityCalories sebagai basis manual, sementara efek ini menimpanya dengan
+  // basis + kalori latihan. Tiap render basisnya membesar sendiri, dan kalori latihan menumpuk
+  // berlipat (bug "ratchet" yang sama seperti versi Math.max lawas). activityCaloriesFloor tetap
+  // ditulis: itu lantai hitungan Logym sendiri, bukan milik Lomeal.
+  const lomealOwnsCalories = isLomealOwned(bioData, 'activityCalories');
   useEffect(() => {
      if (activeDate !== todayStr || mergedDailyCalories <= 0) return;
-     const calsChanged = Number(bioData.activityCalories || 0) !== mergedDailyCalories;
+     const calsChanged = !lomealOwnsCalories && Number(bioData.activityCalories || 0) !== mergedDailyCalories;
      const floorChanged = Number(bioData.activityCaloriesFloor || 0) !== mergedDailyCaloriesFloor;
      if (calsChanged || floorChanged) {
          setHistory(prev => ({
              ...prev,
              [activeDate]: {
                  ...(prev[activeDate] || {}),
-                 bioData: { ...(prev[activeDate]?.bioData || {}), activityCalories: mergedDailyCalories, activityCaloriesFloor: mergedDailyCaloriesFloor }
+                 bioData: {
+                    ...(prev[activeDate]?.bioData || {}),
+                    ...(calsChanged ? { activityCalories: mergedDailyCalories } : {}),
+                    activityCaloriesFloor: mergedDailyCaloriesFloor,
+                 }
              }
          }));
      }
@@ -694,7 +725,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   // berubah tapi mergedDailyCalories tetap sama — deps gak berubah, efek gak jalan lagi, dan
   // angka lama itu nempel selamanya. Satu-satunya yang memulihkan cuma remount DashboardTab
   // (pindah tab lalu balik), persis gejala "PWA baru update setelah keluar-masuk tab di APK".
-  }, [mergedDailyCalories, mergedDailyCaloriesFloor, activeDate, todayStr, bioData.activityCalories, bioData.activityCaloriesFloor]);
+  }, [mergedDailyCalories, mergedDailyCaloriesFloor, activeDate, todayStr, bioData.activityCalories, bioData.activityCaloriesFloor, lomealOwnsCalories]);
 
   // Snapshot target/fase diet hari ini — di-refresh terus selama activeDate === todayStr,
   // otomatis membeku jadi arsip begitu tanggalnya lewat (efek ini gak pernah nyentuh hari lain).
@@ -1113,6 +1144,8 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                     onPointClick={navigateToWorkoutDate}
                     language={language}
                     lomealToday={lomealToday}
+                    activityTargets={activityTargets} lomealTargets={lomealTargets}
+                    userWeight={bioData.weight}
                     metricKeys={['steps', 'calories', 'activeMinutes']}
                     extraTabs={VITALS_METRICS(theme)}
                     renderExtra={(key) => (
@@ -1279,9 +1312,9 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                                          </>
                                      );
                                  }
-                                 const totalH = parseFloat(sleepStr);
-                                 const jam = Math.floor(totalH);
-                                 const menit = Math.round((totalH % 1) * 60);
+                                 // sleepHoursToParts membulatkan dari TOTAL menit — cara lama
+                                 // (`(h % 1) * 60` dibulatkan sendiri) memberi "5 jam 60 mnt".
+                                 const { jam, menit } = sleepHoursToParts(sleepStr) || { jam: 0, menit: 0 };
                                  return (
                                      <>
                                          <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>{jam}</span>
@@ -1392,6 +1425,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                      language={language}
                      metricKeys={['sleep', 'energyScore']}
                      storageKey="lyfit_sleep_chart"
+                     activityTargets={activityTargets}
                   />
                 )}
 
@@ -1634,6 +1668,9 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
         t={t} lang={lang} theme={theme}
         showManualModal={showManualModal} setShowManualModal={setShowManualModal} manualTab={manualTab} setManualTab={setManualTab}
         modalDate={modalDate} setModalDate={setModalDate} formBio={formBio} setFormBio={setFormBio} bioData={bioData} lomealToday={lomealToday}
+        // Dihitung dari bioData TANGGAL YANG DIEDIT, bukan tanggal aktif — modal ini bisa membuka
+        // hari lain, dan kepemilikan Lomeal ditentukan per hari.
+        lomealOwnsNutrition={isLomealOwned(history[modalDate]?.bioData, 'nutritionCalories')}
         handleSaveManualData={handleSaveManualData} handleDeleteBioData={handleDeleteBioData} soundEnabled={soundEnabled}
         units={units} setConfirmModal={setConfirmModal} userApiKeys={userApiKeys} keyStatuses={keyStatuses} setKeyStatuses={setKeyStatuses} setShowSettings={setShowSettings}
         connectedApps={connectedApps}

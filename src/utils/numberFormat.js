@@ -20,6 +20,35 @@ export const formatNumber = (value, language = 'ID', maximumFractionDigits = 2) 
 };
 
 /**
+ * Pecah durasi tidur (jam desimal) jadi { jam, menit } bulat.
+ *
+ * Menit dibulatkan dari TOTAL menit, bukan dari sisa pecahannya sendiri. Cara lama
+ * (`Math.round((h % 1) * 60)`) menghasilkan "5 jam 60 mnt" untuk 5,999 jam — jam-nya tidak ikut
+ * naik karena bagian bulatnya dihitung terpisah sebelum pembulatan.
+ *
+ * @param {number|string} hours
+ * @returns {{jam:number, menit:number}|null} null kalau tidak ada data
+ */
+export const sleepHoursToParts = (hours) => {
+  const h = typeof hours === 'string' ? parseFloat(hours) : Number(hours);
+  if (!Number.isFinite(h) || h <= 0) return null;
+  const total = Math.round(h * 60);
+  return { jam: Math.floor(total / 60), menit: total % 60 };
+};
+
+/**
+ * Durasi tidur sebagai teks: "5 jam 18 mnt". Dipakai di tempat yang butuh satu string utuh
+ * (tooltip grafik); kartu tidur memakai sleepHoursToParts karena tiap angkanya digayakan sendiri.
+ */
+export const formatSleepDuration = (hours) => {
+  const p = sleepHoursToParts(hours);
+  if (!p) return '-';
+  if (p.jam === 0) return `${p.menit} mnt`;
+  if (p.menit === 0) return `${p.jam} jam`;
+  return `${p.jam} jam ${p.menit} mnt`;
+};
+
+/**
  * Parses a localized number string back to a valid JS number (float).
  * Useful for inputs.
  * @param {string} formattedValue - The localized string
