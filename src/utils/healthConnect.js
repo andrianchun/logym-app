@@ -412,6 +412,27 @@ export const hcReadRange = async (startYmd, endYmd) => {
   return byDay;
 };
 
+// Nadi mentah dalam SATU rentang sempit (dipakai per sesi latihan, bukan per hari).
+//
+// Sengaja TIDAK menumpang heartRateLog harian di hcReadRange. Di implementasi Android plugin
+// (HealthManager.kt: readRecords), `limit` menghitung RECORD bukan sampel dan paging berhenti
+// begitu kuotanya habis — sementara `ascending` yang dikirim dari JS tidak pernah dipakai sama
+// sekali, jadi urutannya selalu default HC (paling lama dulu). Pada backfill 30 hari, kuota habis
+// di hari-hari tertua dan hari terbaru diam-diam kosong: persis hari yang paling dibutuhkan.
+// Rentang selebar satu sesi (1–2 jam) tidak pernah mendekati batas itu.
+export const hcReadHeartRateWindow = async (startISO, endISO) => {
+  if (!isNative()) return [];
+  try {
+    const res = await Health.readSamples({ dataType: 'heartRate', startDate: startISO, endDate: endISO, limit: 5000, ascending: true });
+    return (res?.samples || [])
+      .map((s) => ({ t: new Date(s.startDate).getTime(), v: Math.round(s.value) }))
+      .filter((s) => Number.isFinite(s.t) && s.v > 0);
+  } catch (e) {
+    console.warn('hcReadHeartRateWindow gagal:', e);
+    return [];
+  }
+};
+
 // Backfill: isi kekosongan histori N hari ke belakang. `hasOtherSource(ymd)` mengembalikan
 // true kalau hari itu udah punya data manual/sumber lain (jangan ditimpa). `onDayResult(ymd,
 // summary)` dipanggil per hari yang berhasil diisi — caller yang nulis ke Firestore.

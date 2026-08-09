@@ -1383,13 +1383,18 @@ const CalendarTab = ({
                                             
                                             const age = calculateAge(userProfile?.biometrics?.birthDate || userProfile?.birthDate) || 30;
                                             const maxHR = 220 - age;
-                                            
+
+                                            // Nadi asli dari Health Connect (jam tangan), diisi saat sinkron — lihat runHcSync
+                                            // di App.jsx. Kalau ada, ini yang dipakai; kurva karangan di bawah cuma cadangan
+                                            // buat sesi lama, latihan tanpa jam tangan, dan PWA (HC cuma hidup di APK).
+                                            const realHr = w.hr?.points?.length > 0 ? w.hr : null;
+
                                             // For now we use dummy data if no real data is found, but scale it around realAvgHr if it exists
                                             const baseHr = realAvgHr || (120 + (w.id.length % 20)); // Base pseudo-random HR
                                             let seed = w.id.charCodeAt(w.id.length - 1) || 1;
-                                            
+
                                             // Generate deterministic dummy curve based on workout ID so it looks stable but varied per session
-                                            const hrData = [
+                                            const dummyHrData = [
                                                 baseHr - 40, baseHr - 35, baseHr - 25, baseHr - 15, baseHr - 5,
                                                 baseHr, baseHr + 10, baseHr + 20, baseHr + 15, baseHr + 25,
                                                 baseHr + 30, baseHr + 35, baseHr + 25, baseHr + 35, baseHr + 20,
@@ -1400,21 +1405,33 @@ const CalendarTab = ({
                                                 return Math.max(60, Math.min(Math.round(v + noise), maxHR));
                                             });
                                             
+                                            const hrData = realHr ? realHr.points.map(p => p.v) : dummyHrData;
+
+                                            // Menit per zona. Data asli: bobot tiap titik = durasi sesi dibagi jumlah titik
+                                            // (titiknya hasil peringkasan per ember waktu, jadi lebarnya seragam). Data
+                                            // karangan: satu titik = satu menit seperti sebelumnya — kebetulan cocok karena
+                                            // memang dikarang 25 titik.
+                                            const minsPerPoint = realHr
+                                                ? (parseWorkoutDurationMinutes(w.duration) || hrData.length) / hrData.length
+                                                : 1;
                                             let zoneMins = [0,0,0,0,0];
                                             hrData.forEach(val => {
                                                 const p = val / maxHR;
-                                                if (p < 0.6) zoneMins[0]++;
-                                                else if (p < 0.7) zoneMins[1]++;
-                                                else if (p < 0.8) zoneMins[2]++;
-                                                else if (p < 0.9) zoneMins[3]++;
-                                                else zoneMins[4]++;
+                                                if (p < 0.6) zoneMins[0] += minsPerPoint;
+                                                else if (p < 0.7) zoneMins[1] += minsPerPoint;
+                                                else if (p < 0.8) zoneMins[2] += minsPerPoint;
+                                                else if (p < 0.9) zoneMins[3] += minsPerPoint;
+                                                else zoneMins[4] += minsPerPoint;
                                             });
-                                        
-                                            const maxDataHr = Math.max(...hrData);
-                                            const avgHr = realAvgHr || Math.round(hrData.reduce((a,b)=>a+b,0)/hrData.length);
-                                            
+                                            zoneMins = zoneMins.map(m => Math.round(m));
+
+                                            // Dari data ASLI pakai angka mentahnya (summarizeHeartRate menghitungnya dari
+                                            // sampel penuh) — puncak sesaat tidak boleh hilang cuma karena kurvanya dihaluskan.
+                                            const maxDataHr = realHr ? realHr.max : Math.max(...hrData);
+                                            const avgHr = realHr ? realHr.avg : (realAvgHr || Math.round(hrData.reduce((a,b)=>a+b,0)/hrData.length));
+
                                             const chartData = hrData.map((val, i) => ({ index: i, value: val }));
-                                            
+
                                             const zoneLabels = [
                                                 { name: 'Warm Up', color: 'bg-zinc-400', pct: 50, val: zoneMins[0] },
                                                 { name: 'Fat Burn', color: 'bg-sky-400', pct: 60, val: zoneMins[1] },
@@ -1433,7 +1450,9 @@ const CalendarTab = ({
                                                 <div key={w.id} className="mt-6 pt-6 border-t border-black/10 dark:border-white/10">
                                                     <div className="flex items-center justify-between mb-4">
                                                         <h4 className={`text-[10px] font-black uppercase tracking-widest ${t.textMain} truncate pr-2`}>{title}</h4>
-                                                        <span className="text-[8px] font-bold bg-blue-500/20 text-blue-500 px-1.5 py-0.5 rounded shrink-0">DUMMY DATA</span>
+                                                        {realHr
+                                                            ? <span className="text-[8px] font-bold bg-emerald-500/20 text-emerald-500 px-1.5 py-0.5 rounded shrink-0">HEALTH CONNECT</span>
+                                                            : <span className="text-[8px] font-bold bg-blue-500/20 text-blue-500 px-1.5 py-0.5 rounded shrink-0">DUMMY DATA</span>}
                                                     </div>
                                                     
                                                     <div className="flex justify-between items-end mb-4">

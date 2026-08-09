@@ -52,8 +52,8 @@ import { fetchExercisesFromApi } from './utils/exerciseDbApi';
 import { AI_MODELS, detectPlateaus, getLogiNotification } from './utils/aiAgent';
 import { calculateReadiness } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
-import { calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType } from './utils/workoutCalc';
-import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcWriteWorkoutCalories, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission } from './utils/healthConnect';
+import { calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate } from './utils/workoutCalc';
+import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcReadHeartRateWindow, hcWriteWorkoutCalories, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission } from './utils/healthConnect';
 import useDialog from './hooks/useDialog';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import UpdaterAlert from './components/UpdaterAlert';
@@ -368,6 +368,86 @@ export default function App() {
     });
   };
 
+  // Isi nadi asli (dari jam tangan, lewat Health Connect) ke sesi latihan yang belum punya,
+  // sejauh `days` hari ke belakang. MEMBACA SAJA — tidak menulis apa pun ke Health Connect.
+  //
+  // Dipakai dua jalur: sinkron rutin (30/7 hari) dan sapuan dalam sekali-jalan (setahun). Kalori
+  // sengaja TIDAK diambil dari sini: itu tetap hitungan Logym berbasis set, yang lebih presisi
+  // daripada taksiran wearable.
+  //
+  // Satu setHistory di akhir, bukan per sesi — setHistory per sesi berarti satu render seluruh
+  // app per sesi (alasan yang sama dengan mergeHcDays).
+  const fillSessionHeartRates = async (days) => {
+    const bySession = {};
+    let count = 0;
+    for (let i = 0; i <= days; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const ymd = getLocalYMD(d);
+      for (const w of history[ymd]?.workouts || []) {
+        if (w.status !== 'completed' || w.hr) continue;
+        const { start, end, guessed } = workoutWindow(w, ymd);
+        // `guessed` = jam sesinya tidak diketahui sama sekali (jatuh ke siang hari). Jangan
+        // ditarik: yang didapat adalah nadi pukul 12 siang, lalu tampil berlabel "HEALTH CONNECT"
+        // seolah nadi latihan sungguhan. Kurva dummy yang jujur mengaku dummy lebih baik.
+        if (guessed) continue;
+        const hr = summarizeHeartRate(await hcReadHeartRateWindow(start.toISOString(), end.toISOString()));
+        if (hr) { (bySession[ymd] = bySession[ymd] || {})[w.id] = hr; count++; }
+      }
+    }
+    if (count > 0) {
+      setHistory(prev => {
+        const next = { ...prev };
+        Object.entries(bySession).forEach(([ymd, byId]) => {
+          const day = prev[ymd];
+          if (!day || !Array.isArray(day.workouts)) return;
+          next[ymd] = {
+            ...day,
+            workouts: day.workouts.map(w => (byId[w.id] && !w.hr ? { ...w, hr: byId[w.id] } : w)),
+          };
+        });
+        return next;
+      });
+    }
+    return count;
+  };
+
+  // Dorong sesi latihan Logym (kalori + record sesi) ke Health Connect, sejauh `days` ke belakang.
+  //
+  // Health Connect menerima record bertanggal lampau — yang dibatasi cuma MEMBACA data lama
+  // (butuh READ_HEALTH_DATA_HISTORY), menulis ke belakang tidak dibatasi sama sekali.
+  // Aman diulang: tiap sesi dicatat lewat dedupeKey (id sesi), jadi tidak pernah dobel.
+  const pushWorkoutsToHc = async (days, canWriteSession) => {
+    let pushed = 0;
+    let sessions = 0;
+    for (let i = 0; i <= days; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const ymd = getLocalYMD(d);
+      for (const w of history[ymd]?.workouts || []) {
+        if (w.status !== 'completed') continue;
+        // JANGAN kirim balik sesi yang justru berasal dari Health Connect — itu bikin
+        // lingkaran duplikat (impor -> kirim balik -> terbaca lagi sebagai sesi baru).
+        if (w.source === 'healthconnect') continue;
+        const mins = parseWorkoutDurationMinutes(w.duration);
+        if (mins <= 0) continue;
+        const kcal = calculateSmartWorkoutCalories(userProfile?.weight, w, w.log);
+        // Satu sumber jendela waktu — sama persis dengan yang dipakai fillSessionHeartRates,
+        // supaya nadi dan record yang dikirim ke HC menggambarkan rentang yang identik.
+        const { start, end } = workoutWindow(w, ymd);
+        if (await hcWriteWorkoutCalories(start.toISOString(), end.toISOString(), kcal, w.id)) pushed++;
+        if (canWriteSession && await hcWriteWorkoutSession({
+          startDate: start.toISOString(),
+          endDate: end.toISOString(),
+          exerciseType: guessWorkoutType(w.overriddenExercises || w.exercises),
+          title: w.programName || 'Latihan',
+          dedupeKey: w.id,
+        })) sessions++;
+      }
+    }
+    return { pushed, sessions };
+  };
+
   // Sinkron dua arah dengan Health Connect.
   //
   // `silent` (dipakai sinkron OTOMATIS): tidak pernah memunculkan dialog izin dan tidak
@@ -404,37 +484,12 @@ export default function App() {
     // Health Connect menerima record bertanggal lampau — yang dibatasi cuma MEMBACA data
     // lama (butuh READ_HEALTH_DATA_HISTORY), menulis ke belakang tidak dibatasi.
     // Aman diulang: tiap sesi dicatat lewat dedupeKey (id sesi), jadi tidak pernah dobel.
-    let pushed = 0;
-    let sessions = 0;
+    const hrFilled = await fillSessionHeartRates(days);
     // Saat silent, jangan minta izin (bisa memunculkan dialog tiba-tiba) — cukup pakai yang
     // sudah ada. Kalau belum diberikan, sesi latihan dilewati dan akan terkirim di sinkron
     // manual berikutnya.
     const canWriteSession = silent ? await hcCheckWorkoutWritePermission() : await hcRequestWorkoutWritePermission();
-    for (let i = 0; i <= days; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const ymd = getLocalYMD(d);
-      for (const w of history[ymd]?.workouts || []) {
-        if (w.status !== 'completed') continue;
-        // JANGAN kirim balik sesi yang justru berasal dari Health Connect — itu bikin
-        // lingkaran duplikat (impor -> kirim balik -> terbaca lagi sebagai sesi baru).
-        if (w.source === 'healthconnect') continue;
-        const mins = parseWorkoutDurationMinutes(w.duration);
-        if (mins <= 0) continue;
-        const kcal = calculateSmartWorkoutCalories(userProfile?.weight, w, w.log);
-        // timestamp cuma "HH:MM" jam selesai; kalau tidak ada, taruh di siang hari.
-        const end = new Date(`${ymd}T${w.timestamp && /^\d{2}:\d{2}$/.test(w.timestamp) ? w.timestamp : '12:00'}:00`);
-        const start = new Date(end.getTime() - mins * 60000);
-        if (await hcWriteWorkoutCalories(start.toISOString(), end.toISOString(), kcal, w.id)) pushed++;
-        if (canWriteSession && await hcWriteWorkoutSession({
-          startDate: start.toISOString(),
-          endDate: end.toISOString(),
-          exerciseType: guessWorkoutType(w.overriddenExercises || w.exercises),
-          title: w.programName || 'Latihan',
-          dedupeKey: w.id,
-        })) sessions++;
-      }
-    }
+    const { pushed, sessions } = await pushWorkoutsToHc(days, canWriteSession);
 
     if (status) {
       const denied = [...(status.readDenied || []), ...(status.writeDenied || [])];
@@ -445,7 +500,7 @@ export default function App() {
         (denied.length ? ` Ditolak: ${denied.join(', ')}.` : '') +
         // Tanpa pembagi: rentangnya inklusif dua ujung (hari ini + N hari ke belakang = N+1)
         // dan beda zona waktu bisa nambah satu lagi, jadi "32/30" bikin bingung.
-        ` Histori masuk: ${filled} hari. Terkirim ke Health Connect: ${pushed} kalori, ${sessions} sesi latihan.`
+        ` Histori masuk: ${filled} hari, nadi ${hrFilled} sesi. Terkirim ke Health Connect: ${pushed} kalori, ${sessions} sesi latihan.`
       );
     }
     } finally {
@@ -456,6 +511,42 @@ export default function App() {
 
   // Tombol "Sinkron Ulang" di Pengaturan — dengan dialog izin & popup hasil.
   const handleHcBackfill = (days = 30) => runHcSync({ days, silent: false });
+
+  // SAPUAN DALAM SEKALI-JALAN, setahun ke belakang, DUA ARAH:
+  //   masuk  — nadi asli per sesi buat latihan lama yang belum punya
+  //   keluar — kalori + record sesi Logym yang belum pernah terkirim ke Health Connect
+  //
+  // Sengaja terpisah dari runHcSync dan tidak sekadar menaikkan `days` jadi 365 di sana: sinkron
+  // rutin juga menarik RINGKASAN HARIAN, dan menariknya setahun sekaligus berarti kueri selebar
+  // setahun per tipe data plus penulisan setahun bioData ke Firestore — dokumen tahunan itu
+  // berbatas 1 MiB dan minggu ini baru saja menabrak batas index entry-nya.
+  //
+  // Arah keluar tidak bisa dibatalkan: plugin ini tidak punya jalur hapus, jadi ratusan latihan
+  // bertanggal lampau yang muncul di Samsung Health akan menetap. Ini permintaan eksplisit user,
+  // bukan efek samping — jangan diaktifkan diam-diam kalau kelak fungsi ini dipakai ulang.
+  //
+  // Penanda "sudah" baru dipasang setelah selesai. Kalau app ditutup di tengah jalan, sapuannya
+  // diulang di pembukaan berikutnya — murah, karena sesi yang sudah punya nadi langsung dilewati
+  // dan yang sudah terkirim ditahan memo dedupe.
+  const DEEP_DAYS = 365;
+  const DEEP_KEY = 'hc_deep_backfill_v1';
+  const deepRunning = useRef(false);
+  const runHcDeepBackfill = async () => {
+    if (localStorage.getItem(DEEP_KEY) || deepRunning.current) return;
+    if (!healthConnectEnabled || !isDataLoaded || !isHistoryLoaded) return;
+    deepRunning.current = true;
+    try {
+      const hr = await fillSessionHeartRates(DEEP_DAYS);
+      const canWriteSession = await hcCheckWorkoutWritePermission();
+      const { pushed, sessions } = await pushWorkoutsToHc(DEEP_DAYS, canWriteSession);
+      localStorage.setItem(DEEP_KEY, '1');
+      console.log(`Sapuan setahun selesai — nadi masuk: ${hr} sesi; terkirim: ${pushed} kalori, ${sessions} sesi.`);
+    } catch (e) {
+      console.warn('Sapuan setahun gagal, akan dicoba lagi nanti:', e);
+    } finally {
+      deepRunning.current = false;
+    }
+  };
 
   // Dorong sesi yang baru selesai ke Health Connect, setelah sesinya benar-benar masuk
   // `history` (id-nya baru ada di situ, dan id itulah dedupeKey-nya). Lihat catatan panjang
@@ -476,7 +567,11 @@ export default function App() {
       if (Date.now() - hcLastSync.current < 10 * 60 * 1000) return;
       runHcSync({ days, silent: true });
     };
-    runHcSync({ days: 30, silent: true }); // pertama kali: langsung, tanpa jeda
+    // Sapuan setahun DIRANGKAI setelah sinkron biasa selesai, bukan dijalankan berbarengan:
+    // keduanya memakai fillSessionHeartRates & pushWorkoutsToHc, dan kalau tumpang tindih, 30 hari
+    // terakhir dikerjakan dua kali karena masing-masing membaca `history` versi sebelum yang lain
+    // menulis (`hcSyncing` cuma menjaga runHcSync dari dirinya sendiri, bukan dari sapuan ini).
+    runHcSync({ days: 30, silent: true }).then(runHcDeepBackfill); // pertama kali: langsung, tanpa jeda
     const onVisible = () => { if (document.visibilityState === 'visible') sync(7); };
     document.addEventListener('visibilitychange', onVisible);
     const poll = setInterval(() => sync(7), 30 * 60 * 1000);
@@ -2840,6 +2935,16 @@ export default function App() {
     if (healthConnectEnabled && workoutStartTime && durationSecs >= 60) {
       hcPushAfterSave.current = true;
     }
+    // Jam selesai dipatok SEKALI di sini, bukan `new Date()` baru di tiap cabang penyimpanan —
+    // dengan begitu `timestamp` dan `startedAt` dijamin menggambarkan sesi yang sama.
+    //
+    // `startedAt` = jam selesai dikurangi durasi yang BENAR-BENAR disimpan (bukan mentah dari
+    // workoutStartTime): di sesi yang dilanjutkan, durasi tersimpan bisa lebih panjang dari
+    // hitungan mundur sesi ini. Kalau startedAt tidak ikut durasi itu, jendela sesinya berujung
+    // di masa depan dan Health Connect menolak record-nya.
+    const endedAt = Date.now();
+    const endStamp = `${String(new Date(endedAt).getHours()).padStart(2, '0')}:${String(new Date(endedAt).getMinutes()).padStart(2, '0')}`;
+    const startedAtFor = (secs) => endedAt - secs * 1000;
     const formatDur = (secs) => {
       const h = Math.floor(secs / 3600);
       const m = Math.floor((secs % 3600) / 60);
@@ -2886,7 +2991,8 @@ export default function App() {
             log: cleanLogs,
             skipped: cleanSkipped,
             exercises: cleanExtra,
-            timestamp: `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`,
+            timestamp: endStamp,
+            startedAt: startedAtFor(durationSecs),
             duration: formatDur(durationSecs)
           };
         } else {
@@ -2914,7 +3020,8 @@ export default function App() {
                 log: cleanLogs,
                 skipped: cleanSkipped,
                 exercises: cleanExtra,
-                timestamp: `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`,
+                timestamp: endStamp,
+                startedAt: startedAtFor(finalSecs),
                 duration: formatDur(finalSecs)
               };
           } else {
@@ -2926,7 +3033,8 @@ export default function App() {
                 log: cleanLogs,
                 skipped: cleanSkipped,
                 exercises: cleanExtra,
-                timestamp: `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`,
+                timestamp: endStamp,
+                startedAt: startedAtFor(durationSecs),
                 duration: formatDur(durationSecs)
               });
           }
@@ -2982,7 +3090,8 @@ export default function App() {
               status: 'completed',
               log: cleanLogs,
               skipped: cleanSkipped,
-              timestamp: `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`,
+              timestamp: endStamp,
+              startedAt: startedAtFor(finalSecs),
               duration: formatDur(finalSecs),
               ...(frozenExercises ? { overriddenExercises: frozenExercises } : {})
             };
@@ -3030,7 +3139,8 @@ export default function App() {
                 status: 'completed',
                 log: cleanLogs,
                 skipped: cleanSkipped,
-                timestamp: `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`,
+                timestamp: endStamp,
+                startedAt: startedAtFor(finalSecs),
                 duration: formatDur(finalSecs),
                 ...(frozenExercises ? { overriddenExercises: frozenExercises } : {})
               };
@@ -3050,7 +3160,8 @@ export default function App() {
                  status: 'completed',
                  log: cleanLogs,
                  skipped: cleanSkipped,
-                 timestamp: `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`,
+                 timestamp: endStamp,
+                 startedAt: startedAtFor(durationSecs),
                  duration: durationSecs > 0 ? formatDur(durationSecs) : '00:00',
                  ...(p?.exercises?.length > 0 ? { overriddenExercises: JSON.parse(JSON.stringify(p.exercises)) } : {})
               });

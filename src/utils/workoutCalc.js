@@ -39,6 +39,101 @@ export const parseWorkoutDurationMinutes = (duration) => {
 };
 
 /**
+ * Rentang waktu sebenarnya satu sesi latihan: { start, end } (Date).
+ *
+ * `startedAt` (epoch ms, dicatat saat sesi disimpan) adalah sumber yang benar. Sesi lama tidak
+ * punya itu, jadi jam mulainya direkonstruksi mundur dari `timestamp` — yang cuma "HH:MM" jam
+ * SELESAI — dikurangi durasi. Sesi yang timestamp-nya pun tidak ada ditaruh di siang hari,
+ * sekadar supaya tidak pernah menghasilkan tanggal invalid.
+ *
+ * SATU fungsi buat dua pemakai: rentang yang dikirim ke Health Connect dan rentang yang dipakai
+ * memotong nadi WAJIB identik. Kalau dihitung terpisah di dua tempat, cepat atau lambat keduanya
+ * bergeser dan nadi satu sesi diambil dari menit milik sesi lain.
+ *
+ * `guessed: true` menandai sesi yang jam-nya TIDAK diketahui sama sekali (jatuh ke siang hari).
+ * Pemakai yang menarik data terikat waktu — nadi, misalnya — wajib melewatinya: menempelkan nadi
+ * pukul 12 siang ke sesi yang entah jam berapa itu mengarang data, dan lebih buruk lagi karena
+ * di UI ia tampil berlabel sumber asli.
+ *
+ * @param {object} workout record sesi (butuh `startedAt` atau `timestamp`, plus `duration`)
+ * @param {string} ymd tanggal sesi "YYYY-MM-DD" (dipakai kalau jatuh ke `timestamp`)
+ * @returns {{start: Date, end: Date, guessed: boolean}}
+ */
+export const workoutWindow = (workout, ymd) => {
+  const mins = parseWorkoutDurationMinutes(workout?.duration);
+  const startedAt = Number(workout?.startedAt) || 0;
+  if (startedAt > 0) {
+    const start = new Date(startedAt);
+    return { start, end: new Date(start.getTime() + mins * 60000), guessed: false };
+  }
+  const known = /^\d{2}:\d{2}$/.test(workout?.timestamp || '');
+  const end = new Date(`${ymd}T${known ? workout.timestamp : '12:00'}:00`);
+  return { start: new Date(end.getTime() - mins * 60000), end, guessed: !known };
+};
+
+/**
+ * Ringkas deret nadi mentah jadi kurva pendek + angka ringkasan.
+ *
+ * WAJIB diringkas sebelum disimpan: nadi dari jam tangan itu ~1 sampel/detik (sejam = 3.600
+ * titik), sedangkan riwayat SETAHUN tinggal di SATU dokumen Firestore yang batasnya 1 MiB.
+ *
+ * avg/min/max sengaja dihitung dari sampel ASLI, bukan dari hasil ringkasan: rata-rata per ember
+ * menumpulkan puncak, jadi nadi maksimal yang cuma bertahan beberapa detik akan hilang justru
+ * pada angka yang paling ingin dilihat orang setelah latihan.
+ *
+ * `t` pada hasilnya adalah DETIK sejak titik pertama, bukan epoch ms. Alasannya ukuran: epoch ms
+ * itu 13 digit per titik, dan ratusan sesi setahun menumpuk di satu dokumen yang berbatas 1 MiB —
+ * detik-offset cukup 3–4 digit dan informasinya sama saja untuk kurva satu sesi.
+ *
+ * @param {{t:number, v:number}[]} samples t = epoch ms, v = bpm
+ * @param {number} targetPoints jumlah titik kurva yang diinginkan
+ * @returns {{avg:number, min:number, max:number, points:{t:number,v:number}[]}|null} t = detik sejak awal
+ */
+export const summarizeHeartRate = (samples, targetPoints = 60) => {
+  const valid = (samples || [])
+    .map((s) => ({ t: Number(s?.t), v: Number(s?.v) }))
+    .filter((s) => Number.isFinite(s.t) && s.v > 0)
+    .sort((a, b) => a.t - b.t);
+  if (valid.length === 0) return null;
+
+  const values = valid.map((s) => s.v);
+  const summary = {
+    avg: Math.round(values.reduce((a, b) => a + b, 0) / values.length),
+    min: Math.min(...values),
+    max: Math.max(...values),
+  };
+
+  const t0 = valid[0].t;
+  const secOffset = (t) => Math.round((t - t0) / 1000);
+
+  // Sampel lebih sedikit dari target: tidak ada yang perlu diringkas, pakai apa adanya.
+  if (valid.length <= targetPoints) {
+    return { ...summary, points: valid.map((s) => ({ t: secOffset(s.t), v: s.v })) };
+  }
+
+  // Ember dibagi rata berdasarkan WAKTU, bukan jumlah sampel — jam tangan bisa merekam rapat saat
+  // bergerak dan renggang saat istirahat, dan pembagian per-jumlah bikin sumbu waktunya melar
+  // tidak beraturan.
+  const span = valid[valid.length - 1].t - t0;
+  if (span <= 0) return { ...summary, points: [{ t: 0, v: valid[0].v }] };
+
+  const buckets = [];
+  valid.forEach((s) => {
+    const idx = Math.min(targetPoints - 1, Math.floor(((s.t - t0) / span) * targetPoints));
+    (buckets[idx] = buckets[idx] || []).push(s);
+  });
+
+  const points = buckets
+    .filter(Boolean) // ember kosong (jeda rekaman) dibuang, bukan diisi nol yang bikin kurva terjun
+    .map((bucket) => ({
+      t: secOffset(bucket[0].t),
+      v: Math.round(bucket.reduce((a, s) => a + s.v, 0) / bucket.length),
+    }));
+
+  return { ...summary, points };
+};
+
+/**
  * Ambil [durasi menit, jarak km] dari satu set, apapun bentuk penyimpanannya.
  *
  * Set KARDIO (ImmersiveWorkout/ExerciseCard mode cardio) menyimpan { duration: MENIT, distance: KM }.
