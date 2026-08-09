@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import Model from './react-body-highlighter/index.js';
 import { ChevronDown } from 'lucide-react';
-import { normalizeMuscleKey } from '../data/constants';
+import { normalizeMuscleKey, resolveLoggedExercise } from '../data/constants';
 
 // Mapping from LyFit standard keys to react-body-highlighter muscle names
 const muscleMapping = {
@@ -180,8 +180,7 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
                 if (Object.keys(eLogs).length === 0) continue;
                 
                 for (const [exIdStr, sets] of Object.entries(eLogs)) {
-                    const baseId = typeof exIdStr === 'string' && exIdStr.includes('-') ? Number(exIdStr.split('-')[0]) : Number(exIdStr);
-                    const ex = exLookup[baseId];
+                    const ex = resolveLoggedExercise(exIdStr, exLookup);
                     if (ex && sets) {
                         const exType = ex.type || 'weight';
                         const exTargets = Array.isArray(ex.target) ? ex.target : [ex.target || 'Lainnya'];

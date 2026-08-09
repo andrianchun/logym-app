@@ -54,10 +54,11 @@ import { calculateReadiness } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
 import { calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds } from './utils/workoutCalc';
 import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcReadHeartRateWindow, hcWriteWorkoutCalories, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission } from './utils/healthConnect';
+import { bumpExercisePopularity } from './utils/exercisePopularity';
 import useDialog from './hooks/useDialog';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import UpdaterAlert from './components/UpdaterAlert';
-import { getLocalYMD, resolveProjectedProgramId, isLomealOwned, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos } from './data/constants';
+import { getLocalYMD, resolveProjectedProgramId, isLomealOwned, resolveLoggedExercise, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos } from './data/constants';
 import { serializeDay, reconcileHistory, workoutsToMap, workoutIdsFromBaseline, diffFields, stableStringify } from './utils/historySync';
 import { Loader2, Download, X } from 'lucide-react';
 
@@ -3012,6 +3013,25 @@ export default function App() {
     // oleh efek yang menunggu history berubah.
     if (healthConnectEnabled && workoutStartTime && durationSecs >= 60) {
       hcPushAfterSave.current = true;
+    }
+
+    // Sumbang hitungan pemakaian ke peringkat global (semua pengguna Logym). Namanya saja yang
+    // dikirim — bukan beban, repetisi, tanggal, atau apa pun yang mengikat ke orang tertentu.
+    // Sengaja tidak di-await: statistik hiasan tidak boleh menunda penyimpanan sesi, dan
+    // kegagalannya sudah ditelan di dalam.
+    {
+      const lookup = {};
+      programs.forEach(p => p.exercises?.forEach(ex => { lookup[ex.id] = ex; }));
+      exerciseLibrary.forEach(ex => { lookup[ex.id] = ex; });
+      (extraExercises || []).forEach(ex => { lookup[ex.id] = ex; });
+      // Hanya latihan yang BENAR-BENAR ada setnya dicentang selesai yang dihitung — kalau semua
+      // latihan terjadwal ikut dihitung, peringkatnya jadi cerminan program orang, bukan yang
+      // sungguh-sungguh dikerjakan.
+      const doneNames = Object.entries(exerciseLogs || {})
+        .filter(([, sets]) => Object.values(sets || {}).some(s => s?.done))
+        .map(([k]) => resolveLoggedExercise(k, lookup)?.name)
+        .filter(Boolean);
+      if (doneNames.length > 0) bumpExercisePopularity(doneNames, `${selectedDate}_${progId || focusWorkoutId || 'sesi'}`);
     }
     // Jam selesai dipatok SEKALI di sini, bukan `new Date()` baru di tiap cabang penyimpanan —
     // dengan begitu `timestamp` dan `startedAt` dijamin menggambarkan sesi yang sama.

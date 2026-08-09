@@ -9,6 +9,7 @@ import UnifiedExerciseCard from '../components/UnifiedExerciseCard';
 import FilterChips from '../components/FilterChips';
 import SwipeInput from '../components/SwipeInput';
 import GymManagerModal from '../components/GymManagerModal';
+import { fetchExercisePopularity, exerciseSlug } from '../utils/exercisePopularity';
 
 // ─── Blank exercise template ───────────────────────────────────────
 const blankExercise = () => ({
@@ -442,39 +443,39 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
     return [...deduplicatedLocal, ...onlineToAdd];
   }, [exerciseLibrary, onlineExercises]);
 
-  // ── Calculate Popularity Scores ───────────────────────────────────
-  const popularityScores = useMemo(() => {
+  // ── Peringkat global (semua pengguna Logym) ──────────────────────
+  // Diambil sekali per buka tab, di-cache 24 jam di localStorage. Kosong saat offline atau
+  // sebelum ada datanya — urutannya jatuh ke pemakaian sendiri, bukan jadi acak.
+  const [globalScores, setGlobalScores] = useState({});
+  useEffect(() => { fetchExercisePopularity().then(setGlobalScores); }, []);
+
+  // ── Pemakaian sendiri ─────────────────────────────────────────────
+  const ownScores = useMemo(() => {
     const scores = {};
-    if (history) {
-      Object.values(history).forEach(day => {
-        if (day.workouts && Array.isArray(day.workouts)) {
-          day.workouts.forEach(w => {
-            if (w.exercises && Array.isArray(w.exercises)) {
-              w.exercises.forEach(ex => {
-                if (ex.name) {
-                  const key = ex.name.toLowerCase();
-                  scores[key] = (scores[key] || 0) + 1;
-                }
-              });
-            }
-          });
-        }
+    Object.values(history || {}).forEach(day => {
+      (day.workouts || []).forEach(w => {
+        // `overriddenExercises` WAJIB ikut: sesi program menyimpan daftar latihannya di situ,
+        // sementara `exercises` cuma dipakai sesi Ekstra. Dulu yang dibaca hanya `exercises`,
+        // jadi seluruh sesi program tidak pernah menyumbang popularitas sama sekali.
+        (w.overriddenExercises || w.exercises || []).forEach(ex => {
+          if (!ex?.name) return;
+          const key = exerciseSlug(ex.name);
+          scores[key] = (scores[key] || 0) + 1;
+        });
       });
-    }
-    // Give massive boost to the 22 master exercises
-    const specialExercises = [
-      'smith machine incline bench press', 'seated cable rows', 'dumbbell bench press', 'cable seated lateral raise',
-      'triceps pushdown', 'dumbbell alternate bicep curl', 'smith machine squat', 'barbell romanian deadlift',
-      'barbell walking lunge', 'rocking standing calf raise', 'cable crunch', 'wide-grip lat pulldown',
-      'dumbbell shoulder press', 'dumbbell shrug', 'smith machine bench press', 'cable rear delt fly',
-      'cable rope overhead triceps extension', 'high cable curls', 'split squat with dumbbells',
-      'pull through', 'seated calf raise', 'plank'
-    ];
-    specialExercises.forEach(name => {
-      scores[name] = (scores[name] || 0) + 1000;
     });
     return scores;
   }, [history]);
+
+  // Gabungan: pemakaian sendiri dikalikan supaya kebiasaan user tetap menang atas tren global —
+  // daftar ini dipakai buat memilih latihan berikutnya, jadi yang sering dia pakai harus di depan.
+  // Bonus +1000 untuk 22 latihan master yang dulu di-hardcode sudah dibuang: itu mengunci urutan
+  // ke daftar tetap dan menutupi data sungguhan.
+  const popularityScores = useMemo(() => {
+    const merged = { ...globalScores };
+    Object.entries(ownScores).forEach(([k, v]) => { merged[k] = (merged[k] || 0) + v * 10; });
+    return merged;
+  }, [globalScores, ownScores]);
   // ── Apply Gym Constraints First ──────────────────────────────────
   const gymFilteredLibrary = useMemo(() => {
     let list = [...combinedLibrary];
@@ -532,21 +533,39 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
 
     // (Active Gym Equipment Filter moved to gymFilteredLibrary)
 
-    // Sort
-    if (sortOrder === 'popular') {
-      list.sort((a, b) => {
-        const scoreA = popularityScores[a.name.toLowerCase()] || 0;
-        const scoreB = popularityScores[b.name.toLowerCase()] || 0;
+    // Urutan di dalam kelompok. Favoritnya sendiri diangkat setelah ini.
+    const byOrder = (a, b) => {
+      if (sortOrder === 'popular') {
+        const scoreA = popularityScores[exerciseSlug(a.name)] || 0;
+        const scoreB = popularityScores[exerciseSlug(b.name)] || 0;
         if (scoreB !== scoreA) return scoreB - scoreA;
-        // fallback to alphabetical if scores are equal
         return a.name.localeCompare(b.name);
-      });
-    } else if (sortOrder === 'az') list.sort((a, b) => a.name.localeCompare(b.name));
-    else if (sortOrder === 'za') list.sort((a, b) => b.name.localeCompare(a.name));
-    else {
-      // newest: reverse combined list so user custom ones (end of local array) appear at top
-      list.reverse();
-    }
+      }
+      if (sortOrder === 'az') return a.name.localeCompare(b.name);
+      if (sortOrder === 'za') return b.name.localeCompare(a.name);
+      // "Terbaru" = terakhir DITAMBAHKAN user. Latihan buatan/tambahan sendiri memakai
+      // `id: Date.now()`, jadi id-nya sudah berupa stempel waktu — id terbesar = paling baru.
+      // Latihan bawaan (id kecil) dan latihan online (bukan angka) turun dengan sendirinya.
+      //
+      // Versi lama cuma `list.reverse()` atas gabungan [lokal…, online…]; karena latihan online
+      // ditempel di belakang, membaliknya justru menaruh latihan ONLINE paling atas — kebalikan
+      // dari maksudnya.
+      const ta = Number(a.id);
+      const tb = Number(b.id);
+      const va = Number.isFinite(ta) ? ta : -1;
+      const vb = Number.isFinite(tb) ? tb : -1;
+      if (vb !== va) return vb - va;
+      return a.name.localeCompare(b.name);
+    };
+
+    // Favorit selalu naik ke puncak, apa pun urutan yang dipilih — urutan yang dipilih tetap
+    // berlaku DI DALAM masing-masing kelompok, jadi tidak ada pilihan dropdown yang jadi mubazir.
+    list.sort((a, b) => {
+      const fa = a.isFavorite ? 1 : 0;
+      const fb = b.isFavorite ? 1 : 0;
+      if (fa !== fb) return fb - fa;
+      return byOrder(a, b);
+    });
 
     return list;
   }, [gymFilteredLibrary, viewMode, showFavoritesOnly, searchQuery, muscleFilter, equipFilter, levelFilter, sortOrder, popularityScores]);
@@ -844,7 +863,7 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
                       className={`px-3 py-1.5 rounded-lg ${t.inputBg} ${t.textMain} body-md outline-none appearance-none cursor-pointer pr-7`}
                     >
                       <option value="popular">Terpopuler</option>
-                      <option value="newest">{lang?.newest || 'Terbaru'}</option>
+                      <option value="newest">Terbaru Ditambahkan</option>
                       <option value="az">A - Z</option>
                       <option value="za">Z - A</option>
                     </select>

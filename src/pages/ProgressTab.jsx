@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { TrendingUp } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
-import { getLocalYMD, formatTarget, normalizeMuscleKey } from '../data/constants';
+import { getLocalYMD, formatTarget, normalizeMuscleKey, resolveLoggedExercise } from '../data/constants';
 
 const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibrary, soundEnabled, playSoundEffect, selectedDate, units, activePlanIds, isSubCard = false }) => {
   const [chartType, setChartType] = useState(() => {
@@ -100,9 +100,8 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
 
       Object.keys(eLogs).forEach(exIdStr => {
           const sets = eLogs[exIdStr];
-          const baseId = typeof exIdStr === 'string' && exIdStr.includes('-') ? Number(exIdStr.split('-')[0]) : Number(exIdStr);
-          const ex = exLookup[baseId];
-          
+          const ex = resolveLoggedExercise(exIdStr, exLookup);
+
           if (ex && sets) {
               const exName = ex.name;
               const exType = ex.type || 'weight';
@@ -166,8 +165,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                 const eLogs = (w.log && Object.keys(w.log).length > 0) ? (w.log.exerciseLogs || w.log) : activeSessionLogs;
                 
                 Object.keys(eLogs).forEach(exIdStr => {
-                    const baseId = typeof exIdStr === 'string' && exIdStr.includes('-') ? Number(exIdStr.split('-')[0]) : Number(exIdStr);
-                    const ex = exLookup[baseId];
+                    const ex = resolveLoggedExercise(exIdStr, exLookup);
                     if (ex) {
                         if (isMusc) {
                            const exTargets = Array.isArray(ex.target) ? ex.target : [ex.target || 'Lainnya'];

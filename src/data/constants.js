@@ -172,6 +172,37 @@ export const deletedProjectedMap = (dp) => {
 export const hasDeletedProjected = (dayData) =>
   Object.keys(deletedProjectedMap(dayData?.deletedProjected)).length > 0;
 
+/**
+ * Cari latihan yang dimaksud sebuah KUNCI LOG, dari peta id -> latihan.
+ *
+ * Kunci log punya beberapa bentuk yang hidup berdampingan:
+ *   "101"                                    id angka polos
+ *   "101-prog-1"                             id angka + id sesi (sesi program)
+ *   "3fa85f64-5717-4562-b3fc-2c963f66afa6"   id UUID (dari Tambah/Ganti Latihan)
+ *   "3fa85f64-...-afa6-w1"                   id UUID + id sesi
+ *   "123-1786258529614"                      latihan ekstra (id + stempel waktu)
+ *
+ * Cara lama `Number(key.split('-')[0])` benar HANYA untuk dua bentuk pertama. Untuk id UUID ia
+ * memotong di tanda hubung pertama lalu `Number("3fa85f64")` = NaN, latihannya tidak ketemu, dan
+ * seluruh datanya DIAM-DIAM HILANG dari grafik progres — bukan salah hitung, tapi tidak muncul
+ * sama sekali. Setiap latihan yang pernah ditambahkan/diganti user kena.
+ *
+ * Di sini dicoba dari yang paling panjang: kunci utuh dulu, baru dikupas satu potong dari
+ * belakang. Urutan itu penting — kalau dari yang terpendek, UUID akan tercocokkan ke potongan
+ * pertamanya dan bisa nyasar ke latihan lain.
+ */
+export const resolveLoggedExercise = (logKey, exLookup) => {
+  if (logKey === null || logKey === undefined || !exLookup) return undefined;
+  const key = String(logKey);
+  if (exLookup[key]) return exLookup[key];
+  const parts = key.split('-');
+  for (let i = parts.length - 1; i > 0; i--) {
+    const head = parts.slice(0, i).join('-');
+    if (exLookup[head]) return exLookup[head];
+  }
+  return undefined;
+};
+
 // Field bioData yang PEMILIKNYA Lomeal, bukan Logym. Lomeal menulis langsung ke history_years
 // Logym (lihat lomeal-app/src/utils/biometricSync.js) untuk SEMUA hari yang berubah, termasuk hari
 // lampau — jadi salurannya sudah benar dan Logym cukup berhenti menimpanya.
