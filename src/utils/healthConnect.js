@@ -15,7 +15,9 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 // native "Health.then()" yang gak ada → promise gak pernah selesai → semua pemanggil
 // nge-hang diam-diam selamanya. (Bug nyata: tombol "Hubungkan" macet di "Menghubungkan...".)
 import { Health } from '@capgo/capacitor-health';
-import { stepMinutesFromHourly } from './workoutCalc';
+// Ekstensi .js ditulis eksplisit supaya file ini bisa di-import Node apa adanya (buat tes).
+// Vite menerima kedua bentuk.
+import { stepMinutesFromHourly } from './workoutCalc.js';
 
 const isNative = () => Capacitor.isNativePlatform();
 
@@ -71,10 +73,15 @@ export const hcCheckStatus = async () => {
 // Tulis kalori terbakar satu sesi latihan yang baru selesai. startDate/endDate = rentang waktu
 // sesi (jadi durasinya ikut kebawa lewat rentang record, bukan cuma angka kalori polos) — app
 // lain yang baca ActiveCaloriesBurnedRecord dari Health Connect akan lihat kapan & berapa lama.
-// `dedupeKey` (opsional) — id sesi latihan. Health Connect MENJUMLAHKAN semua record dan
-// plugin ini tidak punya delete/update, jadi sesi yang sama tidak boleh terkirim dua kali
-// (mis. saat mendorong histori berulang kali). Sesi yang sudah terkirim dicatat di
-// localStorage dan dilewati di panggilan berikutnya.
+// `dedupeKey` (opsional) — id sesi latihan. Health Connect MENJUMLAHKAN semua record, dan plugin
+// capgo ini tidak mengekspos metadata sama sekali — jadi TIDAK ADA clientRecordId di sini seperti
+// pada hcWriteWorkoutSession, dan record yang terlanjur dobel tidak bisa dihapus.
+//
+// Karena itu penjaga sebenarnya BUKAN memo localStorage di bawah (yang hilang saat app
+// di-reinstall, lalu sapuan setahun menulis ulang semuanya), melainkan penanda `hcSync` yang
+// disimpan di record sesinya sendiri — lihat pushWorkoutsToHc di App.jsx. Penanda itu ikut ke
+// Firestore, jadi selamat dari reinstall DAN berlaku sama di semua perangkat.
+// Memo di bawah cuma menghemat panggilan native dalam satu sesi app.
 export const hcWriteWorkoutCalories = async (startDate, endDate, kcal, dedupeKey) => {
   if (!isNative() || !kcal || kcal <= 0) return false;
   const memo = dedupeKey ? `hc_workout_written_${dedupeKey}` : null;
@@ -155,15 +162,28 @@ export const hcRequestWorkoutWritePermission = async () => {
   }
 };
 
-// `dedupeKey` sama seperti hcWriteWorkoutCalories: Health Connect tidak bisa hapus/ubah record
-// lewat plugin, jadi sesi yang sama tidak boleh terkirim dua kali.
-export const hcWriteWorkoutSession = async ({ startDate, endDate, exerciseType, title, dedupeKey }) => {
+// `dedupeKey` (id sesi Logym) diteruskan sebagai clientRecordId, jadi Health Connect sendiri yang
+// MENG-UPSERT: menulis ulang sesi yang sama tidak pernah melahirkan record kedua. Ini pengganti
+// sebenarnya untuk memo localStorage — memo itu hilang saat app di-reinstall, dan sesudahnya
+// sapuan setahun menulis ulang semua sesi jadi duplikat yang permanen (HC tidak punya jalur hapus
+// lewat plugin ini).
+//
+// `version` dinaikkan pemanggil kalau isi sesinya berubah (mis. durasinya diperbaiki); HC membuang
+// tulisan dengan versi lebih rendah dari yang sudah tersimpan.
+//
+// Memo localStorage tetap dipakai sebagai penghemat panggilan native, BUKAN sebagai penjaga
+// korektnya — dan dilewati saat `version` naik, supaya koreksi benar-benar sampai.
+export const hcWriteWorkoutSession = async ({ startDate, endDate, exerciseType, title, dedupeKey, version = 1 }) => {
   if (!isNative()) return false;
   const memo = dedupeKey ? `hc_session_written_${dedupeKey}` : null;
-  if (memo && localStorage.getItem(memo)) return false;
+  if (memo && localStorage.getItem(memo) === String(version)) return false;
   try {
-    await ExerciseWriter.saveWorkout({ startDate, endDate, exerciseType, title });
-    if (memo) localStorage.setItem(memo, '1');
+    await ExerciseWriter.saveWorkout({
+      startDate, endDate, exerciseType, title,
+      clientRecordId: dedupeKey ? String(dedupeKey) : null,
+      clientRecordVersion: version,
+    });
+    if (memo) localStorage.setItem(memo, String(version));
     return true;
   } catch (e) {
     console.warn('hcWriteWorkoutSession gagal:', e);
@@ -193,19 +213,87 @@ const latestPerDay = (samples, mapValue) => {
   return byDay;
 };
 
-// Kelompokkan sample "titik waktu" APA ADANYA (semua titik, bukan cuma yang terbaru) jadi log
-// intraday per hari — dipakai buat grafik detail per jam (nadi, tensi, SpO2), beda dari
-// latestPerDay yang cuma nyimpen satu angka ringkasan per hari.
-const logPerDay = (samples, mapValue) => {
+// Batas titik per hari untuk log intraday.
+//
+// WAJIB ADA. Riwayat SETAHUN tinggal di SATU dokumen Firestore yang berbatas 1 MiB, sementara
+// jam tangan merekam nadi hampir tiap menit — sampel mentah berarti puluhan KB per hari, jadi
+// megabyte per tahun. Yang terjadi saat batas itu tertabrak bukan "grafiknya jadi jelek": SELURUH
+// tulisan ke history_years/<tahun> ditolak, dan seluruh latihan tahun itu berhenti tersimpan.
+// (Dokumen yang sama sudah pernah menabrak batas index entry 40.000 karena sebab sejenis.)
+//
+// Sesi latihan sudah lama diringkas lewat summarizeHeartRate dengan alasan yang persis sama;
+// log harian ini yang kelewat. 96 titik = satu titik tiap 15 menit, ~4 KB/hari, ~1,5 MB setahun
+// untuk KETIGA log digabung. Ini knob kalibrasi: naikkan kalau kurvanya terasa terlalu kasar,
+// tapi hitung dulu ongkosnya terhadap batas 1 MiB.
+const MAX_LOG_POINTS = 96;
+
+// Kelompokkan sample "titik waktu" jadi log intraday per hari — dipakai grafik detail per jam
+// (nadi, tensi, SpO2), beda dari latestPerDay yang cuma nyimpen satu angka ringkasan per hari.
+//
+// Titiknya diikat ke JAM DINDING (menit ke berapa dalam hari itu), bukan ke sebaran sampel:
+// dengan begitu ember hari ini dan hari kemarin mewakili rentang jam yang sama, dan sumbu
+// waktunya tidak melar cuma karena jam tangan merekam lebih rapat di satu hari. Ember kosong
+// (jam tanpa rekaman) dibuang, bukan diisi nol yang bikin kurva terjun ke lantai.
+//
+// Bentuk keluarannya SENGAJA tidak berubah ({ time, ts, ...nilai }) — VitalsChart, ActivityChart,
+// dan DashboardTab membacanya langsung, dan yang perlu diperbaiki cuma JUMLAHnya.
+const BUCKET_MINUTES = 1440 / MAX_LOG_POINTS;
+export const logPerDay = (samples, mapValue) => {
   const byDay = {};
   for (const s of samples) {
     const ymd = ymdOf(s.startDate);
-    if (!byDay[ymd]) byDay[ymd] = [];
-    const ts = new Date(s.startDate).getTime();
-    byDay[ymd].push({ time: new Date(ts).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }), ts, ...mapValue(s) });
+    const at = new Date(s.startDate);
+    const ts = at.getTime();
+    if (!Number.isFinite(ts)) continue;
+    const bucket = Math.floor((at.getHours() * 60 + at.getMinutes()) / BUCKET_MINUTES);
+    const day = (byDay[ymd] = byDay[ymd] || {});
+    (day[bucket] = day[bucket] || []).push({ ts, vals: mapValue(s) });
   }
-  Object.values(byDay).forEach((list) => list.sort((a, b) => a.ts - b.ts));
-  return byDay;
+
+  const out = {};
+  Object.entries(byDay).forEach(([ymd, buckets]) => {
+    out[ymd] = Object.values(buckets)
+      .map((list) => {
+        list.sort((a, b) => a.ts - b.ts);
+        // Rata-rata per ember. Tiap kunci numerik dirata-rata sendiri, jadi satu fungsi ini
+        // melayani nadi ({value}) maupun tensi ({sys, dia}) tanpa cabang khusus.
+        const avg = {};
+        Object.keys(list[0].vals).forEach((k) => {
+          const nums = list.map((x) => Number(x.vals[k])).filter(Number.isFinite);
+          if (nums.length > 0) avg[k] = Math.round(nums.reduce((a, b) => a + b, 0) / nums.length);
+        });
+        const ts = list[0].ts;
+        return { time: new Date(ts).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }), ts, ...avg };
+      })
+      .sort((a, b) => a.ts - b.ts);
+  });
+  return out;
+};
+
+/**
+ * Ringkas log intraday yang SUDAH TERSIMPAN (bentuk { time, ts, ...nilai }).
+ *
+ * logPerDay di atas cuma menjaga data BARU. Hari-hari yang terlanjur tersimpan sebelum batas ini
+ * ada tetap gemuk, dan merekalah yang sudah menggerus jatah 1 MiB dokumen tahunan. Sinkron rutin
+ * hanya menyentuh 7–30 hari terakhir, jadi sisanya tidak akan pernah sembuh sendiri.
+ *
+ * Mengembalikan ARRAY YANG SAMA (referensi identik) kalau sudah cukup pendek — supaya pemanggil
+ * bisa memakai perbandingan referensi untuk tahu ada yang berubah, dan hari yang sudah beres
+ * tidak ikut ditandai kotor lalu dikirim ulang ke Firestore tanpa guna.
+ */
+export const capIntradayLog = (list) => {
+  if (!Array.isArray(list) || list.length <= MAX_LOG_POINTS) return list;
+  const byDay = logPerDay(
+    list.map((p) => ({ startDate: new Date(p.ts), _p: p })),
+    (s) => {
+      // eslint-disable-next-line no-unused-vars
+      const { time, ts, ...vals } = s._p;
+      return vals;
+    }
+  );
+  // Digabung lintas key, bukan diambil satu: entri di sekitar tengah malam bisa jatuh ke tanggal
+  // tetangga, dan mengambil satu key berarti membuang titik-titik itu diam-diam.
+  return Object.values(byDay).flat().sort((a, b) => a.ts - b.ts);
 };
 
 // Jumlahkan durasi tidur per stage per hari, dikelompokkan dari TANGGAL BANGUN (akhir sesi),
@@ -328,6 +416,15 @@ export const hcReadRange = async (startYmd, endYmd) => {
         .forEach(([ymd, v]) => put(ymd, v)))
       .catch((e) => console.warn('hcReadRange basalCalories gagal:', e)),
 
+    // Disimpan sebagai `hcActiveCalories`, BUKAN `activityCalories`. Dua alasan, keduanya bug nyata:
+    //  1. Satuannya beda. Ini kalori AKTIF (tanpa BMR); `activityCalories` milik Logym adalah
+    //     TOTAL (BMR + langkah + latihan). Satu field dua satuan bikin grafik mingguan bergerigi:
+    //     hari yang disinkron HC ~600 kkal, hari hitungan Logym ~2.400 kkal.
+    //  2. Angka ini SUDAH MENGANDUNG record yang Logym sendiri tulis ke Health Connect
+    //     (pushWorkoutsToHc). Menimpakannya balik ke field yang juga menghitung latihan Logym =
+    //     satu sesi terhitung dua kali. Itu ping-pong yang bikin kalori hari lampau menggelembung.
+    // Sekarang murni informasi pembanding; yang dipakai berhitung selalu dailyBurnCalories.
+    //
     // Fallback dua tipe: 'calories' (ActiveCaloriesBurned, bisa di-aggregate langsung) dulu;
     // kalau kosong, baru 'totalCalories' (TotalCaloriesBurned) yang HARUS dibaca mentah lalu
     // dijumlah manual — queryAggregated plugin ini gak dukung tipe itu (lihat aggregateMetrics
@@ -337,7 +434,7 @@ export const hcReadRange = async (startYmd, endYmd) => {
         const res = await H.queryAggregated({ dataType: 'calories', startDate: startISO, endDate: endISO, bucket: 'day', aggregation: 'sum' });
         const hit = (res?.samples || []).filter((s) => s.value > 0);
         if (hit.length > 0) {
-          hit.forEach((s) => put(ymdOf(s.startDate), { activityCalories: Math.round(s.value) }));
+          hit.forEach((s) => put(ymdOf(s.startDate), { hcActiveCalories: Math.round(s.value) }));
           return;
         }
       } catch (e) { console.warn('hcReadRange calories gagal:', e); }
@@ -348,7 +445,7 @@ export const hcReadRange = async (startYmd, endYmd) => {
           const ymd = ymdOf(s.startDate);
           byDay[ymd] = (byDay[ymd] || 0) + (s.value || 0);
         });
-        Object.entries(byDay).forEach(([ymd, kcal]) => { if (kcal > 0) put(ymd, { activityCalories: Math.round(kcal) }); });
+        Object.entries(byDay).forEach(([ymd, kcal]) => { if (kcal > 0) put(ymd, { hcActiveCalories: Math.round(kcal) }); });
       } catch (e) { console.warn('hcReadRange totalCalories gagal:', e); }
     })(),
 

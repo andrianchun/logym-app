@@ -13,7 +13,7 @@ import { MuscleProgress } from './MuscleProgress';
 import { shareWorkoutToFeed } from '../utils/communityApi';
 import CreatePostModal from './CreatePostModal';
 import ActivityRings from './ActivityRings';
-import { parseWorkoutDurationMinutes, calculateWorkoutCalories, calculateSmartWorkoutCalories } from '../utils/workoutCalc';
+import { parseWorkoutDurationMinutes, calculateWorkoutCalories, calculateSmartWorkoutCalories, dailyBurnCalories } from '../utils/workoutCalc';
 let globalTemplateIndex = 0; // default to bodycomp
 
 export default function ShareCardGenerator({ user, setUser, t, theme, history, activityTargets, programs, exerciseLibrary, lang, language, soundEnabled, playSoundEffect, selectedDate, units, activePlanIds, userProfile, onPostCreated }) {
@@ -308,17 +308,16 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
     const mergedWeeklyActiveMinutes = bioData.weeklyDuration || weeklyDur;
     const mergedWeeklySessions = bioData.weeklySessions || weeklySess;
     const mergedWeeklyWorkoutDuration = weeklyDur; // simplified
-    // Calculate calories safely to avoid NaN
-    let workoutCal = 0;
     let dailyIntDur = 0;
     if (todayActivity.workouts?.length) {
-       todayActivity.workouts.forEach(w => {
-           const wMins = parseWorkoutDurationMinutes(w.duration);
-           workoutCal += calculateSmartWorkoutCalories(bioData.weight, w, w.log);
-           dailyIntDur += wMins;
-       });
+       todayActivity.workouts.forEach(w => { dailyIntDur += parseWorkoutDurationMinutes(w.duration); });
     }
-    const mergedDailyCalories = (Number(bioData.activityCalories) || 0) + workoutCal;
+    // Rumus yang SAMA dengan kartu dasbor. Versi lama di sini adalah
+    // `bioData.activityCalories + workoutCal` — dan `activityCalories` SUDAH mengandung kalori
+    // latihan (ditulis DashboardTab sebagai BMR + langkah + latihan), jadi latihan hari itu
+    // terhitung DUA KALI. Angka di kartu yang dibagikan ke publik selalu lebih besar dari angka
+    // di dasbor, untuk hari yang sama.
+    const mergedDailyCalories = dailyBurnCalories(bioData, todayActivity.workouts, bioData.weight, todayActivity.exerciseLogs).total;
     const mergedDailyActiveMinutes = Math.max(Number(bioData.activeMinutes || 0), dailyIntDur);
 
     const scoreStyle = bioData.bodyScore >= 80 ? 'border-emerald-500/50 text-emerald-400 bg-emerald-500/10' : bioData.bodyScore >= 60 ? 'border-amber-400/50 text-amber-400 bg-amber-400/10' : 'border-rose-500/50 text-rose-500 bg-rose-500/10';
@@ -928,7 +927,8 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                                 completed.forEach(w => {
                                      const dur = parseWorkoutDurationMinutes(w.duration) || 0;
                                      monthDuration += dur;
-                                     monthCalories += calculateSmartWorkoutCalories(userProfile?.weight, w, w.log) || 0;
+                                     const logsToUse = (w.log && Object.keys(w.log).length > 0) ? w.log : (dayData.exerciseLogs);
+                                     monthCalories += calculateSmartWorkoutCalories(userProfile?.weight, w, logsToUse) || 0;
                                 });
                             });
 
@@ -974,7 +974,8 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                                                     completed.forEach(w => {
                                                         const dur = parseWorkoutDurationMinutes(w.duration) || 0;
                                                         totalDuration += dur;
-                                                        totalCalories += calculateSmartWorkoutCalories(userProfile?.weight, w, w.log) || 0;
+                                                        const logsToUse = (w.log && Object.keys(w.log).length > 0) ? w.log : (dayData.exerciseLogs);
+                                                        totalCalories += calculateSmartWorkoutCalories(userProfile?.weight, w, logsToUse) || 0;
                                                     });
                                                     
                                                     const targetDuration = activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 7) : 45;

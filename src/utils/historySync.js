@@ -20,6 +20,67 @@ export const serializeDay = (val) => {
   return stableStringify(val ?? null);
 };
 
+// ── Sidik jari hari (baseline) ──────────────────────────────────────────────────────────────
+//
+// Baseline dulu menyimpan serializeDay UTUH per tanggal — artinya salinan KEDUA dari seluruh
+// riwayat, di localStorage yang jatahnya cuma ~5 MB dan sudah dipakai __CACHED_HISTORY. Begitu
+// jatahnya habis, setItem gagal dan baseline MEMBEKU di versi lama. Akibatnya bukan sekadar
+// "boot lebih lambat": rekonsiliasi lalu membaca salinan basi sebagai "perubahan lokal belum
+// terkirim", menolak snapshot server, dan mengirim salinan basi itu menimpa data yang lebih
+// baru dari device lain. Kehilangan data lintas device, dipicu semata-mata oleh penyimpanan penuh.
+//
+// Baseline tidak pernah dibaca isinya — cuma DIBANDINGKAN. Jadi yang perlu disimpan cukup sidik
+// jarinya. Satu-satunya bagian yang benar-benar dibaca adalah daftar id sesi (buat mendeteksi
+// penghapusan), dan itu ikut disertakan apa adanya.
+//
+// Bentuknya: "<panjang36>.<hash36>|<id1>,<id2>,..." — dari beberapa KB per hari jadi puluhan byte.
+//
+// TRADEOFF YANG DISENGAJA: hash 32-bit bisa bertabrakan, dan tabrakan berarti satu perubahan
+// dianggap "tidak ada" lalu tidak pernah terkirim. Panjang string ikut dimasukkan supaya dua isi
+// yang berbeda harus sama panjang DAN sama hash — peluangnya jauh di bawah peluang penyimpanan
+// penuh yang jadi sebab perubahan ini. Kalau kelak terasa kurang, perlebar ke dua hash (32 bit
+// dari awal + 32 bit dari akhir), jangan kembali menyimpan JSON utuh.
+const hash32 = (s) => {
+  let h = 0x811c9dc5; // FNV-1a
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(36);
+};
+
+export const dayFingerprint = (day) => {
+  const json = serializeDay(day);
+  const ids = (day && Array.isArray(day.workouts) ? day.workouts : [])
+    .map(w => String(w?.id))
+    .filter(id => id !== 'undefined' && id !== 'null');
+  return `${json.length.toString(36)}.${hash32(json)}|${ids.join(',')}`;
+};
+
+/**
+ * Ubah baseline format lama (serializeDay utuh) jadi sidik jari.
+ *
+ * Tanpa ini, baseline lama di localStorage tidak akan pernah cocok dengan sidik jari yang baru:
+ * SEMUA tanggal terlihat berubah dan seluruh riwayat setahun dikirim ulang sekali. Tulisannya
+ * idempoten jadi tidak merusak, tapi mahal dan tidak perlu — nilai lamanya PERSIS serializeDay,
+ * jadi sidik jarinya bisa dihitung langsung dari situ.
+ */
+export const migrateBaseline = (base) => {
+  if (!base) return base;
+  const out = {};
+  let migrated = 0;
+  Object.keys(base).forEach(d => {
+    const v = base[d];
+    if (typeof v !== 'string') return;
+    if (v.includes('|') && /^[0-9a-z]+\.[0-9a-z]+\|/.test(v)) { out[d] = v; return; } // sudah baru
+    const ids = (() => { try { return (JSON.parse(v)?.workouts || []).map(w => String(w?.id)).filter(id => id !== 'undefined'); } catch { return []; } })();
+    out[d] = `${v.length.toString(36)}.${hash32(v)}|${ids.join(',')}`;
+    migrated++;
+  });
+  if (migrated > 0) console.log(`[Baseline] ${migrated} tanggal dimigrasi ke sidik jari ringkas.`);
+  return out;
+};
+
 // ── Format kabel `workouts` ────────────────────────────────────────────────────────────────
 // Di dalam app, `day.workouts` itu ARRAY (93 titik baca bergantung pada itu — jangan diubah).
 // Tapi di Firestore array TIDAK bisa di-merge: setDoc({merge:true}) mengganti seluruh array.
@@ -56,11 +117,21 @@ export const workoutsToMap = (list, removedIds = [], deleteSentinel = null) => {
   return map;
 };
 
-/** Ambil daftar id sesi dari sebuah baseline JSON (hasil serializeDay). */
-export const workoutIdsFromBaseline = (baselineJson) => {
-  if (!baselineJson) return [];
+/**
+ * Ambil daftar id sesi dari sebuah entri baseline.
+ *
+ * Menerima sidik jari baru ("len.hash|id1,id2") maupun serializeDay utuh dari versi lama —
+ * baseline lama masih hidup di localStorage sampai migrateBaseline sempat jalan, dan salah baca
+ * di sini berarti penghapusan sesi tidak pernah terkirim (sesi yang dihapus muncul lagi).
+ */
+export const workoutIdsFromBaseline = (entry) => {
+  if (!entry || typeof entry !== 'string') return [];
+  const bar = entry.indexOf('|');
+  if (bar >= 0 && /^[0-9a-z]+\.[0-9a-z]+$/.test(entry.slice(0, bar))) {
+    return entry.slice(bar + 1).split(',').filter(Boolean);
+  }
   try {
-    const day = JSON.parse(baselineJson);
+    const day = JSON.parse(entry);
     return (day?.workouts || []).map(w => String(w?.id)).filter(id => id !== 'undefined');
   } catch { return []; }
 };
@@ -115,18 +186,20 @@ export const diffFields = (local, baseline) => {
  * @param {object} prev - state history lokal sekarang
  * @param {object} serverData - isi dokumen history dari Firestore
  * @param {object|null} baseline - map tanggal -> serializeDay terakhir yang diketahui tersimpan
+ * @param {string|null} snapshotYear - (Opsional) tahun dari dokumen snapshot ini (misal "2026").
  * @returns {{ next: object, baseline: object, kept: string[], taken: string[] }}
  */
-export const reconcileHistory = (prev, serverData, baseline) => {
+export const reconcileHistory = (prev, serverData, baseline, snapshotYear) => {
   const next = { ...(prev || {}) };
   const nextBaseline = { ...(baseline || {}) };
   const kept = [];
   const taken = [];
 
+  // 1. Ambil semua perubahan/penambahan dari server
   Object.keys(serverData || {}).forEach(d => {
     const localExists = prev && prev[d] !== undefined;
     // Tanggal yang belum pernah ada di device ini selalu aman diambil.
-    const hasUnsavedLocal = localExists && serializeDay(prev[d]) !== nextBaseline[d];
+    const hasUnsavedLocal = localExists && dayFingerprint(prev[d]) !== nextBaseline[d];
     if (hasUnsavedLocal) { kept.push(d); return; }
 
     const serverDay = serverData[d] && typeof serverData[d] === 'object'
@@ -141,9 +214,27 @@ export const reconcileHistory = (prev, serverData, baseline) => {
     };
     // Baseline selalu dalam bentuk APP (workouts sebagai array), sama seperti yang nanti
     // dibandingkan auto-save. Jangan pernah menyimpan bentuk kabel di sini.
-    nextBaseline[d] = serializeDay(serverDay);
+    nextBaseline[d] = dayFingerprint(serverDay);
     taken.push(d);
   });
+
+  // 2. Hapus tanggal yang hilang di server, tapi masih menyangkut di memori lokal.
+  // Jika snapshot ini adalah dokumen "2026", maka tanggal apa pun di tahun "2026"
+  // yang tidak ada di `serverData` berarti sudah dihapus di server.
+  if (snapshotYear) {
+    Object.keys(next).forEach(d => {
+      if (d.startsWith(snapshotYear) && (!serverData || serverData[d] === undefined)) {
+        // Hanya hapus jika tidak ada modifikasi lokal yang tertunda
+        const hasUnsavedLocal = dayFingerprint(prev[d]) !== nextBaseline[d];
+        if (hasUnsavedLocal) {
+          kept.push(d);
+        } else {
+          delete next[d];
+          delete nextBaseline[d];
+        }
+      }
+    });
+  }
 
   return { next, baseline: nextBaseline, kept, taken };
 };

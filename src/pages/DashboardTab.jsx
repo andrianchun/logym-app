@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Activity, Zap, Brain, Footprints, HeartPulse, Moon, Droplets, Droplet, Dumbbell, Scale, RefreshCw, Trophy, Link2, Pencil, Settings, Info, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Wind, Utensils, Flame, Clock } from 'lucide-react';
-import { getLocalYMD, hasDeletedProjected, isLomealOwned, manualFieldValue } from '../data/constants';
+import { getLocalYMD, hasDeletedProjected, isLomealOwned } from '../data/constants';
 import DashboardModals from '../components/DashboardModals';
 import DashboardChart from '../components/DashboardChart';
 import ActivityChart from '../components/ActivityChart';
@@ -10,7 +10,7 @@ import ProgressTab from './ProgressTab';
 import { MuscleProgress } from '../components/MuscleProgress';
 import SwipeInput from '../components/SwipeInput';
 import { formatNumber, sleepHoursToParts } from '../utils/numberFormat';
-import { parseWorkoutDurationMinutes, calculateWorkoutCalories, calculateSmartWorkoutCalories, splitWorkoutCalories } from '../utils/workoutCalc';
+import { parseWorkoutDurationMinutes, dailyBurnCalories } from '../utils/workoutCalc';
 import { calcBMR } from '../utils/bmr';
 import { AreaChart, Area, ResponsiveContainer, YAxis } from 'recharts';
 
@@ -205,6 +205,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   }, [isSleepExpanded]);
 
   const [sleepSubTab, setSleepSubTab] = useState('durasi');
+  const prefillBioRef = useRef(null);
   // Navigasi tanggal KHUSUS kartu tidur (0 = hari ini, 1 = kemarin, dst). Turunannya
   // (sleepDate/sleepBio) didefinisikan SESUDAH bioData di bawah — bukan di sini — karena
   // membacanya sebelum itu bikin error "Cannot access before initialization" saat render.
@@ -383,6 +384,10 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          initialBio.weeklySessions = weeklySess;
          
          setFormBio(initialBio);
+         // Salinan beku nilai prefill, dipakai handleSaveManualData buat membedakan "diketik user"
+         // dari "sudah terisi duluan oleh hitungan/sinkron". Tanpa pembanding ini tidak ada cara
+         // tahu field mana yang benar-benar disentuh.
+         prefillBioRef.current = { ...initialBio };
      }
   }, [modalDate, showManualModal, history]);
 
@@ -439,15 +444,36 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                  const existingBio = prev[modalDate]?.bioData || {};
                  const manualFlags = { ...(existingBio._manualFlags || {}) };
                  
+                 // HANYA field yang BENAR-BENAR DIUBAH user yang ditandai manual.
+                 //
+                 // Dulu setiap field tidak kosong ikut ditandai — padahal form ini sudah terisi
+                 // duluan oleh angka hasil hitungan Logym dan hasil sinkron Health Connect. Jadi
+                 // sekadar membuka modal lalu menekan Simpan (walau cuma mau mengisi SATU field)
+                 // membekukan semuanya jadi "manual". Akibatnya fatal: mergeHcDays melewati field
+                 // bertanda manual, jadi langkah, nadi, SpO2, dan tidur BERHENTI disinkron dari
+                 // Health Connect untuk hari itu, selamanya, tanpa pemberitahuan apa pun.
+                 // (Kejadian 9 Agu 2026 — kartu menampilkan "Manual 1.789" untuk angka yang tidak
+                 // pernah diketik siapa pun.)
+                 const sama = (a, b) => {
+                     if (a === null || a === undefined || a === '') return b === null || b === undefined || b === '';
+                     if (typeof a === 'object' || typeof b === 'object') return JSON.stringify(a) === JSON.stringify(b);
+                     return String(a) === String(b);
+                 };
                  Object.keys(evaluatedData).forEach(k => {
-                     if (evaluatedData[k] !== null && evaluatedData[k] !== '') {
-                         // Simpan nilainya sendiri (bukan cuma `true`) — activityCalories butuh angka
-                         // manual yang STABIL sebagai basis, supaya tidak ikut kebaca ulang dari
-                         // bioData.activityCalories yang tiap render ditimpa hasil hitung otomatis.
-                         manualFlags[k] = evaluatedData[k];
-                     } else {
-                         delete manualFlags[k]; // Hapus flag jika input dikosongkan agar bisa kembali auto
+                     const kosong = evaluatedData[k] === null || evaluatedData[k] === '';
+                     if (kosong) {
+                         delete manualFlags[k]; // dikosongkan = kembalikan ke otomatis
+                         return;
                      }
+                     // Tidak berubah dari nilai prefill → bukan input user, biarkan tetap otomatis.
+                     if (sama(evaluatedData[k], prefillBioRef.current?.[k])) {
+                         delete manualFlags[k];
+                         return;
+                     }
+                     // Simpan nilainya sendiri (bukan cuma `true`) — activityCalories butuh angka
+                     // manual yang STABIL sebagai basis, supaya tidak ikut kebaca ulang dari
+                     // bioData.activityCalories yang tiap render ditimpa hasil hitung otomatis.
+                     manualFlags[k] = evaluatedData[k];
                  });
 
                  return {
@@ -466,6 +492,20 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      });
   };
 
+  // Lepas SEMUA tanda manual hari itu tanpa menghapus angkanya. Hari yang terlanjur terkunci
+  // (mis. karena versi lama menandai seluruh isi form saat Simpan) tidak punya jalan pulih lain:
+  // selama tandanya ada, mergeHcDays melewati field itu dan Health Connect tidak akan pernah
+  // mengisinya lagi. Setelah dilepas, sinkron berikutnya menimpanya dengan data asli dari HC.
+  const handleUnlockManual = () => {
+     playSoundEffect('click', soundEnabled);
+     setHistory(prev => {
+        const bio = prev[modalDate]?.bioData;
+        if (!bio?._manualFlags) return prev;
+        const { _manualFlags, ...rest } = bio;
+        return { ...prev, [modalDate]: { ...prev[modalDate], bioData: rest } };
+     });
+  };
+
   const handleDeleteBioData = () => {
      playSoundEffect('click', soundEnabled);
      setHistory(prev => {
@@ -480,7 +520,12 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                      if (newBio._manualFlags) delete newBio._manualFlags[k];
                  });
              } else {
-                 ['steps', 'activeMinutes', 'activityCalories', 'nutritionCalories', 'sleep', 'sleepLog', 'heartRate', 'minHeartRate', 'maxHeartRate', 'bloodPressure', 'oxygenSaturation', 'heartRateLog', 'bloodPressureLog', 'oxygenSaturationLog', 'waterIntake', 'weeklyDuration', 'weeklySessions', 'weeklyCalories', 'sleepAwake', 'sleepRem', 'sleepLight', 'sleepDeep', 'hrv', 'energyScore'].forEach(k => {
+                 // `stepMinutes`, `distance`, dan `bmr` dulu tidak ikut disebut di sini — ketiganya
+                 // ditambahkan belakangan dan daftar ini tidak ikut diperbarui. Akibatnya setelah
+                 // "hapus data hari ini" ketiganya tertinggal dengan nilai lama sementara yang lain
+                 // kosong, dan tampilannya jadi campur aduk (Langkah "–" tapi Durasi Aktif tetap
+                 // menampilkan menit dari langkah).
+                 ['steps', 'stepMinutes', 'distance', 'bmr', 'activeMinutes', 'activityCalories', 'activityCaloriesFloor', 'nutritionCalories', 'sleep', 'sleepLog', 'heartRate', 'minHeartRate', 'maxHeartRate', 'restingHeartRate', 'bloodPressure', 'oxygenSaturation', 'heartRateLog', 'bloodPressureLog', 'oxygenSaturationLog', 'waterIntake', 'weeklyDuration', 'weeklySessions', 'weeklyCalories', 'sleepAwake', 'sleepRem', 'sleepLight', 'sleepDeep', 'hrv', 'energyScore'].forEach(k => {
                      newBio[k] = null;
                      if (newBio._manualFlags) delete newBio._manualFlags[k];
                  });
@@ -532,25 +577,26 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   const { mergedDailyActiveMinutes, mergedDurationParts, mergedCalorieParts, mergedDailyCalories, mergedDailyCaloriesFloor, mergedWeeklyActiveMinutes, mergedWeeklySessions, mergedWeeklyCalories } = useMemo(() => {
      const currentWeight = Number(bioData.weight) || 70; // Asumsi 70kg jika tidak ada data
      let dailyActive = Number(bioData.activeMinutes || 0);
-     const isDailyCalsManual = !!bioData._manualFlags?.activityCalories;
 
      const todayWks = history[activeDate]?.workouts || [];
      const todayCompletedWks = todayWks.filter(w => w.status === 'completed' || w.programId === 'adhoc');
-     
+
+     // Kalori harian: SATU rumus, di workoutCalc.js. Salinannya dulu ada di sini, di
+     // handleSaveWorkout, di ActivityChart, dan di ShareCardGenerator — dan ketiganya sempat
+     // berbeda, jadi kartu, grafik, dan kartu bagikan menampilkan angka berbeda untuk hari sama.
+     // `activeDate`, bukan `targetDateStr` — variabel itu tidak pernah ada di scope ini, jadi
+     // fallback "pakai log tingkat-hari kalau sesi tidak punya log sendiri" selalu berujung
+     // `history[undefined]` alias tidak pernah jalan. Sesi lama yang lognya tersimpan di level
+     // hari karena itu dihitung 0 kalori.
+     const burn = dailyBurnCalories(bioData, todayWks, currentWeight, history[activeDate]?.exerciseLogs);
+     const isDailyCalsManual = burn.isManual;
+     const intTodayCardio = burn.kardio;
+     const intTodayWeights = burn.beban;
+
      let intTodayDur = 0;
-     let intTodayCals = 0;
-     let intTodayCardio = 0;
-     let intTodayWeights = 0;
      let intTodayExercises = 0;
      todayCompletedWks.forEach(w => {
-         const wDuration = parseWorkoutDurationMinutes(w.duration);
-         intTodayDur += wDuration;
-         intTodayCals += calculateSmartWorkoutCalories(currentWeight, w, w.log);
-         // Pecahan kardio/beban dijumlahkan per sesi, dan splitWorkoutCalories menjamin
-         // kardio+beban tiap sesi = total sesi itu — jadi totalnya tetap cocok.
-         const s = splitWorkoutCalories(currentWeight, w, w.log);
-         intTodayCardio += s.kardio;
-         intTodayWeights += s.beban;
+         intTodayDur += parseWorkoutDurationMinutes(w.duration);
 
          if (w.exercises && Array.isArray(w.exercises)) {
              intTodayExercises += w.exercises.length;
@@ -573,28 +619,15 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      const manualActive = dailyActive;
      dailyActive = Math.max(manualActive, autoActive);
 
-     // Kalori Dibakar = BMR + Langkah Kaki + Workout — bmr Mifflin-St Jeor asli (sudah
-     // dihitung di atas buat kartu Komposisi Tubuh), fallback 1600 nyamain konvensi Lomeal
-     // (nutrition.js: calcBMR(profile) || 1600) buat profil yang belum lengkap.
-     const bmrCalories = bioData.bmr || 1600;
-     const stepsCalories = Math.round((Number(bioData.steps || 0) * 0.04)); // ~0.04 kcal per langkah
-     const workoutCalories = intTodayCals;
-     const totalDailyCals = bmrCalories + stepsCalories + workoutCalories;
-     // Jika diset manual, pakai nilai manual itu SEBAGAI BASIS (BMR+langkah pengganti), tapi
-     // workout Logym hari ini tetap selalu ditambahkan di atasnya — manual cuma menimpa sinkronisasi
-     // alat/app LAIN (lihat dialog konfirmasi di handleSaveManualData), bukan tracking latihan sendiri.
-     // Basis diambil dari _manualFlags (angka yang user ketik, stabil) BUKAN dari bioData.activityCalories
-     // (field itu ditimpa hasil hitung tiap render oleh efek auto-save di bawah) — kalau dari situ,
-     // workoutCalories bakal numpuk dobel tiap render karena basisnya sendiri sudah kebawa workout
-     // hasil render sebelumnya. Ini juga yang bikin bug "ratchet" versi sebelumnya (Math.max lawas).
-     //
-     // Lomeal menandai override-nya dengan boolean `true`, bukan angka (biometricSync.js:
-     // pushActivityOverrideToLogym) — `Number(true)` = 1, jadi dulu basisnya runtuh jadi
-     // Math.max(BMR, 1) = BMR dan angka override Lomeal hilang tanpa jejak. Itu sebabnya kartunya
-     // menampilkan "Manual" senilai BMR persis. manualFieldValue menangani dua bentuk itu.
-     const manualCals = isDailyCalsManual ? manualFieldValue(bioData, 'activityCalories') : 0;
-     const dailyCals = isDailyCalsManual ? Math.max(bmrCalories, manualCals) + workoutCalories : totalDailyCals;
-     
+     // Kalori Dibakar = BMR + Langkah Kaki + Workout. Semua cabangnya (termasuk basis manual,
+     // yang WAJIB dibaca lewat manualFieldValue karena Lomeal menandai override-nya dengan
+     // boolean `true` dan `Number(true)` = 1) ada di dailyBurnCalories.
+     const bmrCalories = burn.bmr;
+     const stepsCalories = burn.steps;
+     const workoutCalories = burn.workout;
+     const totalDailyCals = burn.floor;
+     const dailyCals = burn.total;
+
      let weeklyDur = 0;
      let weeklyWorkoutDur = 0;
      let weeklySess = 0;
@@ -609,22 +642,16 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          const dateStr = getLocalYMD(d);
          const dayData = history[dateStr] || {};
          
-         let extDur = Number(dayData.bioData?.activeMinutes || 0);
-         const extCal = Number(dayData.bioData?.activityCalories || 0);
-         const isDayCalManual = !!dayData.bioData?._manualFlags?.activityCalories;
-         const dayWeight = Number(dayData.bioData?.weight) || currentWeight;
+         const extDur = Number(dayData.bioData?.activeMinutes || 0);
 
          let intDur = 0;
-         let intCal = 0;
 
          const wks = dayData.workouts || [];
          const completedWks = wks.filter(w => w.status === 'completed' || w.programId === 'adhoc');
          weeklySess += completedWks.length;
 
          completedWks.forEach(w => {
-             const wDuration = parseWorkoutDurationMinutes(w.duration);
-             intDur += wDuration;
-             intCal += calculateSmartWorkoutCalories(dayWeight, w, w.log);
+             intDur += parseWorkoutDurationMinutes(w.duration);
 
              const exs = w.overriddenExercises || w.exercises || [];
              const isCardioWorkout = exs.length > 0 && exs.every(ex => ex.target?.some(t => t.toLowerCase().includes('cardio') || t.toLowerCase().includes('kardio')));
@@ -634,9 +661,12 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
 
          weeklyDur += Math.max(extDur, intDur);
          weeklyWorkoutDur += intDur;
-         // Sama seperti dailyCals di atas: kalau manual, tambahkan tetap workout hari itu (intCal)
-         // di atas basis manual (bukan extCal, yang bisa sudah ketimpa hasil hitung otomatis).
-         weeklyCals += isDayCalManual ? manualFieldValue(dayData.bioData, 'activityCalories') + intCal : Math.max(extCal, intCal);
+         // Rumus yang SAMA PERSIS dengan kartu harian. Versi lama di sini
+         // `Math.max(bioData.activityCalories, kaloriLatihan)` — membaca field tersimpan yang
+         // bisa saja ditulis Health Connect dengan satuan lain (kalori aktif, tanpa BMR). Hari
+         // yang tersinkron HC ikut dihitung dengan satuan berbeda dari hari yang tidak, jadi
+         // totalnya tidak pernah bisa dijelaskan.
+         weeklyCals += dailyBurnCalories(dayData.bioData, wks, currentWeight, dayData.exerciseLogs).total;
      }
      
      // Override with manual weekly if user explicitly saved a modified value in the modal
@@ -665,7 +695,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                ],
          mergedCalorieParts: isDailyCalsManual
              ? [
-                 { key: 'manual', label: 'Manual', value: Math.max(bmrCalories, manualCals) },
+                 { key: 'manual', label: 'Manual', value: burn.manualBase },
                  { key: 'latihan', label: 'Latihan', value: workoutCalories },
                ]
              : [
@@ -1671,6 +1701,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
         // Dihitung dari bioData TANGGAL YANG DIEDIT, bukan tanggal aktif — modal ini bisa membuka
         // hari lain, dan kepemilikan Lomeal ditentukan per hari.
         lomealOwnsNutrition={isLomealOwned(history[modalDate]?.bioData, 'nutritionCalories')}
+        hasManualLock={Object.keys(history[modalDate]?.bioData?._manualFlags || {}).length > 0} handleUnlockManual={handleUnlockManual}
         handleSaveManualData={handleSaveManualData} handleDeleteBioData={handleDeleteBioData} soundEnabled={soundEnabled}
         units={units} setConfirmModal={setConfirmModal} userApiKeys={userApiKeys} keyStatuses={keyStatuses} setKeyStatuses={setKeyStatuses} setShowSettings={setShowSettings}
         connectedApps={connectedApps}

@@ -2,7 +2,7 @@ import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip } from 'recharts';
 import { getLocalYMD } from '../data/constants';
 import { formatNumber, formatSleepDuration } from '../utils/numberFormat';
-import { splitWorkoutCalories } from '../utils/workoutCalc';
+import { dailyBurnCalories } from '../utils/workoutCalc';
 
 // Warna garis target, disamakan persis dengan grafik Lomeal (NutritionChart.jsx) supaya "garis
 // kuning = target" berarti sama di kedua app.
@@ -98,22 +98,27 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
           const d = new Date(entry.dateStr);
           const histBio = entry.bioData;
 
-          const actCals = Number(histBio?.activityCalories || 0);
           const nutritionKcal = entry.dateStr === todayStr && lomealFresh ? lomealFresh.kcal : histBio?.nutritionCalories;
 
-          // Rincian kalori dibakar, rumusnya sama dengan kartu utama: BMR + langkah + latihan,
-          // dengan latihan dipecah kardio/beban PER LATIHAN (splitWorkoutCalories).
+          // Rincian kalori dibakar — rumusnya BUKAN disalin dari kartu utama, tapi fungsi yang
+          // sama persis (dailyBurnCalories). Salinan terpisah di sini pernah membuat grafik dan
+          // kartu menampilkan angka berbeda untuk hari yang sama.
+          //
+          // Totalnya juga DIHITUNG, tidak dibaca dari bioData.activityCalories: field itu dulu
+          // ikut ditulis Health Connect dengan satuan berbeda (kalori aktif, tanpa BMR), jadi
+          // batang hari yang tersinkron HC menyusut drastis tanpa sebab yang kelihatan.
+          const burn = dailyBurnCalories(histBio, history[entry.dateStr]?.workouts, dayWeight, history[entry.dateStr]?.exerciseLogs);
+          // Hari yang benar-benar kosong tidak boleh dapat batang. dailyBurnCalories selalu
+          // memberi minimal BMR fallback 1600 (konvensi yang disamakan dengan Lomeal), jadi tanpa
+          // penjaga ini tiap hari tanpa data muncul sebagai batang 1600 kkal yang mengarang.
+          const punyaData = Number(histBio?.bmr) > 0 || Number(histBio?.steps) > 0 || burn.sessions > 0;
+          const actCals = punyaData ? burn.total : 0;
+          // BMR di grafik pakai angka tersimpan apa adanya (0 kalau hari itu belum punya),
+          // supaya hari tanpa data tidak mendapat batang palsu setinggi 1600 dari fallback.
           const bmr = Number(histBio?.bmr || 0);
-          const stepCals = Math.round(Number(histBio?.steps || 0) * 0.04);
-          let cardioCals = 0;
-          let weightCals = 0;
-          (history[entry.dateStr]?.workouts || [])
-              .filter(w => w.status === 'completed' || w.programId === 'adhoc')
-              .forEach(w => {
-                  const s = splitWorkoutCalories(Number(histBio?.weight) || dayWeight, w, w.log);
-                  cardioCals += s.kardio;
-                  weightCals += s.beban;
-              });
+          const stepCals = burn.steps;
+          const cardioCals = burn.kardio;
+          const weightCals = burn.beban;
           // Hari yang tidak punya rincian sama sekali (mis. angka dibakar datang dari override
           // Lomeal/alat lain) tetap ditampilkan utuh sebagai satu balok, bukan hilang: sisanya
           // dimasukkan ke BMR. Tanpa ini batangnya menyusut diam-diam dan tidak cocok dengan kartu.

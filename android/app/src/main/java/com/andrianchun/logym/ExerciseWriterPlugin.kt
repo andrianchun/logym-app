@@ -101,6 +101,15 @@ class ExerciseWriterPlugin : Plugin() {
      * startDate/endDate: ISO 8601. exerciseType: nama konstanta Health Connect (lihat
      * exerciseTypeOf) — kalau tidak dikenal, jatuh ke OTHER_WORKOUT supaya tidak pernah gagal
      * cuma karena nama jenis latihan.
+     *
+     * `clientRecordId` (id sesi Logym) + `clientRecordVersion` membuat Health Connect
+     * MENG-UPSERT, bukan menyisipkan record baru. Tanpa itu, satu-satunya penjaga duplikat adalah
+     * memo di localStorage — yang hilang begitu app di-reinstall atau datanya dibersihkan, lalu
+     * sapuan setahun menulis ULANG semua sesi. Health Connect tidak punya jalur hapus lewat
+     * plugin ini, jadi duplikatnya permanen dan kalori di Samsung Health melonjak dua kali lipat.
+     *
+     * Versi juga membuat sesi yang durasinya diperbaiki belakangan bisa MENGGANTI record lama,
+     * bukan menumpuk record kedua di sebelahnya.
      */
     @PluginMethod
     fun saveWorkout(call: PluginCall) {
@@ -117,6 +126,10 @@ class ExerciseWriterPlugin : Plugin() {
         }
         val type = exerciseTypeOf(call.getString("exerciseType"))
         val title = call.getString("title")
+        val clientRecordId = call.getString("clientRecordId")?.takeIf { it.isNotBlank() }
+        // Versi WAJIB naik tiap kali isinya berubah; Health Connect membuang tulisan dengan versi
+        // yang lebih rendah dari yang sudah tersimpan.
+        val version = call.getLong("clientRecordVersion") ?: 1L
         val zone = ZoneId.systemDefault()
 
         scope.launch {
@@ -135,7 +148,8 @@ class ExerciseWriterPlugin : Plugin() {
                             endZoneOffset = zone.rules.getOffset(end),
                             exerciseType = type,
                             title = title,
-                            metadata = Metadata.manualEntry()
+                            metadata = if (clientRecordId == null) Metadata.manualEntry()
+                                       else Metadata.manualEntryWithId(clientRecordId, version)
                         )
                     )
                 )

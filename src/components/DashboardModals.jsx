@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Check, CalendarDays, Loader2, ShieldAlert, HeartPulse, Camera, Image as ImageIcon, Scan } from 'lucide-react';
+import { X, Check, CalendarDays, Loader2, ShieldAlert, HeartPulse, Camera, Image as ImageIcon, Scan, RefreshCw } from 'lucide-react';
 import { playSoundEffect } from '../utils/audio';
 import SwipeInput from './SwipeInput';
 import { extractBiometricsFromImage } from '../utils/aiVision';
@@ -9,7 +9,7 @@ import { checkOverallAIStatus } from '../utils/aiAgent';
 const DashboardModals = ({
   t, lang, theme,
   showManualModal, setShowManualModal, manualTab, setManualTab, 
-  modalDate, setModalDate, formBio, setFormBio, bioData, lomealToday, lomealOwnsNutrition,
+  modalDate, setModalDate, formBio, setFormBio, bioData, lomealToday, lomealOwnsNutrition, hasManualLock, handleUnlockManual,
   handleSaveManualData, handleDeleteBioData, soundEnabled, units, setConfirmModal,
   userApiKeys, setKeyStatuses, setShowSettings, keyStatuses, connectedApps
 }) => {
@@ -196,8 +196,28 @@ const DashboardModals = ({
                          {isScanning ? <Loader2 size={16} className="animate-spin" /> : scanSuccess ? <Check size={16} /> : <ImageIcon size={16} />}
                          <input type="file" accept="image/*" onChange={handleAIScan} className="hidden" disabled={isScanning || scanSuccess} />
                      </label>
-                     <button 
-                         onClick={() => { 
+                     {/* Muncul hanya kalau hari itu memang punya field terkunci manual. Selama
+                         terkunci, Health Connect tidak akan pernah mengisi ulang field-nya — dan
+                         sebelum ada tombol ini, satu-satunya jalan keluar adalah menghapus seluruh
+                         data hari itu. */}
+                     {hasManualLock && (
+                       <button
+                           onClick={() => {
+                               setConfirmModal({
+                                   isOpen: true,
+                                   title: 'Kembalikan ke Otomatis?',
+                                   message: 'Semua kunci manual di tanggal ini dilepas. Angkanya tidak dihapus — Health Connect akan mengisi ulang langkah, nadi, SpO2, dan tidur pada sinkron berikutnya.',
+                                   onConfirm: handleUnlockManual
+                               });
+                           }}
+                           className="p-2 rounded-full bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 transition-colors"
+                           title="Kembalikan ke Otomatis"
+                       >
+                           <RefreshCw size={16}/>
+                       </button>
+                     )}
+                     <button
+                         onClick={() => {
                              setConfirmModal({
                                  isOpen: true,
                                  title: 'Hapus Data?',

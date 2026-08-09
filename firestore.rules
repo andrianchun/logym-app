@@ -44,6 +44,19 @@ service cloud.firestore {
         allow read, write: if isOwner(uid);
       }
 
+      // WAJIB IKUT KE RULES MASTER (darka-app/firestore.rules) — file ini vestigial, lihat
+      // catatan di paling atas. Tanpa dua aturan ini, tulisannya ditolak diam-diam:
+      //  - history_backups: jaring pengaman harian. Kegagalannya cuma masuk console.error, jadi
+      //    gejalanya adalah "backup tidak pernah ada" yang baru ketahuan saat dibutuhkan.
+      //  - active_sessions: satu dokumen per perangkat untuk sesi latihan yang sedang berjalan,
+      //    supaya sesi bisa dilanjutkan di perangkat lain.
+      match /history_backups/{day} {
+        allow read, write: if isOwner(uid);
+      }
+      match /active_sessions/{deviceId} {
+        allow read, write: if isOwner(uid);
+      }
+
       // Sesi chat Coach Raiga — satu dokumen per sesi, hanya pemiliknya yang boleh akses.
       match /ai_sessions/{sessionId} {
         allow read, write: if isOwner(uid);

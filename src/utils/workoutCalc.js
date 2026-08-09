@@ -1,3 +1,5 @@
+import { manualFieldValue, resolveLoggedExercise } from '../data/constants.js';
+
 // MET (Metabolic Equivalent) untuk latihan beban/resistance training. Dipakai konsisten di
 // seluruh app (dashboard, kartu riwayat kalender, share card) supaya estimasi kalori tidak
 // beda-beda tergantung layar yang dibuka. Ini estimasi kasar (MET tetap, tidak membedakan
@@ -203,6 +205,33 @@ const setExtraCalories = (weight, ex, set) => {
 };
 
 /**
+ * Ambil daftar set satu latihan dari sebuah objek log, apa pun bentuk kuncinya.
+ *
+ * Kunci log tidak seragam: `ex.id` polos, `${ex.id}-${workout.id}`, dan untuk latihan ekstra
+ * `${ex.id}-${timestamp}`. Mencocokkan dua bentuk saja seperti dulu bikin sesi yang kuncinya
+ * sedikit berbeda menghasilkan kalori NOL padahal set-nya jelas tercatat — angka yang salah
+ * total, dan tidak ada tanda apa pun bahwa penyebabnya cuma kunci tidak ketemu.
+ *
+ * Urutannya: dua bentuk baku dulu (paling murah dan paling sering benar), baru menyapu kunci
+ * yang berawalan `${ex.id}-` sebagai jaring pengaman.
+ */
+const setsForExercise = (logs, ex, workout) => {
+  if (!logs || !ex) return null;
+  const direct = logs[ex.id] || (workout?.id != null ? logs[`${ex.id}-${workout.id}`] : undefined);
+  if (direct) return direct;
+  const prefix = `${ex.id}-`;
+  const kandidat = Object.keys(logs).filter(k => k.startsWith(prefix));
+  if (kandidat.length === 0) return null;
+  if (kandidat.length === 1) return logs[kandidat[0]];
+  // Lebih dari satu kunci berawalan sama = `logs` ini log tingkat-HARI (dipakai saat `w.log`
+  // kosong), jadi isinya set dari BEBERAPA sesi. Mengambil yang pertama seperti dulu berarti
+  // sesi sore bisa dihitung memakai set sesi pagi. Utamakan yang berakhiran id sesi ini;
+  // baru kalau tidak ada yang cocok, pakai yang pertama sebagai jaring pengaman.
+  const milikSesi = workout?.id != null && kandidat.find(k => k.endsWith(`-${workout.id}`));
+  return logs[milikSesi || kandidat[0]];
+};
+
+/**
  * Apakah SATU latihan tergolong kardio. Per-latihan, bukan per-sesi — sesi campuran (program
  * beban yang ditutup treadmill) harus terbelah benar.
  *
@@ -241,11 +270,11 @@ export const splitWorkoutCalories = (weightKg, workout, logs, globalRestTime = 9
   exercises.forEach((ex) => {
     // Pencocokan log sama persis dengan calculateSmartWorkoutCalories — sesi program me-render
     // tiap latihan dengan id gabungan `${ex.id}-${workout.id}`.
-    const exLogs = (logs || {})[ex.id] || (workout?.id != null ? (logs || {})[`${ex.id}-${workout.id}`] : undefined);
-    if (!Array.isArray(exLogs)) return;
+    const exLogs = setsForExercise(logs, ex, workout);
+    if (!exLogs) return;
     const isCardio = isCardioExercise(ex);
-    exLogs.forEach((set) => {
-      if (!set.done) return;
+    Object.values(exLogs).forEach((set) => {
+      if (!set?.done) return;
       const cal = setExtraCalories(weight, ex, set);
       if (isCardio) extraCardio += cal; else extraBeban += cal;
     });
@@ -352,14 +381,16 @@ export const calculateSmartWorkoutCalories = (weightKg, workout, logs, globalRes
   const exercises = workout.overriddenExercises || workout.exercises || [];
 
   exercises.forEach(ex => {
-    // Sesi program biasa (bukan adhoc) me-render tiap exercise dengan id gabungan
-    const exLogs = logs[ex.id] || (workout.id != null ? logs[`${ex.id}-${workout.id}`] : undefined);
-    if (!exLogs || !Array.isArray(exLogs)) return;
+    const exLogs = setsForExercise(logs, ex, workout);
+    if (!exLogs) return;
     matchedAnyExercise = true;
 
-    exLogs.forEach(set => {
+    // Object.values, bukan Array.isArray lalu forEach: set bisa berbentuk objek ber-key angka
+    // setelah bolak-balik lewat penyimpanan. Dulu bentuk itu ditolak diam-diam dan seluruh
+    // latihannya dianggap tidak ada — hasilnya kalori NOL padahal setnya lengkap.
+    Object.values(exLogs).forEach(set => {
       // HANYA hitung kalori jika set benar-benar dicentang selesai
-      if (set.done) extraCalories += setExtraCalories(weight, ex, set);
+      if (set?.done) extraCalories += setExtraCalories(weight, ex, set);
     });
   });
 
@@ -376,6 +407,123 @@ export const calculateSmartWorkoutCalories = (weightKg, workout, logs, globalRes
   }
 
   return Math.round(baselineCalories + extraCalories);
+};
+
+/**
+ * Hitung ulang rekor kekuatan (10RM estimasi + beban terakhir) dari SELURUH riwayat, untuk
+ * latihan-latihan yang kuncinya disebut di `logKeys`.
+ *
+ * Kunci log diterjemahkan lewat resolveLoggedExercise, BUKAN `key.split('-')[0]`. Cara lama itu
+ * memotong id UUID di tanda hubung pertama, jadi setiap latihan yang pernah ditambahkan atau
+ * diganti user (semuanya ber-UUID) tidak pernah mendapat rekor — diam-diam, tanpa error, dan
+ * kolom 10RM-nya kosong selamanya. Aturan yang sama sudah dipakai di grafik progres; ini titik
+ * terakhir yang masih memakai versi lamanya.
+ *
+ * @param {object} history seluruh history
+ * @param {string[]} logKeys kunci log dari sesi yang baru disimpan
+ * @param {object} exLookup peta id -> latihan (program + library + latihan ekstra)
+ * @returns {object} { [idLatihan]: { rm10, lastWeight } } — hanya yang punya rekor
+ */
+export const recomputeStrengthRecords = (history, logKeys, exLookup) => {
+  const ids = new Set();
+  (logKeys || []).forEach((k) => {
+    const ex = resolveLoggedExercise(k, exLookup);
+    if (ex) ids.add(String(ex.id));
+  });
+  if (ids.size === 0) return {};
+
+  const out = {};
+  Object.keys(history || {}).forEach((dateStr) => {
+    const dateMs = new Date(dateStr).getTime();
+    if (!Number.isFinite(dateMs)) return;
+    (history[dateStr]?.workouts || []).forEach((wk) => {
+      if (wk?.status !== 'completed' || !wk.log) return;
+      Object.keys(wk.log).forEach((k) => {
+        const id = String(resolveLoggedExercise(k, exLookup)?.id);
+        if (!ids.has(id)) return;
+        const rec = (out[id] = out[id] || { rm10: 0, lastWeight: 0, _at: 0 });
+        let bestInSession = 0;
+        // Object.values, bukan .forEach langsung: set bisa berbentuk objek ber-key angka setelah
+        // bolak-balik lewat penyimpanan, dan `.forEach` pada objek melempar TypeError — satu sesi
+        // berbentuk begitu dulu menjatuhkan seluruh proses simpan latihan.
+        Object.values(wk.log[k] || {}).forEach((s) => {
+          if (!s || s.skipped || !(Number(s.w) > 0) || !(Number(s.r) > 0)) return;
+          // Epley 1RM, lalu diturunkan ke 10RM (faktor 1,3333).
+          const c10RM = (Number(s.w) * (1 + Number(s.r) / 30)) / 1.3333;
+          if (c10RM > rec.rm10) rec.rm10 = c10RM;
+          if (Number(s.w) > bestInSession) bestInSession = Number(s.w);
+        });
+        // `>=`: sesi yang baru saja disimpan bertanggal sama dengan rekor terakhir, dan yang
+        // terbaru harus menang.
+        if (bestInSession > 0 && dateMs >= rec._at) { rec._at = dateMs; rec.lastWeight = bestInSession; }
+      });
+    });
+  });
+
+  const clean = {};
+  Object.entries(out).forEach(([id, r]) => {
+    if (r.rm10 > 0) clean[id] = { rm10: Math.round(r.rm10 * 10) / 10, lastWeight: r.lastWeight };
+  });
+  return clean;
+};
+
+/**
+ * Kalori terbakar SATU HARI: BMR + langkah + latihan.
+ *
+ * SATU rumus untuk semua pemakai. Sebelumnya rumus ini disalin di empat tempat — useMemo
+ * DashboardTab, handleSaveWorkout, ActivityChart, dan ShareCardGenerator — dan salinan yang
+ * berbeda-beda itulah yang membuat kartu, grafik, dan kartu bagikan menampilkan tiga angka
+ * berbeda untuk hari yang sama.
+ *
+ * KENAPA DIHITUNG, BUKAN DIBACA dari `bioData.activityCalories`: field itu pernah jadi rebutan.
+ * Health Connect menimpanya dengan kalori AKTIF (tanpa BMR, dan sudah termasuk record yang Logym
+ * sendiri tulis ke sana), sementara Logym menulisnya sebagai TOTAL (dengan BMR). Satu field, dua
+ * satuan, dua penulis — hari yang disinkron HC tampil ~600 kkal, hari hitungan Logym ~2.400 kkal,
+ * dan latihan yang sama terhitung dua kali. Sekarang field itu murni KELUARAN (buat Lomeal yang
+ * membacanya langsung), tidak pernah jadi masukan hitungan.
+ *
+ * @param {object} bioData bioData hari itu
+ * @param {Array} workouts day.workouts hari itu
+ * @param {number} fallbackWeightKg dipakai kalau hari itu tidak mencatat berat badan
+ * @param {object} [dayExerciseLogs] log tingkat-hari, untuk sesi yang `log`-nya kosong
+ */
+export const dailyBurnCalories = (bioData, workouts, fallbackWeightKg, dayExerciseLogs) => {
+  const bio = bioData || {};
+  const weight = Number(bio.weight) || Number(fallbackWeightKg) || 70;
+
+  let workout = 0;
+  let kardio = 0;
+  let beban = 0;
+  let sessions = 0;
+  (Array.isArray(workouts) ? workouts : [])
+    .filter(w => w?.status === 'completed' || w?.programId === 'adhoc')
+    .forEach(w => {
+      const logs = (w.log && Object.keys(w.log).length > 0) ? w.log : dayExerciseLogs;
+      workout += calculateSmartWorkoutCalories(weight, w, logs);
+      // Rincian diambil dari splitWorkoutCalories, yang menjamin kardio+beban = total sesi itu —
+      // jadi segmen bar tidak pernah meleset dari angka besarnya.
+      const s = splitWorkoutCalories(weight, w, logs);
+      kardio += s.kardio;
+      beban += s.beban;
+      sessions++;
+    });
+
+  // Fallback 1600 menyamakan konvensi Lomeal (nutrition.js: calcBMR(profile) || 1600).
+  const bmr = Number(bio.bmr) || 1600;
+  const steps = Math.round(Number(bio.steps) * 0.04) || 0;
+  const floor = bmr + steps + workout;
+
+  // Angka manual menggantikan BASIS (BMR + langkah) saja — latihan Logym hari itu SELALU
+  // ditambahkan di atasnya. Manual dimaksudkan untuk menimpa sinkronisasi alat/app LAIN, bukan
+  // pencatatan latihan sendiri.
+  const isManual = !!bio._manualFlags?.activityCalories;
+  const manualBase = isManual ? Math.max(bmr, manualFieldValue(bio, 'activityCalories')) : 0;
+
+  return {
+    total: isManual ? manualBase + workout : floor,
+    floor,   // lantai mentah TANPA manual — dipakai Lomeal sebagai basis koreksi
+    workout, kardio, beban, bmr, steps, sessions, isManual, manualBase,
+  };
 };
 
 /**

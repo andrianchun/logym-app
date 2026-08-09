@@ -2,7 +2,7 @@
 // Jalankan: node src/utils/dashboardCalc.test.mjs
 // Kalau rincian tidak berjumlah sama dengan angka besarnya, user berhenti percaya semua angkanya.
 import assert from 'node:assert/strict';
-import { splitWorkoutCalories, isCardioExercise, calculateSmartWorkoutCalories } from './workoutCalc.js';
+import { splitWorkoutCalories, isCardioExercise, calculateSmartWorkoutCalories, dailyBurnCalories } from './workoutCalc.js';
 import { sleepHoursToParts, formatSleepDuration } from './numberFormat.js';
 
 // --- isCardioExercise ----------------------------------------------------
@@ -84,6 +84,126 @@ cocokDenganTotal(sesi([beban]), {}, 'tanpa log beban');
 // 8. Sesi kosong / durasi nol tidak bikin NaN atau pembagian nol.
 assert.deepEqual(splitWorkoutCalories(BERAT, sesi([], '00:00'), {}), { kardio: 0, beban: 0 });
 assert.deepEqual(splitWorkoutCalories(BERAT, null, {}), { kardio: 0, beban: 0 });
+
+// 9. REGRESI 9 Agu 2026 — kalori NOL padahal setnya lengkap.
+//    Sesi yang disimpan ulang bisa punya id berbeda dari saat lognya dibuat, jadi kunci
+//    `${ex.id}-${idLama}` tidak cocok dengan `${ex.id}-${idBaru}`. Dulu latihannya dilewati
+//    diam-diam dan kalorinya jadi 0 — angka yang salah total tanpa tanda apa pun.
+{
+  const w = { id: 'id-baru', exercises: [beban], duration: '45:00' };
+  const logs = { '1-id-lama': logSet(4, { r: 10, w: 40 }) };
+  const total = calculateSmartWorkoutCalories(BERAT, w, logs);
+  assert.ok(total > 0, 'kalori 0 padahal set tercatat — kunci log tidak tercocokkan');
+  cocokDenganTotal(w, logs, 'kunci sesi berbeda');
+}
+
+// 10. Set berbentuk OBJEK ber-key angka (bukan array) setelah bolak-balik penyimpanan.
+//     Dulu ditolak Array.isArray lalu seluruh latihannya dianggap tidak ada.
+{
+  const w = sesi([beban]);
+  const logs = { 1: { 0: { done: true, r: 10, w: 40 }, 1: { done: true, r: 10, w: 40 } } };
+  assert.ok(calculateSmartWorkoutCalories(BERAT, w, logs) > 0, 'set berbentuk objek diabaikan');
+  cocokDenganTotal(w, logs, 'set objek');
+}
+
+// 11. Durasi 0 (sesi disimpan ulang tanpa timer) tapi set lengkap → kalori TETAP dihitung.
+{
+  const w = { id: 'w1', exercises: [beban], duration: '00:00' };
+  const logs = { 1: logSet(4, { r: 10, w: 40 }) };
+  assert.ok(calculateSmartWorkoutCalories(BERAT, w, logs) > 0, 'durasi 0 tidak boleh menihilkan kalori');
+}
+
+// --- dailyBurnCalories ---------------------------------------------------
+// Rumus kalori harian yang dipakai kartu dasbor, grafik aktivitas, kartu bagikan, DAN yang
+// ditulis ke bioData buat Lomeal. Dulu empat salinan terpisah yang saling berbeda.
+
+const hariKosong = { bmr: 2000, steps: 0 };
+const sesiSelesai = { id: 'w1', status: 'completed', exercises: [beban], duration: '45:00', log: { 1: logSet(4, { r: 10, w: 40 }) } };
+
+// 12. Dasar: BMR + langkah + latihan. Langkah ~0,04 kkal/langkah.
+{
+  const b = dailyBurnCalories({ bmr: 2000, steps: 5000 }, [], BERAT);
+  assert.equal(b.bmr, 2000);
+  assert.equal(b.steps, 200);
+  assert.equal(b.workout, 0);
+  assert.equal(b.total, 2200);
+  assert.equal(b.floor, 2200);
+}
+
+// 13. Hanya sesi 'completed'/adhoc yang dihitung — sesi terjadwal yang belum dikerjakan tidak
+//     boleh menyumbang kalori, kalau tidak dasbor memberi kredit untuk latihan yang tidak terjadi.
+{
+  const planned = { id: 'w2', status: 'planned', exercises: [beban], duration: '45:00', log: { 1: logSet(4, { r: 10, w: 40 }) } };
+  assert.equal(dailyBurnCalories(hariKosong, [planned], BERAT).workout, 0);
+  assert.ok(dailyBurnCalories(hariKosong, [sesiSelesai], BERAT).workout > 0);
+}
+
+// 14. INVARIAN: kardio + beban == workout. Segmen bar tidak boleh meleset dari angka besarnya.
+{
+  const b = dailyBurnCalories(hariKosong, [sesiSelesai], BERAT);
+  assert.equal(b.kardio + b.beban, b.workout);
+  assert.equal(b.total, b.bmr + b.steps + b.workout);
+}
+
+// 15. Berat badan hari itu menang atas fallback — riwayat lama harus dihitung dengan berat
+//     saat itu, bukan berat hari ini.
+{
+  const ringan = dailyBurnCalories({ bmr: 2000, weight: 50 }, [sesiSelesai], 120).workout;
+  const berat = dailyBurnCalories({ bmr: 2000, weight: 120 }, [sesiSelesai], 50).workout;
+  assert.ok(berat > ringan, 'berat badan hari itu tidak dipakai');
+}
+
+// 16. Manual menggantikan BASIS (BMR+langkah), TAPI latihan tetap ditambahkan di atasnya —
+//     manual dimaksudkan menimpa sinkronisasi alat lain, bukan pencatatan latihan sendiri.
+{
+  const bio = { bmr: 2000, steps: 5000, _manualFlags: { activityCalories: 3000 } };
+  const b = dailyBurnCalories(bio, [sesiSelesai], BERAT);
+  assert.equal(b.isManual, true);
+  assert.equal(b.manualBase, 3000);
+  assert.equal(b.total, 3000 + b.workout, 'langkah tidak boleh ikut ditambah di cabang manual');
+  // `floor` tetap lantai mentah tanpa manual — Lomeal memakainya sebagai basis koreksi.
+  assert.equal(b.floor, 2000 + 200 + b.workout);
+}
+
+// 17. REGRESI: Lomeal menandai override dengan boolean `true` (angkanya di bioData), bukan angka.
+//     `Number(true)` = 1, jadi versi lama meruntuhkan basisnya jadi Math.max(BMR, 1) = BMR dan
+//     angka Lomeal hilang tanpa jejak — kartunya menampilkan "Manual" senilai BMR persis.
+{
+  const bio = { bmr: 2000, activityCalories: 2800, _manualFlags: { activityCalories: true } };
+  assert.equal(dailyBurnCalories(bio, [], BERAT).total, 2800);
+}
+
+// 18. Manual di BAWAH BMR tidak boleh menurunkan angka di bawah lantai fisiologisnya.
+{
+  const bio = { bmr: 2000, _manualFlags: { activityCalories: 500 } };
+  assert.equal(dailyBurnCalories(bio, [], BERAT).total, 2000);
+}
+
+// 19. REGRESI PING-PONG: `bioData.activityCalories` TIDAK BOLEH jadi masukan. Field itu keluaran
+//     fungsi ini sendiri; kalau ikut dibaca, tiap putaran render/sinkron menambah kalori latihan
+//     di atas hasil putaran sebelumnya (bug "ratchet"), dan nilai yang ditulis Health Connect
+//     dengan satuan berbeda ikut merusak hitungannya.
+{
+  const tanpa = dailyBurnCalories({ bmr: 2000 }, [sesiSelesai], BERAT).total;
+  const dengan = dailyBurnCalories({ bmr: 2000, activityCalories: 9999, hcActiveCalories: 700 }, [sesiSelesai], BERAT).total;
+  assert.equal(dengan, tanpa, 'activityCalories/hcActiveCalories bocor jadi masukan hitungan');
+}
+
+// 20. IDEMPOTEN: memberi makan hasilnya kembali tidak mengubah apa pun. Ini yang menjamin efek
+//     tulis-balik di DashboardTab mengendap, bukan naik terus tiap render.
+{
+  const bio = { bmr: 2000, steps: 3000 };
+  const b1 = dailyBurnCalories(bio, [sesiSelesai], BERAT);
+  const b2 = dailyBurnCalories({ ...bio, activityCalories: b1.total, activityCaloriesFloor: b1.floor }, [sesiSelesai], BERAT);
+  assert.equal(b2.total, b1.total);
+}
+
+// 21. Masukan kosong/kotor tidak boleh melahirkan NaN — satu NaN merusak seluruh kartu.
+{
+  assert.equal(dailyBurnCalories(null, null, null).total, 1600); // fallback BMR ala Lomeal
+  assert.equal(dailyBurnCalories({ bmr: 'x', steps: 'y' }, undefined, undefined).total, 1600);
+  assert.ok(Number.isFinite(dailyBurnCalories({ steps: null }, [], NaN).total));
+}
 
 // --- format durasi tidur -------------------------------------------------
 

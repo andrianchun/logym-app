@@ -955,7 +955,8 @@ const CalendarTab = ({
                completedWorkouts.forEach(w => {
                  const dur = parseWorkoutDurationMinutes(w.duration) || 0;
                  totalDuration += dur;
-                 totalCalories += calculateSmartWorkoutCalories(userProfile?.weight, w, w.log) || 0;
+                 const logsToUse = (w.log && Object.keys(w.log).length > 0) ? w.log : (history[dateKey]?.exerciseLogs);
+                 totalCalories += calculateSmartWorkoutCalories(userProfile?.weight, w, logsToUse) || 0;
                });
                
                const targetDuration = activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 7) : 45;
@@ -1320,7 +1321,8 @@ const CalendarTab = ({
                              dailyWorkouts.forEach(w => {
                                  const dur = parseWorkoutDurationMinutes(w.duration) || 0;
                                  dailyDuration += dur;
-                                 dailyCalories += calculateSmartWorkoutCalories(userProfile?.weight, w, w.log) || 0;
+                                 const logsToUse = (w.log && Object.keys(w.log).length > 0) ? w.log : dayData.exerciseLogs;
+                                 dailyCalories += calculateSmartWorkoutCalories(userProfile?.weight, w, logsToUse) || 0;
                              });
                              const tDuration = activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 7) : 45;
                              const tCalories = activityTargets?.calories || 400;
