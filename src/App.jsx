@@ -303,7 +303,7 @@ export default function App() {
   const [logiMemory, _setLogiMemory] = useState([]);
   const setLogiMemory = _setLogiMemory;
   const [hasUnreadChat, setHasUnreadChat] = useState(false);
-  const [activityTargets, _setActivityTargets] = useState({ steps: 10000, weeklyDuration: 150, sleep: 8 });
+  const [activityTargets, _setActivityTargets] = useState({ steps: 10000, dailyActiveMinutes: 30, sleep: 8 });
   const setActivityTargets = _setActivityTargets;
 
   // TDEE hidup — dihitung ulang tiap biometrik/activityLevel berubah (termasuk dari sinkron
@@ -1395,7 +1395,7 @@ export default function App() {
         
         if (
            existingBio.targetSteps === activityTargets.steps &&
-           existingBio.targetActiveMinutes === activityTargets.weeklyDuration &&
+           existingBio.targetActiveMinutes === (activityTargets.dailyActiveMinutes || (activityTargets.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 5) : 30)) &&
            existingBio.targetSleep === activityTargets.sleep &&
            existingBio.targetCalories === activityTargets.activityCalories
         ) {
@@ -1409,7 +1409,7 @@ export default function App() {
                bioData: {
                    ...existingBio,
                    targetSteps: activityTargets.steps,
-                   targetActiveMinutes: activityTargets.weeklyDuration,
+                   targetActiveMinutes: activityTargets.dailyActiveMinutes || (activityTargets.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 5) : 30),
                    targetSleep: activityTargets.sleep,
                    targetCalories: activityTargets.activityCalories,
                }
@@ -1504,7 +1504,7 @@ export default function App() {
         setUnits({ weight: 'kg', height: 'cm', distance: 'km', temp: 'c' });
         setGymProfiles([{ id: 'default', name: 'Logym', equipment: 'all', config: {} }]);
         setActiveGymId('default');
-        setActivityTargets({ steps: 10000, weeklyDuration: 150, sleep: 8 });
+        setActivityTargets({ steps: 10000, dailyActiveMinutes: 30, sleep: 8 });
         setActivePlanIds(['custom']);
         setBiometricStandard('asia');
       }

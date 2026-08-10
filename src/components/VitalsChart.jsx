@@ -200,6 +200,15 @@ const VitalsChart = ({ t, theme, history, language, activeMetric }) => {
     }
   }, [pointWidth, chartData]);
 
+  // Auto scroll ke ujung kanan (data terbaru) saat ganti metrik atau data masuk
+  useEffect(() => {
+     if (scrollRef.current && chartData.length > 0) {
+        const clientW = scrollRef.current.clientWidth || (window.innerWidth - 64);
+        const nextChartWidth = Math.max(chartData.length * pointWidth, clientW);
+        scrollTarget.current = nextChartWidth - clientW;
+     }
+  }, [chartData, activeMetric]);
+
   const chartWidth = Math.max(chartData.length * pointWidth, window.innerWidth - 64);
   const resolutionLabel = { hour: 'Per Jam', day: 'Per Hari', month: 'Per Bulan', year: 'Per Tahun' }[resolution];
 
@@ -213,12 +222,12 @@ const VitalsChart = ({ t, theme, history, language, activeMetric }) => {
         onScroll={handleScroll}
         onTouchStartCapture={handleTouchStart}
         onTouchMoveCapture={handleTouchMove}
-        className="w-full h-40 overflow-x-auto scrollbar-hide touch-pan-x"
+        className="w-full overflow-x-auto scrollbar-hide mb-4 touch-pan-x pt-2 flex"
         style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}
       >
         {chartData.length > 0 ? (
-          <div style={{ width: `${chartWidth}px`, height: '100%' }}>
-            <LineChart width={chartWidth} height={160} data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }} style={{ outline: 'none' }}>
+          <div style={{ width: `${chartWidth}px`, height: '224px', marginLeft: (chartData.length * pointWidth) < (window.innerWidth - 64) ? 'auto' : '0' }} className="cursor-crosshair relative shrink-0">
+            <LineChart width={chartWidth} height={224} data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }} style={{ outline: 'none' }}>
               <Tooltip
                 formatter={(value, name, props) => activeMetric === 'bloodPressureLog' && props.dataKey === 'value'
                   ? [`${props.payload.value}/${props.payload.dia ?? '-'} ${metric.unit}`, metric.label]
@@ -236,7 +245,7 @@ const VitalsChart = ({ t, theme, history, language, activeMetric }) => {
             </LineChart>
           </div>
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
+          <div className="w-full h-[224px] flex items-center justify-center">
             <span className={`text-xs ${t.textMuted}`}>Belum ada data {metric.label.toLowerCase()}</span>
           </div>
         )}

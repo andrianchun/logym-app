@@ -968,7 +968,7 @@ const CalendarTab = ({
                  totalCalories += calculateSmartWorkoutCalories(userProfile?.weight, w, logsToUse) || 0;
                });
                
-               const targetDuration = activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 7) : 45;
+               const targetDuration = activityTargets?.dailyActiveMinutes || (activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 7) : 45);
                const targetCalories = activityTargets?.calories || 400;
                const targetSteps = activityTargets?.steps || 10000;
                
@@ -1333,7 +1333,7 @@ const CalendarTab = ({
                                  const logsToUse = (w.log && Object.keys(w.log).length > 0) ? w.log : dayData.exerciseLogs;
                                  dailyCalories += calculateSmartWorkoutCalories(userProfile?.weight, w, logsToUse) || 0;
                              });
-                             const tDuration = activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 7) : 45;
+                             const tDuration = activityTargets?.dailyActiveMinutes || (activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 7) : 45);
                              const tCalories = activityTargets?.calories || 400;
                              const tSteps = activityTargets?.steps || 10000;
 

@@ -829,10 +829,10 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                                             <div className="flex flex-col flex-1 justify-end w-full">
                                                 <div className="flex items-baseline justify-end space-x-1 mb-1">
                                                     <span className="text-2xl font-black text-white leading-tight">{formatNumber(mergedDailyActiveMinutes) || '0'}</span>
-                                                    <span className="text-[9px] text-white/50 font-bold">/ {formatNumber(activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 5) : 30)}</span>
+                                                    <span className="text-[9px] text-white/50 font-bold">/ {formatNumber(activityTargets?.dailyActiveMinutes || (activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 5) : 30))}</span>
                                                 </div>
-                                                <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden flex justify-end">
-                                                    <div className="h-full bg-blue-400 rounded-full" style={{ width: `${Math.min(100, (mergedDailyActiveMinutes / (activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 5) : 30)) * 100)}%` }}></div>
+                                                <div className="h-1.5 w-full bg-white/10 rounded-full mt-1.5 overflow-hidden">
+                                                    <div className="h-full bg-blue-400 rounded-full" style={{ width: `${Math.min(100, (mergedDailyActiveMinutes / (activityTargets?.dailyActiveMinutes || (activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 5) : 30))) * 100)}%` }}></div>
                                                 </div>
                                             </div>
                                         </div>
@@ -976,7 +976,8 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                                                         totalCalories += calculateSmartWorkoutCalories(userProfile?.weight, w, logsToUse) || 0;
                                                     });
                                                     
-                                                    const targetDuration = activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 7) : 45;
+                                                    const dailyActive = dailyActiveMinutes(histBio, dayWks).total;
+                                                    const targetDuration = activityTargets?.dailyActiveMinutes || (activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 7) : 45);
                                                     const targetCalories = activityTargets?.calories || 400;
                                                     const targetSteps = activityTargets?.steps || 10000;
 

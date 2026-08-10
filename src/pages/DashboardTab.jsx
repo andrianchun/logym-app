@@ -141,7 +141,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   // TARGET SETTINGS
   const [showTargetModal, setShowTargetModal] = useState(false);
 
-  const [targetForm, setTargetForm] = useState(activityTargets || { steps: 10000, weeklyDuration: 150, sleep: 8, activityCalories: 2500, calorieDelta: 0 });
+  const [targetForm, setTargetForm] = useState(activityTargets || { steps: 10000, dailyActiveMinutes: 30, sleep: 8, activityCalories: 2500, calorieDelta: 0 });
 
   useEffect(() => {
      if (activityTargets) {
@@ -217,7 +217,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
     bodyScore: null, weight: null, height: null, bmi: null, bmiStatus: '-', bodyFat: null, bodyFatStatus: '-',
     muscleMass: null, musclePercent: null, boneMass: null, waterPercent: null, visceralFat: null, bmr: null, bodyAge: null, 
     waist: null, waistToHip: null, proteinPercent: null, bodyType: '-', weightSuggestion: '-',
-    steps: '', activeMinutes: '', activityCalories: '', nutritionCalories: '', sleep: '', energyScore: null, 
+    steps: '', stepMinutes: '', distance: '', activeMinutes: '', activityCalories: '', nutritionCalories: '', sleep: '', energyScore: null, 
     sleepAwake: '', sleepRem: '', sleepLight: '', sleepDeep: '', hrv: null,
     heartRate: null, minHeartRate: null, maxHeartRate: null, bloodPressure: '', oxygenSaturation: null, waterIntake: '',
     weeklyDuration: '', weeklySessions: '', weeklyCalories: ''
@@ -253,6 +253,9 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          weight: userProfile?.weight || null,
          ...latestBodyData,
          steps: todayDailyData.steps !== undefined ? todayDailyData.steps : (emptyBio.steps || 0),
+         stepMinutes: todayDailyData.stepMinutes !== undefined ? todayDailyData.stepMinutes : (emptyBio.stepMinutes || 0),
+         distance: todayDailyData.distance !== undefined ? todayDailyData.distance : (emptyBio.distance || 0),
+         bmr: todayDailyData.bmr !== undefined ? todayDailyData.bmr : (emptyBio.bmr || null),
          activeMinutes: todayDailyData.activeMinutes !== undefined ? todayDailyData.activeMinutes : (emptyBio.activeMinutes || 0),
          activityCalories: todayDailyData.activityCalories !== undefined ? todayDailyData.activityCalories : (emptyBio.activityCalories || 0),
          nutritionCalories: todayDailyData.nutritionCalories !== undefined ? todayDailyData.nutritionCalories : (emptyBio.nutritionCalories || 0),
@@ -1066,7 +1069,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                  {/* Durasi Aktif (Hari Ini) */}
                   {(() => {
                       const todayDur = mergedDailyActiveMinutes;
-                      const targetDur = activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 5) : 30;
+                      const targetDur = activityTargets?.dailyActiveMinutes || (activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 5) : 30);
                       return (
                           <div className="flex flex-col h-full text-right items-end">
                               <div className="flex items-center justify-end space-x-1.5 mb-1"><span className={`caption ${t.textMuted} capitalize`}>Durasi Aktif</span> <span className={`w-5 h-5 rounded-full ${t.bgAccentSoft} ${t.textAccent} flex items-center justify-center shrink-0`}><Clock size={11}/></span></div>
@@ -1132,29 +1135,29 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                  </div>
 
                  <div className="px-1 space-y-5">
-                 {/* ROW 4: Tekanan Darah, Detak Jantung, SpO2 (Sebaris bertiga) */}
-                 <div className={`grid grid-cols-3 gap-x-2 pt-2 border-t border-dashed ${t.borderDashed}`}>
+                 {/* ROW 4: Tekanan Darah, Detak Jantung, SpO2 (Dua kolom) */}
+                 <div className={`grid grid-cols-2 gap-x-5 gap-y-5 pt-4 border-t border-dashed ${t.borderDashed}`}>
                      {/* Tekanan Darah */}
-                     <div className="flex flex-col">
+                     <div className="flex flex-col h-full">
                          <div className="flex items-center space-x-1 mb-1 text-blue-400"><Activity size={12}/> <span className={`text-[10px] ${t.textMuted}`}>Tensi</span></div>
                          <span className={`text-lg font-black ${t.textMain} leading-none`}>{bioData.bloodPressure || '-'}</span>
                      </div>
                      
                      {/* Detak Jantung */}
-                     <div className="flex flex-col items-center">
-                         <div className="flex items-center space-x-1 mb-1 text-blue-400"><HeartPulse size={12}/> <span className={`text-[10px] ${t.textMuted}`}>Nadi</span></div>
-                         <div className="flex flex-col items-center">
+                     <div className="flex flex-col h-full text-right items-end">
+                         <div className="flex items-center justify-end space-x-1.5 mb-1 text-blue-400"><span className={`text-[10px] ${t.textMuted}`}>Nadi</span> <HeartPulse size={12}/></div>
+                         <div className="flex flex-col items-end">
                              <span className={`text-lg font-black ${t.textMain} leading-none`}>{bioData.heartRate > 0 ? <>{formatNumber(bioData.heartRate, language)} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">bpm</span></> : '-'}</span>
                              <span className="text-[8px] text-zinc-500 dark:text-zinc-400 whitespace-nowrap mt-0.5">Min {bioData.minHeartRate > 0 ? formatNumber(bioData.minHeartRate, language) : '-'} &bull; Max {bioData.maxHeartRate > 0 ? formatNumber(bioData.maxHeartRate, language) : '-'}</span>
                          </div>
                      </div>
                      
                      {/* SpO2 */}
-                     <div className="flex flex-col items-end text-right">
+                     <div className="flex flex-col h-full">
                          <div className="flex items-center space-x-1 mb-1 text-blue-400"><Wind size={12}/> <span className={`text-[10px] ${t.textMuted}`}>SpO2</span></div>
                          <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.oxygenSaturation, language) || '-'} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span>
                      </div>
-                     </div>
+                 </div>
                  </div>
              </div>
              
@@ -1852,7 +1855,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm anim-fade-in" onClick={() => setShowTargetModal(false)}>
               <div className={`w-full max-w-sm rounded-[2rem] border ${t.border} ${t.bgCard} p-6 shadow-2xl anim-scale-in`} onClick={e => e.stopPropagation()}>
                   <div className="flex items-center justify-between mb-6">
-                      <h3 className={`h2 ${t.textMain} flex items-center gap-2`}><Settings size={20} className={t.textAccent}/> Target Harian</h3>
+                      <h3 className={`h2 ${t.textMain} flex items-center gap-2`}><Settings size={20} className={t.textAccent}/> Target</h3>
                       <button onClick={() => { playSoundEffect('click', soundEnabled); setShowTargetModal(false); }} className={`p-1.5 rounded-full ${t.bgBox} ${t.textMuted} hover:${t.textMain} transition-colors`}><X size={16}/></button>
                   </div>
 
@@ -1864,7 +1867,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                                   <Footprints size={14} />
                               </div>
                               <div className="flex-1">
-                                  <label className={`text-xs font-bold uppercase tracking-wider ${t.textMuted}`}>Target Langkah Kaki</label>
+                                  <label className={`text-xs font-bold uppercase tracking-wider ${t.textMuted}`}>Langkah Kaki</label>
                               </div>
                           </div>
                           <div className="relative">
@@ -1877,6 +1880,29 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                                   className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-4 rounded-xl outline-none font-black text-center text-xl pr-14`}
                               />
                               <span className={`absolute right-4 top-1/2 -translate-y-1/2 caption font-bold ${t.textMuted}`}>Langkah</span>
+                          </div>
+                      </div>
+
+                      {/* Durasi Aktif Mingguan */}
+                      <div className={`p-4 rounded-2xl ${t.bgBox} border ${t.borderDashed}`}>
+                          <div className="flex items-center gap-3 mb-3">
+                              <div className="w-8 h-8 rounded-full bg-sky-500/20 text-sky-500 flex items-center justify-center shrink-0">
+                                  <Clock size={14} />
+                              </div>
+                              <div className="flex-1">
+                                  <label className={`text-xs font-bold uppercase tracking-wider ${t.textMuted}`}>Durasi Aktif (Harian)</label>
+                              </div>
+                          </div>
+                          <div className="relative">
+                              <SwipeInput 
+                                  value={targetForm.dailyActiveMinutes || targetForm.weeklyDuration ? Math.round(targetForm.weeklyDuration / 5) : ''} 
+                                  onChange={(v) => setTargetForm(p => ({...p, dailyActiveMinutes: Number(v)}))} 
+                                  min={0} max={180} step={5} 
+                                  placeholder="Contoh: 30"
+                                  language={language}
+                                  className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-4 rounded-xl outline-none font-black text-center text-xl pr-14`}
+                              />
+                              <span className={`absolute right-4 top-1/2 -translate-y-1/2 caption font-bold ${t.textMuted}`}>Mnt</span>
                           </div>
                       </div>
 

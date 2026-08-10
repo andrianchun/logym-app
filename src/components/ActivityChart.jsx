@@ -77,6 +77,7 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
       { key: 'activeMinutes', label: 'Durasi Aktif', color: theme === 'dark' ? '#3b82f6' : '#1d4ed8', type: 'grouped', target: 'targetActiveMinutes', // Blue
           subMetrics: [
              { key: 'actSteps', label: 'Langkah', color: theme === 'dark' ? '#818cf8' : '#6366f1', stackId: 'act' },
+             { key: 'actManual', label: 'Manual', color: theme === 'dark' ? '#a1a1aa' : '#71717a', stackId: 'act' },
              { key: 'actCardio', label: 'Kardio', color: theme === 'dark' ? '#9ca3af' : '#6b7280', stackId: 'act' },
              { key: 'actWeights', label: 'Beban', color: theme === 'dark' ? '#38bdf8' : '#0369a1', stackId: 'act', top: true },
           ]
@@ -135,7 +136,7 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
       // Target durasi HARIAN diturunkan dari target mingguan dengan pembagi yang sama dengan
       // kartu Durasi Aktif (5 hari latihan seminggu) — kalau beda, garis di grafik tidak akan
       // cocok dengan angka target di kartunya.
-      const targetActive = activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 5) : null;
+      const targetActive = activityTargets?.dailyActiveMinutes || (activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 5) : null);
       const targetSleepH = activityTargets?.sleep || null;
       const targetBurn = activityTargets?.activityCalories || null;
 
@@ -213,7 +214,8 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
               // lagi kalau nilainya sama dengan hasil hitung. Jadi untuk hampir semua hari field
               // itu tidak ada, dan batang "Durasi Aktif" selalu kosong padahal kartunya terisi.
               activeMinutes: act.total > 0 ? act.total : null,
-              actSteps: act.total > 0 && act.stepMinutes > 0 ? act.stepMinutes : null,
+              actSteps: act.total > 0 && act.stepMinutes > 0 && !act.isManual ? act.stepMinutes : null,
+              actManual: act.total > 0 && act.isManual ? Math.max(0, act.manual - act.workoutMinutes) : null,
               actCardio: act.total > 0 && act.cardioMinutes > 0 ? act.cardioMinutes : null,
               actWeights: act.total > 0 && act.weightMinutes > 0 ? act.weightMinutes : null,
               sleep: totalSleep,
@@ -388,6 +390,13 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
          scrollTarget.current = null;
      }
   }, [pointWidth]);
+
+  useEffect(() => {
+     if (scrollRef.current) {
+         // Auto-scroll to the latest data (rightmost) by default
+         scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
+     }
+  }, [multiChartData.length, activeMetric, pointWidth]);
 
   const chartWidth = Math.max(multiChartData.length * pointWidth, window.innerWidth - 64);
   const activeObj = chartMetricsList.find(m => m.key === activeMetric);
