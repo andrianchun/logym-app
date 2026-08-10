@@ -4,6 +4,7 @@ import androidx.activity.result.ActivityResult
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.permission.HealthPermission
+import androidx.health.connect.client.records.ExerciseSegment
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.metadata.Metadata
 import com.getcapacitor.JSObject
@@ -126,6 +127,11 @@ class ExerciseWriterPlugin : Plugin() {
         }
         val type = exerciseTypeOf(call.getString("exerciseType"))
         val title = call.getString("title")
+        // Ringkasan set x reps x kg. Health Connect TIDAK punya field beban sama sekali di skema
+        // latihannya — ini batas platform, bukan batas plugin — jadi kilogram cuma bisa dibawa
+        // sebagai teks. Tanpa ini, sesi di Samsung Health cuma berisi nama dan durasi.
+        val notes = call.getString("notes")
+        val segments = buildSegments(call.getArray("segments"), start, end)
         val clientRecordId = call.getString("clientRecordId")?.takeIf { it.isNotBlank() }
         // Versi WAJIB naik tiap kali isinya berubah; Health Connect membuang tulisan dengan versi
         // yang lebih rendah dari yang sudah tersimpan.
@@ -138,30 +144,108 @@ class ExerciseWriterPlugin : Plugin() {
                 call.reject("Izin menulis sesi latihan belum diberikan.")
                 return@launch
             }
-            runCatching {
-                client.insertRecords(
-                    listOf(
-                        ExerciseSessionRecord(
-                            startTime = start,
-                            startZoneOffset = zone.rules.getOffset(start),
-                            endTime = end,
-                            endZoneOffset = zone.rules.getOffset(end),
-                            exerciseType = type,
-                            title = title,
-                            // manualEntry(clientRecordId, clientRecordVersion, device?) — BUKAN
-                            // manualEntryWithId, yang parameter keduanya `Device?` dan tidak punya
-                            // versi sama sekali. Tanpa versi, koreksi sesi tidak pernah bisa
-                            // menggantikan record lama.
-                            metadata = if (clientRecordId == null) Metadata.manualEntry()
-                                       else Metadata.manualEntry(clientRecordId, version)
-                        )
-                    )
-                )
-            }.onSuccess {
-                call.resolve(JSObject().put("saved", true))
+            // manualEntry(clientRecordId, clientRecordVersion, device?) — BUKAN manualEntryWithId,
+            // yang parameter keduanya `Device?` dan tidak punya versi sama sekali. Tanpa versi,
+            // koreksi sesi tidak pernah bisa menggantikan record lama.
+            val meta = if (clientRecordId == null) Metadata.manualEntry()
+                       else Metadata.manualEntry(clientRecordId, version)
+
+            fun record(segs: List<ExerciseSegment>) = ExerciseSessionRecord(
+                startTime = start,
+                startZoneOffset = zone.rules.getOffset(start),
+                endTime = end,
+                endZoneOffset = zone.rules.getOffset(end),
+                exerciseType = type,
+                title = title,
+                notes = notes,
+                segments = segs,
+                laps = emptyList(),
+                metadata = meta,
+            )
+
+            val hasil = runCatching { client.insertRecords(listOf(record(segments))) }
+                // Health Connect MENOLAK seluruh record kalau ada satu jenis segmen yang dianggap
+                // tidak cocok dengan jenis sesinya (tabel kecocokannya internal dan tidak stabil
+                // antar versi). Sesi tanpa rincian jauh lebih baik daripada sesi yang tidak
+                // tersimpan sama sekali, jadi kalau ditolak — coba lagi tanpa segmen.
+                .recoverCatching { e ->
+                    if (segments.isEmpty()) throw e
+                    client.insertRecords(listOf(record(emptyList())))
+                }
+
+            hasil.onSuccess {
+                call.resolve(JSObject().put("saved", true).put("segments", segments.size))
             }.onFailure {
                 call.reject("Gagal menyimpan sesi latihan: ${it.message}")
             }
+        }
+    }
+
+    /**
+     * Ubah daftar latihan dari JS jadi ExerciseSegment.
+     *
+     * Health Connect mewajibkan segmen berada DI DALAM rentang sesi dan tidak saling tumpang
+     * tindih — satu saja yang melanggar, seluruh record ditolak. Karena itu semuanya dipotong
+     * paksa ke [start, end] dan yang mundur/nol panjang dibuang, bukan dipercaya apa adanya.
+     */
+    private fun buildSegments(arr: com.getcapacitor.JSArray?, start: Instant, end: Instant): List<ExerciseSegment> {
+        if (arr == null) return emptyList()
+        val out = mutableListOf<ExerciseSegment>()
+        for (i in 0 until arr.length()) {
+            val o = runCatching { arr.getJSONObject(i) }.getOrNull() ?: continue
+            val s = runCatching { Instant.parse(o.getString("startDate")) }.getOrNull() ?: continue
+            val e = runCatching { Instant.parse(o.getString("endDate")) }.getOrNull() ?: continue
+            val cs = if (s.isBefore(start)) start else s
+            val ce = if (e.isAfter(end)) end else e
+            if (!cs.isBefore(ce)) continue
+            out.add(
+                ExerciseSegment(
+                    startTime = cs,
+                    endTime = ce,
+                    segmentType = segmentTypeOf(o.optString("type")),
+                    repetitions = o.optInt("reps", 0).coerceAtLeast(0),
+                )
+            )
+        }
+        return out
+    }
+
+    // Kata kunci nama latihan -> jenis segmen. Sengaja kasar dan sedikit: yang tidak dikenal jatuh
+    // ke OTHER_WORKOUT, dan repetisinya tetap terbawa — itu bagian yang paling berguna. Memaksa
+    // pemetaan yang tepat untuk ratusan nama latihan tidak sepadan dengan nilainya.
+    private fun segmentTypeOf(name: String?): Int {
+        val n = (name ?: "").lowercase()
+        return when {
+            n.contains("bench") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_BENCH_PRESS
+            n.contains("squat") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_SQUAT
+            n.contains("deadlift") || n.contains("angkat mati") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_DEADLIFT
+            n.contains("lat pull") || n.contains("pulldown") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_LAT_PULL_DOWN
+            n.contains("pull up") || n.contains("pull-up") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_PULL_UP
+            n.contains("shoulder press") || n.contains("overhead press") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_SHOULDER_PRESS
+            n.contains("curl") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_ARM_CURL
+            n.contains("leg press") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_LEG_PRESS
+            n.contains("leg curl") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_LEG_CURL
+            n.contains("leg extension") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_LEG_EXTENSION
+            n.contains("lunge") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_LUNGE
+            n.contains("plank") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_PLANK
+            n.contains("crunch") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_CRUNCH
+            n.contains("sit up") || n.contains("sit-up") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_SIT_UP
+            n.contains("lateral raise") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_LATERAL_RAISE
+            n.contains("front raise") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_FRONT_RAISE
+            n.contains("row") && !n.contains("rowing") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_DUMBBELL_ROW
+            n.contains("hip thrust") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_HIP_THRUST
+            n.contains("treadmill") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_RUNNING_TREADMILL
+            n.contains("lari") || n.contains("run") || n.contains("jog") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_RUNNING
+            n.contains("jalan") || n.contains("walk") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_WALKING
+            n.contains("sepeda") || n.contains("bike") || n.contains("cycl") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_BIKING_STATIONARY
+            n.contains("rowing") || n.contains("dayung") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_ROWING_MACHINE
+            n.contains("elliptical") || n.contains("eliptik") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_ELLIPTICAL
+            n.contains("burpee") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_BURPEE
+            n.contains("jumping jack") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_JUMPING_JACK
+            n.contains("skipping") || n.contains("jump rope") || n.contains("lompat tali") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_JUMP_ROPE
+            n.contains("yoga") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_YOGA
+            n.contains("stretch") || n.contains("peregangan") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_STRETCHING
+            else -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_OTHER_WORKOUT
         }
     }
 

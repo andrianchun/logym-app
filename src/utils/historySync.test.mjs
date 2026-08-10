@@ -249,6 +249,75 @@ assert.deepEqual(workoutIdsFromBaseline('{bukan json'), []);
   assert.equal(r.baseline['2026-08-05'], base['2026-08-05'], 'baseline tidak boleh bergeser tanpa perubahan');
 }
 
+// ── Pemutus arus penghapusan massal ─────────────────────────────────────────────────────────
+// Penghapusan wajar selalu sedikit. Kehilangan massal (skrip debug salah sasaran, migrasi
+// setengah jalan, dokumen terpotong) tidak boleh diikuti diam-diam — begitu diikuti, salinan
+// lokal yang jadi satu-satunya sisa datanya ikut tertimpa.
+
+const hariKe = (n) => `2026-03-${String(n).padStart(2, '0')}`;
+const bikinLokal = (n) => {
+  const prev = {}; const base = {};
+  for (let i = 1; i <= n; i++) { prev[hariKe(i)] = day(`s${i}`); base[hariKe(i)] = dayFingerprint(prev[hariKe(i)]); }
+  return { prev, base };
+};
+
+// 28. Penghapusan KECIL tetap diikuti — user menghapus satu-dua hari itu normal.
+{
+  const { prev, base } = bikinLokal(5);
+  const server = { ...prev }; delete server[hariKe(1)]; delete server[hariKe(2)];
+  const r = reconcileHistory(prev, server, base, '2026');
+  assert.equal(r.next[hariKe(1)], undefined, 'penghapusan wajar harus tetap jalan');
+  assert.equal(r.next[hariKe(2)], undefined);
+  assert.deepEqual(r.blockedDeletes, []);
+  assert.ok(r.next[hariKe(3)], 'yang lain jangan ikut hilang');
+}
+
+// 29. REGRESI UTAMA: penghapusan MASSAL ditahan, dan datanya UTUH di next.
+{
+  const { prev, base } = bikinLokal(40);
+  const r = reconcileHistory(prev, {}, base, '2026'); // server tiba-tiba kosong isinya
+  assert.equal(r.blockedDeletes.length, 40, 'semua harus tertahan, bukan sebagian');
+  assert.equal(Object.keys(r.next).length, 40, 'tidak satu tanggal pun boleh hilang');
+  for (let i = 1; i <= 40; i++) assert.ok(r.next[hariKe(i)], `${hariKe(i)} hilang padahal ditahan`);
+}
+
+// 30. Yang ditahan tidak boleh ikut menggeser baseline — kalau bergeser, penghapusan yang sama
+//     akan lolos di snapshot berikutnya lewat pintu belakang.
+{
+  const { prev, base } = bikinLokal(40);
+  const r = reconcileHistory(prev, {}, base, '2026');
+  assert.equal(r.baseline[hariKe(1)], base[hariKe(1)], 'baseline bergeser padahal penghapusan ditahan');
+}
+
+// 31. Tepat di ambang (3) masih lolos; satu di atasnya ditahan.
+{
+  const a = bikinLokal(10);
+  const srvA = { ...a.prev }; [1, 2, 3].forEach(i => delete srvA[hariKe(i)]);
+  assert.deepEqual(reconcileHistory(a.prev, srvA, a.base, '2026').blockedDeletes, []);
+
+  const b = bikinLokal(10);
+  const srvB = { ...b.prev }; [1, 2, 3, 4].forEach(i => delete srvB[hariKe(i)]);
+  assert.equal(reconcileHistory(b.prev, srvB, b.base, '2026').blockedDeletes.length, 4);
+}
+
+// 32. Pemutus arus TIDAK BOLEH mengubah perilaku tanggal yang punya perubahan lokal tertunda —
+//     itu jalur terpisah, dan harus tetap dipertahankan + dilaporkan lewat `kept`.
+{
+  const { prev, base } = bikinLokal(3);
+  prev[hariKe(1)] = day('s1', 'BARU'); // lokal berubah, belum terkirim
+  const r = reconcileHistory(prev, {}, base, '2026');
+  assert.ok(r.kept.includes(hariKe(1)), 'perubahan lokal tertunda harus tetap dilaporkan');
+  assert.equal(r.next[hariKe(1)].workouts.length, 2, 'perubahan lokal tidak boleh hilang');
+}
+
+// 33. Tahun LAIN tidak pernah tersentuh — snapshot 2026 tidak boleh menghapus tanggal 2025.
+{
+  const prev = { '2025-12-31': day('lama'), '2026-01-01': day('baru') };
+  const base = { '2025-12-31': dayFingerprint(prev['2025-12-31']), '2026-01-01': dayFingerprint(prev['2026-01-01']) };
+  const r = reconcileHistory(prev, {}, base, '2026');
+  assert.ok(r.next['2025-12-31'], 'tanggal tahun lain ikut terhapus');
+}
+
 function stableStringifyLike(o) {
   // sama seperti stableStringify: key di-sort
   return '{' + Object.keys(o).sort().map(k => JSON.stringify(k) + ':' + JSON.stringify(o[k])).join(',') + '}';

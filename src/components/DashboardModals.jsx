@@ -24,6 +24,38 @@ const DashboardModals = ({
   const [scanError, setScanError] = useState('');
   const [scanSuccess, setScanSuccess] = useState(false);
 
+  // Field yang MEMANG bisa diisi Health Connect. Sengaja daftar eksplisit, bukan "semua yang ada
+  // di kartu ini": `activeMinutes` misalnya tidak pernah bisa datang dari HC (HC tidak punya
+  // metrik menit aktif sama sekali — Logym menurunkannya dari sebaran langkah), jadi menguncinya
+  // berarti mematikan satu-satunya cara mengisinya.
+  const HC_OWNED = [
+    'steps', 'stepMinutes', 'distance', 'bmr',
+    'heartRate', 'minHeartRate', 'maxHeartRate', 'restingHeartRate',
+    'weight', 'height', 'bodyFat', 'oxygenSaturation', 'bloodPressure',
+    'sleep', 'sleepAwake', 'sleepRem', 'sleepLight', 'sleepDeep',
+  ];
+
+  /**
+   * Apakah field ini dikunci karena datanya milik Health Connect?
+   *
+   * Aturannya PER FIELD dan berbasis ADA-TIDAKNYA DATA — bukan "HC tersambung, kunci semua"
+   * seperti sebelumnya. Aturan lama mematikan seluruh kartu begitu HC tersambung, termasuk field
+   * yang HC-nya kosong: user tidak bisa mengisi manual, dan angkanya juga tidak pernah datang.
+   *
+   * Field yang sudah ditimpa manual (`_manualFlags`) tetap terbuka — HC memang tidak akan
+   * menimpanya lagi (lihat mergeHcDays), jadi menguncinya cuma menjebak user pada angkanya sendiri.
+   * Pola kepemilikan ini sama dengan yang dipakai Lomeal (isLomealOwned di data/constants.js).
+   */
+  const hcLocked = (field) => {
+    if (!connectedApps?.healthConnect || !HC_OWNED.includes(field)) return false;
+    if (bioData?._manualFlags?.[field] !== undefined) return false;
+    const v = bioData?.[field];
+    return v !== undefined && v !== null && v !== '';
+  };
+  // Kelas visual senada dengan status terkunci — satu tempat, biar tidak ada input yang
+  // kelihatan aktif padahal mati (atau sebaliknya).
+  const lockCls = (field) => (hcLocked(field) ? 'opacity-50 cursor-not-allowed' : '');
+
   const handleAIScan = async (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
@@ -352,8 +384,8 @@ const DashboardModals = ({
                             
                             {/* Group 1: Langkah, Durasi Aktif, SpO2, Skor Energi */}
                             <div className="grid grid-cols-2 gap-2.5 mb-2.5">
-                                <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Langkah</label><SwipeInput language={lang?.id || 'ID'} value={formBio.steps || ''} onChange={(val) => setFormBio({...formBio, steps: val})} step={100} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center ${connectedApps?.healthConnect && isToday ? 'opacity-50 cursor-not-allowed' : ''}`} disabled={!!(connectedApps?.healthConnect && isToday)} placeholder={ph(bioData?.steps, "5000")} /></div>
-                                <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Durasi Aktif (mnt)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.activeMinutes || ''} onChange={(val) => setFormBio({...formBio, activeMinutes: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center ${connectedApps?.healthConnect && isToday ? 'opacity-50 cursor-not-allowed' : ''}`} disabled={!!(connectedApps?.healthConnect && isToday)} placeholder={ph(bioData?.activeMinutes, "30")} /></div>
+                                <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Langkah</label><SwipeInput language={lang?.id || 'ID'} value={formBio.steps || ''} onChange={(val) => setFormBio({...formBio, steps: val})} step={100} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center ${lockCls('steps')}`} disabled={hcLocked('steps')} placeholder={ph(bioData?.steps, "5000")} /></div>
+                                <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Durasi Aktif (mnt)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.activeMinutes || ''} onChange={(val) => setFormBio({...formBio, activeMinutes: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center ${lockCls('activeMinutes')}`} disabled={hcLocked('activeMinutes')} placeholder={ph(bioData?.activeMinutes, "30")} /></div>
                                 <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>SpO2 (%)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.oxygenSaturation || ''} onChange={(val) => setFormBio({...formBio, oxygenSaturation: val})} step={1} min={0} max={100} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.oxygenSaturation, "98")} /></div>
                                 <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Energy Score</label><SwipeInput language={lang?.id || 'ID'} value={formBio.energyScore || ''} onChange={(val) => setFormBio({...formBio, energyScore: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.energyScore, "80")} /></div>
                             </div>
@@ -363,11 +395,11 @@ const DashboardModals = ({
                                 <label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Tidur Malam (Jam & Menit)</label>
                                 <div className="grid grid-cols-2 gap-2">
                                     <div className="relative">
-                                        <SwipeInput language={lang?.id || 'ID'} value={sleepH || ''} onChange={handleSleepH} step={1} min={0} soundEnabled={soundEnabled} disabled={!!(connectedApps?.healthConnect && isToday)} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center pr-4 ${connectedApps?.healthConnect && isToday ? 'opacity-50 cursor-not-allowed' : ''}`} placeholder={ph(lastSleepH, "7")} />
+                                        <SwipeInput language={lang?.id || 'ID'} value={sleepH || ''} onChange={handleSleepH} step={1} min={0} soundEnabled={soundEnabled} disabled={hcLocked('sleep')} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center pr-4 ${lockCls('sleep')}`} placeholder={ph(lastSleepH, "7")} />
                                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-zinc-500 font-bold pointer-events-none">h</span>
                                     </div>
                                     <div className="relative">
-                                        <SwipeInput language={lang?.id || 'ID'} value={sleepM || ''} onChange={handleSleepM} step={5} min={0} soundEnabled={soundEnabled} disabled={!!(connectedApps?.healthConnect && isToday)} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center pr-4 ${connectedApps?.healthConnect && isToday ? 'opacity-50 cursor-not-allowed' : ''}`} placeholder={ph(lastSleepM, "0")} />
+                                        <SwipeInput language={lang?.id || 'ID'} value={sleepM || ''} onChange={handleSleepM} step={5} min={0} soundEnabled={soundEnabled} disabled={hcLocked('sleep')} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center pr-4 ${lockCls('sleep')}`} placeholder={ph(lastSleepM, "0")} />
                                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-zinc-500 font-bold pointer-events-none">m</span>
                                     </div>
                                 </div>
@@ -377,10 +409,10 @@ const DashboardModals = ({
                             <div className="mb-2.5">
                                <label className={`block ${t.textMuted} text-xs mb-1 truncate`}>Detail Tahap Tidur (mnt) & HRV</label>
                                <div className="grid grid-cols-5 gap-2">
-                                   <SwipeInput language={lang?.id || 'ID'} value={formBio.sleepAwake || ''} onChange={(val) => setFormBio({...formBio, sleepAwake: val})} disabled={!!(connectedApps?.healthConnect && isToday)} step={5} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center ${connectedApps?.healthConnect && isToday ? 'opacity-50 cursor-not-allowed' : ''}`} placeholder="Awk" />
-                                   <SwipeInput language={lang?.id || 'ID'} value={formBio.sleepRem || ''} onChange={(val) => setFormBio({...formBio, sleepRem: val})} disabled={!!(connectedApps?.healthConnect && isToday)} step={5} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center ${connectedApps?.healthConnect && isToday ? 'opacity-50 cursor-not-allowed' : ''}`} placeholder="REM" />
-                                   <SwipeInput language={lang?.id || 'ID'} value={formBio.sleepLight || ''} onChange={(val) => setFormBio({...formBio, sleepLight: val})} disabled={!!(connectedApps?.healthConnect && isToday)} step={5} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center ${connectedApps?.healthConnect && isToday ? 'opacity-50 cursor-not-allowed' : ''}`} placeholder="Light" />
-                                   <SwipeInput language={lang?.id || 'ID'} value={formBio.sleepDeep || ''} onChange={(val) => setFormBio({...formBio, sleepDeep: val})} disabled={!!(connectedApps?.healthConnect && isToday)} step={5} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center ${connectedApps?.healthConnect && isToday ? 'opacity-50 cursor-not-allowed' : ''}`} placeholder="Deep" />
+                                   <SwipeInput language={lang?.id || 'ID'} value={formBio.sleepAwake || ''} onChange={(val) => setFormBio({...formBio, sleepAwake: val})} disabled={hcLocked('sleepAwake')} step={5} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center ${lockCls('sleepAwake')}`} placeholder="Awk" />
+                                   <SwipeInput language={lang?.id || 'ID'} value={formBio.sleepRem || ''} onChange={(val) => setFormBio({...formBio, sleepRem: val})} disabled={hcLocked('sleepRem')} step={5} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center ${lockCls('sleepRem')}`} placeholder="REM" />
+                                   <SwipeInput language={lang?.id || 'ID'} value={formBio.sleepLight || ''} onChange={(val) => setFormBio({...formBio, sleepLight: val})} disabled={hcLocked('sleepLight')} step={5} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center ${lockCls('sleepLight')}`} placeholder="Light" />
+                                   <SwipeInput language={lang?.id || 'ID'} value={formBio.sleepDeep || ''} onChange={(val) => setFormBio({...formBio, sleepDeep: val})} disabled={hcLocked('sleepDeep')} step={5} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center ${lockCls('sleepDeep')}`} placeholder="Deep" />
                                    <SwipeInput language={lang?.id || 'ID'} value={formBio.hrv || ''} onChange={(val) => setFormBio({...formBio, hrv: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center`} placeholder="HRV" />
                                </div>
                             </div>
@@ -390,9 +422,9 @@ const DashboardModals = ({
                                 <div>
                                     <label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Detak Jantung (bpm)</label>
                                     <div className="grid grid-cols-3 gap-1">
-                                        <SwipeInput language={lang?.id || 'ID'} value={formBio.heartRate || ''} onChange={(val) => setFormBio({...formBio, heartRate: val})} disabled={!!(connectedApps?.healthConnect && isToday)} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center ${connectedApps?.healthConnect && isToday ? 'opacity-50 cursor-not-allowed' : ''}`} placeholder="Avg" />
-                                        <SwipeInput language={lang?.id || 'ID'} value={formBio.minHeartRate || ''} onChange={(val) => setFormBio({...formBio, minHeartRate: val})} disabled={!!(connectedApps?.healthConnect && isToday)} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center ${connectedApps?.healthConnect && isToday ? 'opacity-50 cursor-not-allowed' : ''}`} placeholder="Min" />
-                                        <SwipeInput language={lang?.id || 'ID'} value={formBio.maxHeartRate || ''} onChange={(val) => setFormBio({...formBio, maxHeartRate: val})} disabled={!!(connectedApps?.healthConnect && isToday)} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center ${connectedApps?.healthConnect && isToday ? 'opacity-50 cursor-not-allowed' : ''}`} placeholder="Max" />
+                                        <SwipeInput language={lang?.id || 'ID'} value={formBio.heartRate || ''} onChange={(val) => setFormBio({...formBio, heartRate: val})} disabled={hcLocked('heartRate')} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center ${lockCls('heartRate')}`} placeholder="Avg" />
+                                        <SwipeInput language={lang?.id || 'ID'} value={formBio.minHeartRate || ''} onChange={(val) => setFormBio({...formBio, minHeartRate: val})} disabled={hcLocked('minHeartRate')} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center ${lockCls('minHeartRate')}`} placeholder="Min" />
+                                        <SwipeInput language={lang?.id || 'ID'} value={formBio.maxHeartRate || ''} onChange={(val) => setFormBio({...formBio, maxHeartRate: val})} disabled={hcLocked('maxHeartRate')} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center ${lockCls('maxHeartRate')}`} placeholder="Max" />
                                     </div>
                                 </div>
                                 <div>

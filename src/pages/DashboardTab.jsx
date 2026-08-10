@@ -10,7 +10,7 @@ import ProgressTab from './ProgressTab';
 import { MuscleProgress } from '../components/MuscleProgress';
 import SwipeInput from '../components/SwipeInput';
 import { formatNumber, sleepHoursToParts } from '../utils/numberFormat';
-import { parseWorkoutDurationMinutes, dailyBurnCalories } from '../utils/workoutCalc';
+import { dailyBurnCalories, dailyActiveMinutes } from '../utils/workoutCalc';
 import { calcBMR } from '../utils/bmr';
 import { AreaChart, Area, ResponsiveContainer, YAxis } from 'recharts';
 
@@ -576,7 +576,6 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   // Nilainya masih dihitung di useMemo, tinggal ditambahkan lagi di sini kalau mau dipakai.
   const { mergedDailyActiveMinutes, mergedDurationParts, mergedCalorieParts, mergedDailyCalories, mergedDailyCaloriesFloor, mergedWeeklyActiveMinutes, mergedWeeklySessions, mergedWeeklyCalories } = useMemo(() => {
      const currentWeight = Number(bioData.weight) || 70; // Asumsi 70kg jika tidak ada data
-     let dailyActive = Number(bioData.activeMinutes || 0);
 
      const todayWks = history[activeDate]?.workouts || [];
      const todayCompletedWks = todayWks.filter(w => w.status === 'completed' || w.programId === 'adhoc');
@@ -588,16 +587,23 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      // fallback "pakai log tingkat-hari kalau sesi tidak punya log sendiri" selalu berujung
      // `history[undefined]` alias tidak pernah jalan. Sesi lama yang lognya tersimpan di level
      // hari karena itu dihitung 0 kalori.
-     const burn = dailyBurnCalories(bioData, todayWks, currentWeight, history[activeDate]?.exerciseLogs);
+     const burn = dailyBurnCalories(bioData, todayWks, currentWeight, history[activeDate]?.exerciseLogs, userProfile);
      const isDailyCalsManual = burn.isManual;
      const intTodayCardio = burn.kardio;
      const intTodayWeights = burn.beban;
 
-     let intTodayDur = 0;
+     // Durasi Aktif = jalan + latihan, satu rumus di workoutCalc.js — sama seperti kalori.
+     // Menit jalan sudah dikurangi durasi sesi kardio di dalamnya, jadi treadmill tidak lagi
+     // terhitung dua kali (sekali sebagai menit-langkah, sekali sebagai durasi sesi).
+     const act = dailyActiveMinutes(bioData, todayWks);
+     const intTodayDur = act.workoutMinutes;
+     const stepMinutes = act.stepMinutes;
+     const autoActive = act.auto;
+     const manualActive = act.manual;
+     const dailyActive = act.total;
+
      let intTodayExercises = 0;
      todayCompletedWks.forEach(w => {
-         intTodayDur += parseWorkoutDurationMinutes(w.duration);
-
          if (w.exercises && Array.isArray(w.exercises)) {
              intTodayExercises += w.exercises.length;
          } else if (w.log && typeof w.log === 'object') {
@@ -607,18 +613,6 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          }
      });
      
-     // Durasi Aktif = jalan + latihan. Menit jalan diturunkan dari sebaran langkah per jam di
-     // Health Connect (lihat stepMinutesFromHourly) — HC sendiri tidak punya metrik "menit aktif".
-     // Input manual tetap menang sebagai lantai, sama seperti sebelumnya.
-     // ponytail: langkah saat treadmill/kardio di gym terhitung di DUA segmen sekaligus, jadi
-     // totalnya bisa sedikit menggelembung. Sesi menyimpan `timestamp` (jam selesai) + `duration`,
-     // jadi kalau kelak terasa mengganggu, jam yang tertutup sesi tinggal dikecualikan dari
-     // bucket per jam sebelum dijumlah.
-     const stepMinutes = Math.round(Number(bioData.stepMinutes || 0));
-     const autoActive = stepMinutes + intTodayDur;
-     const manualActive = dailyActive;
-     dailyActive = Math.max(manualActive, autoActive);
-
      // Kalori Dibakar = BMR + Langkah Kaki + Workout. Semua cabangnya (termasuk basis manual,
      // yang WAJIB dibaca lewat manualFieldValue karena Lomeal menandai override-nya dengan
      // boolean `true` dan `Number(true)` = 1) ada di dailyBurnCalories.
@@ -642,31 +636,29 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          const dateStr = getLocalYMD(d);
          const dayData = history[dateStr] || {};
          
-         const extDur = Number(dayData.bioData?.activeMinutes || 0);
-
-         let intDur = 0;
-
          const wks = dayData.workouts || [];
          const completedWks = wks.filter(w => w.status === 'completed' || w.programId === 'adhoc');
          weeklySess += completedWks.length;
 
          completedWks.forEach(w => {
-             intDur += parseWorkoutDurationMinutes(w.duration);
-
              const exs = w.overriddenExercises || w.exercises || [];
              const isCardioWorkout = exs.length > 0 && exs.every(ex => ex.target?.some(t => t.toLowerCase().includes('cardio') || t.toLowerCase().includes('kardio')));
              if (isCardioWorkout) weeklyCardioSess++;
              else weeklyWeightSess++;
          });
 
-         weeklyDur += Math.max(extDur, intDur);
-         weeklyWorkoutDur += intDur;
+         // Rumus yang sama dengan kartu harian. Versi lama `Math.max(activeMinutes, durasiLatihan)`
+         // membuang menit jalan sepenuhnya: hari dengan 8.000 langkah dan tanpa latihan menyumbang
+         // 0 menit ke total mingguan, padahal kartu hariannya menampilkan ~80 menit.
+         const dayAct = dailyActiveMinutes(dayData.bioData, wks);
+         weeklyDur += dayAct.total;
+         weeklyWorkoutDur += dayAct.workoutMinutes;
          // Rumus yang SAMA PERSIS dengan kartu harian. Versi lama di sini
          // `Math.max(bioData.activityCalories, kaloriLatihan)` — membaca field tersimpan yang
          // bisa saja ditulis Health Connect dengan satuan lain (kalori aktif, tanpa BMR). Hari
          // yang tersinkron HC ikut dihitung dengan satuan berbeda dari hari yang tidak, jadi
          // totalnya tidak pernah bisa dijelaskan.
-         weeklyCals += dailyBurnCalories(dayData.bioData, wks, currentWeight, dayData.exerciseLogs).total;
+         weeklyCals += dailyBurnCalories(dayData.bioData, wks, currentWeight, dayData.exerciseLogs, userProfile).total;
      }
      
      // Override with manual weekly if user explicitly saved a modified value in the modal
@@ -717,7 +709,10 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          mergedWeeklyWeight: weeklyWeightSess,
          mergedWeeklyCalories: weeklyCals
      };
-  }, [history, activeDate, bioData]);
+  // userProfile WAJIB ikut: umur & jenis kelamin datang async dari Firestore SETELAH render
+  // pertama. Tanpa ini memo tidak pernah dihitung ulang saat profil tiba, dan sesi kardio
+  // menempel di hitungan non-nadi sampai kebetulan ada hal lain yang berubah.
+  }, [history, activeDate, bioData, userProfile]);
 
   // Tulis balik mergedDailyCalories (udah dilindungi Math.max lantai BMR+langkah+workout,
   // lihat useMemo di atas) ke bioData.activityCalories — biar Lomeal, yang baca field mentah
@@ -1175,7 +1170,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                     language={language}
                     lomealToday={lomealToday}
                     activityTargets={activityTargets} lomealTargets={lomealTargets}
-                    userWeight={bioData.weight}
+                    userWeight={bioData.weight} userProfile={userProfile}
                     metricKeys={['steps', 'calories', 'activeMinutes']}
                     extraTabs={VITALS_METRICS(theme)}
                     renderExtra={(key) => (
@@ -1455,7 +1450,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                      language={language}
                      metricKeys={['sleep', 'energyScore']}
                      storageKey="lyfit_sleep_chart"
-                     activityTargets={activityTargets}
+                     activityTargets={activityTargets} userProfile={userProfile}
                   />
                 )}
 

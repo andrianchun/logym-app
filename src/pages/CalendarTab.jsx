@@ -766,11 +766,20 @@ const CalendarTab = ({
               deletedProjected: newDeletedProjected
           };
 
-          // Jika setelah dihapus hari itu benar-benar kosong dan bukan adhoc, tandai untuk dihapus agar auto-save membersihkannya
-          if (h[dateStr] && Array.isArray(h[dateStr].workouts) && h[dateStr].workouts.length === 0 && (!h[dateStr]._activeSession || Object.keys(h[dateStr]._activeSession).length === 0)) {
-              if (!hasDeletedProjected(h[dateStr])) {
-                  h[dateStr] = { _delete: true };
-              }
+          // Hari yang jadi benar-benar kosong ditandai untuk dihapus, supaya tidak menyisakan
+          // entri hampa di dokumen tahunan.
+          //
+          // `bioData` WAJIB ikut diperiksa. Tanpa itu, menghapus latihan TERAKHIR hari itu ikut
+          // membuang langkah, tidur, berat badan, dan nadi hari yang sama — data yang sama sekali
+          // tidak diminta dihapus, sebagiannya hasil sinkron Health Connect yang tidak akan
+          // ditarik ulang karena sinkron cuma menyentuh hari yang datanya berubah. Menghapus satu
+          // sesi latihan tidak boleh berarti menghapus satu hari kesehatan.
+          const sisa = h[dateStr];
+          const adaBio = sisa?.bioData && Object.keys(sisa.bioData).length > 0;
+          if (sisa && Array.isArray(sisa.workouts) && sisa.workouts.length === 0
+              && (!sisa._activeSession || Object.keys(sisa._activeSession).length === 0)
+              && !adaBio && !hasDeletedProjected(sisa)) {
+              h[dateStr] = { _delete: true };
           }
 
           return h;

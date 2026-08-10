@@ -2,7 +2,7 @@
 // Jalankan: node src/utils/dashboardCalc.test.mjs
 // Kalau rincian tidak berjumlah sama dengan angka besarnya, user berhenti percaya semua angkanya.
 import assert from 'node:assert/strict';
-import { splitWorkoutCalories, isCardioExercise, calculateSmartWorkoutCalories, dailyBurnCalories } from './workoutCalc.js';
+import { splitWorkoutCalories, isCardioExercise, calculateSmartWorkoutCalories, dailyBurnCalories, dailyActiveMinutes, heartRateCalories } from './workoutCalc.js';
 import { sleepHoursToParts, formatSleepDuration } from './numberFormat.js';
 
 // --- isCardioExercise ----------------------------------------------------
@@ -185,8 +185,8 @@ const sesiSelesai = { id: 'w1', status: 'completed', exercises: [beban], duratio
 //     dengan satuan berbeda ikut merusak hitungannya.
 {
   const tanpa = dailyBurnCalories({ bmr: 2000 }, [sesiSelesai], BERAT).total;
-  const dengan = dailyBurnCalories({ bmr: 2000, activityCalories: 9999, hcActiveCalories: 700 }, [sesiSelesai], BERAT).total;
-  assert.equal(dengan, tanpa, 'activityCalories/hcActiveCalories bocor jadi masukan hitungan');
+  const dengan = dailyBurnCalories({ bmr: 2000, activityCalories: 9999, hcCalories: 700 }, [sesiSelesai], BERAT).total;
+  assert.equal(dengan, tanpa, 'activityCalories/hcCalories bocor jadi masukan hitungan');
 }
 
 // 20. IDEMPOTEN: memberi makan hasilnya kembali tidak mengubah apa pun. Ini yang menjamin efek
@@ -204,6 +204,171 @@ const sesiSelesai = { id: 'w1', status: 'completed', exercises: [beban], duratio
   assert.equal(dailyBurnCalories({ bmr: 'x', steps: 'y' }, undefined, undefined).total, 1600);
   assert.ok(Number.isFinite(dailyBurnCalories({ steps: null }, [], NaN).total));
 }
+
+// --- HIBRIDA: kalori dari nadi untuk sesi kardio --------------------------
+// Nadi lebih akurat untuk kardio stabil (menangkap inklinasi & kebugaran yang tidak diketahui
+// tabel MET). Untuk beban justru menyesatkan — nadi naik dari kontraksi isometrik, bukan dari
+// konsumsi oksigen, dan itu yang bikin Samsung mencatat ~700 kkal untuk sesi angkat beban.
+
+const PROFIL = { gender: 'male', age: 30 };
+const kardioMurni = (hr) => ({
+  id: 'c1', status: 'completed', duration: '45:00',
+  exercises: [{ id: 2, name: 'Treadmill', type: 'cardio', target: ['Cardio'] }],
+  ...(hr ? { hr: { avg: hr } } : {}),
+});
+const bebanSesi2 = (hr) => ({
+  id: 'b1', status: 'completed', duration: '45:00',
+  exercises: [{ id: 1, name: 'Bench Press', type: 'weight' }],
+  log: { 1: logSet(4, { r: 10, w: 40 }) },
+  ...(hr ? { hr: { avg: hr } } : {}),
+});
+
+// 22. REGRESI PALING PENTING: TANPA nadi (tidak punya jam tangan / Health Connect mati),
+//     semuanya tetap terhitung persis seperti sebelumnya. Nadi itu peningkatan, bukan syarat.
+{
+  const logs = { 2: [{ done: true, duration: 45, distance: 6 }] };
+  const tanpaHr = calculateSmartWorkoutCalories(BERAT, kardioMurni(null), logs, 90, PROFIL);
+  const tanpaProfil = calculateSmartWorkoutCalories(BERAT, kardioMurni(null), logs);
+  assert.ok(tanpaHr > 0, 'sesi tanpa nadi harus tetap punya kalori');
+  assert.equal(tanpaHr, tanpaProfil, 'tanpa nadi, hasilnya harus identik dengan jalur lama');
+}
+
+// 23. Tanpa PROFIL (umur/gender belum diisi) juga tetap jatuh ke jalur lama, walau nadi ada.
+{
+  const logs = { 2: [{ done: true, duration: 45, distance: 6 }] };
+  assert.equal(
+    calculateSmartWorkoutCalories(BERAT, kardioMurni(140), logs),
+    calculateSmartWorkoutCalories(BERAT, kardioMurni(null), logs)
+  );
+}
+
+// 24. Sesi KARDIO dengan nadi: dipakai rumus nadi, dan hasilnya berbeda dari jalur MET.
+{
+  const logs = { 2: [{ done: true, duration: 45, distance: 6 }] };
+  const denganHr = calculateSmartWorkoutCalories(BERAT, kardioMurni(150), logs, 90, PROFIL);
+  const tanpaHr = calculateSmartWorkoutCalories(BERAT, kardioMurni(null), logs, 90, PROFIL);
+  assert.notEqual(denganHr, tanpaHr, 'nadi tidak dipakai untuk sesi kardio');
+  assert.ok(denganHr > 0);
+  // Nadi lebih tinggi harus berarti kalori lebih besar — kalau tidak, tandanya rumusnya terbalik.
+  assert.ok(calculateSmartWorkoutCalories(BERAT, kardioMurni(170), logs, 90, PROFIL) > denganHr);
+}
+
+// 25. REGRESI UTAMA: sesi BEBAN dengan nadi TIDAK BOLEH pakai rumus nadi. Ini seluruh alasan
+//     hibridanya dibatasi — kalau bocor ke sini, Logym mengulangi persis kesalahan Samsung.
+{
+  assert.equal(
+    calculateSmartWorkoutCalories(BERAT, bebanSesi2(150), bebanSesi2(150).log, 90, PROFIL),
+    calculateSmartWorkoutCalories(BERAT, bebanSesi2(null), bebanSesi2(null).log, 90, PROFIL),
+    'sesi beban ikut memakai nadi — inilah bug yang bikin angka menggelembung'
+  );
+}
+
+// 26. Sesi CAMPURAN (beban + treadmill) juga tidak pakai nadi — bagian bebannya akan digelembungkan.
+{
+  const campur = {
+    id: 'm1', status: 'completed', duration: '45:00', hr: { avg: 150 },
+    exercises: [{ id: 1, name: 'Bench', type: 'weight' }, { id: 2, name: 'Treadmill', type: 'cardio' }],
+  };
+  const logs = { 1: logSet(3, { r: 10, w: 40 }), 2: [{ done: true, duration: 10, distance: 1.5 }] };
+  const { hr, ...tanpaNadi } = campur;
+  assert.equal(
+    calculateSmartWorkoutCalories(BERAT, campur, logs, 90, PROFIL),
+    calculateSmartWorkoutCalories(BERAT, tanpaNadi, logs, 90, PROFIL)
+  );
+}
+
+// 27. Nadi di luar nalar (artefak sensor) diabaikan — angka meyakinkan tapi karangan lebih
+//     buruk daripada tidak punya angka.
+{
+  const logs = { 2: [{ done: true, duration: 45, distance: 6 }] };
+  const normal = calculateSmartWorkoutCalories(BERAT, kardioMurni(null), logs, 90, PROFIL);
+  [30, 260].forEach(hr => assert.equal(
+    calculateSmartWorkoutCalories(BERAT, kardioMurni(hr), logs, 90, PROFIL), normal, `HR ${hr} tidak ditolak`
+  ));
+  // Umur ngawur (tanggal lahir salah isi) juga ditolak.
+  assert.equal(calculateSmartWorkoutCalories(BERAT, kardioMurni(150), logs, 90, { gender: 'male', age: 200 }), normal);
+}
+
+// 28. INVARIAN tetap berlaku di jalur nadi: kardio + beban == total.
+{
+  const logs = { 2: [{ done: true, duration: 45, distance: 6 }] };
+  const w = kardioMurni(150);
+  const s = splitWorkoutCalories(BERAT, w, logs, 90, PROFIL);
+  assert.equal(s.kardio + s.beban, calculateSmartWorkoutCalories(BERAT, w, logs, 90, PROFIL));
+}
+
+// 29. heartRateCalories langsung: perempuan dan laki-laki pakai koefisien berbeda, dan nadi
+//     rendah yang menghasilkan angka negatif dikembalikan 0 (bukan kalori negatif).
+{
+  const p = { avgHr: 140, minutes: 45, weightKg: 80, age: 30 };
+  assert.notEqual(heartRateCalories({ ...p, gender: 'male' }), heartRateCalories({ ...p, gender: 'female' }));
+  assert.ok(heartRateCalories({ ...p, gender: 'male' }) > 0);
+  assert.equal(heartRateCalories({ avgHr: 61, minutes: 5, weightKg: 50, age: 20, gender: 'male' }), 0);
+  assert.equal(heartRateCalories({}), 0);
+}
+
+// 30. ageFromDob dipakai kalau profil cuma punya tanggal lahir, bukan `age` jadi.
+{
+  const tahunLahir = new Date().getFullYear() - 30;
+  const logs = { 2: [{ done: true, duration: 45, distance: 6 }] };
+  assert.equal(
+    calculateSmartWorkoutCalories(BERAT, kardioMurni(150), logs, 90, { gender: 'male', dob: `${tahunLahir}-05-01` }),
+    calculateSmartWorkoutCalories(BERAT, kardioMurni(150), logs, 90, PROFIL)
+  );
+}
+
+// --- dailyActiveMinutes --------------------------------------------------
+// Angka "Durasi Aktif" di kartu, grafik, dan kartu bagikan.
+
+const kardioSesi = { id: 'c1', status: 'completed', duration: '30:00', exercises: [kardio] };
+const bebanSesi = { id: 'b1', status: 'completed', duration: '45:00', exercises: [beban] };
+
+// 22. Dasar: menit jalan + durasi latihan beban (beban tidak menghasilkan langkah).
+{
+  const a = dailyActiveMinutes({ stepMinutes: 50 }, [bebanSesi]);
+  assert.equal(a.stepMinutes, 50);
+  assert.equal(a.workoutMinutes, 45);
+  assert.equal(a.total, 95);
+}
+
+// 23. REGRESI UTAMA: treadmill tidak boleh terhitung DUA KALI. 30 menit treadmill menghasilkan
+//     langkah yang jadi ~30 menit-langkah, lalu sesinya menyumbang 30 menit lagi = 60 menit
+//     untuk setengah jam yang sama.
+{
+  const a = dailyActiveMinutes({ stepMinutes: 40 }, [kardioSesi]);
+  assert.equal(a.workoutMinutes, 30);
+  assert.equal(a.stepMinutes, 10, 'menit-langkah harus dikurangi durasi sesi kardio');
+  assert.equal(a.total, 40, 'bukan 70');
+}
+
+// 24. Sesi kardio lebih panjang dari menit-langkah -> menit jalan NOL, bukan negatif.
+{
+  const a = dailyActiveMinutes({ stepMinutes: 10 }, [kardioSesi]);
+  assert.equal(a.stepMinutes, 0);
+  assert.equal(a.total, 30);
+}
+
+// 25. Sesi beban tidak mengurangi menit-langkah — angkat besi tidak menghasilkan langkah.
+assert.equal(dailyActiveMinutes({ stepMinutes: 40 }, [bebanSesi]).stepMinutes, 40);
+
+// 26. Input manual menang sebagai lantai, tapi tidak pernah menurunkan hasil otomatis.
+{
+  assert.equal(dailyActiveMinutes({ stepMinutes: 10, activeMinutes: 90 }, []).total, 90);
+  assert.equal(dailyActiveMinutes({ stepMinutes: 10, activeMinutes: 90 }, []).isManual, true);
+  assert.equal(dailyActiveMinutes({ stepMinutes: 80, activeMinutes: 5 }, []).total, 80, 'manual kecil tidak boleh menurunkan');
+}
+
+// 27. REGRESI "bar kosong melompong": hari yang cuma punya langkah (tanpa latihan sama sekali)
+//     TETAP menghasilkan angka. Grafik dulu membaca bioData.activeMinutes yang tidak pernah
+//     ditulis, jadi hari seperti ini selalu jadi batang kosong.
+assert.equal(dailyActiveMinutes({ stepMinutes: 75 }, []).total, 75);
+
+// 28. Sesi terjadwal yang belum dikerjakan tidak menyumbang durasi.
+assert.equal(dailyActiveMinutes({ stepMinutes: 0 }, [{ id: 'p', status: 'planned', duration: '60:00' }]).total, 0);
+
+// 29. Masukan kosong/kotor tidak melahirkan NaN.
+assert.equal(dailyActiveMinutes(null, null).total, 0);
+assert.equal(dailyActiveMinutes({ stepMinutes: 'x', activeMinutes: null }, undefined).total, 0);
 
 // --- format durasi tidur -------------------------------------------------
 

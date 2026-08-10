@@ -2,7 +2,7 @@ import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip } from 'recharts';
 import { getLocalYMD } from '../data/constants';
 import { formatNumber, formatSleepDuration } from '../utils/numberFormat';
-import { dailyBurnCalories } from '../utils/workoutCalc';
+import { dailyBurnCalories, dailyActiveMinutes } from '../utils/workoutCalc';
 
 // Warna garis target, disamakan persis dengan grafik Lomeal (NutritionChart.jsx) supaya "garis
 // kuning = target" berarti sama di kedua app.
@@ -16,7 +16,7 @@ const TARGET_COLOR = (theme) => (theme === 'dark' ? '#facc15' : '#eab308');
 // Tensi/SpO2 di sebelah Durasi Aktif) tapi visualisasinya beda total (bukan bar per-hari) —
 // pas tab itu aktif, seluruh area chart bar diganti sama renderExtra(key), baris toggle-nya
 // tetap satu biar gak makan tempat vertikal buat tab row kedua.
-const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPointClick, language, lomealToday, metricKeys, storageKey = 'lyfit_activity_chart', extraTabs, renderExtra, activityTargets, lomealTargets, userWeight }) => {
+const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPointClick, language, lomealToday, metricKeys, storageKey = 'lyfit_activity_chart', extraTabs, renderExtra, activityTargets, lomealTargets, userWeight, userProfile }) => {
   // `stackId` = batang bertumpuk (rincian satu angka), tanpa itu = batang berdampingan.
   // Kalori: "Masuk" berdiri sendiri di sebelah tumpukan "Dibakar" yang dirinci per sumber.
   // Tidur: satu tumpukan tahapan; `total` cuma dipakai hari yang sumbernya tidak merinci tahapan.
@@ -107,7 +107,8 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
           // Totalnya juga DIHITUNG, tidak dibaca dari bioData.activityCalories: field itu dulu
           // ikut ditulis Health Connect dengan satuan berbeda (kalori aktif, tanpa BMR), jadi
           // batang hari yang tersinkron HC menyusut drastis tanpa sebab yang kelihatan.
-          const burn = dailyBurnCalories(histBio, history[entry.dateStr]?.workouts, dayWeight, history[entry.dateStr]?.exerciseLogs);
+          const burn = dailyBurnCalories(histBio, history[entry.dateStr]?.workouts, dayWeight, history[entry.dateStr]?.exerciseLogs, userProfile);
+          const act = dailyActiveMinutes(histBio, history[entry.dateStr]?.workouts);
           // Hari yang benar-benar kosong tidak boleh dapat batang. dailyBurnCalories selalu
           // memberi minimal BMR fallback 1600 (konvensi yang disamakan dengan Lomeal), jadi tanpa
           // penjaga ini tiap hari tanpa data muncul sebagai batang 1600 kkal yang mengarang.
@@ -144,7 +145,11 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
               calSteps: stepCals > 0 ? stepCals : null,
               calCardio: cardioCals > 0 ? cardioCals : null,
               calWeights: weightCals > 0 ? weightCals : null,
-              activeMinutes: histBio?.activeMinutes ? Number(histBio.activeMinutes) : null,
+              // DIHITUNG, bukan dibaca dari bioData.activeMinutes. Field itu tidak pernah ditulis
+              // siapa pun kecuali input manual — dan handleSaveManualData justru MENGHAPUSNYA
+              // lagi kalau nilainya sama dengan hasil hitung. Jadi untuk hampir semua hari field
+              // itu tidak ada, dan batang "Durasi Aktif" selalu kosong padahal kartunya terisi.
+              activeMinutes: act.total > 0 ? act.total : null,
               sleep: totalSleep,
               // Sumber yang tidak merinci tahapan tetap dapat satu balok utuh lewat sleepTotalOnly,
               // jadi hari lama tidak berubah jadi batang kosong.
@@ -161,7 +166,8 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
           });
       });
       return data;
-  }, [history, lomealToday, activityTargets, lomealTargets, userWeight]);
+  // userProfile: lihat catatan yang sama di DashboardTab — profil tiba setelah render pertama.
+  }, [history, lomealToday, activityTargets, lomealTargets, userWeight, userProfile]);
 
   const scrollRef = useRef(null);
 

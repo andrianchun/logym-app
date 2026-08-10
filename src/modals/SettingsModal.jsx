@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Moon, Sun, Globe, Volume2, VolumeX, Timer, Download, DownloadCloud, Upload, CalendarDays, Bell, BellOff, Clock, Activity, Scale, Ruler, Thermometer, Database, Trash2, Plus, MessageCircle, Brain, HelpCircle, ChevronDown, ShieldAlert, AlertTriangle } from 'lucide-react';
+import { X, Moon, Sun, Globe, Volume2, VolumeX, Timer, Download, DownloadCloud, Upload, CalendarDays, Bell, BellOff, Clock, Activity, Scale, Ruler, Thermometer, Database, Trash2, Plus, MessageCircle, Brain, HelpCircle, ChevronDown, ShieldAlert, AlertTriangle, RefreshCw } from 'lucide-react';
 import SwipeInput from '../components/SwipeInput';
 import { AI_MODELS, PERSONA_PRESETS } from '../utils/aiAgent';
 import { FAQ_ITEMS } from '../utils/faqData';
@@ -17,6 +17,7 @@ export default function SettingsModal({
   undoStack, redoStack, handleUndo, handleRedo,
   setShowLibManager, setShowHelp,
   exportData, handleImportFile,
+  backupList, isRestoring, onLoadBackups, onRestoreBackup,
   user, handleLogout, handleDeleteAccount,
   setConfirmModal,
   biometricStandard, setBiometricStandard,
@@ -489,6 +490,51 @@ export default function SettingsModal({
                     <Upload size={16} /> <span>Import</span>
                     <input type="file" accept=".json" onChange={handleImportFile} className="hidden" />
                 </label>
+                </div>
+
+                {/* PULIHKAN DARI BACKUP OTOMATIS DI CLOUD.
+                    Backup dibuat sendiri tiap selesai latihan, tapi sampai sekarang tidak ada satu
+                    pun cara membacanya dari dalam app — harus buka konsol Firebase. Ini gagangnya. */}
+                <div className={`pt-3 border-t ${t.border}`}>
+                    <p className={`body-sm ${t.textMuted} mb-2`}>
+                        Backup otomatis tersimpan di cloud tiap selesai latihan, disimpan 30 hari.
+                        Memulihkan <span className="font-bold">hanya menambahkan tanggal yang hilang</span> — data yang ada di HP ini tidak akan diubah.
+                    </p>
+                    <button
+                        onClick={onLoadBackups}
+                        disabled={isRestoring}
+                        className={`w-full flex items-center justify-center space-x-2 py-3 rounded-xl font-bold ${t.btnBg} ${t.textMain} body-lg border ${t.border} active:scale-95 transition-all disabled:opacity-50`}
+                    >
+                        <RefreshCw size={16} className={isRestoring ? 'animate-spin' : ''} />
+                        <span>{isRestoring ? 'Memuat…' : 'Lihat Backup Cloud'}</span>
+                    </button>
+
+                    {backupList?.length > 0 && (
+                        <div className="mt-3 space-y-2 max-h-56 overflow-y-auto">
+                            {backupList.map(b => (
+                                <div key={b.id} className={`flex items-center justify-between gap-2 p-2.5 rounded-xl border ${t.border}`}>
+                                    <div className="min-w-0">
+                                        <p className={`body-md font-bold ${t.textMain} truncate`}>{b.id}</p>
+                                        <p className={`body-sm ${t.textMuted}`}>
+                                            {b.sessions ?? '?'} sesi · {b.timestamp ? new Date(b.timestamp).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : '-'}
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={() => setConfirmModal({
+                                            isOpen: true,
+                                            title: 'Pulihkan dari Backup',
+                                            message: `Pulihkan tanggal yang hilang dari backup ${b.id}? Data yang sudah ada di perangkat ini tidak akan diubah atau ditimpa.`,
+                                            confirmText: 'Ya, Pulihkan',
+                                            onConfirm: () => onRestoreBackup(b),
+                                        })}
+                                        className="shrink-0 px-3 py-2 rounded-lg font-bold body-sm bg-emerald-500/15 text-emerald-500 active:scale-95 transition-all"
+                                    >
+                                        Pulihkan
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
 

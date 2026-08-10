@@ -2,10 +2,9 @@
 // ORCHESTRATOR HEALTH CONNECT via @capgo/capacitor-health (baca + tulis + backfill histori)
 // Baca: steps, kalori aktif, detak jantung, berat/tinggi, body fat, oksigen, tekanan darah,
 // tidur (dengan breakdown stage kalau perangkatnya nyediain).
-// Tulis: kalori terbakar per sesi latihan (ActiveCaloriesBurnedRecord, rentang waktu = durasi
-// sesi). Plugin ini TIDAK punya jalur nulis sesi latihan formal (ExerciseSessionRecord) — cuma
-// baca (queryWorkouts) — jadi Logym belum bisa bikin entry "Workout" yang dikenali app lain,
-// tapi kalori + rentang waktunya tetap kepush dan kebaca app lain lewat Health Connect.
+// Tulis: TIDAK ADA lewat plugin ini. Sesi latihan ditulis lewat ExerciseWriterPlugin.kt lokal
+// (plugin capgo cuma bisa MEMBACA sesi). Kalori sengaja tidak pernah ditulis — HC menjumlahkan
+// semua sumber, jadi taksiran Logym bertumpuk di atas hitungan Samsung untuk jam yang sama.
 // Hanya aktif di platform native Android (Capacitor).
 // ============================================================
 import { Capacitor, registerPlugin } from '@capacitor/core';
@@ -34,7 +33,9 @@ export const hcAvailable = async () => {
 // TotalCaloriesBurned dan TIDAK pernah nulis ActiveCaloriesBurned — tanpa ini, query
 // 'calories' balik kosong terus walau Health Connect penuh data (kejadian nyata).
 const READ_TYPES = ['steps', 'calories', 'totalCalories', 'heartRate', 'restingHeartRate', 'weight', 'height', 'sleep', 'bodyFat', 'oxygenSaturation', 'bloodPressure', 'distance', 'basalCalories'];
-const WRITE_TYPES = ['calories'];
+// Logym tidak lagi menulis tipe data apa pun lewat plugin capgo (lihat catatan di bawah).
+// Record sesi latihan ditulis lewat ExerciseWriterPlugin.kt yang izinnya terpisah.
+const WRITE_TYPES = [];
 
 // Android gak nge-throw kalau user pencet "Tolak" di dialog izin — tetap resolve normal
 // dengan readAuthorized kosong. Lempar di sini kalau BENERAN nihil, biar caller yang udah
@@ -70,32 +71,12 @@ export const hcCheckStatus = async () => {
   }
 };
 
-// Tulis kalori terbakar satu sesi latihan yang baru selesai. startDate/endDate = rentang waktu
-// sesi (jadi durasinya ikut kebawa lewat rentang record, bukan cuma angka kalori polos) — app
-// lain yang baca ActiveCaloriesBurnedRecord dari Health Connect akan lihat kapan & berapa lama.
-// `dedupeKey` (opsional) — id sesi latihan. Health Connect MENJUMLAHKAN semua record, dan plugin
-// capgo ini tidak mengekspos metadata sama sekali — jadi TIDAK ADA clientRecordId di sini seperti
-// pada hcWriteWorkoutSession, dan record yang terlanjur dobel tidak bisa dihapus.
-//
-// Karena itu penjaga sebenarnya BUKAN memo localStorage di bawah (yang hilang saat app
-// di-reinstall, lalu sapuan setahun menulis ulang semuanya), melainkan penanda `hcSync` yang
-// disimpan di record sesinya sendiri — lihat pushWorkoutsToHc di App.jsx. Penanda itu ikut ke
-// Firestore, jadi selamat dari reinstall DAN berlaku sama di semua perangkat.
-// Memo di bawah cuma menghemat panggilan native dalam satu sesi app.
-export const hcWriteWorkoutCalories = async (startDate, endDate, kcal, dedupeKey) => {
-  if (!isNative() || !kcal || kcal <= 0) return false;
-  const memo = dedupeKey ? `hc_workout_written_${dedupeKey}` : null;
-  if (memo && localStorage.getItem(memo)) return false;
-  try {
-    const H = Health;
-    await H.saveSample({ dataType: 'calories', startDate, endDate, value: Math.round(kcal) });
-    if (memo) localStorage.setItem(memo, '1');
-    return true;
-  } catch (e) {
-    console.warn('hcWriteWorkoutCalories gagal:', e);
-    return false;
-  }
-};
+// Logym TIDAK menulis kalori ke Health Connect. hcWriteWorkoutCalories dihapus, jangan
+// dihidupkan lagi: HC menjumlahkan semua sumber, jadi taksiran Logym bertumpuk di atas kalori
+// yang sudah dihitung Samsung Health dari sensor nadi untuk jam yang sama (satu hari pernah
+// tercatat ~2.000 kkal padahal sesinya 400). Tidak bisa ditambal dedup: plugin ini tidak
+// mengekspos metadata, jadi record kalori tidak punya clientRecordId, tidak bisa di-upsert, dan
+// tidak bisa dihapus. Yang dikirim ke HC sekarang cuma record SESI (lihat hcWriteWorkoutSession).
 
 // DIAGNOSA: cek semua tipe yang didukung plugin, laporkan mana yang benar-benar ada isinya
 // di Health Connect perangkat ini dan dari aplikasi mana. Dipakai buat memutuskan data apa
@@ -173,13 +154,16 @@ export const hcRequestWorkoutWritePermission = async () => {
 //
 // Memo localStorage tetap dipakai sebagai penghemat panggilan native, BUKAN sebagai penjaga
 // korektnya — dan dilewati saat `version` naik, supaya koreksi benar-benar sampai.
-export const hcWriteWorkoutSession = async ({ startDate, endDate, exerciseType, title, dedupeKey, version = 1 }) => {
+export const hcWriteWorkoutSession = async ({ startDate, endDate, exerciseType, title, dedupeKey, version = 1, segments = [], notes = '' }) => {
   if (!isNative()) return false;
   const memo = dedupeKey ? `hc_session_written_${dedupeKey}` : null;
   if (memo && localStorage.getItem(memo) === String(version)) return false;
   try {
     await ExerciseWriter.saveWorkout({
       startDate, endDate, exerciseType, title,
+      // Rincian isi sesi: segmen per latihan (dengan jumlah repetisi) + ringkasan teks
+      // "3x10 @40kg". Tanpa ini sesi Logym muncul di app lain sebagai blok kosong tanpa isi.
+      segments, notes,
       clientRecordId: dedupeKey ? String(dedupeKey) : null,
       clientRecordVersion: version,
     });
@@ -211,6 +195,51 @@ const latestPerDay = (samples, mapValue) => {
   }
   Object.values(byDay).forEach((v) => delete v._at);
   return byDay;
+};
+
+/** Kelompokkan sample berjangka-waktu per tanggal lokal, dibuang yang tidak valid. */
+export const groupByDay = (samples) => {
+  const out = {};
+  (samples || []).forEach((s) => {
+    const mulai = new Date(s?.startDate).getTime();
+    if (!Number.isFinite(mulai) || !(s.value > 0)) return;
+    const selesaiRaw = new Date(s?.endDate ?? s?.startDate).getTime();
+    (out[ymdOf(s.startDate)] = out[ymdOf(s.startDate)] || []).push({
+      mulai,
+      selesai: Number.isFinite(selesaiRaw) ? Math.max(mulai, selesaiRaw) : mulai,
+      nilai: s.value,
+    });
+  });
+  return out;
+};
+
+/**
+ * Jumlahkan nilai record berjangka-waktu, MELEWATI yang tumpang tindih.
+ *
+ * Menjumlah semua record mentah itu salah: sumber seperti Samsung Health bisa menulis record
+ * total HARIAN sekaligus record per-SESI yang rentangnya berada di dalam hari itu. Keduanya sah,
+ * tapi yang kedua sudah tercakup di yang pertama — dijumlah polos, satu sesi latihan terhitung
+ * dua kali dan kalori harian menggelembung tanpa sebab yang kelihatan.
+ *
+ * queryAggregated milik Health Connect menangani ini lewat prioritas sumber, tapi plugin capgo
+ * tidak mendukung agregasi untuk TotalCaloriesBurned (lihat aggregateMetrics di HealthManager.kt),
+ * jadi harus dikerjakan di sini.
+ *
+ * Yang paling awal dan paling PANJANG menang, supaya record harian mengalahkan record sesi yang
+ * bersarang di dalamnya — bukan sebaliknya.
+ */
+export const sumNonOverlapping = (list) => {
+  const urut = [...(list || [])].sort(
+    (a, b) => a.mulai - b.mulai || (b.selesai - b.mulai) - (a.selesai - a.mulai)
+  );
+  let batas = -Infinity;
+  let total = 0;
+  urut.forEach((r) => {
+    if (r.mulai < batas) return; // bersarang/tumpang tindih — sudah terhitung
+    total += r.nilai;
+    batas = Math.max(batas, r.selesai);
+  });
+  return total;
 };
 
 // Batas titik per hari untuk log intraday.
@@ -416,7 +445,7 @@ export const hcReadRange = async (startYmd, endYmd) => {
         .forEach(([ymd, v]) => put(ymd, v)))
       .catch((e) => console.warn('hcReadRange basalCalories gagal:', e)),
 
-    // Disimpan sebagai `hcActiveCalories`, BUKAN `activityCalories`. Dua alasan, keduanya bug nyata:
+    // Disimpan sebagai `hcCalories`, BUKAN `activityCalories`. Dua alasan, keduanya bug nyata:
     //  1. Satuannya beda. Ini kalori AKTIF (tanpa BMR); `activityCalories` milik Logym adalah
     //     TOTAL (BMR + langkah + latihan). Satu field dua satuan bikin grafik mingguan bergerigi:
     //     hari yang disinkron HC ~600 kkal, hari hitungan Logym ~2.400 kkal.
@@ -434,18 +463,32 @@ export const hcReadRange = async (startYmd, endYmd) => {
         const res = await H.queryAggregated({ dataType: 'calories', startDate: startISO, endDate: endISO, bucket: 'day', aggregation: 'sum' });
         const hit = (res?.samples || []).filter((s) => s.value > 0);
         if (hit.length > 0) {
-          hit.forEach((s) => put(ymdOf(s.startDate), { hcActiveCalories: Math.round(s.value) }));
+          // AKTIF = di atas metabolisme istirahat, TIDAK termasuk BMR.
+          hit.forEach((s) => put(ymdOf(s.startDate), { hcCalories: Math.round(s.value), hcCaloriesType: 'active' }));
           return;
         }
       } catch (e) { console.warn('hcReadRange calories gagal:', e); }
       try {
         const res = await H.readSamples({ dataType: 'totalCalories', startDate: startISO, endDate: endISO, limit: 5000, ascending: true });
         const byDay = {};
-        (res?.samples || []).forEach((s) => {
-          const ymd = ymdOf(s.startDate);
-          byDay[ymd] = (byDay[ymd] || 0) + (s.value || 0);
+        // Dikelompokkan lalu DIJUMLAH TANPA TUMPANG TINDIH.
+        //
+        // Menjumlah semua sample mentah begitu saja itu salah: sumber seperti Samsung Health bisa
+        // menulis record total HARIAN sekaligus record per-SESI yang rentangnya berada di dalam
+        // hari itu. Keduanya sah, tapi yang kedua sudah termasuk di yang pertama — dijumlah
+        // polos, satu sesi latihan terhitung dua kali. queryAggregated milik Firestore-nya HC
+        // menangani ini lewat prioritas sumber, tapi plugin capgo tidak mendukung agregasi untuk
+        // tipe ini (lihat aggregateMetrics di HealthManager.kt), jadi harus dikerjakan di sini.
+        //
+        // Aturannya: urutkan menurut waktu mulai, ambil record hanya kalau ia mulai SESUDAH
+        // record terakhir yang sudah dihitung berakhir. Yang bersarang di dalamnya dilewati.
+        Object.entries(groupByDay(res?.samples || [])).forEach(([ymd, list]) => {
+          byDay[ymd] = sumNonOverlapping(list);
         });
-        Object.entries(byDay).forEach(([ymd, kcal]) => { if (kcal > 0) put(ymd, { hcActiveCalories: Math.round(kcal) }); });
+        // TOTAL = BMR + aktif. Jenisnya ikut dicatat, karena angkanya TIDAK sebanding dengan
+        // cabang 'active' di atas — beda ~1.500 kkal sehari, dan tanpa penanda ini grafik yang
+        // menampilkan keduanya berdampingan akan terlihat melonjak tanpa sebab.
+        Object.entries(byDay).forEach(([ymd, kcal]) => { if (kcal > 0) put(ymd, { hcCalories: Math.round(kcal), hcCaloriesType: 'total' }); });
       } catch (e) { console.warn('hcReadRange totalCalories gagal:', e); }
     })(),
 

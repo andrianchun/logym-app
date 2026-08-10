@@ -168,6 +168,12 @@ export const diffFields = (local, baseline) => {
   return { changed, nextBaseline, changedKeys };
 };
 
+// Berapa tanggal yang boleh dihapus otomatis dalam SATU snapshot. Di atas ini, penghapusannya
+// ditahan dan dilaporkan ke user — lihat alasannya di reconcileHistory.
+// Ini knob kalibrasi: 3 muat untuk "hapus beberapa sesi sekaligus" tapi jauh di bawah bentuk
+// kehilangan massal, yang selalu puluhan sampai ratusan tanggal.
+export const MAX_AUTO_DELETE = 3;
+
 /**
  * Gabungkan snapshot server ke state lokal, per tanggal.
  *
@@ -221,20 +227,36 @@ export const reconcileHistory = (prev, serverData, baseline, snapshotYear) => {
   // 2. Hapus tanggal yang hilang di server, tapi masih menyangkut di memori lokal.
   // Jika snapshot ini adalah dokumen "2026", maka tanggal apa pun di tahun "2026"
   // yang tidak ada di `serverData` berarti sudah dihapus di server.
+  const blockedDeletes = [];
   if (snapshotYear) {
+    const calonHapus = Object.keys(next).filter(d =>
+      d.startsWith(snapshotYear)
+      && (!serverData || serverData[d] === undefined)
+      // Tanggal dengan perubahan lokal tertunda tidak pernah jadi calon — dipertahankan di bawah.
+      && dayFingerprint(prev?.[d]) === nextBaseline[d]
+    );
+
+    // PEMUTUS ARUS. Penghapusan yang WAJAR selalu sedikit: user menghapus satu sesi, satu hari.
+    // Kehilangan massal punya bentuk lain — skrip debug yang salah sasaran, migrasi setengah
+    // jalan, atau dokumen tahunan yang terpotong. Bentuk itu tidak boleh diikuti diam-diam,
+    // karena begitu diikuti, salinan lokal (satu-satunya sisa datanya) ikut tertimpa.
+    //
+    // Menahan lebih aman daripada menghapus: data yang tertahan padahal memang sengaja dihapus
+    // cuma muncul lagi sampai penghapusannya dikirim ulang. Kebalikannya tidak bisa dibatalkan.
+    if (calonHapus.length > MAX_AUTO_DELETE) {
+      blockedDeletes.push(...calonHapus);
+    } else {
+      calonHapus.forEach(d => { delete next[d]; delete nextBaseline[d]; });
+    }
+
+    // Yang punya perubahan lokal tertunda tetap dipertahankan seperti sebelumnya.
     Object.keys(next).forEach(d => {
-      if (d.startsWith(snapshotYear) && (!serverData || serverData[d] === undefined)) {
-        // Hanya hapus jika tidak ada modifikasi lokal yang tertunda
-        const hasUnsavedLocal = dayFingerprint(prev[d]) !== nextBaseline[d];
-        if (hasUnsavedLocal) {
-          kept.push(d);
-        } else {
-          delete next[d];
-          delete nextBaseline[d];
-        }
+      if (d.startsWith(snapshotYear) && (!serverData || serverData[d] === undefined)
+          && dayFingerprint(prev?.[d]) !== nextBaseline[d]) {
+        kept.push(d);
       }
     });
   }
 
-  return { next, baseline: nextBaseline, kept, taken };
+  return { next, baseline: nextBaseline, kept, taken, blockedDeletes };
 };

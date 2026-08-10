@@ -6,7 +6,7 @@
 // tersimpan, batasnya tertabrak di tengah tahun dan SEMUA latihan tahun itu berhenti tersimpan —
 // bukan cuma grafiknya yang rusak. Ini penjaga batas itu.
 import assert from 'node:assert/strict';
-import { logPerDay, capIntradayLog } from './healthConnect.js';
+import { logPerDay, capIntradayLog, groupByDay, sumNonOverlapping } from './healthConnect.js';
 
 const hr = (iso, value) => ({ startDate: iso, value });
 const val = (s) => ({ value: Math.round(s.value) });
@@ -149,6 +149,58 @@ const val = (s) => ({ value: Math.round(s.value) });
   assert.ok(capped.length <= 96);
   assert.ok(capped.every((p) => p.sys === 120 && p.dia === 80));
   assert.deepEqual(Object.keys(capped[0]).sort(), ['dia', 'sys', 'time', 'ts']);
+}
+
+// ── sumNonOverlapping: kalori TotalCaloriesBurned dari sumber yang menulis ganda ─────────────
+// Samsung Health menulis TotalCaloriesBurned (bukan ActiveCaloriesBurned), dan bisa menulis
+// record harian SEKALIGUS record per-sesi yang bersarang di dalamnya. Dijumlah polos, sesi
+// latihan terhitung dua kali.
+
+const rec = (mulai, selesai, nilai) => ({ mulai, selesai, nilai });
+const J = (h) => new Date(`2026-08-09T${String(h).padStart(2, '0')}:00:00`).getTime();
+
+// 14. Record yang tidak tumpang tindih dijumlah biasa.
+assert.equal(sumNonOverlapping([rec(J(6), J(7), 100), rec(J(8), J(9), 200)]), 300);
+
+// 15. REGRESI UTAMA: record sesi yang BERSARANG di dalam record harian tidak boleh ikut dijumlah.
+//     Harian 1.800 + sesi 700 di dalamnya = 1.800, bukan 2.500.
+assert.equal(sumNonOverlapping([rec(J(0), J(23), 1800), rec(J(17), J(18), 700)]), 1800);
+
+// 16. Yang paling PANJANG menang walau mulainya sama — record harian mengalahkan sesi.
+assert.equal(sumNonOverlapping([rec(J(0), J(1), 50), rec(J(0), J(23), 1800)]), 1800);
+
+// 17. Tumpang tindih sebagian (bukan bersarang penuh) juga dilewati — lebih baik sedikit
+//     kekurangan daripada menggelembung; angka yang terlalu besar jauh lebih menyesatkan.
+assert.equal(sumNonOverlapping([rec(J(6), J(10), 400), rec(J(8), J(12), 400)]), 400);
+
+// 18. Urutan masukan tidak boleh mengubah hasil — Health Connect tidak menjamin urutan.
+{
+  const a = [rec(J(0), J(23), 1800), rec(J(17), J(18), 700), rec(J(6), J(7), 100)];
+  assert.equal(sumNonOverlapping(a), sumNonOverlapping([...a].reverse()));
+}
+
+// 19. Kosong/kotor tidak melahirkan NaN.
+assert.equal(sumNonOverlapping([]), 0);
+assert.equal(sumNonOverlapping(null), 0);
+
+// 20. groupByDay membuang sample tidak valid dan memisah per tanggal LOKAL.
+{
+  const g = groupByDay([
+    { startDate: '2026-08-09T08:00:00', endDate: '2026-08-09T09:00:00', value: 100 },
+    { startDate: '2026-08-10T08:00:00', endDate: '2026-08-10T09:00:00', value: 200 },
+    { startDate: 'bukan-tanggal', value: 999 },
+    { startDate: '2026-08-09T10:00:00', value: 0 },   // nol dibuang
+  ]);
+  assert.deepEqual(Object.keys(g).sort(), ['2026-08-09', '2026-08-10']);
+  assert.equal(g['2026-08-09'].length, 1);
+}
+
+// 21. Record tanpa endDate diperlakukan sebagai satu titik, bukan rentang tak hingga — kalau
+//     tidak, satu record cacat memblokir seluruh sisa hari itu dari penjumlahan.
+{
+  const g = groupByDay([{ startDate: '2026-08-09T08:00:00', value: 100 }]);
+  assert.equal(g['2026-08-09'][0].mulai, g['2026-08-09'][0].selesai);
+  assert.equal(sumNonOverlapping([...g['2026-08-09'], rec(J(9), J(10), 50)]), 150);
 }
 
 console.log('intradayLog OK');

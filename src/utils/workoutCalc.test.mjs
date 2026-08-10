@@ -9,6 +9,7 @@ import {
   calculateWorkoutCalories,
   guessWorkoutType,
   recomputeStrengthRecords,
+  buildHcSessionDetail,
 } from './workoutCalc.js';
 
 const KG = 70;
@@ -109,5 +110,80 @@ const hari = (log) => ({ workouts: [{ id: 'w1', status: 'completed', log }] });
 assert.deepEqual(recomputeStrengthRecords(null, null, null), {});
 assert.deepEqual(recomputeStrengthRecords({ 'bukan-tanggal': hari({ 1: [{ w: 50, r: 10 }] }) }, ['1'], lookup), {});
 assert.deepEqual(recomputeStrengthRecords({ '2026-08-01': hari({ 1: [] }) }, ['1'], lookup), {});
+
+// --- buildHcSessionDetail ------------------------------------------------
+// Rincian isi sesi yang ditulis ke Health Connect. Sebelumnya sesi Logym masuk sebagai blok
+// kosong: cuma nama, jenis, dan durasi — dibuka di Samsung Health tidak ada isinya.
+
+const T0 = new Date('2026-08-09T08:00:00Z').getTime();
+const T1 = T0 + 60 * 60 * 1000; // sesi 1 jam
+
+// 14. Segmen dibuat per latihan, dengan TOTAL repetisi, plus ringkasan teks berisi kg.
+{
+  const w = {
+    id: 'w1',
+    exercises: [
+      { id: 1, name: 'Bench Press', type: 'weight' },
+      { id: 2, name: 'Squat', type: 'weight' },
+    ],
+  };
+  const logs = {
+    1: [{ done: true, r: 10, w: 40 }, { done: true, r: 10, w: 45 }, { done: true, r: 8, w: 45 }],
+    2: [{ done: true, r: 12, w: 60 }],
+  };
+  const { segments, notes } = buildHcSessionDetail(w, logs, T0, T1);
+  assert.equal(segments.length, 2);
+  assert.equal(segments[0].reps, 28, 'reps harus dijumlah dari semua set');
+  assert.equal(segments[0].type, 'Bench Press');
+  assert.match(notes, /Bench Press 3x9 @45kg/, `notes: ${notes}`);
+  assert.match(notes, /Squat 1x12 @60kg/, `notes: ${notes}`);
+}
+
+// 15. Segmen TIDAK BOLEH tumpang tindih dan wajib di dalam rentang sesi — Health Connect
+//     menolak SELURUH record kalau satu saja melanggar.
+{
+  const w = { id: 'w1', exercises: [{ id: 1, name: 'A' }, { id: 2, name: 'B' }, { id: 3, name: 'C' }] };
+  const logs = { 1: [{ done: true, r: 5 }], 2: [{ done: true, r: 5 }], 3: [{ done: true, r: 5 }] };
+  const { segments } = buildHcSessionDetail(w, logs, T0, T1);
+  assert.equal(segments.length, 3);
+  segments.forEach((s, i) => {
+    assert.ok(new Date(s.startDate).getTime() >= T0, `segmen ${i} mulai sebelum sesi`);
+    assert.ok(new Date(s.endDate).getTime() <= T1, `segmen ${i} selesai sesudah sesi`);
+    assert.ok(new Date(s.startDate) < new Date(s.endDate), `segmen ${i} panjangnya nol/mundur`);
+    if (i > 0) assert.ok(new Date(s.startDate).getTime() >= new Date(segments[i - 1].endDate).getTime(), `segmen ${i} tumpang tindih`);
+  });
+}
+
+// 16. Latihan yang TIDAK dikerjakan tidak ikut ditulis — kalau ikut, Samsung Health menampilkan
+//     latihan yang tidak pernah terjadi.
+{
+  const w = { id: 'w1', exercises: [{ id: 1, name: 'A' }, { id: 2, name: 'B' }] };
+  const { segments, notes } = buildHcSessionDetail(w, { 1: [{ done: true, r: 5 }], 2: [{ done: false, r: 5 }] }, T0, T1);
+  assert.equal(segments.length, 1);
+  assert.equal(segments[0].type, 'A');
+  assert.ok(!notes.includes('B'));
+}
+
+// 17. Latihan tanpa beban (bodyweight/plank) tetap dapat segmen, notes-nya tanpa "@kg".
+{
+  const w = { id: 'w1', exercises: [{ id: 1, name: 'Plank', type: 'time' }] };
+  const { segments, notes } = buildHcSessionDetail(w, { 1: [{ done: true, d: 60 }] }, T0, T1);
+  assert.equal(segments.length, 1);
+  assert.ok(!notes.includes('@'), `tidak boleh ada beban palsu: ${notes}`);
+}
+
+// 18. Kunci log bentuk sesi program (`${ex.id}-${workout.id}`) tetap kena — sama seperti
+//     perhitungan kalori, kalau tidak seluruh sesi program tertulis tanpa rincian.
+{
+  const w = { id: 'w9', exercises: [{ id: 1, name: 'Bench Press' }] };
+  const { segments } = buildHcSessionDetail(w, { '1-w9': [{ done: true, r: 10, w: 40 }] }, T0, T1);
+  assert.equal(segments.length, 1);
+  assert.equal(segments[0].reps, 10);
+}
+
+// 19. Masukan kosong/durasi nol tidak melahirkan segmen invalid.
+assert.deepEqual(buildHcSessionDetail(null, null, T0, T1), { segments: [], notes: '' });
+assert.deepEqual(buildHcSessionDetail({ exercises: [] }, {}, T0, T1), { segments: [], notes: '' });
+assert.deepEqual(buildHcSessionDetail({ exercises: [{ id: 1, name: 'A' }] }, { 1: [{ done: true }] }, T0, T0), { segments: [], notes: '' });
 
 console.log('workoutCalc OK', { cardioKcal, plankKcal, liftKcal });

@@ -258,8 +258,10 @@ export const isCardioExercise = (ex) => {
  * pun — pembagian ini taksiran. Jalur naiknya: catat durasi per latihan, lalu bagi baseline
  * menurut waktu sebenarnya.
  */
-export const splitWorkoutCalories = (weightKg, workout, logs, globalRestTime = 90) => {
-  const total = calculateSmartWorkoutCalories(weightKg, workout, logs, globalRestTime);
+export const splitWorkoutCalories = (weightKg, workout, logs, globalRestTime = 90, profile = null) => {
+  // `profile` WAJIB diteruskan: totalnya diambil dari fungsi itu, jadi kalau di sini tidak ikut,
+  // rincian kardio/beban meleset dari angka besarnya persis di sesi yang memakai nadi.
+  const total = calculateSmartWorkoutCalories(weightKg, workout, logs, globalRestTime, profile);
   if (!(total > 0)) return { kardio: 0, beban: 0 };
 
   const weight = Number(weightKg) || 70;
@@ -333,6 +335,53 @@ export const guessWorkoutType = (exercises) => {
 };
 
 /**
+ * Kalori dari NADI (Keytel et al., 2005) — rumus baku yang dipakai wearable berbasis detak jantung.
+ *
+ * KAPAN INI LEBIH BAIK: kardio stabil (treadmill, sepeda, elliptical). Di situ nadi naik sebanding
+ * dengan konsumsi oksigen, jadi rumusnya valid — dan ia menangkap dua hal yang tidak diketahui
+ * hitungan berbasis MET Logym: INKLINASI (treadmill 6 km/jam di tanjakan 10% jauh lebih berat
+ * daripada di datar, tapi kecepatannya sama) dan tingkat kebugaran masing-masing orang.
+ *
+ * KAPAN INI JUSTRU SALAH: latihan beban. Nadi saat angkat beban naik karena kontraksi isometrik,
+ * napas ditahan, dan lonjakan simpatis — bukan karena konsumsi oksigen berkelanjutan. Rumusnya
+ * tidak tahu bedanya dan menerjemahkan nadi tinggi jadi kalori tinggi. Ini penyebab sesi angkat
+ * beban tercatat ~700 kkal di Samsung Health padahal hitungan berbasis set-nya ~400 (MET 11,7 =
+ * setara lari 11 km/jam selama 45 menit tanpa henti — mustahil untuk latihan berisi istirahat).
+ * Karena itu pemanggilnya WAJIB membatasi ke sesi yang murni kardio.
+ *
+ * Mengembalikan 0 kalau datanya tidak cukup atau di luar nalar — pemanggil jatuh ke hitungan
+ * berbasis set. Nadi itu PENINGKATAN, bukan prasyarat: tanpa jam tangan semuanya tetap terhitung.
+ *
+ * @returns {number} kcal, 0 kalau tidak bisa dihitung
+ */
+export const heartRateCalories = ({ avgHr, minutes, weightKg, age, gender }) => {
+  const hr = Number(avgHr);
+  const min = Number(minutes);
+  const w = Number(weightKg);
+  const a = Number(age);
+  // Batas kewarasan. Nadi di luar 60–220 hampir pasti artefak sensor, dan umur di luar 10–100
+  // biasanya berarti tanggal lahir salah isi — dua-duanya menghasilkan angka yang meyakinkan
+  // tapi karangan, dan itu lebih buruk daripada tidak punya angka sama sekali.
+  if (!(hr >= 60 && hr <= 220) || !(min > 0) || !(w > 0) || !(a >= 10 && a <= 100)) return 0;
+
+  const perMin = gender === 'female'
+    ? (-20.4022 + 0.4472 * hr - 0.1263 * w + 0.074 * a) / 4.184
+    : (-55.0969 + 0.6309 * hr + 0.1988 * w + 0.2017 * a) / 4.184;
+
+  // Di nadi rendah rumusnya bisa menghasilkan angka negatif — itu di luar rentang kalibrasinya,
+  // bukan "membakar kalori negatif". Kembalikan 0 supaya pemanggil memakai hitungan set.
+  const kcal = perMin * min;
+  return kcal > 0 ? Math.round(kcal) : 0;
+};
+
+/** Umur dari tanggal lahir. Konvensinya disamakan dengan yang sudah dipakai calcBMR. */
+export const ageFromDob = (dob) => {
+  if (!dob) return 0;
+  const t = new Date(dob).getFullYear();
+  return Number.isFinite(t) ? new Date().getFullYear() - t : 0;
+};
+
+/**
  * Estimasi kalori terbakar untuk satu sesi latihan berdasarkan berat badan & durasi.
  * @param {number} weightKg - berat badan pengguna (kg). Fallback ke 70kg kalau belum diisi.
  * @param {number} durationMinutes
@@ -353,12 +402,36 @@ export const calculateWorkoutCalories = (weightKg, durationMinutes) => {
  * @param {number} [globalRestTime=90] - Default rest timer jika tidak ada di set/exercise.
  * @returns {number} estimasi kcal yang sangat akurat
  */
-export const calculateSmartWorkoutCalories = (weightKg, workout, logs, globalRestTime = 90) => {
+export const calculateSmartWorkoutCalories = (weightKg, workout, logs, globalRestTime = 90, profile = null) => {
   if (!workout) return 0;
 
   // 1. Prioritas Utama: Jika ada data nyata dari Smartwatch / Health Connect
   if (workout.caloriesBurned) {
     return Number(workout.caloriesBurned);
+  }
+
+  // 1b. HIBRIDA: sesi MURNI KARDIO yang punya nadi asli dihitung dari nadi, bukan dari MET.
+  //
+  // Hanya untuk kardio, dan itu batas yang paling penting di sini. Untuk latihan beban, nadi
+  // menyesatkan (lihat catatan panjang di heartRateCalories) — di situ hitungan berbasis set
+  // justru yang lebih dekat kebenaran. guessWorkoutType dipakai sebagai penentu "murni kardio"
+  // supaya tidak ada definisi kedua yang bisa berbeda jawaban; sesi CAMPURAN sengaja tidak masuk,
+  // karena bagian bebannya akan ikut digelembungkan.
+  //
+  // Nadi = peningkatan, bukan prasyarat. Tanpa jam tangan / tanpa Health Connect, `workout.hr`
+  // tidak ada, blok ini dilewati begitu saja, dan hitungannya persis seperti sebelumnya.
+  if (profile && workout.hr?.avg) {
+    const exs = workout.overriddenExercises || workout.exercises || [];
+    if (exs.length > 0 && guessWorkoutType(exs) !== 'strengthTraining') {
+      const hrKcal = heartRateCalories({
+        avgHr: workout.hr.avg,
+        minutes: parseWorkoutDurationMinutes(workout.duration),
+        weightKg: Number(weightKg) || 70,
+        age: profile.age || ageFromDob(profile.dob),
+        gender: profile.gender,
+      });
+      if (hrKcal > 0) return hrKcal;
+    }
   }
 
   // 2. Fallback: Jika tidak ada logs sama sekali (riwayat lama banget), pakai blind timer lawas
@@ -468,6 +541,106 @@ export const recomputeStrengthRecords = (history, logKeys, exLookup) => {
 };
 
 /**
+ * Rincian satu sesi untuk ditulis ke Health Connect: segmen per latihan + ringkasan teks.
+ *
+ * Sebelumnya sesi Logym masuk ke HC sebagai satu blok kosong — cuma nama, jenis, dan durasi.
+ * Dibuka di Samsung Health, isinya tidak menunjukkan latihan apa pun.
+ *
+ * BATAS PLATFORM YANG PERLU DIKETAHUI SEBELUM BERHARAP LEBIH:
+ *  - `repetitions` per segmen: ADA. Jumlah reps seluruh set latihan itu.
+ *  - beban (kg): TIDAK ADA di skema HC mana pun. Satu-satunya jalan adalah teks `notes`,
+ *    makanya ringkasan "3x10 @40kg" dirakit di sini.
+ *  - jumlah SET sebagai angka: tidak ada juga; ikut ke teks.
+ *
+ * Waktu tiap segmen dibagi RATA sepanjang durasi sesi. Logym tidak mencatat kapan tiap latihan
+ * dimulai — yang tersimpan cuma jam mulai & durasi sesi. HC mewajibkan segmen tidak tumpang
+ * tindih dan berada di dalam rentang sesi, dan pembagian rata memenuhi itu.
+ * ponytail: urutannya benar, durasinya perkiraan. Jalan naiknya: catat `startedAt` per latihan
+ * saat set pertamanya dicentang.
+ *
+ * @returns {{segments: Array, notes: string}}
+ */
+export const buildHcSessionDetail = (workout, logs, startMs, endMs) => {
+  const exercises = workout?.overriddenExercises || workout?.exercises || [];
+  const span = Math.max(0, Number(endMs) - Number(startMs));
+  if (exercises.length === 0 || span <= 0) return { segments: [], notes: '' };
+
+  const slice = span / exercises.length;
+  const segments = [];
+  const ringkasan = [];
+
+  exercises.forEach((ex, i) => {
+    const sets = Object.values(setsForExercise(logs, ex, workout) || {}).filter(s => s?.done);
+    if (sets.length === 0) return; // latihan yang tidak dikerjakan tidak ikut ditulis
+
+    const reps = sets.reduce((n, s) => n + (Number(s.r) || 0), 0);
+    segments.push({
+      startDate: new Date(startMs + i * slice).toISOString(),
+      endDate: new Date(startMs + (i + 1) * slice).toISOString(),
+      type: ex?.name || '',
+      reps,
+    });
+
+    // "Bench Press 3x10 @40kg" — beban diambil dari set terberat, karena satu baris teks tidak
+    // muat menampung beban tiap set dan yang terberat itu yang paling sering dicari orang.
+    const beratMaks = Math.max(0, ...sets.map(s => Number(s.w) || 0));
+    const repsTypical = Math.round(reps / sets.length) || 0;
+    const bagian = [`${ex?.name || 'Latihan'} ${sets.length}x${repsTypical}`];
+    if (beratMaks > 0) bagian.push(`@${beratMaks}kg`);
+    ringkasan.push(bagian.join(' '));
+  });
+
+  return { segments, notes: ringkasan.join(' • ') };
+};
+
+/**
+ * Menit aktif SATU HARI: menit jalan + durasi latihan.
+ *
+ * SATU rumus untuk kartu, grafik, dan kartu bagikan — alasan yang sama dengan dailyBurnCalories.
+ * Grafik dulu tidak memakai rumus apa pun: ia membaca `bioData.activeMinutes` mentah, field yang
+ * TIDAK PERNAH ditulis siapa pun kecuali input manual — dan handleSaveManualData justru
+ * MENGHAPUSNYA lagi kalau nilainya sama dengan hasil hitung. Jadi untuk hampir semua hari field
+ * itu tidak ada, dan batang "Durasi Aktif" di grafik selalu kosong sementara kartunya terisi.
+ *
+ * LANGKAH SAAT KARDIO DI GYM TIDAK DIHITUNG DUA KALI. Treadmill 30 menit menghasilkan langkah
+ * yang jadi ~30 menit-langkah, lalu sesinya sendiri menyumbang 30 menit lagi — totalnya 60 menit
+ * untuk setengah jam yang sama. Menit-langkah dikurangi sebanyak durasi sesi kardio hari itu.
+ *
+ * ponytail: pengurangannya pakai durasi sesi, bukan irisan jam sebenarnya — sebaran langkah per
+ * jam tidak ikut disimpan (sengaja; lihat batas 1 MiB dokumen tahunan). Sesi CAMPURAN yang cuma
+ * ditutup treadmill 10 menit karena itu terkoreksi sedikit berlebihan. Jalan naiknya: simpan
+ * bucket per jam hari ini saja, lalu kecualikan jam yang tertutup `startedAt`..`startedAt+durasi`.
+ */
+export const dailyActiveMinutes = (bioData, workouts) => {
+  const bio = bioData || {};
+  const list = (Array.isArray(workouts) ? workouts : [])
+    .filter(w => w?.status === 'completed' || w?.programId === 'adhoc');
+
+  let workoutMinutes = 0;
+  let cardioMinutes = 0;
+  list.forEach(w => {
+    const mins = parseWorkoutDurationMinutes(w.duration);
+    workoutMinutes += mins;
+    // Sesi yang SEMUA latihannya berbasis waktu — itulah yang menghasilkan langkah. Aturannya
+    // dipinjam dari guessWorkoutType supaya tidak ada definisi "kardio" kedua yang bisa berbeda.
+    if (guessWorkoutType(w.overriddenExercises || w.exercises) !== 'strengthTraining') cardioMinutes += mins;
+  });
+
+  const rawStepMinutes = Math.round(Number(bio.stepMinutes)) || 0;
+  // Tidak pernah negatif: kalau sesi kardio lebih panjang dari menit-langkah hari itu, yang benar
+  // adalah nol menit jalan terpisah, bukan mengurangi durasi latihan.
+  const stepMinutes = Math.max(0, rawStepMinutes - Math.min(rawStepMinutes, cardioMinutes));
+
+  const auto = stepMinutes + workoutMinutes;
+  const manual = Number(bio.activeMinutes) || 0;
+  return {
+    total: Math.max(manual, auto),
+    auto, manual, stepMinutes, workoutMinutes,
+    isManual: manual > auto,
+  };
+};
+
+/**
  * Kalori terbakar SATU HARI: BMR + langkah + latihan.
  *
  * SATU rumus untuk semua pemakai. Sebelumnya rumus ini disalin di empat tempat — useMemo
@@ -487,7 +660,7 @@ export const recomputeStrengthRecords = (history, logKeys, exLookup) => {
  * @param {number} fallbackWeightKg dipakai kalau hari itu tidak mencatat berat badan
  * @param {object} [dayExerciseLogs] log tingkat-hari, untuk sesi yang `log`-nya kosong
  */
-export const dailyBurnCalories = (bioData, workouts, fallbackWeightKg, dayExerciseLogs) => {
+export const dailyBurnCalories = (bioData, workouts, fallbackWeightKg, dayExerciseLogs, profile = null) => {
   const bio = bioData || {};
   const weight = Number(bio.weight) || Number(fallbackWeightKg) || 70;
 
@@ -499,10 +672,10 @@ export const dailyBurnCalories = (bioData, workouts, fallbackWeightKg, dayExerci
     .filter(w => w?.status === 'completed' || w?.programId === 'adhoc')
     .forEach(w => {
       const logs = (w.log && Object.keys(w.log).length > 0) ? w.log : dayExerciseLogs;
-      workout += calculateSmartWorkoutCalories(weight, w, logs);
+      workout += calculateSmartWorkoutCalories(weight, w, logs, 90, profile);
       // Rincian diambil dari splitWorkoutCalories, yang menjamin kardio+beban = total sesi itu —
       // jadi segmen bar tidak pernah meleset dari angka besarnya.
-      const s = splitWorkoutCalories(weight, w, logs);
+      const s = splitWorkoutCalories(weight, w, logs, 90, profile);
       kardio += s.kardio;
       beban += s.beban;
       sessions++;
