@@ -207,7 +207,7 @@ const VitalsChart = ({ t, theme, history, language, activeMetric }) => {
         const nextChartWidth = Math.max(chartData.length * pointWidth, clientW);
         scrollTarget.current = nextChartWidth - clientW;
      }
-  }, [chartData, activeMetric]);
+  }, [chartData.length]);
 
   const chartWidth = Math.max(chartData.length * pointWidth, window.innerWidth - 64);
   const resolutionLabel = { hour: 'Per Jam', day: 'Per Hari', month: 'Per Bulan', year: 'Per Tahun' }[resolution];

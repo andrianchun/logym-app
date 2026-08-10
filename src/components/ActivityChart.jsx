@@ -273,7 +273,7 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
         scrollTarget.current = (latestIdx + 1) * newPointWidth - clientW;
         if (scrollTarget.current < 0) scrollTarget.current = 0;
      }
-  }, [multiChartData, activeMetric]);
+  }, [multiChartData.length]);
   const scrollTarget = useRef(null);
 
   const [yDomain, setYDomain] = useState(['auto', 'auto']);
@@ -396,7 +396,7 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
          // Auto-scroll to the latest data (rightmost) by default
          scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
      }
-  }, [multiChartData.length, activeMetric, pointWidth]);
+  }, [multiChartData.length]);
 
   const chartWidth = Math.max(multiChartData.length * pointWidth, window.innerWidth - 64);
   const activeObj = chartMetricsList.find(m => m.key === activeMetric);
