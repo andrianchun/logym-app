@@ -636,6 +636,7 @@ export const dailyActiveMinutes = (bioData, workouts) => {
   return {
     total: Math.max(manual, auto),
     auto, manual, stepMinutes, workoutMinutes,
+    cardioMinutes, weightMinutes: workoutMinutes - cardioMinutes,
     isManual: manual > auto,
   };
 };

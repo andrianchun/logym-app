@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Activity, Zap, Brain, Footprints, HeartPulse, Moon, Droplets, Droplet, Dumbbell, Scale, RefreshCw, Trophy, Link2, Pencil, Settings, Info, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Wind, Utensils, Flame, Clock } from 'lucide-react';
+import { Activity, Zap, Brain, Footprints, HeartPulse, Moon, Droplets, Droplet, Dumbbell, Scale, RefreshCw, Trophy, Link2, Pencil, Settings, Info, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Wind, Utensils, Flame, Clock, Cloud, CloudOff } from 'lucide-react';
 import { getLocalYMD, hasDeletedProjected, isLomealOwned } from '../data/constants';
 import DashboardModals from '../components/DashboardModals';
 import DashboardChart from '../components/DashboardChart';
@@ -33,14 +33,14 @@ const MetricBox = ({ label, value, unit, icon, color, t, theme }) => (
 // Warna per SUMBER data, dipakai sama persis di bar Durasi Aktif maupun Kalori Dibakar — jadi
 // "biru itu langkah" berlaku di kedua bar, tidak perlu dihafal dua kali.
 const PART_COLORS = {
-    bmr:     { bar: 'bg-zinc-400 dark:bg-zinc-500', dot: 'bg-zinc-400 dark:bg-zinc-500' },
+    bmr:     { bar: 'bg-blue-500', dot: 'bg-blue-500' },
     manual:  { bar: 'bg-zinc-400 dark:bg-zinc-500', dot: 'bg-zinc-400 dark:bg-zinc-500' },
-    langkah: { bar: 'bg-blue-500', dot: 'bg-blue-500' },
-    latihan: { bar: 'bg-emerald-500', dot: 'bg-emerald-500' },
+    langkah: { bar: 'bg-indigo-400 dark:bg-indigo-400', dot: 'bg-indigo-400 dark:bg-indigo-400' },
+    latihan: { bar: 'bg-sky-400 dark:bg-sky-400', dot: 'bg-sky-400 dark:bg-sky-400' },
     // Warna kardio/beban disamakan dengan grafik subcard (ActivityChart) supaya satu warna
     // berarti satu hal di seluruh dasbor.
-    kardio:  { bar: 'bg-orange-500', dot: 'bg-orange-500' },
-    beban:   { bar: 'bg-emerald-500', dot: 'bg-emerald-500' },
+    kardio:  { bar: 'bg-zinc-400 dark:bg-zinc-500', dot: 'bg-zinc-400 dark:bg-zinc-500' },
+    beban:   { bar: 'bg-sky-400 dark:bg-sky-400', dot: 'bg-sky-400 dark:bg-sky-400' },
 };
 
 // Empat kotak di kartu Aktivitas Harian bottom-align isinya (`justify-end`), jadi angka besarnya
@@ -95,7 +95,7 @@ const MiniBox = ({ label, value, unit, t, theme }) => (
     </div>
 );
 
-const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, exerciseLibrary, navigateToWorkoutDate, soundEnabled, playSoundEffect, theme, selectedDate, biometricStandard, units, setConfirmModal, activityTargets, setActivityTargets, gymProfiles, activeGymId, activePlanIds, userApiKeys, userAchievements, connectedApps, userProfile, keyStatuses, setKeyStatuses, setShowSettings, lomealToday, lomealTargets }) => {
+const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, exerciseLibrary, navigateToWorkoutDate, soundEnabled, playSoundEffect, theme, selectedDate, biometricStandard, units, setConfirmModal, activityTargets, setActivityTargets, gymProfiles, activeGymId, activePlanIds, userApiKeys, userAchievements, connectedApps, userProfile, keyStatuses, setKeyStatuses, setShowSettings, lomealToday, lomealTargets, syncStatus }) => {
   const todayStr = getLocalYMD(new Date());
   const activeDate = todayStr;
 
@@ -679,11 +679,13 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                  // Input manual menang: kalau tetap dirinci "Langkah + Latihan", segmennya
                  // berjumlah lebih kecil dari angka besarnya (mis. besar 30, rincian 0+0).
                  { key: 'manual', label: 'Manual', value: manualActive - intTodayDur },
-                 { key: 'latihan', label: 'Latihan', value: intTodayDur },
+                 { key: 'kardio', label: 'Kardio', value: act.cardioMinutes },
+                 { key: 'beban', label: 'Beban', value: act.weightMinutes },
                ]
              : [
                  { key: 'langkah', label: 'Langkah', value: stepMinutes },
-                 { key: 'latihan', label: 'Latihan', value: intTodayDur },
+                 { key: 'kardio', label: 'Kardio', value: act.cardioMinutes },
+                 { key: 'beban', label: 'Beban', value: act.weightMinutes },
                ],
          mergedCalorieParts: isDailyCalsManual
              ? [
@@ -833,6 +835,29 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                  <Dumbbell size={12} />
                  <span className="body-md font-bold text-[13px]">{gymProfiles?.find(g => g.id === activeGymId)?.name || 'Logym'}</span>
                </div>
+
+               <span className={`text-[10px] ${t.textMuted}`}>•</span>
+               <button onClick={() => {
+                   playSoundEffect('click', soundEnabled);
+                   const msg = syncStatus === 'synced' ? 'Semua data Anda sudah aman tersimpan di cloud.' :
+                               syncStatus === 'syncing' ? 'Sedang mensinkronkan data Anda ke cloud...' :
+                               'Terjadi masalah koneksi. Perubahan tersimpan di perangkat dan akan dikirim otomatis saat koneksi pulih.';
+                   setConfirmModal({
+                       isOpen: true,
+                       title: 'Status Sinkronisasi',
+                       message: msg,
+                       onConfirm: () => setConfirmModal({isOpen: false}),
+                       confirmText: 'OK'
+                   });
+               }} className="flex items-center justify-center hover:opacity-80 transition-opacity">
+                    {syncStatus === 'syncing' ? (
+                        <RefreshCw size={14} className="animate-spin text-blue-500" />
+                    ) : syncStatus === 'error' ? (
+                        <CloudOff size={14} className="text-rose-500" />
+                    ) : (
+                        <Cloud size={14} className="text-blue-500" />
+                    )}
+               </button>
             </div>
          </div>
          <div className="flex items-center gap-2 relative z-20 h-10 -mr-1">

@@ -1074,6 +1074,7 @@ export default function App() {
   const [redoStack, setRedoStack] = useState([]);
   const [showExitToast, setShowExitToast] = useState(false);
   const [showSupersetToast, setShowSupersetToast] = useState(false);
+  const [showRestoreToast, setShowRestoreToast] = useState('');
   const backPressedOnce = useRef(false);
   const scrollPositions = useRef({});
   const prevTab = useRef(activeTab);
@@ -1384,6 +1385,39 @@ export default function App() {
     };
   }, [restTargetTime, soundEnabled, activeProgramId, programs]);
 
+  // Target Memori: Stempel target hari ini ke bioData agar grafik riwayat tidak berubah
+  // saat target diganti di kemudian hari.
+  useEffect(() => {
+     if (!isDataLoaded || !activityTargets) return;
+     const todayStr = getLocalYMD(new Date());
+     setHistory(prev => {
+        const existingBio = prev[todayStr]?.bioData || {};
+        
+        if (
+           existingBio.targetSteps === activityTargets.steps &&
+           existingBio.targetActiveMinutes === activityTargets.weeklyDuration &&
+           existingBio.targetSleep === activityTargets.sleep &&
+           existingBio.targetCalories === activityTargets.activityCalories
+        ) {
+           return prev;
+        }
+        
+        return {
+           ...prev,
+           [todayStr]: {
+               ...(prev[todayStr] || {}),
+               bioData: {
+                   ...existingBio,
+                   targetSteps: activityTargets.steps,
+                   targetActiveMinutes: activityTargets.weeklyDuration,
+                   targetSleep: activityTargets.sleep,
+                   targetCalories: activityTargets.activityCalories,
+               }
+           }
+        };
+     });
+  }, [isDataLoaded, activityTargets]);
+
   // ==========================================
   // PERSISTENT WORKOUT NOTIFICATION (Android)
   // ==========================================
@@ -1499,6 +1533,7 @@ export default function App() {
   // gejalanya fatal: perubahan "kesimpan" di layar lalu balik sendiri begitu snapshot server
   // datang. Tampilkan di UI supaya ketahuan dan bisa dilaporkan.
   const [cloudSaveError, setCloudSaveError] = useState(null);
+  const [syncStatus, setSyncStatus] = useState('synced'); // 'synced' | 'syncing' | 'error'
 
   // Baseline per-field dokumen utama — kondisi terakhir yang diketahui tersimpan di server.
   // Ikut persist dengan alasan yang sama seperti baseline history: kalau mulai kosong tiap
@@ -1948,20 +1983,26 @@ export default function App() {
         if (aChanged !== undefined) payload.userAchievements = aChanged;
         if (Object.keys(settingsChanged).length > 0) payload.settings = settingsChanged;
 
+        setSyncStatus('syncing');
         const prevBaseline = mainBaselineRef.current;
         setMainBaseline(nextBaseline);
         // try/catch WAJIB: setDoc melempar SINKRON (bukan promise rejection) kalau datanya
         // mengandung undefined — .catch() saja tidak pernah kena, dan errornya lenyap tanpa jejak.
         try {
           return setDoc(mainDocRef, payload, { merge: true })
-            .then(() => setCloudSaveError(null))
+            .then(() => {
+              setCloudSaveError(null);
+              setSyncStatus('synced');
+            })
             .catch(err => {
               console.error("Auto-save Cloud gagal:", err);
+              setSyncStatus('error');
               setCloudSaveError(err?.message || String(err));
               setMainBaseline(prevBaseline); // gagal kirim — jangan anggap tersimpan
             });
         } catch (err) {
           console.error("Auto-save Cloud gagal (sync):", err);
+          setSyncStatus('error');
           setCloudSaveError(err?.message || String(err));
           setMainBaseline(prevBaseline);
         }
@@ -2108,8 +2149,9 @@ export default function App() {
 
         // Firestore diam saja saat offline — tanpa penanda ini user mengira datanya sudah aman
         // di cloud padahal masih mengantre di memori dan akan hilang kalau app ditutup.
+        setSyncStatus('syncing');
         const pendingWarn = setTimeout(() => {
-           setCloudSaveError('Belum tersimpan ke cloud — koneksi bermasalah. JANGAN tutup aplikasi dulu; data akan terkirim sendiri begitu koneksi pulih.');
+           setSyncStatus('error');
         }, 15000);
 
         const failedYears = new Set();
@@ -2127,6 +2169,7 @@ export default function App() {
            const onFail = (err, label) => {
               failedYears.add(year);
               console.error(`Auto-save History ${year} gagal${label}:`, err);
+              setSyncStatus('error');
               setCloudSaveError(err?.message || String(err));
            };
            // try/catch WAJIB: setDoc melempar SINKRON kalau data mengandung undefined.
@@ -2136,6 +2179,7 @@ export default function App() {
                     clearTimeout(pendingWarn);
                     commitBaselineFor(year); // ← baru di sini tanggalnya dianggap tersimpan
                     setCloudSaveError(null);
+                    setSyncStatus('synced');
                  })
                  .catch(err => onFail(err, ''));
            } catch (err) {
@@ -2489,7 +2533,8 @@ export default function App() {
       };
     });
     const jam = new Date(kandidat.savedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-    showOtaAlert(`Sesi latihan yang belum selesai dari perangkat lain (terakhir tersimpan ${jam}) dipulihkan ke layar ini.`);
+    setShowRestoreToast(`Sesi latihan dari perangkat lain (terakhir tersimpan ${jam}) dilanjutkan.`);
+    setTimeout(() => setShowRestoreToast(''), 5000);
   };
 
   useEffect(() => {
@@ -3577,6 +3622,18 @@ export default function App() {
     // workoutStartTime): di sesi yang dilanjutkan, durasi tersimpan bisa lebih panjang dari
     // hitungan mundur sesi ini. Kalau startedAt tidak ikut durasi itu, jendela sesinya berujung
     // di masa depan dan Health Connect menolak record-nya.
+    if (remote.status === 'in-progress' && !hasLocalActive) {
+         if (remote.updatedAt > localUpdatedAt) {
+             const t = new Date(remote.updatedAt);
+             const timeStr = isNaN(t.getTime()) ? '' : `(${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')})`;
+             
+             // Ganti popup blokir dengan toast yang lebih ramah
+             setShowRestoreToast(`Sesi latihan dari perangkat lain ${timeStr} dilanjutkan.`);
+             setTimeout(() => setShowRestoreToast(''), 5000);
+             
+             return remote;
+         }
+      }
     const endedAt = Date.now();
     const endStamp = `${String(new Date(endedAt).getHours()).padStart(2, '0')}:${String(new Date(endedAt).getMinutes()).padStart(2, '0')}`;
     const startedAtFor = (secs) => endedAt - secs * 1000;
@@ -4091,7 +4148,7 @@ export default function App() {
   // field flat), jadi selalu falsy dan SEMUA user — baru maupun lama yang udah pernah
   // selesai onboarding — kejebak di layar ini selamanya, gak ada jalan balik ke app.
   // Juga dulu ada 2 blok kondisi yang kondisi pertama superset dari kedua (selalu duluan
-  // kena, `onComplete` no-op) — blok kedua yang beneran nutup gate gak pernah kepanggil.
+  // kena, `onComplete` no-op) — blok kedua yang beneran nutup gate kegak pernah kepanggil.
   const isOnboarded = !!(
     userProfile?.hasCompletedOnboarding ||
     userProfile?.onboardingCompleted ||
@@ -4285,6 +4342,7 @@ export default function App() {
                theme={theme} selectedDate={selectedDate}
                biometricStandard={biometricStandard} units={units}
                activityTargets={activityTargets} setActivityTargets={setActivityTargets}
+               syncStatus={syncStatus}
                gymProfiles={gymProfiles} activeGymId={activeGymId}
                activePlanIds={activePlanIds}
                userApiKeys={userApiKeys}
