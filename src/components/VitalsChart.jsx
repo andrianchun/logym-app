@@ -213,10 +213,7 @@ const VitalsChart = ({ t, theme, history, language, activeMetric }) => {
   const resolutionLabel = { hour: 'Per Jam', day: 'Per Hari', month: 'Per Bulan', year: 'Per Tahun' }[resolution];
 
   return (
-    <div className="pt-2">
-      <div className="flex items-center justify-end mb-2">
-        <span className={`text-[9px] font-bold uppercase tracking-wider ${t.textMuted} shrink-0`}>{resolutionLabel}</span>
-      </div>
+    <div>
       <div
         ref={scrollRef}
         onScroll={handleScroll}
