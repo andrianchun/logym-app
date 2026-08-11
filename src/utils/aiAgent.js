@@ -483,7 +483,7 @@ export const detectPlateaus = (historyObj, minWeeks = 3, maxResults = 3) => {
             if (!rawLog) return;
             const weekIdx = Math.floor((now - t) / WEEK_MS);
             const exMap = {};
-            ;(w.exercises || []).concat(w.overriddenExercises || []).forEach(e => { if (e?.id) exMap[String(e.id)] = e.name; });
+            (w.exercises || []).concat(w.overriddenExercises || []).forEach(e => { if (e?.id) exMap[String(e.id)] = e.name; });
             Object.entries(rawLog).forEach(([exId, sets]) => {
                 const name = exMap[String(exId)];
                 if (!name) return;

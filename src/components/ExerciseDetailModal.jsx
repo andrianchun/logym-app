@@ -186,61 +186,10 @@ const ExerciseDetailModal = ({
      }
   }, [initialEx]);
 
-  if (!ex) return null;
-
-  if (ex.type === 'warmup' || ex.type === 'cooldown') {
-    const urls = ex.ytVideo ? ex.ytVideo.split(/(?:,|\s)+/).filter(v => v.trim()) : [];
-    const videos = urls.map(url => {
-        const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})/);
-        return { url, videoId: match ? match[1] : null };
-    }).filter(v => v.videoId);
-
-    return createPortal(
-      <div className={`fixed inset-0 z-[100] flex flex-col ${t.bgApp}`}>
-        <div className="p-4 flex justify-between items-center bg-black/80 absolute top-0 w-full z-20" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
-          <h2 className="h2 text-white drop-shadow-md">{ex.name}</h2>
-          <button data-close-modal="true" onClick={onClose} className="p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition">
-            <X size={20} strokeWidth={2.5} />
-          </button>
-        </div>
-
-        <div className="flex-1 w-full overflow-y-auto hide-scrollbar pb-10" style={{ marginTop: 'calc(56px + max(1rem, env(safe-area-inset-top, 0px)))' }}>
-          {videos.length === 0 ? (
-            <div className="p-10 flex flex-col items-center text-center opacity-50 mt-20">
-              <Video size={64} className={`mb-4 ${t.textMuted}`} />
-              <p className={`h3 ${t.textMuted}`}>Tidak ada link video yang tersedia.</p>
-            </div>
-          ) : (
-            <div className="flex flex-col space-y-8 p-4">
-              {videos.map((vid, i) => (
-                <div key={i} className={`flex flex-col rounded-3xl overflow-hidden shadow-xl ${t.bgCard}`}>
-                  <div className="w-full relative pt-[56.25%] bg-black">
-                    <iframe 
-                      src={`https://www.youtube.com/embed/${vid.videoId}?enablejsapi=1&controls=1&modestbranding=1&playsinline=1&rel=0`}
-                      title="YouTube video player" 
-                      frameBorder="0" 
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; compute-pressure" 
-                      allowFullScreen
-                      className="absolute top-0 left-0 w-full h-full"
-                    ></iframe>
-                  </div>
-                  <div className="p-4">
-                    <a href={`https://youtu.be/${vid.videoId}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl bg-red-600 text-white font-bold body-lg hover:bg-red-700 active:scale-95 transition-all">
-                      <Play size={20} className="fill-white" /> Buka di Aplikasi YouTube
-                    </a>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>,
-      document.body
-    );
-  }
 
   const parseMedia = (exercise) => {
     let items = [];
+    if (!exercise) return items; // dipanggil sebelum penjaga `!ex`, jadi harus tahan nilai kosong
     if (exercise.ytVideo && typeof exercise.ytVideo === 'string') {
       const urls = exercise.ytVideo.split(/(?:,|\s)+/).filter(v => v.trim());
       urls.forEach(u => items.push({ type: 'youtube', url: u }));
@@ -315,6 +264,67 @@ const ExerciseDetailModal = ({
   // Swipe logic for tabs
   const [tabTouchStart, setTabTouchStart] = useState(null);
   const [tabTouchEnd, setTabTouchEnd] = useState(null);
+
+  // SEMUA HOOK SUDAH DIPANGGIL DI ATAS TITIK INI — jangan pernah menyisipkan `return` sebelumnya.
+  //
+  // Dulu dua cabang di bawah ini berdiri SEBELUM sembilan hook (mediaItems, activeMediaIndex,
+  // touchStart/End, isVideoReady, dua useEffect, dua hook swipe tab). React mengenali hook dari
+  // URUTAN pemanggilannya, bukan namanya: sekali render menempuh salah satu cabang itu, sembilan
+  // hook berikutnya tidak ikut dipanggil, dan render selanjutnya memasangkan state ke slot yang
+  // salah — isi satu useState muncul di useState lain. Bugnya acak, tidak melempar error, dan
+  // hampir mustahil dilacak dari gejalanya.
+  if (!ex) return null;
+
+  if (ex.type === 'warmup' || ex.type === 'cooldown') {
+    const urls = ex.ytVideo ? ex.ytVideo.split(/(?:,|\s)+/).filter(v => v.trim()) : [];
+    const videos = urls.map(url => {
+        const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})/);
+        return { url, videoId: match ? match[1] : null };
+    }).filter(v => v.videoId);
+
+    return createPortal(
+      <div className={`fixed inset-0 z-[100] flex flex-col ${t.bgApp}`}>
+        <div className="p-4 flex justify-between items-center bg-black/80 absolute top-0 w-full z-20" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
+          <h2 className="h2 text-white drop-shadow-md">{ex.name}</h2>
+          <button data-close-modal="true" onClick={onClose} className="p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition">
+            <X size={20} strokeWidth={2.5} />
+          </button>
+        </div>
+
+        <div className="flex-1 w-full overflow-y-auto hide-scrollbar pb-10" style={{ marginTop: 'calc(56px + max(1rem, env(safe-area-inset-top, 0px)))' }}>
+          {videos.length === 0 ? (
+            <div className="p-10 flex flex-col items-center text-center opacity-50 mt-20">
+              <Video size={64} className={`mb-4 ${t.textMuted}`} />
+              <p className={`h3 ${t.textMuted}`}>Tidak ada link video yang tersedia.</p>
+            </div>
+          ) : (
+            <div className="flex flex-col space-y-8 p-4">
+              {videos.map((vid, i) => (
+                <div key={i} className={`flex flex-col rounded-3xl overflow-hidden shadow-xl ${t.bgCard}`}>
+                  <div className="w-full relative pt-[56.25%] bg-black">
+                    <iframe 
+                      src={`https://www.youtube.com/embed/${vid.videoId}?enablejsapi=1&controls=1&modestbranding=1&playsinline=1&rel=0`}
+                      title="YouTube video player" 
+                      frameBorder="0" 
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; compute-pressure" 
+                      allowFullScreen
+                      className="absolute top-0 left-0 w-full h-full"
+                    ></iframe>
+                  </div>
+                  <div className="p-4">
+                    <a href={`https://youtu.be/${vid.videoId}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl bg-red-600 text-white font-bold body-lg hover:bg-red-700 active:scale-95 transition-all">
+                      <Play size={20} className="fill-white" /> Buka di Aplikasi YouTube
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>,
+      document.body
+    );
+  }
 
   const onTabTouchStart = (e) => {
     setTabTouchEnd(null);

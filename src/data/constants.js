@@ -277,5 +277,5 @@ export const getVideoId = (url) => {
     const urlToParse = srcMatch ? srcMatch[1] : url;
     const match = urlToParse.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})/);
     return match ? match[1] : null;
-  } catch (e) { return null;  };
+  } catch (e) { return null;  }
 };

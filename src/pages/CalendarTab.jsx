@@ -1,5 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Info, CheckCircle, CalendarDays, Edit2, PlayCircle, X, Copy, Repeat, Plus, Clock, Bell, CalendarPlus, CalendarCheck, BellOff, BellRing, ToggleLeft, ToggleRight, Flame, Check, Activity } from 'lucide-react';
+// Tanpa import ini, `typeof Capacitor === 'undefined'` di penjadwalan notifikasi selalu bernilai
+// true — jadi setiap pengingat latihan diam-diam berhenti di baris pertama dan tidak pernah
+// terpasang, di web MAUPUN di APK. Tidak pernah melempar error, jadi tidak ada gejalanya selain
+// "notifikasinya kok tidak pernah bunyi".
+import { Capacitor } from '@capacitor/core';
 import SwipeInput from '../components/SwipeInput';
 import { getLocalYMD, resolveProjectedProgramId, getDayWorkouts as sharedGetDayWorkouts, deletedProjectedMap, hasDeletedProjected } from '../data/constants';
 import { formatNumber } from '../utils/numberFormat';
