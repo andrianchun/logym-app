@@ -223,6 +223,19 @@ export default function App() {
     };
   }, []);
 
+  // BUKTI BUNDLE INI SEHAT. Capgo menganggap bundle OTA gagal kalau notifyAppReady() tidak datang
+  // dalam appReadyTimeout (10 detik), lalu ROLLBACK sendiri ke bundle sebelumnya di peluncuran
+  // berikutnya. Itu jaring pengaman yang kita mau — dan cuma bekerja kalau panggilannya menandakan
+  // sesuatu. Dulu dipanggil di main.jsx saat modul dimuat, sebelum React merender apa pun, jadi
+  // bundle yang crash saat render pun ikut dicap sehat dan APK terkunci permanen di layar merah.
+  //
+  // Di sini, effect ini baru jalan kalau App berhasil merender tanpa melempar. Sengaja TIDAK
+  // menunggu data/login — cukup React hidup; menunggu jaringan berisiko menembus batas 10 detik
+  // dan me-rollback bundle yang sebenarnya baik-baik saja.
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) CapacitorUpdater.notifyAppReady();
+  }, []);
+
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
     let dlListener;

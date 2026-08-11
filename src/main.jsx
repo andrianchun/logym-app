@@ -5,13 +5,19 @@ import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import App from './App.jsx'
 import './index.css'
 
-// WAJIB dipanggil dalam appReadyTimeout Capgo (default 10 DETIK) sesudah bundle OTA
-// baru boot, atau Capgo mengira update-nya gagal/nge-crash dan ROLLBACK OTOMATIS ke
-// bundle sebelumnya di peluncuran berikutnya — diam-diam, tanpa error yang kelihatan.
-// Dipanggil di sini, paling awal mungkin, SEBELUM nunggu apa pun (lihat main.jsx Lomeal).
-if (Capacitor.isNativePlatform()) {
-  CapacitorUpdater.notifyAppReady();
-}
+// notifyAppReady() SENGAJA TIDAK DIPANGGIL DI SINI LAGI. Lihat App.jsx — sekarang dipanggil dari
+// useEffect, yaitu SESUDAH React berhasil merender sekali tanpa melempar.
+//
+// Dulu dipanggil persis di titik ini, saat modul dimuat, sebelum React menyentuh apa pun. Capgo
+// langsung menandai bundle-nya "sehat" — jadi bundle yang crash SAAT RENDER tetap dianggap sukses
+// dan rollback otomatisnya tidak pernah berjalan. Bersama ErrorBoundary yang cuma tahu cara
+// memperbaiki masalah service worker (jalan di web, sia-sia di APK karena bundle-nya dibaca dari
+// penyimpanan lokal, bukan server), APK jadi TERKUNCI PERMANEN di bundle rusak: layar merah tiap
+// buka, pengecekan OTA tidak pernah jalan, dan tidak ada jalan keluar selain hapus data aplikasi.
+// Persis yang terjadi di v1.1.7.
+//
+// Batas appReadyTimeout Capgo 10 detik dan render pertama React jauh di bawah itu — dia tidak
+// menunggu data, cuma menggambar kerangka.
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -29,11 +35,20 @@ class ErrorBoundary extends React.Component {
     if (error && !sessionStorage.getItem('app-updated-reload')) {
       sessionStorage.setItem('app-updated-reload', 'true');
       (async () => {
+        // DI APK, BERSIH-BERSIH SERVICE WORKER TIDAK ADA GUNANYA. JS-nya dibaca dari bundle OTA di
+        // penyimpanan perangkat (https://localhost/assets/...), bukan dari jaringan — reload
+        // sesudah menghapus cache cuma memuat ulang bundle rusak yang sama. Yang benar: kembalikan
+        // ke bundle bawaan APK lewat reset(), lalu pengecekan OTA bisa jalan lagi dan menarik versi
+        // perbaikannya. Tanpa ini, satu crash saat render mengunci APK permanen.
         try {
-          const regs = await navigator.serviceWorker?.getRegistrations?.();
-          await Promise.all((regs || []).map(r => r.unregister()));
-          const keys = await caches?.keys?.();
-          await Promise.all((keys || []).map(k => caches.delete(k)));
+          if (Capacitor.isNativePlatform()) {
+            await CapacitorUpdater.reset();
+          } else {
+            const regs = await navigator.serviceWorker?.getRegistrations?.();
+            await Promise.all((regs || []).map(r => r.unregister()));
+            const keys = await caches?.keys?.();
+            await Promise.all((keys || []).map(k => caches.delete(k)));
+          }
         } catch (e) { /* best-effort — tetap reload walau gagal bersih-bersih */ }
         window.location.reload();
       })();
