@@ -14,8 +14,13 @@ import AlternativeExerciseModal from '../components/AlternativeExerciseModal';
 import EmptyWorkoutState from '../components/EmptyWorkoutState';
 import useDialog from '../hooks/useDialog';
 
-const WorkoutTab = ({ 
-  t, lang, language, programs, 
+const WorkoutTab = ({
+  // Dikirim App.jsx tapi dulu tidak pernah di-destructure — padahal dipakai di
+  // `if (setConfirmModal)` saat user memulai latihan lain sementara satu sesi masih jalan.
+  // Identifier yang tidak dideklarasikan MELEMPAR ReferenceError, bukan bernilai undefined,
+  // jadi penjaga itu justru yang menjatuhkan layarnya.
+  setConfirmModal,
+  t, lang, language, programs,
   selectedDate, setSelectedDate,
   history, setHistory, setActiveTab,
   activeProgramId, setActiveProgramId,

@@ -50,7 +50,7 @@ import { checkAchievements, ACHIEVEMENTS } from './data/achievements';
 import { playSoundEffect } from './utils/audio';
 import { fetchExercisesFromApi } from './utils/exerciseDbApi';
 import { AI_MODELS, detectPlateaus, getLogiNotification } from './utils/aiAgent';
-import { calculateReadiness } from './utils/readinessEngine';
+import { calculateReadiness, restingHrBaseline } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
 import { calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, recomputeStrengthRecords, buildHcSessionDetail } from './utils/workoutCalc';
 import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcReadHeartRateWindow, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission, capIntradayLog, HC_FIELDS, fillOnlyPatch } from './utils/healthConnect';

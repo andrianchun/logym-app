@@ -373,10 +373,13 @@ export default function GymAIChat({
         setIsLoading(true);
 
         // Rekam pertanyaan user ke inbox AI (jika cukup panjang) untuk kurasi FAQ
-        if (userMsg.content.length > 15 && uid) {
+        // `user?.uid`, bukan `uid` telanjang. Identifier yang tidak pernah dideklarasikan MELEMPAR
+        // ReferenceError begitu disentuh — jadi baris penjaga ini justru menjatuhkan seluruh chat
+        // setiap kali user mengirim pertanyaan lebih dari 15 karakter.
+        if (userMsg.content.length > 15 && user?.uid) {
             try {
                 addDoc(collection(db, 'logym_ai_inbox'), {
-                    uid: uid,
+                    uid: user.uid,
                     email: userProfile?.email || 'unknown',
                     question: userMsg.content,
                     timestamp: serverTimestamp(),

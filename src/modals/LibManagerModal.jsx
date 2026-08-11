@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { X, Search, Edit2, Plus, Filter, Link as LinkIcon, Dumbbell } from 'lucide-react';
+// ChevronDown dipakai dua kali di form edit (dropdown Alat & Tipe) tapi tidak pernah diimpor —
+// JSX dengan komponen tak dikenal melempar saat render, jadi form editnya mati total.
+import { X, Search, Edit2, Plus, Filter, Link as LinkIcon, Dumbbell, ChevronDown } from 'lucide-react';
 import { formatTarget, normalizeMuscleKey, muscleOptions, equipmentOptions } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
 

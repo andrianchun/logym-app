@@ -233,7 +233,10 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
       );
 
       const reply = await Promise.race([
-          chatWithAI(apiMessages, currentProvider, aiModel, userApiKeys),
+          // Tanda tangan chatWithAI adalah (messages, userApiKeys, setKeyStatuses, onChunk).
+          // Panggilan lama masih memakai bentuk lawas (provider, model) — dua identifier yang tidak
+          // pernah ada di file ini, jadi pembuatan program lewat AI selalu melempar ReferenceError.
+          chatWithAI(apiMessages, userApiKeys, setKeyStatuses),
           timeoutPromise
       ]);
 

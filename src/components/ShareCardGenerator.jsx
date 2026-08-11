@@ -976,7 +976,10 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                                                         totalCalories += calculateSmartWorkoutCalories(userProfile?.weight, w, logsToUse) || 0;
                                                     });
                                                     
-                                                    const dailyActive = dailyActiveMinutes(histBio, dayWks).total;
+                                                    // `histBio`/`dayWks` tidak pernah ada di scope ini — nama yang benar
+                                                    // `dayData.bioData` dan `workouts` (dideklarasikan beberapa baris di atas).
+                                                    // Sebelumnya, membuat kartu bagikan selalu melempar ReferenceError.
+                                                    const dailyActive = dailyActiveMinutes(dayData.bioData, workouts).total;
                                                     const targetDuration = activityTargets?.dailyActiveMinutes || (activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 7) : 45);
                                                     const targetCalories = activityTargets?.calories || 400;
                                                     const targetSteps = activityTargets?.steps || 10000;
