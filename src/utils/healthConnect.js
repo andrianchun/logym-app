@@ -438,9 +438,13 @@ export const hcReadRange = async (startYmd, endYmd) => {
         .forEach(([ymd, v]) => put(ymd, v)))
       .catch((e) => console.warn('hcReadRange restingHeartRate gagal:', e)),
 
-    // HRV (RMSSD, satuan milidetik) — beda besaran dari restingHeartRate yang bpm. Selama ini
-    // cuma ada di ALL_READABLE (daftar diagnosa hcInventory) dan tidak pernah benar-benar ditarik,
-    // jadi kolom HRV di input manual selalu kosong walau jam tangannya merekam.
+    // HRV (RMSSD, satuan milidetik) — beda besaran dari restingHeartRate yang bpm.
+    //
+    // SAMSUNG HEALTH TIDAK MENGEKSPOR HRV KE HEALTH CONNECT (diverifikasi 11 Agu 2026 langsung di
+    // layar "Data and access" HC: bagian Vitals cuma Heart rate, Oxygen saturation, dan Resting
+    // heart rate). Kueri ini sengaja DIBIARKAN: ongkosnya satu readSamples dan dia langsung
+    // berguna sendiri kalau kelak Samsung menulisnya, atau kalau user ganti ke jam tangan lain
+    // (Polar/Garmin/Whoop menulis HRV ke HC). Jangan dikira rusak kalau hasilnya selalu kosong.
     H.readSamples({ dataType: 'heartRateVariability', startDate: startISO, endDate: endISO, limit: 1000, ascending: true })
       .then((res) => Object.entries(latestPerDay(res?.samples || [], (s) => ({ hrv: Math.round(s.value) })))
         .forEach(([ymd, v]) => put(ymd, v)))

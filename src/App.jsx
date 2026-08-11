@@ -606,16 +606,30 @@ export default function App() {
 
     if (status) {
       const denied = [...(status.readDenied || []), ...(status.writeDenied || [])];
+      // Metrik apa saja yang BENAR-BENAR ada isinya, bukan cuma "izinnya diberikan". Dua hal yang
+      // sering dikira sama: izin bisa lengkap sementara jam tangannya tidak menulis tipe itu sama
+      // sekali, dan tanpa baris ini satu-satunya cara membedakannya adalah membaca log konsol.
+      const adaIsinya = (k) => Object.values(hcByDay).filter((d) => d?.[k] !== undefined).length;
+      const hrvHari = adaIsinya('hrv');
       // Sengaja gak di-await — tombol yang manggil ini harus langsung balik normal begitu
       // proses selesai, gak boleh nunggu user tekan OK di popup buat lepas loading state-nya.
-      showOtaAlert(
-        `Izin Health Connect — baca: ${status.readAuthorized?.length || 0} tipe, tulis: ${status.writeAuthorized?.length || 0} tipe.` +
-        (denied.length ? ` Ditolak: ${denied.join(', ')}.` : '') +
+      //
+      // Satu baris per angka (dirender \n oleh useDialog): versi lama satu paragraf mengalir dan
+      // tidak ada satu pun angkanya yang bisa dibaca sekilas.
+      showOtaAlert([
+        `Izin — baca ${status.readAuthorized?.length || 0} tipe, tulis ${status.writeAuthorized?.length || 0} tipe`,
+        ...(denied.length ? [`Ditolak — ${denied.join(', ')}`] : []),
         // Tanpa pembagi: rentangnya inklusif dua ujung (hari ini + N hari ke belakang = N+1)
         // dan beda zona waktu bisa nambah satu lagi, jadi "32/30" bikin bingung.
-        ` Histori masuk: ${filled} hari, nadi ${hrFilled} sesi. Terkirim ke Health Connect: ${sessions} sesi latihan.` +
-        ` Hari lampau yang bolong ditambal: ${tertambal}.`
-      );
+        `Histori masuk — ${filled} hari`,
+        // Cuma muncul kalau HRV BENERAN ada. Di Samsung Health HRV tidak pernah diekspor ke
+        // Health Connect (dicek langsung di layar "Data and access", 11 Agu 2026) — baris "tidak
+        // ada" yang muncul tiap sinkron cuma jadi kebisingan tetap.
+        ...(hrvHari > 0 ? [`HRV — ${hrvHari} hari`] : []),
+        `Nadi per sesi — ${hrFilled} sesi`,
+        `Terkirim ke HC — ${sessions} sesi latihan`,
+        `Hari bolong ditambal — ${tertambal} hari`,
+      ].map((s) => `• ${s}`).join('\n'), { title: 'Hasil Sinkron' });
     }
     } finally {
       hcSyncing.current = false;
@@ -962,7 +976,9 @@ export default function App() {
     if (!hasWorkoutToday) return null;
 
     const todayBioData = todayData.bioData || {};
-    return calculateReadiness(todayBioData);
+    // Baseline nadi istirahat 14 hari ke belakang — tanpa ini RHR tidak ikut dihitung sama sekali
+    // (angka mutlaknya tidak berarti apa-apa; lihat catatan di readinessEngine).
+    return calculateReadiness(todayBioData, restingHrBaseline(history, todayStr));
   }, [history, user, activeTab]);
 
   const scheduleLogiPush = async (type, id, vars) => {
@@ -3694,18 +3710,16 @@ export default function App() {
     // workoutStartTime): di sesi yang dilanjutkan, durasi tersimpan bisa lebih panjang dari
     // hitungan mundur sesi ini. Kalau startedAt tidak ikut durasi itu, jendela sesinya berujung
     // di masa depan dan Health Connect menolak record-nya.
-    if (remote.status === 'in-progress' && !hasLocalActive) {
-         if (remote.updatedAt > localUpdatedAt) {
-             const t = new Date(remote.updatedAt);
-             const timeStr = isNaN(t.getTime()) ? '' : `(${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')})`;
-             
-             // Ganti popup blokir dengan toast yang lebih ramah
-             setShowRestoreToast(`Sesi latihan dari perangkat lain ${timeStr} dilanjutkan.`);
-             setTimeout(() => setShowRestoreToast(''), 5000);
-             
-             return remote;
-         }
-      }
+    // JANGAN TARUH LOGIKA "LANJUTKAN SESI DARI PERANGKAT LAIN" DI SINI.
+    //
+    // v1.1.2 menempelkan salinannya persis di titik ini — `remote`, `hasLocalActive`, dan
+    // `localUpdatedAt` tidak pernah ada di scope fungsi ini, jadi baris pertamanya melempar
+    // ReferenceError dan handleSaveWorkout MATI DI SITU: `setIsWorkoutActive(false)` tidak pernah
+    // jalan, sesinya tidak pernah masuk `history`. Gejalanya menyesatkan — layar "Latihan
+    // Selesai!" tetap muncul (dirender WorkoutTab, bukan fungsi ini), tapi timer masih jalan dan
+    // hari itu tetap terlihat terjadwal di kalender. Setiap latihan sejak v1.1.2 gagal disimpan.
+    //
+    // Tempatnya yang benar sudah ada di pemulihan sesi cloud (lihat setShowRestoreToast di atas).
     const endedAt = Date.now();
     const endStamp = `${String(new Date(endedAt).getHours()).padStart(2, '0')}:${String(new Date(endedAt).getMinutes()).padStart(2, '0')}`;
     const startedAtFor = (secs) => endedAt - secs * 1000;

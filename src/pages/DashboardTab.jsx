@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Activity, Zap, Brain, Footprints, HeartPulse, Moon, Droplets, Droplet, Dumbbell, Scale, RefreshCw, Trophy, Link2, Pencil, Settings, Info, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Wind, Utensils, Flame, Clock, Cloud, CloudOff } from 'lucide-react';
 import { getLocalYMD, hasDeletedProjected, isLomealOwned } from '../data/constants';
+import { calculateReadiness, restingHrBaseline } from '../utils/readinessEngine';
 import DashboardModals from '../components/DashboardModals';
 import DashboardChart from '../components/DashboardChart';
 import ActivityChart from '../components/ActivityChart';
@@ -322,6 +323,12 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   // Hari ini pakai bioData hasil merge (sudah termasuk warisan & input manual); hari lain
   // dibaca langsung dari riwayat.
   const sleepBio = sleepOffset === 0 ? bioData : (history[sleepDate]?.bioData || {});
+  // Skor kesiapan untuk tanggal yang sedang dilihat kartu Pemulihan (punya navigasi tanggal
+  // sendiri), bukan selalu hari ini. Baselinenya diambil dari 14 hari SEBELUM tanggal itu.
+  const sleepReadiness = useMemo(
+    () => calculateReadiness(sleepBio, restingHrBaseline(history, sleepDate)),
+    [sleepBio, history, sleepDate]
+  );
   const sleepDateLabel = sleepOffset === 0
     ? 'Semalam'
     : new Date(`${sleepDate}T12:00:00`).toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' });
@@ -1402,17 +1409,21 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                      </div>
                  </div>
 
+                 {/* SKOR KESIAPAN — dihitung Logym sendiri dari tidur, tahap tidur, dan deviasi
+                     nadi istirahat terhadap kebiasaan 14 hari. Dulu di sini tampil "Skor Energi"
+                     milik Samsung, yang harus diketik manual karena Samsung tidak pernah
+                     mengekspornya ke Health Connect — praktisnya selalu kosong. */}
                  <div className="pb-1">
                      <div className="flex items-center space-x-2">
-                         <span className={`text-[10px] font-bold uppercase tracking-widest ${t.textMuted}`}>Skor Energi</span>
+                         <span className={`text-[10px] font-bold uppercase tracking-widest ${t.textMuted}`}>Skor Kesiapan</span>
                      </div>
                      <div className="flex items-baseline space-x-3 mt-1">
                          <div className="flex items-baseline space-x-1">
-                             <span className={`text-3xl font-black tracking-tighter ${t.textMain}`}>{parseFloat(sleepBio.energyScore) > 0 ? formatNumber(sleepBio.energyScore, language) : '-'}</span>
+                             <span className={`text-3xl font-black tracking-tighter ${t.textMain}`}>{sleepReadiness.status !== 'unknown' ? formatNumber(sleepReadiness.score, language) : '-'}</span>
                              <span className={`text-sm font-bold ${t.textMuted}`}>/ 100</span>
                          </div>
                          {(() => {
-                             const score = parseFloat(sleepBio.energyScore) || 0;
+                             const score = sleepReadiness.status === 'unknown' ? 0 : sleepReadiness.score;
                              if (score <= 0) return null;
                              
                              let text = 'Butuh Perhatian';
@@ -1430,6 +1441,9 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                              return <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider ${color} border shadow-sm`}>{text}</span>;
                          })()}
                      </div>
+                     {/* Alasannya ikut ditulis. Skor tanpa sebab itu kotak hitam — persis keluhan
+                         yang bikin Skor Energi Samsung tidak berguna di sini. */}
+                     <p className={`text-[10px] leading-snug mt-1.5 ${t.textMuted}`}>{sleepReadiness.message}</p>
                  </div>
              </div>
 

@@ -385,9 +385,17 @@ const DashboardModals = ({
                             {/* Group 1: Langkah, Durasi Aktif, SpO2, Skor Energi */}
                             <div className="grid grid-cols-2 gap-2.5 mb-2.5">
                                 <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Langkah</label><SwipeInput language={lang?.id || 'ID'} value={formBio.steps || ''} onChange={(val) => setFormBio({...formBio, steps: val})} step={100} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center ${lockCls('steps')}`} disabled={hcLocked('steps')} placeholder={ph(bioData?.steps, "5000")} /></div>
-                                <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Durasi Aktif (mnt)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.activeMinutes || ''} onChange={(val) => setFormBio({...formBio, activeMinutes: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center ${lockCls('activeMinutes')}`} disabled={hcLocked('activeMinutes')} placeholder={ph(bioData?.activeMinutes, "30")} /></div>
+                                {/* `activeMinutes` dan `energyScore` DIBUANG dari input manual (11 Agu 2026):
+                                    - Durasi Aktif sudah dihitung sendiri (dailyActiveMinutes = menit-langkah +
+                                      durasi latihan). Kotaknya cuma lantai override buat olahraga yang belum
+                                      bisa dicatat, dan itu akan dijawab dengan log latihan per tipe, bukan
+                                      dengan menyuruh user mengetik angka.
+                                    - Skor Energi itu milik Samsung dan tidak pernah sampai ke Health Connect.
+                                      Sekarang kartu Pemulihan menampilkan Skor Kesiapan hitungan Logym sendiri
+                                      (readinessEngine), jadi tidak ada lagi yang perlu diketik.
+                                    Hitungannya SENGAJA tidak ikut dihapus — hari lampau yang terlanjur punya
+                                    angka itu tetap dibaca apa adanya, cuma tidak bisa ditambah yang baru. */}
                                 <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>SpO2 (%)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.oxygenSaturation || ''} onChange={(val) => setFormBio({...formBio, oxygenSaturation: val})} disabled={hcLocked('oxygenSaturation')} step={1} min={0} max={100} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center ${lockCls('oxygenSaturation')}`} placeholder={ph(bioData?.oxygenSaturation, "98")} /></div>
-                                <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Energy Score</label><SwipeInput language={lang?.id || 'ID'} value={formBio.energyScore || ''} onChange={(val) => setFormBio({...formBio, energyScore: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.energyScore, "80")} /></div>
                             </div>
 
                             {/* Group 2: Tidur */}

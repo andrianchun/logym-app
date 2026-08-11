@@ -2,6 +2,7 @@ import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip } from 'recharts';
 import { getLocalYMD } from '../data/constants';
 import { formatNumber, formatSleepDuration } from '../utils/numberFormat';
+import { calculateReadiness, restingHrBaseline } from '../utils/readinessEngine';
 import { dailyBurnCalories, dailyActiveMinutes } from '../utils/workoutCalc';
 
 const CustomStackedBarShape = (props) => {
@@ -91,7 +92,9 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
             { key: 'sleepTotalOnly', label: 'Tidur', color: theme === 'dark' ? '#8b5cf6' : '#7c3aed', stackId: 'sleep', top: true },
         ]
       },
-      { key: 'energyScore', label: 'Skor Energi', color: theme === 'dark' ? '#94a3b8' : '#64748b', type: 'single' }, // Slate — tidak punya target
+      // Key-nya tetap `energyScore` supaya tab yang tersimpan di localStorage user tidak reset.
+      // Isinya sekarang skor kesiapan hitungan Logym — lihat titik pengisiannya di bawah.
+      { key: 'energyScore', label: 'Skor Kesiapan', color: theme === 'dark' ? '#94a3b8' : '#64748b', type: 'single' }, // Slate — tidak punya target
   ];
   const chartMetricsList = [
       ...(metricKeys ? allMetrics.filter(m => metricKeys.includes(m.key)) : allMetrics),
@@ -226,7 +229,15 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
               sleepRemH: adaTahapan ? remH || null : null,
               sleepAwakeH: adaTahapan ? awakeH || null : null,
               sleepTotalOnly: !adaTahapan ? totalSleep : null,
-              energyScore: histBio?.energyScore ? Number(histBio.energyScore) : null,
+              // RIWAYAT SKOR KESIAPAN, dihitung ulang per hari — bukan lagi `energyScore` yang
+              // diketik manual. Karena dihitung dari data yang memang sudah tersimpan (tidur,
+              // tahap tidur, nadi istirahat), seluruh riwayat langsung terisi tanpa perlu menunggu
+              // hari baru terkumpul. Hari tanpa data tidur mengembalikan status 'unknown' dan
+              // sengaja dibiarkan kosong, bukan digambar sebagai skor 80 yang menyesatkan.
+              energyScore: (() => {
+                  const r = calculateReadiness(histBio, restingHrBaseline(history, entry.dateStr));
+                  return r.status === 'unknown' ? null : r.score;
+              })(),
               targetSteps: histBio?.targetSteps || targetSteps,
               targetActiveMinutes: histBio?.targetActiveMinutes || targetActive,
               targetSleep: histBio?.targetSleep || targetSleepH,

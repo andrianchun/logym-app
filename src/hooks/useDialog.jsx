@@ -63,7 +63,9 @@ export default function useDialog(isDark = false, customBgClass = null) {
             {state.title && (
               <h3 className={`font-black text-base mb-1 ${isDark ? 'text-white' : 'text-black'}`}>{state.title}</h3>
             )}
-            <p className={`text-sm leading-relaxed ${isDark ? 'text-white/70' : 'text-black/65'}`}>{state.message}</p>
+            {/* whitespace-pre-line: pesan yang berisi \n dirender sebagai baris terpisah.
+                Tanpa ini semua laporan multi-baris runtuh jadi satu paragraf panjang. */}
+            <p className={`text-sm leading-relaxed whitespace-pre-line ${isDark ? 'text-white/70' : 'text-black/65'}`}>{state.message}</p>
           </div>
         </div>
 
