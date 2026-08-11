@@ -53,7 +53,7 @@ import { AI_MODELS, detectPlateaus, getLogiNotification } from './utils/aiAgent'
 import { calculateReadiness } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
 import { calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, recomputeStrengthRecords, buildHcSessionDetail } from './utils/workoutCalc';
-import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcReadHeartRateWindow, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission, capIntradayLog } from './utils/healthConnect';
+import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcReadHeartRateWindow, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission, capIntradayLog, HC_FIELDS, fillOnlyPatch } from './utils/healthConnect';
 import { bumpExercisePopularity } from './utils/exercisePopularity';
 import useDialog from './hooks/useDialog';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
@@ -372,36 +372,37 @@ export default function App() {
   const [healthAvailable, setHealthAvailable] = useState(false);
   useEffect(() => { hcAvailable().then(setHealthAvailable); }, []);
 
-  // Field yang boleh diisi backfill/live-sync — TIDAK PERNAH nimpa field yang udah manual
-  // (_manualFlags, lihat handleSaveManualData di DashboardTab.jsx).
-  //
-  // `activityCalories` SENGAJA TIDAK ADA DI SINI, jangan ditambahkan lagi. Field itu milik Logym
-  // (BMR + langkah + latihan, lihat dailyBurnCalories); versi Health Connect punya satuan berbeda
-  // (aktif saja, tanpa BMR) DAN sudah mengandung kalori yang Logym sendiri push ke sana, jadi
-  // menimpakannya bikin satu sesi terhitung dua kali. Angka HC-nya tetap masuk sebagai
-  // `hcCalories` (+ `hcCaloriesType`: 'active' atau 'total') — pembanding, bukan sumber hitungan.
-  const HC_FIELDS = ['steps', 'stepMinutes', 'hcCalories', 'hcCaloriesType', 'heartRate', 'minHeartRate', 'maxHeartRate', 'restingHeartRate', 'weight', 'height', 'bodyFat', 'oxygenSaturation', 'bloodPressure', 'sleep', 'sleepAwake', 'sleepRem', 'sleepLight', 'sleepDeep', 'sleepLog', 'distance', 'bmr', 'heartRateLog', 'oxygenSaturationLog', 'bloodPressureLog'];
+  // HC_FIELDS / HC_HEAL_FIELDS / fillOnlyPatch tinggal di utils/healthConnect.js — dipakai
+  // di sini DAN dites di src/utils/hcHeal.test.mjs tanpa perlu React.
 
   // SATU setHistory untuk seluruh hasil sinkron, bukan satu per hari. Versi lama memanggilnya
   // 30x beruntun (sekali per hari) — 30 render seluruh app per sinkron, dan dulu itu juga yang
   // membuat guard "baru saja menulis lokal" tidak pernah lepas sepanjang sinkron.
-  const mergeHcDays = (byDay) => {
+  //
+  // `fillOnly` (dipakai penambalan hari lampau, healHcHoles): cuma mengisi field yang KOSONG.
+  // Sinkron rutin sengaja tetap menimpa — lihat alasannya di bawah.
+  const mergeHcDays = (byDay, { fillOnly = false } = {}) => {
     setHistory(prev => {
       const next = { ...prev };
       let changed = false;
       Object.entries(byDay).forEach(([ymd, hcData]) => {
         const existingBio = prev[ymd]?.bioData || {};
         const manualFlags = existingBio._manualFlags || {};
-        const patch = {};
-        HC_FIELDS.forEach((k) => {
-          if (hcData[k] === undefined) return;
-          if (manualFlags[k] !== undefined) return;
-          // JANGAN DIBLOKIR: Health Connect bersifat kumulatif (contoh: langkah nambah terus).
-          // Kalau diblokir saat existingVal !== 0, data cuma narik sekali di pagi hari lalu nyangkut selamanya.
-          // Menulis ulang nilai yang sama juga tidak bikin boros: auto-save membandingkan isi,
-          // jadi hari yang nilainya tidak berubah tidak pernah dikirim ke Firestore.
-          if (existingBio[k] !== hcData[k]) patch[k] = hcData[k];
-        });
+        let patch;
+        if (fillOnly) {
+          patch = fillOnlyPatch(existingBio, hcData);
+        } else {
+          patch = {};
+          HC_FIELDS.forEach((k) => {
+            if (hcData[k] === undefined) return;
+            if (manualFlags[k] !== undefined) return;
+            // JANGAN DIBLOKIR: Health Connect bersifat kumulatif (contoh: langkah nambah terus).
+            // Kalau diblokir saat existingVal !== 0, data cuma narik sekali di pagi hari lalu nyangkut selamanya.
+            // Menulis ulang nilai yang sama juga tidak bikin boros: auto-save membandingkan isi,
+            // jadi hari yang nilainya tidak berubah tidak pernah dikirim ke Firestore.
+            if (existingBio[k] !== hcData[k]) patch[k] = hcData[k];
+          });
+        }
         if (Object.keys(patch).length === 0) return;
         next[ymd] = { ...(prev[ymd] || {}), bioData: { ...existingBio, ...patch } };
         changed = true;
@@ -599,6 +600,10 @@ export default function App() {
     const canWriteSession = silent ? await hcCheckWorkoutWritePermission() : await hcRequestWorkoutWritePermission();
     const { sessions } = await pushWorkoutsToHc(days, canWriteSession);
 
+    // Sinkron MANUAL sekalian menambal lubang hari lampau — `force` melewati throttle sekali
+    // sehari, karena user memang sedang menunggu hasilnya.
+    const tertambal = silent ? 0 : await healHcHoles({ force: true });
+
     if (status) {
       const denied = [...(status.readDenied || []), ...(status.writeDenied || [])];
       // Sengaja gak di-await — tombol yang manggil ini harus langsung balik normal begitu
@@ -608,7 +613,8 @@ export default function App() {
         (denied.length ? ` Ditolak: ${denied.join(', ')}.` : '') +
         // Tanpa pembagi: rentangnya inklusif dua ujung (hari ini + N hari ke belakang = N+1)
         // dan beda zona waktu bisa nambah satu lagi, jadi "32/30" bikin bingung.
-        ` Histori masuk: ${filled} hari, nadi ${hrFilled} sesi. Terkirim ke Health Connect: ${sessions} sesi latihan.`
+        ` Histori masuk: ${filled} hari, nadi ${hrFilled} sesi. Terkirim ke Health Connect: ${sessions} sesi latihan.` +
+        ` Hari lampau yang bolong ditambal: ${tertambal}.`
       );
     }
     } finally {
@@ -617,7 +623,9 @@ export default function App() {
     }
   };
 
-  // Tombol "Sinkron Ulang" di Pengaturan — dengan dialog izin & popup hasil.
+  // Tombol "Sinkron Ulang" di Pengaturan — dengan dialog izin & popup hasil. SATU tombol untuk
+  // dua tahap: menyegarkan 30 hari terakhir, lalu menambal hari kosong sampai setahun ke belakang
+  // (healHcHoles dipanggil di dalam runHcSync saat silent=false).
   const handleHcBackfill = (days = 30) => runHcSync({ days, silent: false });
 
   // SAPUAN DALAM SEKALI-JALAN, setahun ke belakang, DUA ARAH:
@@ -656,6 +664,59 @@ export default function App() {
     }
   };
 
+  // TAMBAL LUBANG dari Health Connect: hari lampau yang KOSONG di Logym tapi ada datanya di HC.
+  //
+  // Beda dari sinkron rutin yang cuma menyentuh 7-30 hari terakhir dan memang menimpa (HC
+  // kumulatif, langkah hari ini nambah terus). Di hari lampau tidak ada yang perlu diperbarui —
+  // yang ada cuma lubang. Maka: FILL-ONLY, angka ringkasan saja, tidak pernah menimpa.
+  //
+  // Dua batas yang wajib dihormati, keduanya bug nyata:
+  //  - Kurva intraday DILEWATI (HC_HEAL_FIELDS). ~4 KB/hari x 365 hari masuk ke SATU dokumen
+  //    history_years/<tahun> yang berbatas 1 MiB. Kalau tertabrak, yang gagal bukan grafiknya
+  //    melainkan SEMUA tulisan tahun itu — latihan berhenti tersimpan.
+  //  - Dikueri PER BULAN, bukan setahun sekaligus. Di HealthManager.kt, `limit` menghitung RECORD
+  //    dan `ascending` dari JS tidak pernah dipakai; kueri selebar setahun kehabisan kuota di
+  //    hari-hari tertua dan hari terbaru diam-diam kosong.
+  const HEAL_KEY = 'hc_heal_last';
+  const healRunning = useRef(false);
+  const healHcHoles = async ({ force = false } = {}) => {
+    if (!healthConnectEnabled || !isDataLoaded || !isHistoryLoaded) return 0;
+    if (healRunning.current) return 0;
+    const hariIni = getLocalYMD(new Date());
+    if (!force && localStorage.getItem(HEAL_KEY) === hariIni) return 0;
+    healRunning.current = true;
+    let tertambal = 0;
+    try {
+      for (let i = 0; i < 12; i++) {
+        const akhir = new Date();
+        akhir.setDate(1);
+        akhir.setMonth(akhir.getMonth() - i + 1);
+        akhir.setDate(0); // hari terakhir bulan itu
+        const awal = new Date(akhir);
+        awal.setDate(1);
+        const byDay = await hcReadRange(getLocalYMD(awal), getLocalYMD(akhir));
+        // Disaring dulu terhadap salinan history terbaru, supaya angka yang dilaporkan ke user
+        // adalah jumlah hari yang BENERAN ditambal — mergeHcDays sendiri tetap menghitung ulang
+        // patchnya terhadap `prev` versi React, jadi penyaringan di sini murni buat pelaporan.
+        const berlubang = {};
+        Object.entries(byDay).forEach(([ymd, hcData]) => {
+          if (Object.keys(fillOnlyPatch(historyMirror.current?.[ymd]?.bioData, hcData)).length > 0) berlubang[ymd] = hcData;
+        });
+        const jumlah = Object.keys(berlubang).length;
+        if (jumlah > 0) { mergeHcDays(berlubang, { fillOnly: true }); tertambal += jumlah; }
+      }
+      // Penanda dipasang di akhir: app yang ditutup di tengah jalan mengulang besok, dan
+      // ulangannya murah karena hari yang sudah terisi tidak menghasilkan patch apa pun.
+      localStorage.setItem(HEAL_KEY, hariIni);
+      console.log(`[Heal HC] ${tertambal} hari lampau ditambal dari Health Connect.`);
+    } catch (e) {
+      console.warn('[Heal HC] gagal, dicoba lagi nanti:', e);
+    } finally {
+      healRunning.current = false;
+    }
+    return tertambal;
+  };
+
   // Dorong sesi yang baru selesai ke Health Connect, setelah sesinya benar-benar masuk
   // `history` (id-nya baru ada di situ, dan id itulah dedupeKey-nya). Lihat catatan panjang
   // di handleSaveWorkout: ini satu-satunya jalur penulisan sesi ke HC.
@@ -679,7 +740,9 @@ export default function App() {
     // keduanya memakai fillSessionHeartRates & pushWorkoutsToHc, dan kalau tumpang tindih, 30 hari
     // terakhir dikerjakan dua kali karena masing-masing membaca `history` versi sebelum yang lain
     // menulis (`hcSyncing` cuma menjaga runHcSync dari dirinya sendiri, bukan dari sapuan ini).
-    runHcSync({ days: 30, silent: true }).then(runHcDeepBackfill); // pertama kali: langsung, tanpa jeda
+    // healHcHoles ikut DIRANGKAI di ujung, alasan yang sama: dia juga membaca `history` dan
+    // menulis lewat setHistory. Punya throttle sendiri (sekali sehari).
+    runHcSync({ days: 30, silent: true }).then(runHcDeepBackfill).then(() => healHcHoles()); // pertama kali: langsung, tanpa jeda
     const onVisible = () => { if (document.visibilityState === 'visible') sync(7); };
     document.addEventListener('visibilitychange', onVisible);
     const poll = setInterval(() => sync(7), 30 * 60 * 1000);
@@ -1062,6 +1125,15 @@ export default function App() {
       const saved = localStorage.getItem('lyfit_connectedApps');
       return saved ? JSON.parse(saved) : { healthconnect: false, applehealth: false };
   });
+  // `connectedApps.healthConnect` (camelCase) TIDAK PERNAH ADA ISINYA: yang tersimpan kuncinya
+  // 'healthconnect' huruf kecil semua, dan tidak satu pun kode yang menulis versi camelCase-nya.
+  // Akibatnya `hcLocked()` di DashboardModals selalu false — seluruh penguncian field milik Health
+  // Connect mati diam-diam, dan badge "TERSINKRONISASI" tidak pernah muncul. Sumber kebenaran HC
+  // adalah `healthConnectEnabled`; diturunkan di sini supaya semua pembaca ikut benar sekaligus.
+  const connectedAppsView = useMemo(
+    () => ({ ...connectedApps, healthConnect: healthConnectEnabled }),
+    [connectedApps, healthConnectEnabled]
+  );
 
   const [exerciseLogs, setExerciseLogs] = useState({});
   const [skippedExercises, setSkippedExercises] = useState({});
@@ -4348,7 +4420,7 @@ export default function App() {
                userApiKeys={userApiKeys}
                keyStatuses={keyStatuses} setKeyStatuses={setKeyStatuses}
                setShowSettings={setShowSettings}
-               userAchievements={userAchievements} connectedApps={connectedApps}
+               userAchievements={userAchievements} connectedApps={connectedAppsView}
                userProfile={userProfile}
                lomealToday={lomealToday} lomealTargets={lomealTargets}
              />

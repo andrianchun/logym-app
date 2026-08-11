@@ -306,33 +306,46 @@ export default function SettingsModal({
               <p className={`body-md ${t.textMuted} uppercase tracking-wider mb-2 flex items-center gap-2`}>
                 <Activity size={16} /> Health Connect
               </p>
-              <div className="flex items-center justify-between">
-                <span className={`font-bold text-sm ${t.textMain}`}>Sinkron Steps, Tidur, Detak Jantung, dsb.</span>
+              {/* Judul dan tombol dipisah baris: sebelumnya sebaris, dan teksnya (yang panjang)
+                  membungkus di belakang tombol "Terhubung" — dua kolom saling berebut lebar. */}
+              <div className="flex items-center justify-between gap-3">
+                <span className={`font-bold text-sm ${t.textMain}`}>Sinkron data kesehatan</span>
                 <button
                   disabled={hcConnecting}
                   onClick={async () => {
                     setHcConnecting(true);
                     try { await onToggleHealthConnect(); } finally { setHcConnecting(false); }
                   }}
-                  className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all disabled:opacity-50 ${healthConnectEnabled ? `${t.bgAccent} text-white shadow-sm` : `${t.btnBg} ${t.textMuted}`}`}
+                  className={`shrink-0 px-4 py-1.5 rounded-full text-xs font-bold transition-all disabled:opacity-50 ${healthConnectEnabled ? `${t.bgAccent} text-white shadow-sm` : `${t.btnBg} ${t.textMuted}`}`}
                 >
                   {hcConnecting ? 'Menghubungkan...' : (healthConnectEnabled ? 'Terhubung' : 'Hubungkan')}
                 </button>
               </div>
-              {!healthAvailable && (
-                <p className={`text-[10px] ${t.textMuted} leading-tight`}>Aktif di aplikasi Android (Capacitor) — belum tersedia di browser web.</p>
-              )}
+              <p className={`text-[10px] ${t.textMuted} leading-tight`}>
+                Langkah, tidur, detak jantung, berat, SpO2, dan tensi.
+                {!healthAvailable && ' Aktif di aplikasi Android — belum tersedia di browser web.'}
+              </p>
+              {/* SATU tombol, bukan dua. Dulu "Sinkron Ulang Histori 30 Hari" dan "Tambal Data
+                  Bolong" terpisah, padahal yang manual sudah menjalankan keduanya berurutan —
+                  tombol kedua cuma mengulang bagian yang sama. */}
               {healthConnectEnabled && (
-                <button
-                  disabled={hcBackfilling}
-                  onClick={async () => {
-                    setHcBackfilling(true);
-                    try { await onHcBackfill(30); } finally { setHcBackfilling(false); }
-                  }}
-                  className={`w-full py-2.5 rounded-xl border border-dashed ${t.border} ${t.btnBg} ${t.textMain} font-bold text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50`}
-                >
-                  {hcBackfilling ? 'Menyinkronkan histori 30 hari...' : 'Sinkron Ulang Histori 30 Hari'}
-                </button>
+                <>
+                  <button
+                    disabled={hcBackfilling}
+                    onClick={async () => {
+                      setHcBackfilling(true);
+                      try { await onHcBackfill(30); } finally { setHcBackfilling(false); }
+                    }}
+                    className={`w-full py-2.5 rounded-xl border border-dashed ${t.border} ${t.btnBg} ${t.textMain} font-bold text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50`}
+                  >
+                    {hcBackfilling ? 'Menyinkronkan...' : 'Sinkron Ulang'}
+                  </button>
+                  <p className={`text-[10px] ${t.textMuted} leading-tight`}>
+                    Menyegarkan 30 hari terakhir, lalu mengisi hari kosong sampai 1 tahun ke belakang.
+                    Yang lampau cuma DIISI kalau kosong — angka yang sudah ada tidak pernah diubah,
+                    jadi aman ditekan berkali-kali. Jalan sendiri juga sekali sehari.
+                  </p>
+                </>
               )}
             </div>
 

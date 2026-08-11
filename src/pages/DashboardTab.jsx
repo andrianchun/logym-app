@@ -1603,10 +1603,18 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                                     {/* Deep: 15-25% */}
                                     {renderSleepBar('Deep (Tidur Nyenyak)', sDeep, 15, 25, 'bg-violet-600')}
                                     
-                                    {/* HRV, SpO2, RHR */}
+                                    {/* HRV, SpO2, RHR — semuanya dari `sleepBio`, BUKAN `bioData`.
+                                        Kartu ini punya navigasi tanggal sendiri (sleepOffset); membaca
+                                        `bioData` berarti bar tahap tidurnya menampilkan tanggal yang
+                                        dipilih sementara tiga bar ini diam-diam menampilkan HARI INI.
+
+                                        RHR dibaca dari `restingHeartRate`, bukan `heartRate`. `heartRate`
+                                        itu RATA-RATA nadi sepanjang hari — angka yang sama sekali beda
+                                        besarannya dari nadi istirahat, tapi selama ini tampil di bawah
+                                        label "RHR (Nadi Istirahat)" seolah-olah itu dia. */}
                                     {renderHrvBar(sHrv)}
-                                    {renderSpo2Bar(parseFloat(bioData.oxygenSaturation))}
-                                    {renderRhrBar(parseFloat(bioData.heartRate))}
+                                    {renderSpo2Bar(parseFloat(sleepBio.oxygenSaturation))}
+                                    {renderRhrBar(parseFloat(sleepBio.restingHeartRate))}
                                     
                                     <div className="flex flex-wrap items-center gap-1.5 mt-6 pt-4 border-t border-dashed border-zinc-500/20">
                                        <div className="flex items-center space-x-1.5"><div className="w-3 h-3 bg-black/10 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-sm"></div><span className={`text-[9px] font-bold ${t.textMuted}`}>Rentang Normal</span></div>

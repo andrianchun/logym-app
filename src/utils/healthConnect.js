@@ -32,7 +32,7 @@ export const hcAvailable = async () => {
 // 'totalCalories' ikut diminta karena banyak sumber (mis. Samsung Health) cuma nulis
 // TotalCaloriesBurned dan TIDAK pernah nulis ActiveCaloriesBurned — tanpa ini, query
 // 'calories' balik kosong terus walau Health Connect penuh data (kejadian nyata).
-const READ_TYPES = ['steps', 'calories', 'totalCalories', 'heartRate', 'restingHeartRate', 'weight', 'height', 'sleep', 'bodyFat', 'oxygenSaturation', 'bloodPressure', 'distance', 'basalCalories'];
+const READ_TYPES = ['steps', 'calories', 'totalCalories', 'heartRate', 'restingHeartRate', 'heartRateVariability', 'weight', 'height', 'sleep', 'bodyFat', 'oxygenSaturation', 'bloodPressure', 'distance', 'basalCalories'];
 // Logym tidak lagi menulis tipe data apa pun lewat plugin capgo (lihat catatan di bawah).
 // Record sesi latihan ditulis lewat ExerciseWriterPlugin.kt yang izinnya terpisah.
 const WRITE_TYPES = [];
@@ -438,6 +438,14 @@ export const hcReadRange = async (startYmd, endYmd) => {
         .forEach(([ymd, v]) => put(ymd, v)))
       .catch((e) => console.warn('hcReadRange restingHeartRate gagal:', e)),
 
+    // HRV (RMSSD, satuan milidetik) — beda besaran dari restingHeartRate yang bpm. Selama ini
+    // cuma ada di ALL_READABLE (daftar diagnosa hcInventory) dan tidak pernah benar-benar ditarik,
+    // jadi kolom HRV di input manual selalu kosong walau jam tangannya merekam.
+    H.readSamples({ dataType: 'heartRateVariability', startDate: startISO, endDate: endISO, limit: 1000, ascending: true })
+      .then((res) => Object.entries(latestPerDay(res?.samples || [], (s) => ({ hrv: Math.round(s.value) })))
+        .forEach(([ymd, v]) => put(ymd, v)))
+      .catch((e) => console.warn('hcReadRange heartRateVariability gagal:', e)),
+
     // BMR terukur dari Samsung Health/Google Fit — angka asli, lebih tepat daripada
     // hasil hitungan rumus Logym sendiri.
     H.readSamples({ dataType: 'basalCalories', startDate: startISO, endDate: endISO, limit: 1000, ascending: true })
@@ -571,6 +579,44 @@ export const hcReadHeartRateWindow = async (startISO, endISO) => {
     console.warn('hcReadHeartRateWindow gagal:', e);
     return [];
   }
+};
+
+// Field bioData yang boleh diisi dari Health Connect — TIDAK PERNAH menimpa field yang sudah
+// ditandai manual (`_manualFlags`, lihat handleSaveManualData di DashboardTab.jsx).
+//
+// `activityCalories` SENGAJA TIDAK ADA DI SINI, jangan ditambahkan lagi. Field itu milik Logym
+// (BMR + langkah + latihan, lihat dailyBurnCalories); versi Health Connect punya satuan berbeda
+// (aktif saja, tanpa BMR) DAN sudah mengandung kalori yang Logym sendiri push ke sana, jadi
+// menimpakannya bikin satu sesi terhitung dua kali. Angka HC-nya tetap masuk sebagai
+// `hcCalories` (+ `hcCaloriesType`: 'active' atau 'total') — pembanding, bukan sumber hitungan.
+export const HC_FIELDS = ['steps', 'stepMinutes', 'hcCalories', 'hcCaloriesType', 'heartRate', 'minHeartRate', 'maxHeartRate', 'restingHeartRate', 'hrv', 'weight', 'height', 'bodyFat', 'oxygenSaturation', 'bloodPressure', 'sleep', 'sleepAwake', 'sleepRem', 'sleepLight', 'sleepDeep', 'sleepLog', 'distance', 'bmr', 'heartRateLog', 'oxygenSaturationLog', 'bloodPressureLog'];
+
+// Bagian yang boleh ditambal ke hari LAMPAU (lihat healHcHoles di App.jsx): angka ringkasan saja.
+// Kurva intraday sengaja dibuang — ~4 KB/hari x 365 hari itu jalur langsung ke batas 1 MiB
+// dokumen history_years/<tahun>, batas yang sudah pernah ditabrak. Diturunkan dari HC_FIELDS,
+// bukan disalin, supaya field baru tidak perlu didaftar dua kali.
+export const HC_HEAL_FIELDS = HC_FIELDS.filter((k) => !k.endsWith('Log'));
+
+/**
+ * Patch "isi yang kosong saja": nilai yang SUDAH ada di bioData tidak pernah disentuh.
+ *
+ * Beda dari merge sinkron rutin, yang memang harus menimpa karena Health Connect bersifat
+ * kumulatif (langkah hari ini nambah terus). Untuk hari lampau tidak ada yang perlu diperbarui —
+ * yang ada cuma lubang. Menimpa di sana berarti menghapus angka yang mungkin dicatat sumber lain,
+ * diam-diam, di ratusan hari sekaligus, tanpa jalur batal.
+ */
+export const fillOnlyPatch = (existingBio, hcData, fields = HC_HEAL_FIELDS) => {
+  const bio = existingBio || {};
+  const flags = bio._manualFlags || {};
+  const patch = {};
+  fields.forEach((k) => {
+    if (hcData?.[k] === undefined) return;
+    if (flags[k] !== undefined) return; // diisi user sendiri — bukan lubang
+    const ada = bio[k];
+    if (ada !== undefined && ada !== null && ada !== '') return;
+    patch[k] = hcData[k];
+  });
+  return patch;
 };
 
 // Backfill: isi kekosongan histori N hari ke belakang. `hasOtherSource(ymd)` mengembalikan

@@ -30,7 +30,7 @@ const DashboardModals = ({
   // berarti mematikan satu-satunya cara mengisinya.
   const HC_OWNED = [
     'steps', 'stepMinutes', 'distance', 'bmr',
-    'heartRate', 'minHeartRate', 'maxHeartRate', 'restingHeartRate',
+    'heartRate', 'minHeartRate', 'maxHeartRate', 'restingHeartRate', 'hrv',
     'weight', 'height', 'bodyFat', 'oxygenSaturation', 'bloodPressure',
     'sleep', 'sleepAwake', 'sleepRem', 'sleepLight', 'sleepDeep',
   ];
@@ -386,7 +386,7 @@ const DashboardModals = ({
                             <div className="grid grid-cols-2 gap-2.5 mb-2.5">
                                 <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Langkah</label><SwipeInput language={lang?.id || 'ID'} value={formBio.steps || ''} onChange={(val) => setFormBio({...formBio, steps: val})} step={100} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center ${lockCls('steps')}`} disabled={hcLocked('steps')} placeholder={ph(bioData?.steps, "5000")} /></div>
                                 <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Durasi Aktif (mnt)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.activeMinutes || ''} onChange={(val) => setFormBio({...formBio, activeMinutes: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center ${lockCls('activeMinutes')}`} disabled={hcLocked('activeMinutes')} placeholder={ph(bioData?.activeMinutes, "30")} /></div>
-                                <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>SpO2 (%)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.oxygenSaturation || ''} onChange={(val) => setFormBio({...formBio, oxygenSaturation: val})} step={1} min={0} max={100} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.oxygenSaturation, "98")} /></div>
+                                <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>SpO2 (%)</label><SwipeInput language={lang?.id || 'ID'} value={formBio.oxygenSaturation || ''} onChange={(val) => setFormBio({...formBio, oxygenSaturation: val})} disabled={hcLocked('oxygenSaturation')} step={1} min={0} max={100} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center ${lockCls('oxygenSaturation')}`} placeholder={ph(bioData?.oxygenSaturation, "98")} /></div>
                                 <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Energy Score</label><SwipeInput language={lang?.id || 'ID'} value={formBio.energyScore || ''} onChange={(val) => setFormBio({...formBio, energyScore: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(bioData?.energyScore, "80")} /></div>
                             </div>
 
@@ -413,7 +413,7 @@ const DashboardModals = ({
                                    <SwipeInput language={lang?.id || 'ID'} value={formBio.sleepRem || ''} onChange={(val) => setFormBio({...formBio, sleepRem: val})} disabled={hcLocked('sleepRem')} step={5} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center ${lockCls('sleepRem')}`} placeholder="REM" />
                                    <SwipeInput language={lang?.id || 'ID'} value={formBio.sleepLight || ''} onChange={(val) => setFormBio({...formBio, sleepLight: val})} disabled={hcLocked('sleepLight')} step={5} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center ${lockCls('sleepLight')}`} placeholder="Light" />
                                    <SwipeInput language={lang?.id || 'ID'} value={formBio.sleepDeep || ''} onChange={(val) => setFormBio({...formBio, sleepDeep: val})} disabled={hcLocked('sleepDeep')} step={5} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center ${lockCls('sleepDeep')}`} placeholder="Deep" />
-                                   <SwipeInput language={lang?.id || 'ID'} value={formBio.hrv || ''} onChange={(val) => setFormBio({...formBio, hrv: val})} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center`} placeholder="HRV" />
+                                   <SwipeInput language={lang?.id || 'ID'} value={formBio.hrv || ''} onChange={(val) => setFormBio({...formBio, hrv: val})} disabled={hcLocked('hrv')} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-xs text-center ${lockCls('hrv')}`} placeholder="HRV" />
                                </div>
                             </div>
 
@@ -430,8 +430,8 @@ const DashboardModals = ({
                                 <div>
                                     <label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Tensi (Sys/Dia)</label>
                                     <div className="grid grid-cols-2 gap-1">
-                                        <SwipeInput language={lang?.id || 'ID'} value={bpSys || ''} onChange={handleBPSys} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(lastBpSys, "120")} />
-                                        <SwipeInput language={lang?.id || 'ID'} value={bpDia || ''} onChange={handleBPDia} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-sm text-center`} placeholder={ph(lastBpDia, "80")} />
+                                        <SwipeInput language={lang?.id || 'ID'} value={bpSys || ''} onChange={handleBPSys} disabled={hcLocked('bloodPressure')} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-sm text-center ${lockCls('bloodPressure')}`} placeholder={ph(lastBpSys, "120")} />
+                                        <SwipeInput language={lang?.id || 'ID'} value={bpDia || ''} onChange={handleBPDia} disabled={hcLocked('bloodPressure')} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-1 rounded-lg outline-none font-bold text-sm text-center ${lockCls('bloodPressure')}`} placeholder={ph(lastBpDia, "80")} />
                                     </div>
                                 </div>
                             </div>
