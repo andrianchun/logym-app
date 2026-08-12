@@ -4,7 +4,7 @@ import { X, Play, Pause, ChevronRight, ChevronLeft, Dumbbell, Check, Info, Clock
 import ScrollPicker from './ScrollPicker';
 import { exerciseTypeLabels } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
-import { calculateWorkoutCalories, calculateLiveWorkoutCalories } from '../utils/workoutCalc';
+import { calculateWorkoutCalories, calculateLiveWorkoutCalories, resolveExerciseKind } from '../utils/workoutCalc';
 import { WorkoutTimerPlugin } from '../App';
 
 const LiveWorkoutStats = ({ workoutStartTime, isPaused, userProfile, validExercises, exerciseLogs, t, formatTime, currentExerciseName }) => {
@@ -822,17 +822,7 @@ const ImmersiveWorkout = ({
         {/* Scroll Pickers */}
         <div className="flex flex-col gap-6 no-swipe-minimize">
           {(() => {
-            let exType = ex?.type || 'weight';
-            const isCardioMatch = ex?.target?.some(t => t.toLowerCase().includes('cardio') || t.toLowerCase().includes('kardio')) 
-                     || (ex?.name || '').toLowerCase().includes('lari') 
-                     || (ex?.name || '').toLowerCase().includes('treadmill') 
-                     || (ex?.name || '').toLowerCase().includes('sepeda') 
-                     || (ex?.name || '').toLowerCase().includes('elliptical');
-            
-            if (exType === 'time' && isCardioMatch) {
-              exType = 'cardio';
-            }
-
+            const exType = resolveExerciseKind(ex);
             const isCardio = exType === 'cardio';
             const itemLogs = getLogsForEx(ex);
             const itemSet = itemLogs[activeSetIdx] || itemLogs[0];
@@ -1016,7 +1006,9 @@ const ImmersiveWorkout = ({
               {(() => {
                 const s = getLogsForEx(ex)[activeSetIdx] || {};
                 const isFilled = s.notes || s.rir || s.rpe;
-                const isCardioEx = ['cardio', 'time', 'distance'].includes(ex.type?.toLowerCase()) || (ex.name || '').toLowerCase().includes('lari') || (ex.name || '').toLowerCase().includes('treadmill') || (ex.name || '').toLowerCase().includes('sepeda') || (ex.name || '').toLowerCase().includes('elliptical');
+                // Tombol catatan kardio (nadi/elevasi/incline) muncul untuk semua latihan berbasis
+                // waktu, termasuk plank — sengaja lebih longgar daripada resolveExerciseKind saja.
+                const isCardioEx = ['cardio', 'time'].includes(resolveExerciseKind(ex)) || ex.type === 'distance';
                 const isCardioFilled = s.heartRate || s.elevation || s.incline;
                 
                 return (

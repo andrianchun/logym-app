@@ -246,6 +246,42 @@ export const isCardioExercise = (ex) => {
 };
 
 /**
+ * Kata yang menandakan latihan kardio. Dicocokkan di AWAL KATA, bukan di mana saja:
+ * "Cable Crunch" mengandung potongan "run" di tengah kata — pencocokan substring lama
+ * menganggapnya kardio. Hari ini tidak berakibat (Crunch bertipe 'weight', promosi cuma
+ * berlaku untuk 'time'), tapi begitu ada Crunch berbasis waktu, durasinya akan dibaca
+ * sebagai MENIT dan kalorinya meledak. Batas awal kata membuat "Running" tetap cocok
+ * sementara "Crunch" tidak.
+ */
+const CARDIO_WORDS = ['cardio', 'kardio', 'run', 'lari', 'jog', 'treadmill', 'cycl', 'bike',
+  'sepeda', 'swim', 'renang', 'elliptical', 'eliptik', 'rowing', 'dayung', 'walk', 'jalan'];
+const CARDIO_RE = new RegExp(`\\b(${CARDIO_WORDS.join('|')})`, 'i');
+
+/**
+ * SATU-SATUNYA penentu kategori latihan untuk UI. Mengembalikan 'weight' | 'reps' | 'time' | 'cardio'.
+ *
+ * Kenapa perlu: `type` di library tidak cukup. Latihan impor ExerciseDB yang jelas-jelas kardio
+ * diberi `type: 'time'` (exerciseDbApi.js), jadi tiap layar dulu menebak ulang dari nama/target —
+ * lima salinan dengan daftar kata kunci yang BERBEDA, sehingga "Swimming (Renang)" bertipe 'time'
+ * dibaca kardio oleh kartu latihan tapi non-kardio oleh mode immersive. Beda jawaban = beda satuan
+ * durasi (menit vs detik) untuk latihan yang sama.
+ *
+ * Promosi hanya dari 'time' ke 'cardio'. Latihan beban bernama kardio tetap beban.
+ */
+export const resolveExerciseKind = (ex) => {
+  const type = ex?.type || 'weight';
+  if (type !== 'time') return type;
+  const hay = `${ex?.name || ''} ${Array.isArray(ex?.target) ? ex.target.join(' ') : (ex?.target || '')}`;
+  return CARDIO_RE.test(hay) ? 'cardio' : 'time';
+};
+
+/**
+ * Satuan durasi set menurut kategorinya. Kardio menyimpan MENIT di `set.duration`,
+ * latihan waktu lain menyimpan DETIK di `set.d` — lihat setDurationKm di atas.
+ */
+export const durationUnitOf = (ex) => (resolveExerciseKind(ex) === 'cardio' ? 'menit' : 'detik');
+
+/**
  * Pecah kalori satu sesi jadi { kardio, beban }.
  *
  * Jumlah keduanya DIJAMIN sama persis dengan calculateSmartWorkoutCalories untuk sesi yang sama:

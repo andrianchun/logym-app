@@ -5,6 +5,7 @@ import EquipmentIcon from './EquipmentIcon';
 import SwipeInput from './SwipeInput';
 import { formatTarget, exerciseTypeLabels, getVideoId } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
+import { resolveExerciseKind } from '../utils/workoutCalc';
 import { getCachedExercises } from '../utils/exerciseDbApi';
 
 const ExerciseCard = ({
@@ -16,15 +17,7 @@ const ExerciseCard = ({
   canDeleteCompleted = false, onRemoveProgramExercise
 }) => {
   const isImp = units?.weight === 'lbs';
-  let exType = ex.type || 'weight';
-  const nameLower = (ex.name || '').toLowerCase();
-  const targetLower = Array.isArray(ex.target) ? ex.target.join(' ').toLowerCase() : (ex.target || '').toLowerCase();
-  const cardioKeywords = ['cardio', 'run', 'lari', 'treadmill', 'jog', 'cycle', 'bike', 'sepeda', 'swim', 'renang', 'elliptical', 'rowing', 'dayung', 'walk', 'jalan'];
-  const isCardioMatch = cardioKeywords.some(kw => nameLower.includes(kw) || targetLower.includes(kw));
-  
-  if (exType === 'time' && isCardioMatch) {
-    exType = 'cardio';
-  }
+  const exType = resolveExerciseKind(ex);
   const isCustom = ex.id > 1000000 && ex.source !== 'exercisedb';
   const doneCount = sets.filter(s => s.done).length;
   const totalSets = sets.length;

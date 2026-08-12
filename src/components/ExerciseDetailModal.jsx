@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Dumbbell, History, Calculator, Replace, Video, Info, ChevronLeft, ChevronRight, Loader2, Play } from 'lucide-react';
 import { formatTarget, resolveProjectedProgramId } from '../data/constants';
+import { resolveExerciseKind } from '../utils/workoutCalc';
 import SwipeInput from './SwipeInput';
 
 const ExerciseDetailModal = ({ 
@@ -17,15 +18,7 @@ const ExerciseDetailModal = ({
   programs
 }) => {
   const isImp = units?.weight === 'lbs';
-  let initialExType = initialEx.type || 'weight';
-  const nameLower = (initialEx.name || '').toLowerCase();
-  const targetLower = Array.isArray(initialEx.target) ? initialEx.target.join(' ').toLowerCase() : (initialEx.target || '').toLowerCase();
-  const cardioKeywords = ['cardio', 'run', 'lari', 'treadmill', 'jog', 'cycle', 'bike', 'sepeda', 'swim', 'renang', 'elliptical', 'rowing', 'dayung', 'walk', 'jalan'];
-  const isCardioMatch = cardioKeywords.some(kw => nameLower.includes(kw) || targetLower.includes(kw));
-  
-  if (initialExType === 'time' && isCardioMatch) {
-    initialExType = 'cardio';
-  }
+  const initialExType = resolveExerciseKind(initialEx);
   const historyData = useMemo(() => {
     if (!fullHistory || !initialEx) return [];
     const logs = [];

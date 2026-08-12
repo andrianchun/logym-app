@@ -8,7 +8,7 @@ import { Capacitor } from '@capacitor/core';
 import SwipeInput from '../components/SwipeInput';
 import { getLocalYMD, resolveProjectedProgramId, getDayWorkouts as sharedGetDayWorkouts, deletedProjectedMap, hasDeletedProjected } from '../data/constants';
 import { formatNumber } from '../utils/numberFormat';
-import { parseWorkoutDurationMinutes, calculateWorkoutCalories, calculateSmartWorkoutCalories } from '../utils/workoutCalc';
+import { parseWorkoutDurationMinutes, calculateWorkoutCalories, calculateSmartWorkoutCalories, resolveExerciseKind } from '../utils/workoutCalc';
 import PanoramicSlider from '../components/PanoramicSlider';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { getLogyNotification } from '../utils/aiAgent';
@@ -1696,11 +1696,7 @@ const CalendarTab = ({
                                                      let textStr = "";
                                                      let zoneNode = null;
                                                      
-                                                     const nameLower = (ex.name || '').toLowerCase();
-                                                     const targetLower = Array.isArray(ex.target) ? ex.target.join(' ').toLowerCase() : (ex.target || '').toLowerCase();
-                                                     const cardioKeywords = ['cardio', 'run', 'lari', 'treadmill', 'jog', 'cycle', 'bike', 'sepeda', 'swim', 'renang', 'elliptical', 'rowing', 'dayung', 'walk', 'jalan'];
-                                                     const isCardioMatch = cardioKeywords.some(kw => nameLower.includes(kw) || targetLower.includes(kw));
-                                                     const exType = (ex.type === 'time' && isCardioMatch) ? 'cardio' : (ex.type || 'weight');
+                                                     const exType = resolveExerciseKind(ex);
 
                                                      if (doneSets.length > 0) {
                                                         const langId = lang?.id || 'ID';
