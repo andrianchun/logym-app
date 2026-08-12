@@ -63,15 +63,20 @@ const VitalsChart = ({ t, theme, history, language, activeMetric }) => {
     const byDay = {};
     hourlyPoints.forEach((p) => {
       const k = dayKeyOf(p.ts);
-      if (!byDay[k]) byDay[k] = { ts: [], value: [], dia: [] };
+      if (!byDay[k]) byDay[k] = { ts: [], value: [], dia: [], readings: [] };
       byDay[k].ts.push(p.ts);
       byDay[k].value.push(p.value);
       if (p.dia != null) byDay[k].dia.push(p.dia);
+      byDay[k].readings.push(p.dia != null ? `${Math.round(p.value)}/${Math.round(p.dia)}` : `${Math.round(p.value)}`);
     });
     return Object.entries(byDay).map(([k, v]) => ({
       ts: avg(v.ts),
-      value: Math.round(avg(v.value) * 10) / 10,
-      dia: v.dia.length ? Math.round(avg(v.dia) * 10) / 10 : undefined,
+      value: Math.round(avg(v.value)),
+      dia: v.dia.length ? Math.round(avg(v.dia)) : undefined,
+      // Pengukuran asli hari itu, buat ditampilkan berdampingan di tooltip. Garisnya tetap
+      // memakai rata-rata (satu titik per hari tidak bisa punya dua nilai y), tapi angka yang
+      // DIBACA user adalah hasil ukur sungguhan, bukan rata-rata yang tidak pernah terjadi.
+      readings: v.readings,
     })).sort((a, b) => a.ts - b.ts);
   }, [hourlyPoints]);
 
@@ -84,10 +89,12 @@ const VitalsChart = ({ t, theme, history, language, activeMetric }) => {
       byMonth[k].value.push(p.value);
       if (p.dia != null) byMonth[k].dia.push(p.dia);
     });
+    // Bulanan & tahunan sengaja TIDAK membawa daftar pengukuran: sebulan bisa ratusan titik,
+    // rata-rata bulat justru yang berguna di zoom sejauh itu.
     return Object.entries(byMonth).map(([k, v]) => ({
       ts: avg(v.ts),
-      value: Math.round(avg(v.value) * 10) / 10,
-      dia: v.dia.length ? Math.round(avg(v.dia) * 10) / 10 : undefined,
+      value: Math.round(avg(v.value)),
+      dia: v.dia.length ? Math.round(avg(v.dia)) : undefined,
     })).sort((a, b) => a.ts - b.ts);
   }, [dailyPoints]);
 
@@ -102,8 +109,8 @@ const VitalsChart = ({ t, theme, history, language, activeMetric }) => {
     });
     return Object.entries(byYear).map(([k, v]) => ({
       ts: avg(v.ts),
-      value: Math.round(avg(v.value) * 10) / 10,
-      dia: v.dia.length ? Math.round(avg(v.dia) * 10) / 10 : undefined,
+      value: Math.round(avg(v.value)),
+      dia: v.dia.length ? Math.round(avg(v.dia)) : undefined,
     })).sort((a, b) => a.ts - b.ts);
   }, [monthlyPoints]);
 
@@ -220,9 +227,22 @@ const VitalsChart = ({ t, theme, history, language, activeMetric }) => {
           <div style={{ width: `${chartWidth}px`, height: '224px', marginLeft: (chartData.length * pointWidth) < (window.innerWidth - 64) ? 'auto' : '0' }} className="cursor-crosshair relative shrink-0">
             <LineChart width={chartWidth} height={224} data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }} style={{ outline: 'none' }}>
               <Tooltip
-                formatter={(value, name, props) => activeMetric === 'bloodPressureLog' && props.dataKey === 'value'
-                  ? [`${props.payload.value}/${props.payload.dia ?? '-'} ${metric.unit}`, metric.label]
-                  : [`${formatNumber(value, language)} ${metric.unit}`, metric.label]}
+                formatter={(value, name, props) => {
+                  const p = props.payload || {};
+                  // Kalau satu hari punya beberapa pengukuran, tampilkan semuanya berdampingan.
+                  // Rata-rata desimal seperti "133,5/89,5" itu angka yang tidak pernah terjadi —
+                  // dan tensi/nadi memang bilangan bulat. Dibatasi 4 supaya tooltip tetap muat.
+                  const list = Array.isArray(p.readings) ? p.readings : null;
+                  if (list && list.length > 1) {
+                    const shown = list.slice(0, 4).join(' • ');
+                    const sisa = list.length > 4 ? ` +${list.length - 4}` : '';
+                    return [`${shown}${sisa} ${metric.unit}`, metric.label];
+                  }
+                  if (activeMetric === 'bloodPressureLog') {
+                    return [`${Math.round(p.value)}/${p.dia != null ? Math.round(p.dia) : '-'} ${metric.unit}`, metric.label];
+                  }
+                  return [`${formatNumber(Math.round(value), language)} ${metric.unit}`, metric.label];
+                }}
                 cursor={{ stroke: theme === 'dark' ? '#52525b' : '#d4d4d8', strokeWidth: 1, strokeDasharray: '3 3' }}
                 contentStyle={{ backgroundColor: theme === 'dark' ? '#18181b' : '#ffffff', borderRadius: '12px', border: '1px solid ' + t.border, padding: '8px 12px', fontSize: '11px', fontWeight: 'bold', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                 labelStyle={{ color: theme === 'dark' ? '#a1a1aa' : '#71717a', marginBottom: '4px', fontSize: '9px' }}
@@ -231,7 +251,11 @@ const VitalsChart = ({ t, theme, history, language, activeMetric }) => {
               <YAxis hide domain={yDomain} allowDataOverflow />
               <Line type="monotone" dataKey="value" stroke={metric.color} strokeWidth={1.5} dot={false} activeDot={{ r: 4, strokeWidth: 0, fill: metric.color }} isAnimationActive={false} connectNulls />
               {activeMetric === 'bloodPressureLog' && (
-                <Line type="monotone" dataKey="dia" stroke={metric.color} strokeOpacity={0.5} strokeWidth={1.5} strokeDasharray="4 3" dot={false} isAnimationActive={false} connectNulls />
+                // tooltipType="none": garis diastol tetap digambar, tapi TIDAK ikut jadi baris
+                // sendiri di tooltip. Tanpa ini tooltip memuat dua baris berlabel sama persis
+                // ("Tensi : 89,5" lalu "Tensi : 133,5/89,5") — sistol dan diastol sudah digabung
+                // dalam satu baris oleh formatter di atas.
+                <Line type="monotone" dataKey="dia" tooltipType="none" stroke={metric.color} strokeOpacity={0.5} strokeWidth={1.5} strokeDasharray="4 3" dot={false} isAnimationActive={false} connectNulls />
               )}
             </LineChart>
           </div>

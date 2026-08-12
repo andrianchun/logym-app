@@ -1128,26 +1128,25 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                  </div>
 
                  <div className="px-1 space-y-5">
-                 {/* ROW 4: Tekanan Darah, Detak Jantung, SpO2 (Dua kolom) */}
-                 <div className={`grid grid-cols-2 gap-x-5 gap-y-5 pt-4 border-t border-dashed ${t.borderDashed}`}>
+                 {/* ROW 4: Tensi, Nadi, SpO2 — satu baris tiga kolom. Sebelumnya dua kolom
+                     sehingga SpO2 turun ke baris kedua sendirian dan menyisakan ruang kosong. */}
+                 <div className={`grid grid-cols-3 gap-x-3 pt-4 border-t border-dashed ${t.borderDashed}`}>
                      {/* Tekanan Darah */}
                      <div className="flex flex-col h-full">
                          <div className="flex items-center space-x-1 mb-1 text-blue-400"><Activity size={12}/> <span className={`text-[10px] ${t.textMuted}`}>Tensi</span></div>
                          <span className={`text-lg font-black ${t.textMain} leading-none`}>{bioData.bloodPressure || '-'}</span>
                      </div>
-                     
+
                      {/* Detak Jantung */}
-                     <div className="flex flex-col h-full text-right items-end">
-                         <div className="flex items-center justify-end space-x-1.5 mb-1 text-blue-400"><span className={`text-[10px] ${t.textMuted}`}>Nadi</span> <HeartPulse size={12}/></div>
-                         <div className="flex flex-col items-end">
-                             <span className={`text-lg font-black ${t.textMain} leading-none`}>{bioData.heartRate > 0 ? <>{formatNumber(bioData.heartRate, language)} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">bpm</span></> : '-'}</span>
-                             <span className="text-[8px] text-zinc-500 dark:text-zinc-400 whitespace-nowrap mt-0.5">Min {bioData.minHeartRate > 0 ? formatNumber(bioData.minHeartRate, language) : '-'} &bull; Max {bioData.maxHeartRate > 0 ? formatNumber(bioData.maxHeartRate, language) : '-'}</span>
-                         </div>
+                     <div className="flex flex-col h-full items-center text-center">
+                         <div className="flex items-center space-x-1 mb-1 text-blue-400"><HeartPulse size={12}/> <span className={`text-[10px] ${t.textMuted}`}>Nadi</span></div>
+                         <span className={`text-lg font-black ${t.textMain} leading-none`}>{bioData.heartRate > 0 ? <>{formatNumber(bioData.heartRate, language)} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">bpm</span></> : '-'}</span>
+                         <span className="text-[8px] text-zinc-500 dark:text-zinc-400 whitespace-nowrap mt-0.5">Min {bioData.minHeartRate > 0 ? formatNumber(bioData.minHeartRate, language) : '-'} &bull; Max {bioData.maxHeartRate > 0 ? formatNumber(bioData.maxHeartRate, language) : '-'}</span>
                      </div>
-                     
+
                      {/* SpO2 */}
-                     <div className="flex flex-col h-full">
-                         <div className="flex items-center space-x-1 mb-1 text-blue-400"><Wind size={12}/> <span className={`text-[10px] ${t.textMuted}`}>SpO2</span></div>
+                     <div className="flex flex-col h-full items-end text-right">
+                         <div className="flex items-center space-x-1 mb-1 text-blue-400"><span className={`text-[10px] ${t.textMuted}`}>SpO2</span> <Wind size={12}/></div>
                          <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.oxygenSaturation, language) || '-'} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span>
                      </div>
                  </div>
