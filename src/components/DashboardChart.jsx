@@ -128,40 +128,25 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
   useEffect(() => { pointWidthRef.current = pointWidth; }, [pointWidth]);
   const rafRef = useRef(null);
 
-  const updateYDomains = useCallback(() => {
-      if (!scrollRef.current || multiChartData.length === 0) return;
-      const { scrollLeft, clientWidth } = scrollRef.current;
-      const pw = pointWidthRef.current;
-      
-      const startIndex = Math.max(0, Math.floor(scrollLeft / pw));
-      const endIndex = Math.min(multiChartData.length - 1, Math.ceil((scrollLeft + clientWidth) / pw));
-      
-      const visibleData = multiChartData.slice(startIndex, endIndex + 1);
+  useEffect(() => {
+      if (multiChartData.length === 0) return;
       
       const newDomains = {};
       activeChartMetrics.forEach(metric => {
           let min = Infinity;
           let max = -Infinity;
 
-          const findMinMax = (dataList) => {
-              dataList.forEach(d => {
-                  let val = d[metric];
-                  if (val !== undefined && val !== null) {
-                      val = Number(val);
-                      if (!isNaN(val)) {
-                          if (val < min) min = val;
-                          if (val > max) max = val;
-                      }
+          multiChartData.forEach(d => {
+              let val = d[metric];
+              if (val !== undefined && val !== null) {
+                  val = Number(val);
+                  if (!isNaN(val)) {
+                      if (val < min) min = val;
+                      if (val > max) max = val;
                   }
-              });
-          };
-
-          findMinMax(visibleData);
+              }
+          });
           
-          if (min === Infinity || max === -Infinity) {
-              findMinMax(multiChartData);
-          }
-
           if (min !== Infinity && max !== -Infinity) {
               const diff = max - min;
               if (diff === 0) {
@@ -184,22 +169,18 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
                   break;
               }
           }
-          return changed ? newDomains : prev;
+          if (changed) return newDomains;
+          return prev;
       });
   }, [multiChartData, activeChartMetrics]);
 
   const handleScroll = () => {
       if (!rafRef.current) {
           rafRef.current = requestAnimationFrame(() => {
-              updateYDomains();
               rafRef.current = null;
           });
       }
   };
-
-  useEffect(() => {
-      updateYDomains();
-  }, [updateYDomains, pointWidth]);
 
   const handleTouchStart = (e) => {
       if (e.touches.length === 2) {

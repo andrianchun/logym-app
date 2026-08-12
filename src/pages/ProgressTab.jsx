@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { TrendingUp } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
-import { getLocalYMD, formatTarget, normalizeMuscleKey, resolveLoggedExercise } from '../data/constants';
+import { getLocalYMD, formatTarget, normalizeMuscleKey, resolveLoggedExercise, resolveProjectedProgramId } from '../data/constants';
 
-const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibrary, soundEnabled, playSoundEffect, selectedDate, units, activePlanIds, isSubCard = false }) => {
+const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibrary, soundEnabled, playSoundEffect, selectedDate, units, activePlanIds, isSubCard = false, expandedSessions = {} }) => {
   const [chartType, setChartType] = useState(() => {
       try {
           const saved = localStorage.getItem('lyfit_prog_chart_type');
@@ -269,16 +269,28 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
      }
   }, [chartDataObj, selectedDate, activeChartLines]);
 
+  const prevExpandedRef = useRef(expandedSessions);
+  const prevChartTypeRef = useRef(chartType);
+  const prevPlanIdsRef = useRef(activePlanIds);
+
   useEffect(() => {
     if (isSubCard) return;
 
+    const expandedChanged = prevExpandedRef.current !== expandedSessions;
+    const chartTypeChanged = prevChartTypeRef.current !== chartType;
+    const planIdsChanged = prevPlanIdsRef.current !== activePlanIds;
+    
+    prevExpandedRef.current = expandedSessions;
+    prevChartTypeRef.current = chartType;
+    prevPlanIdsRef.current = activePlanIds;
+
     // Kalau pilihan yang ada sekarang (dari localStorage atau klik manual user) masih relevan
-    // buat chartType saat ini, JANGAN ditimpa — sebelumnya efek ini rerun tiap history/programs
+    // buat chartType saat ini, JANGAN ditimpa ?" sebelumnya efek ini rerun tiap history/programs
     // berubah dan selalu reset balik ke "latihan aktif hari ini", jadi toggle user kerasa
     // "kacau" ke-reset terus. Auto-pilih default cuma kalau selection kosong atau sudah gak
     // nyambung sama sekali (misal abis ganti tab Per Latihan/Per Otot).
     const stillRelevant = activeChartLines.length > 0 && activeChartLines.some(item => chartDataObj.items.includes(item));
-    if (stillRelevant) return;
+    if (stillRelevant && !expandedChanged && !chartTypeChanged && !planIdsChanged) return;
 
     let activeItems = [];
     const todayStr = selectedDate || getLocalYMD(new Date());
@@ -286,7 +298,16 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
     // Priority 1: Look at today's actual workouts in history, 
     // including overriddenExercises (alternative exercise swaps)
     const todayWorkouts = history[todayStr]?.workouts || [];
+    const activeExpandedId = expandedSessions ? Object.keys(expandedSessions).find(k => expandedSessions[k]) : null;
+    
     const relevantTodayWorkouts = todayWorkouts.filter(w => {
+      if (activeExpandedId) {
+         if (activeExpandedId === 'extra') {
+            if (w.programId !== 'adhoc') return false;
+         } else {
+            if (w.id !== activeExpandedId) return false;
+         }
+      }
       if (!activePlanIds || activePlanIds.length === 0) return true;
       const prog = programs.find(p => p.id === w.programId);
       const wPlanId = (prog ? prog.planId : null) || 'custom';
@@ -317,7 +338,12 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
       });
     } else if (activePlanIds && activePlanIds.length > 0) {
       // Fallback: use exercises from active plan programs
-      const activeProgs = programs.filter(p => activePlanIds.includes(p.planId || 'custom'));
+        let activeProgs = programs.filter(p => activePlanIds.includes(p.planId || 'custom'));
+        if (activeExpandedId && activeExpandedId !== 'extra') {
+           const targetProgId = resolveProjectedProgramId(activeExpandedId);
+           activeProgs = activeProgs.filter(p => p.id === targetProgId);
+        }
+      
       activeProgs.forEach(prog => {
         prog.exercises?.forEach(ex => {
           if (chartType === 'exercise') {
@@ -340,16 +366,13 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
     // Ensure uniqueness
     activeItems = [...new Set(activeItems)];
     
-    // Filter to only include items that actually exist in chartDataObj.items
-    const validActiveItems = activeItems.filter(item => chartDataObj.items.includes(item));
-
-    if (validActiveItems.length > 0) {
-        setActiveChartLines(validActiveItems.slice(0, 6));
+    if (activeItems.length > 0) {
+        setActiveChartLines(activeItems.slice(0, 6));
     } else {
         // Fallback to top 6 most frequent/recent items
         setActiveChartLines(chartDataObj.items.slice(0, 6)); 
     }
-  }, [chartType, chartDataObj, activePlanIds, programs, exerciseLibrary, history, selectedDate, lang.progress]);
+  }, [chartType, chartDataObj, activePlanIds, programs, exerciseLibrary, history, selectedDate, lang.progress, expandedSessions]);
 
   // Pinch-to-zoom logic
   const [pointWidth, setPointWidth] = useState(() => {
@@ -368,19 +391,16 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
   useEffect(() => { pointWidthRef.current = pointWidth; }, [pointWidth]);
   const rafRef = useRef(null);
 
-  const updateYDomain = useCallback(() => {
-      if (!scrollRef.current || chartDataObj.data.length === 0) return;
-      const { scrollLeft, clientWidth } = scrollRef.current;
-      const pw = pointWidthRef.current;
-      
-      const startIndex = Math.max(0, Math.floor(scrollLeft / pw));
-      const endIndex = Math.min(chartDataObj.data.length - 1, Math.ceil((scrollLeft + clientWidth) / pw));
-      
-      const visibleData = chartDataObj.data.slice(startIndex, endIndex + 1);
+  const allDisplayItems = useMemo(() => {
+     return [...new Set([...activeChartLines, ...chartDataObj.items])];
+  }, [activeChartLines, chartDataObj.items]);
+
+  useEffect(() => {
+      if (chartDataObj.data.length === 0) return;
       
       let min = Infinity;
       let max = -Infinity;
-      visibleData.forEach(d => {
+      chartDataObj.data.forEach(d => {
           activeChartLines.forEach(key => {
               let val = d[key];
               if (val !== undefined && val !== null) {
@@ -408,7 +428,6 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
   const handleScroll = () => {
       if (!rafRef.current) {
           rafRef.current = requestAnimationFrame(() => {
-              updateYDomain();
               if (scrollRef.current) {
                   localStorage.setItem('lyfit_prog_scrollLeft', scrollRef.current.scrollLeft);
               }
@@ -416,10 +435,6 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
           });
       }
   };
-
-  useEffect(() => {
-      updateYDomain();
-  }, [updateYDomain, pointWidth]);
 
   // Agar zoom tetap mulus walau jumlah data sedikit
   const calculateChartWidth = (pw) => {
@@ -522,7 +537,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
               <div className={`w-12 shrink-0 pointer-events-none flex items-center border-r border-slate-500/10 z-10 bg-transparent py-3`}>
                     <LineChart width={48} height={isSubCard ? 250 : 288} data={chartDataObj.data} margin={{ top: 5, right: 0, left: 4, bottom: 5 }}>
                        <YAxis stroke={theme === 'dark' ? '#a1a1aa' : '#64748b'} fontSize={10} tickLine={false} axisLine={false} width={40} domain={yDomain} allowDataOverflow={true} tickFormatter={(v) => v > 999 ? (v/1000).toFixed(1)+'k' : v} />
-                       {chartDataObj.items.map((item, idx) => ( activeChartLines.includes(item) && <Line key={item} type="monotone" dataKey={item} stroke="transparent" dot={false} activeDot={false} isAnimationActive={false} /> ))}
+                       {allDisplayItems.map((item, idx) => ( activeChartLines.includes(item) && <Line key={item} type="monotone" dataKey={item} stroke="transparent" dot={false} activeDot={false} isAnimationActive={false} /> ))}
                     </LineChart>
               </div>
           )}
@@ -577,7 +592,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                   />
                   <XAxis dataKey="date" stroke={theme === 'dark' ? '#a1a1aa' : '#64748b'} fontSize={10} tickLine={false} axisLine={false} padding={{ left: 20, right: 20 }} interval={Math.max(0, Math.ceil(50 / pointWidth) - 1)} />
                   <YAxis hide={true} domain={yDomain} allowDataOverflow={true} />
-                  {chartDataObj.items.map((item, idx) => ( activeChartLines.includes(item) && <Line key={item} type="monotone" name={chartType === 'muscle' ? formatTarget(item, lang?.id) : item} dataKey={item} stroke={chartColors[idx % chartColors.length]} strokeWidth={1.5} dot={false} activeDot={{ r: 5, strokeWidth: 0, fill: chartColors[idx % chartColors.length] }} connectNulls={true} isAnimationActive={false} /> ))}
+                  {allDisplayItems.map((item, idx) => ( activeChartLines.includes(item) && <Line key={item} type="monotone" name={chartType === 'muscle' ? formatTarget(item, lang?.id) : item} dataKey={item} stroke={chartColors[idx % chartColors.length]} strokeWidth={1.5} dot={false} activeDot={{ r: 5, strokeWidth: 0, fill: chartColors[idx % chartColors.length] }} connectNulls={true} isAnimationActive={false} /> ))}
                 </LineChart>
                </div>
             ) : ( 
@@ -590,9 +605,9 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
 
         {isSubCard ? (
              <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 mt-0 mb-0">
-                 {chartDataObj.items.filter(item => activeChartLines.includes(item)).map((item, idx) => (
+                 {allDisplayItems.filter(item => activeChartLines.includes(item)).map((item, idx) => (
                      <div key={item} className="flex items-center space-x-1.5">
-                         <div className="w-2.5 h-2.5 rounded-[3px]" style={{ backgroundColor: chartColors[chartDataObj.items.indexOf(item) % chartColors.length] }}></div>
+                         <div className="w-2.5 h-2.5 rounded-[3px]" style={{ backgroundColor: chartColors[allDisplayItems.indexOf(item) % chartColors.length] }}></div>
                          <span className="text-[9px] font-bold text-white/70 uppercase tracking-widest">{chartType === 'muscle' ? formatTarget(item, lang?.id) : item}</span>
                      </div>
                  ))}
@@ -610,10 +625,10 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                   (yang belum aktif) tetap di urutan asli chartDataObj.items. Warna tetap dikunci
                   ke index asli biar konsisten sama warna garis di grafik. */}
               {[
-                ...activeChartLines.filter(item => chartDataObj.items.includes(item)),
-                ...chartDataObj.items.filter(item => !activeChartLines.includes(item))
+                ...activeChartLines.filter(item => allDisplayItems.includes(item)),
+                ...allDisplayItems.filter(item => !activeChartLines.includes(item))
               ].map((item) => {
-                 const idx = chartDataObj.items.indexOf(item);
+                 const idx = allDisplayItems.indexOf(item);
                  const isActive = activeChartLines.includes(item);
                  return (
                    <button key={item} onClick={() => toggleChartLine(item)} className="px-3 py-1.5 rounded-full caption font-black transition-all border active:scale-95 whitespace-nowrap snap-start flex items-center justify-center h-8" style={{ backgroundColor: isActive ? chartColors[idx % chartColors.length] : 'transparent', borderColor: chartColors[idx % chartColors.length], color: isActive ? '#fff' : chartColors[idx % chartColors.length], opacity: isActive ? 1 : 0.5 }}>

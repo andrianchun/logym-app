@@ -3,6 +3,7 @@ import { X, Moon, Sun, Globe, Volume2, VolumeX, Timer, Download, DownloadCloud, 
 import SwipeInput from '../components/SwipeInput';
 import { AI_MODELS, PERSONA_PRESETS } from '../utils/aiAgent';
 import { FAQ_ITEMS } from '../utils/faqData';
+import BleDeviceCard from '../components/BleDeviceCard';
 import BugReportModal from './BugReportModal';
 import AdminDashboardModal from './AdminDashboardModal';
 
@@ -23,10 +24,14 @@ export default function SettingsModal({
   biometricStandard, setBiometricStandard,
   units, setUnits,
   userApiKeys, setUserApiKeys,
+  keyStatuses,
+  userProfile,
   logiPersona, setLogiPersona, logiCustomInstruction, setLogiCustomInstruction,
   logiMemory, setLogiMemory,
   otaAvailable, otaState, currentVer, onUpdateApp, downloadProgress,
   healthConnectEnabled, onToggleHealthConnect, healthAvailable, onHcBackfill,
+  setHistory,
+  bleManager
 }) {
   const [hcBackfilling, setHcBackfilling] = useState(false);
   const [hcConnecting, setHcConnecting] = useState(false);
@@ -341,13 +346,13 @@ export default function SettingsModal({
                     {hcBackfilling ? 'Menyinkronkan...' : 'Sinkron Ulang'}
                   </button>
                   <p className={`text-[10px] ${t.textMuted} leading-tight`}>
-                    Menyegarkan 30 hari terakhir, lalu mengisi hari kosong sampai 1 tahun ke belakang.
-                    Yang lampau cuma DIISI kalau kosong — angka yang sudah ada tidak pernah diubah,
-                    jadi aman ditekan berkali-kali. Jalan sendiri juga sekali sehari.
                   </p>
                 </>
               )}
             </div>
+
+            {/* ALAT BLUETOOTH — menyembunyikan diri sendiri kalau BLE tidak tersedia (web) */}
+            <BleDeviceCard t={t} bleManager={bleManager} />
 
             {/* API UNTUK AI */}
             <div id="ai-agent-settings" className={`p-4 rounded-2xl border ${t.border} ${t.bgCard} space-y-3`}>

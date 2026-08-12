@@ -48,13 +48,13 @@ const WorkoutTab = ({
 
   sessionToRun, setSessionToRun, onSessionExercises,
   resumeDurationSecs, setResumeDurationSecs,
-  units, userProfile, activePlanIds = [], showSupersetToast, tabSlideDir = 'right'
+  units, userProfile, activePlanIds = [], showSupersetToast, tabSlideDir = 'right',
+  expandedSessions, setExpandedSessions
 }) => {
   
   const [detailExercise, setDetailExercise] = useState(null);
   const [showAlternativeModal, setShowAlternativeModal] = useState(false);
   const [showProgramSelect, setShowProgramSelect] = useState(false);
-  const [expandedSessions, setExpandedSessions] = useState({});
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebrationSession, setCelebrationSession] = useState(null);
   const isDark = t?.bgCard !== 'bg-white';
@@ -173,7 +173,7 @@ const WorkoutTab = ({
     onSessionExercises?.(sessionExercises);
   }, [sessionExerciseIds, onSessionExercises]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const hasAutoExpanded = React.useRef(false);
+  const hasAutoExpanded = React.useRef(expandedSessions && Object.keys(expandedSessions || {}).length > 0);
 
   const [scrolledTargets, setScrolledTargets] = React.useState({});
 
@@ -261,15 +261,15 @@ const WorkoutTab = ({
       }, 150);
       setScrolledTargets(prev => ({ ...prev, [focusWorkoutId]: true }));
       hasAutoExpanded.current = true;
-    } else if (activeProgramsList.length > 0 && Object.keys(expandedSessions).length === 0 && !hasAutoExpanded.current) {
+    } else if (activeProgramsList.length > 0 && Object.keys(expandedSessions || {}).length === 0 && !hasAutoExpanded.current) {
       setExpandedSessions({ [activeProgramsList[0].workoutId]: true });
       hasAutoExpanded.current = true;
     }
   }, [activeProgramsList, expandedSessions, focusWorkoutId, scrolledTargets, exerciseLogs, extraExercises, skippedExercises]);
 
   const toggleSession = (id) => {
-    const isNowExpanded = !expandedSessions[id];
-    setExpandedSessions(prev => prev[id] ? {} : { [id]: true });
+    const isNowExpanded = !(expandedSessions || {})[id];
+    setExpandedSessions(prev => (prev || {})[id] ? {} : { [id]: true });
     if (isNowExpanded) {
       setTimeout(() => {
         const el = document.getElementById(`session-${id}`);
@@ -703,7 +703,7 @@ const WorkoutTab = ({
   // Dipakai untuk kasih jarak ekstra di bawah supaya "Tambah Latihan Ekstra"/"Pendinginan"
   // tidak ketutup tombol floating "Mulai Sesi Latihan" saat sebuah sesi sedang diexpand.
   const hasExpandedSessionWithExercises = (() => {
-    const activeExpandedId = Object.keys(expandedSessions).find(k => expandedSessions[k]);
+    const activeExpandedId = Object.keys(expandedSessions || {}).find(k => (expandedSessions || {})[k]);
     if (!activeExpandedId) return false;
     if (activeExpandedId === 'extra') return extraExercises.length > 0;
     const sessionData = activeProgramsList.find(p => p.workoutId === activeExpandedId);
@@ -728,7 +728,7 @@ const WorkoutTab = ({
 
   // Tentukan program mana yang menjadi acuan background
   let bgSourceProgram = activeProgram;
-  const activeExpandedId = Object.keys(expandedSessions).find(k => expandedSessions[k]);
+  const activeExpandedId = Object.keys(expandedSessions || {}).find(k => (expandedSessions || {})[k]);
   
   if (activeExpandedId === 'extra') {
     bgSourceProgram = { planId: 'custom', name: 'Latihan Ekstra' };
@@ -872,7 +872,7 @@ const WorkoutTab = ({
             <div className="space-y-4 mt-4">
               {/* LATIHAN DARI PROGRAM ASLI */}
               {activeProgramsList.map((prog, pIdx) => {
-                const isExpanded = !!expandedSessions[prog.workoutId];
+                const isExpanded = !!(expandedSessions || {})[prog.workoutId];
                 return (
                   <div id={`session-${prog.workoutId}`} key={prog.workoutId} className={`mb-6 rounded-[2rem] border ${prog.status === 'completed' ? 'border-emerald-500/30' : 'border-white/20 dark:border-white/10'} bg-white/60 dark:bg-black/50 backdrop-blur-xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.4)] overflow-hidden transition-all`}>
                     <div
@@ -981,10 +981,10 @@ const WorkoutTab = ({
                     className={`w-full p-5 sm:p-6 flex items-center justify-between font-black text-left transition-colors`}
                   >
                     <span className="text-xl sm:text-2xl uppercase tracking-widest">Ekstra</span>
-                    <div className="flex items-center gap-1 text-sm opacity-60 font-bold bg-black/10 dark:bg-white/10 px-3 py-1.5 rounded-full"><span>{extraExercises.length} Latihan</span>{expandedSessions['extra'] ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}</div>
+                    <div className="flex items-center gap-1 text-sm opacity-60 font-bold bg-black/10 dark:bg-white/10 px-3 py-1.5 rounded-full"><span>{extraExercises.length} Latihan</span>{(expandedSessions || {})['extra'] ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}</div>
                   </button>
                   
-                  {expandedSessions['extra'] && (
+                  {(expandedSessions || {})['extra'] && (
                     <div className="p-2 sm:p-6 pt-0 space-y-4 sm:space-y-0 sm:flex sm:flex-row sm:overflow-x-auto sm:snap-x sm:gap-6 hide-scrollbar animate-in slide-in-from-top-2 fade-in duration-200">
                         {groupExercises(extraExercises).map((group, gIdx) => {
                           return (
@@ -1088,7 +1088,7 @@ const WorkoutTab = ({
 
       {/* FLOATING START WORKOUT BUTTON */}
       {(() => {
-        const activeExpandedId = Object.keys(expandedSessions).find(k => expandedSessions[k]);
+        const activeExpandedId = Object.keys(expandedSessions || {}).find(k => (expandedSessions || {})[k]);
         if (!activeExpandedId || isImmersiveMode || isWorkoutActive) return null;
         
         let sessionData = null;

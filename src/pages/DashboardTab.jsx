@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Activity, Zap, Brain, Footprints, HeartPulse, Moon, Droplets, Droplet, Dumbbell, Scale, RefreshCw, Trophy, Link2, Pencil, Settings, Info, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Wind, Utensils, Flame, Clock, Cloud, CloudOff } from 'lucide-react';
+import { Activity, Zap, Brain, Footprints, HeartPulse, Moon, Droplets, Droplet, Dumbbell, Scale, RefreshCw, Trophy, Link2, Pencil, Settings, Info, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Wind, Utensils, Flame, Clock, Cloud, CloudOff, Bluetooth } from 'lucide-react';
 import { getLocalYMD, hasDeletedProjected, isLomealOwned } from '../data/constants';
 import { calculateReadiness, restingHrBaseline } from '../utils/readinessEngine';
 import DashboardModals from '../components/DashboardModals';
@@ -13,7 +13,7 @@ import SwipeInput from '../components/SwipeInput';
 import { formatNumber, sleepHoursToParts } from '../utils/numberFormat';
 import { dailyBurnCalories, dailyActiveMinutes } from '../utils/workoutCalc';
 import { calcBMR } from '../utils/bmr';
-import { AreaChart, Area, ResponsiveContainer, YAxis } from 'recharts';
+import { AreaChart, Area, ResponsiveContainer, YAxis, XAxis, ReferenceArea } from 'recharts';
 
 
 const MetricBox = ({ label, value, unit, icon, color, t, theme }) => (
@@ -96,7 +96,7 @@ const MiniBox = ({ label, value, unit, t, theme }) => (
     </div>
 );
 
-const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, exerciseLibrary, navigateToWorkoutDate, soundEnabled, playSoundEffect, theme, selectedDate, biometricStandard, units, setConfirmModal, activityTargets, setActivityTargets, gymProfiles, activeGymId, activePlanIds, userApiKeys, userAchievements, connectedApps, userProfile, keyStatuses, setKeyStatuses, setShowSettings, lomealToday, lomealTargets, syncStatus }) => {
+const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, exerciseLibrary, navigateToWorkoutDate, soundEnabled, playSoundEffect, theme, selectedDate, biometricStandard, units, setConfirmModal, activityTargets, setActivityTargets, gymProfiles, activeGymId, activePlanIds, userApiKeys, userAchievements, connectedApps, userProfile, keyStatuses, setKeyStatuses, setShowSettings, lomealToday, lomealTargets, syncStatus, isBleBusy, expandedSessions }) => {
   const todayStr = getLocalYMD(new Date());
   const activeDate = todayStr;
 
@@ -779,56 +779,6 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          }
      }));
   }, [activityTargets?.nutritionGoal, activityTargets?.calorieDelta, activityTargets?.tdee, activeDate, todayStr]);
-  const [sleepPointWidth, setSleepPointWidth] = useState(40);
-  const sleepScrollRef = useRef(null);
-  const sleepTouchState = useRef({ initialDist: 0, initialPointWidth: 40, pinchRatio: 0, scrollRelCenterX: 0 });
-  const sleepScrollTarget = useRef(null);
-
-  const handleSleepTouchStart = (e) => {
-      e.stopPropagation();
-      if (e.touches.length === 2 && sleepScrollRef.current) {
-          const dist = Math.hypot(
-              e.touches[0].clientX - e.touches[1].clientX,
-              e.touches[0].clientY - e.touches[1].clientY
-          );
-          const pinchCenterX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-          const rect = sleepScrollRef.current.getBoundingClientRect();
-          const scrollRelCenterX = pinchCenterX - rect.left;
-          const currentScrollLeft = sleepScrollRef.current.scrollLeft;
-          const currentSleepBio = history[activeDate]?.bioData || {};
-          const sleepDataLength = (currentSleepBio.sleepLog && Array.isArray(currentSleepBio.sleepLog)) ? currentSleepBio.sleepLog.length : 0;
-          const currentChartWidth = Math.max(sleepDataLength * sleepPointWidth, window.innerWidth - 64);
-          const pinchRatio = (scrollRelCenterX + currentScrollLeft) / currentChartWidth;
-          sleepTouchState.current = { initialDist: dist, initialPointWidth: sleepPointWidth, pinchRatio, scrollRelCenterX };
-      }
-  };
-
-  const handleSleepTouchMove = (e) => {
-      e.stopPropagation();
-      if (e.touches.length === 2 && sleepScrollRef.current) {
-          const dist = Math.hypot(
-              e.touches[0].clientX - e.touches[1].clientX,
-              e.touches[0].clientY - e.touches[1].clientY
-          );
-          const scale = dist / sleepTouchState.current.initialDist;
-          let newWidth = sleepTouchState.current.initialPointWidth * scale;
-          if (newWidth < 15) newWidth = 15;
-          if (newWidth > 200) newWidth = 200;
-          setSleepPointWidth(newWidth);
-          const currentSleepBio = history[activeDate]?.bioData || {};
-          const sleepDataLength = (currentSleepBio.sleepLog && Array.isArray(currentSleepBio.sleepLog)) ? currentSleepBio.sleepLog.length : 0;
-          const nextChartWidth = Math.max(sleepDataLength * newWidth, window.innerWidth - 64);
-          const newPinchAbsX = sleepTouchState.current.pinchRatio * nextChartWidth;
-          sleepScrollTarget.current = newPinchAbsX - sleepTouchState.current.scrollRelCenterX;
-      }
-  };
-
-  useEffect(() => {
-     if (sleepScrollTarget.current !== null && sleepScrollRef.current) {
-         sleepScrollRef.current.scrollLeft = sleepScrollTarget.current;
-         sleepScrollTarget.current = null;
-     }
-  }, [sleepPointWidth]);
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300 pb-6 overflow-x-hidden">
@@ -904,7 +854,10 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
           <div id="komposisi-accordion" className={`p-4 relative z-20 flex flex-col justify-between`}>
            <div className="flex justify-between items-center mb-5 relative z-10">
                <div>
-                   <h3 className={`h3 ${t.textMain}`}>Komposisi Tubuh</h3>
+                   <h3 className={`h3 ${t.textMain} flex items-center`}>
+                     Komposisi Tubuh
+                     {isBleBusy && <Bluetooth className="w-4 h-4 text-blue-500 animate-pulse ml-2" />}
+                   </h3>
                    {bioDataDate && (
                        <p className={`caption ${t.textMuted} mt-0.5`} style={{fontSize: '0.65rem'}}>{bioDataDate === activeDate ? 'Hari ini: ' : 'Data dari: '}{new Date(bioDataDate).toLocaleDateString(language==='ID'?'id-ID':'en-US', { day: 'numeric', month: 'short' })}</p>
                    )}
@@ -1043,7 +996,10 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          <div id="aktivitas-accordion" className={`p-4 relative z-20 flex flex-col h-full justify-between`}>
              <div className="flex justify-between items-center shrink-0">
                  <div>
-                     <h3 className={`h3 ${t.textMain}`}>Aktivitas Harian</h3>
+                     <h3 className={`h3 ${t.textMain} flex items-center`}>
+                       Aktivitas Harian
+                       {isBleBusy && <Bluetooth className="w-4 h-4 text-blue-500 animate-pulse ml-2" />}
+                     </h3>
                      <p className={`caption ${t.textMuted} mt-0.5`} style={{fontSize: '0.65rem'}}>Hari ini: {new Date(activeDate).toLocaleDateString(language==='ID'?'id-ID':'en-US', { day: 'numeric', month: 'short' })}</p>
                  </div>
                  <div className="flex space-x-2">
@@ -1255,6 +1211,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                   isSubCard={false}
                   activePlanIds={activePlanIds}
                   units={units}
+                  expandedSessions={expandedSessions}
                 />
              </div>
             <button
@@ -1639,76 +1596,128 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                                 <div className="mt-2">
                                     {true ? (
                                         <>
-                                            <div className="relative h-32 flex flex-col justify-between mb-2">
-                                                <div className="absolute left-0 top-0 bottom-0 w-12 flex flex-col justify-between text-[9px] font-bold text-zinc-400 py-1 z-10">
+                                            <div className="relative h-52 flex flex-col justify-between mt-4 mb-4">
+                                                <div className="absolute left-0 top-1 bottom-10 w-12 flex flex-col justify-between text-[9px] font-bold text-zinc-400 py-1 z-10 pointer-events-none">
                                                     <span>Awake</span>
                                                     <span>REM</span>
                                                     <span>Light</span>
                                                     <span>Deep</span>
                                                 </div>
-                                                <div className="absolute left-12 right-0 top-0 bottom-0 flex flex-col justify-between pointer-events-none">
-                                                    <div className={`h-px w-full ${t.borderDashed} border-b`}></div>
-                                                    <div className={`h-px w-full ${t.borderDashed} border-b`}></div>
-                                                    <div className={`h-px w-full ${t.borderDashed} border-b`}></div>
-                                                    <div className={`h-px w-full ${t.borderDashed} border-b`}></div>
-                                                </div>
-                                                <div 
-                                                    className="absolute left-12 right-0 top-0 bottom-0 overflow-x-auto scrollbar-hide touch-pan-x no-swipe"
-                                                    ref={sleepScrollRef}
-                                                    onTouchStartCapture={handleSleepTouchStart}
-                                                    onTouchMoveCapture={handleSleepTouchMove}
-                                                    style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}
-                                                >
-                                                    {(() => {
-                                                        const sleepData = (sleepBio.sleepLog && Array.isArray(sleepBio.sleepLog) && sleepBio.sleepLog.length > 1) 
-                                                            ? sleepBio.sleepLog 
-                                                            : null;
-                                                        
-                                                        if (!sleepData) {
-                                                            return (
-                                                                <div className="w-full h-full flex flex-col items-center justify-center text-center">
-                                                                    <span className={`text-xs font-bold ${t.textMuted}`}>Tidak Cukup Data Tahap Tidur</span>
-                                                                    <span className={`text-[9px] mt-1 opacity-70 ${t.textMuted}`}>Sinkronkan dengan Health Connect untuk melihat grafik.</span>
-                                                                </div>
-                                                            );
-                                                        }
-                                                        
-                                                        const currentChartWidth = Math.max(sleepData.length * sleepPointWidth, window.innerWidth - 64);
-                                                        return (
-                                                          <div style={{ width: `${currentChartWidth}px`, height: '100%', paddingRight: '20px' }}>
-                                                            <ResponsiveContainer width="100%" height="100%">
-                                                                <AreaChart data={sleepData} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
-                                                                    <defs>
-                                                                        <linearGradient id="colorSleepStroke" x1="0" y1="0" x2="0" y2="1">
-                                                                            <stop offset="0%" stopColor="#a1a1aa" />
-                                                                            <stop offset="33%" stopColor="#38bdf8" />
-                                                                            <stop offset="66%" stopColor="#818cf8" />
-                                                                            <stop offset="100%" stopColor="#7c3aed" />
-                                                                        </linearGradient>
-                                                                        <linearGradient id="colorSleepFill" x1="0" y1="0" x2="0" y2="1">
-                                                                            <stop offset="0%" stopColor="#a1a1aa" stopOpacity={0.5}/>
-                                                                            <stop offset="33%" stopColor="#38bdf8" stopOpacity={0.5}/>
-                                                                            <stop offset="66%" stopColor="#818cf8" stopOpacity={0.5}/>
-                                                                            <stop offset="100%" stopColor="#7c3aed" stopOpacity={0.1}/>
-                                                                        </linearGradient>
-                                                                    </defs>
-                                                                    <YAxis domain={[0, 3]} hide />
-                                                                    <Area 
-                                                                        type="stepAfter" 
-                                                                        dataKey="stage" 
-                                                                        stroke="url(#colorSleepStroke)" 
-                                                                        strokeWidth={1.5}
-                                                                        strokeLinejoin="round"
-                                                                        fillOpacity={1} 
-                                                                        fill="url(#colorSleepFill)" 
-                                                                        isAnimationActive={false}
-                                                                        dot={false}
-                                                                    />
-                                                                </AreaChart>
-                                                            </ResponsiveContainer>
-                                                          </div>
-                                                        );
-                                                    })()}
+                                                <div className="flex-1 relative pl-10">
+                                                  {(() => {
+                                                      const sleepData = (sleepBio.sleepLog && Array.isArray(sleepBio.sleepLog) && sleepBio.sleepLog.length > 1) 
+                                                          ? sleepBio.sleepLog 
+                                                          : null;
+                                                      
+                                                      let processedSleepData = [];
+                                                      if (sleepData) {
+                                                          let prevMinutesRaw = null;
+                                                          let prevAbsoluteMinutes = null;
+                                                          let midnightOffset = 0;
+                                                          for (let i = 0; i < sleepData.length; i++) {
+                                                              const item = sleepData[i];
+                                                              const parts = (item.time || '').split(':');
+                                                              if (parts.length < 2) continue;
+                                                              const h = parseInt(parts[0], 10);
+                                                              const m = parseInt(parts[1], 10);
+                                                              if (isNaN(h) || isNaN(m)) continue;
+                                                              
+                                                              let currentMinutes = h * 60 + m;
+                                                              if (prevMinutesRaw !== null && currentMinutes < prevMinutesRaw - 12 * 60) {
+                                                                  midnightOffset += 24 * 60;
+                                                              }
+                                                              const absoluteMinutes = currentMinutes + midnightOffset;
+                                                              
+                                                              if (prevAbsoluteMinutes !== null && absoluteMinutes > prevAbsoluteMinutes) {
+                                                                  let gap = absoluteMinutes - prevAbsoluteMinutes;
+                                                                  if (gap > 1440) gap = 1440; // Prevent OOM by capping at 24 hours
+                                                                  const prevStage = sleepData[i-1].stage;
+                                                                  for (let j = 0; j < gap; j++) {
+                                                                      const rawMins = (prevAbsoluteMinutes + j) % (24 * 60);
+                                                                      const th = Math.floor(rawMins / 60).toString().padStart(2, '0');
+                                                                      const tm = (rawMins % 60).toString().padStart(2, '0');
+                                                                      processedSleepData.push({ stage: prevStage, time: `${th}:${tm}` });
+                                                                  }
+                                                              } else if (i === 0) {
+                                                                  processedSleepData.push({ stage: item.stage, time: item.time });
+                                                              }
+                                                              prevMinutesRaw = currentMinutes;
+                                                              prevAbsoluteMinutes = absoluteMinutes;
+                                                          }
+                                                          
+                                                          // Smooth out short spikes using a majority-vote (mode) filter over a 30-minute window
+                                                          if (processedSleepData.length > 30) {
+                                                              const SMOOTH_WINDOW = 30;
+                                                              const halfWin = Math.floor(SMOOTH_WINDOW / 2);
+                                                              let smoothedData = [];
+                                                              for (let k = 0; k < processedSleepData.length; k++) {
+                                                                  let counts = {0:0, 1:0, 2:0, 3:0};
+                                                                  let start = Math.max(0, k - halfWin);
+                                                                  let end = Math.min(processedSleepData.length - 1, k + halfWin);
+                                                                  for (let w = start; w <= end; w++) {
+                                                                      counts[processedSleepData[w].stage]++;
+                                                                  }
+                                                                  let maxStage = processedSleepData[k].stage;
+                                                                  let maxCount = -1;
+                                                                  for (let stage in counts) {
+                                                                      if (counts[stage] > maxCount) {
+                                                                          maxCount = counts[stage];
+                                                                          maxStage = parseInt(stage);
+                                                                      }
+                                                                  }
+                                                                  smoothedData.push({ stage: maxStage, time: processedSleepData[k].time });
+                                                              }
+                                                              processedSleepData = smoothedData;
+                                                          }
+                                                      }
+                                                      
+                                                      if (!processedSleepData || processedSleepData.length === 0) {
+                                                          return (
+                                                              <div className="w-full h-full flex flex-col items-center justify-center text-center">
+                                                                  <span className={`text-xs font-bold ${t.textMuted}`}>Tidak Cukup Data Tahap Tidur</span>
+                                                                  <span className={`text-[9px] mt-1 opacity-70 ${t.textMuted}`}>Sinkronkan dengan Health Connect untuk melihat grafik.</span>
+                                                              </div>
+                                                          );
+                                                      }
+                                                      
+                                                      return (
+                                                        <div className="w-full h-full">
+                                                          <ResponsiveContainer width="100%" height="100%">
+                                                              <AreaChart data={processedSleepData} margin={{ top: 5, right: 10, left: 0, bottom: 15 }}>
+                                                                  <defs>
+                                                                      <linearGradient id="colorStage" x1="0" y1="0" x2="0" y2="1">
+                                                                          <stop offset="0%" stopColor="#a1a1aa" />
+                                                                          <stop offset="25%" stopColor="#a1a1aa" />
+                                                                          <stop offset="25%" stopColor="#38bdf8" />
+                                                                          <stop offset="50%" stopColor="#38bdf8" />
+                                                                          <stop offset="50%" stopColor="#818cf8" />
+                                                                          <stop offset="75%" stopColor="#818cf8" />
+                                                                          <stop offset="75%" stopColor="#7c3aed" />
+                                                                          <stop offset="100%" stopColor="#7c3aed" />
+                                                                      </linearGradient>
+                                                                  </defs>
+                                                                  <XAxis dataKey="time" tick={{ fontSize: 9, fill: '#a1a1aa' }} tickLine={false} axisLine={false} minTickGap={40} dy={10} />
+                                                                  <YAxis domain={[-0.2, 3.2]} hide />
+                                                                  <ReferenceArea y1={2.5} y2={3.2} fill="#a1a1aa" fillOpacity={0.05} />
+                                                                  <ReferenceArea y1={1.5} y2={2.5} fill="#38bdf8" fillOpacity={0.05} />
+                                                                  <ReferenceArea y1={0.5} y2={1.5} fill="#818cf8" fillOpacity={0.05} />
+                                                                  <ReferenceArea y1={-0.2} y2={0.5} fill="#7c3aed" fillOpacity={0.05} />
+                                                                  <Area 
+                                                                      type="stepAfter" 
+                                                                      dataKey="stage" 
+                                                                      stroke="#ffffff" 
+                                                                      strokeWidth={1.5}
+                                                                      strokeLinejoin="round"
+                                                                      fill="url(#colorStage)" 
+                                                                      fillOpacity={0.85}
+                                                                      isAnimationActive={false}
+                                                                      dot={false}
+                                                                  />
+                                                              </AreaChart>
+                                                          </ResponsiveContainer>
+                                                        </div>
+                                                      );
+                                                  })()}
                                                 </div>
                                             </div>
                                             <div className="flex flex-wrap gap-x-4 gap-y-2 mt-6 pt-4 border-t border-dashed border-zinc-500/20">

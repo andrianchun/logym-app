@@ -7,6 +7,7 @@ import { toJpeg } from 'html-to-image';
 import { followUser, unfollowUser, isFollowing, getFollowerCount, getFollowingCount, blockUser, isBlocked, unblockUser } from '../utils/followApi';
 import { reportUser, getLocalBlockedUsers, banUserGlobal } from '../utils/moderationApi';
 import useDialog from '../hooks/useDialog';
+import DeveloperTools from './DeveloperTools';
 
 export default function SharedProfileView({
   profileUserId,
@@ -30,6 +31,7 @@ export default function SharedProfileView({
   handleUpdateName,
   onPostClick,
   history,
+  setHistory,
   userAchievements = [],
   onAchievementShareComplete,
   onBadgeActionClick
@@ -441,6 +443,10 @@ export default function SharedProfileView({
               <p className="text-sm font-bold">Belum ada aktivitas</p>
             </div>
           )}
+        </div>
+
+        <div className="px-6 mt-4">
+           <DeveloperTools user={currentUser} setHistory={setHistory} t={t} theme={isDark ? 'dark' : 'light'} />
         </div>
 
         {/* Moderation actions (for other users) */}

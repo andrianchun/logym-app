@@ -72,6 +72,12 @@
     <uses-permission android:name="android.permission.health.READ_HEIGHT" />
     <uses-permission android:name="android.permission.health.READ_OXYGEN_SATURATION" />
     <uses-permission android:name="android.permission.health.READ_BLOOD_PRESSURE" />
+    <!-- Buat nulis hasil ukur alat BLE (tensimeter Yuwell, timbangan Xiaomi) lewat
+         utils/ble.js. Health Connect gak bisa kasih izin tulis untuk tipe yang gak
+         dideklarasikan di sini, walau WRITE_TYPES di healthConnect.js sudah nyebut. -->
+    <uses-permission android:name="android.permission.health.WRITE_WEIGHT" />
+    <uses-permission android:name="android.permission.health.WRITE_BODY_FAT" />
+    <uses-permission android:name="android.permission.health.WRITE_BLOOD_PRESSURE" />
     <!-- Buat nulis kalori terbakar per sesi latihan (lihat hcWriteWorkoutCalories) -->
     <uses-permission android:name="android.permission.health.WRITE_ACTIVE_CALORIES_BURNED" />
     <!-- Buat nulis SESI LATIHAN lengkap dengan jenis olahraga, lewat plugin lokal

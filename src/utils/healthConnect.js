@@ -32,10 +32,12 @@ export const hcAvailable = async () => {
 // 'totalCalories' ikut diminta karena banyak sumber (mis. Samsung Health) cuma nulis
 // TotalCaloriesBurned dan TIDAK pernah nulis ActiveCaloriesBurned — tanpa ini, query
 // 'calories' balik kosong terus walau Health Connect penuh data (kejadian nyata).
-const READ_TYPES = ['steps', 'calories', 'totalCalories', 'heartRate', 'restingHeartRate', 'heartRateVariability', 'weight', 'height', 'sleep', 'bodyFat', 'oxygenSaturation', 'bloodPressure', 'distance', 'basalCalories'];
-// Logym tidak lagi menulis tipe data apa pun lewat plugin capgo (lihat catatan di bawah).
-// Record sesi latihan ditulis lewat ExerciseWriterPlugin.kt yang izinnya terpisah.
-const WRITE_TYPES = [];
+const READ_TYPES = ['steps', 'calories', 'totalCalories', 'heartRate', 'restingHeartRate', 'heartRateVariability', 'weight', 'height', 'sleep', 'bodyFat', 'oxygenSaturation', 'bloodPressure', 'distance', 'basalCalories', 'nutrition'];
+// Kalori TIDAK pernah ditulis lewat plugin ini (lihat catatan di bawah). Tiga tipe ini boleh:
+// semuanya record TITIK WAKTU dari alat ukur BLE (lihat utils/ble.js), dibaca sebagai "paling
+// baru per hari" dan tidak pernah dijumlah antar sumber — jadi tidak bisa menggandakan apa pun.
+// Record sesi latihan tetap lewat ExerciseWriterPlugin.kt yang izinnya terpisah.
+const WRITE_TYPES = ['weight', 'bodyFat', 'bloodPressure', 'boneMass', 'leanBodyMass', 'basalCalories', 'bodyWaterMass'];
 
 // Android gak nge-throw kalau user pencet "Tolak" di dialog izin — tetap resolve normal
 // dengan readAuthorized kosong. Lempar di sini kalau BENERAN nihil, biar caller yang udah
@@ -154,13 +156,13 @@ export const hcRequestWorkoutWritePermission = async () => {
 //
 // Memo localStorage tetap dipakai sebagai penghemat panggilan native, BUKAN sebagai penjaga
 // korektnya — dan dilewati saat `version` naik, supaya koreksi benar-benar sampai.
-export const hcWriteWorkoutSession = async ({ startDate, endDate, exerciseType, title, dedupeKey, version = 1, segments = [], notes = '' }) => {
+export const hcWriteWorkoutSession = async ({ startDate, endDate, exerciseType, title, dedupeKey, version = 1, segments = [], notes = '', calories = 0 }) => {
   if (!isNative()) return false;
   const memo = dedupeKey ? `hc_session_written_${dedupeKey}` : null;
   if (memo && localStorage.getItem(memo) === String(version)) return false;
   try {
     await ExerciseWriter.saveWorkout({
-      startDate, endDate, exerciseType, title,
+      startDate, endDate, exerciseType, title, energy: calories,
       // Rincian isi sesi: segmen per latihan (dengan jumlah repetisi) + ringkasan teks
       // "3x10 @40kg". Tanpa ini sesi Logym muncul di app lain sebagai blok kosong tanpa isi.
       segments, notes,
@@ -174,6 +176,40 @@ export const hcWriteWorkoutSession = async ({ startDate, endDate, exerciseType, 
     return false;
   }
 };
+
+// ============================================================
+// TULIS PENGUKURAN ALAT BLE (berat / tensi / body fat) — lihat utils/ble.js
+//
+// Ini AMAN ditulis walau kalori tidak (lihat catatan panjang di atas): berat, tensi, dan body
+// fat itu record TITIK WAKTU yang dibaca sebagai "yang paling baru per hari", bukan dijumlah
+// antar sumber. Record kedua di jam yang sama menggantikan tampilannya, tidak menggandakannya.
+//
+// Tetap TIDAK bisa dihapus/di-upsert lewat plugin ini (saveSample selalu Metadata.manualEntry()
+// tanpa clientRecordId), jadi hanya panggil ini dari event pengukuran alat — sekali per hasil,
+// jangan dari sapuan berulang atau loop sinkron.
+const hcSaveSample = async (dataType, value, at, extra = {}) => {
+  if (!isNative()) return false;
+  const iso = (at instanceof Date ? at : new Date(at)).toISOString();
+  try {
+    await Health.saveSample({ dataType, value, startDate: iso, endDate: iso, ...extra });
+    return true;
+  } catch (e) {
+    console.warn(`hcSaveSample ${dataType} gagal:`, e);
+    return false;
+  }
+};
+
+export const hcWriteWeight = (kg, at = new Date()) => hcSaveSample('weight', kg, at);
+export const hcWriteBodyFat = (percent, at = new Date()) => hcSaveSample('bodyFat', percent, at);
+export const hcWriteBoneMass = (kg, at = new Date()) => hcSaveSample('boneMass', kg, at, { unit: 'kilograms' });
+export const hcWriteLeanBodyMass = (kg, at = new Date()) => hcSaveSample('leanBodyMass', kg, at, { unit: 'kilograms' });
+export const hcWriteBodyWaterMass = (kg, at = new Date()) => hcSaveSample('bodyWaterMass', kg, at, { unit: 'kilograms' });
+export const hcWriteBMR = (kcal, at = new Date()) => hcSaveSample('basalCalories', kcal, at, { unit: 'kilocalories' });
+
+// BloodPressureRecord tidak punya "nilai tunggal" — plugin tetap mewajibkan `value` terisi,
+// dan yang benar-benar dipakai cuma systolic/diastolic.
+export const hcWriteBloodPressure = (systolic, diastolic, at = new Date()) =>
+  hcSaveSample('bloodPressure', systolic, at, { systolic, diastolic });
 
 // slice(0,10) di ISO string ngasih tanggal UTC, bukan tanggal lokal — buat user WIB (UTC+7),
 // sample yang jam lokalnya dini hari (00:00-07:00) masih "kemarin" di UTC, jadi kesplit ke
@@ -333,7 +369,7 @@ export const capIntradayLog = (list) => {
 const sleepPerDay = (samples) => {
   const byDay = {};
   for (const s of samples) {
-    const ymd = ymdOf(s.endDate || s.startDate);
+    const ymd = ymdOf(new Date(s.startDate).getTime() - 12 * 3600 * 1000);
     if (!byDay[ymd]) byDay[ymd] = { totalMinutes: 0, awake: 0, rem: 0, light: 0, deep: 0, sleepLog: [] };
     
     let currentEpoch = new Date(s.startDate).getTime();
@@ -559,6 +595,18 @@ export const hcReadRange = async (startYmd, endYmd) => {
       .then((res) => Object.entries(sleepPerDay(res?.samples || []))
         .forEach(([ymd, v]) => put(ymd, v)))
       .catch((e) => console.warn('hcReadRange sleep gagal:', e)),
+
+    H.readSamples({ dataType: 'nutrition', startDate: startISO, endDate: endISO, limit: 5000, ascending: true })
+      .then((res) => {
+        const byDay = {};
+        (res?.samples || []).forEach((s) => {
+          const ymd = ymdOf(s.startDate);
+          const kcal = s.energy?.value ?? s.energy ?? s.value ?? 0;
+          if (kcal > 0) byDay[ymd] = (byDay[ymd] || 0) + kcal;
+        });
+        Object.entries(byDay).forEach(([ymd, kcal]) => put(ymd, { nutritionCalories: Math.round(kcal) }));
+      })
+      .catch((e) => console.warn('hcReadRange nutrition gagal:', e)),
   ]);
 
   return byDay;
@@ -593,7 +641,7 @@ export const hcReadHeartRateWindow = async (startISO, endISO) => {
 // (aktif saja, tanpa BMR) DAN sudah mengandung kalori yang Logym sendiri push ke sana, jadi
 // menimpakannya bikin satu sesi terhitung dua kali. Angka HC-nya tetap masuk sebagai
 // `hcCalories` (+ `hcCaloriesType`: 'active' atau 'total') — pembanding, bukan sumber hitungan.
-export const HC_FIELDS = ['steps', 'stepMinutes', 'hcCalories', 'hcCaloriesType', 'heartRate', 'minHeartRate', 'maxHeartRate', 'restingHeartRate', 'hrv', 'weight', 'height', 'bodyFat', 'oxygenSaturation', 'bloodPressure', 'sleep', 'sleepAwake', 'sleepRem', 'sleepLight', 'sleepDeep', 'sleepLog', 'distance', 'bmr', 'heartRateLog', 'oxygenSaturationLog', 'bloodPressureLog'];
+export const HC_FIELDS = ['steps', 'stepMinutes', 'hcCalories', 'hcCaloriesType', 'heartRate', 'minHeartRate', 'maxHeartRate', 'restingHeartRate', 'hrv', 'weight', 'height', 'bodyFat', 'oxygenSaturation', 'bloodPressure', 'sleep', 'sleepAwake', 'sleepRem', 'sleepLight', 'sleepDeep', 'sleepLog', 'distance', 'bmr', 'heartRateLog', 'oxygenSaturationLog', 'bloodPressureLog', 'nutritionCalories', 'activityCalories'];
 
 // Bagian yang boleh ditambal ke hari LAMPAU (lihat healHcHoles di App.jsx): angka ringkasan saja.
 // Kurva intraday sengaja dibuang — ~4 KB/hari x 365 hari itu jalur langsung ke batas 1 MiB

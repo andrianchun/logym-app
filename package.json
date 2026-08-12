@@ -1,7 +1,7 @@
 {
   "name": "lyfeat.app",
   "private": true,
-  "version": "1.1.10",
+  "version": "1.1.11",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,6 +13,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor-community/bluetooth-le": "^8.2.0",
     "@capacitor-firebase/authentication": "^8.2.0",
     "@capacitor/android": "^8.3.4",
     "@capacitor/app": "^8.1.0",

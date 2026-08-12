@@ -137,15 +137,10 @@ const VitalsChart = ({ t, theme, history, language, activeMetric }) => {
   const rafRef = useRef(null);
   const [yDomain, setYDomain] = useState(['auto', 'auto']);
 
-  const updateYDomain = useCallback(() => {
-    if (!scrollRef.current || chartData.length === 0) { setYDomain(['auto', 'auto']); return; }
-    const { scrollLeft, clientWidth } = scrollRef.current;
-    const pw = pointWidthRef.current;
-    const startIndex = Math.max(0, Math.floor(scrollLeft / pw));
-    const endIndex = Math.min(chartData.length - 1, Math.ceil((scrollLeft + clientWidth) / pw));
-    const visible = chartData.slice(startIndex, endIndex + 1);
+  useEffect(() => {
+    if (chartData.length === 0) { setYDomain(['auto', 'auto']); return; }
     let min = Infinity, max = -Infinity;
-    (visible.length ? visible : chartData).forEach((d) => {
+    chartData.forEach((d) => {
       [d.value, d.dia].forEach((v) => {
         if (v !== undefined && v !== null && !isNaN(v)) {
           if (v < min) min = v;
@@ -160,11 +155,9 @@ const VitalsChart = ({ t, theme, history, language, activeMetric }) => {
 
   const handleScroll = () => {
     if (!rafRef.current) {
-      rafRef.current = requestAnimationFrame(() => { updateYDomain(); rafRef.current = null; });
+      rafRef.current = requestAnimationFrame(() => { rafRef.current = null; });
     }
   };
-
-  useEffect(() => { updateYDomain(); }, [updateYDomain, pointWidth]);
 
   const handleTouchStart = (e) => {
     if (e.touches.length === 2) {

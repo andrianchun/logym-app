@@ -1400,53 +1400,29 @@ const CalendarTab = ({
                                             const age = calculateAge(userProfile?.biometrics?.birthDate || userProfile?.birthDate) || 30;
                                             const maxHR = 220 - age;
 
-                                            // Nadi asli dari Health Connect (jam tangan), diisi saat sinkron — lihat runHcSync
-                                            // di App.jsx. Kalau ada, ini yang dipakai; kurva karangan di bawah cuma cadangan
-                                            // buat sesi lama, latihan tanpa jam tangan, dan PWA (HC cuma hidup di APK).
                                             const realHr = w.hr?.points?.length > 0 ? w.hr : null;
+                                            const hrData = realHr ? realHr.points.map(p => p.v) : null;
 
-                                            // For now we use dummy data if no real data is found, but scale it around realAvgHr if it exists
-                                            const baseHr = realAvgHr || (120 + (w.id.length % 20)); // Base pseudo-random HR
-                                            let seed = w.id.charCodeAt(w.id.length - 1) || 1;
-
-                                            // Generate deterministic dummy curve based on workout ID so it looks stable but varied per session
-                                            const dummyHrData = [
-                                                baseHr - 40, baseHr - 35, baseHr - 25, baseHr - 15, baseHr - 5,
-                                                baseHr, baseHr + 10, baseHr + 20, baseHr + 15, baseHr + 25,
-                                                baseHr + 30, baseHr + 35, baseHr + 25, baseHr + 35, baseHr + 20,
-                                                baseHr + 10, baseHr - 5, baseHr - 10, baseHr + 5, baseHr + 15,
-                                                baseHr + 5, baseHr - 10, baseHr - 20, baseHr - 30, baseHr - 40
-                                            ].map(v => {
-                                                const noise = ((seed * v) % 15) - 7;
-                                                return Math.max(60, Math.min(Math.round(v + noise), maxHR));
-                                            });
-                                            
-                                            const hrData = realHr ? realHr.points.map(p => p.v) : dummyHrData;
-
-                                            // Menit per zona. Data asli: bobot tiap titik = durasi sesi dibagi jumlah titik
-                                            // (titiknya hasil peringkasan per ember waktu, jadi lebarnya seragam). Data
-                                            // karangan: satu titik = satu menit seperti sebelumnya — kebetulan cocok karena
-                                            // memang dikarang 25 titik.
-                                            const minsPerPoint = realHr
+                                            const minsPerPoint = (realHr && hrData.length > 0)
                                                 ? (parseWorkoutDurationMinutes(w.duration) || hrData.length) / hrData.length
                                                 : 1;
                                             let zoneMins = [0,0,0,0,0];
-                                            hrData.forEach(val => {
-                                                const p = val / maxHR;
-                                                if (p < 0.6) zoneMins[0] += minsPerPoint;
-                                                else if (p < 0.7) zoneMins[1] += minsPerPoint;
-                                                else if (p < 0.8) zoneMins[2] += minsPerPoint;
-                                                else if (p < 0.9) zoneMins[3] += minsPerPoint;
-                                                else zoneMins[4] += minsPerPoint;
-                                            });
+                                            if (hrData) {
+                                                hrData.forEach(val => {
+                                                    const p = val / maxHR;
+                                                    if (p < 0.6) zoneMins[0] += minsPerPoint;
+                                                    else if (p < 0.7) zoneMins[1] += minsPerPoint;
+                                                    else if (p < 0.8) zoneMins[2] += minsPerPoint;
+                                                    else if (p < 0.9) zoneMins[3] += minsPerPoint;
+                                                    else zoneMins[4] += minsPerPoint;
+                                                });
+                                            }
                                             zoneMins = zoneMins.map(m => Math.round(m));
 
-                                            // Dari data ASLI pakai angka mentahnya (summarizeHeartRate menghitungnya dari
-                                            // sampel penuh) — puncak sesaat tidak boleh hilang cuma karena kurvanya dihaluskan.
-                                            const maxDataHr = realHr ? realHr.max : Math.max(...hrData);
-                                            const avgHr = realHr ? realHr.avg : (realAvgHr || Math.round(hrData.reduce((a,b)=>a+b,0)/hrData.length));
+                                            const maxDataHr = realHr ? realHr.max : (hrData ? Math.max(...hrData) : 0);
+                                            const avgHr = realHr ? realHr.avg : (realAvgHr || (hrData && hrData.length > 0 ? Math.round(hrData.reduce((a,b)=>a+b,0)/hrData.length) : 0));
 
-                                            const chartData = hrData.map((val, i) => ({ index: i, value: val }));
+                                            const chartData = hrData ? hrData.map((val, i) => ({ index: i, value: val })) : [];
 
                                             const zoneLabels = [
                                                 { name: 'Warm Up', color: 'bg-zinc-400', pct: 50, val: zoneMins[0] },
@@ -1461,75 +1437,80 @@ const CalendarTab = ({
                                             const prog = w.programId === 'adhoc' ? null : programs.find(p => p.id === w.programId);
                                             const parentPlanName = prog?.planName || (prog?.planId ? 'Kustom' : 'Ekstra');
                                             const title = `Zona Nadi - ${parentPlanName} - ${w.programName || 'Sesi'}`.toUpperCase();
+
+                                            if (!hrData || hrData.length === 0) return null;
                                             
                                             return (
                                                 <div key={w.id} className="mt-6 pt-6 border-t border-black/10 dark:border-white/10">
                                                     <div className="flex items-center justify-between mb-4">
                                                         <h4 className={`text-[10px] font-black uppercase tracking-widest ${t.textMain} truncate pr-2`}>{title}</h4>
-                                                        {realHr
-                                                            ? <span className="text-[8px] font-bold bg-emerald-500/20 text-emerald-500 px-1.5 py-0.5 rounded shrink-0">HEALTH CONNECT</span>
-                                                            : <span className="text-[8px] font-bold bg-blue-500/20 text-blue-500 px-1.5 py-0.5 rounded shrink-0">DUMMY DATA</span>}
+                                                        {realHr && (
+                                                            <span className="text-[8px] font-bold bg-emerald-500/20 text-emerald-500 px-1.5 py-0.5 rounded shrink-0">HEALTH CONNECT</span>
+                                                        )}
                                                     </div>
                                                     
-                                                    <div className="flex justify-between items-end mb-4">
-                                                        <div>
-                                                            <div className={`text-[9px] font-bold uppercase tracking-widest ${t.textMuted}`}>Rata-rata</div>
-                                                            <div className="flex items-baseline gap-1"><span className={`text-2xl font-black tracking-tighter ${t.textMain}`}>{avgHr}</span><span className={`text-[9px] font-bold ${t.textMuted}`}>bpm</span></div>
-                                                        </div>
-                                                        <div className="text-right">
-                                                            <div className={`text-[9px] font-bold uppercase tracking-widest ${t.textMuted}`}>Maksimal</div>
-                                                            <div className="flex items-baseline justify-end gap-1"><span className={`text-xl font-black tracking-tighter ${t.textMain}`}>{maxDataHr}</span><span className={`text-[9px] font-bold ${t.textMuted}`}>bpm</span></div>
-                                                        </div>
-                                                    </div>
-                                                    
-                                                    <div className="relative w-full h-24 mb-5 border-b border-black/10 dark:border-white/10">
-                                                        <ResponsiveContainer width="100%" height="100%">
-                                                            <AreaChart data={chartData} margin={{ top: 5, right: 5, left: 5, bottom: 0 }}>
-                                                                <defs>
-                                                                    <linearGradient id={`colorHr-${w.id}`} x1="0" y1="0" x2="0" y2="1">
-                                                                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.6}/>
-                                                                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                                                                    </linearGradient>
-                                                                </defs>
-                                                                <Tooltip 
-                                                                    contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '10px', fontWeight: 'bold' }}
-                                                                    itemStyle={{ color: '#fff' }}
-                                                                    labelStyle={{ display: 'none' }}
-                                                                    formatter={(value) => [`${value} bpm`, 'HR']}
-                                                                    animationDuration={200}
-                                                                />
-                                                                <Area 
-                                                                    type="natural" 
-                                                                    dataKey="value" 
-                                                                    stroke="#3b82f6" 
-                                                                    strokeWidth={1.5}
-                                                                    fillOpacity={1} 
-                                                                    fill={`url(#colorHr-${w.id})`} 
-                                                                    isAnimationActive={false}
-                                                                    dot={false}
-                                                                    activeDot={{ r: 4, fill: '#3b82f6', stroke: '#fff', strokeWidth: 1.5 }}
-                                                                />
-                                                            </AreaChart>
-                                                        </ResponsiveContainer>
-                                                    </div>
-                                                    
-                                                    <div className="space-y-2.5">
-                                                        {zoneLabels.map((z, i) => {
-                                                            if (z.val === 0) return null;
-                                                            const wPct = (z.val / totalMins) * 100;
-                                                            return (
-                                                                <div key={i} className="flex flex-col gap-1">
-                                                                    <div className="flex justify-between items-center text-[9px]">
-                                                                        <span className={`font-bold ${t.textMain}`}>{z.name} <span className="opacity-50">(&gt;{Math.round(maxHR * (z.pct/100))} bpm)</span></span>
-                                                                        <span className="font-bold opacity-80">{Math.round(wPct)}%</span>
-                                                                    </div>
-                                                                    <div className="relative w-full h-1.5 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden">
-                                                                        <div className={`absolute top-0 bottom-0 left-0 rounded-full ${z.color} transition-all duration-1000`} style={{ width: `${wPct}%` }}></div>
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
+                                                    {hrData && hrData.length > 0 && (
+                                                        <>
+                                                          <div className="flex justify-between items-end mb-4">
+                                                              <div>
+                                                                  <div className={`text-[9px] font-bold uppercase tracking-widest ${t.textMuted}`}>Rata-rata</div>
+                                                                  <div className="flex items-baseline gap-1"><span className={`text-2xl font-black tracking-tighter ${t.textMain}`}>{avgHr}</span><span className={`text-[9px] font-bold ${t.textMuted}`}>bpm</span></div>
+                                                              </div>
+                                                              <div className="text-right">
+                                                                  <div className={`text-[9px] font-bold uppercase tracking-widest ${t.textMuted}`}>Maksimal</div>
+                                                                  <div className="flex items-baseline justify-end gap-1"><span className={`text-xl font-black tracking-tighter ${t.textMain}`}>{maxDataHr}</span><span className={`text-[9px] font-bold ${t.textMuted}`}>bpm</span></div>
+                                                              </div>
+                                                          </div>
+                                                            <div className="relative w-full h-24 mb-5 border-b border-black/10 dark:border-white/10">
+                                                                <ResponsiveContainer width="100%" height="100%">
+                                                                    <AreaChart data={chartData} margin={{ top: 5, right: 5, left: 5, bottom: 0 }}>
+                                                                        <defs>
+                                                                            <linearGradient id={`colorHr-${w.id}`} x1="0" y1="0" x2="0" y2="1">
+                                                                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.6}/>
+                                                                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                                                                            </linearGradient>
+                                                                        </defs>
+                                                                        <Tooltip 
+                                                                            contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '10px', fontWeight: 'bold' }}
+                                                                            itemStyle={{ color: '#fff' }}
+                                                                            labelStyle={{ display: 'none' }}
+                                                                            formatter={(value) => [`${value} bpm`, 'HR']}
+                                                                            animationDuration={200}
+                                                                        />
+                                                                        <Area 
+                                                                            type="natural" 
+                                                                            dataKey="value" 
+                                                                            stroke="#3b82f6" 
+                                                                            strokeWidth={1.5}
+                                                                            fillOpacity={1} 
+                                                                            fill={`url(#colorHr-${w.id})`} 
+                                                                            isAnimationActive={false}
+                                                                            dot={false}
+                                                                            activeDot={{ r: 4, fill: '#3b82f6', stroke: '#fff', strokeWidth: 1.5 }}
+                                                                        />
+                                                                    </AreaChart>
+                                                                </ResponsiveContainer>
+                                                            </div>
+                                                            
+                                                            <div className="space-y-2.5">
+                                                                {zoneLabels.map((z, i) => {
+                                                                    if (z.val === 0) return null;
+                                                                    const wPct = (z.val / totalMins) * 100;
+                                                                    return (
+                                                                        <div key={i} className="flex flex-col gap-1">
+                                                                            <div className="flex justify-between items-center text-[9px]">
+                                                                                <span className={`font-bold ${t.textMain}`}>{z.name} <span className="opacity-50">(&gt;{Math.round(maxHR * (z.pct/100))} bpm)</span></span>
+                                                                                <span className="font-bold opacity-80">{Math.round(wPct)}%</span>
+                                                                            </div>
+                                                                            <div className="relative w-full h-1.5 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden">
+                                                                                <div className={`absolute top-0 bottom-0 left-0 rounded-full ${z.color} transition-all duration-1000`} style={{ width: `${wPct}%` }}></div>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </>
+                                                    )}
                                                 </div>
                                             );
                                         });
@@ -1658,7 +1639,7 @@ const CalendarTab = ({
                                               }, 150);
                                             }}>
                                               <div className="absolute top-4 right-4 flex items-center gap-1 z-10">
-                                                <button onClick={(e) => { e.stopPropagation(); removeWorkout(w.id, targetDateStr); }} className={`p-1.5 ${c.text} opacity-50 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg transition-colors`} title="Hapus Jadwal">
+                                                <button onClick={(e) => { e.stopPropagation(); removeWorkout(w.id, targetDateStr); }} className={`p-1.5 text-red-500 opacity-70 hover:opacity-100 hover:bg-red-500/10 rounded-lg transition-colors`} title="Hapus Jadwal">
                                                   <X size={16} />
                                                 </button>
                                               </div>

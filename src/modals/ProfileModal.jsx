@@ -17,6 +17,7 @@ import UserProfileModal from '../components/UserProfileModal';
 import SharedProfileView from '../components/SharedProfileView';
 import UnifiedBadge from '../components/UnifiedBadge';
 import useDialog from '../hooks/useDialog';
+import DeveloperTools from '../components/DeveloperTools';
 
 let globalProfileScrolls = {};
 let globalProfileLastTab = 'beranda';
@@ -30,6 +31,7 @@ export default function ProfileModal({
     theme, 
     handleLogout,
     history,
+    setHistory,
     activityTargets,
     programs,
     setPrograms,
@@ -457,6 +459,8 @@ export default function ProfileModal({
                             onEditPersonalClick={openEditPersonal}
                             userProfileData={userProfile}
                             history={history}
+                            setHistory={setHistory}
+                            onReport={() => {}}
                             userAchievements={userAchievements}
                             onAchievementShareComplete={onAchievementShareComplete}
                             onBadgeActionClick={(tabId) => {

@@ -292,49 +292,38 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
   useEffect(() => { pointWidthRef.current = pointWidth; }, [pointWidth]);
   const rafRef = useRef(null);
 
-  const updateYDomain = useCallback(() => {
-      if (!scrollRef.current || multiChartData.length === 0) return;
+  useEffect(() => {
+      if (multiChartData.length === 0) return;
       const activeObj = chartMetricsList.find(m => m.key === activeMetric);
       if (!activeObj || activeObj.isExtra) return;
-      const { scrollLeft, clientWidth } = scrollRef.current;
-      const pw = pointWidthRef.current;
-
-      const startIndex = Math.max(0, Math.floor(scrollLeft / pw));
-      const endIndex = Math.min(multiChartData.length - 1, Math.ceil((scrollLeft + clientWidth) / pw));
-      const visibleData = multiChartData.slice(startIndex, endIndex + 1);
 
       let min = Infinity;
       let max = -Infinity;
 
-      const findMinMax = (dataList) => {
-          dataList.forEach(d => {
-              const consider = (val) => {
+      multiChartData.forEach(d => {
+          const consider = (val) => {
+              if (val === null || val === undefined) return;
+              if (val < min) min = val;
+              if (val > max) max = val;
+          };
+          if (activeObj.type === 'single') {
+              consider(d[activeMetric]);
+          } else {
+              // Batang bertumpuk diukur dari JUMLAH satu tumpukan, bukan tiap potongnya —
+              // pakai nilai per potong, puncak grafiknya kepotong setinggi potongan terbesar.
+              const stacks = {};
+              activeObj.subMetrics.forEach(sub => {
+                  const val = d[sub.key];
                   if (val === null || val === undefined) return;
-                  if (val < min) min = val;
-                  if (val > max) max = val;
-              };
-              if (activeObj.type === 'single') {
-                  consider(d[activeMetric]);
-              } else {
-                  // Batang bertumpuk diukur dari JUMLAH satu tumpukan, bukan tiap potongnya —
-                  // pakai nilai per potong, puncak grafiknya kepotong setinggi potongan terbesar.
-                  const stacks = {};
-                  activeObj.subMetrics.forEach(sub => {
-                      const val = d[sub.key];
-                      if (val === null || val === undefined) return;
-                      if (sub.stackId) stacks[sub.stackId] = (stacks[sub.stackId] || 0) + val;
-                      else consider(val);
-                  });
-                  Object.values(stacks).forEach(consider);
-              }
-              // Garis target ikut diperhitungkan, kalau tidak ia bisa jatuh di luar layar persis
-              // saat paling berguna: waktu targetnya jauh di atas capaian.
-              if (activeObj.target) consider(d[activeObj.target]);
-          });
-      };
-
-      findMinMax(visibleData);
-      if (min === Infinity || max === -Infinity) findMinMax(multiChartData);
+                  if (sub.stackId) stacks[sub.stackId] = (stacks[sub.stackId] || 0) + val;
+                  else consider(val);
+              });
+              Object.values(stacks).forEach(consider);
+          }
+          // Garis target ikut diperhitungkan, kalau tidak ia bisa jatuh di luar layar persis
+          // saat paling berguna: waktu targetnya jauh di atas capaian.
+          if (activeObj.target) consider(d[activeObj.target]);
+      });
 
       if (min !== Infinity && max !== -Infinity) {
           const diff = max - min;
@@ -347,15 +336,10 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
   const handleScroll = () => {
       if (!rafRef.current) {
           rafRef.current = requestAnimationFrame(() => {
-              updateYDomain();
               rafRef.current = null;
           });
       }
   };
-
-  useEffect(() => {
-      updateYDomain();
-  }, [updateYDomain, pointWidth]);
 
   const handleTouchStart = (e) => {
       if (e.touches.length === 2) {
