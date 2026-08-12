@@ -140,7 +140,10 @@ class WorkoutTimerService : Service() {
             val restLeft = kotlin.math.ceil((restTargetTime - System.currentTimeMillis()) / 1000.0).toLong()
             val timeStr = formatTime(restLeft)
             
-            if (previousRestLeft > 0 && restLeft <= 0) {
+            // !isAppActive: kalau aplikasi sedang dibuka, sisi web sudah membunyikan nada yang
+            // SAMA PERSIS (public/timer-end.wav). Tanpa penjaga ini keduanya berbunyi bersamaan
+            // dan terdengar seperti gema.
+            if (previousRestLeft > 0 && restLeft <= 0 && !isAppActive) {
                 try {
                     // Nada yang SAMA PERSIS dengan yang dibunyikan aplikasi (public/timer-end.wav
                     // dan res/raw/timer_end.wav dibuat dari satu sumber, scripts/generate-timer-sound.cjs).

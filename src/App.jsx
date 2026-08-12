@@ -1237,13 +1237,13 @@ export default function App() {
       // dengan yang dibunyikan service native kalau aplikasi sedang ditutup.
       playSoundEffect('timerEnd', soundEnabled);
 
-      if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
-        WorkoutTimerPlugin.updateTimer({
-            isResting: false, 
-            targetTime: 0, 
-            workoutName: programs?.find(p => p.id === activeProgramId)?.name || 'Sesi Latihan Aktif' 
-        }).catch(console.warn);
-      }
+      // SENGAJA tidak mengirim isResting:false di sini. Dulu baris inilah yang membuat floating
+      // timer LENYAP begitu hitungan mencapai nol: overlay native hanya tampil saat
+      // (!isAppActive && isResting), jadi mematikan isResting menyembunyikannya seketika —
+      // padahal justru itu momen user paling perlu melihatnya. Native sudah siap menampilkan
+      // hitungan negatif (updateFloatingWidgetData menulis "-MM:SS" merah), tinggal dibiarkan
+      // berjalan. Overlay baru ditutup saat user benar-benar mengakhiri istirahat, lewat
+      // cleanup di bawah ketika restTargetTime jadi null.
     }, timeRemainingMs);
 
     if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
