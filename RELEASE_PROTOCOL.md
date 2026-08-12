@@ -56,6 +56,8 @@ Update isi file tersebut dengan format berikut:
 ```
 *Pastikan `ota_version` sama dengan versi di `package.json`.*
 
+> **WAJIB: edit file ini SEBELUM `npm run build` di step 6.** Vite menyalin `public/` ke `dist/` saat build, jadi kalau diedit setelah build, yang ter-deploy adalah `version.json` versi lama — aplikasi tidak akan pernah melihat update-nya. Ini pernah kejadian di rilis 1.1.18.
+
 ### 6. Deploy OTA ke Firebase
 Untuk membuat aplikasi langsung mendeteksi update ini, konfigurasi OTA tersebut harus dinaikkan ke Firebase Hosting.
 Jalankan perintah berikut di root folder:
@@ -63,6 +65,19 @@ Jalankan perintah berikut di root folder:
 npm run build
 firebase deploy --only hosting
 ```
+Verifikasi hasilnya sebelum lanjut — jangan percaya "Deploy complete" saja:
+```bash
+curl -s https://logym.web.app/ota/version.json
+```
+`ota_version` yang keluar harus sudah versi baru.
 
-### 7. Konfirmasi Selesai
+### 7. Commit & Push ke GitHub
+Rilis belum selesai kalau kodenya masih menggantung di working tree. Commit semua perubahan dengan pesan `release vX.Y.Z` (mengikuti konvensi commit sebelumnya), lalu push ke `main`:
+```bash
+git add -A
+git commit -m "release vX.Y.Z"
+git push origin main
+```
+
+### 8. Konfirmasi Selesai
 Beri tahu pengguna bahwa proses rilis telah selesai. Saat pengguna lama membuka aplikasi Logym, mereka akan langsung mendapatkan layar **Update Penting** yang tidak bisa ditutup, dan ketika menekan "Update Sekarang", sistem akan otomatis mengunduh APK baru dari Google Drive tersebut.
