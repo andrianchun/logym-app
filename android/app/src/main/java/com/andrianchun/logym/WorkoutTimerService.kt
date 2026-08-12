@@ -128,7 +128,9 @@ class WorkoutTimerService : Service() {
             .setColor(android.graphics.Color.parseColor("#3B82F6"))
             .setColorized(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            // Ikon status bar WAJIB monokrom: Android membuang warnanya dan menyisakan siluet.
+            // ic_launcher adaptif penuh warna jadi gumpalan putih; ic_stat_logym sudah 24dp putih.
+            .setSmallIcon(R.drawable.ic_stat_logym)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setShowWhen(false)
 

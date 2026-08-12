@@ -3425,14 +3425,14 @@ export default function App() {
       const tabs = ['dashboard', 'workout', 'calendar', 'program', 'database'];
       const currentIndex = tabs.indexOf(activeTab);
       
+      // Sengaja tanpa suara: pindah tab terjadi puluhan kali per sesi, bunyinya jadi berisik.
+      // Tap di BottomNav juga sudah senyap, jadi kedua cara pindah tab konsisten.
       if (distanceX > 0) {
         if (currentIndex < tabs.length - 1) {
-          playSoundEffect('click', soundEnabled);
           setActiveTab(tabs[currentIndex + 1]);
         }
       } else {
         if (currentIndex > 0) {
-          playSoundEffect('click', soundEnabled);
           setActiveTab(tabs[currentIndex - 1]);
         }
       }
@@ -3891,7 +3891,7 @@ export default function App() {
         </div>
       )}
 
-      <BottomNav t={t} lang={lang} activeTab={activeTab} setActiveTab={setActiveTab} setIsEditingMode={setIsEditingMode} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} />
+      <BottomNav t={t} lang={lang} activeTab={activeTab} setActiveTab={setActiveTab} setIsEditingMode={setIsEditingMode} />
     </div>
     </>
   );

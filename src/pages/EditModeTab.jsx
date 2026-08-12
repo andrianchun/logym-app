@@ -97,7 +97,7 @@ const EditModeTab = ({ t, lang, programs, setPrograms, setIsEditingMode, setActi
                          </div>
                          {isTime ? (
                            <div className="flex items-center justify-between">
-                              <span className={`font-bold ${t.textMuted}`}>Durasi (m)</span>
+                              <span className={`font-bold ${t.textMuted}`}>Durasi (dtk)</span>
                               <input 
                                  type="number" 
                                  value={ex.duration === 0 ? '' : ex.duration} 

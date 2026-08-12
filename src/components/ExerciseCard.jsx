@@ -531,7 +531,9 @@ const ExerciseCard = ({
                          {exType === 'weight' && (
                            <div>{isImp ? 'LBS' : 'KG'}</div>
                          )}
-                       {exType === 'time' && <div>Menit</div>}
+                       {/* Detik, bukan menit: kolom ini mengisi set.d yang disimpan dalam detik
+                           (lihat isSecondsFormat di bawah). ImmersiveWorkout memberi label sama. */}
+                       {exType === 'time' && <div>Detik</div>}
                        {exType !== 'time' && <div>Reps</div>}
                        <div></div>
                        <div></div>

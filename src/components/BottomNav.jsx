@@ -1,7 +1,8 @@
 import React from 'react';
 import { Dumbbell, Calendar, LineChart, ClipboardList, Database, LayoutDashboard } from 'lucide-react';
 
-const BottomNav = ({ t, lang, activeTab, setActiveTab, setIsEditingMode, soundEnabled, playSoundEffect }) => {
+// Pindah tab sengaja tanpa suara — lihat handleGlobalTouchEnd di App.jsx.
+const BottomNav = ({ t, lang, activeTab, setActiveTab, setIsEditingMode }) => {
   const tabs = [
     { id: 'dashboard', icon: LayoutDashboard, label: lang.id === 'EN' ? 'Dashboard' : 'Dasbor' },
     { id: 'workout', icon: Dumbbell, label: lang.workout || 'Latihan' },

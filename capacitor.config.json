@@ -8,7 +8,7 @@
       "providers": ["google.com"]
     },
     "LocalNotifications": {
-      "smallIcon": "ic_launcher",
+      "smallIcon": "ic_stat_logym",
       "iconColor": "#3B82F6"
     },
     "CapacitorUpdater": {
