@@ -533,6 +533,70 @@ export const calculateSmartWorkoutCalories = (weightKg, workout, logs, globalRes
  * @param {object} exLookup peta id -> latihan (program + library + latihan ekstra)
  * @returns {object} { [idLatihan]: { rm10, lastWeight } } — hanya yang punya rekor
  */
+/**
+ * SATU-SATUNYA rumus 10RM. Sebelumnya ada empat salinan yang tidak sepakat, dan yang paling
+ * mencolok: kalkulator manual di ExerciseDetailModal membulatkan 1RM ke bilangan bulat SEBELUM
+ * dibagi 1,3333. Untuk 100 kg x 10 reps, jalur riwayat memberi 100,0 sementara kalkulator memberi
+ * 99,8 — dari data yang sama persis. Itulah keluhan "10RM calc kok ga sinkron".
+ *
+ * Epley (1RM = w x (1 + reps/30)) tidak berlaku untuk 1 repetisi: kalau seseorang mengangkat 1
+ * kali, beban itu MEMANG 1RM-nya, bukan 3,3% lebih berat. Kekecualian ini dulu hanya ada di
+ * kalkulator manual.
+ */
+export const estimate1RM = (weightKg, reps) => {
+  const w = Number(weightKg) || 0;
+  const r = Number(reps) || 0;
+  if (w <= 0 || r <= 0) return 0;
+  return r > 1 ? w * (1 + r / 30) : w;
+};
+
+export const estimate10RM = (weightKg, reps) => {
+  const oneRM = estimate1RM(weightKg, reps);
+  if (oneRM <= 0) return 0;
+  return Math.round((oneRM / 1.3333) * 10) / 10;
+};
+
+/**
+ * Bulatkan KE BAWAH ke kelipatan yang benar-benar tersedia di alat. Ke bawah, bukan ke terdekat:
+ * menawarkan beban yang lebih berat dari kemampuan terukur itu saran yang bisa mencederai.
+ * 10RM 42,5 kg di alat berkelipatan 5 -> 40 kg.
+ */
+export const roundDownToStep = (weightKg, step) => {
+  const w = Number(weightKg) || 0;
+  const s = Number(step) || 0;
+  if (w <= 0) return 0;
+  if (s <= 0) return w;
+  return Math.round(Math.floor(w / s) * s * 100) / 100;
+};
+
+/**
+ * Kelipatan beban yang tersedia di gym yang sedang aktif, untuk satu jenis alat.
+ * Sumbernya sama dengan yang dipakai kolom input beban di ExerciseCard.
+ */
+export const gymStepFor = (gymProfiles, activeGymId, equipment, isImperial = false) => {
+  const bawaan = isImperial ? 5 : 2.5;
+  if (!gymProfiles || !activeGymId || !equipment) return bawaan;
+  const gym = gymProfiles.find((g) => g.id === activeGymId) || gymProfiles[0];
+  return Number(gym?.config?.[equipment]?.increment) || bawaan;
+};
+
+/**
+ * Beban awal yang muncul di kolom kg saat satu set belum pernah disentuh.
+ *
+ * Urutannya SENGAJA 10RM lebih dulu, baru beban terakhir: 10RM adalah taksiran kemampuan
+ * sekarang dan ikut naik begitu user memecahkan rekor, sementara lastWeight cuma "angka yang
+ * terakhir diketik" — termasuk kalau sesi terakhir kebetulan ringan. Selalu dibulatkan KE BAWAH
+ * ke kelipatan yang benar-benar ada di alat.
+ */
+export const defaultSetWeight = (libEx, ex, step) => {
+  const rm10 = Number(libEx?.rm10) || 0;
+  if (rm10 > 0) {
+    const bulat = roundDownToStep(rm10, step);
+    if (bulat > 0) return bulat;
+  }
+  return Number(libEx?.lastWeight) || Number(ex?.defaultWeight) || 0;
+};
+
 export const recomputeStrengthRecords = (history, logKeys, exLookup) => {
   const ids = new Set();
   (logKeys || []).forEach((k) => {
@@ -557,8 +621,7 @@ export const recomputeStrengthRecords = (history, logKeys, exLookup) => {
         // berbentuk begitu dulu menjatuhkan seluruh proses simpan latihan.
         Object.values(wk.log[k] || {}).forEach((s) => {
           if (!s || s.skipped || !(Number(s.w) > 0) || !(Number(s.r) > 0)) return;
-          // Epley 1RM, lalu diturunkan ke 10RM (faktor 1,3333).
-          const c10RM = (Number(s.w) * (1 + Number(s.r) / 30)) / 1.3333;
+          const c10RM = estimate10RM(s.w, s.r);
           if (c10RM > rec.rm10) rec.rm10 = c10RM;
           if (Number(s.w) > bestInSession) bestInSession = Number(s.w);
         });
@@ -571,7 +634,7 @@ export const recomputeStrengthRecords = (history, logKeys, exLookup) => {
 
   const clean = {};
   Object.entries(out).forEach(([id, r]) => {
-    if (r.rm10 > 0) clean[id] = { rm10: Math.round(r.rm10 * 10) / 10, lastWeight: r.lastWeight };
+    if (r.rm10 > 0) clean[id] = { rm10: r.rm10, lastWeight: r.lastWeight };
   });
   return clean;
 };

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Dumbbell, History, Calculator, Replace, Video, Info, ChevronLeft, ChevronRight, Loader2, Play } from 'lucide-react';
 import { formatTarget, resolveProjectedProgramId } from '../data/constants';
-import { resolveExerciseKind } from '../utils/workoutCalc';
+import { resolveExerciseKind, estimate10RM, estimate1RM } from '../utils/workoutCalc';
 import SwipeInput from './SwipeInput';
 
 const ExerciseDetailModal = ({ 
@@ -105,14 +105,11 @@ const ExerciseDetailModal = ({
     let max = 0;
     historyData.forEach(day => {
       day.sets.forEach(s => {
-        if (s.w > 0 && s.r > 0) {
-           const c1RM = s.w * (1 + s.r / 30);
-           const c10RM = c1RM / 1.3333;
-           if (c10RM > max) max = c10RM;
-        }
+        const c10RM = estimate10RM(s.w, s.r);
+        if (c10RM > max) max = c10RM;
       });
     });
-    return Math.round(max * 10) / 10;
+    return max;
   }, [historyData]);
 
   const existingLibEx = exerciseLibrary?.find(e => e.name?.toLowerCase() === initialEx.name?.toLowerCase() || e.id === initialEx.id);
@@ -135,9 +132,10 @@ const ExerciseDetailModal = ({
     return isIndo ? `${d}/${m}/${y}` : `${m}/${d}/${y}`;
   };
 
-  // Epley formula: 1RM = weight * (1 + reps/30)
-  const oneRM = calcReps > 1 ? Math.round(calcWeight * (1 + calcReps / 30)) : calcWeight;
-  const calculated10RM = Math.round((oneRM / 1.3333) * 10) / 10;
+  // Rumus yang SAMA dengan jalur riwayat. Versi lama di sini membulatkan 1RM ke bilangan bulat
+  // dulu, sehingga 100 kg x 10 memberi 99,8 di kalkulator tapi 100,0 dari riwayat.
+  const oneRM = Math.round(estimate1RM(calcWeight, calcReps) * 10) / 10;
+  const calculated10RM = estimate10RM(calcWeight, calcReps);
 
   const handleSave10RM = () => {
     if (!setExerciseLibrary) return;

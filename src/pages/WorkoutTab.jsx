@@ -4,6 +4,7 @@ import { Plus, Wind, Play, CalendarDays, X, CheckCircle, ChevronDown, ChevronUp,
 import { fetchExercisesFromApi } from '../utils/exerciseDbApi';
 import { shareWorkoutToFeed } from '../utils/communityApi';
 import { normalizeMuscleKey, resolveProjectedProgramId, getDayWorkouts } from '../data/constants';
+import { estimate10RM, defaultSetWeight, gymStepFor } from '../utils/workoutCalc';
 
 // Import Komponen Pecahan
 import WorkoutHeader from '../components/WorkoutHeader';
@@ -448,7 +449,8 @@ const WorkoutTab = ({
 
     // 3. Default: empty template
     const libMatch = exerciseLibrary?.find(e => e.id === ex?.originalId || e.id === ex?.id || e.name?.toLowerCase() === ex?.name?.toLowerCase());
-    const suggestedWeight = libMatch?.lastWeight || libMatch?.rm10 || ex?.defaultWeight || 0;
+    const suggestedWeight = defaultSetWeight(libMatch, ex,
+      gymStepFor(gymProfiles, activeGymId, ex?.equipment, units?.weight === 'lbs'));
 
     return Array.from({length: ex.sets || 3}).map(() => ({
         w: suggestedWeight,
@@ -503,10 +505,9 @@ const WorkoutTab = ({
                 
                 targetLog.forEach(s => {
                   if (!s.skipped && s.w > 0 && s.r > 0) {
-                    const c1RM = Number(s.w) * (1 + Number(s.r) / 30);
-                    const c10RM = c1RM / 1.3333;
+                    const c10RM = estimate10RM(s.w, s.r);
                     if (c10RM > historyMax10RM) historyMax10RM = c10RM;
-                    
+
                     if (Number(s.w) > bestWeightInSession) {
                       bestWeightInSession = Number(s.w);
                       bestRepsAtWeight = Number(s.r);
@@ -537,15 +538,18 @@ const WorkoutTab = ({
       const currentLogs = exerciseLogs[exItem.id] || getSetLogs(exItem);
       currentLogs.forEach(s => {
         if (s.done && !s.skipped && s.w > 0 && s.r > 0) {
-          const c1RM = Number(s.w) * (1 + Number(s.r) / 30);
-          const c10RM = c1RM / 1.3333;
+          const c10RM = estimate10RM(s.w, s.r);
           if (c10RM > currentMax10RM) currentMax10RM = c10RM;
         }
       });
-      
-      historyMax10RM = Math.round(historyMax10RM * 10) / 10;
-      currentMax10RM = Math.round(currentMax10RM * 10) / 10;
-      const stored10RM = Number(exItem.rm10) || 0;
+
+      // rm10 dibaca dari PUSTAKA, bukan dari exItem. exItem adalah salinan beku yang dibuat saat
+      // latihan ditambahkan ke program — dengan id UUID baru — dan tidak ada satu pun kode yang
+      // pernah menulis rm10 ke sana. Jadi exItem.rm10 praktis selalu 0, dan 10RM yang disimpan
+      // manual lewat ExerciseDetailModal tidak pernah sampai ke tombol otak biru.
+      const libEx = exerciseLibrary?.find(e => e.id === exItem.originalId || e.id === exItem.id
+        || e.name?.toLowerCase() === exItem.name?.toLowerCase());
+      const stored10RM = Number(libEx?.rm10 ?? exItem.rm10) || 0;
       const base10RM = Math.max(historyMax10RM, stored10RM);
       
       const true10RM = Math.max(base10RM, currentMax10RM);

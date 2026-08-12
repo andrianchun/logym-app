@@ -52,7 +52,7 @@ import { fetchExercisesFromApi } from './utils/exerciseDbApi';
 import { AI_MODELS, detectPlateaus, getLogyNotification } from './utils/aiAgent';
 import { calculateReadiness, restingHrBaseline } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
-import { calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, recomputeStrengthRecords, buildHcSessionDetail } from './utils/workoutCalc';
+import { calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, recomputeStrengthRecords, buildHcSessionDetail, estimate10RM, defaultSetWeight, gymStepFor } from './utils/workoutCalc';
 import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcReadHeartRateWindow, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission, capIntradayLog, HC_FIELDS, fillOnlyPatch, hcDroppedTypes } from './utils/healthConnect';
 import { bumpExercisePopularity } from './utils/exercisePopularity';
 import useDialog from './hooks/useDialog';
@@ -2635,9 +2635,13 @@ export default function App() {
       }
     }
     
-    const libMatch = exerciseLibrary.find(e => e.id === ex?.id || e.name?.toLowerCase() === ex?.name?.toLowerCase());
-    const suggestedWeight = libMatch?.lastWeight || libMatch?.rm10 || ex?.defaultWeight || 0;
-    
+    // originalId ikut dicocokkan: latihan program adalah salinan beku ber-UUID, jadi tanpa klausa
+    // ini pencocokan cuma jalan lewat nama — dan dua salinan lain dari fungsi yang sama
+    // (WorkoutTab, ImmersiveWorkout) sudah punya klausa itu sejak dulu.
+    const libMatch = exerciseLibrary.find(e => e.id === ex?.originalId || e.id === ex?.id || e.name?.toLowerCase() === ex?.name?.toLowerCase());
+    const suggestedWeight = defaultSetWeight(libMatch, ex,
+      gymStepFor(gymProfiles, activeGymId, ex?.equipment, units?.weight === 'lbs'));
+
     return Array.from({length: ex?.sets || 3}).map(() => ({ 
       w: suggestedWeight, 
       r: ex?.reps || 10, 
@@ -2704,9 +2708,8 @@ export default function App() {
         const weight = Number(currentLogs[setIdx].w) || 0;
         const reps = Number(currentLogs[setIdx].r) || 0;
         if (ex && weight > 0 && (!ex.type || ex.type === 'weight' || ex.type === 'reps')) {
-           const c1RM = weight * (1 + reps / 30);
-           const c10RM = Math.round((c1RM / 1.3333) * 10) / 10;
-           
+           const c10RM = estimate10RM(weight, reps);
+
            setExerciseLibrary(lib => {
               const existingIdx = lib.findIndex(e => e.name?.toLowerCase() === ex.name?.toLowerCase() || e.id === ex.id);
               if (existingIdx >= 0) {
@@ -3023,9 +3026,17 @@ export default function App() {
       let changed = false;
       const next = lib.map(e => {
         const r = records[String(e.id)];
-        if (!r || (e.rm10 === r.rm10 && e.lastWeight === r.lastWeight)) return e;
+        if (!r) return e;
+        // rm10 diambil MAKSIMUM, bukan ditimpa. Versi lama menimpa tanpa syarat dengan nilai
+        // turunan riwayat setiap kali latihan disimpan — sehingga 10RM yang disimpan manual
+        // lewat ExerciseDetailModal hilang di sesi berikutnya, dan rekor yang sesi asalnya
+        // tidak ada lagi di `history` (mis. riwayat lama belum tersinkron) ikut lenyap.
+        // Inilah "10RM selalu hilang tiap sesi baru".
+        // lastWeight TIDAK dimaksimumkan: itu memang "beban terakhir dipakai", wajar turun.
+        const rm10 = Math.max(Number(e.rm10) || 0, Number(r.rm10) || 0);
+        if (e.rm10 === rm10 && e.lastWeight === r.lastWeight) return e;
         changed = true;
-        return { ...e, rm10: r.rm10, lastWeight: r.lastWeight };
+        return { ...e, rm10, lastWeight: r.lastWeight };
       });
       return changed ? next : lib;
     });

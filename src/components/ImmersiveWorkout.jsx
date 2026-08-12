@@ -4,7 +4,7 @@ import { X, Play, Pause, ChevronRight, ChevronLeft, Dumbbell, Check, Info, Clock
 import ScrollPicker from './ScrollPicker';
 import { exerciseTypeLabels } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
-import { calculateWorkoutCalories, calculateLiveWorkoutCalories, resolveExerciseKind } from '../utils/workoutCalc';
+import { calculateWorkoutCalories, calculateLiveWorkoutCalories, resolveExerciseKind, defaultSetWeight, gymStepFor } from '../utils/workoutCalc';
 import { WorkoutTimerPlugin } from '../App';
 
 const LiveWorkoutStats = ({ workoutStartTime, isPaused, userProfile, validExercises, exerciseLogs, t, formatTime, currentExerciseName }) => {
@@ -231,7 +231,8 @@ const ImmersiveWorkout = ({
   const getLogsForEx = (exItem) => {
     if (exerciseLogs[exItem.id]) return exerciseLogs[exItem.id];
     const libMatch = exerciseLibrary?.find(e => e.id === exItem.originalId || e.id === exItem.id || e.name?.toLowerCase() === exItem.name?.toLowerCase());
-    const suggestedWeight = libMatch?.lastWeight || libMatch?.rm10 || exItem.defaultWeight || 0;
+    const suggestedWeight = defaultSetWeight(libMatch, exItem,
+      gymStepFor(gymProfiles, activeGymId, exItem.equipment, units?.weight === 'lbs'));
     return Array.from({length: exItem.sets || 3}).map(() => ({
       w: suggestedWeight, r: exItem.reps || 10, d: exItem.duration || 10, done: false
     }));
