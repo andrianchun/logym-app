@@ -344,13 +344,25 @@ export default function App() {
         } else {
           patch = {};
           HC_FIELDS.forEach((k) => {
-            if (hcData[k] === undefined) return;
             if (manualFlags[k] !== undefined) return;
-            if (existingBio[k] !== hcData[k]) patch[k] = hcData[k];
+            if (hcData[k] !== undefined) {
+              // HC punya data → update kalau beda
+              if (existingBio[k] !== hcData[k]) patch[k] = hcData[k];
+            } else if (existingBio[k] !== undefined) {
+              // HC TIDAK punya data tapi bioData masih simpan → hapus (data dihapus di HC)
+              patch[k] = undefined;
+            }
           });
         }
-        if (Object.keys(patch).length === 0) return;
-        next[ymd] = { ...(prev[ymd] || {}), bioData: { ...existingBio, ...patch } };
+        // Cek apakah ada perubahan (termasuk penghapusan)
+        const realChanges = Object.keys(patch).filter(k => patch[k] !== undefined || existingBio[k] !== undefined);
+        if (realChanges.length === 0) return;
+        const merged = { ...existingBio };
+        Object.entries(patch).forEach(([k, v]) => {
+          if (v === undefined) delete merged[k];
+          else merged[k] = v;
+        });
+        next[ymd] = { ...(prev[ymd] || {}), bioData: merged };
         changed = true;
       });
       return changed ? next : prev;

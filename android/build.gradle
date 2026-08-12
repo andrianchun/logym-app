@@ -43,7 +43,7 @@ allprojects {
         // ':app' juga dikecualikan sejak modul itu punya kode Kotlin sendiri
         // (ExerciseWriterPlugin.kt): javac-nya nyatanya jalan di 21, jadi Kotlin-nya harus
         // ikut 21 — bukan dipaksa turun ke 17. Lihat komentar di app/build.gradle.
-        if (project.name != 'capgo-capacitor-health' && project.name != 'app') {
+        if (project.name != 'capgo-capacitor-health' && project.name != 'app' && project.name != 'capacitor-community-bluetooth-le') {
             project.tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
                 kotlinOptions.jvmTarget = "17"
             }

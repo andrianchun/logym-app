@@ -49,7 +49,14 @@ export function useBleManager({ setHistory, userProfile }) {
             persist(next);
             return next;
           });
-          setWarn(res?.hcOk ? '' : 'Tersimpan di Logym, tapi belum masuk Health Connect — tekan "Hubungkan" di bagian Health Connect di atas, lalu ukur lagi. (Di browser memang selalu begini; Health Connect cuma ada di aplikasi Android.)');
+          if (res?.hcOk) {
+            setWarn('');
+          } else {
+            const native = typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform();
+            setWarn(native
+              ? 'Tersimpan di Logym, tapi gagal menulis ke Health Connect. Coba tekan "Sinkron Ulang" di bagian Health Connect di atas.'
+              : 'Tersimpan di Logym. Health Connect hanya tersedia di aplikasi Android.');
+          }
         } catch (e) {
           patch(setErrors, id, e?.message || 'Gagal menyimpan hasil ukur.');
         }
