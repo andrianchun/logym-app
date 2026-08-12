@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Check, CalendarDays, Loader2, ShieldAlert, HeartPulse, Camera, Image as ImageIcon, Scan, RefreshCw } from 'lucide-react';
+import { X, Check, CalendarDays, Loader2, ShieldAlert, HeartPulse, Camera, Image as ImageIcon, Scan, RefreshCw, Bluetooth } from 'lucide-react';
 import { playSoundEffect } from '../utils/audio';
 import SwipeInput from './SwipeInput';
 import { extractBiometricsFromImage } from '../utils/aiVision';
@@ -11,7 +11,7 @@ const DashboardModals = ({
   showManualModal, setShowManualModal, manualTab, setManualTab, 
   modalDate, setModalDate, formBio, setFormBio, bioData, lomealToday, lomealOwnsNutrition, hasManualLock, handleUnlockManual,
   handleSaveManualData, handleDeleteBioData, soundEnabled, units, setConfirmModal,
-  userApiKeys, setKeyStatuses, setShowSettings, keyStatuses, connectedApps
+  userApiKeys, setKeyStatuses, setShowSettings, keyStatuses, connectedApps, bleManager
 }) => {
   const isImp = units?.weight === 'lbs';
   const todayStr = new Date().toLocaleDateString('en-CA');
@@ -55,6 +55,55 @@ const DashboardModals = ({
   // Kelas visual senada dengan status terkunci — satu tempat, biar tidak ada input yang
   // kelihatan aktif padahal mati (atau sebaliknya).
   const lockCls = (field) => (hcLocked(field) ? 'opacity-50 cursor-not-allowed' : '');
+
+  // Tarik data BLE yang tersimpan dan sinkronkan ke formBio
+  const handleBleFetch = () => {
+    if (!bleManager?.available || !bleManager?.devices?.length) {
+      alert('Belum ada alat medis Bluetooth yang dipasangkan. Tambahkan di tab Pengaturan.');
+      return;
+    }
+    bleManager.devices.forEach(d => {
+      bleManager.listen(d);
+    });
+  };
+
+  React.useEffect(() => {
+    if (!bleManager || !bleManager.readings) return;
+    const latestReadings = Object.values(bleManager.readings);
+    if (latestReadings.length === 0) return;
+    
+    let updated = false;
+    const newFormBio = { ...formBio };
+    const now = new Date();
+    
+    for (const r of latestReadings) {
+      if (r.at && (now - r.at) < 15000) { // recently measured (last 15s)
+         if (r.type === 'weight') {
+             newFormBio.weight = r.weight.toString();
+             if (r.bodyFat) newFormBio.bodyFat = r.bodyFat.toString();
+             if (r.muscleMass) newFormBio.muscleMass = r.muscleMass.toString();
+             if (r.boneMass) newFormBio.boneMass = r.boneMass.toString();
+             if (r.musclePercent) newFormBio.musclePercent = r.musclePercent.toString();
+             if (r.visceralFat) newFormBio.visceralFat = r.visceralFat.toString();
+             if (r.waterPercent) newFormBio.waterPercent = r.waterPercent.toString();
+             if (r.proteinPercent) newFormBio.proteinPercent = r.proteinPercent.toString();
+             if (r.bmr) newFormBio.bmr = r.bmr.toString();
+             if (r.bodyAge) newFormBio.bodyAge = r.bodyAge.toString();
+             if (r.bodyScore) newFormBio.bodyScore = r.bodyScore.toString();
+             if (r.bmi) newFormBio.bmi = r.bmi.toString();
+             updated = true;
+         } else if (r.type === 'bloodPressure') {
+             newFormBio.bloodPressure = `${r.systolic}/${r.diastolic}`;
+             if (r.pulse > 0) newFormBio.heartRate = r.pulse.toString();
+             updated = true;
+         }
+      }
+    }
+    if (updated) {
+       setFormBio(newFormBio);
+       playSoundEffect('success', soundEnabled);
+    }
+  }, [bleManager?.readings]);
 
   const handleAIScan = async (e) => {
       const file = e.target.files?.[0];
@@ -219,7 +268,15 @@ const DashboardModals = ({
                         <input type="date" value={modalDate} onChange={(e) => setModalDate(e.target.value)} onClick={(e) => { try { e.target.showPicker() } catch(err){} }} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
                     </div>
                  </div>
-                 <div className="flex space-x-2 relative">
+                 <div className="flex space-x-2 relative items-center">
+                     <button
+                         type="button"
+                         onClick={handleBleFetch}
+                         className={`p-2 rounded-full ${bleManager?.isBleBusy ? 'bg-zinc-500/20 text-zinc-500' : `${t.btnBg} ${t.textAccent} hover:brightness-110`} transition-all cursor-pointer shadow-sm relative z-10`} 
+                         title="Tarik Data Bluetooth"
+                     >
+                         {bleManager?.isBleBusy ? <Loader2 size={16} className="animate-spin" /> : <Bluetooth size={16} />}
+                     </button>
                      <label className={`p-2 rounded-full ${isScanning ? 'bg-zinc-500/20 text-zinc-500' : scanSuccess ? 'bg-green-500/20 text-green-500' : `${t.btnBg} ${t.textAccent} hover:brightness-110`} transition-all cursor-pointer shadow-sm relative z-10`} title="Kamera">
                          {isScanning ? <Loader2 size={16} className="animate-spin" /> : scanSuccess ? <Check size={16} /> : <Camera size={16} />}
                          <input type="file" accept="image/*" capture="environment" onChange={handleAIScan} className="hidden" disabled={isScanning || scanSuccess} />
@@ -348,7 +405,7 @@ const DashboardModals = ({
                                     lain, mis. MyFitnessPal lewat Health Connect). */}
                                 {lomealLocked && (
                                     <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-500 text-[9px] uppercase font-bold tracking-wider flex items-center gap-1">
-                                        <Check size={10} /> TERKUNCI OLEH LOMEAL
+                                        <Check size={10} /> LOMEAL
                                     </span>
                                 )}
                             </div>
@@ -364,9 +421,6 @@ const DashboardModals = ({
                                         className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-xl outline-none font-bold text-sm text-center ${lomealLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                                         placeholder={ph(bioData?.nutritionCalories, "2000")}
                                     />
-                                    {lomealLocked && (
-                                      <p className={`${t.textMuted} text-[10px] mt-1 text-center`}>Diatur dari Lomeal — ubah di sana, angkanya ikut di sini.</p>
-                                    )}
                                 </div>
                             </div>
                         </div>
@@ -377,7 +431,7 @@ const DashboardModals = ({
                                 <h4 className={`text-sm font-black ${t.textMain}`}>Kesehatan & Aktivitas</h4>
                                 {connectedApps?.healthConnect && isToday && (
                                     <span className="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-500 text-[9px] uppercase font-bold tracking-wider flex items-center gap-1">
-                                        <Check size={10} /> TERSINKRONISASI
+                                        <Check size={10} /> Health Connect
                                     </span>
                                 )}
                             </div>

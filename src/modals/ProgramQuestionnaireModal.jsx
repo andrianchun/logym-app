@@ -168,7 +168,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
           weight: 72,
           dob: '1995-03-24',
           gender: 'male',
-          name: prev.name || 'Logi'
+          name: prev.name || 'Logy'
       }));
   };
 
@@ -248,7 +248,11 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
       if (reply.includes(tagStart) && reply.includes(tagEnd)) {
           const startIndex = reply.indexOf(tagStart) + tagStart.length;
           const endIndex = reply.indexOf(tagEnd);
-          const jsonStr = reply.substring(startIndex, endIndex).trim();
+          let jsonStr = reply.substring(startIndex, endIndex).trim();
+          
+          // Clean up markdown code blocks if the AI accidentally added them
+          jsonStr = jsonStr.replace(/```json/gi, '').replace(/```/g, '').trim();
+          
           jsonPart = JSON.parse(jsonStr);
       } else {
           throw new Error('AI tidak memberikan format JSON yang valid.');
@@ -506,7 +510,7 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
           
           <div className="flex-1 text-center">
             <p className={`text-[14px] ${!isDark ? 'text-black font-medium' : `${t.textMain} font-medium`} mt-2 leading-snug max-w-[280px] mx-auto`}>
-              Halo, <span className="font-black">Coach Logi</span> di sini. Aku siap bantu kamu menuju badan impian yang sehat dan kuat!
+              Halo, <span className="font-black">Coach Logy</span> di sini. Aku siap bantu kamu menuju badan impian yang sehat dan kuat!
             </p>
           </div>
 

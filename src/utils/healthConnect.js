@@ -36,8 +36,29 @@ const READ_TYPES = ['steps', 'calories', 'totalCalories', 'heartRate', 'restingH
 // Kalori TIDAK pernah ditulis lewat plugin ini (lihat catatan di bawah). Tiga tipe ini boleh:
 // semuanya record TITIK WAKTU dari alat ukur BLE (lihat utils/ble.js), dibaca sebagai "paling
 // baru per hari" dan tidak pernah dijumlah antar sumber — jadi tidak bisa menggandakan apa pun.
-// Record sesi latihan tetap lewat ExerciseWriterPlugin.kt yang izinnya terpisah.
-const WRITE_TYPES = ['weight', 'bodyFat', 'bloodPressure', 'boneMass', 'leanBodyMass', 'basalCalories', 'bodyWaterMass'];
+// Record sesi latihan tetap lewat ExerciseWriterPlugin.kt // Data yang ditulis aplikasi (atau lebih tepatnya: diklaim akan ditulis) di dialog perizinan awal.
+// Di luar ini, usaha penulisan pasti ditolak. Logym (sejak rilis awal) sudah merangkum berat ke
+// daily stats, tapi data tersebut belum dikirim ke Health Connect secara rinci per pengukuran.
+// Sekarang, dengan integrasi Bluetooth skala berat (seperti MIBFS), ini perlu ditambahkan.
+//
+// CATATAN: 'bloodPressure' tidak ada di Health Connect UI "Vitals" yang standar, tapi tipenya
+// dikenali plugin ini. Kalau suatu saat Health Connect menolak, mungkin perlu 'bloodPressure'
+// dibuang dari daftar dan menggunakan 'bloodPressureSystolic'/'bloodPressureDiastolic'.
+// (Saat ini, penulisannya masih lolos).
+//
+// Oxygen saturation, body temperature, dll sengaja dibuang: Logym belum punya form input-nya,
+// minta izin di depan malah bikin user curiga (buat apa?).
+//
+// Kalori BMR ("basalCalories") diekspor bersamaan dengan berat, karena BMR dihitung ulang tiap
+// ada berat baru. Kalori makanan TIDAK diekspor ?" Logym mengambilnya dari Lomeal,
+// biar Lomeal yang ekspor ke HC. Mengekspor dari sini akan membuat data ganda kalau user juga
+// menghubungkan Lomeal ke HC.
+// 
+// Langkah dan Menit Aktif (steps, stepMinutes) adalah input mentah dari jam tangan/HP, Logym 
+// hanya membaca, BUKAN menulisnya. Kalori aktif diekspor per sesi latihan lewat plugin terpisah.
+//
+// heartRate ditulis karena tensimeter bluetooth juga mengirimkan data detak jantung (pulse).
+const WRITE_TYPES = ['weight', 'bodyFat', 'bloodPressure', 'boneMass', 'leanBodyMass', 'basalCalories', 'bodyWaterMass', 'heartRate'];
 
 // Android gak nge-throw kalau user pencet "Tolak" di dialog izin — tetap resolve normal
 // dengan readAuthorized kosong. Lempar di sini kalau BENERAN nihil, biar caller yang udah
@@ -210,6 +231,7 @@ export const hcWriteBMR = (kcal, at = new Date()) => hcSaveSample('basalCalories
 // dan yang benar-benar dipakai cuma systolic/diastolic.
 export const hcWriteBloodPressure = (systolic, diastolic, at = new Date()) =>
   hcSaveSample('bloodPressure', systolic, at, { systolic, diastolic });
+export const hcWriteHeartRate = (bpm, at = new Date()) => hcSaveSample('heartRate', bpm, at);
 
 // slice(0,10) di ISO string ngasih tanggal UTC, bukan tanggal lokal — buat user WIB (UTC+7),
 // sample yang jam lokalnya dini hari (00:00-07:00) masih "kemarin" di UTC, jadi kesplit ke
@@ -556,8 +578,13 @@ export const hcReadRange = async (startYmd, endYmd) => {
       .catch((e) => console.warn('hcReadRange heartRateLog gagal:', e)),
 
     H.readSamples({ dataType: 'weight', startDate: startISO, endDate: endISO, limit: 1000, ascending: true })
-      .then((res) => Object.entries(latestPerDay(res?.samples || [], (s) => ({ weight: Number(s.value.toFixed(1)) })))
-        .forEach(([ymd, v]) => put(ymd, v)))
+      .then((res) => {
+         const samples = res?.samples || [];
+         Object.entries(latestPerDay(samples, (s) => ({ weight: Number(s.value.toFixed(1)) })))
+          .forEach(([ymd, v]) => put(ymd, v));
+         Object.entries(logPerDay(samples, (s) => ({ value: Number(s.value.toFixed(1)) })))
+          .forEach(([ymd, log]) => put(ymd, { weightLog: log }));
+      })
       .catch((e) => console.warn('hcReadRange weight gagal:', e)),
 
     H.readSamples({ dataType: 'height', startDate: startISO, endDate: endISO, limit: 1000, ascending: true })
@@ -641,7 +668,7 @@ export const hcReadHeartRateWindow = async (startISO, endISO) => {
 // (aktif saja, tanpa BMR) DAN sudah mengandung kalori yang Logym sendiri push ke sana, jadi
 // menimpakannya bikin satu sesi terhitung dua kali. Angka HC-nya tetap masuk sebagai
 // `hcCalories` (+ `hcCaloriesType`: 'active' atau 'total') — pembanding, bukan sumber hitungan.
-export const HC_FIELDS = ['steps', 'stepMinutes', 'hcCalories', 'hcCaloriesType', 'heartRate', 'minHeartRate', 'maxHeartRate', 'restingHeartRate', 'hrv', 'weight', 'height', 'bodyFat', 'oxygenSaturation', 'bloodPressure', 'sleep', 'sleepAwake', 'sleepRem', 'sleepLight', 'sleepDeep', 'sleepLog', 'distance', 'bmr', 'heartRateLog', 'oxygenSaturationLog', 'bloodPressureLog', 'nutritionCalories', 'activityCalories'];
+export const HC_FIELDS = ['steps', 'stepMinutes', 'hcCalories', 'hcCaloriesType', 'heartRate', 'minHeartRate', 'maxHeartRate', 'restingHeartRate', 'hrv', 'weight', 'height', 'bodyFat', 'oxygenSaturation', 'bloodPressure', 'sleep', 'sleepAwake', 'sleepRem', 'sleepLight', 'sleepDeep', 'sleepLog', 'distance', 'bmr', 'heartRateLog', 'oxygenSaturationLog', 'bloodPressureLog', 'weightLog', 'nutritionCalories', 'activityCalories'];
 
 // Bagian yang boleh ditambal ke hari LAMPAU (lihat healHcHoles di App.jsx): angka ringkasan saja.
 // Kurva intraday sengaja dibuang — ~4 KB/hari x 365 hari itu jalur langsung ke batas 1 MiB

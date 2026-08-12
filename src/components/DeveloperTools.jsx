@@ -102,7 +102,21 @@ export default function DeveloperTools({ user, setHistory, t, theme }) {
         const next = { ...prev };
         Object.keys(next).forEach(ymd => {
             if (next[ymd].workouts) {
+                const hadDummy = next[ymd].workouts.some(w => w.id.startsWith('dummy_'));
                 next[ymd].workouts = next[ymd].workouts.filter(w => !w.id.startsWith('dummy_'));
+                
+                if (hadDummy && next[ymd].bioData) {
+                    delete next[ymd].bioData.sleep;
+                    delete next[ymd].bioData.sleepAwake;
+                    delete next[ymd].bioData.sleepRem;
+                    delete next[ymd].bioData.sleepLight;
+                    delete next[ymd].bioData.sleepDeep;
+                    delete next[ymd].bioData.sleepLog;
+                    delete next[ymd].bioData.steps;
+                    delete next[ymd].bioData.heartRate;
+                    delete next[ymd].bioData.restingHeartRate;
+                    delete next[ymd].bioData.oxygenSaturation;
+                }
             }
         });
         return next;

@@ -30,36 +30,42 @@ export function useBleManager({ setHistory, userProfile }) {
     deps.current = { setHistory, userProfile };
   }, [setHistory, userProfile]);
 
+  // Queue untuk memastikan data BLE yang masuk bersamaan (seperti dari RACP memori lama)
+  // diproses berurutan, tidak menimpa satu sama lain atau menyebabkan crash di Health Connect
+  const queueRef = useRef(Promise.resolve());
+
   const listen = useCallback(async (dev) => {
     const id = dev.deviceId;
     patch(setErrors, id, ''); setWarn('');
     patch(setStatus, id, 'connecting');
     try {
       await stops.current[id]?.(); // jangan menumpuk langganan kalau ditekan dua kali
-      stops.current[id] = await connectAndListen(id, async (r) => {
-        if (r.type === 'disconnected') { patch(setStatus, id, undefined); return; }
-        try {
-          // Gunakan deps terbaru agar kita tidak perlu re-subscribe BLE saat profil berubah
-          const { setHistory: sh, userProfile: up } = deps.current;
-          const res = await saveMeasurement(r, { setHistory: sh, userProfile: up });
-          patch(setReadings, id, r);
-          
-          setDevices((prev) => {
-            const next = prev.map((d) => (d.deviceId === id ? { ...d, kind: r.type } : d));
-            persist(next);
-            return next;
-          });
-          if (res?.hcOk) {
-            setWarn('');
-          } else {
-            const native = typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform();
-            setWarn(native
-              ? 'Tersimpan di Logym, tapi gagal menulis ke Health Connect. Coba tekan "Sinkron Ulang" di bagian Health Connect di atas.'
-              : 'Tersimpan di Logym. Health Connect hanya tersedia di aplikasi Android.');
+      stops.current[id] = await connectAndListen(id, (r) => {
+        queueRef.current = queueRef.current.then(async () => {
+          if (r.type === 'disconnected') { patch(setStatus, id, undefined); return; }
+          try {
+            // Gunakan deps terbaru agar kita tidak perlu re-subscribe BLE saat profil berubah
+            const { setHistory: sh, userProfile: up } = deps.current;
+            const res = await saveMeasurement(r, { setHistory: sh, userProfile: up });
+            patch(setReadings, id, { ...r, ...(res?.patch || {}) });
+            
+            setDevices((prev) => {
+              const next = prev.map((d) => (d.deviceId === id ? { ...d, kind: r.type } : d));
+              persist(next);
+              return next;
+            });
+            if (res?.hcOk) {
+              setWarn('');
+            } else {
+              setWarn(res?.nativeApp 
+                ? 'Tersimpan di Logym, tapi gagal menulis ke Health Connect. Pastikan Anda sudah memberi izin di Health Connect (Pengaturan -> Izin).'
+                : 'Tersimpan di Logym. (Menulis ke Health Connect hanya didukung di aplikasi native Android, bukan browser)'
+              );
+            }
+          } catch (e) {
+            console.warn('[BLE] error onReading', e);
           }
-        } catch (e) {
-          patch(setErrors, id, e?.message || 'Gagal menyimpan hasil ukur.');
-        }
+        }).catch(err => console.error('[BLE] Queue error', err));
       });
       patch(setStatus, id, 'listening');
     } catch (e) {

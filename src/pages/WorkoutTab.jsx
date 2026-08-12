@@ -14,6 +14,9 @@ import AlternativeExerciseModal from '../components/AlternativeExerciseModal';
 import EmptyWorkoutState from '../components/EmptyWorkoutState';
 import useDialog from '../hooks/useDialog';
 
+let notified10RM_Date = null;
+const notified10RM_Ids = new Set();
+
 const WorkoutTab = ({
   // Dikirim App.jsx tapi dulu tidak pernah di-destructure — padahal dipakai di
   // `if (setConfirmModal)` saat user memulai latihan lain sementara satu sesi masih jalan.
@@ -593,6 +596,50 @@ const WorkoutTab = ({
         };
       }
     };
+
+  React.useEffect(() => {
+     if (!isWorkoutActive) return;
+     const sessionExs = sessionExercises.length > 0 ? sessionExercises : Object.keys(exerciseLogs).map(id => exerciseLibrary.find(e => e.id === id)).filter(Boolean);
+     
+     sessionExs.forEach(ex => {
+        if (!ex) return;
+        const hint = getOverloadHint(ex);
+        if (hint && hint.isNewRecord) {
+           const cacheKey = `${selectedDate}_${ex.id}`;
+           
+           // Gunakan localStorage agar tidak me-reset saat aplikasi ditutup (force close)
+           let notifiedIds = [];
+           try {
+             notifiedIds = JSON.parse(localStorage.getItem(`lyfit_notified_10rm_${selectedDate}`) || '[]');
+           } catch(e) {}
+
+           if (!notifiedIds.includes(cacheKey)) {
+              notifiedIds.push(cacheKey);
+              try {
+                 localStorage.setItem(`lyfit_notified_10rm_${selectedDate}`, JSON.stringify(notifiedIds));
+              } catch(e) {}
+              
+              const recordTitle = `REKOR 10RM BARU!`;
+              let cleanDesc = hint.text;
+              if (cleanDesc.includes('Mantap! Kamu baru saja buat rekor 10RM baru:')) {
+                  cleanDesc = cleanDesc.replace('Mantap! Kamu baru saja buat rekor 10RM baru:', 'Rekor baru:');
+              }
+              
+              window.dispatchEvent(new CustomEvent('show-achievement', {
+                 detail: {
+                    id: `10rm_${cacheKey}_${Date.now()}`,
+                    title: recordTitle,
+                    description: cleanDesc,
+                    color: 'text-amber-500', 
+                    bg: 'bg-amber-500/10', 
+                    borderColor: 'border-amber-500/30',
+                    imageUrl: '/badges/badge_volume.png',
+                 }
+              }));
+           }
+        }
+     });
+  }, [exerciseLogs, sessionExercises, isWorkoutActive, selectedDate]);
 
   const handleStartWorkout = (progId) => {
     const doStart = () => {

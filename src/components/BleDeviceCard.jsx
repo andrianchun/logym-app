@@ -16,10 +16,10 @@ const KIND = {
 const describe = (r) => {
   if (!r) return null;
   if (r.type === 'bloodPressure') {
-    return `${r.systolic}/${r.diastolic} mmHg${r.pulse > 0 ? ` · ${r.pulse} bpm` : ''}`;
+    return `${r.systolic}/${r.diastolic} mmHg${r.pulse > 0 ? ` — ${r.pulse} bpm` : ''}`;
   }
   if (r.type === 'weight') {
-    return `${r.weight} kg${r.impedance > 0 ? ` · ${r.impedance} Ω` : ''}`;
+    return `${r.weight} kg${r.impedance > 0 ? ` — ${r.impedance} Ic` : ''}`;
   }
   return null;
 };
@@ -38,6 +38,12 @@ export default function BleDeviceCard({ t, bleManager }) {
   if (!bleManager.available) return null;
 
   const { devices, status, readings, errors, warn, addDevice, forgetDevice, listen } = bleManager;
+
+  const handleForget = (d) => {
+    if (window.confirm(`Yakin ingin melupakan ${d.name}?`)) {
+      forgetDevice(d.deviceId);
+    }
+  };
 
   const pair = async (showAll = false) => {
     let dev;
@@ -80,7 +86,7 @@ export default function BleDeviceCard({ t, bleManager }) {
               >
                 {st === 'connecting' ? 'Menyambung...' : st === 'listening' ? 'Terhubung' : 'Sambungkan'}
               </button>
-              <button onClick={() => forgetDevice(d.deviceId)} aria-label={`Lupakan ${d.name}`} className={`shrink-0 p-1 rounded-full ${t.textMuted} hover:text-rose-500 transition-colors`}>
+              <button onClick={() => handleForget(d)} aria-label={`Lupakan ${d.name}`} className={`shrink-0 p-1 rounded-full ${t.textMuted} hover:text-rose-500 transition-colors`}>
                 <X size={14} />
               </button>
             </div>

@@ -397,7 +397,7 @@ export const shareTemplate = async (userId, userName, program) => {
   try {
     const docRef = await addDoc(collection(db, 'logym_community_posts'), {
       sourceApp: 'logym',
-      type: 'template', userId, userName: userName || 'Coach Logi',
+      type: 'template', userId, userName: userName || 'Coach Logy',
       programName: program.name || 'My Custom Program',
       planName: program.planName || 'Custom Plan',
       exercises: program.exercises || [],

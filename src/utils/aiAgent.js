@@ -11,7 +11,7 @@ import { functions } from '../firebase';
 const FILLER_WORD = '(sip|siap|oke|ok|okay|mantap|noted|got it|nice|keren|good)';
 const TRIVIAL_MESSAGE_PATTERNS = [
     /^(hai|halo|hi|hey|hello|oi|woy|pagi|siang|sore|malam)[!.\s]*$/i,
-    /^(makasih|thanks|thank you|thx|terima kasih)[!.\s]*(bro|coach|logi)?[!.\s]*$/i,
+    /^(makasih|thanks|thank you|thx|terima kasih)[!.\s]*(bro|coach|logy)?[!.\s]*$/i,
     new RegExp(`^${FILLER_WORD}([\\s,]+${FILLER_WORD})*[!.\\s]*$`, 'i'),
     /^(wk)+[!.\s]*$/i,
     /^(ha){2,}[!.\s]*$/i,
@@ -82,7 +82,7 @@ export const APP_HELP_REFERENCE = `[App Feature Reference — LOGYM app, use ONL
 - Reorder programs/exercises: tap the pencil icon next to a program name to enter Edit Mode, then hold + drag the dots icon.
 - Custom exercises: Database tab -> add/manage exercise -> can set name, target muscle, and a YouTube link.
 - Copy last week's schedule: Calendar tab -> "+ Ulangi 7 Hari Lalu" button.
-- Coach Logi (this chat): can create a brand-new program or edit/progress an existing active one directly from chat requests; personality (santai/galak/serius/custom) is changed in Settings -> Lanjutan.
+- Coach Logy (this chat): can create a brand-new program or edit/progress an existing active one directly from chat requests; personality (santai/galak/serius/custom) is changed in Settings -> Lanjutan.
 - Body composition photo scan: Dashboard -> Komposisi Tubuh card -> upload/scan a smart-scale app screenshot (Zepp Life, Mi Fit, Garmin, Huawei Health, etc.), AI extracts the numbers automatically.
 - Community: share workouts/achievements to a feed, follow other users, search by username, weekly social-score leaderboard.
 - Progress charts: toggle which exercises/muscle groups are plotted (max 6 at once), switch between "Per Latihan" and "Per Otot" view.
@@ -128,7 +128,7 @@ export const getAvailableModels = () => {
 // Local notifications are scheduled ahead of time (sometimes days out) with no guarantee the
 // device is online or the app is running when they fire, so the text has to be baked in up
 // front. Multiple variants per persona/type avoid the same line repeating every single day.
-// {placeholders} are filled in by getLogiNotification().
+// {placeholders} are filled in by getLogyNotification().
 export const LOGI_NOTIF_TEMPLATES = {
     prep: {
         santai: [
@@ -181,7 +181,7 @@ export const LOGI_NOTIF_TEMPLATES = {
 
 // 'custom' has no fixed voice (it's a freeform LLM instruction, not something we can render
 // without calling the API) — notifications fall back to 'santai' for that persona.
-export const getLogiNotification = (type, persona, vars = {}) => {
+export const getLogyNotification = (type, persona, vars = {}) => {
     const pool = LOGI_NOTIF_TEMPLATES[type]?.[persona] || LOGI_NOTIF_TEMPLATES[type]?.santai || [];
     if (pool.length === 0) return null;
     const [titleTpl, bodyTpl] = pool[Math.floor(Math.random() * pool.length)];
@@ -256,7 +256,7 @@ ${userProfile.lomealSync?.preferences?.allergies ? `- Allergies/Intolerances (fr
         ? `\n[User Memory — facts the user asked you to remember, treat as true unless the user contradicts them now]\n${memory.map(m => `- ${m}`).join('\n')}\n`
         : '';
 
-    return `You are "Coach Logi", an elite AI Personal Trainer built into the LOGYM app.
+    return `You are "Coach Logy", an elite AI Personal Trainer built into the LOGYM app.
 Your goal is to provide evidence-based fitness advice, analyze workout logs, and create highly personalized workout programs.
 ${toneInstruction}
 Regardless of tone, NEVER invent workout numbers, dates, or program details that are not present in the data given to you below — if you don't have the data, say so instead of guessing.
@@ -388,7 +388,8 @@ export const summarizeActivePrograms = (programs, activePlanIds) => {
     plans.forEach(plan => {
         summary += `Plan "${plan.planName}" (planId: ${plan.planId}${plan.planLevel ? `, level: ${plan.planLevel}` : ''}):\n`;
         plan.routines.forEach(r => {
-            const days = r.assignedDays?.length ? ` (${r.assignedDays.join(', ')})` : '';
+            const daysArr = Array.isArray(r.assignedDays) ? r.assignedDays : (typeof r.assignedDays === 'string' ? [r.assignedDays] : []);
+            const days = daysArr.length ? ` (${daysArr.join(', ')})` : '';
             const exList = (r.exercises || []).map(ex => `${ex.name} ${ex.sets}x${ex.reps}`).join(', ');
             summary += `  - ${r.name}${days}: ${exList}\n`;
         });

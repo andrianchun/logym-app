@@ -96,7 +96,7 @@ const MiniBox = ({ label, value, unit, t, theme }) => (
     </div>
 );
 
-const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, exerciseLibrary, navigateToWorkoutDate, soundEnabled, playSoundEffect, theme, selectedDate, biometricStandard, units, setConfirmModal, activityTargets, setActivityTargets, gymProfiles, activeGymId, activePlanIds, userApiKeys, userAchievements, connectedApps, userProfile, keyStatuses, setKeyStatuses, setShowSettings, lomealToday, lomealTargets, syncStatus, isBleBusy, expandedSessions }) => {
+const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, exerciseLibrary, navigateToWorkoutDate, soundEnabled, playSoundEffect, theme, selectedDate, biometricStandard, units, setConfirmModal, activityTargets, setActivityTargets, gymProfiles, activeGymId, activePlanIds, userApiKeys, userAchievements, connectedApps, userProfile, keyStatuses, setKeyStatuses, setShowSettings, lomealToday, lomealTargets, syncStatus, isBleBusy, expandedSessions, bleManager }) => {
   const todayStr = getLocalYMD(new Date());
   const activeDate = todayStr;
 
@@ -104,20 +104,20 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   // STATE KONEKSI & SINKRONISASI
   // ==========================================
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [isLogiHidden, setIsLogiHidden] = useState(() => localStorage.getItem('lyfit_logi_hidden') === 'true');
+  const [isLogyHidden, setIsLogyHidden] = useState(() => localStorage.getItem('lyfit_logy_hidden') === 'true');
 
   useEffect(() => {
       const handleToggle = (e) => {
           if (e.detail?.action === 'show' || e.detail?.action === 'showAndOpen') {
-              setIsLogiHidden(false);
+              setIsLogyHidden(false);
           } else if (e.detail?.action === 'hide') {
-              setIsLogiHidden(true);
+              setIsLogyHidden(true);
           } else {
-              setIsLogiHidden(prev => !prev);
+              setIsLogyHidden(prev => !prev);
           }
       };
-      window.addEventListener('toggle-logi-float', handleToggle);
-      return () => window.removeEventListener('toggle-logi-float', handleToggle);
+      window.addEventListener('toggle-logy-float', handleToggle);
+      return () => window.removeEventListener('toggle-logy-float', handleToggle);
   }, []);
 
 
@@ -239,20 +239,32 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      const COMPOSITION_FIELDS = ['weight', 'bodyFat', 'musclePercent', 'muscleMass', 'boneMass', 'visceralFat', 'waterPercent', 'proteinPercent', 'bodyAge', 'bmr', 'bodyScore', 'waist'];
      let latestBodyData = null;
      let bodyDataDate = null;
+     let fallbackHeight = null;
+     let fallbackWaist = null;
+
      for (const date of sortedDates) {
          const dayBio = history[date]?.bioData;
-         if (dayBio && COMPOSITION_FIELDS.some(f => Number(dayBio[f]) > 0)) {
-             latestBodyData = dayBio;
-             bodyDataDate = date;
-             break;
+         if (dayBio) {
+             if (!fallbackHeight && dayBio.height) fallbackHeight = dayBio.height;
+             if (!fallbackWaist && dayBio.waist) fallbackWaist = dayBio.waist;
+
+             if (!latestBodyData && COMPOSITION_FIELDS.some(f => Number(dayBio[f]) > 0)) {
+                 latestBodyData = dayBio;
+                 bodyDataDate = date;
+             }
+
+             if (fallbackHeight && fallbackWaist && latestBodyData) {
+                 break;
+             }
          }
      }
 
      const mergedData = {
          ...emptyBio,
-         height: userProfile?.height || null,
          weight: userProfile?.weight || null,
          ...latestBodyData,
+         height: (latestBodyData && latestBodyData.height) || fallbackHeight || userProfile?.height || emptyBio.height,
+         waist: (latestBodyData && latestBodyData.waist) || fallbackWaist || emptyBio.waist,
          steps: todayDailyData.steps !== undefined ? todayDailyData.steps : (emptyBio.steps || 0),
          stepMinutes: todayDailyData.stepMinutes !== undefined ? todayDailyData.stepMinutes : (emptyBio.stepMinutes || 0),
          distance: todayDailyData.distance !== undefined ? todayDailyData.distance : (emptyBio.distance || 0),
@@ -343,6 +355,24 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          let initialBio = { ...emptyBio };
          if (history[modalDate] && history[modalDate].bioData) {
              initialBio = { ...history[modalDate].bioData };
+         }
+
+         // Prefill height dan waist dari riwayat jika hari ini kosong (berguna jika timbangan
+         // cuma ngasih berat, biar form gak kosong).
+         if (!initialBio.height || !initialBio.waist) {
+             const sortedDates = Object.keys(history).filter(d => d <= modalDate).sort().reverse();
+             let fallbackH = initialBio.height;
+             let fallbackW = initialBio.waist;
+             for (const d of sortedDates) {
+                 if (fallbackH && fallbackW) break;
+                 const past = history[d]?.bioData;
+                 if (past) {
+                     if (!fallbackH && past.height) fallbackH = past.height;
+                     if (!fallbackW && past.waist) fallbackW = past.waist;
+                 }
+             }
+             initialBio.height = fallbackH || userProfile?.height || emptyBio.height;
+             initialBio.waist = fallbackW || emptyBio.waist;
          }
          
          // Injeksi nilai Smart Merge agar UI Swipe Input menampilkan angka yang tersinkronisasi
@@ -821,8 +851,8 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
             </div>
          </div>
          <div className="flex items-center gap-2 relative z-20 h-10 -mr-1">
-            {isLogiHidden && (
-               <button onClick={() => { playSoundEffect('click', soundEnabled); window.dispatchEvent(new CustomEvent('toggle-logi-float', { detail: { action: 'showAndOpen' } })); }} className={`flex flex-col items-center justify-center gap-0.5 bg-blue-500/10 text-blue-500 border border-blue-500/20 rounded-2xl p-1.5 hover:bg-blue-500/20 transition-all shadow-sm animate-in zoom-in-90 duration-300 min-w-[48px]`}>
+            {isLogyHidden && (
+               <button onClick={() => { playSoundEffect('click', soundEnabled); window.dispatchEvent(new CustomEvent('toggle-logy-float', { detail: { action: 'showAndOpen' } })); }} className={`flex flex-col items-center justify-center gap-0.5 bg-blue-500/10 text-blue-500 border border-blue-500/20 rounded-2xl p-1.5 hover:bg-blue-500/20 transition-all shadow-sm animate-in zoom-in-90 duration-300 min-w-[48px]`}>
                   <div className="w-7 h-7 rounded-full overflow-hidden bg-zinc-900 border border-blue-400 shrink-0" style={{backgroundImage: "url('/bg-program.webp')", backgroundSize: '450%', backgroundPosition: '52% 7%'}}></div>
                   <span className="text-[8px] font-black tracking-wide uppercase whitespace-nowrap leading-none pb-0.5">Konsul</span>
                </button>
@@ -1758,7 +1788,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
         hasManualLock={Object.keys(history[modalDate]?.bioData?._manualFlags || {}).length > 0} handleUnlockManual={handleUnlockManual}
         handleSaveManualData={handleSaveManualData} handleDeleteBioData={handleDeleteBioData} soundEnabled={soundEnabled}
         units={units} setConfirmModal={setConfirmModal} userApiKeys={userApiKeys} keyStatuses={keyStatuses} setKeyStatuses={setKeyStatuses} setShowSettings={setShowSettings}
-        connectedApps={connectedApps}
+        connectedApps={connectedApps} bleManager={bleManager}
       />
 
       {/* DETAIL BIOMETRIK MODAL */}

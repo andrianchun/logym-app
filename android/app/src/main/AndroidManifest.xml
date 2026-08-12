@@ -85,7 +85,12 @@
          dideklarasikan di sini, walau WRITE_TYPES di healthConnect.js sudah nyebut. -->
     <uses-permission android:name="android.permission.health.WRITE_WEIGHT" />
     <uses-permission android:name="android.permission.health.WRITE_BODY_FAT" />
+    <uses-permission android:name="android.permission.health.WRITE_HEART_RATE" />
     <uses-permission android:name="android.permission.health.WRITE_BLOOD_PRESSURE" />
+    <uses-permission android:name="android.permission.health.WRITE_BONE_MASS" />
+    <uses-permission android:name="android.permission.health.WRITE_LEAN_BODY_MASS" />
+    <uses-permission android:name="android.permission.health.WRITE_BASAL_METABOLIC_RATE" />
+    <uses-permission android:name="android.permission.health.WRITE_BODY_WATER_MASS" />
     <!-- Buat nulis kalori terbakar per sesi latihan (lihat hcWriteWorkoutCalories) -->
     <uses-permission android:name="android.permission.health.WRITE_ACTIVE_CALORIES_BURNED" />
     <!-- Buat nulis SESI LATIHAN lengkap dengan jenis olahraga, lewat plugin lokal

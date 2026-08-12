@@ -785,7 +785,7 @@ const ImmersiveWorkout = ({
                               <div className={`w-8 h-8 rounded-full ${t.bgAccent} flex items-center justify-center shadow-lg`}>
                                 <Brain size={16} className="text-white" />
                               </div>
-                              <span className={`font-black text-[11px] tracking-widest uppercase ${t.textMain}`}>Coach Logi</span>
+                              <span className={`font-black text-[11px] tracking-widest uppercase ${t.textMain}`}>Coach Logy</span>
                             </div>
                           </div>
                           <div className="flex flex-col items-center mt-auto pt-32 pb-2">

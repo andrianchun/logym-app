@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, ChevronRight } from 'lucide-react';
 
-const STORAGE_KEY = 'logi_float_pos';
+const STORAGE_KEY = 'logy_float_pos';
 const SIZE = 56;          // w-14 = 56px
 const EDGE_PAD = 16;      // jarak dari tepi layar saat snapped
 const TOP_SAFE = 72;      // bawah header (px)
@@ -23,14 +23,14 @@ function clampY(y) {
 }
 
 /**
- * CoachLogiFloat
+ * CoachLogyFloat
  *
  * - Draggable, snap ke kiri/kanan saat dilepas (spring cubic-bezier)
  * - Posisi Y tersimpan di localStorage
  * - Drag dari avatar = no-swipe (tidak pindah tab)
  * - onPositionChange(pos) → dikembalikan ke parent untuk animasi GymAIChat
  */
-export default function CoachLogiFloat({
+export default function CoachLogyFloat({
     onOpenChat,
     plateauInsights = [],
     hasUnreadChat = false, // dari GymAIChat: ada balasan/insight yang belum dibaca
@@ -59,7 +59,7 @@ export default function CoachLogiFloat({
 
     const [visualPos, setVisualPos] = useState(pos);
     const [isSnapping, setIsSnapping] = useState(false);
-    const [isVisible, setIsVisible] = useState(() => localStorage.getItem('lyfit_logi_hidden') !== 'true');
+    const [isVisible, setIsVisible] = useState(() => localStorage.getItem('lyfit_logy_hidden') !== 'true');
     const [isHoveringDrop, setIsHoveringDrop] = useState(false);
     const [showDragDrop, setShowDragDrop] = useState(false);
 
@@ -73,23 +73,23 @@ export default function CoachLogiFloat({
         const handleToggle = (e) => {
             if (e.detail?.action === 'show' || e.detail?.action === 'showAndOpen') {
                 setIsVisible(true);
-                localStorage.setItem('lyfit_logi_hidden', 'false');
+                localStorage.setItem('lyfit_logy_hidden', 'false');
                 if (e.detail?.action === 'showAndOpen') {
                     setTimeout(() => onOpenChat?.(), 100);
                 }
             } else if (e.detail?.action === 'hide') {
                 setIsVisible(false);
-                localStorage.setItem('lyfit_logi_hidden', 'true');
+                localStorage.setItem('lyfit_logy_hidden', 'true');
             } else {
                 setIsVisible(prev => {
                     const next = !prev;
-                    localStorage.setItem('lyfit_logi_hidden', next ? 'false' : 'true');
+                    localStorage.setItem('lyfit_logy_hidden', next ? 'false' : 'true');
                     return next;
                 });
             }
         };
-        window.addEventListener('toggle-logi-float', handleToggle);
-        return () => window.removeEventListener('toggle-logi-float', handleToggle);
+        window.addEventListener('toggle-logy-float', handleToggle);
+        return () => window.removeEventListener('toggle-logy-float', handleToggle);
     }, []);
 
     const isDragging = useRef(false);
@@ -169,8 +169,8 @@ export default function CoachLogiFloat({
 
         if (isHoveringDrop) {
             setIsVisible(false);
-            localStorage.setItem('lyfit_logi_hidden', 'true');
-            window.dispatchEvent(new CustomEvent('toggle-logi-float', { detail: { action: 'hide' } }));
+            localStorage.setItem('lyfit_logy_hidden', 'true');
+            window.dispatchEvent(new CustomEvent('toggle-logy-float', { detail: { action: 'hide' } }));
             setIsHoveringDrop(false);
             // Snap back silently for when it reappears
             setPos(defaultPos());
@@ -300,7 +300,7 @@ export default function CoachLogiFloat({
                         onClick={handleOpenChat}
                         className="w-full flex items-center justify-between bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 text-blue-300 text-xs font-bold px-3 py-2 rounded-xl transition-colors group"
                     >
-                        <span>Tanya Coach Logi</span>
+                        <span>Tanya Coach Logy</span>
                         <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
                     </button>
                 </div>
@@ -323,7 +323,7 @@ export default function CoachLogiFloat({
                 onPointerUp={onPointerUp}
                 onPointerCancel={onPointerUp}
                 title="Tahan untuk geser · Ketuk untuk chat"
-                aria-label="Coach Logi — ketuk untuk chat"
+                aria-label="Coach Logy — ketuk untuk chat"
             />
 
             {/* Titik unread — sibling DI LUAR avatar (yang overflow-hidden buat crop foto bulat),

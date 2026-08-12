@@ -10,7 +10,7 @@
 // setHistory milik App (biar angkanya langsung kelihatan tanpa nunggu sinkron HC berikutnya).
 // ============================================================
 import { BleClient } from '@capacitor-community/bluetooth-le';
-import { hcWriteBloodPressure, hcWriteWeight, hcWriteBodyFat, hcWriteBoneMass, hcWriteLeanBodyMass, hcWriteBodyWaterMass, hcWriteBMR } from './healthConnect.js';
+import { hcWriteBloodPressure, hcWriteHeartRate, hcWriteWeight, hcWriteBodyFat, hcWriteBoneMass, hcWriteLeanBodyMass, hcWriteBodyWaterMass, hcWriteBMR } from './healthConnect.js';
 import { calculateBodyComposition } from './xiaomiScaleCalc.js';
 
 // UUID BLE 16-bit harus ditulis panjang untuk plugin ini (Android menolak bentuk pendek).
@@ -314,6 +314,7 @@ const ymdOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, 
  */
 export const saveMeasurement = async (reading, { setHistory, userProfile } = {}) => {
   const at = reading.at instanceof Date && !Number.isNaN(reading.at.getTime()) ? reading.at : new Date();
+  reading.at = at;
   const ymd = ymdOf(at);
   const patch = {};
   // Gagal menulis ke HC TIDAK membatalkan simpan ke Logym — angkanya sudah di tangan, dan
@@ -325,9 +326,14 @@ export const saveMeasurement = async (reading, { setHistory, userProfile } = {})
     if (!(reading.systolic > 0) || !(reading.diastolic > 0)) {
       throw new Error('Pengukuran tensi tidak valid (sistolik/diastolik kosong).');
     }
-    hcOk = await hcWriteBloodPressure(reading.systolic, reading.diastolic, at);
+    const bpOk = await hcWriteBloodPressure(reading.systolic, reading.diastolic, at);
+    let hrOk = true;
     patch.bloodPressure = `${reading.systolic}/${reading.diastolic}`;
-    if (reading.pulse > 0) patch.heartRate = reading.pulse;
+    if (reading.pulse > 0) {
+      hrOk = await hcWriteHeartRate(reading.pulse, at);
+      patch.heartRate = reading.pulse.toString();
+    }
+    hcOk = bpOk && hrOk;
   } else if (reading.type === 'weight') {
     if (!(reading.weight > 0)) throw new Error('Pengukuran berat tidak valid.');
     hcOk = await hcWriteWeight(reading.weight, at);
@@ -373,10 +379,28 @@ export const saveMeasurement = async (reading, { setHistory, userProfile } = {})
     return null;
   }
 
-  setHistory?.((prev) => ({
-    ...prev,
-    [ymd]: { ...(prev[ymd] || {}), bioData: { ...(prev[ymd]?.bioData || {}), ...patch } },
-  }));
+  setHistory?.((prev) => {
+    const oldBio = prev[ymd]?.bioData || {};
+    const newBio = { ...oldBio, ...patch };
+
+    // Intraday Data Append (Grafik harian)
+    const ts = at.getTime();
+    const timeStr = at.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+    
+    if (reading.type === 'bloodPressure') {
+      newBio.bloodPressureLog = [...(oldBio.bloodPressureLog || []), { time: timeStr, ts, sys: Math.round(reading.systolic), dia: Math.round(reading.diastolic) }].sort((a,b) => a.ts - b.ts);
+      if (reading.pulse > 0) {
+        newBio.heartRateLog = [...(oldBio.heartRateLog || []), { time: timeStr, ts, value: Math.round(reading.pulse) }].sort((a,b) => a.ts - b.ts);
+      }
+    } else if (reading.type === 'weight') {
+      newBio.weightLog = [...(oldBio.weightLog || []), { time: timeStr, ts, value: Number(reading.weight.toFixed(1)) }].sort((a,b) => a.ts - b.ts);
+    }
+
+    return {
+      ...prev,
+      [ymd]: { ...(prev[ymd] || {}), bioData: newBio },
+    };
+  });
 
   return { ymd, patch, hcOk };
 };

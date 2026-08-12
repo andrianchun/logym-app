@@ -19,7 +19,7 @@ import Header from './components/Header';
 import BottomNav from './components/BottomNav';
 import TabSlider from './components/TabSlider';
 import FloatingTimer from './components/FloatingTimer';
-import CoachLogiFloat from './components/CoachLogiFloat';
+import CoachLogyFloat from './components/CoachLogyFloat';
 import GymAIChat from './components/GymAIChat';
 
 // --- IMPORT HALAMAN (PAGES) ---
@@ -49,7 +49,7 @@ import { checkAchievements, ACHIEVEMENTS } from './data/achievements';
 // --- IMPORT DATA & MESIN ---
 import { playSoundEffect } from './utils/audio';
 import { fetchExercisesFromApi } from './utils/exerciseDbApi';
-import { AI_MODELS, detectPlateaus, getLogiNotification } from './utils/aiAgent';
+import { AI_MODELS, detectPlateaus, getLogyNotification } from './utils/aiAgent';
 import { calculateReadiness, restingHrBaseline } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
 import { calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, recomputeStrengthRecords, buildHcSessionDetail } from './utils/workoutCalc';
@@ -177,6 +177,9 @@ export default function App() {
         if (res.ok) {
           const data = await res.json();
           if (data.ota_version && data.ota_version !== installedVer) {
+            if (data.is_apk && !isNative) {
+              return; 
+            }
             const dismissed = localStorage.getItem('logym_dismissed_ota');
             if (!data.is_forced && dismissed === data.ota_version) {
               setOtaState(prev => ({ ...prev, open: false, force: data.is_forced, url: data.ota_url, version: data.ota_version, notes: data.release_notes }));
@@ -223,6 +226,22 @@ export default function App() {
 
   const handleUpdateApp = async () => {
     localStorage.removeItem('logym_dismissed_ota');
+
+    if (otaState.url && !otaState.url.toLowerCase().endsWith('.zip')) {
+      setDownloadProgress('apk');
+      const link = document.createElement('a');
+      link.href = otaState.url;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Reset after 10 seconds to allow retry if the download didn't trigger
+      setTimeout(() => {
+        setDownloadProgress(null);
+      }, 10000);
+      return;
+    }
 
     if (!Capacitor.isNativePlatform()) {
       setDownloadProgress(0);
@@ -278,10 +297,10 @@ export default function App() {
   const [userApiKeys, _setUserApiKeys] = useState([]);
   const setUserApiKeys = _setUserApiKeys;
   const [keyStatuses, setKeyStatuses] = useState({});
-  const [logiPersona, setLogiPersona] = useState('santai');
-  const [logiCustomInstruction, setLogiCustomInstruction] = useState('');
-  const [logiMemory, _setLogiMemory] = useState([]);
-  const setLogiMemory = _setLogiMemory;
+  const [logyPersona, setLogyPersona] = useState('santai');
+  const [logyCustomInstruction, setLogyCustomInstruction] = useState('');
+  const [logyMemory, _setLogyMemory] = useState([]);
+  const setLogyMemory = _setLogyMemory;
   const [hasUnreadChat, setHasUnreadChat] = useState(false);
   const [activityTargets, _setActivityTargets] = useState({ steps: 10000, dailyActiveMinutes: 30, sleep: 8 });
   const setActivityTargets = _setActivityTargets;
@@ -480,12 +499,14 @@ export default function App() {
 
     const tertambal = silent ? 0 : await healHcHoles({ force: true });
 
-    if (status) {
-      const denied = [...(status.readDenied || []), ...(status.writeDenied || [])];
+    if (!silent) {
+      const denied = status ? [...(status.readDenied || []), ...(status.writeDenied || [])] : [];
       const adaIsinya = (k) => Object.values(hcByDay).filter((d) => d?.[k] !== undefined).length;
       const hrvHari = adaIsinya('hrv');
+      const reads = status?.readAuthorized?.length || 0;
+      const writes = status?.writeAuthorized?.length || 0;
       showOtaAlert([
-        `Izin — baca ${status.readAuthorized?.length || 0} tipe, tulis ${status.writeAuthorized?.length || 0} tipe`,
+        ...(status ? [`Izin — baca ${reads} tipe, tulis ${writes} tipe`] : [`Pengecekan izin gagal / belum tuntas`]),
         ...(denied.length ? [`Ditolak — ${denied.join(', ')}`] : []),
         `Histori masuk — ${filled} hari`,
         ...(hrvHari > 0 ? [`HRV — ${hrvHari} hari`] : []),
@@ -790,11 +811,11 @@ export default function App() {
     return calculateReadiness(todayBioData, restingHrBaseline(history, todayStr));
   }, [history, user, activeTab]);
 
-  const scheduleLogiPush = async (type, id, vars) => {
+  const scheduleLogyPush = async (type, id, vars) => {
     try {
       const perm = await LocalNotifications.requestPermissions();
       if (perm.display !== 'granted') return;
-      const copy = getLogiNotification(type, logiPersona, vars);
+      const copy = getLogyNotification(type, logyPersona, vars);
       if (!copy) return;
       const [h, m] = (defaultReminderTime || '09:00').split(':');
       const fireAt = new Date();
@@ -806,11 +827,11 @@ export default function App() {
           title: copy.title,
           body: copy.body,
           schedule: { at: fireAt },
-          largeIcon: 'coach_logi_avatar',
+          largeIcon: 'coach_logy_avatar',
         }]
       });
     } catch (err) {
-      console.warn('Logi push notif error:', err);
+      console.warn('Logy push notif error:', err);
     }
   };
 
@@ -824,7 +845,7 @@ export default function App() {
         const perm = await LocalNotifications.checkPermissions();
         if (perm.display !== 'granted') return;
 
-        const copy = getLogiNotification('start', logiPersona, { program: 'Latihan hari ini' });
+        const copy = getLogyNotification('start', logyPersona, { program: 'Latihan hari ini' });
         if (!copy) return;
 
         const [h, m] = (defaultReminderTime || '09:00').split(':');
@@ -842,7 +863,7 @@ export default function App() {
               repeats: true,
               allowWhileIdle: true
             },
-            largeIcon: 'coach_logi_avatar',
+            largeIcon: 'coach_logy_avatar',
           }]
         });
       } catch (err) {
@@ -850,7 +871,7 @@ export default function App() {
       }
     };
     scheduleDailyReminder();
-  }, [reminderEnabled, defaultReminderTime, logiPersona]);
+  }, [reminderEnabled, defaultReminderTime, logyPersona]);
 
 
   useEffect(() => {
@@ -870,9 +891,9 @@ export default function App() {
     const dedupVal = `${completedDates[0]}_${daysSince}`;
     if (localStorage.getItem(dedupKey) === dedupVal) return;
 
-    scheduleLogiPush('missed', 88000000 + (daysSince % 1000), { days: daysSince })
+    scheduleLogyPush('missed', 88000000 + (daysSince % 1000), { days: daysSince })
       .then(() => localStorage.setItem(dedupKey, dedupVal));
-  }, [history, reminderEnabled, logiPersona, defaultReminderTime, user?.uid]);
+  }, [history, reminderEnabled, logyPersona, defaultReminderTime, user?.uid]);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform() || !reminderEnabled) return;
@@ -882,9 +903,9 @@ export default function App() {
     const dedupKey = `lyfit_insight_notif_${user?.uid || 'guest'}`;
     if (localStorage.getItem(dedupKey) === insightKey) return;
 
-    scheduleLogiPush('insight', 89000000 + (top.weeks % 1000), { exName: top.name, weeks: top.weeks, maxWeight: top.maxWeight })
+    scheduleLogyPush('insight', 89000000 + (top.weeks % 1000), { exName: top.name, weeks: top.weeks, maxWeight: top.maxWeight })
       .then(() => localStorage.setItem(dedupKey, insightKey));
-  }, [plateauInsights, reminderEnabled, logiPersona, defaultReminderTime, user?.uid]);
+  }, [plateauInsights, reminderEnabled, logyPersona, defaultReminderTime, user?.uid]);
 
   const handleAcceptAiProgram = React.useCallback(async (programData) => {
     const isUpdate = programData.action === 'update' && programData.targetPlanId;
@@ -927,7 +948,7 @@ export default function App() {
     try {
       if (isUpdate) {
         setPrograms(prev => [...routines, ...prev.filter(p => p.planId !== planId)]);
-        await showAiAlert('Program berhasil diperbarui sesuai saran Coach Logi!', { type: 'success' });
+        await showAiAlert('Program berhasil diperbarui sesuai saran Coach Logy!', { type: 'success' });
       } else {
         setPrograms(prev => [...routines, ...prev]);
         setActivePlanIds(prev => [...prev.filter(id => id !== 'custom'), planId]);
@@ -1548,9 +1569,9 @@ export default function App() {
               migratedKeys = migratedKeys.filter(k => k && k.trim());
               setUserApiKeys(prev => takeServer('userApiKeys', prev) ? migratedKeys : prev);
 
-              setLogiPersona(parsedSettings.logiPersona || 'santai');
-              setLogiCustomInstruction(parsedSettings.logiCustomInstruction || '');
-              setLogiMemory(prev => takeServer('logiMemory', prev) ? (Array.isArray(parsedSettings.logiMemory) ? parsedSettings.logiMemory : []) : prev);
+              setLogyPersona(parsedSettings.logyPersona || 'santai');
+              setLogyCustomInstruction(parsedSettings.logyCustomInstruction || '');
+              setLogyMemory(prev => takeServer('logyMemory', prev) ? (Array.isArray(parsedSettings.logyMemory) ? parsedSettings.logyMemory : []) : prev);
             }
             if (data.userAchievements) setUserAchievements(data.userAchievements);
             setUser(prev => {
@@ -1675,7 +1696,7 @@ export default function App() {
           cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard,
           unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, userProfile,
           userApiKeys: (userApiKeys || []).filter(k => k && k.trim()),
-          logiPersona, logiCustomInstruction, logiMemory
+          logyPersona, logyCustomInstruction, logyMemory
         };
         const { changed, nextBaseline, changedKeys } = diffFields(localMain, mainBaselineRef.current);
         if (changedKeys.length === 0) return; 
@@ -1714,7 +1735,7 @@ export default function App() {
 
       return () => { clearTimeout(timer); if (retryTimer) clearTimeout(retryTimer); pendingMainSaveRef.current = null; };
     }
-  }, [programs, exerciseLibrary, theme, language, soundEnabled, healthConnectEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, user?.uid, isDataLoaded, userAchievements, userProfile, userApiKeys, logiPersona, logiCustomInstruction, logiMemory]);
+  }, [programs, exerciseLibrary, theme, language, soundEnabled, healthConnectEnabled, defaultRestTime, warmupVideos, cooldownVideos, weekStartDay, defaultReminderTime, reminderEnabled, biometricStandard, unitSystem, units, gymProfiles, activeGymId, activityTargets, activePlanIds, user?.uid, isDataLoaded, userAchievements, userProfile, userApiKeys, logyPersona, logyCustomInstruction, logyMemory]);
 
   const lastSavedHistoryJson = useRef(migrateBaseline(readCache('__CACHED_HISTORY_BASE', null)));
   const setHistoryBaseline = (next) => {
@@ -1890,6 +1911,8 @@ export default function App() {
   }, []);
 
   const historyRef = useRef(history);
+  const poppedBadgesRef = useRef(new Set());
+
   useEffect(() => {
     if (history === historyRef.current || !isDataLoaded) return;
     const timer = setTimeout(() => {
@@ -1903,15 +1926,27 @@ export default function App() {
         }
       }
       const newBadges = checkAchievements(history, userAchievements, lastWorkout);
-      if (newBadges.length > 0) {
-        if (soundEnabled) {
-          const audio = new Audio('/cheer.wav');
-          audio.volume = 1.0;
-          audio.play().catch(() => {});
+      const isRetroactiveSpam = userAchievements.length === 0 && Object.keys(history).length > 1;
+      
+      const newlyEarned = [];
+      newBadges.forEach(b => {
+          if (!poppedBadgesRef.current.has(b.id)) {
+              newlyEarned.push(b);
+              poppedBadgesRef.current.add(b.id);
+          }
+      });
+
+      if (newlyEarned.length > 0) {
+        if (!isRetroactiveSpam) {
+          if (soundEnabled) {
+            const audio = new Audio('/cheer.wav');
+            audio.volume = 1.0;
+            audio.play().catch(() => {});
+          }
+          setUnlockedAchievementsPopup(prev => [...prev, ...newlyEarned]);
         }
-        setUnlockedAchievementsPopup(prev => [...prev, ...newBadges]);
         setUserAchievements(prev => {
-          const newSet = new Set([...prev, ...newBadges.map(b => b.id)]);
+          const newSet = new Set([...prev, ...newlyEarned.map(b => b.id)]);
           return Array.from(newSet);
         });
       }
@@ -1919,6 +1954,24 @@ export default function App() {
     }, 800);
     return () => clearTimeout(timer);
   }, [history, isDataLoaded, userAchievements, soundEnabled]);
+
+  useEffect(() => {
+    const handleShowAchievement = (e) => {
+      const detail = e.detail;
+      if (!detail || !detail.id) return;
+      if (poppedBadgesRef.current.has(detail.id)) return;
+      poppedBadgesRef.current.add(detail.id);
+      
+      if (soundEnabled) {
+        const audio = new Audio('/cheer.wav');
+        audio.volume = 1.0;
+        audio.play().catch(() => {});
+      }
+      setUnlockedAchievementsPopup(prev => [...prev, detail]);
+    };
+    window.addEventListener('show-achievement', handleShowAchievement);
+    return () => window.removeEventListener('show-achievement', handleShowAchievement);
+  }, [soundEnabled]);
 
   useEffect(() => {
     if (activeTab === 'workout') {
@@ -3539,9 +3592,9 @@ export default function App() {
            keyStatuses={keyStatuses}
            userProfile={userProfile}
            bleManager={bleManager}
-           logiPersona={logiPersona} setLogiPersona={setLogiPersona}
-           logiCustomInstruction={logiCustomInstruction} setLogiCustomInstruction={setLogiCustomInstruction}
-           logiMemory={logiMemory} setLogiMemory={setLogiMemory}
+           logyPersona={logyPersona} setLogyPersona={setLogyPersona}
+           logyCustomInstruction={logyCustomInstruction} setLogyCustomInstruction={setLogyCustomInstruction}
+           logyMemory={logyMemory} setLogyMemory={setLogyMemory}
          defaultRestTime={defaultRestTime} setDefaultRestTime={setDefaultRestTime}
          weekStartDay={weekStartDay} setWeekStartDay={setWeekStartDay}
          defaultReminderTime={defaultReminderTime} setDefaultReminderTime={setDefaultReminderTime}
@@ -3603,6 +3656,7 @@ export default function App() {
                userProfile={userProfile}
                lomealToday={lomealToday} lomealTargets={lomealTargets}
                expandedSessions={expandedSessions}
+               bleManager={bleManager}
              />
          )}
          
@@ -3652,7 +3706,7 @@ export default function App() {
                units={units}
                activePlanIds={activePlanIds}
                userProfile={userProfile}
-               logiPersona={logiPersona}
+               logyPersona={logyPersona}
                activityTargets={activityTargets}
              />
          )}
@@ -3711,7 +3765,7 @@ export default function App() {
 
       {/* === GLOBAL COACH LOGI FLOAT === */}
       {user && (
-        <CoachLogiFloat
+        <CoachLogyFloat
           onOpenChat={() => setShowAiChat(true)}
           plateauInsights={plateauInsights}
           hasUnreadChat={hasUnreadChat}
@@ -3736,10 +3790,10 @@ export default function App() {
         programs={programs}
         activePlanIds={activePlanIds}
         plateauInsights={plateauInsights}
-        logiPersona={logiPersona}
-        logiCustomInstruction={logiCustomInstruction}
-        logiMemory={logiMemory}
-        setLogiMemory={setLogiMemory}
+        logyPersona={logyPersona}
+        logyCustomInstruction={logyCustomInstruction}
+        logyMemory={logyMemory}
+        setLogyMemory={setLogyMemory}
         onUnreadChange={setHasUnreadChat}
         onAcceptProgram={handleAcceptAiProgram}
         user={user}

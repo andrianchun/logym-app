@@ -364,7 +364,7 @@ const ExerciseCard = ({
                               }}
                             />
                             <div className="relative z-10 flex flex-col h-full flex-1">
-                                {/* Removed Coach Logi top badge */}
+                                {/* Removed Coach Logy top badge */}
                                 <div className="flex flex-col items-center mt-auto pt-32 pb-2">
                                   {overloadHint ? (
                                      <>

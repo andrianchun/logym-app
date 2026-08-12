@@ -11,7 +11,7 @@ import { formatNumber } from '../utils/numberFormat';
 import { parseWorkoutDurationMinutes, calculateWorkoutCalories, calculateSmartWorkoutCalories } from '../utils/workoutCalc';
 import PanoramicSlider from '../components/PanoramicSlider';
 import { LocalNotifications } from '@capacitor/local-notifications';
-import { getLogiNotification } from '../utils/aiAgent';
+import { getLogyNotification } from '../utils/aiAgent';
 import ActivityRings from '../components/ActivityRings';
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts';
 import { calculateAge, getHRZone } from '../utils/hrZones';
@@ -22,7 +22,7 @@ const CalendarTab = ({
   setActiveTab, soundEnabled, playSoundEffect, navigateToWorkoutDate,
   exerciseLogs, skippedExercises, handleEditPastWorkout,
   weekStartDay = 0, defaultReminderTime = "15:00", reminderEnabled = true,
-  unitSystem, setConfirmModal, activePlanIds = [], userProfile, logiPersona = 'santai', activityTargets, sessionToRun, isWorkoutActive
+  unitSystem, setConfirmModal, activePlanIds = [], userProfile, logyPersona = 'santai', activityTargets, sessionToRun, isWorkoutActive
 }) => {
   const isImp = unitSystem === 'imperial';
   const [calendarDate, setCalendarDate] = useState(() => {
@@ -438,7 +438,7 @@ const CalendarTab = ({
       if (prepTime.getTime() >= Date.now()) {
         const id1 = Math.floor(Math.random() * 1000000);
         notifIds.push(id1);
-        const copy = getLogiNotification('prep', logiPersona, { program: programName });
+        const copy = getLogyNotification('prep', logyPersona, { program: programName });
         notifs.push({
           title: copy.title,
           body: copy.body,
@@ -446,14 +446,14 @@ const CalendarTab = ({
           schedule: { at: prepTime },
           actionTypeId: "",
           extra: null,
-          largeIcon: 'coach_logi_avatar'
+          largeIcon: 'coach_logy_avatar'
         });
       }
 
       if (targetTime.getTime() >= Date.now()) {
         const id2 = Math.floor(Math.random() * 1000000);
         notifIds.push(id2);
-        const copy = getLogiNotification('start', logiPersona, { program: programName });
+        const copy = getLogyNotification('start', logyPersona, { program: programName });
         notifs.push({
           title: copy.title,
           body: copy.body,
@@ -461,7 +461,7 @@ const CalendarTab = ({
           schedule: { at: targetTime },
           actionTypeId: "",
           extra: null,
-          largeIcon: 'coach_logi_avatar'
+          largeIcon: 'coach_logy_avatar'
         });
       }
 

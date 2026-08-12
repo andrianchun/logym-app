@@ -1,8 +1,20 @@
-import { DownloadCloud, X } from 'lucide-react';
+import { DownloadCloud, X, Loader2 } from 'lucide-react';
 
 // Bar progres unduhan. Bundle OTA puluhan MB, jadi tanpa indikator user ngira
 // tombolnya macet dan menekan berulang kali.
 function DownloadProgress({ progress, t }) {
+  if (progress === 'apk') {
+    return (
+      <div className="w-full flex flex-col items-center justify-center p-4">
+        <Loader2 className={`animate-spin ${t.textAccent} mb-3`} size={32} />
+        <span className={`text-sm font-bold ${t.textMain}`}>Mempersiapkan Unduhan...</span>
+        <p className={`text-[10px] ${t.textMuted} mt-2 leading-tight text-center`}>
+          Tunggu sebentar, file APK sedang diproses oleh browser.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full">
       <div className="flex items-center justify-between mb-2">

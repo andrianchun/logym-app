@@ -26,8 +26,8 @@ export default function SettingsModal({
   userApiKeys, setUserApiKeys,
   keyStatuses,
   userProfile,
-  logiPersona, setLogiPersona, logiCustomInstruction, setLogiCustomInstruction,
-  logiMemory, setLogiMemory,
+  logyPersona, setLogyPersona, logyCustomInstruction, setLogyCustomInstruction,
+  logyMemory, setLogyMemory,
   otaAvailable, otaState, currentVer, onUpdateApp, downloadProgress,
   healthConnectEnabled, onToggleHealthConnect, healthAvailable, onHcBackfill,
   setHistory,
@@ -420,7 +420,7 @@ export default function SettingsModal({
             {/* KEPRIBADIAN COACH LOGI */}
             <div className={`p-4 rounded-2xl border ${t.border} ${t.bgCard} space-y-3`}>
                 <p className={`body-md ${t.textMuted} uppercase tracking-wider mb-2 flex items-center gap-2`}>
-                  <MessageCircle size={16} /> Kepribadian Coach Logi
+                  <MessageCircle size={16} /> Kepribadian Coach Logy
                 </p>
                 <div className="grid grid-cols-3 gap-2">
                     {[
@@ -430,9 +430,9 @@ export default function SettingsModal({
                     ].map(p => (
                         <button
                             key={p.key}
-                            onClick={() => setLogiPersona(p.key)}
+                            onClick={() => setLogyPersona(p.key)}
                             title={PERSONA_PRESETS[p.key]?.label}
-                            className={`py-3 rounded-xl text-2xl transition-all flex items-center justify-center ${logiPersona === p.key ? `${t.bgAccent} shadow-sm` : t.btnBg}`}
+                            className={`py-3 rounded-xl text-2xl transition-all flex items-center justify-center ${logyPersona === p.key ? `${t.bgAccent} shadow-sm` : t.btnBg}`}
                         >
                             {p.emoji}
                         </button>
@@ -443,19 +443,19 @@ export default function SettingsModal({
             {/* MEMORI COACH LOGI */}
             <div className={`p-4 rounded-2xl border ${t.border} ${t.bgCard} space-y-2`}>
                 <p className={`body-md ${t.textMuted} uppercase tracking-wider mb-2 flex items-center gap-2`}>
-                  <Brain size={16} /> Memori Coach Logi
+                  <Brain size={16} /> Memori Coach Logy
                 </p>
-                {(!logiMemory || logiMemory.length === 0) ? (
+                {(!logyMemory || logyMemory.length === 0) ? (
                     <p className={`text-xs ${t.textMuted} leading-relaxed`}>
-                        Belum ada memori tersimpan. Tandai pesan di chat (ikon bookmark) untuk menyimpannya ke sini. Coach Logi akan mengingatnya.
+                        Belum ada memori tersimpan. Tandai pesan di chat (ikon bookmark) untuk menyimpannya ke sini. Coach Logy akan mengingatnya.
                     </p>
                 ) : (
                     <div className="space-y-2">
-                        {logiMemory.map((m, i) => (
+                        {logyMemory.map((m, i) => (
                             <div key={i} className={`flex items-start gap-2 p-2.5 rounded-xl ${t.inputBg} border ${t.border}`}>
                                 <p className={`flex-1 text-xs ${t.textMain} leading-relaxed`}>{m}</p>
                                 <button
-                                    onClick={() => setLogiMemory(logiMemory.filter((_, idx) => idx !== i))}
+                                    onClick={() => setLogyMemory(logyMemory.filter((_, idx) => idx !== i))}
                                     className="p-1 rounded-full text-neutral-500 hover:text-rose-500 transition-colors shrink-0"
                                 >
                                     <Trash2 size={14} />
