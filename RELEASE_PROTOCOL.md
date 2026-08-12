@@ -27,11 +27,12 @@ Jalur A pakai [`scripts/build-ota.js`](scripts/build-ota.js) dan Capgo Updater �
 ## Jalur A — Rilis OTA ZIP (default)
 
 ```bash
-npm run release            # bump versi + build + zip + manifest
-firebase deploy --only hosting
+npm run release force "Perbaikan bug X dan Y"
+```
+Satu perintah ini sudah mencakup semuanya: bump versi → build → zip → manifest → deploy hosting → commit → push. Tanpa kata `force`, kartu update bisa ditutup user. Verifikasi setelahnya:
+```bash
 curl -s https://logym.web.app/ota/version.json
 ```
-Untuk update wajib beserta catatan rilis: `npm run release force "catatan rilis"`. Lalu commit & push (lihat bagian Commit di bawah).
 
 ---
 
@@ -49,28 +50,39 @@ Untuk menghindari masalah cache (di mana aplikasi mengabaikan update karena meng
 *(Catatan: Pastikan konstanta `__APP_VERSION__` di `vite.config.js` tersinkronisasi jika perlu).*
 
 ### 2. Build APK (Native Android)
-Instruksikan pengguna atau jalankan perintah berikut untuk mem-build APK baru:
+Urutannya penting — `sync:android` membekukan versi yang sedang ada di `package.json` ke dalam APK:
 ```bash
-npm run build
-npx cap sync android
-cd android
-./gradlew assembleRelease
+npm run sync:android
+cd android && ./gradlew assembleRelease
 ```
 *(Catatan: Jika pengguna memiliki konfigurasi Keystore khusus, pastikan APK yang dihasilkan adalah Signed APK).*
 
-### 3. Bagikan APK lewat Firebase Hosting, bukan Google Drive
-Jangan pakai Google Drive. Drive selalu menyajikan halaman peringatan virus-scan untuk APK, jadi yang terunduh user adalah HTML 2,5 KB — bukan aplikasi. Taruh APK di hosting yang sudah kita pakai:
+Verifikasi versi yang benar-benar terbungkus sebelum dibagikan:
+```bash
+unzip -p android/app/build/outputs/apk/release/app-release.apk assets/public/assets/index-*.js | grep -o "[0-9]\+\.[0-9]\+\.[0-9]\+" | head -1
+```
+
+### 3. Salin APK ke hosting
+Jangan pakai Google Drive. Drive selalu menyajikan halaman peringatan virus-scan untuk APK, jadi yang terunduh user adalah HTML 2,5 KB — bukan aplikasi.
 ```bash
 cp android/app/build/outputs/apk/release/app-release.apk public/apk/logym-latest.apk
 ```
-Link publiknya jadi `https://logym.web.app/apk/logym-latest.apk`, permanen dan tidak perlu unggah manual ke mana pun. Verifikasi setelah deploy:
-```bash
-curl -sIL https://logym.web.app/apk/logym-latest.apk | grep -i "content-type\|content-length"
-```
-Harus `application/vnd.android.package-archive` (atau `octet-stream`) dengan ukuran ±28 MB. Kalau yang keluar `text/html`, berarti kena rewrite SPA — periksa `firebase.json`.
+Link publiknya `https://logym.web.app/apk/logym-latest.apk` — permanen, ditimpa tiap rilis, tidak perlu unggah manual. File `.apk` sengaja tidak di-commit (lihat `.gitignore`) supaya repo tidak bengkak 28 MB tiap rilis.
 
-### 4. Manifest OTA
-Manifest **selalu** dihasilkan `npm run build:ota`, tidak ditulis tangan (lihat aturan di atas). Untuk rilis APK, jalankan `npm run release force "catatan rilis"` seperti biasa, lalu ubah `ota_url` di `dist/ota/version.json` ke link APK di atas dan tambahkan `"is_apk": true` sebelum deploy — atau lebih aman, biarkan jalur ZIP yang menangani bagian web dan bagikan link APK secara terpisah ke user yang perlu.
+### 4. Rilis dengan jalur APK
+```bash
+npm run release force apk "Menambah izin Health Connect"
+```
+Kata `apk` membuat manifest menunjuk APK di hosting, bukan bundle ZIP, sehingga tombol Update di aplikasi mengunduh APK dan memicu dialog install Android. Script akan berhenti lebih awal kalau `public/apk/logym-latest.apk` belum ada.
+
+Verifikasi setelah deploy:
+```bash
+curl -s https://logym.web.app/ota/version.json
+curl -sIL https://logym.web.app/apk/logym-latest.apk | grep -i "content-type"
+```
+Manifest harus memuat `"is_apk": true`, dan APK harus tayang sebagai `application/vnd.android.package-archive`. Kalau yang keluar `text/html`, berarti kena rewrite SPA — periksa `firebase.json`.
+
+> `is_apk` dan akhiran `ota_url` wajib sejalan: [App.jsx](src/App.jsx) memilih cara update **hanya** dari akhiran `.zip`. Invarian ini dikunci oleh `node scripts/otaManifest.test.mjs`.
 
 ### 5. Commit & Push ke GitHub
 `npm run release` sudah otomatis `git add -A`, commit `release vX.Y.Z`, dan `git push`. Kalau rilis dikerjakan manual, lakukan sendiri:

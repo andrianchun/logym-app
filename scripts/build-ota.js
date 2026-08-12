@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { ZipArchive } from 'archiver';
+import { buildManifest, zipNameFor } from './otaManifest.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,7 +18,7 @@ const KEEP = 3;
 // Versi selalu diambil dari package.json — JANGAN oper versi lewat argumen.
 // Bump versi dilakukan otomatis oleh scripts/release.js.
 const version = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf8')).version;
-const zipName = `update_${version.replace(/\./g, '')}.zip`;
+const zipName = zipNameFor(version);
 const outputPath = path.join(otaPath, zipName);
 
 console.log(`Building OTA ZIP: ${zipName}`);
@@ -50,16 +51,14 @@ output.on('close', function() {
   kept.slice(0, KEEP).forEach(f => fs.copyFileSync(path.join(archivePath, f), path.join(otaPath, f)));
 
   // version.json ditulis SETELAH zip selesai, supaya manifest tidak pernah menunjuk zip yang gagal dibuat.
-  // OTA_FORCE/OTA_NOTES di-set oleh scripts/release.js (`npm run release force "catatan"`).
-  fs.writeFileSync(path.join(otaPath, 'version.json'), JSON.stringify({
-    ota_version: version,
-    // Domain produksi asli itu logym.web.app (project hexa-life) — logym-id.web.app project
-    // beda yang gak pernah dipakai siapa pun, APK yang download dari situ selalu 404.
-    ota_url: `https://logym.web.app/ota/${zipName}`,
-    is_forced: process.env.OTA_FORCE === '1',
-    release_notes: process.env.OTA_NOTES || `Pembaruan v${version}`
-  }, null, 2));
-  console.log(`OTA siap (v${version}). Zip ter-deploy: ${kept.slice(0, KEEP).join(', ')}`);
+  // OTA_FORCE/OTA_NOTES/OTA_APK di-set oleh scripts/release.js (`npm run release force apk "catatan"`).
+  // OTA_APK=1 mengarahkan tombol Update ke APK di hosting, bukan bundle ZIP — dipakai HANYA saat
+  // ada perubahan native di android/, karena ZIP tidak bisa menambah permission/plugin.
+  const apk = process.env.OTA_APK === '1';
+  fs.writeFileSync(path.join(otaPath, 'version.json'), JSON.stringify(
+    buildManifest(version, { apk, forced: process.env.OTA_FORCE === '1', notes: process.env.OTA_NOTES }),
+    null, 2));
+  console.log(`OTA siap (v${version})${apk ? ' — jalur APK' : ''}. Zip ter-deploy: ${kept.slice(0, KEEP).join(', ')}`);
 });
 
 archive.on('warning', function(err) {
