@@ -142,45 +142,27 @@ class WorkoutTimerService : Service() {
             
             if (previousRestLeft > 0 && restLeft <= 0) {
                 try {
-                    val audioManager = getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
-                    val maxVolume = audioManager.getStreamMaxVolume(android.media.AudioManager.STREAM_ALARM)
-                    val currentVolume = audioManager.getStreamVolume(android.media.AudioManager.STREAM_ALARM)
-                    if (currentVolume < maxVolume) {
-                        audioManager.setStreamVolume(android.media.AudioManager.STREAM_ALARM, maxVolume, 0)
-                    }
-
-                    val notification = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM)
-                    val mediaPlayer = android.media.MediaPlayer()
-                    mediaPlayer.setDataSource(applicationContext, notification)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                        mediaPlayer.setAudioAttributes(
-                            android.media.AudioAttributes.Builder()
-                                .setUsage(android.media.AudioAttributes.USAGE_ALARM)
-                                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                                .build()
-                        )
-                    } else {
-                        mediaPlayer.setAudioStreamType(android.media.AudioManager.STREAM_ALARM)
-                    }
-                    mediaPlayer.isLooping = true
-                    mediaPlayer.prepare()
+                    // Nada yang SAMA PERSIS dengan yang dibunyikan aplikasi (public/timer-end.wav
+                    // dan res/raw/timer_end.wav dibuat dari satu sumber, scripts/generate-timer-sound.cjs).
+                    // Dulu di sini memakai nada alarm bawaan HP, di-loop, DAN memaksa volume alarm
+                    // ke maksimum lalu mengembalikannya — mengubah setelan volume punya user, dan
+                    // membuat timer terdengar sangat berbeda di dalam vs di luar aplikasi.
+                    // Sekarang berbunyi sekali di volume yang user pilih sendiri.
+                    val mediaPlayer = android.media.MediaPlayer.create(applicationContext, R.raw.timer_end)
+                    mediaPlayer.setAudioAttributes(
+                        android.media.AudioAttributes.Builder()
+                            .setUsage(android.media.AudioAttributes.USAGE_ALARM)
+                            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build()
+                    )
+                    mediaPlayer.setOnCompletionListener { it.release() }
                     mediaPlayer.start()
-                    
-                    serviceScope.launch {
-                        delay(3000) // play max volume for 3s
-                        var volume = 1.0f
-                        while (volume > 0f) {
-                            mediaPlayer.setVolume(volume, volume)
-                            volume -= 0.1f
-                            delay(200) // fade out over 2 seconds (10 steps * 200ms)
-                        }
-                        if (mediaPlayer.isPlaying) mediaPlayer.stop()
-                        mediaPlayer.release()
-                        audioManager.setStreamVolume(android.media.AudioManager.STREAM_ALARM, currentVolume, 0)
-                    }
-                    
+
+
                     val v = getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
-                    val pattern = longArrayOf(0, 500, 200, 500, 200, 1000, 200, 500, 200, 500, 200, 1000)
+                    // Polanya mengikuti nada: dua ketuk pendek lalu satu getar panjang. Dulu 5,6
+                    // detik bergetar untuk bunyi yang sudah lama selesai.
+                    val pattern = longArrayOf(0, 150, 90, 150, 90, 520)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                         v.vibrate(android.os.VibrationEffect.createWaveform(pattern, -1))
                     } else {

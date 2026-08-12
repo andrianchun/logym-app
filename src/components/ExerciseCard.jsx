@@ -623,7 +623,10 @@ const ExerciseCard = ({
                    </div>
 
                    <div className="flex justify-center">
-                     <button onClick={() => { playSoundEffect('click', soundEnabled); onToggleSet(ex.id, setIdx); }} disabled={activeTimer.idx === setIdx} className={`w-11 h-11 rounded-full flex justify-center items-center font-bold transition-all ${s.skipped ? 'bg-rose-500/20 text-rose-500 border border-rose-500/50 hover:bg-rose-500/30' : s.done ? t.bgAccent + ' text-white shadow-lg scale-105' : 'bg-transparent border-2 ' + t.borderAccentSoft + ' ' + t.textAccent + ' hover:bg-black/5 dark:hover:bg-white/5'} ${activeTimer.idx === setIdx ? 'opacity-30 cursor-not-allowed' : ''}`}>
+                     {/* Sama seperti set beban di atas: mencentang berbunyi 'done_set', membatalkan
+                         berbunyi 'click'. Dulu set durasi selalu 'click' — menyelesaikan plank
+                         terdengar sama saja dengan menekan tombol biasa. */}
+                     <button onClick={() => { playSoundEffect(s.done ? 'click' : 'done_set', soundEnabled); onToggleSet(ex.id, setIdx); }} disabled={activeTimer.idx === setIdx} className={`w-11 h-11 rounded-full flex justify-center items-center font-bold transition-all ${s.skipped ? 'bg-rose-500/20 text-rose-500 border border-rose-500/50 hover:bg-rose-500/30' : s.done ? t.bgAccent + ' text-white shadow-lg scale-105' : 'bg-transparent border-2 ' + t.borderAccentSoft + ' ' + t.textAccent + ' hover:bg-black/5 dark:hover:bg-white/5'} ${activeTimer.idx === setIdx ? 'opacity-30 cursor-not-allowed' : ''}`}>
                        {s.skipped ? <X size={18} /> : <CheckCircle size={18} />}
                      </button>
                    </div>

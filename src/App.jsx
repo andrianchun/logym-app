@@ -1233,10 +1233,12 @@ export default function App() {
       if (soundEnabled) {
         if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 500]);
       }
-      playSoundEffect('success', soundEnabled);
+      // 'timerEnd', bukan 'success': ini timer istirahat habis, dan nadanya harus sama persis
+      // dengan yang dibunyikan service native kalau aplikasi sedang ditutup.
+      playSoundEffect('timerEnd', soundEnabled);
 
       if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
-        WorkoutTimerPlugin.updateTimer({ 
+        WorkoutTimerPlugin.updateTimer({
             isResting: false, 
             targetTime: 0, 
             workoutName: programs?.find(p => p.id === activeProgramId)?.name || 'Sesi Latihan Aktif' 
