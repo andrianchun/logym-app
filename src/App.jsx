@@ -3581,7 +3581,7 @@ export default function App() {
                theme={theme} selectedDate={selectedDate}
                biometricStandard={biometricStandard} units={units}
                activityTargets={activityTargets} setActivityTargets={setActivityTargets}
-               syncStatus={syncStatus}
+               syncStatus={syncStatus} isBleBusy={bleManager.isBleBusy}
                gymProfiles={gymProfiles} activeGymId={activeGymId}
                activePlanIds={activePlanIds}
                userApiKeys={userApiKeys}
