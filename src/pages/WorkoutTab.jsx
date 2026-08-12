@@ -45,6 +45,7 @@ const WorkoutTab = ({
   restTargetTime, setRestTargetTime,
 
   focusWorkoutId, setFocusWorkoutId,
+  activeExerciseId, setActiveExerciseId,
 
   // Library
   isImmersiveMode, setIsImmersiveMode,
@@ -203,11 +204,11 @@ const WorkoutTab = ({
          if (startIndex !== -1) startIndex += 1;
          else startIndex = 0;
          forceScroll = true; // force scroll when advancing to next exercise
-      } else if (window.logymLastInteractedExId) {
-         // if opening tab, try to find the last interacted exercise
-         const lastExIdx = list.findIndex(e => e.id === window.logymLastInteractedExId);
+      } else if (activeExerciseId) {
+         // Buka tab: gulirkan ke latihan yang sedang dikerjakan, bukan ke yang pertama.
+         const lastExIdx = list.findIndex(e => e.id === activeExerciseId);
          if (lastExIdx !== -1) {
-            targetExId = window.logymLastInteractedExId;
+            targetExId = activeExerciseId;
          }
       }
       
@@ -239,6 +240,25 @@ const WorkoutTab = ({
       }
     }
   };
+  // Dipanggil setelah user mencentang satu set: kalau set itu MENYELESAIKAN latihannya, maju ke
+  // latihan berikutnya yang belum selesai. Kalau sudah latihan terakhir, tidak melakukan apa pun —
+  // scrollToFirstIncompleteExercise dengan ignoreExId tidak punya fallback ke atas sesi.
+  //
+  // `exerciseLogs` dibaca lewat ref, bukan langsung: nilai di dalam handler ini adalah snapshot
+  // SEBELUM centang diproses, jadi kode lama harus membalik logikanya (`!logs[setIdx].done`) dan
+  // ikut salah begitu centangnya beruntun cepat.
+  const exerciseLogsRef = React.useRef(exerciseLogs);
+  React.useEffect(() => { exerciseLogsRef.current = exerciseLogs; }, [exerciseLogs]);
+
+  const advanceIfExerciseFinished = (wId, exId, setIdx) => {
+    setTimeout(() => {
+      const logs = exerciseLogsRef.current?.[exId];
+      if (!logs || !logs[setIdx]?.done) return;      // dibatalkan, bukan diselesaikan
+      if (logs.some(s => !s.done && !s.skipped)) return; // masih ada set tersisa
+      scrollToFirstIncompleteExercise(wId, exId);
+    }, 80);
+  };
+
   const prevExtraLen = React.useRef(extraExercises.length);
   React.useEffect(() => {
     if (extraExercises.length > prevExtraLen.current) {
@@ -812,12 +832,13 @@ const WorkoutTab = ({
           exerciseLogs={exerciseLogs}
           exerciseLibrary={exerciseLibrary}
           onSetChange={onSetChange}
+          activeExerciseId={activeExerciseId}
           onToggleSet={(exId, setIdx, siblingIds) => {
-            window.logymLastInteractedExId = exId;
+            setActiveExerciseId(exId);
             onToggleSet(exId, setIdx, siblingIds);
           }}
           onSkipSet={(exId, setIdx) => {
-            window.logymLastInteractedExId = exId;
+            setActiveExerciseId(exId);
             onSkipSet(exId, setIdx);
           }}
           userProfile={userProfile}
@@ -884,8 +905,15 @@ const WorkoutTab = ({
         gymProfiles={gymProfiles} activeGymId={activeGymId}
       />
 
+      {/* `invisible`, BUKAN `hidden`. `hidden` itu display:none, sehingga tinggi dokumen runtuh
+          jadi ~0 saat mode immersive terbuka dan browser menjepit scrollY ke 0 — begitu immersive
+          ditutup, daftar muncul kembali di posisi paling atas dan user kehilangan tempatnya.
+          `invisible` menyembunyikan daftar tapi mempertahankan tinggi, jadi posisi gulir kembali
+          apa adanya tanpa perlu menyimpan/memulihkan apa pun. pointer-events-none supaya kartu di
+          belakang overlay tidak bisa tersentuh. */}
       <div
-        className={`space-y-4 animate-in fade-in ${isImmersiveMode ? 'hidden' : ''}`}
+        className={`space-y-4 animate-in fade-in ${isImmersiveMode ? 'invisible pointer-events-none' : ''}`}
+        aria-hidden={isImmersiveMode || undefined}
         style={{ paddingBottom: showsFloatingStartButton ? 'calc(9.5rem + env(safe-area-inset-bottom, 20px))' : '2rem' }}
       >
         
@@ -947,8 +975,11 @@ const WorkoutTab = ({
                       </div>
                     </div>
                     
+                    {/* no-swipe di bawah: pada lebar tablet daftar latihan ini men-scroll
+                        horizontal, dan tanpa kelas itu gerakan yang sama juga dibaca App.jsx
+                        sebagai perintah pindah tab (lihat handleGlobalTouchStart). */}
                     {isExpanded && (
-                      <div className="pb-4 sm:p-6 sm:pt-0 space-y-4 sm:space-y-0 sm:flex sm:flex-row sm:overflow-x-auto sm:snap-x sm:gap-6 hide-scrollbar animate-in slide-in-from-top-2 fade-in duration-200">
+                      <div className="no-swipe pb-4 sm:p-6 sm:pt-0 space-y-4 sm:space-y-0 sm:flex sm:flex-row sm:overflow-x-auto sm:snap-x sm:gap-6 hide-scrollbar animate-in slide-in-from-top-2 fade-in duration-200">
                         {groupExercises(prog.exercises).map((group, gIdx) => {
                           return (
                           <div key={`${prog.id}-group-${gIdx}`} className={`sm:w-[340px] sm:shrink-0 sm:snap-center sm:bg-black/5 sm:dark:bg-white/5 sm:rounded-3xl sm:border sm:border-black/5 sm:dark:border-white/5 sm:overflow-hidden relative flex flex-col mb-4 sm:mb-0 last:mb-0 ${group.isSuperset ? 'pr-0' : ''}`}>
@@ -973,14 +1004,21 @@ const WorkoutTab = ({
                                   onSetChange(exId, setIdx, field, val);
                                 }} 
                                 onToggleSet={(exId, setIdx) => {
-                                  window.logymLastInteractedExId = exId;
+                                  setActiveExerciseId(exId);
                                   setSessionToRun(prog.workoutId);
                                   let siblingIds = null;
                                   if (ex.supersetId) {
                                     siblingIds = prog.exercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
                                   }
                                   onToggleSet(exId, setIdx, siblingIds);
-                                }}  
+                                  // Set terakhir selesai -> maju ke latihan berikutnya. Kartu program
+                                  // dulu tidak melakukan ini sama sekali (cuma latihan ekstra yang
+                                  // punya), jadi user harus mencari sendiri latihan selanjutnya.
+                                  // scrollToFirstIncompleteExercise dengan ignoreExId sengaja TIDAK
+                                  // punya fallback ke atas sesi — kalau ini latihan terakhir, layar
+                                  // diam di tempat, tidak melompat ke atas.
+                                  advanceIfExerciseFinished(prog.workoutId, exId, setIdx);
+                                }}
                                 onAddSet={(exId) => {
                                   setSessionToRun(prog.workoutId);
                                   if (ex.supersetId) {
@@ -1032,7 +1070,7 @@ const WorkoutTab = ({
                   </button>
                   
                   {(expandedSessions || {})['extra'] && (
-                    <div className="p-2 sm:p-6 pt-0 space-y-4 sm:space-y-0 sm:flex sm:flex-row sm:overflow-x-auto sm:snap-x sm:gap-6 hide-scrollbar animate-in slide-in-from-top-2 fade-in duration-200">
+                    <div className="no-swipe p-2 sm:p-6 pt-0 space-y-4 sm:space-y-0 sm:flex sm:flex-row sm:overflow-x-auto sm:snap-x sm:gap-6 hide-scrollbar animate-in slide-in-from-top-2 fade-in duration-200">
                         {groupExercises(extraExercises).map((group, gIdx) => {
                           return (
                           <div key={`extra-group-${gIdx}`} className={`sm:w-[340px] sm:shrink-0 sm:snap-center sm:bg-black/5 sm:dark:bg-white/5 sm:rounded-3xl sm:border sm:border-black/5 sm:dark:border-white/5 sm:overflow-hidden relative flex flex-col mb-4 sm:mb-0 last:mb-0 ${group.isSuperset ? 'pr-3' : ''}`}>
@@ -1053,25 +1091,15 @@ const WorkoutTab = ({
                                   onSetChange(exId, setIdx, field, val);
                                 }} 
                                 onToggleSet={(exId, setIdx) => {
-                                  window.logymLastInteractedExId = exId;
+                                  setActiveExerciseId(exId);
                                   setSessionToRun('extra');
                                   let siblingIds = null;
                                   if (ex.supersetId) {
                                     siblingIds = extraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
                                   }
                                   onToggleSet(exId, setIdx, siblingIds);
-                                  
-                                  setTimeout(() => {
-                                      const logs = exerciseLogs[exId];
-                                      if (logs) {
-                                          const setsLainSelesai = logs.filter((s, i) => i !== setIdx).every(s => s.done);
-                                          const setIniJadiSelesai = !logs[setIdx].done; 
-                                          if (setsLainSelesai && setIniJadiSelesai) {
-                                              scrollToFirstIncompleteExercise('extra', exId);
-                                          }
-                                      }
-                                  }, 50);
-                                }} 
+                                  advanceIfExerciseFinished('extra', exId, setIdx);
+                                }}
                               onAddSet={(exId) => {
                                 setSessionToRun('extra');
                                 if (ex.supersetId) {

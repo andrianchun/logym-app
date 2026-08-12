@@ -139,7 +139,8 @@ const ImmersiveWorkout = ({
   activeGymId,
   showSupersetToast,
   getOverloadHint,
-  userProfile
+  userProfile,
+  activeExerciseId
 }) => {
 
   // 1. Gather all active exercise groups
@@ -150,9 +151,11 @@ const ImmersiveWorkout = ({
     return [...baseExercises, ...extraExercises].filter(ex => !skippedExercises[ex.id]);
   }, [activeProgramsList, activeProgramId, programs, extraExercises, skippedExercises]);
 
+  // Dihitung sekali saat mode immersive dibuka: mulai dari latihan yang SEDANG dikerjakan
+  // (set terakhir yang dicentang user), bukan dari latihan pertama.
   const [currentIndex, setCurrentIndex] = useState(() => {
-    if (window.logymLastInteractedExId) {
-       const idx = validExercises.findIndex(ex => ex.id === window.logymLastInteractedExId);
+    if (activeExerciseId) {
+       const idx = validExercises.findIndex(ex => ex.id === activeExerciseId);
        if (idx !== -1) return idx;
     }
     for (let i = 0; i < validExercises.length; i++) {
@@ -313,13 +316,8 @@ const ImmersiveWorkout = ({
 
   const mediaItems = React.useMemo(() => parseMedia(ex), [ex]);
   const [ytLoaded, setYtLoaded] = React.useState(false);
-  const [activeExerciseIdx, setActiveExerciseIdx] = React.useState(() => {
-    if (window.logymLastInteractedExId && validExercises) {
-      const idx = validExercises.findIndex(e => e.id === window.logymLastInteractedExId);
-      if (idx !== -1) return idx;
-    }
-    return 0;
-  });
+  // (activeExerciseIdx dihapus: state kembar dari currentIndex yang tidak pernah dibaca
+  //  maupun ditulis di mana pun.)
   const [activeMediaIndex, setActiveMediaIndex] = React.useState(0);
   
   React.useEffect(() => {

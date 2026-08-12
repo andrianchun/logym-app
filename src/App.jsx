@@ -53,7 +53,7 @@ import { AI_MODELS, detectPlateaus, getLogyNotification } from './utils/aiAgent'
 import { calculateReadiness, restingHrBaseline } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
 import { calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, recomputeStrengthRecords, buildHcSessionDetail } from './utils/workoutCalc';
-import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcReadHeartRateWindow, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission, capIntradayLog, HC_FIELDS, fillOnlyPatch } from './utils/healthConnect';
+import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcReadHeartRateWindow, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission, capIntradayLog, HC_FIELDS, fillOnlyPatch, hcDroppedTypes } from './utils/healthConnect';
 import { bumpExercisePopularity } from './utils/exercisePopularity';
 import useDialog from './hooks/useDialog';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
@@ -191,7 +191,12 @@ export default function App() {
           }
         }
       } catch (err) {
-        console.error('Failed to check OTA', err);
+        // Di dev, /ota/version.json belum ada (dihasilkan npm run build:ota) sehingga server
+        // mengembalikan index.html dan JSON.parse melempar. Itu bukan kegagalan — cukup catat
+        // sebagai peringatan, jangan sebagai error yang menutupi masalah sungguhan di konsol.
+        const bukanJson = err instanceof SyntaxError;
+        if (bukanJson) console.warn('Cek OTA dilewati: manifest belum ada (normal saat dev).');
+        else console.error('Failed to check OTA', err);
       }
     };
 
@@ -501,6 +506,7 @@ export default function App() {
 
     if (!silent) {
       const denied = status ? [...(status.readDenied || []), ...(status.writeDenied || [])] : [];
+      const dibuang = hcDroppedTypes || [];
       const adaIsinya = (k) => Object.values(hcByDay).filter((d) => d?.[k] !== undefined).length;
       const hrvHari = adaIsinya('hrv');
       const reads = status?.readAuthorized?.length || 0;
@@ -508,6 +514,7 @@ export default function App() {
       showOtaAlert([
         ...(status ? [`Izin — baca ${reads} tipe, tulis ${writes} tipe`] : [`Pengecekan izin gagal / belum tuntas`]),
         ...(denied.length ? [`Ditolak — ${denied.join(', ')}`] : []),
+        ...(dibuang.length ? [`Tidak didukung, dilewati — ${dibuang.join(', ')}`] : []),
         `Histori masuk — ${filled} hari`,
         ...(hrvHari > 0 ? [`HRV — ${hrvHari} hari`] : []),
         `Nadi per sesi — ${hrFilled} sesi`,
@@ -697,6 +704,25 @@ export default function App() {
   const setActivePlanIds = _setActivePlanIds;
   const [activeProgramId, setActiveProgramId] = useState(defaultPrograms[0]?.id || null);
   const [focusWorkoutId, setFocusWorkoutId] = useState(null);
+  // Latihan yang SEDANG dikerjakan = latihan yang set-nya terakhir dicentang user. Dipakai untuk
+  // memutuskan di mana mode immersive terbuka dan ke mana daftar kartu digulirkan.
+  //
+  // Dulu ini variabel global `window.logymLastInteractedExId`: tidak reaktif, tidak pernah
+  // dibersihkan, dan hilang setiap aplikasi dimuat ulang — jadi sesi yang dilanjutkan setelah
+  // aplikasi ditutup selalu balik ke latihan pertama. Sekarang state biasa yang ikut disimpan
+  // bersama sesi aktif.
+  const [activeExerciseId, setActiveExerciseId] = useState(null);
+  // Tanggal milik sesi yang sedang berjalan, dikunci saat sesi DIMULAI. Sengaja tidak ikut
+  // `selectedDate`: user boleh menjelajah kalender saat latihan, dan tombol "Lanjutkan" harus
+  // tetap tahu sesi aslinya milik hari yang mana.
+  const [activeWorkoutDate, setActiveWorkoutDate] = useState(null);
+  useEffect(() => {
+    // Deps sengaja hanya isWorkoutActive — selectedDate dibaca dari closure supaya nilainya
+    // terkunci pada saat sesi dimulai, bukan mengikuti kalender yang sedang dilihat.
+    if (isWorkoutActive) setActiveWorkoutDate(prev => prev || selectedDate);
+    else setActiveWorkoutDate(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isWorkoutActive]);
 
   useEffect(() => {
     if (!programs || programs.length === 0) return;
@@ -2033,13 +2059,13 @@ export default function App() {
     if (!isWorkoutActive || !workoutStartTime) { localStorage.removeItem(TIMER_KEY); return; }
     const beat = () => {
       try {
-        localStorage.setItem(TIMER_KEY, JSON.stringify({ startTime: workoutStartTime, savedAt: Date.now(), date: selectedDate }));
+        localStorage.setItem(TIMER_KEY, JSON.stringify({ startTime: workoutStartTime, savedAt: Date.now(), date: selectedDate, workoutDate: activeWorkoutDate, activeExerciseId }));
       } catch { /* storage penuh/diblokir — sesi tetap jalan di memori */ }
     };
     beat();
     const id = setInterval(beat, 15 * 1000);
     return () => clearInterval(id);
-  }, [isWorkoutActive, workoutStartTime, selectedDate, TIMER_KEY]);
+  }, [isWorkoutActive, workoutStartTime, selectedDate, activeWorkoutDate, activeExerciseId, TIMER_KEY]);
 
   const timerRestored = useRef(false);
   useEffect(() => {
@@ -2057,6 +2083,10 @@ export default function App() {
       }
       const secs = recoveredWorkoutSeconds(startTime, savedAt);
       if (secs > 0) setResumeDurationSecs(secs);
+      // Pulihkan latihan yang sedang dikerjakan, supaya sesi yang dilanjutkan setelah aplikasi
+      // ditutup kembali ke tempat user berhenti — bukan ke latihan pertama.
+      if (saved.activeExerciseId != null) setActiveExerciseId(saved.activeExerciseId);
+      if (saved.workoutDate) setActiveWorkoutDate(saved.workoutDate);
     } catch { localStorage.removeItem(TIMER_KEY); }
   }, [isDataLoaded, TIMER_KEY]);
 
@@ -3693,6 +3723,7 @@ export default function App() {
                
                // Focus
                focusWorkoutId={focusWorkoutId} setFocusWorkoutId={setFocusWorkoutId}
+               activeExerciseId={activeExerciseId} setActiveExerciseId={setActiveExerciseId}
                activePlanIds={activePlanIds}
              />
          )}
@@ -3756,8 +3787,9 @@ export default function App() {
       <FloatingTimer 
         restTargetTime={restTargetTime} setRestTargetTime={setRestTargetTime} defaultRestTime={defaultRestTime} 
         t={t} soundEnabled={soundEnabled} 
-        isWorkoutActive={isWorkoutActive} activeTab={activeTab} 
+        isWorkoutActive={isWorkoutActive} activeTab={activeTab}
         setActiveTab={setActiveTab} workoutStartTime={workoutStartTime}
+        activeWorkoutDate={activeWorkoutDate} setSelectedDate={setSelectedDate}
         isImmersiveMode={isImmersiveMode} setIsImmersiveMode={setIsImmersiveMode}
         sessionToRun={sessionToRun} setSessionToRun={setSessionToRun}
         userProfile={userProfile}

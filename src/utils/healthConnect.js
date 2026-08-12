@@ -76,15 +76,42 @@ const WRITE_TYPES = ['weight', 'bodyFat', 'bloodPressure', 'basalCalories', 'hea
 // punya try/catch otomatis kebenerin tanpa perlu diubah manual satu-satu.
 // requestHistoryAccess:true — tanpa ini Health Connect cuma kasih akses baca 30 hari
 // terakhir, backfill histori yang lebih lama gak akan dapat apa-apa.
+// Tipe yang terpaksa dibuang karena ditolak plugin — dibaca layar Pengaturan supaya user tahu
+// ada yang tidak ikut tersinkron, alih-alih diam-diam kehilangan satu sumber data.
+export let hcDroppedTypes = [];
+
 export const hcRequestPermissions = async () => {
   const H = Health;
   // Race pakai timeout — tanpa ini, kalau dialog izin native gagal muncul/nyangkut, tombol
   // "Hubungkan" nge-freeze diam-diam selamanya (gak ada error, gak ada dialog) dan user gak
   // tau apa yang salah.
-  const result = await Promise.race([
-    H.requestAuthorization({ read: READ_TYPES, write: WRITE_TYPES, requestHistoryAccess: true }),
+  const minta = (read, write) => Promise.race([
+    H.requestAuthorization({ read, write, requestHistoryAccess: true }),
     new Promise((_, reject) => setTimeout(() => reject(new Error('Waktu habis menunggu dialog izin Health Connect (30 detik) — dialognya kemungkinan gagal muncul. Coba lagi, atau buka app Health Connect langsung lalu cek/aktifkan izin untuk app ini secara manual.')), 30000)),
   ]);
+
+  // SATU nama tipe yang tidak dikenal plugin membatalkan SELURUH permintaan izin sebelum
+  // dialognya sempat muncul — akibatnya tidak ada satu pun izin baca yang diberikan, dan Logym
+  // berhenti menarik data sama sekali (kejadian nyata dengan 'nutrition'). Kalau itu terjadi,
+  // buang tipe yang disebut error lalu ulangi, supaya kehilangan satu sumber data tidak
+  // berubah jadi kehilangan semuanya. Dicatat di hcDroppedTypes untuk ditampilkan di Pengaturan.
+  let read = [...READ_TYPES];
+  let write = [...WRITE_TYPES];
+  hcDroppedTypes = [];
+  let result;
+  for (let percobaan = 0; ; percobaan++) {
+    try {
+      result = await minta(read, write);
+      break;
+    } catch (e) {
+      const nama = /Unsupported data type:\s*([\w]+)/.exec(e?.message || '')?.[1];
+      if (!nama || percobaan >= 5) throw e;
+      console.warn(`Health Connect menolak tipe '${nama}' — dibuang lalu dicoba lagi.`);
+      hcDroppedTypes.push(nama);
+      read = read.filter((x) => x !== nama);
+      write = write.filter((x) => x !== nama);
+    }
+  }
   if (!result?.readAuthorized?.length && !result?.writeAuthorized?.length) {
     throw new Error('Izin ditolak — buka Pengaturan Android > Aplikasi > Health Connect > Aplikasi terhubung untuk memberi akses manual.');
   }

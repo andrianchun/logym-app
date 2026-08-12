@@ -9,7 +9,8 @@ const FloatingTimer = ({
   restTargetTime, defaultRestTime, t, soundEnabled,
   isWorkoutActive, activeTab, setActiveTab, workoutStartTime,
   isImmersiveMode, setIsImmersiveMode, sessionToRun, focusWorkoutId, setFocusWorkoutId,
-  userProfile, exerciseLogs, sessionExercises
+  userProfile, exerciseLogs, sessionExercises,
+  activeWorkoutDate, setSelectedDate
 }) => {
   
   const [workoutSeconds, setWorkoutSeconds] = React.useState(0);
@@ -60,6 +61,12 @@ const FloatingTimer = ({
   const showTimer = restTargetTime !== null;
 
   const handleClick = () => {
+    // Kembalikan kalender ke tanggal milik sesi yang sedang berjalan SEBELUM pindah tab.
+    // Tanpa ini, kalau user sempat menjelajah kalender ke tanggal lain, "Lanjutkan" mendarat di
+    // tanggal itu — Tab Latihan kosong melompong dan mode immersive tidak bisa terbuka sama
+    // sekali karena tidak ada latihan di sana. Didahulukan karena setActiveTab milik App bisa
+    // menyela dengan dialog "Bersihkan Sesi Kosong?" dan menunda perpindahan tabnya.
+    if (activeWorkoutDate && setSelectedDate) setSelectedDate(activeWorkoutDate);
     setActiveTab('workout');
     // Fallback ke focusWorkoutId jika sessionToRun belum sempat di-set oleh titik masuk tertentu
     // (mis. resume dari Kalender) — supaya klik selalu masuk immersive selama ada workout aktif.
