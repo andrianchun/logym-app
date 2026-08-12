@@ -30,3 +30,6 @@ functions/.env
 # Cache unggah Firebase Hosting — jangan di-commit, versi basi bikin /ota/** raib
 # dari hosting saat deploy (lihat scripts/release.js).
 .firebase/
+
+# APK rilis: 28 MB per file, jangan masuk git — repo bengkak permanen.
+public/apk/*.apk

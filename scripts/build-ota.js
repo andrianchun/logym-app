@@ -78,12 +78,15 @@ archive.pipe(output);
 
 // Append files from the dist directory, putting its contents at the root of archive.
 // - 'ota/**' wajib di-ignore supaya zip tidak me-zip dirinya sendiri.
+// - 'apk/**' juga: APK rilis ±28 MB numpang di hosting untuk diunduh manual, tidak ada
+//   gunanya di dalam bundle web. Tanpa ini zip membengkak 19 MB -> 47 MB dan setiap user
+//   menanggung unduhan APK yang tidak pernah dipakai.
 // - service worker & manifest PWA dibuang: tidak berguna di WebView native, dan kalau
 //   sampai ter-register di dalam WebView, SW itu akan menyajikan index.html lamanya
 //   sendiri dan menutupi bundle yang baru dipasang Capgo.
 archive.glob('**/*', {
   cwd: distPath,
-  ignore: ['ota/**', 'sw.js', 'workbox-*.js', 'registerSW.js', 'manifest.webmanifest']
+  ignore: ['ota/**', 'apk/**', 'sw.js', 'workbox-*.js', 'registerSW.js', 'manifest.webmanifest']
 });
 
 archive.finalize();
