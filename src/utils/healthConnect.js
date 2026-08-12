@@ -32,7 +32,13 @@ export const hcAvailable = async () => {
 // 'totalCalories' ikut diminta karena banyak sumber (mis. Samsung Health) cuma nulis
 // TotalCaloriesBurned dan TIDAK pernah nulis ActiveCaloriesBurned — tanpa ini, query
 // 'calories' balik kosong terus walau Health Connect penuh data (kejadian nyata).
-const READ_TYPES = ['steps', 'calories', 'totalCalories', 'heartRate', 'restingHeartRate', 'heartRateVariability', 'weight', 'height', 'sleep', 'bodyFat', 'oxygenSaturation', 'bloodPressure', 'distance', 'basalCalories', 'nutrition'];
+// PENTING: setiap nama di sini WAJIB ada di enum HealthDataType milik @capgo/capacitor-health
+// (node_modules/@capgo/capacitor-health/android/.../HealthDataType.kt). Satu nama asing saja
+// membuat requestAuthorization DITOLAK SELURUHNYA — parseTypeList melempar sebelum dialog izin
+// sempat muncul, dan user cuma melihat "Gagal menyambungkan Health Connect: Unsupported data
+// type: X". Nama enum-nya tidak selalu intuitif: NutritionRecord ber-identifier
+// 'dietaryEnergyConsumed', bukan 'nutrition'.
+const READ_TYPES = ['steps', 'calories', 'totalCalories', 'heartRate', 'restingHeartRate', 'heartRateVariability', 'weight', 'height', 'sleep', 'bodyFat', 'oxygenSaturation', 'bloodPressure', 'distance', 'basalCalories', 'dietaryEnergyConsumed'];
 // Kalori TIDAK pernah ditulis lewat plugin ini (lihat catatan di bawah). Tiga tipe ini boleh:
 // semuanya record TITIK WAKTU dari alat ukur BLE (lihat utils/ble.js), dibaca sebagai "paling
 // baru per hari" dan tidak pernah dijumlah antar sumber — jadi tidak bisa menggandakan apa pun.
@@ -58,7 +64,12 @@ const READ_TYPES = ['steps', 'calories', 'totalCalories', 'heartRate', 'restingH
 // hanya membaca, BUKAN menulisnya. Kalori aktif diekspor per sesi latihan lewat plugin terpisah.
 //
 // heartRate ditulis karena tensimeter bluetooth juga mengirimkan data detak jantung (pulse).
-const WRITE_TYPES = ['weight', 'bodyFat', 'bloodPressure', 'boneMass', 'leanBodyMass', 'basalCalories', 'bodyWaterMass', 'heartRate'];
+//
+// boneMass / leanBodyMass / bodyWaterMass DIBUANG dari daftar ini: plugin tidak mengenal
+// ketiganya sama sekali (tidak ada di enum HealthDataType), jadi mencantumkannya menggagalkan
+// seluruh permintaan izin dengan cara yang sama seperti 'nutrition'. Data itu tetap tersimpan
+// di bioData Logym, cuma tidak diekspor ke Health Connect.
+const WRITE_TYPES = ['weight', 'bodyFat', 'bloodPressure', 'basalCalories', 'heartRate'];
 
 // Android gak nge-throw kalau user pencet "Tolak" di dialog izin — tetap resolve normal
 // dengan readAuthorized kosong. Lempar di sini kalau BENERAN nihil, biar caller yang udah
@@ -222,9 +233,10 @@ const hcSaveSample = async (dataType, value, at, extra = {}) => {
 
 export const hcWriteWeight = (kg, at = new Date()) => hcSaveSample('weight', kg, at);
 export const hcWriteBodyFat = (percent, at = new Date()) => hcSaveSample('bodyFat', percent, at);
-export const hcWriteBoneMass = (kg, at = new Date()) => hcSaveSample('boneMass', kg, at, { unit: 'kilograms' });
-export const hcWriteLeanBodyMass = (kg, at = new Date()) => hcSaveSample('leanBodyMass', kg, at, { unit: 'kilograms' });
-export const hcWriteBodyWaterMass = (kg, at = new Date()) => hcSaveSample('bodyWaterMass', kg, at, { unit: 'kilograms' });
+// hcWriteBoneMass / hcWriteLeanBodyMass / hcWriteBodyWaterMass DIHAPUS: plugin tidak punya
+// identifier untuk BoneMassRecord, LeanBodyMassRecord, maupun BodyWaterMassRecord, jadi
+// panggilannya selalu ditolak. Angkanya tetap tersimpan di bioData Logym. Jalur naiknya kalau
+// suatu saat perlu: tulis lewat plugin native sendiri, seperti ExerciseWriterPlugin.kt.
 export const hcWriteBMR = (kcal, at = new Date()) => hcSaveSample('basalCalories', kcal, at, { unit: 'kilocalories' });
 
 // BloodPressureRecord tidak punya "nilai tunggal" — plugin tetap mewajibkan `value` terisi,
@@ -623,7 +635,7 @@ export const hcReadRange = async (startYmd, endYmd) => {
         .forEach(([ymd, v]) => put(ymd, v)))
       .catch((e) => console.warn('hcReadRange sleep gagal:', e)),
 
-    H.readSamples({ dataType: 'nutrition', startDate: startISO, endDate: endISO, limit: 5000, ascending: true })
+    H.readSamples({ dataType: 'dietaryEnergyConsumed', startDate: startISO, endDate: endISO, limit: 5000, ascending: true })
       .then((res) => {
         const byDay = {};
         (res?.samples || []).forEach((s) => {

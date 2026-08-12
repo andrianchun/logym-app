@@ -10,7 +10,7 @@
 // setHistory milik App (biar angkanya langsung kelihatan tanpa nunggu sinkron HC berikutnya).
 // ============================================================
 import { BleClient } from '@capacitor-community/bluetooth-le';
-import { hcWriteBloodPressure, hcWriteHeartRate, hcWriteWeight, hcWriteBodyFat, hcWriteBoneMass, hcWriteLeanBodyMass, hcWriteBodyWaterMass, hcWriteBMR } from './healthConnect.js';
+import { hcWriteBloodPressure, hcWriteHeartRate, hcWriteWeight, hcWriteBodyFat, hcWriteBMR } from './healthConnect.js';
 import { calculateBodyComposition } from './xiaomiScaleCalc.js';
 
 // UUID BLE 16-bit harus ditulis panjang untuk plugin ini (Android menolak bentuk pendek).
@@ -355,8 +355,9 @@ export const saveMeasurement = async (reading, { setHistory, userProfile } = {})
     if (comp) {
         // Tulis semua ke HC yang didukung
         hcOk = (await hcWriteBodyFat(comp.bodyFat, at)) && hcOk;
-        if (comp.boneMass > 0) hcOk = (await hcWriteBoneMass(comp.boneMass, at)) && hcOk;
-        if (comp.muscleMass > 0) hcOk = (await hcWriteLeanBodyMass(comp.muscleMass, at)) && hcOk;
+        // Massa tulang & massa otot sengaja tidak dikirim ke Health Connect: plugin tidak
+        // mengenal record-nya (lihat healthConnect.js), jadi dulu panggilannya selalu gagal
+        // dan menyeret hcOk jadi false padahal berat/body fat/BMR sudah tersimpan.
         if (comp.bmr > 0) hcOk = (await hcWriteBMR(comp.bmr, at)) && hcOk;
         
         // Simpan semua ke state Logym (patch)

@@ -87,10 +87,10 @@
     <uses-permission android:name="android.permission.health.WRITE_BODY_FAT" />
     <uses-permission android:name="android.permission.health.WRITE_HEART_RATE" />
     <uses-permission android:name="android.permission.health.WRITE_BLOOD_PRESSURE" />
-    <uses-permission android:name="android.permission.health.WRITE_BONE_MASS" />
-    <uses-permission android:name="android.permission.health.WRITE_LEAN_BODY_MASS" />
     <uses-permission android:name="android.permission.health.WRITE_BASAL_METABOLIC_RATE" />
-    <uses-permission android:name="android.permission.health.WRITE_BODY_WATER_MASS" />
+    <!-- WRITE_BONE_MASS / WRITE_LEAN_BODY_MASS / WRITE_BODY_WATER_MASS dihapus: plugin capgo
+         tidak punya identifier untuk ketiga record itu, jadi izinnya cuma diminta tanpa pernah
+         bisa dipakai — dan izin health yang tak terpakai jadi sorotan saat audit Play Store. -->
     <!-- Buat nulis kalori terbakar per sesi latihan (lihat hcWriteWorkoutCalories) -->
     <uses-permission android:name="android.permission.health.WRITE_ACTIVE_CALORIES_BURNED" />
     <!-- Buat nulis SESI LATIHAN lengkap dengan jenis olahraga, lewat plugin lokal
