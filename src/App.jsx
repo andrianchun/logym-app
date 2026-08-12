@@ -58,7 +58,7 @@ import { bumpExercisePopularity } from './utils/exercisePopularity';
 import useDialog from './hooks/useDialog';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import UpdaterAlert from './components/UpdaterAlert';
-import { getLocalYMD, resolveProjectedProgramId, isLomealOwned, resolveLoggedExercise, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos } from './data/constants';
+import { getLocalYMD, resolveProjectedProgramId, isLomealOwned, resolveLoggedExercise, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos, getDayWorkouts, countMissedScheduledDays } from './data/constants';
 import { serializeDay, dayFingerprint, migrateBaseline, reconcileHistory, workoutsToMap, workoutIdsFromBaseline, diffFields, stableStringify } from './utils/historySync';
 import { useBleManager } from './hooks/useBleManager';
 import { Loader2, Download, X } from 'lucide-react';
@@ -865,61 +865,75 @@ export default function App() {
     if (!Capacitor.isNativePlatform()) return;
     const scheduleDailyReminder = async () => {
       try {
-        await LocalNotifications.cancel({ notifications: [{ id: 8888 }] });
+        // Dijadwalkan TUJUH HARI ke depan, satu notifikasi per hari (id 8888..8894).
+        //
+        // Versi lama memakai satu alarm `repeats: true` dengan teks tetap "Latihan hari ini" —
+        // tidak pernah membaca jadwal, jadi hari istirahat pun tetap disuruh latihan. Teks yang
+        // menyesuaikan mustahil dengan alarm berulang, karena isinya dikunci sekali di awal.
+        //
+        // Kenapa tujuh dan bukan satu: alarm berulang punya satu keunggulan nyata yang tidak
+        // boleh hilang — tetap berbunyi walau aplikasi tidak pernah dibuka lagi. Menjadwalkan
+        // sepekan ke depan mempertahankan itu; tiap kali aplikasi dibuka, jadwalnya disegarkan.
+        const ids = Array.from({ length: 7 }, (_, i) => 8888 + i);
+        await LocalNotifications.cancel({ notifications: ids.map(id => ({ id })) });
         if (!reminderEnabled) return;
 
         const perm = await LocalNotifications.checkPermissions();
         if (perm.display !== 'granted') return;
 
-        const copy = getLogyNotification('start', logyPersona, { program: 'Latihan hari ini' });
-        if (!copy) return;
-
         const [h, m] = (defaultReminderTime || '09:00').split(':');
-        
-        await LocalNotifications.schedule({
-          notifications: [{
-            id: 8888,
+        const notifications = [];
+
+        for (let i = 0; i < 7; i++) {
+          const fireAt = new Date();
+          fireAt.setHours(parseInt(h, 10), parseInt(m, 10), 0, 0);
+          fireAt.setDate(fireAt.getDate() + i);
+          if (fireAt.getTime() <= Date.now()) continue; // jam hari ini sudah lewat
+
+          const ymd = getLocalYMD(fireAt);
+          const terjadwal = getDayWorkouts(history, programs, activePlanIds, ymd)
+            .filter(w => w.status !== 'completed');
+          const nama = terjadwal.map(w => w.programName || w.name).filter(Boolean).join(' + ');
+
+          const copy = terjadwal.length > 0
+            ? getLogyNotification('start', logyPersona, { program: nama || 'Latihan hari ini' })
+            : getLogyNotification('rest', logyPersona, {});
+          if (!copy) continue;
+
+          notifications.push({
+            id: ids[i],
             title: copy.title,
             body: copy.body,
-            schedule: { 
-              on: {
-                hour: parseInt(h, 10),
-                minute: parseInt(m, 10)
-              },
-              repeats: true,
-              allowWhileIdle: true
-            },
+            schedule: { at: fireAt, allowWhileIdle: true },
             largeIcon: 'coach_logy_avatar',
-          }]
-        });
+          });
+        }
+
+        if (notifications.length > 0) await LocalNotifications.schedule({ notifications });
       } catch (err) {
         console.warn('Daily reminder error:', err);
       }
     };
     scheduleDailyReminder();
-  }, [reminderEnabled, defaultReminderTime, logyPersona]);
+  }, [reminderEnabled, defaultReminderTime, logyPersona, history, programs, activePlanIds]);
 
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform() || !reminderEnabled) return;
     const MISSED_THRESHOLD_DAYS = 2;
-    const completedDates = Object.keys(history).filter(d => {
-      const day = history[d];
-      const workouts = day?.workouts || (day?.status ? [day] : []);
-      return workouts.some(w => w.status === 'completed');
-    }).sort((a, b) => b.localeCompare(a));
-    if (completedDates.length === 0) return; 
-
-    const daysSince = Math.floor((Date.now() - new Date(completedDates[0]).getTime()) / 86400000);
-    if (daysSince < MISSED_THRESHOLD_DAYS) return;
+    const todayYmd = getLocalYMD(new Date());
+    // Hari TERJADWAL yang dilewatkan — bukan "hari sejak latihan terakhir". Yang lama menghitung
+    // hari istirahat sebagai bolos, jadi program 3x seminggu memicu tuduhan ini tiap minggu.
+    const daysMissed = countMissedScheduledDays(history, programs, activePlanIds, todayYmd);
+    if (daysMissed < MISSED_THRESHOLD_DAYS) return;
 
     const dedupKey = `lyfit_missed_notif_${user?.uid || 'guest'}`;
-    const dedupVal = `${completedDates[0]}_${daysSince}`;
+    const dedupVal = `${todayYmd}_${daysMissed}`;
     if (localStorage.getItem(dedupKey) === dedupVal) return;
 
-    scheduleLogyPush('missed', 88000000 + (daysSince % 1000), { days: daysSince })
+    scheduleLogyPush('missed', 88000000 + (daysMissed % 1000), { days: daysMissed })
       .then(() => localStorage.setItem(dedupKey, dedupVal));
-  }, [history, reminderEnabled, logyPersona, defaultReminderTime, user?.uid]);
+  }, [history, programs, activePlanIds, reminderEnabled, logyPersona, defaultReminderTime, user?.uid]);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform() || !reminderEnabled) return;

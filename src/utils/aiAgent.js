@@ -166,6 +166,20 @@ export const LOGI_NOTIF_TEMPLATES = {
             ['Konsistensi menurun', 'Sudah {days} hari sejak sesi latihan terakhir. Disarankan untuk kembali ke jadwal guna menjaga progres.'],
         ],
     },
+    // Hari tanpa latihan terjadwal. Dulu pengingat harian tetap menyuruh latihan tiap hari,
+    // termasuk hari istirahat — bikin notifikasinya kehilangan wibawa dan gampang di-mute.
+    rest: {
+        santai: [
+            ['Hari ini santai dulu', 'Gak ada jadwal latihan hari ini, bro. Istirahat itu bagian dari programnya — otot tumbuhnya pas lu rebahan, bukan pas ngangkat.'],
+            ['Rest day, nikmatin', 'Jadwal lu kosong hari ini. Tidur yang cukup, makan yang bener, besok kita gas lagi.'],
+        ],
+        galak: [
+            ['Istirahat. Beneran istirahat.', 'Hari ini gak ada jadwal. Jangan sok rajin latihan tambahan — recovery itu bagian dari kerjaan, bukan bolos.'],
+        ],
+        serius: [
+            ['Hari pemulihan', 'Tidak ada sesi terjadwal hari ini. Pemulihan yang cukup menjaga kualitas sesi berikutnya.'],
+        ],
+    },
     insight: {
         santai: [
             ['Eh, {exName} lu stuck nih', '{exName} lu flat {weeks} minggu di {maxWeight}kg bro. Gue ada ide buat naikin lagi, cek chat yuk!'],

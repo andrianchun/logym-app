@@ -273,6 +273,44 @@ export const getDayWorkouts = (history, programs, activePlanIds, dateStr) => {
   });
 };
 
+/**
+ * Berapa hari TERJADWAL yang dilewatkan, dihitung mundur dari kemarin.
+ *
+ * Versi lama menghitung "hari sejak latihan terakhir selesai", bukan hari terjadwal yang
+ * dilewatkan — program 3x seminggu otomatis menembus ambang 2 hari SETIAP MINGGU, sehingga
+ * notifikasi "kamu bolos" muncul terus padahal jadwalnya diikuti sempurna.
+ *
+ * Hari ini sengaja tidak dihitung: harinya belum selesai, latihannya belum tentu dilewatkan.
+ *
+ * Semua tanggal diurai sebagai waktu LOKAL. `new Date('YYYY-MM-DD')` diurai sebagai tengah
+ * malam UTC sementara Date.now() waktu lokal — di WIB (+7) itu menggeser hitungan sampai
+ * satu hari penuh.
+ */
+export const countMissedScheduledDays = (history, programs, activePlanIds, todayYmd, maxLookback = 60) => {
+  const hariLokal = (ymd) => new Date(`${ymd}T00:00:00`);
+  const ymdOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  // Tanpa riwayat sama sekali, tidak ada yang bisa "dilewatkan": user baru bukan pembolos.
+  // Tanpa batas ini, penelusuran berjalan sampai maxLookback dan menuduh pemakai hari pertama
+  // sudah bolos belasan hari.
+  const tanggalRiwayat = Object.keys(history || {}).sort();
+  if (tanggalRiwayat.length === 0) return 0;
+  const palingAwal = tanggalRiwayat[0];
+
+  let missed = 0;
+  const cursor = hariLokal(todayYmd);
+  for (let i = 0; i < maxLookback; i++) {
+    cursor.setDate(cursor.getDate() - 1); // mulai dari KEMARIN
+    const ymd = ymdOf(cursor);
+    if (ymd < palingAwal) break;                                // sebelum user mulai memakai app
+    const workouts = getDayWorkouts(history, programs, activePlanIds, ymd);
+    if (workouts.length === 0) continue;                        // hari istirahat, bukan bolos
+    if (workouts.some(w => w.status === 'completed')) break;    // ketemu hari latihan — berhenti
+    missed++;
+  }
+  return missed;
+};
+
 export const getVideoId = (url) => {
   if (!url) return null;
   try {
