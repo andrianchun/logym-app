@@ -614,7 +614,7 @@ export const recomputeStrengthRecords = (history, logKeys, exLookup) => {
       Object.keys(wk.log).forEach((k) => {
         const id = String(resolveLoggedExercise(k, exLookup)?.id);
         if (!ids.has(id)) return;
-        const rec = (out[id] = out[id] || { rm10: 0, lastWeight: 0, _at: 0 });
+        const rec = (out[id] = out[id] || { rm10: 0, rm10At: 0, lastWeight: 0, _at: 0 });
         let bestInSession = 0;
         // Object.values, bukan .forEach langsung: set bisa berbentuk objek ber-key angka setelah
         // bolak-balik lewat penyimpanan, dan `.forEach` pada objek melempar TypeError — satu sesi
@@ -622,7 +622,9 @@ export const recomputeStrengthRecords = (history, logKeys, exLookup) => {
         Object.values(wk.log[k] || {}).forEach((s) => {
           if (!s || s.skipped || !(Number(s.w) > 0) || !(Number(s.r) > 0)) return;
           const c10RM = estimate10RM(s.w, s.r);
-          if (c10RM > rec.rm10) rec.rm10 = c10RM;
+          // rm10At = KAPAN rekor itu tercatat. Dibutuhkan supaya 10RM yang di-override manual
+          // tidak bisa ditimpa oleh sesi lama, tapi tetap boleh dipecahkan sesi baru.
+          if (c10RM > rec.rm10) { rec.rm10 = c10RM; rec.rm10At = dateMs; }
           if (Number(s.w) > bestInSession) bestInSession = Number(s.w);
         });
         // `>=`: sesi yang baru saja disimpan bertanggal sama dengan rekor terakhir, dan yang
@@ -634,9 +636,29 @@ export const recomputeStrengthRecords = (history, logKeys, exLookup) => {
 
   const clean = {};
   Object.entries(out).forEach(([id, r]) => {
-    if (r.rm10 > 0) clean[id] = { rm10: r.rm10, lastWeight: r.lastWeight };
+    if (r.rm10 > 0) clean[id] = { rm10: r.rm10, rm10At: r.rm10At, lastWeight: r.lastWeight };
   });
   return clean;
+};
+
+/**
+ * Gabungkan 10RM tersimpan dengan yang baru dihitung dari riwayat.
+ *
+ * Aturannya tiga baris, tapi tiap barisnya menutup satu cara data hilang:
+ *  1. Tanpa override manual -> ambil yang tertinggi. Rekor tidak boleh turun hanya karena sesi
+ *     asalnya tidak lagi ada di `history` (riwayat lama belum tersinkron, dipangkas, dsb).
+ *  2. Ada override manual, dan rekor riwayat berasal dari SEBELUM tanggal override -> pertahankan
+ *     nilai manual. Inilah gunanya tombol simpan di kalkulator 10RM: menurunkan acuan setelah
+ *     jeda panjang. Kalau riwayat lama boleh menimpanya, tombol itu tidak ada artinya.
+ *  3. Ada override manual, tapi rekor riwayat berasal dari SESUDAH tanggal override -> ambil yang
+ *     tertinggi seperti biasa. Override menetapkan titik awal baru, bukan plafon permanen.
+ */
+export const mergeRm10 = (tersimpan, manualAt, dariRiwayat, rm10At) => {
+  const a = Number(tersimpan) || 0;
+  const b = Number(dariRiwayat) || 0;
+  const manual = Number(manualAt) || 0;
+  if (manual > 0 && (Number(rm10At) || 0) <= manual) return a;
+  return Math.max(a, b);
 };
 
 /**

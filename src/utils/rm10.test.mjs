@@ -61,3 +61,50 @@ assert.equal(recomputeStrengthRecords(skipHist, ['101'], lookup).rm10, undefined
 assert.equal(recomputeStrengthRecords(skipHist, ['101'], lookup)['101'].rm10, estimate10RM(50, 10));
 
 console.log('rm10 OK', { r100x10: estimate10RM(100, 10), bulat42_5step5: roundDownToStep(42.5, 5) });
+
+// ---- mergeRm10: override manual vs rekor dari riwayat ----
+{
+  const { mergeRm10 } = await import('./workoutCalc.js');
+  const KEMARIN = new Date('2026-08-12T00:00:00').getTime();
+  const HARI_INI = new Date('2026-08-13T00:00:00').getTime();
+  const BESOK = new Date('2026-08-14T00:00:00').getTime();
+
+  // 1. Tanpa override manual -> ambil yang tertinggi. Rekor tidak boleh turun cuma karena sesi
+  //    asalnya tidak lagi ada di history (riwayat lama belum tersinkron / dipangkas).
+  assert.equal(mergeRm10(100, null, 80, KEMARIN), 100);
+  assert.equal(mergeRm10(80, null, 100, KEMARIN), 100);
+  assert.equal(mergeRm10(0, 0, 90, KEMARIN), 90);
+
+  // 2. REGRESI UTAMA: user menurunkan acuan manual hari ini setelah jeda panjang. Rekor lama
+  //    dari riwayat TIDAK BOLEH menaikkannya lagi — kalau boleh, tombol simpan di kalkulator
+  //    10RM tidak ada artinya sama sekali.
+  assert.equal(mergeRm10(60, HARI_INI, 100, KEMARIN), 60,
+    'rekor lama tidak boleh menimpa acuan yang baru ditetapkan manual');
+
+  // 3. Tapi override bukan plafon permanen: sesi SESUDAH tanggal override tetap boleh menang.
+  assert.equal(mergeRm10(60, HARI_INI, 100, BESOK), 100,
+    'rekor baru sesudah override harus tetap menang');
+
+  // 4. Sesi baru yang lebih RENDAH dari acuan manual tidak menurunkannya.
+  assert.equal(mergeRm10(60, HARI_INI, 50, BESOK), 60);
+
+  // 5. Masukan kosong tidak menghasilkan NaN.
+  assert.equal(mergeRm10(undefined, undefined, undefined, undefined), 0);
+  assert.ok(!Number.isNaN(mergeRm10('x', 'y', 'z', 'w')));
+
+  console.log('mergeRm10 OK');
+}
+
+// ---- recomputeStrengthRecords ikut melaporkan KAPAN rekornya tercatat ----
+{
+  const lookup2 = { 101: { id: 101, name: 'Bench Press' } };
+  const hist2 = {
+    '2026-08-01': { workouts: [{ status: 'completed', id: 'a', log: { 101: [{ w: 100, r: 10, done: true }] } }] },
+    '2026-08-05': { workouts: [{ status: 'completed', id: 'b', log: { 101: [{ w: 60, r: 10, done: true }] } }] },
+  };
+  const r = recomputeStrengthRecords(hist2, ['101'], lookup2)['101'];
+  assert.equal(r.rm10, estimate10RM(100, 10));
+  assert.equal(r.rm10At, new Date('2026-08-01').getTime(),
+    'rm10At harus menunjuk sesi yang benar-benar menghasilkan rekornya, bukan sesi terakhir');
+  console.log('rm10At OK');
+}

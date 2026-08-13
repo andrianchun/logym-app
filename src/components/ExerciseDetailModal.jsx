@@ -115,7 +115,9 @@ const ExerciseDetailModal = ({
   const existingLibEx = exerciseLibrary?.find(e => e.name?.toLowerCase() === initialEx.name?.toLowerCase() || e.id === initialEx.id);
   const stored10RM = existingLibEx?.rm10 || 0;
   const storedLastWeight = existingLibEx?.lastWeight || 0;
-  const best10RM = Math.max(historyMax10RM, stored10RM);
+  // Kalau user pernah menetapkan acuan sendiri, angka tersimpan itulah kebenarannya — jangan
+  // ditimpa rekor riwayat lama di tampilan, karena logika penyimpanannya juga tidak menimpanya.
+  const best10RM = existingLibEx?.rm10ManualAt ? stored10RM : Math.max(historyMax10RM, stored10RM);
 
   const [activeTab, setActiveTab] = useState('info'); // info, history, calc
   const [calcWeight, setCalcWeight] = useState(best10RM || storedLastWeight || 50);
@@ -140,13 +142,18 @@ const ExerciseDetailModal = ({
   const handleSave10RM = () => {
     if (!setExerciseLibrary) return;
     setExerciseLibrary(lib => {
+      // rm10ManualAt menandai KAPAN acuan ini ditetapkan sendiri oleh user. Tanpa penanda itu,
+      // perhitungan ulang dari riwayat akan menaikkan angkanya lagi di sesi berikutnya dan
+      // tombol simpan ini jadi tidak ada artinya — padahal justru dipakai untuk MENURUNKAN acuan
+      // setelah jeda panjang. Rekor dari sesi SESUDAH tanggal ini tetap boleh menang.
+      const manual = { rm10: calculated10RM, rm10ManualAt: Date.now() };
       const idx = lib.findIndex(e => e.name?.toLowerCase() === initialEx.name?.toLowerCase() || e.id === initialEx.id);
       if (idx >= 0) {
         const newLib = [...lib];
-        newLib[idx] = { ...newLib[idx], rm10: calculated10RM };
+        newLib[idx] = { ...newLib[idx], ...manual };
         return newLib;
       }
-      return [...lib, { ...initialEx, rm10: calculated10RM, id: initialEx.id || Date.now(), isFavorite: false }];
+      return [...lib, { ...initialEx, ...manual, id: initialEx.id || Date.now(), isFavorite: false }];
     });
     setIsRmSaved(true);
     setTimeout(() => setIsRmSaved(false), 2000);

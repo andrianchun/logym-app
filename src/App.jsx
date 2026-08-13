@@ -52,7 +52,7 @@ import { fetchExercisesFromApi } from './utils/exerciseDbApi';
 import { AI_MODELS, detectPlateaus, getLogyNotification } from './utils/aiAgent';
 import { calculateReadiness, restingHrBaseline } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
-import { calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, recomputeStrengthRecords, buildHcSessionDetail, estimate10RM, defaultSetWeight, gymStepFor } from './utils/workoutCalc';
+import { calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, recomputeStrengthRecords, buildHcSessionDetail, estimate10RM, defaultSetWeight, gymStepFor, mergeRm10 } from './utils/workoutCalc';
 import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcReadHeartRateWindow, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission, capIntradayLog, HC_FIELDS, fillOnlyPatch, hcDroppedTypes } from './utils/healthConnect';
 import { bumpExercisePopularity } from './utils/exercisePopularity';
 import useDialog from './hooks/useDialog';
@@ -3041,13 +3041,12 @@ export default function App() {
       const next = lib.map(e => {
         const r = records[String(e.id)];
         if (!r) return e;
-        // rm10 diambil MAKSIMUM, bukan ditimpa. Versi lama menimpa tanpa syarat dengan nilai
-        // turunan riwayat setiap kali latihan disimpan — sehingga 10RM yang disimpan manual
-        // lewat ExerciseDetailModal hilang di sesi berikutnya, dan rekor yang sesi asalnya
-        // tidak ada lagi di `history` (mis. riwayat lama belum tersinkron) ikut lenyap.
-        // Inilah "10RM selalu hilang tiap sesi baru".
-        // lastWeight TIDAK dimaksimumkan: itu memang "beban terakhir dipakai", wajar turun.
-        const rm10 = Math.max(Number(e.rm10) || 0, Number(r.rm10) || 0);
+        // Versi lama menimpa rm10 TANPA SYARAT dengan nilai turunan riwayat setiap kali latihan
+        // disimpan — 10RM yang disimpan manual hilang di sesi berikutnya, dan rekor yang sesi
+        // asalnya tidak ada lagi di `history` ikut lenyap. Itu "10RM selalu hilang tiap sesi baru".
+        // mergeRm10 menghormati override manual tanpa membekukannya selamanya.
+        // lastWeight TIDAK ikut aturan ini: itu memang "beban terakhir dipakai", wajar turun.
+        const rm10 = mergeRm10(e.rm10, e.rm10ManualAt, r.rm10, r.rm10At);
         if (e.rm10 === rm10 && e.lastWeight === r.lastWeight) return e;
         changed = true;
         return { ...e, rm10, lastWeight: r.lastWeight };
