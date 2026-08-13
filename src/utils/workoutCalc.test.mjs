@@ -135,8 +135,10 @@ const T1 = T0 + 60 * 60 * 1000; // sesi 1 jam
   assert.equal(segments.length, 2);
   assert.equal(segments[0].reps, 28, 'reps harus dijumlah dari semua set');
   assert.equal(segments[0].type, 'Bench Press');
-  assert.match(notes, /Bench Press 3x9 @45kg/, `notes: ${notes}`);
-  assert.match(notes, /Squat 1x12 @60kg/, `notes: ${notes}`);
+  assert.match(notes, /Bench Press — 3x9 @45kg/, `notes: ${notes}`);
+  assert.match(notes, /Squat — 1x12 @60kg/, `notes: ${notes}`);
+  // Satu baris per latihan, bukan satu paragraf padat dipisah titik-tengah.
+  assert.equal(notes.split('\n').length, 2, `notes: ${notes}`);
 }
 
 // 15. Segmen TIDAK BOLEH tumpang tindih dan wajib di dalam rentang sesi — Health Connect
@@ -187,3 +189,48 @@ assert.deepEqual(buildHcSessionDetail({ exercises: [] }, {}, T0, T1), { segments
 assert.deepEqual(buildHcSessionDetail({ exercises: [{ id: 1, name: 'A' }] }, { 1: [{ done: true }] }, T0, T0), { segments: [], notes: '' });
 
 console.log('workoutCalc OK', { cardioKcal, plankKcal, liftKcal });
+
+// ---- buildHcSessionDetail: apa yang benar-benar dikirim ke Health Connect ----
+{
+  const { buildHcSessionDetail } = await import('./workoutCalc.js');
+  const start = new Date('2026-08-13T20:00:00').getTime();
+  const end = new Date('2026-08-13T21:00:00').getTime();
+
+  const workout = { id: 'w1', exercises: [
+    { id: 101, name: 'Bench Press' },
+    { id: 123, name: 'Plank' },
+    { id: 999, name: 'Tidak Dikerjakan' },
+  ] };
+  const logs = {
+    101: [ { w: 40, r: 10, done: true }, { w: 40, r: 10, done: true }, { w: 45, r: 8, done: true } ],
+    123: [ { d: 45, done: true }, { d: 45, done: true } ],
+    999: [ { w: 20, r: 10, done: false } ],
+  };
+  const { segments, notes } = buildHcSessionDetail(workout, logs, start, end);
+
+  // Satu baris per latihan, bukan satu paragraf padat.
+  const baris = notes.split('\n');
+  assert.equal(baris.length, 2, `harus 2 baris (latihan tanpa set dilewati), dapat: ${notes}`);
+  assert.ok(baris[0].includes('Bench Press') && baris[0].includes('@45kg'), baris[0]);
+
+  // REGRESI: Plank dulu tampil "Plank 3x0" — terbaca seperti nol repetisi alias tidak dikerjakan.
+  assert.ok(!/x0\b/.test(notes), `latihan berbasis waktu tidak boleh tampil "x0": ${notes}`);
+  assert.ok(baris[1].includes('Plank') && /dtk|mnt/.test(baris[1]), baris[1]);
+
+  // Segmen: hanya latihan yang dikerjakan, tidak tumpang tindih, dan di dalam rentang sesi —
+  // syarat keras Health Connect. Kalau dilanggar, record DITOLAK dan plugin diam-diam
+  // mengirim ulang tanpa segmen sama sekali.
+  assert.equal(segments.length, 2);
+  let prevEnd = start;
+  for (const s of segments) {
+    const a = new Date(s.startDate).getTime();
+    const b = new Date(s.endDate).getTime();
+    assert.ok(a >= start && b <= end, 'segmen harus di dalam rentang sesi');
+    assert.ok(a < b, 'segmen harus punya durasi positif');
+    assert.ok(a >= prevEnd, 'segmen tidak boleh tumpang tindih');
+    prevEnd = b;
+  }
+  assert.equal(segments[0].reps, 28, 'total reps Bench Press = 10+10+8');
+
+  console.log('buildHcSessionDetail OK');
+}

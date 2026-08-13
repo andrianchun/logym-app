@@ -680,16 +680,32 @@ export const buildHcSessionDetail = (workout, logs, startMs, endMs) => {
       reps,
     });
 
-    // "Bench Press 3x10 @40kg" — beban diambil dari set terberat, karena satu baris teks tidak
+    // "Bench Press — 3x10 @40kg" — beban diambil dari set terberat, karena satu baris teks tidak
     // muat menampung beban tiap set dan yang terberat itu yang paling sering dicari orang.
+    const nama = ex?.name || 'Latihan';
     const beratMaks = Math.max(0, ...sets.map(s => Number(s.w) || 0));
     const repsTypical = Math.round(reps / sets.length) || 0;
-    const bagian = [`${ex?.name || 'Latihan'} ${sets.length}x${repsTypical}`];
-    if (beratMaks > 0) bagian.push(`@${beratMaks}kg`);
-    ringkasan.push(bagian.join(' '));
+
+    let rincian;
+    if (repsTypical > 0) {
+      rincian = `${sets.length}x${repsTypical}`;
+      if (beratMaks > 0) rincian += ` @${beratMaks}kg`;
+    } else {
+      // Latihan berbasis waktu (plank, dsb) tidak punya repetisi — versi lama menulis "Plank 3x0",
+      // yang terbaca seperti nol repetisi alias tidak dikerjakan. Tampilkan durasinya.
+      // Set 'time' menyimpan detik di `d`; set kardio menyimpan menit di `duration`.
+      const detik = sets.reduce((n, s) => n + (Number(s.d) || Number(s.duration) * 60 || 0), 0);
+      rincian = detik >= 60
+        ? `${sets.length}x, total ${Math.round(detik / 60)} mnt`
+        : `${sets.length}x, total ${Math.round(detik)} dtk`;
+      if (!(detik > 0)) rincian = `${sets.length} set`;
+    }
+    ringkasan.push(`${nama} — ${rincian}`);
   });
 
-  return { segments, notes: ringkasan.join(' • ') };
+  // Baris baru, bukan titik-tengah: Health Connect merender notes apa adanya, dan pemisah
+  // titik-tengah membuat seluruh sesi jadi satu paragraf padat yang sulit dibaca.
+  return { segments, notes: ringkasan.join('\n') };
 };
 
 /**

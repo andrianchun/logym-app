@@ -216,24 +216,38 @@ class ExerciseWriterPlugin : Plugin() {
     private fun segmentTypeOf(name: String?): Int {
         val n = (name ?: "").lowercase()
         return when {
+            // URUTAN PENTING: yang lebih spesifik WAJIB di atas yang generik. Versi lama menaruh
+            // "curl" di atas "leg curl", sehingga Leg Curl terkirim ke Health Connect sebagai
+            // "Arm curl" — salah otot, dan tidak ada tanda apa pun bahwa itu terjadi.
+            n.contains("leg press") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_LEG_PRESS
+            n.contains("leg curl") || n.contains("hamstring curl") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_LEG_CURL
+            n.contains("leg extension") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_LEG_EXTENSION
+            n.contains("leg raise") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_LEG_RAISE
+            n.contains("back extension") || n.contains("hyperextension") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_BACK_EXTENSION
+            // Triceps: dulu jatuh ke OTHER_WORKOUT dan tampil "Workout" di layar Health Connect.
+            n.contains("triceps") || n.contains("tricep") || n.contains("pushdown") ->
+                ExerciseSegment.EXERCISE_SEGMENT_TYPE_DOUBLE_ARM_TRICEPS_EXTENSION
+            n.contains("lateral raise") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_LATERAL_RAISE
+            n.contains("front raise") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_FRONT_RAISE
+            n.contains("shoulder press") || n.contains("overhead press") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_SHOULDER_PRESS
             n.contains("bench") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_BENCH_PRESS
-            n.contains("squat") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_SQUAT
-            n.contains("deadlift") || n.contains("angkat mati") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_DEADLIFT
             n.contains("lat pull") || n.contains("pulldown") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_LAT_PULL_DOWN
             n.contains("pull up") || n.contains("pull-up") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_PULL_UP
-            n.contains("shoulder press") || n.contains("overhead press") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_SHOULDER_PRESS
+            n.contains("hip thrust") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_HIP_THRUST
+            n.contains("kettlebell") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_KETTLEBELL_SWING
+            n.contains("mountain climber") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_MOUNTAIN_CLIMBER
+            n.contains("squat") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_SQUAT
+            n.contains("deadlift") || n.contains("angkat mati") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_DEADLIFT
             n.contains("curl") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_ARM_CURL
-            n.contains("leg press") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_LEG_PRESS
-            n.contains("leg curl") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_LEG_CURL
-            n.contains("leg extension") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_LEG_EXTENSION
             n.contains("lunge") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_LUNGE
             n.contains("plank") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_PLANK
             n.contains("crunch") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_CRUNCH
             n.contains("sit up") || n.contains("sit-up") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_SIT_UP
-            n.contains("lateral raise") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_LATERAL_RAISE
-            n.contains("front raise") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_FRONT_RAISE
             n.contains("row") && !n.contains("rowing") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_DUMBBELL_ROW
-            n.contains("hip thrust") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_HIP_THRUST
+            n.contains("hiit") || n.contains("interval") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_HIGH_INTENSITY_INTERVAL_TRAINING
+            n.contains("pilates") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_PILATES
+            n.contains("renang") || n.contains("swim") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_SWIMMING_POOL
+            n.contains("stair") || n.contains("tangga") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_STAIR_CLIMBING_MACHINE
             n.contains("treadmill") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_RUNNING_TREADMILL
             n.contains("lari") || n.contains("run") || n.contains("jog") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_RUNNING
             n.contains("jalan") || n.contains("walk") -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_WALKING
