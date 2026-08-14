@@ -4,7 +4,7 @@ const FilterChips = ({ t, label, options, selected, onToggle, formatOption }) =>
   return (
     <div className="space-y-1.5">
       <span className={`text-[10px] font-black uppercase tracking-wider ${t.textMuted}`}>{label}</span>
-      <div className={`flex gap-1.5 overflow-x-auto hide-scrollbar pb-1.5`}>
+      <div className={`no-swipe flex gap-1.5 overflow-x-auto hide-scrollbar pb-1.5`}>
         {options.map(opt => (
           <button
             key={opt}

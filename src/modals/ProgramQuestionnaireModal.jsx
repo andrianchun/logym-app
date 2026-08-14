@@ -9,6 +9,7 @@ import GymManagerModal from '../components/GymManagerModal';
 import { getPlanBgConfig } from '../utils/planBg';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from '../utils/bmr';
 import { rapikanNamaProgram, rapikanNamaSesi } from '../utils/programNaming';
+import { useWakeLock } from '../hooks/useWakeLock';
 
 const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, soundEnabled, gymProfiles, setGymProfiles, activeGymId, setActiveGymId, exerciseLibrary, units, user, userProfile, userApiKeys, keyStatuses, setKeyStatuses, setShowSettings }) => {
   const [step, setStep] = useState(0);
@@ -54,6 +55,16 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
     // Broadcast for Lomeal mock sync via localhost cookies
     document.cookie = `shared_profile=${encodeURIComponent(JSON.stringify(answers))}; path=/; max-age=3600`;
   }, [answers]);
+
+  const { requestWakeLock, releaseWakeLock } = useWakeLock();
+
+  useEffect(() => {
+    if (isGenerating) {
+      requestWakeLock();
+    } else {
+      releaseWakeLock();
+    }
+  }, [isGenerating, requestWakeLock, releaseWakeLock]);
 
   const [touchStart, setTouchStart] = useState(null);
   const [touchEnd, setTouchEnd] = useState(null);

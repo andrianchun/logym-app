@@ -102,7 +102,7 @@ const ExerciseForm = ({ t, lang, formData, setFormData, originalData, onSave, on
           className="relative -mx-6"
           style={{ WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 32px), transparent 100%)', maskImage: 'linear-gradient(to right, black calc(100% - 32px), transparent 100%)' }}
         >
-          <div className="flex flex-col flex-wrap content-start gap-2 overflow-x-auto hide-scrollbar h-[96px] pb-2 px-6">
+          <div className="no-swipe flex flex-col flex-wrap content-start gap-2 overflow-x-auto hide-scrollbar h-[96px] pb-2 px-6">
             {muscleOptions.map(m => (
               <button
                 key={m}

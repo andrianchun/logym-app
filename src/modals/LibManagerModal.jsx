@@ -101,7 +101,7 @@ const LibManagerModal = ({ showLibManager, setShowLibManager, t, exerciseLibrary
                     </select>
                 </div>
                 
-                <div className="flex items-center space-x-2 w-full overflow-x-auto hide-scrollbar pb-1">
+                <div className="no-swipe flex items-center space-x-2 w-full overflow-x-auto hide-scrollbar pb-1">
                      <div className={`flex items-center body-md ${t.textMuted} whitespace-nowrap pl-1`}><Filter size={14} className="mr-1"/></div>
                      <button onClick={() => setFilterMuscle('All')} className={`px-3 py-1.5 rounded-lg body-md whitespace-nowrap transition-colors border ${filterMuscle === 'All' ? t.bgAccent + ' border-transparent' : t.inputBg + ' ' + t.textMuted + ' border-transparent'}`}>Semua Otot</button>
                      {muscleOptions.map(m => (
@@ -109,7 +109,7 @@ const LibManagerModal = ({ showLibManager, setShowLibManager, t, exerciseLibrary
                      ))}
                 </div>
 
-                <div className="flex items-center space-x-2 w-full overflow-x-auto hide-scrollbar pb-1">
+                <div className="no-swipe flex items-center space-x-2 w-full overflow-x-auto hide-scrollbar pb-1">
                      <div className={`flex items-center body-md ${t.textMuted} whitespace-nowrap pl-1`}><Dumbbell size={14} className="mr-1"/></div>
                      <button onClick={() => setFilterEquip('All')} className={`px-3 py-1.5 rounded-lg body-md whitespace-nowrap transition-colors border ${filterEquip === 'All' ? t.bgAccent + ' border-transparent' : t.inputBg + ' ' + t.textMuted + ' border-transparent'}`}>Semua Alat</button>
                      {equipmentOptions.map(eq => (

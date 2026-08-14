@@ -4,6 +4,7 @@ import { Send, X, Check, Loader2, Dumbbell, Menu, Plus, MessageSquare, Trash2, B
 import { buildSystemPrompt, summarizeWorkoutLogs, summarizeBiometrics, summarizeActivePrograms, summarizeFavoriteProgram, needsPersonalContext, needsAppHelpContext, APP_HELP_REFERENCE, chatWithAI, AI_MODELS, getAvailableModels, getProviderStatus, checkOverallAIStatus } from '../utils/aiAgent';
 import renderMiniMarkdown from '../utils/miniMarkdown';
 import { db } from '../firebase';
+import { useWakeLock } from '../hooks/useWakeLock';
 
 const THINKING_PHASES = ['Membaca riwayat latihanmu...', 'Menganalisis progress mingguan...', 'Menyusun jawaban...'];
 
@@ -56,6 +57,16 @@ export default function GymAIChat({
     // "user closed the chat / switched sessions while a reply was still generating".
     const isOpenRef = useRef(isOpen);
     useEffect(() => { isOpenRef.current = isOpen; }, [isOpen]);
+
+    const { requestWakeLock, releaseWakeLock } = useWakeLock();
+
+    useEffect(() => {
+        if (isLoading) {
+            requestWakeLock();
+        } else {
+            releaseWakeLock();
+        }
+    }, [isLoading, requestWakeLock, releaseWakeLock]);
 
     // Phase state machine — guarantees both open AND close animations fire reliably
     // closed → opening (mount, scale=0) → open (scale=1) → closing (scale=0) → closed (unmount)

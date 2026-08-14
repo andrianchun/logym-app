@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { X, Dumbbell, History, Calculator, Replace, Video, Info, ChevronLeft, ChevronRight, Loader2, Play } from 'lucide-react';
 import { formatTarget, resolveProjectedProgramId } from '../data/constants';
 import { resolveExerciseKind, estimate10RM, estimate1RM } from '../utils/workoutCalc';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 import SwipeInput from './SwipeInput';
 
 const ExerciseDetailModal = ({ 
@@ -112,6 +113,8 @@ const ExerciseDetailModal = ({
     return max;
   }, [historyData]);
 
+
+
   const existingLibEx = exerciseLibrary?.find(e => e.name?.toLowerCase() === initialEx.name?.toLowerCase() || e.id === initialEx.id);
   const stored10RM = existingLibEx?.rm10 || 0;
   const storedLastWeight = existingLibEx?.lastWeight || 0;
@@ -135,6 +138,26 @@ const ExerciseDetailModal = ({
     const isIndo = lang?.id === 'ID' || t?.settings !== 'Settings';
     return isIndo ? `${d}/${m}/${y}` : `${m}/${d}/${y}`;
   };
+
+  const chartData = useMemo(() => {
+    if (!historyData || historyData.length === 0 || initialExType !== 'weight') return [];
+    const data = [];
+    // historyData diurutkan dari baru ke lama, kita butuh lama ke baru untuk grafik
+    [...historyData].reverse().forEach(day => {
+      let max10RM = 0;
+      day.sets.forEach(s => {
+        const c = estimate10RM(s.w, s.r);
+        if (c > max10RM) max10RM = c;
+      });
+      if (max10RM > 0) {
+        data.push({
+          date: formatDate(day.date),
+          rm10: isImp ? Number((max10RM * 2.20462).toFixed(1)) : max10RM
+        });
+      }
+    });
+    return data;
+  }, [historyData, initialExType, isImp, formatDate]);
 
   // Rumus yang SAMA dengan jalur riwayat. Versi lama di sini membulatkan 1RM ke bilangan bulat
   // dulu, sehingga 100 kg x 10 memberi 99,8 di kalkulator tapi 100,0 dari riwayat.
@@ -558,8 +581,36 @@ const ExerciseDetailModal = ({
                          <p className="body-lg font-bold">Belum ada riwayat latihan ini.</p>
                        </div>
                      ) : (
-                       historyData.map((log, i) => (
-                         <div key={i} className={`mb-3 pb-3 border-b border-dashed last:border-b-0 ${t.border}`}>
+                       <>
+                         {chartData.length > 1 && (
+                           <div className={`mb-6 p-4 rounded-2xl border ${t.border} bg-black/5 dark:bg-white/5`}>
+                             <div className={`flex items-center justify-between mb-4`}>
+                               <h3 className={`body-lg font-bold ${t.textMain}`}>Progresivitas Latihan (10RM)</h3>
+                             </div>
+                             <div className="w-full h-[120px] -ml-2">
+                               <ResponsiveContainer width="100%" height="100%">
+                                 <AreaChart data={chartData} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
+                                   <defs>
+                                     <linearGradient id="colorRm10" x1="0" y1="0" x2="0" y2="1">
+                                       <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                                       <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                                     </linearGradient>
+                                   </defs>
+                                   <XAxis dataKey="date" hide />
+                                   <YAxis domain={['auto', 'auto']} hide />
+                                   <Tooltip 
+                                     contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '10px' }}
+                                     itemStyle={{ color: '#3b82f6', fontWeight: 'bold' }}
+                                     labelStyle={{ color: '#aaa', marginBottom: '4px' }}
+                                   />
+                                   <Area type="monotone" dataKey="rm10" name="10RM" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorRm10)" />
+                                 </AreaChart>
+                               </ResponsiveContainer>
+                             </div>
+                           </div>
+                         )}
+                         {historyData.map((log, i) => (
+                           <div key={i} className={`mb-3 pb-3 border-b border-dashed last:border-b-0 ${t.border}`}>
                            <div className="flex items-center mb-1.5 px-1">
                              <div className={`caption ${t.textMuted} w-[65px] shrink-0`}>
                                {formatDate(log.date)}
@@ -627,7 +678,8 @@ const ExerciseDetailModal = ({
                              </table>
                            </div>
                          </div>
-                       ))
+                       ))}
+                       </>
                      )}
                   </div>
                 </div>

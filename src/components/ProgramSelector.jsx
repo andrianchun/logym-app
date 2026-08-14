@@ -9,7 +9,7 @@ const ProgramSelector = ({
     <div className="flex justify-between items-center mb-4">
       
       {/* DERETAN TAB PROGRAM (Bisa di-scroll / swipe) */}
-      <div className="flex overflow-x-auto space-x-2 hide-scrollbar pb-1">
+      <div className="no-swipe flex overflow-x-auto space-x-2 hide-scrollbar pb-1">
         {programs.map(p => (
           <button 
             key={p.id} 
