@@ -235,7 +235,9 @@ export const generateDynamicWorkout = (userProfile, gymProfile, exerciseLibrary)
 
     routines.push({
       id: `prog-${idx+1}`,
-      name: `${dayPlan.focus} (${dayPlan.day})`,
+      // Nama sesi TANPA hari — harinya ditampilkan sebagai badge terpisah di kartu program,
+      // jadi "Full Body A (Rab)" cuma bikin nama panjang dan dobel.
+      name: dayPlan.focus,
       day: dayPlan.day,
       exercises: routineExs
     });

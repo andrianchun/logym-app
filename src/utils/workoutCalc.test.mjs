@@ -58,14 +58,16 @@ const uuidEx = { id: '3fa85f64-5717-4562-b3fc-2c963f66afa6', name: 'Latihan Cust
 const lookup = { [bench.id]: bench, [uuidEx.id]: uuidEx };
 const hari = (log) => ({ workouts: [{ id: 'w1', status: 'completed', log }] });
 
-// 8. Dasar: rekor diambil dari set TERBERAT sepanjang riwayat, beban terakhir dari hari TERBARU.
+// 8. Dasar: 10RM diambil dari sesi TERAKHIR (boleh turun — deload/salah input bisa terkoreksi),
+//    rekor sepanjang masa tetap dilaporkan terpisah lewat rm10Best, beban terakhir dari hari TERBARU.
 {
   const history = {
     '2026-08-01': hari({ 1: [{ w: 100, r: 5 }] }),  // 1RM ~116,7 -> 10RM ~87,5
     '2026-08-05': hari({ 1: [{ w: 60, r: 10 }] }),
   };
   const r = recomputeStrengthRecords(history, ['1'], lookup)['1'];
-  assert.ok(r.rm10 > 85 && r.rm10 < 90, `10RM di luar dugaan: ${r.rm10}`);
+  assert.equal(r.rm10, 60, `10RM harus dari sesi terakhir, dapat ${r.rm10}`);
+  assert.ok(r.rm10Best > 85 && r.rm10Best < 90, `rekor sepanjang masa di luar dugaan: ${r.rm10Best}`);
   assert.equal(r.lastWeight, 60, 'beban terakhir harus dari hari terbaru, bukan yang terberat');
 }
 

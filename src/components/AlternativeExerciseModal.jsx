@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Search, Filter, Dumbbell, Heart, ChevronDown } from 'lucide-react';
 import { formatTarget, getVideoId, muscleOptions, equipmentOptions, normalizeMuscleKey } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
@@ -140,8 +141,20 @@ const AlternativeExerciseModal = ({
 
   if (!isOpen || !originalEx) return null;
 
-  return (
-    <div className={`fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in`} onClick={onClose}>
+  // z-[110], bukan z-[60]. Editor program (ProgramTab) dan mode immersive dua-duanya overlay
+  // z-[100] yang menutup layar penuh dan opak — dialog ini disisipkan sebagai saudara di pohon
+  // yang sama, jadi dengan z-[60] dia tetap dirender tapi ADA DI BELAKANG editor: tombol "ganti
+  // latihan alternatif" di editor terasa tidak melakukan apa-apa sama sekali.
+  // `no-swipe` + role="dialog": App.jsx memasang penangkap sentuh global untuk geser-pindah-tab
+  // dan handleGlobalTouchStart/TouchEnd MELEWATI elemen yang punya salah satu penanda itu. Dialog
+  // ini satu-satunya modal yang belum menandai dirinya (bandingkan ExerciseDetailModal), jadi
+  // sentuhan di dalamnya ikut dimakan penangkap global — terasa seperti dialog yang tidak bisa
+  // dipencet atau di-scroll.
+  //
+  // Dirender lewat portal ke <body> supaya tidak pernah lagi terjebak di dalam tumpukan overlay
+  // pemanggilnya, apa pun z-index mereka.
+  return createPortal(
+    <div role="dialog" aria-modal="true" className={`fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in no-swipe`} onClick={onClose}>
       <div className={`w-full max-w-md mx-auto ${t.bgCard} rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 border ${t.border}`} onClick={e => e.stopPropagation()}>
         
         {/* Header */}
@@ -251,7 +264,9 @@ const AlternativeExerciseModal = ({
         </div>
 
         {/* List */}
-        <div className="flex-1 overflow-y-auto p-2 space-y-2">
+        {/* overscroll-contain: gulirannya berhenti di daftar ini, tidak merembet menggulir
+            halaman di belakang begitu sampai ujung. */}
+        <div className="flex-1 overflow-y-auto overscroll-contain p-2 space-y-2" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
           {alternatives.length === 0 ? (
             <div className={`text-center py-12 ${t.textMuted}`}>
               <p className="body-lg font-bold">Tidak ada latihan yang ditemukan.</p>
@@ -310,7 +325,8 @@ const AlternativeExerciseModal = ({
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

@@ -370,6 +370,35 @@ assert.equal(dailyActiveMinutes({ stepMinutes: 0 }, [{ id: 'p', status: 'planned
 assert.equal(dailyActiveMinutes(null, null).total, 0);
 assert.equal(dailyActiveMinutes({ stepMinutes: 'x', activeMinutes: null }, undefined).total, 0);
 
+// 30. REGRESI: SESI CAMPURAN — beban lalu ditutup treadmill 8 menit, dalam satu sesi 53 menit.
+//     Dulu penggolongannya all-or-nothing per sesi (guessWorkoutType): sesi ini dicap 100% beban,
+//     menit kardionya hilang, dan menit-langkah treadmill tidak dikurangi sehingga 8 menit itu
+//     terhitung dua kali.
+{
+  const campuran = {
+    id: 'mix', status: 'completed', duration: '53:00',
+    exercises: [beban, kardio],
+    log: { 1: logSet(4, { r: 10, w: 40 }), 2: [{ done: true, duration: 8 }] },
+  };
+  const a = dailyActiveMinutes({ stepMinutes: 30 }, [campuran]);
+  assert.equal(a.workoutMinutes, 53);
+  assert.equal(a.cardioMinutes, 8, 'menit kardio dari durasi SET treadmill, bukan seluruh sesi');
+  assert.equal(a.weightMinutes, 45, 'sisanya beban');
+  assert.equal(a.stepMinutes, 22, 'menit-langkah dikurangi 8, bukan 53');
+}
+
+// 31. Durasi set tidak boleh melebihi durasi sesinya (mis. salah ketik 999 menit).
+{
+  const ngawur = {
+    id: 'x', status: 'completed', duration: '20:00', exercises: [kardio],
+    log: { 2: [{ done: true, duration: 999 }] },
+  };
+  assert.equal(dailyActiveMinutes({ stepMinutes: 60 }, [ngawur]).cardioMinutes, 20);
+}
+
+// 32. Riwayat lama tanpa log per-set tetap memakai aturan lama, bukan jadi nol.
+assert.equal(dailyActiveMinutes({ stepMinutes: 40 }, [kardioSesi]).cardioMinutes, 30);
+
 // --- format durasi tidur -------------------------------------------------
 
 assert.deepEqual(sleepHoursToParts(5.3), { jam: 5, menit: 18 });

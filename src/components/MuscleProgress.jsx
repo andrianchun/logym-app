@@ -61,11 +61,12 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
         const diffY = touchStartY.current - touchEndY.current;
         
         if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 40) {
+            // Tanpa suara: geser antar-tampilan di sini tidak bisa dibedakan user dari geser
+            // pindah tab (yang memang sudah senyap), jadi terdengar seperti "dup" acak tiap
+            // kali pindah tab. Lihat handleGlobalTouchEnd di App.jsx.
             if (diffX > 0 && viewMode === 'image') {
-                playSoundEffect('swipe', soundEnabled);
                 setViewMode('radar');
             } else if (diffX < 0 && viewMode === 'radar') {
-                playSoundEffect('swipe', soundEnabled);
                 setViewMode('image');
             }
         }

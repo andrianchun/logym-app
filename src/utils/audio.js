@@ -69,10 +69,13 @@ export const playSoundEffect = (type, enabled) => {
       } else if (type === 'swipe') {
         tone(200, { gain: 0.05, dur: 0.05 });
       } else if (type === 'done_set') {
-        // Centang: dua ketuk naik yang rapat. Dulu nyaris identik dengan 'click' (sama-sama
-        // sinus 600 Hz turun), jadi menyelesaikan set terasa sama saja dengan menekan tombol.
-        tone(1046, { gain: 0.35, dur: 0.045 });
-        tone(1568, { gain: 0.42, dur: 0.075, when: 0.045 });
+        // Centang: tiga nada naik cepat (E6-B6-E7) pakai gelombang segitiga yang lebih "berisi"
+        // dari sinus, plus ekor sedikit panjang di nada terakhir supaya terdengar tuntas —
+        // bukan 'tik' datar. Dulu nyaris identik dengan 'click' (sama-sama sinus 600 Hz turun),
+        // jadi menyelesaikan set terasa sama saja dengan menekan tombol biasa.
+        tone(1318, { type: 'triangle', gain: 0.4, dur: 0.05 });
+        tone(1976, { type: 'triangle', gain: 0.45, dur: 0.05, when: 0.048 });
+        tone(2637, { type: 'triangle', gain: 0.32, dur: 0.22, when: 0.096 });
       } else if (type === 'success') {
         // Dulu TIDAK ADA cabangnya sama sekali — sepuluh pemanggil (termasuk simpan latihan
         // dan popup pencapaian) memanggil playSoundEffect('success') dan tidak menghasilkan

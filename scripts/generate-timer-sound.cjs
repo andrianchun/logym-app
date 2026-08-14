@@ -5,10 +5,16 @@
 // berarti dua suara berbeda untuk kejadian yang sama — di dalam aplikasi terdengar "plup" pelan,
 // begitu aplikasi ditutup berubah jadi nada alarm bawaan HP yang dipaksa volume maksimum.
 //
-// Karakter nada: dua ketuk pendek lalu satu nada panjang lebih tinggi (pola timer gym standar).
-// Frekuensinya 880-1320 Hz — rentang yang paling menembus di speaker HP, sekaligus rentang yang
-// masih terdengar di ruangan berisik. Ada harmonik ketiga tipis supaya terasa "nyaring" dan
-// bukan sinus datar, plus envelope attack/release supaya tidak ada bunyi 'klik' di ujung.
+// Karakter nada: alarm naik bertingkat 600 -> 800 -> 1000 -> 1200 Hz selama ~2 detik, sama
+// seperti nada timer versi paling awal (oscillator 'square', gain 0.6 ditahan penuh) yang memang
+// terdengar lantang di gym. Versi sebelumnya — dua ketuk sinus pendek dengan envelope luruh
+// cepat, total 1 detik — jauh lebih pelan: energinya cuma di 0,15 detik pertama tiap ketuk.
+//
+// Dua hal yang bikin nyaring, dua-duanya sengaja:
+//   1. Gelombang KOTAK (dijumlah dari harmonik ganjil, band-limited biar tidak aliasing) —
+//      harmonik banyak = menembus speaker HP kecil yang tidak punya bass.
+//   2. Envelope DITAHAN, bukan luruh. Attack/release cuma 8 ms di ujung tiap tingkat supaya
+//      tidak ada bunyi 'klik', sisanya amplitudo penuh.
 const fs = require('fs');
 const path = require('path');
 
@@ -40,31 +46,39 @@ function writeWav(filename, samples, sampleRate = SR) {
 
 const silence = (ms) => new Array(Math.round((ms / 1000) * SR)).fill(0);
 
-// Satu ketuk: nada dasar + harmonik ketiga tipis, dengan attack 8 ms dan release halus.
-const beep = (freq, ms, gain = 0.85) => {
+// Satu tingkat alarm: gelombang kotak band-limited (harmonik ganjil sampai di bawah Nyquist),
+// amplitudo DITAHAN penuh, cuma diberi fade 8 ms di kedua ujung supaya sambungan antar tingkat
+// tidak berbunyi 'klik'.
+const blast = (freq, ms, gain = 0.92) => {
   const n = Math.round((ms / 1000) * SR);
-  const attack = Math.round(0.008 * SR);
+  const fade = Math.round(0.008 * SR);
+  const harmonics = [];
+  for (let h = 1; h * freq < SR / 2; h += 2) harmonics.push(h);
   const out = new Array(n);
+  let puncak = 0;
   for (let i = 0; i < n; i++) {
     const tt = i / SR;
-    let env;
-    if (i < attack) env = i / attack;
-    else {
-      const rel = (i - attack) / (n - attack);
-      env = Math.pow(1 - rel, 1.6); // luruh cepat di akhir, tanpa klik
-    }
-    const tone = Math.sin(2 * Math.PI * freq * tt) + 0.28 * Math.sin(2 * Math.PI * freq * 3 * tt);
-    out[i] = (tone / 1.28) * env * gain;
+    let s = 0;
+    for (const h of harmonics) s += Math.sin(2 * Math.PI * freq * h * tt) / h;
+    out[i] = s;
+    if (Math.abs(s) > puncak) puncak = Math.abs(s);
+  }
+  // Normalisasi ke puncak SEBENARNYA, bukan ke jumlah 1/h. Deret harmonik sampai 22 kHz
+  // menjumlah ~2,2 padahal puncak gelombangnya cuma ~1,2 — dibagi angka itu hasilnya jadi
+  // separuh volume yang dimaksud, persis keluhan "kurang nyaring".
+  for (let i = 0; i < n; i++) {
+    const env = Math.min(1, i / fade, (n - i) / fade);
+    out[i] = (out[i] / puncak) * env * gain;
   }
   return out;
 };
 
 const samples = [
-  ...beep(880, 150),
-  ...silence(90),
-  ...beep(880, 150),
-  ...silence(90),
-  ...beep(1320, 520),
+  ...blast(600, 450),
+  ...blast(800, 450),
+  ...blast(1000, 450),
+  ...blast(1200, 650),
+  ...silence(60),
 ];
 
 const targets = [

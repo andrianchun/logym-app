@@ -69,24 +69,25 @@ console.log('rm10 OK', { r100x10: estimate10RM(100, 10), bulat42_5step5: roundDo
   const HARI_INI = new Date('2026-08-13T00:00:00').getTime();
   const BESOK = new Date('2026-08-14T00:00:00').getTime();
 
-  // 1. Tanpa override manual -> ambil yang tertinggi. Rekor tidak boleh turun cuma karena sesi
-  //    asalnya tidak lagi ada di history (riwayat lama belum tersinkron / dipangkas).
-  assert.equal(mergeRm10(100, null, 80, KEMARIN), 100);
+  // 1. Tanpa override manual -> pakai angka dari sesi TERAKHIR, termasuk kalau lebih rendah.
+  //    REGRESI UTAMA: dulu di sini Math.max, jadi 10RM tidak pernah bisa turun seumur hidup akun —
+  //    deload tidak tercermin dan satu salah ketik (100 kg padahal 10) merusak saran beban selamanya.
+  assert.equal(mergeRm10(100, null, 80, KEMARIN), 80, '10RM harus boleh turun (deload / salah input)');
   assert.equal(mergeRm10(80, null, 100, KEMARIN), 100);
   assert.equal(mergeRm10(0, 0, 90, KEMARIN), 90);
 
-  // 2. REGRESI UTAMA: user menurunkan acuan manual hari ini setelah jeda panjang. Rekor lama
-  //    dari riwayat TIDAK BOLEH menaikkannya lagi — kalau boleh, tombol simpan di kalkulator
-  //    10RM tidak ada artinya sama sekali.
+  // 2. Riwayat kosong (belum tersinkron / dipangkas) -> yang tersimpan dipertahankan, bukan dinolkan.
+  assert.equal(mergeRm10(100, null, 0, KEMARIN), 100);
+
+  // 3. REGRESI: user menurunkan acuan manual hari ini setelah jeda panjang. Sesi lama TIDAK BOLEH
+  //    menimpanya — kalau boleh, tombol simpan di kalkulator 10RM tidak ada artinya.
   assert.equal(mergeRm10(60, HARI_INI, 100, KEMARIN), 60,
-    'rekor lama tidak boleh menimpa acuan yang baru ditetapkan manual');
+    'sesi lama tidak boleh menimpa acuan yang baru ditetapkan manual');
 
-  // 3. Tapi override bukan plafon permanen: sesi SESUDAH tanggal override tetap boleh menang.
-  assert.equal(mergeRm10(60, HARI_INI, 100, BESOK), 100,
-    'rekor baru sesudah override harus tetap menang');
-
-  // 4. Sesi baru yang lebih RENDAH dari acuan manual tidak menurunkannya.
-  assert.equal(mergeRm10(60, HARI_INI, 50, BESOK), 60);
+  // 4. Tapi override bukan plafon permanen: sesi SESUDAH tanggal override tetap menang,
+  //    naik maupun turun.
+  assert.equal(mergeRm10(60, HARI_INI, 100, BESOK), 100, 'sesi sesudah override harus menang');
+  assert.equal(mergeRm10(60, HARI_INI, 50, BESOK), 50, 'sesi sesudah override yang lebih ringan juga menang');
 
   // 5. Masukan kosong tidak menghasilkan NaN.
   assert.equal(mergeRm10(undefined, undefined, undefined, undefined), 0);
@@ -95,7 +96,7 @@ console.log('rm10 OK', { r100x10: estimate10RM(100, 10), bulat42_5step5: roundDo
   console.log('mergeRm10 OK');
 }
 
-// ---- recomputeStrengthRecords ikut melaporkan KAPAN rekornya tercatat ----
+// ---- 10RM mengikuti sesi TERAKHIR, rekor sepanjang masa disimpan terpisah ----
 {
   const lookup2 = { 101: { id: 101, name: 'Bench Press' } };
   const hist2 = {
@@ -103,8 +104,29 @@ console.log('rm10 OK', { r100x10: estimate10RM(100, 10), bulat42_5step5: roundDo
     '2026-08-05': { workouts: [{ status: 'completed', id: 'b', log: { 101: [{ w: 60, r: 10, done: true }] } }] },
   };
   const r = recomputeStrengthRecords(hist2, ['101'], lookup2)['101'];
-  assert.equal(r.rm10, estimate10RM(100, 10));
-  assert.equal(r.rm10At, new Date('2026-08-01').getTime(),
-    'rm10At harus menunjuk sesi yang benar-benar menghasilkan rekornya, bukan sesi terakhir');
-  console.log('rm10At OK');
+  assert.equal(r.rm10, estimate10RM(60, 10), '10RM = sesi terakhir (deload), bukan rekor lama');
+  assert.equal(r.rm10Best, estimate10RM(100, 10), 'rekor sepanjang masa tetap tersimpan');
+  assert.equal(r.rm10At, new Date('2026-08-05').getTime(), 'rm10At = tanggal sesi terakhir');
+  console.log('rm10 terakhir OK');
+}
+
+// ---- rm10Series: bahan grafik progressive overload ----
+{
+  const { rm10Series } = await import('./workoutCalc.js');
+  const lookup3 = { 101: { id: 101, name: 'Bench Press' } };
+  const hist3 = {
+    '2026-08-05': { workouts: [{ status: 'completed', id: 'b', log: { 101: [{ w: 60, r: 10, done: true }] } }] },
+    '2026-08-01': { workouts: [{ status: 'completed', id: 'a', log: { 101: [
+      { w: 50, r: 10, done: true }, { w: 55, r: 10, done: true },
+    ] } }] },
+    '2026-08-03': { workouts: [{ status: 'in_progress', id: 'x', log: { 101: [{ w: 999, r: 10, done: true }] } }] },
+    '2026-08-04': { workouts: [{ status: 'completed', id: 'c', log: { 202: [{ w: 80, r: 10, done: true }] } }] },
+  };
+  const seri = rm10Series(hist3, 101, lookup3);
+  assert.deepEqual(seri.map(p => p.date), ['2026-08-01', '2026-08-05'],
+    'urut lama->baru, sesi belum selesai & latihan lain tidak ikut');
+  assert.equal(seri[0].rm10, estimate10RM(55, 10), 'per sesi diambil set terbaiknya');
+  assert.equal(seri[1].weight, 60);
+  assert.deepEqual(rm10Series({}, 101, lookup3), []);
+  console.log('rm10Series OK');
 }

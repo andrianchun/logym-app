@@ -446,7 +446,9 @@ const CalendarTab = ({
           schedule: { at: prepTime },
           actionTypeId: "",
           extra: null,
-          largeIcon: 'coach_logy_avatar'
+          // Logo Logym putih di status bar, tanpa foto coach di kanan notifikasi.
+          // Lihat catatan lengkap di scheduleLogyPush (App.jsx).
+          smallIcon: 'ic_stat_logym'
         });
       }
 
@@ -461,7 +463,7 @@ const CalendarTab = ({
           schedule: { at: targetTime },
           actionTypeId: "",
           extra: null,
-          largeIcon: 'coach_logy_avatar'
+          smallIcon: 'ic_stat_logym'
         });
       }
 
@@ -1602,7 +1604,7 @@ const CalendarTab = ({
                                        const logsToUse = (w.log && Object.keys(w.log).length > 0) ? w.log : sessionLogs;
                                        const skippedToUse = w.skipped || sessionSkipped;
                                        const effectiveTime = w.reminderTime || defaultReminderTime || "15:00";
-                                       const isNotifOn = w.hasOwnProperty('reminderEnabled') ? w.reminderEnabled : (w.reminderTime ? true : reminderEnabled);
+                                       const isNotifOn = Object.prototype.hasOwnProperty.call(w, 'reminderEnabled') ? w.reminderEnabled : (w.reminderTime ? true : reminderEnabled);
                                        const estDuration = Math.round((w.overriddenExercises || prog?.exercises || []).reduce((acc, ex) => acc + (parseInt(ex.sets) || 3), 0) * (45 + (parseInt(w.restTime) || parseInt(prog?.restTime) || 90)) / 60) || 0;
                                        
                                        const actualMins = parseWorkoutDurationMinutes(w.duration);
@@ -1668,8 +1670,16 @@ const CalendarTab = ({
                                                   <span className="opacity-50">·</span>
                                                   <span>{`~${calBurned} kcal`}</span>
                                                 </div>
-                                                <div className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${isCompleted ? c.badge : 'bg-black/10 dark:bg-white/10 ' + c.text}`}>
-                                                  {isCompleted ? 'Selesai' : 'Terjadwal'}
+                                                {/* TIGA status, bukan dua. "Selesai" hanya untuk sesi yang benar-benar tersimpan
+                                                    (w.status === 'completed'). Sesi yang semua setnya tercentang tapi belum
+                                                    disimpan dulu ikut dicap "Selesai" — user mengira latihannya sudah aman
+                                                    padahal masih menggantung di sesi berjalan, dan yang tersimpan cuma di
+                                                    perangkat itu. Durasi 0 menit di kartunya adalah gejala yang sama. */}
+                                                <div className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
+                                                  w.status === 'completed' ? c.badge
+                                                    : isCompleted ? 'bg-amber-500/20 text-amber-500 border border-amber-500/40'
+                                                    : 'bg-black/10 dark:bg-white/10 ' + c.text}`}>
+                                                  {w.status === 'completed' ? 'Selesai' : isCompleted ? 'Belum disimpan' : 'Terjadwal'}
                                                 </div>
                                               </div>
 

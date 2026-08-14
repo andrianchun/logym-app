@@ -10,6 +10,7 @@ import AlternativeExerciseModal from '../components/AlternativeExerciseModal';
 import CreatePostModal from '../components/CreatePostModal';
 import useDialog from '../hooks/useDialog';
 import { getPlanBgConfig } from '../utils/planBg';
+import { defaultSetWeight, gymStepFor } from '../utils/workoutCalc';
 import GymAIChat from '../components/GymAIChat';
 
 const PlanNameInput = ({ initialValue, onSave, className, placeholder }) => {
@@ -48,6 +49,9 @@ const SortableExerciseItem = ({ ex, prevEx, idx, routineId, t, lang, soundEnable
   const isTime = ex.type === 'time';
   const isSuperset = !!ex.supersetId;
   const isNewSupersetGroup = isSuperset && prevEx && prevEx.supersetId && prevEx.supersetId !== ex.supersetId;
+  // Latihan ini SATU superset dengan yang di atasnya. Dulu petunjuknya cuma ikon rantai dan
+  // garis aksen di tepi kanan — tidak ada tulisan apa pun, jadi tidak ada yang tahu artinya.
+  const lanjutanSuperset = isSuperset && prevEx?.supersetId === ex.supersetId;
 
   return (
     <div 
@@ -56,6 +60,14 @@ const SortableExerciseItem = ({ ex, prevEx, idx, routineId, t, lang, soundEnable
       className={`relative pl-5 pr-5 py-5 border-b last:border-b-0 ${t.border} transition-colors duration-300 ${isDragging ? 'shadow-2xl ring-2 ' + t.ringAccent + ' scale-[1.02] opacity-100 ' + t.bgCard : 'hover:bg-black/5 dark:hover:bg-white/5'} ${isNewSupersetGroup ? 'mt-4' : ''}`}
     >
       {isSuperset && <div className={`absolute top-0 bottom-0 right-0 w-[6px] ${t.bgAccent}`}></div>}
+      {/* Badge menumpuk tepat di garis batas antar kartu — celah yang memang kosong. */}
+      {lanjutanSuperset && (
+        <div className="absolute -top-[9px] right-3 z-20 pointer-events-none">
+          <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${t.bgAccent} text-white shadow-md`}>
+            Superset
+          </span>
+        </div>
+      )}
       <div className="flex items-start justify-between gap-1">
         
         {/* Left Column: Title and Sets/Reps */}
@@ -130,7 +142,7 @@ const SortableExerciseItem = ({ ex, prevEx, idx, routineId, t, lang, soundEnable
 const ProgramTab = ({
   t, lang, programs, setPrograms, user, exerciseLibrary, soundEnabled,
   setActiveAddModalTarget, saveStateToHistory, openQuestionnaire,
-  activePlanIds, setActivePlanIds, gymProfiles,
+  activePlanIds, setActivePlanIds, gymProfiles, activeGymId,
   focusRoutineId, setFocusRoutineId, setConfirmModal, activityTargets,
   userApiKeys, userProfile, history,
   keyStatuses, setKeyStatuses, setShowSettings,
@@ -140,6 +152,9 @@ const ProgramTab = ({
   const isDark = t.bgCard !== 'bg-white';
   const { dialog, showAlert } = useDialog(isDark);
   const [expandedRoutineId, setExpandedRoutineId] = useState(null);
+  // Rincian sesi yang sedang dibuka di KARTU program (bukan di editor). SATU id saja — membuka
+  // yang lain otomatis menutup yang sekarang, kalau tidak kartunya jadi panjang sekali.
+  const [openRoutineId, setOpenRoutineId] = useState(null);
   const [editingPlanId, setEditingPlanId] = useState(null);
   const [programsSnapshot, setProgramsSnapshot] = useState(null); // snapshot for Batal/cancel
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -784,15 +799,54 @@ const ProgramTab = ({
               </div>
             </div>
 
-            {/* SIMPLE SCHEDULE LIST */}
+            {/* SCHEDULE LIST — badge hari + chevron buka/tutup rincian set x reps x kg.
+                Chevron menggantikan bullet biru yang dulu tidak bisa diapa-apakan: rincian latihan
+                jadi bisa dilihat tanpa masuk mode editor. Badge harinya TAMPILAN saja — nama sesi
+                tetap ramping ("Full Body A", bukan "Rabu: Full Body A"). */}
             <div className="flex-1 overflow-y-auto mb-3 border-t border-white/10 pt-3">
-                 <div className="flex flex-col gap-2">
-                     {group.routines.map(r => (
-                         <div key={r.id} className="flex items-start gap-2">
-                             <div className={`w-1.5 h-1.5 shrink-0 rounded-full mt-1.5 ${t.bgAccent}`} />
-                             <span className="text-[11px] font-bold text-white/90 drop-shadow-sm leading-tight line-clamp-2">{r.name}</span>
+                 <div className="flex flex-col gap-1.5">
+                     {group.routines.map(r => {
+                         const isOpen = openRoutineId === r.id;
+                         const hari = (r.assignedDays || []);
+                         return (
+                         <div key={r.id} className="flex flex-col">
+                             <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); playSoundEffect('click', soundEnabled); setOpenRoutineId(prev => (prev === r.id ? null : r.id)); }}
+                                className="flex items-start gap-1.5 text-left w-full active:opacity-70 transition-opacity"
+                             >
+                                 <ChevronRight size={12} className={`shrink-0 mt-0.5 text-white/60 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`} />
+                                 {hari.length > 0 && (
+                                     <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-white/15 border border-white/10 text-[8px] font-black uppercase tracking-wide text-white/80 leading-none mt-[1px]">
+                                         {hari.join('/')}
+                                     </span>
+                                 )}
+                                 <span className="text-[11px] font-bold text-white/90 drop-shadow-sm leading-tight line-clamp-2 flex-1">{r.name}</span>
+                             </button>
+                             {isOpen && (
+                                 <div className="pl-[18px] pt-1 pb-1.5 flex flex-col gap-1">
+                                     {(r.exercises || []).length === 0 && (
+                                         <span className="text-[9px] text-white/40 font-bold">Belum ada latihan</span>
+                                     )}
+                                     {(r.exercises || []).map(ex => {
+                                         const libEx = exerciseLibrary?.find(e => e.id === ex.id || e.name?.toLowerCase() === ex.name?.toLowerCase());
+                                         const step = gymStepFor(gymProfiles, gymProfiles?.[0]?.id, ex.equipment || libEx?.equipment);
+                                         const kg = (ex.type || libEx?.type) === 'time' ? 0 : defaultSetWeight(libEx, ex, step);
+                                         const takaran = (ex.type || libEx?.type) === 'time'
+                                             ? `${ex.sets || 1} × ${ex.duration || 0} mnt`
+                                             : `${ex.sets || 0} × ${ex.reps || 0}${kg > 0 ? ` × ${kg} kg` : ''}`;
+                                         return (
+                                             <div key={ex.id} className="flex items-start justify-between gap-2">
+                                                 <span className="text-[9.5px] text-white/70 font-semibold leading-tight line-clamp-1 flex-1">{ex.name}</span>
+                                                 <span className="text-[9.5px] text-white/90 font-black shrink-0 tabular-nums">{takaran}</span>
+                                             </div>
+                                         );
+                                     })}
+                                 </div>
+                             )}
                          </div>
-                     ))}
+                         );
+                     })}
                  </div>
             </div>
 
@@ -1068,6 +1122,7 @@ const ProgramTab = ({
         exerciseLibrary={exerciseLibrary}
         onSelectAlternative={handleSelectAlternative}
         t={t} lang={lang} soundEnabled={soundEnabled}
+        gymProfiles={gymProfiles} activeGymId={activeGymId}
       />
 
       {pendingShareProgram && (

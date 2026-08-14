@@ -157,7 +157,9 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
           // ikut ditulis Health Connect dengan satuan berbeda (kalori aktif, tanpa BMR), jadi
           // batang hari yang tersinkron HC menyusut drastis tanpa sebab yang kelihatan.
           const burn = dailyBurnCalories(histBio, history[entry.dateStr]?.workouts, dayWeight, history[entry.dateStr]?.exerciseLogs, userProfile);
-          const act = dailyActiveMinutes(histBio, history[entry.dateStr]?.workouts);
+          // Log hari itu ikut dikirim: menit kardio/beban dipecah dari durasi SET, bukan dari
+          // jenis sesi. Tanpa argumen ini, sesi campuran kembali digolongkan all-or-nothing.
+          const act = dailyActiveMinutes(histBio, history[entry.dateStr]?.workouts, history[entry.dateStr]?.exerciseLogs);
           // Hari yang benar-benar kosong tidak boleh dapat batang. dailyBurnCalories selalu
           // memberi minimal BMR fallback 1600 (konvensi yang disamakan dengan Lomeal), jadi tanpa
           // penjaga ini tiap hari tanpa data muncul sebagai batang 1600 kkal yang mengarang.
@@ -436,7 +438,15 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
                            else if (k === 'activeMinutes') unit = ' m';
                            return [`${formatNumber(value, language)}${unit}`, name];
                        }}
-                       cursor={{ fill: theme === 'dark' ? '#27272a' : '#f4f4f5' }} 
+                       // Tooltip tidur cuma merinci per tahap; totalnya — angka yang paling
+                       // dicari — tidak muncul di mana pun karena `sleep` sendiri bukan bar.
+                       labelFormatter={(label, payload) => {
+                           const total = payload?.[0]?.payload?.sleep;
+                           return activeMetric === 'sleep' && total > 0
+                               ? `${label} · Total ${formatSleepDuration(total)}`
+                               : label;
+                       }}
+                       cursor={{ fill: theme === 'dark' ? '#27272a' : '#f4f4f5' }}
                        contentStyle={{ backgroundColor: theme === 'dark' ? '#18181b' : '#ffffff', borderRadius: '12px', border: '1px solid ' + t.border, padding: '8px 12px', fontSize: '11px', fontWeight: 'bold', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} 
                        itemStyle={{ padding: 0, margin: 0, marginTop: '4px' }} 
                        labelStyle={{ color: theme === 'dark' ? '#a1a1aa' : '#71717a', marginBottom: '4px', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }} 

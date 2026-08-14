@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { TrendingUp } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
 import { getLocalYMD, formatTarget, normalizeMuscleKey, resolveLoggedExercise, resolveProjectedProgramId } from '../data/constants';
+import { estimate10RM } from '../utils/workoutCalc';
 
 const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibrary, soundEnabled, playSoundEffect, selectedDate, units, activePlanIds, isSubCard = false, expandedSessions = {} }) => {
   const [chartType, setChartType] = useState(() => {
@@ -37,6 +38,10 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
   // ==========================================
   const chartDataObj = useMemo(() => {
     const isMusc = chartType === 'muscle';
+    // Mode 10RM: beban mentah per sesi tidak bisa dibandingkan langsung (5x5 @80 kg vs 3x12 @60 kg
+    // mana yang lebih kuat?). 10RM menormalkan beban+reps jadi satu angka, jadi garis yang naik
+    // benar-benar berarti lebih kuat — inilah indikator progressive overload yang sebenarnya.
+    const isRm10 = chartType === 'rm10';
     const itemsSet = new Set();
     const itemFreq = {};
     const dataPoints = []; // Menggunakan Array datar agar titiknya berurutan sesuai set
@@ -126,9 +131,15 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                           }
                       } else {
                           let val = 0;
-                          if (exType === 'weight') val = Number(s.w) * (isImp ? 2.20462 : 1);
-                          else if (exType === 'reps') val = Number(s.r);
-                          else if (exType === 'time') val = Number(s.d);
+                          if (exType === 'weight') {
+                              // Di mode 10RM hanya latihan berbeban yang punya arti — latihan
+                              // reps/waktu dilewati, bukan digambar dengan angka yang salah makna.
+                              val = isRm10
+                                ? estimate10RM(Number(s.w), Number(s.r)) * (isImp ? 2.20462 : 1)
+                                : Number(s.w) * (isImp ? 2.20462 : 1);
+                          }
+                          else if (!isRm10 && exType === 'reps') val = Number(s.r);
+                          else if (!isRm10 && exType === 'time') val = Number(s.d);
 
                           if (val > 0) {
                               itemsSet.add(exName);
@@ -320,7 +331,8 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
         // Use overriddenExercises first (alternative swaps), fall back to program exercises
         const exercises = w.overriddenExercises || prog?.exercises || [];
         exercises.forEach(ex => {
-          if (chartType === 'exercise') {
+          // 10RM memakai daftar item yang sama dengan 'exercise' (nama latihan), cuma nilainya beda.
+          if (chartType !== 'muscle') {
             const libEx = exerciseLibrary.find(e => e.id === ex.id) || ex;
             if (libEx?.name) activeItems.push(libEx.name);
           } else if (chartType === 'muscle') {
@@ -346,7 +358,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
       
       activeProgs.forEach(prog => {
         prog.exercises?.forEach(ex => {
-          if (chartType === 'exercise') {
+          if (chartType !== 'muscle') {
             activeItems.push(ex.name);
           } else if (chartType === 'muscle') {
             const libEx = exerciseLibrary.find(e => e.id === ex.id);
@@ -523,11 +535,17 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
         {!isSubCard && (
         <div className={`mb-5 border-b border-dashed ${t.border} pb-5 no-swipe`} onTouchStart={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
            <div className={`relative flex w-full p-1.5 rounded-full ${t.btnBg}`}>
-               <div className={`absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] rounded-full transition-transform duration-300 ease-out ${t.bgAccent} shadow-sm`} style={{ transform: chartType === 'exercise' ? 'translateX(0)' : 'translateX(100%)', left: '6px' }}></div>
-               
+               <div className={`absolute top-1.5 bottom-1.5 w-[calc(33.333%-5px)] rounded-full transition-transform duration-300 ease-out ${t.bgAccent} shadow-sm`} style={{ transform: chartType === 'exercise' ? 'translateX(0)' : chartType === 'muscle' ? 'translateX(100%)' : 'translateX(200%)', left: '6px' }}></div>
+
                <button onClick={() => { playSoundEffect('click', soundEnabled); setChartType('exercise');}} className={`flex-1 py-3 rounded-full body-lg font-black relative z-10 transition-colors duration-300 ${chartType === 'exercise' ? 'text-white' : t.textMuted}`}>{lang?.progExercise || 'Per Latihan'}</button>
                <button onClick={() => { playSoundEffect('click', soundEnabled); setChartType('muscle');}} className={`flex-1 py-3 rounded-full body-lg font-black relative z-10 transition-colors duration-300 ${chartType === 'muscle' ? 'text-white' : t.textMuted}`}>{lang?.progMuscle || 'Per Otot'}</button>
+               <button onClick={() => { playSoundEffect('click', soundEnabled); setChartType('rm10');}} className={`flex-1 py-3 rounded-full body-lg font-black relative z-10 transition-colors duration-300 ${chartType === 'rm10' ? 'text-white' : t.textMuted}`}>10RM</button>
            </div>
+           {chartType === 'rm10' && (
+             <p className={`mt-3 text-[10px] leading-snug ${t.textMuted}`}>
+               Estimasi 10RM per sesi — beban dan reps dinormalkan jadi satu angka, jadi garis naik = benar-benar makin kuat. Hanya latihan berbeban.
+             </p>
+           )}
         </div>
         )}
         

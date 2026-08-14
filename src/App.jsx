@@ -55,6 +55,7 @@ import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
 import { calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, recomputeStrengthRecords, buildHcSessionDetail, estimate10RM, defaultSetWeight, gymStepFor, mergeRm10 } from './utils/workoutCalc';
 import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcReadHeartRateWindow, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission, capIntradayLog, HC_FIELDS, fillOnlyPatch, hcDroppedTypes } from './utils/healthConnect';
 import { bumpExercisePopularity } from './utils/exercisePopularity';
+import { rapikanNamaProgram, rapikanNamaSesi, pertahankanNamaSesi } from './utils/programNaming';
 import useDialog from './hooks/useDialog';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import UpdaterAlert from './components/UpdaterAlert';
@@ -853,9 +854,14 @@ export default function App() {
           title: copy.title,
           body: copy.body,
           schedule: { at: fireAt },
-          largeIcon: 'coach_logy_avatar',
+          // smallIcon: logo Logym putih 24dp (drawable/ic_stat_logym), bukan ikon 'i' bawaan
+          // Capacitor. Ditulis di tiap notifikasi, BUKAN cuma di capacitor.config.json: config
+          // itu ikut ter-bundle ke APK, jadi perubahannya tidak pernah sampai lewat OTA.
+          // largeIcon sengaja tidak dipakai — foto coach di kanan notifikasi bikin ramai.
+          smallIcon: 'ic_stat_logym',
         }]
       });
+      return id;
     } catch (err) {
       console.warn('Logy push notif error:', err);
     }
@@ -905,7 +911,7 @@ export default function App() {
             title: copy.title,
             body: copy.body,
             schedule: { at: fireAt, allowWhileIdle: true },
-            largeIcon: 'coach_logy_avatar',
+            smallIcon: 'ic_stat_logym', // lihat catatan di scheduleLogyPush
           });
         }
 
@@ -920,20 +926,47 @@ export default function App() {
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform() || !reminderEnabled) return;
+    // Riwayat & program HARUS sudah selesai dimuat. Efek ini ikut berjalan pada render pertama
+    // ketika history masih kosong/separuh dari cache — hitungannya jadi ngawur (mis. "7 hari"
+    // padahal kemarin latihan), notifikasinya terlanjur dijadwalkan, dan dedup menyimpan angka
+    // salah itu sehingga tidak pernah dikoreksi.
+    if (!isDataLoaded || !isHistoryLoaded) return;
+
     const MISSED_THRESHOLD_DAYS = 2;
     const todayYmd = getLocalYMD(new Date());
     // Hari TERJADWAL yang dilewatkan — bukan "hari sejak latihan terakhir". Yang lama menghitung
     // hari istirahat sebagai bolos, jadi program 3x seminggu memicu tuduhan ini tiap minggu.
     const daysMissed = countMissedScheduledDays(history, programs, activePlanIds, todayYmd);
-    if (daysMissed < MISSED_THRESHOLD_DAYS) return;
 
+    // Notifikasi "bolos" dijadwalkan ke JAM PENGINGAT, bisa besok — kalau user latihan lagi
+    // sebelum jamnya tiba, tuduhan basi itu tetap berbunyi. Jadi yang tertunda selalu dibatalkan
+    // dulu, baik saat angkanya berubah maupun saat user sudah kembali ke jadwal.
     const dedupKey = `lyfit_missed_notif_${user?.uid || 'guest'}`;
+    const pendingKey = `lyfit_missed_notif_id_${user?.uid || 'guest'}`;
+    const batalkanTertunda = async () => {
+      const idLama = Number(localStorage.getItem(pendingKey));
+      if (!idLama) return;
+      try { await LocalNotifications.cancel({ notifications: [{ id: idLama }] }); } catch (e) {}
+      localStorage.removeItem(pendingKey);
+    };
+
+    if (daysMissed < MISSED_THRESHOLD_DAYS) {
+      batalkanTertunda();
+      localStorage.removeItem(dedupKey);
+      return;
+    }
+
     const dedupVal = `${todayYmd}_${daysMissed}`;
     if (localStorage.getItem(dedupKey) === dedupVal) return;
 
-    scheduleLogyPush('missed', 88000000 + (daysMissed % 1000), { days: daysMissed })
-      .then(() => localStorage.setItem(dedupKey, dedupVal));
-  }, [history, programs, activePlanIds, reminderEnabled, logyPersona, defaultReminderTime, user?.uid]);
+    const id = 88000000 + (daysMissed % 1000);
+    batalkanTertunda().then(() =>
+      scheduleLogyPush('missed', id, { days: daysMissed }).then(() => {
+        localStorage.setItem(dedupKey, dedupVal);
+        localStorage.setItem(pendingKey, String(id));
+      })
+    );
+  }, [history, programs, activePlanIds, reminderEnabled, logyPersona, defaultReminderTime, user?.uid, isDataLoaded, isHistoryLoaded]);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform() || !reminderEnabled) return;
@@ -951,9 +984,13 @@ export default function App() {
     const isUpdate = programData.action === 'update' && programData.targetPlanId;
     const planId = isUpdate ? programData.targetPlanId : `plan_ai_${Date.now()}`;
 
+    // Nama plan yang SUDAH ADA selalu menang saat mengedit — user boleh rename, Logy tidak boleh
+    // menimpanya balik. Nama baru dari AI dirapikan dulu ("Program Full Body 3 Hari Logym" ->
+    // "Full Body"); lihat programNaming.js.
+    const rutinLama = isUpdate ? programs.filter(p => p.planId === planId) : [];
     const existingPlanName = isUpdate
-      ? programs.find(p => p.planId === planId)?.planName || programData.planName || 'AI Program'
-      : programData.planName || 'AI Program';
+      ? rutinLama[0]?.planName || rapikanNamaProgram(programData.planName, 'Program AI')
+      : rapikanNamaProgram(programData.planName, 'Program AI');
 
     const ts = Date.now();
     const routines = (programData.routines || []).map((r, i) => {
@@ -978,19 +1015,24 @@ export default function App() {
         planId,
         planName: existingPlanName,
         assignedDays: Array.isArray(r.assignedDays) ? r.assignedDays : [],
-        name: r.name || `Day ${i + 1}`,
+        // Nama hari dibuang dari nama sesi ("Rabu: Full Body A" -> "Full Body A"); harinya
+        // ditampilkan sebagai badge terpisah di kartu program.
+        name: rapikanNamaSesi(r.name, `Sesi ${i + 1}`),
         exercises,
         restTime: 90,
         source: 'ai'
       };
     });
 
+    // Sesi yang sudah di-rename user tidak boleh balik ke nama karangan AI saat program diedit.
+    const routinesFinal = isUpdate ? pertahankanNamaSesi(routines, rutinLama) : routines;
+
     try {
       if (isUpdate) {
-        setPrograms(prev => [...routines, ...prev.filter(p => p.planId !== planId)]);
+        setPrograms(prev => [...routinesFinal, ...prev.filter(p => p.planId !== planId)]);
         await showAiAlert('Program berhasil diperbarui sesuai saran Coach Logy!', { type: 'success' });
       } else {
-        setPrograms(prev => [...routines, ...prev]);
+        setPrograms(prev => [...routinesFinal, ...prev]);
         setActivePlanIds(prev => [...prev.filter(id => id !== 'custom'), planId]);
         await showAiAlert('Program AI berhasil disimpan dan diaktifkan! 🧠', { type: 'success' });
       }
@@ -2091,7 +2133,8 @@ export default function App() {
       const saved = JSON.parse(raw);
       const startTime = Number(saved?.startTime) || 0;
       const savedAt = Number(saved?.savedAt) || 0;
-      if (!startTime || !savedAt || saved.date !== getLocalYMD(new Date())) {
+      const ageHours = (Date.now() - savedAt) / 3600000;
+      if (!startTime || !savedAt || ageHours > 24) {
         localStorage.removeItem(TIMER_KEY);
         return;
       }
@@ -2106,7 +2149,17 @@ export default function App() {
 
   const activeSessionRestored = useRef(false);
   useEffect(() => { activeSessionRestored.current = false; }, [user?.uid]);
-  const restoreRemoteSession = async (localSavedAt) => {
+  // Seberapa "berisi" sebuah sesi: jumlah set yang benar-benar tercatat. Dipakai untuk memilih
+  // sesi mana yang menang saat beberapa perangkat sama-sama punya sesi hari ini.
+  const bobotSesi = (payload) => {
+    let n = 0;
+    Object.values(payload?.exerciseLogs || {}).forEach(sets => {
+      Object.values(sets || {}).forEach(s => { if (s && (s.done || Number(s.w) > 0 || Number(s.r) > 0 || Number(s.d) > 0)) n++; });
+    });
+    return n;
+  };
+
+  const restoreRemoteSession = async (localSavedAt, localPayload = null) => {
     if (!user?.uid) return;
     let docs = [];
     try {
@@ -2115,17 +2168,29 @@ export default function App() {
       console.warn('[Sesi] gagal membaca sesi perangkat lain:', e?.message || e);
       return;
     }
+    // PEMENANGNYA YANG PALING BERISI, baru yang paling baru.
+    //
+    // Dulu murni `savedAt` terbaru. Kejadian nyata: HP mencatat 5 latihan (19:09), lalu PWA yang
+    // cuma punya 1 latihan menyimpan sesinya jam 19:42 — dan sesi 1-latihan itu menang, menimpa
+    // tampilan sesi HP yang jauh lebih lengkap. Set yang sudah dikerjakan hilang dari layar
+    // sebelum sempat disimpan jadi riwayat.
     const kandidat = docs
       .map(d => d.data())
       .filter(s => s && s.deviceId !== deviceId.current && s.date === getLocalYMD(new Date()))
       .filter(s => Date.now() - (Number(s.savedAt) || 0) < 12 * 60 * 60 * 1000)
-      .sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0))[0];
+      .map(s => { let p = null; try { p = JSON.parse(s.payload || '{}'); } catch {} return { ...s, _p: p, _bobot: bobotSesi(p) }; })
+      .filter(s => s._p)
+      .sort((a, b) => (b._bobot - a._bobot) || ((b.savedAt || 0) - (a.savedAt || 0)))[0];
     if (!kandidat) return;
-    if (localSavedAt && kandidat.savedAt <= localSavedAt) return;
 
-    let parsed;
-    try { parsed = JSON.parse(kandidat.payload || '{}'); } catch { return; }
-    if (!parsed || Object.keys(parsed.exerciseLogs || {}).length === 0) return;
+    // Sesi lokal hanya kalah kalau kandidatnya BENAR-BENAR lebih berisi; kalau sama berisinya,
+    // barulah yang lebih baru menang.
+    const bobotLokal = bobotSesi(localPayload);
+    if (kandidat._bobot < bobotLokal) return;
+    if (kandidat._bobot === bobotLokal && localSavedAt && kandidat.savedAt <= localSavedAt) return;
+
+    const parsed = kandidat._p;
+    if (Object.keys(parsed.exerciseLogs || {}).length === 0) return;
 
     setHistory(prev => {
       const day = prev[kandidat.date] || { workouts: [] };
@@ -2159,7 +2224,8 @@ export default function App() {
         return;
       }
       activeSessionRestored.current = true;
-      restoreRemoteSession(saved.savedAt || 0);
+      // Isi sesi lokal ikut dikirim: penentunya sekarang seberapa berisi, bukan cuma yang terbaru.
+      restoreRemoteSession(saved.savedAt || 0, saved);
       setHistory(prev => {
         const day = prev[saved.date] || { workouts: [] };
         return {
@@ -2275,7 +2341,81 @@ export default function App() {
       });
       return changed ? next : prev;
     });
-  }, [isHistoryLoaded, user?.uid]); 
+  }, [isHistoryLoaded, user?.uid]);
+
+  // SEKALI JALAN: tidur yang terlanjur tersimpan di tanggal MULAI dipindah ke tanggal BANGUN.
+  // Sebelum perbaikan di sleepPerDay (healthConnect.js), sesi 23:00 -> 07:00 dikelompokkan ke
+  // tanggal kemarin, jadi grafik selalu bolong satu hari di ujung. Sync HC berikutnya menulis ke
+  // tanggal yang benar tapi TIDAK menghapus sisa di tanggal lama (dan hari yang sudah tidak lagi
+  // disimpan Health Connect tidak pernah tersentuh), jadi pembersihannya harus dari sini.
+  //
+  // Hanya hari yang punya sleepLog yang disentuh — input manual tidak punya log dan memang sudah
+  // memakai tanggal yang dimaksud user. Tidur siang (mulai >= 12:00 dan tidak lewat tengah malam)
+  // dulu sudah jatuh di tanggal yang benar, jadi tidak digeser.
+  const SLEEP_FIELDS = ['sleep', 'sleepAwake', 'sleepRem', 'sleepLight', 'sleepDeep', 'sleepLog'];
+  const sleepWakeDayFixDone = useRef(false);
+  useEffect(() => { sleepWakeDayFixDone.current = false; }, [user?.uid]);
+  useEffect(() => {
+    if (!isHistoryLoaded || sleepWakeDayFixDone.current) return;
+    if (Object.keys(history).length === 0) return;
+    sleepWakeDayFixDone.current = true;
+    // localStorage cuma penjaga MURAH supaya tidak menyapu riwayat tiap buka app. Penjaga yang
+    // sebenarnya ada di DATANYA (`_sleepWakeDay` per hari, lihat di bawah): kunci di localStorage
+    // hilang begitu user clear site data / ganti browser, dan kalau itu satu-satunya penjaga,
+    // migrasinya jalan lagi di atas data yang sudah benar dan menggeser rantai hari DUA KALI.
+    const KEY = `hc_sleep_wakeday_fix2_${user?.uid || 'anon'}`;
+    if (localStorage.getItem(KEY)) return;
+    localStorage.setItem(KEY, '1');
+
+    const hariIni = getLocalYMD(new Date());
+    setHistory(prev => {
+      // SEMUA keputusan dihitung dari `prev` dulu, penulisan belakangan. Versi pertama menghapus
+      // dan memindah dalam satu loop: hari D dipindah ke D+1, lalu giliran D+1 diproses dan
+      // menghapus isi yang baru saja pindah ke situ. Deretan hari berurutan hilang gara-gara itu.
+      const mnt = (e) => { const [h, m] = (e?.time || '').split(':').map(Number); return h * 60 + m; };
+      const sumber = [];
+      Object.keys(prev).sort().forEach(dateStr => {
+        const bio = prev[dateStr]?.bioData;
+        const log = bio?.sleepLog;
+        if (!Array.isArray(log) || log.length < 2) return;
+        if (bio._manualFlags?.sleep !== undefined) return;
+        // Sudah pernah dipindah ke sini oleh migrasi ini — jangan digeser lagi. Penanda ini ikut
+        // tersinkron ke server, jadi berlaku juga di browser/perangkat lain yang baru pertama
+        // menjalankan migrasinya.
+        if (bio._sleepWakeDay) return;
+
+        const mulai = mnt(log[0]);
+        if (!Number.isFinite(mulai)) return;
+        const lewatTengahMalam = log.some((e, i) => i > 0 && mnt(e) < mnt(log[i - 1]));
+        if (mulai >= 12 * 60 && !lewatTengahMalam) return;
+
+        const besok = getLocalYMD(new Date(new Date(`${dateStr}T12:00:00`).getTime() + 864e5));
+        if (besok > hariIni) return;
+        sumber.push({ dateStr, besok, bio });
+      });
+
+      const ikutPindah = new Set(sumber.map(s => s.dateStr));
+      // Tanggal tujuan yang sudah punya tidur SAH (bukan sisa geseran — mis. sudah ditulis ulang
+      // sync HC, atau tidur siang) tidak boleh ditimpa. Hari sumbernya dibiarkan utuh juga:
+      // duplikat masih bisa dilihat user, data hilang tidak.
+      const dipakai = sumber.filter(s => ikutPindah.has(s.besok) || !(Number(prev[s.besok]?.bioData?.sleep) > 0));
+      if (dipakai.length === 0) return prev;
+
+      const next = { ...prev };
+      dipakai.forEach(({ dateStr }) => {
+        const bersih = { ...prev[dateStr].bioData };
+        SLEEP_FIELDS.forEach(f => delete bersih[f]);
+        next[dateStr] = { ...prev[dateStr], bioData: bersih };
+      });
+      dipakai.forEach(({ besok, bio }) => {
+        const tujuan = { ...(next[besok]?.bioData || {}) };
+        SLEEP_FIELDS.forEach(f => { if (bio[f] !== undefined) tujuan[f] = bio[f]; else delete tujuan[f]; });
+        tujuan._sleepWakeDay = true; // penanda: hari ini hasil geseran, jangan digeser lagi
+        next[besok] = { ...(next[besok] || prev[besok] || {}), bioData: tujuan };
+      });
+      return next;
+    });
+  }, [isHistoryLoaded, user?.uid]);
 
 
   useEffect(() => {
@@ -2576,6 +2716,7 @@ export default function App() {
 
   useEffect(() => {
     if (!isDataLoaded || !isHistoryLoaded) return;
+    if (isWorkoutActive) return;
     if (loadedDate === selectedDate) return;
 
     const dayData = getDayHistory(selectedDate);
@@ -2693,7 +2834,13 @@ export default function App() {
       const ex = getBaseEx(exId);
       const currentLogs = prev[exId] ? [...prev[exId]] : getSetLogs(ex, exId);
       const isDoneNow = !currentLogs[setIdx].done;
+      // `at` = KAPAN set ini diselesaikan. Dipakai untuk menghitung durasi PER SESI di
+      // handleSaveWorkout: tanpa ini, sesi mana pun yang disimpan belakangan mengambil seluruh
+      // waktu timer. Kejadian nyata: sesi ekstra treadmill 8 menit tercatat 1 jam 4 menit karena
+      // ikut memakan waktu sesi beban yang belum disimpan.
       currentLogs[setIdx] = { ...currentLogs[setIdx], done: isDoneNow };
+      if (isDoneNow) currentLogs[setIdx].at = Date.now();
+      else delete currentLogs[setIdx].at; // undefined ditolak Firestore — hapus kuncinya
       if (!isDoneNow) {
         currentLogs[setIdx].skipped = false;
       }
@@ -3057,7 +3204,31 @@ export default function App() {
 
   const handleSaveWorkout = (progId) => {
     playSoundEffect('success', soundEnabled);
-    const durationSecs = workoutStartTime ? Math.floor((Date.now() - workoutStartTime) / 1000) : 0;
+
+    // DURASI SESI INI SAJA, bukan seluruh waktu timer.
+    //
+    // Timer global menghitung sejak "Mulai Latihan" sampai sekarang. Kalau dalam satu periode ada
+    // dua sesi (mis. Full Body B lalu ditambah sesi ekstra treadmill), sesi yang disimpan duluan
+    // menelan seluruh waktu itu — treadmill 8 menit tercatat 1 jam 4 menit, dan sesi bebannya
+    // kehilangan durasinya. Sekarang rentangnya dihitung dari stempel `at` set-set MILIK sesi ini.
+    // Sesi/riwayat tanpa stempel (data lama) tetap memakai timer global seperti sebelumnya.
+    const rentangSesiSecs = (() => {
+      const exs = progId === 'extra'
+        ? (extraExercises || [])
+        : (programs.find(p => p.id === progId)?.exercises || sessionExercises || []);
+      const stamps = [];
+      exs.forEach(ex => {
+        const langsung = exerciseLogs[ex.id];
+        const cocok = langsung || Object.entries(exerciseLogs || {}).find(([k]) => k.startsWith(`${ex.id}-`))?.[1];
+        Object.values(cocok || {}).forEach(s => { if (s?.done && Number(s.at) > 0) stamps.push(Number(s.at)); });
+      });
+      if (stamps.length < 2) return 0;
+      return Math.round((Math.max(...stamps) - Math.min(...stamps)) / 1000);
+    })();
+
+    const durationSecs = rentangSesiSecs > 0
+      ? rentangSesiSecs
+      : (workoutStartTime ? Math.floor((Date.now() - workoutStartTime) / 1000) : 0);
     if (healthConnectEnabled && workoutStartTime) {
       hcPushAfterSave.current = true;
     }
@@ -3088,10 +3259,12 @@ export default function App() {
     setRestTargetTime(null);
     clearCloudSession(); 
 
-    if (progId === 'extra') setExtraExercises([]);
+    setExerciseLogs({});
+    setSkippedExercises({});
+    setExtraExercises([]);
     setSessionSnapshot(null);
 
-    const targetDateStr = selectedDate;
+    const targetDateStr = activeWorkoutDate || selectedDate;
 
     let cleanLogs = {};
     let cleanSkipped = {};
@@ -3299,7 +3472,9 @@ export default function App() {
         workouts,
         _activeSession: {
           ...(dayData._activeSession || {}),
-          ...(progId === 'extra' ? { extraExercises: [] } : {})
+          exerciseLogs: {},
+          skippedExercises: {},
+          extraExercises: []
         }
       };
       
@@ -3777,7 +3952,9 @@ export default function App() {
                saveStateToHistory={saveStateToHistory}
                openQuestionnaire={() => setShowQuestionnaire(true)}
                activePlanIds={activePlanIds} setActivePlanIds={setActivePlanIds}
-               gymProfiles={gymProfiles}
+               // activeGymId ikut dikirim supaya dialog "Alternatif Latihan" di editor program
+               // menyaring alat sesuai gym aktif — sama persis dengan yang dibuka dari tab Latihan.
+               gymProfiles={gymProfiles} activeGymId={activeGymId}
                focusRoutineId={focusRoutineId} setFocusRoutineId={setFocusRoutineId}
                activityTargets={activityTargets}
                userApiKeys={userApiKeys}

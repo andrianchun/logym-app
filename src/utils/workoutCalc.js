@@ -294,6 +294,35 @@ export const durationUnitOf = (ex) => (resolveExerciseKind(ex) === 'cardio' ? 'm
  * pun — pembagian ini taksiran. Jalur naiknya: catat durasi per latihan, lalu bagi baseline
  * menurut waktu sebenarnya.
  */
+/**
+ * Menit aktif satu sesi, DIPECAH per jenis latihan dan dihitung dari SET — bukan dari durasi sesi.
+ *
+ *  - kardio/plank: durasi set apa adanya (`set.duration` menit atau `set.d` detik)
+ *  - beban       : reps x 4 detik TUT, angka yang sama yang dipakai setExtraCalories, supaya
+ *                  menit dan kalori tidak pernah bercerita beda
+ *
+ * Ini yang bikin "beban 45 menit + treadmill 8 menit" terekap sebagai dua angka, bukan satu sesi
+ * 53 menit yang seluruhnya dicap beban (atau seluruhnya kardio).
+ *
+ * @returns {{kardio: number, beban: number}} menit
+ */
+export const sessionMinutesByKind = (workout, logs) => {
+  const exercises = workout?.overriddenExercises || workout?.exercises || [];
+  let kardio = 0;
+  let beban = 0;
+  exercises.forEach((ex) => {
+    const exLogs = setsForExercise(logs, ex, workout);
+    if (!exLogs) return;
+    Object.values(exLogs).forEach((set) => {
+      if (!set?.done) return;
+      if (isCardioExercise(ex)) kardio += setDurationKm(set)[0];
+      else if (isTimeBased(ex)) beban += setDurationKm(set)[0];
+      else beban += (Number(set.r || ex.reps || 10) * 4) / 60;
+    });
+  });
+  return { kardio, beban };
+};
+
 export const splitWorkoutCalories = (weightKg, workout, logs, globalRestTime = 90, profile = null) => {
   // `profile` WAJIB diteruskan: totalnya diambil dari fungsi itu, jadi kalau di sini tidak ikut,
   // rincian kardio/beban meleset dari angka besarnya persis di sesi yang memakai nadi.
@@ -614,19 +643,28 @@ export const recomputeStrengthRecords = (history, logKeys, exLookup) => {
       Object.keys(wk.log).forEach((k) => {
         const id = String(resolveLoggedExercise(k, exLookup)?.id);
         if (!ids.has(id)) return;
-        const rec = (out[id] = out[id] || { rm10: 0, rm10At: 0, lastWeight: 0, _at: 0 });
+        const rec = (out[id] = out[id] || { rm10: 0, rm10At: 0, rm10Best: 0, lastWeight: 0, _at: 0 });
         let bestInSession = 0;
+        let rm10InSession = 0;
         // Object.values, bukan .forEach langsung: set bisa berbentuk objek ber-key angka setelah
         // bolak-balik lewat penyimpanan, dan `.forEach` pada objek melempar TypeError — satu sesi
         // berbentuk begitu dulu menjatuhkan seluruh proses simpan latihan.
         Object.values(wk.log[k] || {}).forEach((s) => {
           if (!s || s.skipped || !(Number(s.w) > 0) || !(Number(s.r) > 0)) return;
           const c10RM = estimate10RM(s.w, s.r);
-          // rm10At = KAPAN rekor itu tercatat. Dibutuhkan supaya 10RM yang di-override manual
-          // tidak bisa ditimpa oleh sesi lama, tapi tetap boleh dipecahkan sesi baru.
-          if (c10RM > rec.rm10) { rec.rm10 = c10RM; rec.rm10At = dateMs; }
+          if (c10RM > rm10InSession) rm10InSession = c10RM;
+          if (c10RM > rec.rm10Best) rec.rm10Best = c10RM; // rekor sepanjang masa, buat grafik/PR
           if (Number(s.w) > bestInSession) bestInSession = Number(s.w);
         });
+        // 10RM = set terberat dari sesi TERAKHIR, bukan rekor sepanjang masa.
+        //
+        // Dulu ini `Math.max` seumur hidup, jadi angkanya tidak pernah bisa turun: sekali salah
+        // ketik 100 kg (harusnya 10), acuan beban ikut ngaco selamanya, dan deload sengaja pun
+        // tidak tercermin. Konsekuensi yang disadari: sesi ringan menurunkan saran beban sesi
+        // berikutnya — itu memang yang diminta ("bener-bener pakai 10RM terakhir"), dan rekor
+        // sepanjang masa tetap tersimpan di rm10Best.
+        // `>=`: sesi yang baru disimpan bisa bertanggal sama dengan yang terakhir tercatat.
+        if (rm10InSession > 0 && dateMs >= rec.rm10At) { rec.rm10 = rm10InSession; rec.rm10At = dateMs; }
         // `>=`: sesi yang baru saja disimpan bertanggal sama dengan rekor terakhir, dan yang
         // terbaru harus menang.
         if (bestInSession > 0 && dateMs >= rec._at) { rec._at = dateMs; rec.lastWeight = bestInSession; }
@@ -636,29 +674,58 @@ export const recomputeStrengthRecords = (history, logKeys, exLookup) => {
 
   const clean = {};
   Object.entries(out).forEach(([id, r]) => {
-    if (r.rm10 > 0) clean[id] = { rm10: r.rm10, rm10At: r.rm10At, lastWeight: r.lastWeight };
+    if (r.rm10 > 0) clean[id] = { rm10: r.rm10, rm10At: r.rm10At, rm10Best: r.rm10Best, lastWeight: r.lastWeight };
   });
   return clean;
 };
 
 /**
- * Gabungkan 10RM tersimpan dengan yang baru dihitung dari riwayat.
+ * Riwayat 10RM satu latihan, satu titik per sesi — bahan grafik progressive overload.
  *
- * Aturannya tiga baris, tapi tiap barisnya menutup satu cara data hilang:
- *  1. Tanpa override manual -> ambil yang tertinggi. Rekor tidak boleh turun hanya karena sesi
- *     asalnya tidak lagi ada di `history` (riwayat lama belum tersinkron, dipangkas, dsb).
- *  2. Ada override manual, dan rekor riwayat berasal dari SEBELUM tanggal override -> pertahankan
- *     nilai manual. Inilah gunanya tombol simpan di kalkulator 10RM: menurunkan acuan setelah
- *     jeda panjang. Kalau riwayat lama boleh menimpanya, tombol itu tidak ada artinya.
- *  3. Ada override manual, tapi rekor riwayat berasal dari SESUDAH tanggal override -> ambil yang
- *     tertinggi seperti biasa. Override menetapkan titik awal baru, bukan plafon permanen.
+ * Beban mentah per sesi tidak bisa dibandingkan langsung (5x5 @80 kg vs 3x12 @60 kg mana yang
+ * lebih kuat?). 10RM menormalkan set/reps jadi satu angka, jadi garis yang naik benar-benar
+ * berarti lebih kuat, bukan cuma "hari ini repsnya banyak".
+ *
+ * @returns {Array<{date: string, rm10: number, weight: number, reps: number}>} urut lama -> baru
+ */
+export const rm10Series = (history, exerciseId, exLookup) => {
+  const target = String(exerciseId);
+  const titik = [];
+  Object.keys(history || {}).sort().forEach((dateStr) => {
+    let rm10 = 0, weight = 0, reps = 0;
+    (history[dateStr]?.workouts || []).forEach((wk) => {
+      if (wk?.status !== 'completed' || !wk.log) return;
+      Object.keys(wk.log).forEach((k) => {
+        if (String(resolveLoggedExercise(k, exLookup)?.id) !== target) return;
+        Object.values(wk.log[k] || {}).forEach((s) => {
+          if (!s || s.skipped || !(Number(s.w) > 0) || !(Number(s.r) > 0)) return;
+          const c = estimate10RM(s.w, s.r);
+          if (c > rm10) { rm10 = c; weight = Number(s.w); reps = Number(s.r); }
+        });
+      });
+    });
+    if (rm10 > 0) titik.push({ date: dateStr, rm10, weight, reps });
+  });
+  return titik;
+};
+
+/**
+ * Gabungkan 10RM tersimpan dengan yang dihitung dari riwayat (sesi TERAKHIR).
+ *
+ *  1. Riwayat punya angka -> angka itu yang dipakai, TERMASUK kalau lebih rendah. Inilah yang
+ *     bikin deload dan salah ketik bisa terkoreksi; dulu di sini `Math.max` dan akibatnya 10RM
+ *     tidak pernah bisa turun seumur hidup akun.
+ *  2. Ada override manual yang tanggalnya SAMA/LEBIH BARU dari sesi terakhir -> pertahankan nilai
+ *     manual. Itu gunanya tombol simpan di kalkulator 10RM; sesi lama tidak boleh menimpanya.
+ *  3. Riwayat kosong (belum tersinkron / dipangkas) -> pertahankan yang tersimpan, jangan
+ *     dinolkan.
  */
 export const mergeRm10 = (tersimpan, manualAt, dariRiwayat, rm10At) => {
   const a = Number(tersimpan) || 0;
   const b = Number(dariRiwayat) || 0;
   const manual = Number(manualAt) || 0;
   if (manual > 0 && (Number(rm10At) || 0) <= manual) return a;
-  return Math.max(a, b);
+  return b > 0 ? b : a;
 };
 
 /**
@@ -748,7 +815,7 @@ export const buildHcSessionDetail = (workout, logs, startMs, endMs) => {
  * ditutup treadmill 10 menit karena itu terkoreksi sedikit berlebihan. Jalan naiknya: simpan
  * bucket per jam hari ini saja, lalu kecualikan jam yang tertutup `startedAt`..`startedAt+durasi`.
  */
-export const dailyActiveMinutes = (bioData, workouts) => {
+export const dailyActiveMinutes = (bioData, workouts, dayExerciseLogs = null) => {
   const bio = bioData || {};
   const list = (Array.isArray(workouts) ? workouts : [])
     .filter(w => w?.status === 'completed' || w?.programId === 'adhoc');
@@ -758,9 +825,19 @@ export const dailyActiveMinutes = (bioData, workouts) => {
   list.forEach(w => {
     const mins = parseWorkoutDurationMinutes(w.duration);
     workoutMinutes += mins;
-    // Sesi yang SEMUA latihannya berbasis waktu — itulah yang menghasilkan langkah. Aturannya
-    // dipinjam dari guessWorkoutType supaya tidak ada definisi "kardio" kedua yang bisa berbeda.
-    if (guessWorkoutType(w.overriddenExercises || w.exercises) !== 'strengthTraining') cardioMinutes += mins;
+    // Menit kardio diambil dari DURASI SET yang benar-benar tercatat, bukan dari jenis sesinya.
+    // Dulu penggolongannya all-or-nothing lewat guessWorkoutType: sesi beban yang ditutup
+    // treadmill 8 menit dihitung 100% beban (menit kardionya hilang), dan sesi yang mayoritas
+    // kardio dihitung 100% kardio (menit bebannya hilang). Sesi campuran itu justru yang paling
+    // umum. Lihat sessionMinutesByKind.
+    const logs = (w.log && Object.keys(w.log).length > 0) ? w.log : dayExerciseLogs;
+    const perJenis = sessionMinutesByKind(w, logs);
+    if (perJenis.kardio > 0 || perJenis.beban > 0) {
+      cardioMinutes += Math.min(mins || perJenis.kardio, perJenis.kardio);
+    } else if (guessWorkoutType(w.overriddenExercises || w.exercises) !== 'strengthTraining') {
+      // Tanpa set tercatat (riwayat lama / kalori dari wearable), jatuh ke aturan lama.
+      cardioMinutes += mins;
+    }
   });
 
   const rawStepMinutes = Math.round(Number(bio.stepMinutes)) || 0;

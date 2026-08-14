@@ -635,7 +635,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      // Durasi Aktif = jalan + latihan, satu rumus di workoutCalc.js — sama seperti kalori.
      // Menit jalan sudah dikurangi durasi sesi kardio di dalamnya, jadi treadmill tidak lagi
      // terhitung dua kali (sekali sebagai menit-langkah, sekali sebagai durasi sesi).
-     const act = dailyActiveMinutes(bioData, todayWks);
+     const act = dailyActiveMinutes(bioData, todayWks, history[activeDate]?.exerciseLogs);
      const intTodayDur = act.workoutMinutes;
      const stepMinutes = act.stepMinutes;
      const autoActive = act.auto;
@@ -690,7 +690,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          // Rumus yang sama dengan kartu harian. Versi lama `Math.max(activeMinutes, durasiLatihan)`
          // membuang menit jalan sepenuhnya: hari dengan 8.000 langkah dan tanpa latihan menyumbang
          // 0 menit ke total mingguan, padahal kartu hariannya menampilkan ~80 menit.
-         const dayAct = dailyActiveMinutes(dayData.bioData, wks);
+         const dayAct = dailyActiveMinutes(dayData.bioData, wks, dayData.exerciseLogs);
          weeklyDur += dayAct.total;
          weeklyWorkoutDur += dayAct.workoutMinutes;
          // Rumus yang SAMA PERSIS dengan kartu harian. Versi lama di sini

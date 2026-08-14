@@ -8,6 +8,7 @@ import useDialog from '../hooks/useDialog';
 import GymManagerModal from '../components/GymManagerModal';
 import { getPlanBgConfig } from '../utils/planBg';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from '../utils/bmr';
+import { rapikanNamaProgram, rapikanNamaSesi } from '../utils/programNaming';
 
 const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, soundEnabled, gymProfiles, setGymProfiles, activeGymId, setActiveGymId, exerciseLibrary, units, user, userProfile, userApiKeys, keyStatuses, setKeyStatuses, setShowSettings }) => {
   const [step, setStep] = useState(0);
@@ -275,7 +276,8 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
               };
           });
           return {
-              name: r.name || `Day ${i+1}`,
+              // Nama hari dibuang dari nama sesi — harinya jadi badge di kartu program.
+              name: rapikanNamaSesi(r.name, `Sesi ${i+1}`),
               exercises: exercises,
               restTime: 90
           };
@@ -283,7 +285,7 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
 
       setRecommendedPlan({
         planId: `plan_ai_quest_${Date.now()}`,
-        name: jsonPart.planName || 'AI Custom Program',
+        name: rapikanNamaProgram(jsonPart.planName, 'Program AI'),
         description: jsonPart.description || `Disusun dinamis berdasarkan profil, target otot, level, dan ketersediaan alat kamu.`,
         goal: [finalAnswers.goal],
         experience: [finalAnswers.experience],

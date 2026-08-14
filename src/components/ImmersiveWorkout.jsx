@@ -140,7 +140,8 @@ const ImmersiveWorkout = ({
   showSupersetToast,
   getOverloadHint,
   userProfile,
-  activeExerciseId
+  activeExerciseId,
+  onUpdateExercise
 }) => {
 
   // 1. Gather all active exercise groups
@@ -261,8 +262,16 @@ const ImmersiveWorkout = ({
   });
 
   const handleTimerEnd = React.useCallback(() => {
+     const completedIdx = activeTimer.idx !== null ? activeTimer.idx : activeSetIdx;
      setActiveTimer({ idx: null, targetTime: null, startTime: null, mode: 'down' });
-  }, []);
+     if (ex && onToggleSet) {
+        let siblingIds = null;
+        if (ex.supersetId) {
+           siblingIds = validExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
+        }
+        onToggleSet(ex.id, completedIdx, siblingIds);
+     }
+  }, [activeTimer.idx, activeSetIdx, ex, onToggleSet, validExercises]);
 
   React.useEffect(() => {
     if (activeTimer.idx !== null) {
@@ -296,10 +305,19 @@ const ImmersiveWorkout = ({
     }
   };
 
-  const [isTreadmillMode, setIsTreadmillMode] = React.useState(() => (ex?.name || '').toLowerCase().includes('treadmill'));
+  const [isTreadmillMode, setIsTreadmillMode] = React.useState(() => 
+    ex?.isTreadmillMode ?? (ex?.name || '').toLowerCase().includes('treadmill')
+  );
+  
   React.useEffect(() => {
-    if (ex) setIsTreadmillMode((ex.name || '').toLowerCase().includes('treadmill'));
-  }, [ex?.name]);
+    if (ex) setIsTreadmillMode(ex.isTreadmillMode ?? (ex.name || '').toLowerCase().includes('treadmill'));
+  }, [ex?.name, ex?.isTreadmillMode]);
+
+  const handleToggleTreadmill = () => {
+    const newMode = !isTreadmillMode;
+    setIsTreadmillMode(newMode);
+    onUpdateExercise?.({ ...ex, isTreadmillMode: newMode });
+  };
 
   const parseMedia = (exercise) => {
     if (!exercise) return [];
@@ -888,7 +906,7 @@ const ImmersiveWorkout = ({
                                  <span className="body-md uppercase">
                                    {isTreadmillMode ? 'Kec (km/j)' : 'Pace'}
                                  </span>
-                                 <button onClick={() => setIsTreadmillMode(!isTreadmillMode)} className={`absolute right-0 sm:right-2 p-1.5 rounded-full ${t.bgAccentSoft} ${t.textAccent} hover:scale-110 transition`} title="Ganti Mode (Treadmill / Lari)">
+                                 <button onClick={handleToggleTreadmill} className={`absolute right-0 sm:right-2 p-1.5 rounded-full ${t.bgAccentSoft} ${t.textAccent} hover:scale-110 transition`} title="Ganti Mode (Treadmill / Lari)">
                                    <ArrowLeftRight size={12} />
                                  </button>
                                </div>

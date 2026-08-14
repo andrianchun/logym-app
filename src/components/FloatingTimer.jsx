@@ -16,6 +16,7 @@ const FloatingTimer = ({
   const [workoutSeconds, setWorkoutSeconds] = React.useState(0);
 
   const [localRestTimer, setLocalRestTimer] = React.useState(0);
+  const prevRestRef = React.useRef(0);
 
   useEffect(() => {
     if (isWorkoutActive && Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
@@ -26,20 +27,24 @@ const FloatingTimer = ({
   useEffect(() => {
     let interval;
     if (restTargetTime !== null) {
+      // Bunyi dibandingkan lewat ref, BUKAN di dalam updater setLocalRestTimer. Fungsi updater
+      // dipanggil React di fase render dan boleh dipanggil lebih dari sekali untuk satu perubahan
+      // (mode Strict memang selalu dua kali) — hitung mundur 3-2-1 jadi terdengar dobel.
       const updateTimer = () => {
         const remaining = Math.ceil((restTargetTime - Date.now()) / 1000);
-        setLocalRestTimer(prev => {
-          if (prev === 4 && remaining === 3) playSoundEffect('timerTick', soundEnabled);
-          if (prev === 3 && remaining === 2) playSoundEffect('timerTick', soundEnabled);
-          if (prev === 2 && remaining === 1) playSoundEffect('timerTick', soundEnabled);
+        const prev = prevRestRef.current;
+        if (prev !== remaining) {
+          if (remaining === 3 || remaining === 2 || remaining === 1) playSoundEffect('timerTick', soundEnabled);
           if (prev === 1 && remaining === 0) playSoundEffect('timerEnd', soundEnabled);
-          return remaining;
-        });
+          prevRestRef.current = remaining;
+        }
+        setLocalRestTimer(remaining);
       };
       updateTimer();
       interval = setInterval(updateTimer, 500); // 500ms for more responsive UI
     } else {
       setLocalRestTimer(0);
+      prevRestRef.current = 0; // istirahat berhenti — mulai lagi dari nol, jangan bawa sisa hitungan
     }
     return () => clearInterval(interval);
   }, [restTargetTime, soundEnabled]);
@@ -73,7 +78,10 @@ const FloatingTimer = ({
     const targetId = sessionToRun || focusWorkoutId;
     if (targetId) {
       setFocusWorkoutId(targetId);
-      setIsImmersiveMode(true);
+      // Wait for date state to settle before entering immersive mode
+      requestAnimationFrame(() => {
+        setIsImmersiveMode(true);
+      });
     }
   };
 

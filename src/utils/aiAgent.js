@@ -124,84 +124,9 @@ export const getAvailableModels = () => {
     return AI_MODELS;
 };
 
-// Canned, persona-flavored notification copy — deliberately NOT AI-generated per notification.
-// Local notifications are scheduled ahead of time (sometimes days out) with no guarantee the
-// device is online or the app is running when they fire, so the text has to be baked in up
-// front. Multiple variants per persona/type avoid the same line repeating every single day.
-// {placeholders} are filled in by getLogyNotification().
-export const LOGI_NOTIF_TEMPLATES = {
-    prep: {
-        santai: [
-            ['Bro, gas siap-siap!', '{program} lu tinggal 30 menit lagi. Cus ambil botol minum sama towel, kita gaspol bentar lagi.'],
-            ['{program} sebentar lagi!', 'Tinggal 30 menit sebelum {program}. Mulai pemanasan ringan yuk biar gak kaget pas mulai.'],
-        ],
-        galak: [
-            ['30 menit lagi. Jangan mager.', '{program} dimulai 30 menit lagi. Udah ganti baju belum? Jangan sampe gue cariin alasan lu.'],
-            ['Gak ada alasan.', '30 menit sebelum {program}. Siap-siap sekarang, jangan nunggu mepet.'],
-        ],
-        serius: [
-            ['Pengingat sesi latihan', 'Sesi {program} dimulai dalam 30 menit. Silakan siapkan peralatan dan mulai pemanasan ringan.'],
-        ],
-    },
-    start: {
-        santai: [
-            ['Waktunya gas, bro!', '{program} lu mulai sekarang. Buka LOGYM, kita rapihin set pertama bareng-bareng.'],
-            ['Cus mulai!', 'Ini waktunya {program}. Jangan ditunda-tunda ya, momentum penting bro.'],
-        ],
-        galak: [
-            ['Sekarang. Gerak.', '{program} lu mulai detik ini juga. Gak ada alasan nunda-nunda lagi, langsung buka app dan mulai.'],
-        ],
-        serius: [
-            ['Sesi latihan dimulai', '{program} dijadwalkan mulai sekarang. Silakan buka aplikasi untuk memulai sesi.'],
-        ],
-    },
-    missed: {
-        santai: [
-            ['Kangen sama beban lu gak?', 'Udah {days} hari nih lu absen, bro. Gapapa kalo capek, tapi jangan sampe momentum ilang ya. Balik yuk!'],
-        ],
-        galak: [
-            ['{days} hari. Cukup.', 'Udah {days} hari lu bolos tanpa kabar. Progress gak nunggu lu santai-santai. Balik sekarang, gak pake drama.'],
-        ],
-        serius: [
-            ['Konsistensi menurun', 'Sudah {days} hari sejak sesi latihan terakhir. Disarankan untuk kembali ke jadwal guna menjaga progres.'],
-        ],
-    },
-    // Hari tanpa latihan terjadwal. Dulu pengingat harian tetap menyuruh latihan tiap hari,
-    // termasuk hari istirahat — bikin notifikasinya kehilangan wibawa dan gampang di-mute.
-    rest: {
-        santai: [
-            ['Hari ini santai dulu', 'Gak ada jadwal latihan hari ini, bro. Istirahat itu bagian dari programnya — otot tumbuhnya pas lu rebahan, bukan pas ngangkat.'],
-            ['Rest day, nikmatin', 'Jadwal lu kosong hari ini. Tidur yang cukup, makan yang bener, besok kita gas lagi.'],
-        ],
-        galak: [
-            ['Istirahat. Beneran istirahat.', 'Hari ini gak ada jadwal. Jangan sok rajin latihan tambahan — recovery itu bagian dari kerjaan, bukan bolos.'],
-        ],
-        serius: [
-            ['Hari pemulihan', 'Tidak ada sesi terjadwal hari ini. Pemulihan yang cukup menjaga kualitas sesi berikutnya.'],
-        ],
-    },
-    insight: {
-        santai: [
-            ['Eh, {exName} lu stuck nih', '{exName} lu flat {weeks} minggu di {maxWeight}kg bro. Gue ada ide buat naikin lagi, cek chat yuk!'],
-        ],
-        galak: [
-            ['{exName} lu mandek. Perbaiki.', '{weeks} minggu {exName} lu gak naik-naik dari {maxWeight}kg. Ini bukan plateau biasa, ini lu yang kurang niat. Buka chat sekarang.'],
-        ],
-        serius: [
-            ['Plateau terdeteksi: {exName}', '{exName} stagnan selama {weeks} minggu di {maxWeight}kg. Rekomendasi penyesuaian program tersedia di chat.'],
-        ],
-    },
-};
-
-// 'custom' has no fixed voice (it's a freeform LLM instruction, not something we can render
-// without calling the API) — notifications fall back to 'santai' for that persona.
-export const getLogyNotification = (type, persona, vars = {}) => {
-    const pool = LOGI_NOTIF_TEMPLATES[type]?.[persona] || LOGI_NOTIF_TEMPLATES[type]?.santai || [];
-    if (pool.length === 0) return null;
-    const [titleTpl, bodyTpl] = pool[Math.floor(Math.random() * pool.length)];
-    const fill = (s) => s.replace(/\{(\w+)\}/g, (_, k) => (vars[k] !== undefined ? vars[k] : ''));
-    return { title: fill(titleTpl), body: fill(bodyTpl) };
-};
+// Teks notifikasi Coach Logy pindah ke logyNotif.js: modul ini mengimpor firebase, jadi
+// batas panjang teksnya tidak bisa diuji dari Node polos selama isinya masih di sini.
+export { LOGI_NOTIF_TEMPLATES, NOTIF_MAX_TITLE, NOTIF_MAX_BODY, getLogyNotification } from './logyNotif';
 
 // A key that hit a rate limit / error is benched for a few minutes, not forever —
 // free-tier quotas reset per minute/day, so permanent "exhausted" was wrong.
@@ -300,7 +225,7 @@ The JSON must exactly match this schema:
 {
   "action": "create" | "update",
   "targetPlanId": "String — REQUIRED and must exactly match one of the planId values from [Active Programs] when action is \\"update\\". Omit or leave empty when action is \\"create\\".",
-  "planName": "String — a short program name WITHOUT any day-count/frequency wording (no \\"3 Hari\\", \\"3x Seminggu\\", etc — that's redundant with daysPerWeek/routines and should never appear in the name itself). E.g. \\"Full Body Gainz\\", not \\"Full Body Gainz 3 Hari\\".",
+  "planName": "String — MAX 3 WORDS, minimalist. Just the split/theme: \\"Full Body\\", \\"Upper Lower\\", \\"Push Pull Legs\\". NEVER include: the word \\"Program\\"/\\"Plan\\"/\\"Latihan\\"/\\"Workout\\", the app name \\"Logym\\", or any day-count/frequency (\\"3 Hari\\", \\"3x Seminggu\\") — all of that is already shown around the name in the UI. \\"Program Full Body 3 Hari Logym\\" is WRONG; \\"Full Body\\" is right.",
   "description": "String",
   "daysPerWeek": Number,
   "routines": [
@@ -314,7 +239,7 @@ The JSON must exactly match this schema:
   ]
 }
 
-Rules for "update": include ALL routines the plan should have after the edit (this is a full replace of that plan's routines, not a merge) — so copy over unchanged routines exactly as they are in [Active Programs] and only change what the user asked for. Keep the same planName unless the user asked to rename it.
+Rules for "update": include ALL routines the plan should have after the edit (this is a full replace of that plan's routines, not a merge) — so copy over unchanged routines exactly as they are in [Active Programs] and only change what the user asked for. Keep the EXACT planName and the EXACT routine names from [Active Programs] unless the user explicitly asked to rename them: those names may have been renamed by the user, and silently restoring your own naming is treated as a bug (the app will override you anyway).
 Rules for "create": always use action "create" with no targetPlanId when the user wants a separate new program rather than editing one that exists.
 
 Available Exercise Library (Use these names as closely as possible):

@@ -184,8 +184,35 @@ const WorkoutTab = ({
 
   const [isClosingImmersive, setIsClosingImmersive] = React.useState(false);
 
+  // POSISI GULIR SAAT KEMBALI DARI OVERLAY (immersive / detail latihan).
+  //
+  // Aturannya: kembali dari overlay = kembali ke tempat yang SAMA. Bukan ke latihan aktif, bukan
+  // ke atas sesi. Autoscroll ke latihan aktif memang disengaja untuk "buka tab Latihan", tapi
+  // begitu dipakai juga saat menutup overlay, user kehilangan tempatnya tiap kali cuma mengintip
+  // detail satu gerakan.
+  const scrollBeforeOverlay = React.useRef(null);
+  const blockAutoScrollUntil = React.useRef(0);
+  const overlayOpen = isImmersiveMode || isClosingImmersive || !!detailExercise;
+  React.useEffect(() => {
+    if (overlayOpen) {
+      if (scrollBeforeOverlay.current === null) scrollBeforeOverlay.current = window.scrollY;
+      return;
+    }
+    const y = scrollBeforeOverlay.current;
+    scrollBeforeOverlay.current = null;
+    if (y === null) return;
+    // Efek tutup immersive berjalan 300 ms dan daftarnya baru terlihat lagi sesudah itu, jadi
+    // posisinya dipulihkan dua kali: sekarang, dan sekali lagi setelah animasinya selesai.
+    blockAutoScrollUntil.current = Date.now() + 700;
+    const pulihkan = () => window.scrollTo({ top: y, behavior: 'auto' });
+    requestAnimationFrame(pulihkan);
+    const timer = setTimeout(pulihkan, 350);
+    return () => clearTimeout(timer);
+  }, [overlayOpen]);
+
   const smartScrollTo = (el, offset = 100, force = false, instant = false) => {
     if (!el) return;
+    if (Date.now() < blockAutoScrollUntil.current) return; // baru menutup overlay — jangan pindah
     const rect = el.getBoundingClientRect();
     const isTopVisible = rect.top >= 80 && rect.top <= (window.innerHeight || document.documentElement.clientHeight) - 120;
     if (!isTopVisible || force) {
@@ -704,7 +731,7 @@ const WorkoutTab = ({
           isOpen: true,
           title: 'Sesi Latihan Berjalan',
           message: 'Kamu sedang memiliki sesi latihan yang aktif berjalan. Apakah kamu ingin menyimpan sesi yang berjalan saat ini, atau langsung membuangnya dan memulai latihan yang baru?',
-          onConfirm: () => {
+          onConfirm: async () => {
              if (sessionToRun && onSaveWorkout) {
                if (soundEnabled) {
                  const audio = new Audio('/cheer.wav');
@@ -713,12 +740,14 @@ const WorkoutTab = ({
                }
                setCelebrationSession(sessionToRun);
                setShowCelebration(true);
+               await onSaveWorkout(sessionToRun);
                setTimeout(() => {
                  setShowCelebration(false);
-                 onSaveWorkout(sessionToRun);
+                 doStart();
                }, 2000);
+             } else {
+               setTimeout(doStart, 100);
              }
-             setTimeout(doStart, 100);
           },
           confirmText: 'Simpan Perubahan',
           onDiscard: () => {

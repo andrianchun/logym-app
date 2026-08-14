@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { SkipForward, Video, CheckCircle, Play, Square, Info, ArrowLeftRight, X, Dumbbell, ClipboardEdit, Flame, Brain, Plus, ChevronUp, ChevronDown, Activity } from 'lucide-react';
 import EquipmentIcon from './EquipmentIcon';
@@ -126,32 +126,35 @@ const ExerciseCard = ({
     setActiveSetDetail(null);
   };
 
+  // Cermin `activeTimer` untuk dibaca dari dalam interval.
+  //
+  // SEMUA efek samping detik-terakhir (bunyi, getar, mencentang set) HARUS di luar fungsi
+  // updater `setActiveTimer`. React memanggil updater di fase render — dan `onToggleSet` memanggil
+  // setState milik App, jadi hasilnya: "Cannot update a component (App) while rendering a
+  // different component (ExerciseCard)". Di React 18 warning; di mode Strict updater dipanggil
+  // dua kali, artinya bunyi dobel dan set bisa tercentang lalu batal lagi.
+  const timerRef = useRef(activeTimer);
+  useEffect(() => { timerRef.current = activeTimer; }, [activeTimer]);
+
   useEffect(() => {
-    let interval = null;
-    if (activeTimer.idx !== null) {
-      interval = setInterval(() => {
-        setActiveTimer(prev => {
-          if (prev.mode === 'down') {
-              if (prev.timeLeft <= 1) {
-                clearInterval(interval);
-                // Waktu Habis! Otomatis centang set ini jika belum selesai
-                if (!sets[prev.idx]?.done) {
-                    onToggleSet(ex.id, prev.idx);
-                    playSoundEffect('click', soundEnabled); 
-                }
-                return { idx: null, timeLeft: 0, mode: 'down' };
-              }
-              return { ...prev, timeLeft: prev.timeLeft - 1 };
-          } else {
-              // mode === 'up'
-              return { ...prev, timeLeft: prev.timeLeft + 1 };
-          }
-        });
-      }, 1000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
+    if (activeTimer.idx === null) return;
+    const terapkan = (next) => { timerRef.current = next; setActiveTimer(next); };
+    const interval = setInterval(() => {
+      const cur = timerRef.current;
+      if (cur.idx === null) return;
+      if (cur.mode !== 'down') { terapkan({ ...cur, timeLeft: cur.timeLeft + 1 }); return; }
+      if (cur.timeLeft > 1) { terapkan({ ...cur, timeLeft: cur.timeLeft - 1 }); return; }
+
+      // Timer set HABIS — nadanya sama lantangnya dengan timer istirahat, apa pun jenis
+      // latihannya (kardio, plank, hold). Dulu di sini 'click': bunyi "plup" pelan yang tidak
+      // kedengaran dari treadmill, dan cuma dibunyikan kalau setnya kebetulan belum tercentang.
+      clearInterval(interval);
+      terapkan({ idx: null, timeLeft: 0, mode: 'down' });
+      playSoundEffect('timerEnd', soundEnabled);
+      if (soundEnabled && navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 500]);
+      if (!sets[cur.idx]?.done) onToggleSet(ex.id, cur.idx);
+    }, 1000);
+    return () => clearInterval(interval);
   }, [activeTimer.idx, ex?.id, sets, onToggleSet, soundEnabled]);
 
   useEffect(() => {

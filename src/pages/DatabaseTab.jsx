@@ -338,13 +338,13 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
     const isLeftSwipe = distance > minSwipeDistance;
     const isRightSwipe = distance < -minSwipeDistance;
     
+    // Tanpa suara, sama alasannya dengan MuscleProgress: geser di sini terasa sama dengan
+    // geser pindah tab, dan pindah tab sengaja senyap.
     if (isLeftSwipe && viewMode === 'all') {
       setViewMode('custom');
-      playSoundEffect('swipe', soundEnabled);
       e.stopPropagation(); // Prevent global swipe
     } else if (isRightSwipe && viewMode === 'custom') {
       setViewMode('all');
-      playSoundEffect('swipe', soundEnabled);
       e.stopPropagation(); // Prevent global swipe
     }
   };

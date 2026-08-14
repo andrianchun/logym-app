@@ -430,7 +430,10 @@ export const capIntradayLog = (list) => {
 const sleepPerDay = (samples) => {
   const byDay = {};
   for (const s of samples) {
-    const ymd = ymdOf(new Date(s.startDate).getTime() - 12 * 3600 * 1000);
+    // Tanggal BANGUN = tanggal lokal endDate. Dulu di sini dipakai `startDate - 12 jam`, yang
+    // justru kebalikannya: tidur 23:00 -> 07:00 mundur jadi 11:00 tanggal MULAI, sehingga tidur
+    // semalam muncul di slot kemarin dan slot hari ini kosong (grafik terlihat "bolong 1 hari").
+    const ymd = ymdOf(s.endDate);
     if (!byDay[ymd]) byDay[ymd] = { totalMinutes: 0, awake: 0, rem: 0, light: 0, deep: 0, sleepLog: [] };
     
     let currentEpoch = new Date(s.startDate).getTime();

@@ -115,9 +115,11 @@ const ExerciseDetailModal = ({
   const existingLibEx = exerciseLibrary?.find(e => e.name?.toLowerCase() === initialEx.name?.toLowerCase() || e.id === initialEx.id);
   const stored10RM = existingLibEx?.rm10 || 0;
   const storedLastWeight = existingLibEx?.lastWeight || 0;
-  // Kalau user pernah menetapkan acuan sendiri, angka tersimpan itulah kebenarannya — jangan
-  // ditimpa rekor riwayat lama di tampilan, karena logika penyimpanannya juga tidak menimpanya.
-  const best10RM = existingLibEx?.rm10ManualAt ? stored10RM : Math.max(historyMax10RM, stored10RM);
+  // Acuan yang berlaku = angka tersimpan (sekarang mengikuti sesi TERAKHIR, lihat mergeRm10),
+  // bukan rekor tertinggi sepanjang masa. Dulu di sini Math.max(riwayat, tersimpan) — akibatnya
+  // sesudah deload angka di layar tetap rekor lama sementara kolom kg saat latihan sudah turun:
+  // dua angka berbeda untuk hal yang sama. Rekor tertinggi tetap ditampilkan, terpisah.
+  const best10RM = stored10RM || historyMax10RM;
 
   const [activeTab, setActiveTab] = useState('info'); // info, history, calc
   const [calcWeight, setCalcWeight] = useState(best10RM || storedLastWeight || 50);
@@ -653,7 +655,7 @@ const ExerciseDetailModal = ({
                           {showRmInfo && (
                              <div className={`p-3.5 rounded-xl ${t.bgCard} border ${t.border} text-left text-xs ${t.textMuted} space-y-2 shadow-lg mb-4`}>
                                 <p>Kalkulator RM (Repetition Maximum) digunakan untuk mengestimasi beban maksimal yang bisa kamu angkat berdasarkan set terbaikmu.</p>
-                                <p>Aplikasi Logym secara otomatis membaca rekor 10RM kamu dari riwayat (<b>{best10RM} {isImp ? 'lbs' : 'kg'}</b>). Jika kamu ingin mengubahnya secara manual sebagai acuan (misal baru kembali dari jeda lama), sesuaikan angkanya lalu <b>Simpan</b>.</p>
+                                <p>Acuan 10RM kamu diambil dari <b>sesi terakhir</b> latihan ini (<b>{best10RM} {isImp ? 'lbs' : 'kg'}</b>){historyMax10RM > best10RM ? <> — rekor tertingginya <b>{historyMax10RM} {isImp ? 'lbs' : 'kg'}</b></> : null}. Jadi angkanya ikut turun kalau kamu deload, dan salah input bisa terkoreksi sendiri di sesi berikutnya. Mau menetapkan acuan sendiri? Sesuaikan angkanya lalu <b>Simpan</b>.</p>
                              </div>
                           )}
    
