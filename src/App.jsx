@@ -3681,7 +3681,7 @@ export default function App() {
   if (isWaitingForAuth || (user && (!isDataLoaded || !isHistoryLoaded))) {
     return (
       <div className={`fixed inset-0 z-50 flex flex-col items-center justify-center p-4 transition-colors duration-300 ${theme === 'dark' ? 'bg-[#0f1115]' : 'bg-white'}`}>
-         <img src={theme === 'dark' ? '/logo-dark.png' : '/logo-light.png'} alt="Logym Logo" className="w-40 h-40 object-contain animate-pulse drop-shadow-2xl" />
+         <img src={theme === 'dark' ? '/logo-dark.webp' : '/logo-light.webp'} alt="Logym Logo" className="w-40 h-40 object-contain animate-pulse drop-shadow-2xl" />
          
          {isSlowLoading && user && (!isDataLoaded || !isHistoryLoaded) && (
            <div className="absolute bottom-12 left-0 right-0 px-8 flex flex-col items-center justify-center text-center animate-in fade-in slide-in-from-bottom-4 duration-700">

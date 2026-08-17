@@ -684,7 +684,7 @@ const WorkoutTab = ({
                     color: 'text-amber-500', 
                     bg: 'bg-amber-500/10', 
                     borderColor: 'border-amber-500/30',
-                    imageUrl: '/badges/badge_volume.png',
+                    imageUrl: '/badges/badge_volume.webp',
                  }
               }));
            }

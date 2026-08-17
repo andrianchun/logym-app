@@ -67,7 +67,7 @@ export default function SettingsModal({
     <div className={`fixed inset-0 z-[999] ${t.bgApp} flex flex-col animate-in slide-in-from-bottom-full duration-300`}>
       {/* HEADER MODAL */}
       <div className={`relative px-4 pt-4 pb-4 border-b ${t.border} shrink-0`}>
-        <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: `url('/banner-${theme}.png')`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+        <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: `url('/banner-${theme}.webp')`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
         <div className="absolute top-4 right-4 z-20 flex items-center space-x-2">
             <button onClick={() => setShowSettings(false)} className={`p-2 rounded-full ${t.btnBg} transition-colors`}>
                 <X size={20} className={t.textMain} />

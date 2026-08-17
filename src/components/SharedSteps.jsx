@@ -94,7 +94,7 @@ export const SharedStepRenderer = ({
         {fromLogym ? (
           <div className={`p-4 rounded-2xl border-2 ${t.borderAccent} ${t.bgAccentSoft} text-center`}>
             <div className="w-12 h-12 mx-auto mb-3 bg-black rounded-xl flex items-center justify-center shadow-lg p-1.5">
-              <img src="/lomeal-icon.png" alt="Lomeal" className="w-full h-full object-contain" onError={(e) => e.target.style.display = 'none'} />
+              <img src="/lomeal-icon.webp" alt="Lomeal" className="w-full h-full object-contain" onError={(e) => e.target.style.display = 'none'} />
             </div>
             <p className={`body-md font-bold ${t.textMain}`}>Data Profil Terhubung!</p>
             <p className={`caption font-medium mt-1 ${t.textMuted}`}>Semua data yang tersedia di ekosistem Hexa-Life sudah ditarik otomatis — cek di langkah berikutnya.</p>
@@ -105,7 +105,7 @@ export const SharedStepRenderer = ({
         ) : (
           <div className={`p-4 rounded-2xl border ${isDark ? 'border-white/10 bg-white/5' : 'border-black/5 bg-black/5'} text-center`}>
             <div className="w-12 h-12 mx-auto mb-3 bg-black rounded-xl flex items-center justify-center shadow-lg p-1.5">
-              <img src="/lomeal-icon.png" alt="Lomeal" className="w-full h-full object-contain" onError={(e) => e.target.style.display = 'none'} />
+              <img src="/lomeal-icon.webp" alt="Lomeal" className="w-full h-full object-contain" onError={(e) => e.target.style.display = 'none'} />
             </div>
             <p className={`body-md font-bold ${t.textMain}`}>Belum punya Lomeal?</p>
             <p className={`caption mt-1 ${t.textMuted}`}>Lomeal adalah aplikasi tracker nutrisi yang terhubung langsung dengan Logym. Install sekarang untuk mempermudah tracking asupan nutrisi kamu!</p>

@@ -54,7 +54,7 @@ export default function UpdaterAlert({
       <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center p-6 bg-black/80 backdrop-blur-md">
         <div className={`w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl ${t.bgCardSolid} border ${t.border} ${t.textMain} flex flex-col items-center text-center animate-in zoom-in-95 duration-500`}>
           <div className="pt-8 pb-4">
-            <img src="/icon-512.png" alt="LOGYM Logo" className="w-24 h-24 mx-auto rounded-2xl shadow-lg mb-4 bg-white/5 border border-white/10 p-2" />
+            <img src="/icon-512.webp" alt="LOGYM Logo" className="w-24 h-24 mx-auto rounded-2xl shadow-lg mb-4 bg-white/5 border border-white/10 p-2" />
             <h2 className={`text-2xl font-bold tracking-tight mb-2 bg-clip-text text-transparent bg-gradient-to-br ${t.gradientText}`}>Update Penting!</h2>
             <p className={`text-sm font-medium ${t.textMuted} px-6`}>
               Versi terbaru LOGYM telah tersedia. Kamu harus mengunduh pembaruan ini untuk melanjutkan.
@@ -104,7 +104,7 @@ export default function UpdaterAlert({
 
         <div className="flex gap-4 items-center pr-6">
           <div className={`bg-black/20 border ${t.border} p-1.5 rounded-xl shrink-0`}>
-            <img src="/icon-512.png" alt="LOGYM" className="w-10 h-10 rounded-lg" />
+            <img src="/icon-512.webp" alt="LOGYM" className="w-10 h-10 rounded-lg" />
           </div>
           <div>
             <h3 className="font-bold text-lg leading-tight">Update Tersedia</h3>

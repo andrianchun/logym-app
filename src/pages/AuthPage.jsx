@@ -190,7 +190,7 @@ const AuthPage = ({ t, theme, soundEnabled, onLogin }) => {
 
           {/* Logo */}
           <div className="absolute top-0 left-0 right-0 p-6" style={{ paddingTop: 'max(1.5rem, env(safe-area-inset-top))' }}>
-            <img src={theme === 'dark' ? '/banner-dark.png' : '/banner-light.png'} alt="Logym" className="h-7 w-auto object-contain drop-shadow-lg" />
+            <img src={theme === 'dark' ? '/banner-dark.webp' : '/banner-light.webp'} alt="Logym" className="h-7 w-auto object-contain drop-shadow-lg" />
           </div>
         </div>
       </div>

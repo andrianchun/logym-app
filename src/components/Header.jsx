@@ -31,7 +31,7 @@ const Header = ({ t, theme, user, showSettings, setShowSettings, setShowProfileM
       {/* BAGIAN KIRI: LOGO */}
       <div className="flex items-center">
         <img 
-          src={theme === 'dark' ? "/banner-dark.png" : "/banner-light.png"} 
+          src={theme === 'dark' ? "/banner-dark.webp" : "/banner-light.webp"} 
           alt="Logo Logym" 
           className="h-8 w-auto object-contain drop-shadow-sm" 
         />
