@@ -15,9 +15,6 @@ import AlternativeExerciseModal from '../components/AlternativeExerciseModal';
 import EmptyWorkoutState from '../components/EmptyWorkoutState';
 import useDialog from '../hooks/useDialog';
 
-let notified10RM_Date = null;
-const notified10RM_Ids = new Set();
-
 const WorkoutTab = ({
   // Dikirim App.jsx tapi dulu tidak pernah di-destructure — padahal dipakai di
   // `if (setConfirmModal)` saat user memulai latihan lain sementara satu sesi masih jalan.
@@ -83,16 +80,12 @@ const WorkoutTab = ({
          progId = resolveProjectedProgramId(sessionToRun);
       }
       
-      if (progId === 'extra') {
-         sourceWorkouts.push({
-            id: 'extra',
-            programId: 'adhoc',
-            programName: 'Latihan Ekstra',
-            status: 'planned',
-            isProjected: true,
-            log: {}
-         });
-      } else {
+      // Sesi Ekstra SENGAJA tidak disuntikkan ke sini. Dulu blok ini mendorong workout adhoc
+      // tanpa exercises, jadi selama sesi ekstra berjalan tab Latihan menampilkan kartu
+      // "Sesi N: Latihan Ekstra" yang kosong melompong tepat di atas kartu "Ekstra" yang berisi
+      // latihannya — dua kartu untuk satu sesi. Extras punya kartunya sendiri di bawah, dan
+      // sessionPrograms memang mengembalikan [] untuk sessionToRun === 'extra'.
+      if (progId !== 'extra') {
          const prog = programs.find(p => p.id === progId);
          if (prog) {
            sourceWorkouts.push({
@@ -422,8 +415,21 @@ const WorkoutTab = ({
              w = dayData.workouts[wIdx];
           }
 
-          // Update secara immutable — jangan mutasi objek di dalam state React
-          const replacement = { ...newEx, sets: detailExercise.sets || 3, reps: detailExercise.reps || 10, duration: detailExercise.duration || 10, id: newEx.id };
+          // Update secara immutable — jangan mutasi objek di dalam state React.
+          //
+          // supersetId WAJIB ikut. Tanpa itu latihan pengganti keluar dari supersetnya: siblingIds
+          // dirakit dengan filter supersetId, jadi anggota yang diganti langsung memicu istirahat
+          // di tengah ronde sementara sisa anggota mengira rondenya sudah selesai — dan
+          // groupExercises (yang mengelompokkan berdasar kedekatan) memecah kartunya jadi dua.
+          // Versi di ProgramTab.jsx sudah mempertahankannya sejak dulu.
+          const replacement = {
+            ...newEx,
+            sets: detailExercise.sets || 3,
+            reps: detailExercise.reps || 10,
+            duration: detailExercise.duration || 10,
+            id: newEx.id,
+            ...(detailExercise.supersetId ? { supersetId: detailExercise.supersetId } : {})
+          };
           let newW = w;
 
           if (w.programId === 'adhoc') {
@@ -512,7 +518,13 @@ const WorkoutTab = ({
       if (!exItem || !exerciseLibrary || exItem.type === 'time' || exItem.type === 'cardio' || exItem.target?.includes('Cardio')) return null;
       
       if (!historicalStatsRef.current[exItem.id]) {
-        let historyMax10RM = 0;
+        // DUA angka, bukan satu. `best10RM` = rekor sepanjang masa (acuan "rekor baru dipecahkan"),
+        // `last10RM` = 10RM sesi TERAKHIR (acuan beban hari ini, dan boleh turun kalau user deload
+        // atau mengoreksi salah ketik 100 kg jadi 10 kg). Dulu keduanya satu variabel bernilai
+        // maksimum seumur hidup, jadi 10RM tidak pernah bisa turun.
+        let best10RM = 0;
+        let last10RM = 0;
+        let last10RMDateMs = 0;
         let lastSessionWeight = 0;
         let lastSessionReps = 0;
         let mostRecentDateMs = 0;
@@ -523,17 +535,23 @@ const WorkoutTab = ({
           
           if (day.workouts) {
             day.workouts.forEach(w => {
-              const baseId = exItem.originalId || (typeof exItem.id === 'string' && exItem.id.includes('-') ? exItem.id.split('-')[0] : exItem.id);
+              // split('-')[0] hanya untuk id BERBENTUK ANGKA + id sesi ("101-w1"). Untuk id UUID
+              // pola itu memotong di tanda hubung pertama, latihannya tidak pernah ketemu, dan
+              // datanya hilang diam-diam (lihat resolveLoggedExercise di data/constants.js).
+              const rawId = String(exItem.id);
+              const baseId = exItem.originalId ?? (/^d+-/.test(rawId) ? rawId.split('-')[0] : rawId);
               const targetLog = w.log && (w.log[`${baseId}-${w.id}`] || w.log[baseId] || w.log[exItem.id]);
   
               if (w.status === 'completed' && targetLog) {
                 let bestWeightInSession = 0;
                 let bestRepsAtWeight = 0;
+                let rm10InSession = 0;
                 
-                targetLog.forEach(s => {
+                Object.values(targetLog || {}).forEach(s => {
                   if (!s.skipped && s.w > 0 && s.r > 0) {
                     const c10RM = estimate10RM(s.w, s.r);
-                    if (c10RM > historyMax10RM) historyMax10RM = c10RM;
+                    if (c10RM > best10RM) best10RM = c10RM;
+                    if (c10RM > rm10InSession) rm10InSession = c10RM;
 
                     if (Number(s.w) > bestWeightInSession) {
                       bestWeightInSession = Number(s.w);
@@ -544,7 +562,13 @@ const WorkoutTab = ({
                   }
                 });
                 
-                if (bestWeightInSession > 0 && dateMs > mostRecentDateMs) {
+                // `>=`: sesi yang baru saja disimpan bisa bertanggal sama dengan sesi terakhir
+                // yang tercatat, dan yang terbaru harus menang.
+                if (rm10InSession > 0 && dateMs >= last10RMDateMs) {
+                  last10RMDateMs = dateMs;
+                  last10RM = rm10InSession;
+                }
+                if (bestWeightInSession > 0 && dateMs >= mostRecentDateMs) {
                   mostRecentDateMs = dateMs;
                   lastSessionWeight = bestWeightInSession;
                   lastSessionReps = bestRepsAtWeight;
@@ -554,10 +578,10 @@ const WorkoutTab = ({
           }
         });
         
-        historicalStatsRef.current[exItem.id] = { historyMax10RM, lastSessionWeight, lastSessionReps };
+        historicalStatsRef.current[exItem.id] = { best10RM, last10RM, lastSessionWeight, lastSessionReps };
       }
       
-      let { historyMax10RM, lastSessionWeight, lastSessionReps } = historicalStatsRef.current[exItem.id];
+      let { best10RM, last10RM, lastSessionWeight, lastSessionReps } = historicalStatsRef.current[exItem.id];
 
 
       // 2. Scan current session
@@ -577,10 +601,16 @@ const WorkoutTab = ({
       const libEx = exerciseLibrary?.find(e => e.id === exItem.originalId || e.id === exItem.id
         || e.name?.toLowerCase() === exItem.name?.toLowerCase());
       const stored10RM = Number(libEx?.rm10 ?? exItem.rm10) || 0;
-      const base10RM = Math.max(historyMax10RM, stored10RM);
-      
-      const true10RM = Math.max(base10RM, currentMax10RM);
-      const isNewRecord = currentMax10RM > base10RM && base10RM > 0;
+
+      // Acuan REKOR = yang tertinggi sepanjang masa. Acuan BEBAN HARI INI = sesi terakhir (atau
+      // override manual dari kalkulator 10RM kalau riwayatnya belum ada).
+      //
+      // stored10RM SENGAJA tidak ikut ke acuan rekor. Nilainya ditulis ulang tiap sesi disimpan,
+      // jadi begitu ia ikut dibandingkan, rekornya selalu terlihat "sudah pernah dicapai" dan
+      // badge REKOR BARU tidak pernah muncul.
+      const record10RM = Math.max(best10RM, Number(libEx?.rm10Best) || 0);
+      const true10RM = last10RM > 0 ? last10RM : stored10RM;
+      const isNewRecord = currentMax10RM > record10RM && record10RM > 0;
       
       if (isNewRecord) {
         return {
@@ -866,6 +896,7 @@ const WorkoutTab = ({
           exerciseLibrary={exerciseLibrary}
           onSetChange={onSetChange}
           activeExerciseId={activeExerciseId}
+          onActiveExercise={setActiveExerciseId}
           onToggleSet={(exId, setIdx, siblingIds) => {
             setActiveExerciseId(exId);
             onToggleSet(exId, setIdx, siblingIds);
@@ -1093,13 +1124,16 @@ const WorkoutTab = ({
 
               {/* LATIHAN TAMBAHAN (EKSTRA) */}
               {extraExercises.length > 0 && (
-                <div className={`mb-6 rounded-[2rem] border border-dashed border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-md overflow-hidden transition-all`}>
+                <div id="session-extra" className={`mb-6 rounded-[2rem] border border-white/20 dark:border-white/10 bg-white/60 dark:bg-black/50 backdrop-blur-xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.4)] overflow-hidden transition-all`}>
                   <button 
                     onClick={() => { playSoundEffect('click', soundEnabled); toggleSession('extra'); }}
-                    className={`w-full p-5 sm:p-6 flex items-center justify-between font-black text-left transition-colors`}
+                    className={`w-full p-5 sm:p-6 flex items-start justify-between font-black text-left transition-colors`}
                   >
-                    <span className="text-xl sm:text-2xl uppercase tracking-widest">Ekstra</span>
-                    <div className="flex items-center gap-1 text-sm opacity-60 font-bold bg-black/10 dark:bg-white/10 px-3 py-1.5 rounded-full"><span>{extraExercises.length} Latihan</span>{(expandedSessions || {})['extra'] ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}</div>
+                    <div className="flex flex-col items-start gap-0.5 flex-1 min-w-0 pr-4">
+                      <span className="text-xl sm:text-2xl uppercase tracking-widest break-words leading-tight">Sesi {activeProgramsList.length + 1}: Ekstra</span>
+                      <span className={`text-xs ${t.textMuted} font-medium`}>{extraExercises.length} latihan di luar program</span>
+                    </div>
+                    <div className="caption opacity-60 font-bold flex items-center gap-1 shrink-0 mt-0.5">{(expandedSessions || {})['extra'] ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}</div>
                   </button>
                   
                   {(expandedSessions || {})['extra'] && (

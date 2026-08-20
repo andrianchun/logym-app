@@ -172,7 +172,7 @@ export const PERSONA_PRESETS = {
     }
 };
 
-export const buildSystemPrompt = (userProfile, exerciseLibraryStr, workoutLogsSummary = '', bioSummary = '', activeProgramsSummary = '', persona = 'santai', customInstruction = '', memory = [], favoriteProgramSummary = '', appHelpBlock = '') => {
+export const buildSystemPrompt = (userProfile, exerciseLibraryStr, workoutLogsSummary = '', bioSummary = '', activeProgramsSummary = '', persona = 'santai', customInstruction = '', memory = [], favoriteProgramSummary = '', appHelpBlock = '', extraCatalogStr = '') => {
     let bioString = "";
     if (userProfile) {
         bioString = `
@@ -242,8 +242,12 @@ The JSON must exactly match this schema:
 Rules for "update": include ALL routines the plan should have after the edit (this is a full replace of that plan's routines, not a merge) — so copy over unchanged routines exactly as they are in [Active Programs] and only change what the user asked for. Keep the EXACT planName and the EXACT routine names from [Active Programs] unless the user explicitly asked to rename them: those names may have been renamed by the user, and silently restoring your own naming is treated as a bug (the app will override you anyway).
 Rules for "create": always use action "create" with no targetPlanId when the user wants a separate new program rather than editing one that exists.
 
-Available Exercise Library (Use these names as closely as possible):
+Available Exercise Library — already in the user's app (format: name (muscles, equipment)). Prefer these, and match the names exactly:
 ${exerciseLibraryStr}
+${extraCatalogStr ? `
+Extra Catalog — NOT yet in the user's app, but the app can add them automatically. Use these when the user asks for alternatives, variations, or says they are bored with their current routine. Never invent a name that is not in either list:
+${extraCatalogStr}
+` : ''}
 
 Only use the <program_proposal> tags if you are explicitly generating or editing a program for the user to use in the app. Otherwise, just reply with normal text.`;
 };

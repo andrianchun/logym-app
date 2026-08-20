@@ -12,7 +12,7 @@ import { MuscleProgress } from '../components/MuscleProgress';
 import SwipeInput from '../components/SwipeInput';
 import { formatNumber, sleepHoursToParts } from '../utils/numberFormat';
 import { dailyBurnCalories, dailyActiveMinutes } from '../utils/workoutCalc';
-import { calcBMR } from '../utils/bmr';
+import { dayBmr } from '../utils/bmr';
 import { AreaChart, Area, ResponsiveContainer, YAxis, XAxis, ReferenceArea } from 'recharts';
 
 
@@ -312,12 +312,14 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          }
      }
      
-     // Auto-calculate BMR for dashboard display if not exist
-     if (mergedData.weight > 0 && !mergedData.bmr) {
-         const age = userProfile?.dob ? (new Date().getFullYear() - new Date(userProfile.dob).getFullYear()) : 25;
-         const h = mergedData.height > 0 ? mergedData.height : 165;
-         const g = userProfile?.gender || 'male';
-         mergedData.bmr = calcBMR({ weight: mergedData.weight, height: h, age, gender: g });
+     // BMR kartu = turunan Logym yang SAMA dengan grafik & hitungan kalori (dayBmr). Dihitung
+     // ulang selalu, bukan cuma kalau kosong: angka dari timbangan/scan AI/Health Connect memakai
+     // rumus berbeda-beda, jadi kartu dan grafik dulu bisa menunjukkan dua angka untuk hari yang
+     // sama. Fallback diam-diam "tinggi 165 / umur 25 / male" ikut dibuang — kalau profilnya belum
+     // lengkap, dayBmr mengembalikan angka tersimpan apa adanya, bukan tebakan yang terlihat wajar.
+     {
+         const dihitung = dayBmr(mergedData, userProfile);
+         if (dihitung > 0) mergedData.bmr = dihitung;
      }
      
      return { 
@@ -998,7 +1000,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                  t={t} theme={theme} history={history} 
                  soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
                  onPointClick={handleChartPointClick}
-                 units={units}
+                 units={units} userProfile={userProfile}
               />
               </div>
             </div>

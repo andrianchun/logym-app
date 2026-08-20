@@ -4,6 +4,7 @@ import { getLocalYMD } from '../data/constants';
 import { formatNumber, formatSleepDuration } from '../utils/numberFormat';
 import { calculateReadiness, restingHrBaseline } from '../utils/readinessEngine';
 import { dailyBurnCalories, dailyActiveMinutes } from '../utils/workoutCalc';
+import { dayBmr } from '../utils/bmr';
 
 const CustomStackedBarShape = (props) => {
   const { x, y, width, height, fill, payload, dataKey, chartId = 'default' } = props;
@@ -165,9 +166,10 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
           // penjaga ini tiap hari tanpa data muncul sebagai batang 1600 kkal yang mengarang.
           const punyaData = Number(histBio?.bmr) > 0 || Number(histBio?.steps) > 0 || burn.sessions > 0;
           const actCals = punyaData ? burn.total : 0;
-          // BMR di grafik pakai angka tersimpan apa adanya (0 kalau hari itu belum punya),
-          // supaya hari tanpa data tidak mendapat batang palsu setinggi 1600 dari fallback.
-          const bmr = Number(histBio?.bmr || 0);
+          // BMR turunan Logym, bukan angka mentah bioData.bmr. Penjaga `punyaData` di atas TETAP
+          // membaca field mentah itu — perannya cuma "hari ini ada datanya", jadi hari kosong tidak
+          // mendapat batang palsu setinggi BMR.
+          const bmr = punyaData ? dayBmr(histBio, userProfile) : 0;
           const stepCals = burn.steps;
           const cardioCals = burn.kardio;
           const weightCals = burn.beban;

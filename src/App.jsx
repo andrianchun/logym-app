@@ -59,7 +59,7 @@ import { rapikanNamaProgram, rapikanNamaSesi, pertahankanNamaSesi } from './util
 import useDialog from './hooks/useDialog';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import UpdaterAlert from './components/UpdaterAlert';
-import { getLocalYMD, resolveProjectedProgramId, isLomealOwned, resolveLoggedExercise, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos, getDayWorkouts, countMissedScheduledDays } from './data/constants';
+import { getLocalYMD, resolveProjectedProgramId, isLomealOwned, resolveLoggedExercise, splitSessionLogs, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos, getDayWorkouts, countMissedScheduledDays } from './data/constants';
 import { serializeDay, dayFingerprint, migrateBaseline, reconcileHistory, workoutsToMap, workoutIdsFromBaseline, diffFields, stableStringify } from './utils/historySync';
 import { useBleManager } from './hooks/useBleManager';
 import { Loader2, Download, X } from 'lucide-react';
@@ -1304,6 +1304,40 @@ export default function App() {
     }
   }, []);
 
+  // Nama sesi yang BENAR-BENAR sedang dijalankan. Notifikasi & overlay native dulu memakai
+  // `activeProgramId` — variabel yang cuma menandai program terakhir yang dipilih di UI, jadi
+  // barnya bisa menyebut program yang tidak sedang dikerjakan sama sekali.
+  const runningWorkoutName = useMemo(() => {
+    const id = sessionToRun;
+    const fallback = programs?.find(p => p.id === activeProgramId)?.name || 'Sesi Latihan Aktif';
+    if (!id) return fallback;
+    if (id === 'extra') return 'Latihan Ekstra';
+    const day = history[activeWorkoutDate || selectedDate];
+    const w = (day?.workouts || []).find(x => x.id === id || x.programId === id);
+    if (w?.programId === 'adhoc') return w.programName || 'Latihan Ekstra';
+    let progId = w?.programId || id;
+    if (typeof progId === 'string' && progId.startsWith('projected_')) progId = resolveProjectedProgramId(progId);
+    return programs?.find(p => p.id === progId)?.name || w?.programName || fallback;
+  }, [sessionToRun, history, activeWorkoutDate, selectedDate, programs, activeProgramId]);
+
+  // SATU pemilik untuk nama latihan di notifikasi. Sisi Kotlin memasang field ini lewat `?.let`
+  // sehingga nilainya menetap sampai ditimpa; dulu satu-satunya penulis adalah ImmersiveWorkout,
+  // jadi begitu immersive ditutup notifikasi membeku di latihan terakhir yang tampil di sana —
+  // sering milik sesi lain. Sekarang diturunkan dari activeExerciseId, yang ikut berpindah baik
+  // lewat kartu maupun lewat tombol "Latihan Berikutnya" di immersive.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') return;
+    if (!isWorkoutActive) {
+      WorkoutTimerPlugin.updateTimer({ exerciseName: '' }).catch(() => {});
+      return;
+    }
+    const ex = (sessionExercises || []).find(e => String(e.id) === String(activeExerciseId));
+    // Tidak ketemu = daftar sesi belum sempat dilaporkan WorkoutTab. Biarkan nama lama daripada
+    // mengosongkannya bolak-balik tiap pindah tab.
+    if (!ex?.name) return;
+    WorkoutTimerPlugin.updateTimer({ exerciseName: ex.name }).catch(() => {});
+  }, [activeExerciseId, sessionExercises, isWorkoutActive]);
+
   useEffect(() => {
     if (!restTargetTime) return;
     
@@ -1312,6 +1346,11 @@ export default function App() {
     if (timeRemainingMs <= 0) return;
 
     const timeout = setTimeout(() => {
+      // Kalau aplikasi sedang tidak terlihat, service native SUDAH membunyikan berkas yang sama
+      // di stream ALARM (WorkoutTimerService.kt, gerbang !isAppActive) berikut getarannya. Ikut
+      // membunyikannya di sini berarti dua kali: satu lantang lewat alarm, satu pelan lewat media.
+      const dibunyikanNative = Capacitor.isNativePlatform() && document.visibilityState === 'hidden';
+      if (dibunyikanNative) return;
       if (soundEnabled) {
         if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 500]);
       }
@@ -1332,7 +1371,7 @@ export default function App() {
         WorkoutTimerPlugin.updateTimer({ 
             isResting: true, 
             targetTime: restTargetTime, 
-            workoutName: programs?.find(p => p.id === activeProgramId)?.name || 'Sesi Latihan Aktif' 
+            workoutName: runningWorkoutName
         }).catch(console.warn);
     }
 
@@ -1342,11 +1381,11 @@ export default function App() {
             WorkoutTimerPlugin.updateTimer({ 
                 isResting: false, 
                 targetTime: 0, 
-                workoutName: programs?.find(p => p.id === activeProgramId)?.name || 'Sesi Latihan Aktif' 
+                workoutName: runningWorkoutName
             }).catch(console.warn);
         }
     };
-  }, [restTargetTime, soundEnabled, activeProgramId, programs]);
+  }, [restTargetTime, soundEnabled, runningWorkoutName]);
 
   useEffect(() => {
      if (!isDataLoaded || !activityTargets) return;
@@ -1387,8 +1426,7 @@ export default function App() {
     const showNotification = async () => {
       try {
         if (Capacitor.getPlatform() === 'android') {
-           const workoutName = programs?.find(p => p.id === activeProgramId)?.name || 'Sesi Latihan Aktif';
-           await WorkoutTimerPlugin.startTimer({ startTime: workoutStartTime || Date.now(), workoutName });
+           await WorkoutTimerPlugin.startTimer({ startTime: workoutStartTime || Date.now(), workoutName: runningWorkoutName });
         }
       } catch (err) {
         console.warn('Notification error:', err);
@@ -2876,21 +2914,24 @@ export default function App() {
         if (ex && weight > 0 && (!ex.type || ex.type === 'weight' || ex.type === 'reps')) {
            const c10RM = estimate10RM(weight, reps);
 
+           // rm10 SENGAJA tidak ditulis di sini lagi. Dua alasannya:
+           //
+           //  1. Aturannya dulu `if (c10RM > existingRm)` — maksimum seumur hidup. 10RM jadi tidak
+           //     pernah bisa turun, sehingga deload maupun koreksi salah ketik (100 kg padahal
+           //     10 kg) tidak pernah tercermin di saran beban.
+           //  2. Penulisan itu terjadi di handler yang SAMA dengan pencentangan set, jadi saat
+           //     getOverloadHint dievaluasi, acuannya sudah terlanjur naik ke nilai sesi ini —
+           //     badge "REKOR BARU" karena itu tidak pernah muncul lagi.
+           //
+           // Nilai yang benar dihitung ulang oleh efek pendingRmLogKeys (recomputeStrengthRecords
+           // + mergeRm10) setelah sesinya disimpan. lastWeight tetap ditulis di sini: itu memang
+           // "beban terakhir yang diketik", wajar naik-turun seketika.
            setExerciseLibrary(lib => {
               const existingIdx = lib.findIndex(e => e.name?.toLowerCase() === ex.name?.toLowerCase() || e.id === ex.id);
-              if (existingIdx >= 0) {
-                  const existingRm = lib[existingIdx].rm10 || 0;
+              if (existingIdx >= 0 && lib[existingIdx].lastWeight !== weight) {
                   const newLib = [...lib];
-                  let updated = false;
-                  if (lib[existingIdx].lastWeight !== weight) {
-                     newLib[existingIdx] = { ...newLib[existingIdx], lastWeight: weight };
-                     updated = true;
-                  }
-                  if (c10RM > existingRm) {
-                     newLib[existingIdx] = { ...newLib[existingIdx], rm10: c10RM };
-                     updated = true;
-                  }
-                  if (updated) return newLib;
+                  newLib[existingIdx] = { ...newLib[existingIdx], lastWeight: weight };
+                  return newLib;
               }
               return lib;
            });
@@ -3095,14 +3136,25 @@ export default function App() {
             clearCloudSession(); 
             const targetDateStr = selectedDate;
             
-            let restoredLogs = {};
-            let restoredSkipped = {};
-            let restoredExtra = [];
-            
+            // Membatalkan SATU sesi tidak boleh menggulung sesi lain yang belum disimpan.
+            // Snapshot dipulihkan hanya untuk kunci milik sesi yang dibatalkan; kunci sesi lain
+            // dibiarkan seperti sekarang. extras cuma ikut dipulihkan kalau yang dibatalkan
+            // memang sesi Ekstra.
+            const batalEkstra = progId === 'extra';
+            const opsiBelah = { progId, workoutId: focusWorkoutId, extraExercises };
+            const sisaLogsBatal = splitSessionLogs(exerciseLogs, opsiBelah).sisa;
+            const sisaSkipBatal = splitSessionLogs(skippedExercises, opsiBelah).sisa;
+
+            let restoredLogs = sisaLogsBatal;
+            let restoredSkipped = sisaSkipBatal;
+            let restoredExtra = extraExercises || [];
+
             if (sessionSnapshot) {
-               restoredLogs = sessionSnapshot.exerciseLogs;
-               restoredSkipped = sessionSnapshot.skippedExercises;
-               restoredExtra = sessionSnapshot.extraExercises;
+               const snapLogs = splitSessionLogs(sessionSnapshot.exerciseLogs, opsiBelah).milikSesi;
+               const snapSkip = splitSessionLogs(sessionSnapshot.skippedExercises, opsiBelah).milikSesi;
+               restoredLogs = { ...sisaLogsBatal, ...snapLogs };
+               restoredSkipped = { ...sisaSkipBatal, ...snapSkip };
+               if (batalEkstra) restoredExtra = sessionSnapshot.extraExercises || [];
             }
             
             setHistory(prev => {
@@ -3199,9 +3251,13 @@ export default function App() {
         // mergeRm10 menghormati override manual tanpa membekukannya selamanya.
         // lastWeight TIDAK ikut aturan ini: itu memang "beban terakhir dipakai", wajar turun.
         const rm10 = mergeRm10(e.rm10, e.rm10ManualAt, r.rm10, r.rm10At);
-        if (e.rm10 === rm10 && e.lastWeight === r.lastWeight) return e;
+        // rm10Best dihitung recomputeStrengthRecords tapi dulu dibuang. Padahal itulah acuan
+        // "rekor baru dipecahkan" — satu-satunya angka yang TIDAK boleh ikut turun saat rm10
+        // turun karena deload atau koreksi input.
+        const rm10Best = Math.max(Number(e.rm10Best) || 0, Number(r.rm10Best) || 0);
+        if (e.rm10 === rm10 && e.lastWeight === r.lastWeight && (e.rm10Best || 0) === rm10Best) return e;
         changed = true;
-        return { ...e, rm10, lastWeight: r.lastWeight };
+        return { ...e, rm10, rm10Best, lastWeight: r.lastWeight };
       });
       return changed ? next : lib;
     });
@@ -3264,9 +3320,19 @@ export default function App() {
     setRestTargetTime(null);
     clearCloudSession(); 
 
-    setExerciseLogs({});
-    setSkippedExercises({});
-    setExtraExercises([]);
+    // HANYA log milik sesi ini yang disimpan & dibuang dari state. Versi lama mengosongkan
+    // exerciseLogs/skippedExercises/extraExercises tanpa syarat dan menulis SELURUH log hari itu
+    // ke sesi yang kebetulan disimpan duluan — treadmill di sesi Ekstra yang belum disimpan ikut
+    // masuk ke sesi beban, lalu kartu Ekstranya lenyap bersama datanya.
+    const belah = splitSessionLogs(exerciseLogs, { progId, workoutId: focusWorkoutId, extraExercises });
+    const belahSkip = splitSessionLogs(skippedExercises, { progId, workoutId: focusWorkoutId, extraExercises });
+    // extras cuma dibersihkan kalau yang disimpan memang sesi Ekstra — invarian lama yang sempat
+    // hilang (lihat memori extra-exercises-are-adhoc-only).
+    const isSesiEkstra = progId === 'extra';
+
+    setExerciseLogs(belah.sisa);
+    setSkippedExercises(belahSkip.sisa);
+    if (isSesiEkstra) setExtraExercises([]);
     setSessionSnapshot(null);
 
     const targetDateStr = activeWorkoutDate || selectedDate;
@@ -3274,10 +3340,14 @@ export default function App() {
     let cleanLogs = {};
     let cleanSkipped = {};
     let cleanExtra = [];
+    let sisaLogs = {};
+    let sisaSkipped = {};
     try {
-      cleanLogs = JSON.parse(JSON.stringify(exerciseLogs || {}));
-      cleanSkipped = JSON.parse(JSON.stringify(skippedExercises || {}));
+      cleanLogs = JSON.parse(JSON.stringify(belah.milikSesi));
+      cleanSkipped = JSON.parse(JSON.stringify(belahSkip.milikSesi));
       cleanExtra = JSON.parse(JSON.stringify(extraExercises || []));
+      sisaLogs = JSON.parse(JSON.stringify(belah.sisa));
+      sisaSkipped = JSON.parse(JSON.stringify(belahSkip.sisa));
     } catch (e) {
       console.warn("Failed to sanitize workout logs", e);
     }
@@ -3475,11 +3545,13 @@ export default function App() {
       h[targetDateStr] = {
         ...dayData,
         workouts,
+        // Sesi lain yang masih menggantung TETAP hidup di _activeSession — itulah yang membuat
+        // kalender masih menandainya "Belum disimpan" alih-alih menghapusnya diam-diam.
         _activeSession: {
           ...(dayData._activeSession || {}),
-          exerciseLogs: {},
-          skippedExercises: {},
-          extraExercises: []
+          exerciseLogs: sisaLogs,
+          skippedExercises: sisaSkipped,
+          extraExercises: isSesiEkstra ? [] : (cleanExtra || [])
         }
       };
       
@@ -4001,6 +4073,7 @@ export default function App() {
         userProfile={userProfile}
         focusWorkoutId={focusWorkoutId} setFocusWorkoutId={setFocusWorkoutId}
         exerciseLogs={exerciseLogs} sessionExercises={sessionExercises}
+        activeExerciseId={activeExerciseId}
       />
 
       {/* === GLOBAL COACH LOGI FLOAT === */}

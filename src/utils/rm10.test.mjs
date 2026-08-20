@@ -130,3 +130,43 @@ console.log('rm10 OK', { r100x10: estimate10RM(100, 10), bulat42_5step5: roundDo
   assert.deepEqual(rm10Series({}, 101, lookup3), []);
   console.log('rm10Series OK');
 }
+
+// ---- rm10Best: acuan REKOR tidak boleh ikut turun saat rm10 turun ----
+{
+  const lookup4 = { 101: { id: 101, name: 'Bench Press' } };
+  const sesi = (tanggal, w) => ({ [tanggal]: { workouts: [
+    { status: 'completed', id: 'w-' + tanggal, log: { 101: [{ w, r: 10, done: true }] } },
+  ] } });
+
+  // Salah ketik 100 kg (harusnya 10), lalu dikoreksi di sesi berikutnya.
+  const salahKetik = { ...sesi('2026-08-01', 10), ...sesi('2026-08-02', 100) };
+  const a = recomputeStrengthRecords(salahKetik, ['101'], lookup4)['101'];
+  assert.equal(a.rm10, estimate10RM(100, 10), 'sesi terakhir menang, walau nilainya keliru');
+  assert.equal(a.rm10Best, estimate10RM(100, 10));
+
+  // User memperbaiki sesi itu lewat Edit Riwayat -> 10RM ikut turun.
+  const setelahKoreksi = { ...sesi('2026-08-01', 10), ...sesi('2026-08-02', 10) };
+  const b = recomputeStrengthRecords(setelahKoreksi, ['101'], lookup4)['101'];
+  assert.equal(b.rm10, estimate10RM(10, 10), '10RM harus ikut terkoreksi turun');
+  // rm10Best diturunkan dari riwayat yang tersisa, dan App.jsx menggabungnya dengan nilai lama
+  // pakai Math.max — jadi rekor lama tetap hidup di pustaka meski riwayatnya sudah dibetulkan.
+  assert.equal(Math.max(a.rm10Best, b.rm10Best), a.rm10Best, 'rekor sepanjang masa tidak boleh turun');
+
+  // Deload sengaja: 10RM turun, rekor bertahan.
+  const deload = { ...sesi('2026-08-01', 100), ...sesi('2026-08-08', 70) };
+  const c = recomputeStrengthRecords(deload, ['101'], lookup4)['101'];
+  assert.equal(c.rm10, estimate10RM(70, 10));
+  assert.equal(c.rm10Best, estimate10RM(100, 10));
+  assert.ok(c.rm10 < c.rm10Best, 'rm10 dan rm10Best memang boleh berbeda — itu intinya');
+
+  console.log('rm10Best OK');
+}
+
+// ---- Saran beban ikut turun setelah koreksi (gejala yang dilaporkan user) ----
+{
+  const { defaultSetWeight } = await import('./workoutCalc.js');
+  const ex = { reps: 10 };
+  assert.equal(defaultSetWeight({ rm10: estimate10RM(100, 10) }, ex, 2.5), 100, 'sebelum dikoreksi');
+  assert.equal(defaultSetWeight({ rm10: estimate10RM(10, 10) }, ex, 2.5), 10, 'sesudah dikoreksi');
+  console.log('saran beban OK');
+}

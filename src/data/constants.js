@@ -206,6 +206,50 @@ export const resolveLoggedExercise = (logKey, exLookup) => {
   return undefined;
 };
 
+/**
+ * Pisahkan log satu HARI menjadi "milik sesi yang sedang disimpan" dan "sisa".
+ *
+ * `exerciseLogs`, `skippedExercises`, dan `extraExercises` adalah state SATU HARI, bukan satu
+ * sesi. Dulu handleSaveWorkout memperlakukan semuanya sebagai milik sesi yang disimpan: log
+ * treadmill di sesi Ekstra yang belum disimpan ikut ditulis ke `log` sesi beban, lalu
+ * `extraExercises` dikosongkan — kartu Ekstra "Belum disimpan" di kalender lenyap dan
+ * treadmillnya hilang permanen.
+ *
+ * Cara mengenali pemilik sebuah kunci:
+ *  - Latihan ekstra: kuncinya PERSIS id di `extraExercises` (`${libId}-${stempelWaktu}`).
+ *  - Sesi program: WorkoutTab merakit id majemuk `${ex.id}-${w.id}`, jadi kuncinya berakhiran
+ *    `-${workoutId}`.
+ *
+ * Kalau tidak ada satu kunci pun yang cocok dengan sufiks itu (riwayat lama berkunci polos "101"),
+ * SEMUA kunci non-ekstra dianggap milik sesi itu. Fallback ini disengaja: sesi yang tersimpan
+ * dengan log kosong jauh lebih merusak daripada sesi yang lognya kelebihan.
+ *
+ * Lihat juga resolveLoggedExercise di atas soal lima bentuk kunci — jangan pernah
+ * `key.split('-')[0]`.
+ */
+export const splitSessionLogs = (exerciseLogs, { progId, workoutId, extraExercises } = {}) => {
+  const semua = exerciseLogs || {};
+  const idEkstra = new Set((extraExercises || []).map(ex => String(ex?.id)));
+  const kunci = Object.keys(semua);
+
+  let milik;
+  if (progId === 'extra') {
+    milik = new Set(kunci.filter(k => idEkstra.has(String(k))));
+  } else {
+    const nonEkstra = kunci.filter(k => !idEkstra.has(String(k)));
+    const sufiks = [workoutId, progId].filter(Boolean).map(id => `-${id}`);
+    const cocok = sufiks.length > 0
+      ? nonEkstra.filter(k => sufiks.some(s => String(k).endsWith(s)))
+      : [];
+    milik = new Set(cocok.length > 0 ? cocok : nonEkstra);
+  }
+
+  const milikSesi = {};
+  const sisa = {};
+  kunci.forEach(k => { (milik.has(k) ? milikSesi : sisa)[k] = semua[k]; });
+  return { milikSesi, sisa };
+};
+
 // Field bioData yang PEMILIKNYA Lomeal, bukan Logym. Lomeal menulis langsung ke history_years
 // Logym (lihat lomeal-app/src/utils/biometricSync.js) untuk SEMUA hari yang berubah, termasuk hari
 // lampau — jadi salurannya sudah benar dan Logym cukup berhenti menimpanya.

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { doc, setDoc, deleteDoc, getDocs, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Send, X, Check, Loader2, Dumbbell, Menu, Plus, MessageSquare, Trash2, Bookmark, ChevronDown, ChevronRight } from 'lucide-react';
 import { buildSystemPrompt, summarizeWorkoutLogs, summarizeBiometrics, summarizeActivePrograms, summarizeFavoriteProgram, needsPersonalContext, needsAppHelpContext, APP_HELP_REFERENCE, chatWithAI, AI_MODELS, getAvailableModels, getProviderStatus, checkOverallAIStatus } from '../utils/aiAgent';
+import { fetchExercisesFromApi, pickRelevantExercises } from '../utils/exerciseDbApi';
 import renderMiniMarkdown from '../utils/miniMarkdown';
 import { db } from '../firebase';
 import { useWakeLock } from '../hooks/useWakeLock';
@@ -405,11 +406,27 @@ export default function GymAIChat({
         const tempId = 'temp_' + Date.now();
 
         try {
-            // Trim exercise library: only names, max 150 exercises
+            // SELURUH library user, bukan 150 nama pertama, dan dengan otot + alatnya: tanpa itu
+            // Logy tidak tahu latihan mana yang bisa saling menggantikan dan cuma mengulang nama
+            // yang kebetulan ada di awal array.
             const exLibStr = exerciseLibrary
-                .slice(0, 150)
-                .map(ex => ex.name)
-                .join(', ');
+                .map(ex => `${ex.name} (${(ex.target || []).join('/') || '-'}, ${ex.equipment || '-'})`)
+                .join('; ');
+
+            // Katalog 873 gerakan cuma dilampirkan yang RELEVAN dengan pertanyaannya (±60 entri,
+            // ~1-2k token). Mengirim semuanya boros; tidak mengirim apa pun bikin jawabannya
+            // berputar di program yang itu-itu saja — keluhan aslinya.
+            let extraCatalogStr = '';
+            try {
+                const kandidat = pickRelevantExercises(userMsg.content, await fetchExercisesFromApi());
+                if (kandidat.length > 0) {
+                    extraCatalogStr = kandidat
+                        .map(ex => `${ex.name} (${(ex.target || []).join('/') || '-'}, ${ex.equipment || '-'})`)
+                        .join('; ');
+                }
+            } catch (e) {
+                // Katalog tambahan itu bonus — kalau gagal dimuat, chat tetap jalan dengan library user.
+            }
 
             // Cuma tarik data pribadi (riwayat, biometrik, program aktif) kalau pesannya
             // memang kelihatan butuh itu — basa-basi atau pertanyaan umum di luar
@@ -422,7 +439,7 @@ export default function GymAIChat({
             const favoriteProgramSummary = needsContext ? summarizeFavoriteProgram(history) : '';
             // Referensi cara-pakai-app juga cuma nempel kalau pesannya kelihatan nanya soal fitur/navigasi app.
             const appHelpBlock = needsAppHelpContext(userMsg.content) ? APP_HELP_REFERENCE : '';
-            const systemContent = buildSystemPrompt(userProfile, exLibStr, logsSummary, bioSummary, activeProgramsSummary, logyPersona, logyCustomInstruction, logyMemory, favoriteProgramSummary, appHelpBlock);
+            const systemContent = buildSystemPrompt(userProfile, exLibStr, logsSummary, bioSummary, activeProgramsSummary, logyPersona, logyCustomInstruction, logyMemory, favoriteProgramSummary, appHelpBlock, extraCatalogStr);
 
             // Keep only last 10 real messages; local error/warning bubbles never go to the API
             const recentHistory = messages.filter(m => !m.isError && !m.isSystemWarning).slice(-10);

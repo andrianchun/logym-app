@@ -4,6 +4,8 @@
  * Free, no API key needed. Provides ~1500 exercises with GIFs.
  */
 
+import { equipmentOptions } from '../data/constants.js';
+
 // Database latihan di-serve dari public/exercisedb.json dan di-fetch on-demand,
 // supaya JSON ~1MB tidak ikut membebani parse bundle JS utama saat startup.
 const LOCAL_DB_URL = '/exercisedb.json';
@@ -238,4 +240,63 @@ export const fetchExercisesFromApi = async () => {
 
 export const clearExerciseDbCache = () => {
   // Tidak perlu melakukan apa-apa karena menggunakan database lokal
+};
+
+/**
+ * Pilih latihan dari katalog 873 gerakan yang RELEVAN dengan satu pertanyaan.
+ *
+ * Logy dulu cuma menerima 150 nama pertama dari library lokal user — jadi setiap kali diminta
+ * "cari alternatif lain", jawabannya berputar di gerakan yang itu-itu saja. Mengirim seluruh
+ * katalog tiap pesan boros (±8-10k token) dan sebagian besarnya tidak nyambung dengan
+ * pertanyaannya.
+ *
+ * Yang dicocokkan: nama otot (Indonesia lewat `muscleNameMap`, mis. "dada" -> Dada Tengah/Atas/
+ * Bawah, sekaligus istilah Inggrisnya), nama alat, dan potongan nama latihannya sendiri. Kalau
+ * pertanyaannya tidak menyebut apa pun yang bisa dicocokkan, kembalikan [] — bukan 60 gerakan
+ * acak yang cuma memakan token.
+ */
+export const pickRelevantExercises = (question, db, max = 60) => {
+  const q = String(question || '').toLowerCase();
+  if (!q || !Array.isArray(db) || db.length === 0) return [];
+
+  // Istilah otot: kunci muscleNameMap (Inggris) + hasil terjemahannya (Indonesia), plus beberapa
+  // kata sehari-hari yang tidak ada di peta itu.
+  const istilahOtot = new Map();
+  Object.entries(muscleNameMap).forEach(([en, id]) => {
+    istilahOtot.set(en.toLowerCase(), id);
+    istilahOtot.set(id.toLowerCase(), id);
+  });
+  [['dada', 'Dada'], ['punggung', 'Punggung'], ['bahu', 'Deltoid'], ['lengan', 'Biceps'],
+   ['kaki', 'Quads'], ['paha', 'Quads'], ['betis', 'Calves'], ['perut', 'Core'],
+   ['bokong', 'Glutes'], ['pantat', 'Glutes'], ['trisep', 'Triceps'], ['bisep', 'Biceps']]
+    .forEach(([kata, target]) => istilahOtot.set(kata, target));
+
+  const ototDicari = [];
+  istilahOtot.forEach((target, kata) => {
+    if (kata.length >= 3 && q.includes(kata)) ototDicari.push(target.toLowerCase());
+  });
+
+  const alatDicari = equipmentOptions
+    .map(e => e.toLowerCase())
+    .filter(e => q.includes(e));
+
+  if (ototDicari.length === 0 && alatDicari.length === 0) return [];
+
+  const skor = (ex) => {
+    const target = (ex.target || []).join(' ').toLowerCase();
+    const alat = String(ex.equipment || '').toLowerCase();
+    let n = 0;
+    if (ototDicari.some(m => target.includes(m))) n += 2;
+    if (alatDicari.length > 0 && alatDicari.some(a => alat === a)) n += 1;
+    // Alat disebut TAPI tidak cocok = bukan jawaban yang diminta ("alternatif dumbbell").
+    if (alatDicari.length > 0 && !alatDicari.some(a => alat === a)) n -= 1;
+    return n;
+  };
+
+  return db
+    .map(ex => ({ ex, n: skor(ex) }))
+    .filter(x => x.n > 0)
+    .sort((a, b) => b.n - a.n)
+    .slice(0, max)
+    .map(x => x.ex);
 };

@@ -7,7 +7,7 @@ import { playSoundEffect } from '../utils/audio';
 import { calculateWorkoutCalories, calculateLiveWorkoutCalories, resolveExerciseKind, defaultSetWeight, gymStepFor } from '../utils/workoutCalc';
 import { WorkoutTimerPlugin } from '../App';
 
-const LiveWorkoutStats = ({ workoutStartTime, isPaused, userProfile, validExercises, exerciseLogs, t, formatTime, currentExerciseName }) => {
+const LiveWorkoutStats = ({ workoutStartTime, isPaused, userProfile, validExercises, exerciseLogs, t, formatTime }) => {
   const [workoutSeconds, setWorkoutSeconds] = useState(() => {
     return workoutStartTime ? Math.floor((Date.now() - workoutStartTime) / 1000) : 0;
   });
@@ -25,14 +25,15 @@ const LiveWorkoutStats = ({ workoutStartTime, isPaused, userProfile, validExerci
 
   const caloriesBurned = calculateLiveWorkoutCalories(userProfile?.weight || 70, validExercises, exerciseLogs, workoutSeconds);
 
+  // Nama latihan SENGAJA tidak dikirim dari sini. Sisi Kotlin memasang exerciseName lewat
+  // `?.let`, jadi nilainya tidak pernah terhapus — begitu immersive di-minimize dan user lanjut
+  // lewat kartu, notifikasi terus menyebut latihan lama (bahkan dari sesi lain). Sekarang App.jsx
+  // yang memiliki field itu, diturunkan dari activeExerciseId.
   useEffect(() => {
     if (window.Capacitor?.isNativePlatform() && window.Capacitor?.getPlatform() === 'android') {
-      WorkoutTimerPlugin.updateTimer({ 
-        calories: caloriesBurned.toString(),
-        exerciseName: currentExerciseName || ''
-      }).catch(() => {});
+      WorkoutTimerPlugin.updateTimer({ calories: caloriesBurned.toString() }).catch(() => {});
     }
-  }, [caloriesBurned, currentExerciseName]);
+  }, [caloriesBurned]);
 
   return (
     <div className="flex flex-col">
@@ -141,6 +142,7 @@ const ImmersiveWorkout = ({
   getOverloadHint,
   userProfile,
   activeExerciseId,
+  onActiveExercise,
   onUpdateExercise
 }) => {
 
@@ -169,6 +171,15 @@ const ImmersiveWorkout = ({
   });
   
   const ex = validExercises[currentIndex];
+
+  // activeExerciseId dulu berarti "set terakhir yang dicentang", bukan "latihan yang sedang
+  // dibuka" — tombol LATIHAN BERIKUTNYA cuma menggeser currentIndex lokal. Akibatnya minimize lalu
+  // buka lagi selalu mendarat di latihan yang BARU SAJA selesai (initializer di atas memprioritaskan
+  // activeExerciseId dan langsung return), dan notifikasi ikut menyebut latihan yang salah.
+  // Dengan lapor balik di sini, satu id itu jadi penanda posisi yang sesungguhnya.
+  useEffect(() => {
+    if (ex?.id) onActiveExercise?.(ex.id);
+  }, [ex?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [isPaused, setIsPaused] = useState(false);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
@@ -629,7 +640,6 @@ const ImmersiveWorkout = ({
             exerciseLogs={exerciseLogs} 
             t={t} 
             formatTime={formatTime} 
-            currentExerciseName={ex?.exercise?.name || ex?.name || ''}
           />
         </div>
 

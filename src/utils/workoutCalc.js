@@ -1,4 +1,5 @@
 import { manualFieldValue, resolveLoggedExercise } from '../data/constants.js';
+import { dayBmr } from './bmr.js';
 
 // MET (Metabolic Equivalent) untuk latihan beban/resistance training. Dipakai konsisten di
 // seluruh app (dashboard, kartu riwayat kalender, share card) supaya estimasi kalori tidak
@@ -896,8 +897,10 @@ export const dailyBurnCalories = (bioData, workouts, fallbackWeightKg, dayExerci
       sessions++;
     });
 
+  // BMR selalu turunan Logym (dayBmr), bukan angka mentah bioData.bmr — field itu ditulis lima
+  // produsen dengan rumus berbeda dan bikin dasar kalori harian meloncat 1600/1700/2900.
   // Fallback 1600 menyamakan konvensi Lomeal (nutrition.js: calcBMR(profile) || 1600).
-  const bmr = Number(bio.bmr) || 1600;
+  const bmr = dayBmr(bio, profile) || 1600;
   const steps = Math.round(Number(bio.steps) * 0.04) || 0;
   const floor = bmr + steps + workout;
 

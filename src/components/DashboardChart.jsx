@@ -2,8 +2,9 @@ import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { getLocalYMD } from '../data/constants';
 import { formatNumber } from '../utils/numberFormat';
+import { dayBmr } from '../utils/bmr';
 
-const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPointClick, unitSystem, language, isSubCard = false }) => {
+const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPointClick, unitSystem, language, userProfile, isSubCard = false }) => {
   const isImp = unitSystem === 'imperial';
   const chartMetricsList = [
       { key: 'weight', label: 'Berat Badan', color: theme === 'dark' ? '#38bdf8' : '#0284c7' }, // Sky Blue
@@ -62,7 +63,9 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
               bodyFat: histBio?.bodyFat ? Number(histBio.bodyFat) : null,
               musclePercent: histBio?.musclePercent ? Number(histBio.musclePercent) : null,
               visceralFat: histBio?.visceralFat ? Number(histBio.visceralFat) : null,
-              bmr: histBio?.bmr ? Number(histBio.bmr) : null,
+              // Turunan Logym, bukan bioData.bmr mentah — lihat dayBmr. Titiknya cuma digambar
+              // kalau hari itu memang punya data komposisi, supaya garisnya tidak mengarang.
+              bmr: histBio?.weight || histBio?.bmr ? (dayBmr(histBio, userProfile) || null) : null,
               waist: histBio?.waist ? Number((isImp ? Number(histBio.waist) * 0.393701 : Number(histBio.waist)).toFixed(1)) : null,
               bpSys: bpSys,
               heartRate: histBio?.heartRate ? Number(histBio.heartRate) : null,

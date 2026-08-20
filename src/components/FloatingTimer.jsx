@@ -9,7 +9,7 @@ const FloatingTimer = ({
   restTargetTime, defaultRestTime, t, soundEnabled,
   isWorkoutActive, activeTab, setActiveTab, workoutStartTime,
   isImmersiveMode, setIsImmersiveMode, sessionToRun, focusWorkoutId, setFocusWorkoutId,
-  userProfile, exerciseLogs, sessionExercises,
+  userProfile, exerciseLogs, sessionExercises, activeExerciseId,
   activeWorkoutDate, setSelectedDate
 }) => {
   
@@ -35,7 +35,10 @@ const FloatingTimer = ({
         const prev = prevRestRef.current;
         if (prev !== remaining) {
           if (remaining === 3 || remaining === 2 || remaining === 1) playSoundEffect('timerTick', soundEnabled);
-          if (prev === 1 && remaining === 0) playSoundEffect('timerEnd', soundEnabled);
+          // Alarm habisnya istirahat SENGAJA tidak dibunyikan di sini. App.jsx sudah punya
+          // setTimeout tepat di restTargetTime, dan playFile memutar cloneNode() supaya bisa
+          // menumpuk — dua penerbit untuk satu kejadian terdengar sebagai gema. App.jsx
+          // pemilik tunggalnya; di sini cukup hitungan mundur 3-2-1.
           prevRestRef.current = remaining;
         }
         setLocalRestTimer(remaining);
@@ -102,6 +105,10 @@ const FloatingTimer = ({
   // key-nya bikin set dari sesi lain ikut kehitung — itu sumber lompatan kalori pas di-minimize.
   const caloriesBurned = calculateLiveWorkoutCalories(userProfile?.weight || 70, sessionExercises, exerciseLogs, workoutSeconds);
 
+  // Diturunkan dari sumber yang sama dengan nama di notifikasi (activeExerciseId + sessionExercises),
+  // supaya pil dan notification bar tidak pernah menyebut latihan yang berbeda.
+  const activeExerciseName = (sessionExercises || []).find(e => String(e.id) === String(activeExerciseId))?.name || '';
+
   return (
     <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 pointer-events-none flex justify-center animate-in slide-in-from-bottom-8 fade-in duration-300">
       <div 
@@ -110,8 +117,8 @@ const FloatingTimer = ({
         onClick={handleClick}
       >
       <div className="flex flex-col">
-        <span className="text-[10px] font-black uppercase text-white/70 tracking-widest">
-           Workout Berjalan 
+        <span className="text-[10px] font-black uppercase text-white/70 tracking-widest truncate max-w-[45vw]">
+           {activeExerciseName || 'Workout Berjalan'}
         </span>
         <span className="h2 text-white leading-tight flex items-baseline gap-1.5">
            <span className="tabular-nums tracking-tight">{formatTime(workoutSeconds)}</span>
