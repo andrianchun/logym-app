@@ -4,6 +4,7 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getFunctions } from "firebase/functions";
+import { initAppCheck } from "./utils/appCheck";
 
 // Logym dimigrasi dari project sendiri (logym-id) ke hexa-life — project Firebase yang sama
 // kayak Darka/Domus/Lomeal, biar "seamless" dalam 1 database (1 identitas Auth bareng Lomeal,
@@ -33,3 +34,10 @@ export const storage = getStorage(app);
 
 // Backend proxy AI (Cloud Functions region Jakarta)
 export const functions = getFunctions(app, "asia-southeast2");
+
+// App Check dinyalakan DI SINI, bukan di App.jsx, supaya jalannya sedini mungkin: token harus
+// sudah siap sebelum Firestore/Functions mengirim permintaan pertamanya. Sengaja fire-and-forget
+// dan gagal-dengan-lembut — selama enforcement di console masih mati, aplikasi harus tetap jalan
+// persis seperti sekarang. Lihat src/utils/appCheck.js untuk alasan CustomProvider dan daftar
+// prasyarat di console.
+export const appCheckReady = initAppCheck();
