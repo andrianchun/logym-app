@@ -7,6 +7,7 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import { App as CapApp } from '@capacitor/app';
 
 export const WorkoutTimerPlugin = registerPlugin('WorkoutTimer');
+export const ApkInstallerPlugin = registerPlugin('ApkInstaller');
 
 
 // --- IMPORT MESIN FIREBASE ---
@@ -164,6 +165,10 @@ export default function App() {
   const [otaState, setOtaState] = useState({ open: false, force: false, url: '', version: '', notes: '' });
   const [currentVer, setCurrentVer] = useState(__APP_VERSION__);
   const [downloadProgress, setDownloadProgress] = useState(null);
+  // Izin "Install unknown apps" belum diberikan / pemasangan gagal — dua-duanya butuh penjelasan
+  // ke user, bukan sekadar tombol yang diam-diam tidak bereaksi.
+  const [apkPermissionAsk, setApkPermissionAsk] = useState(false);
+  const [apkError, setApkError] = useState(null);
 
   useEffect(() => {
     const isNative = Capacitor.isNativePlatform();
@@ -230,10 +235,49 @@ export default function App() {
     return () => { if (dlListener) dlListener.remove(); };
   }, []);
 
+  // Kabar dari ApkInstallerPlugin: unduhan, dialog Install, berhasil, atau gagal. Dipakai supaya
+  // bar progresnya ikut jalur APK juga — bukan cuma jalur bundle ZIP.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') return;
+    let sub;
+    ApkInstallerPlugin.addListener('apkInstall', (info) => {
+      if (info?.state === 'downloading') setDownloadProgress(Math.round(info.percent || 0));
+      else if (info?.state === 'installing') setDownloadProgress(100);
+      // 'prompt' = dialog Install Android sedang tampil. Progres dibiarkan 100 supaya kartunya
+      // tidak balik ke tombol "Update" seolah gagal saat user masih menatap dialognya.
+      else if (info?.state === 'failed') {
+        setDownloadProgress(null);
+        setApkError(info?.message || 'Pemasangan gagal.');
+      }
+      // 'success' tidak perlu ditangani: Android mematikan aplikasi saat memasang versi baru.
+    }).then(l => { sub = l; });
+    return () => { if (sub) sub.remove(); };
+  }, []);
+
   const handleUpdateApp = async () => {
     localStorage.removeItem('logym_dismissed_ota');
 
     if (otaState.url && !otaState.url.toLowerCase().endsWith('.zip')) {
+      // Di APK: unduh & pasang DI DALAM aplikasi. Dulu baris-baris ini membuka tautan hosting di
+      // browser, dan user harus mencari sendiri berkasnya di folder Downloads — langkah manual
+      // yang paling sering bikin pembaruan tidak jadi dipasang. Dialog "Install" milik Android
+      // tetap muncul; itu batas platform, bukan sesuatu yang bisa dilewati.
+      if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+        setDownloadProgress(0);
+        try {
+          const res = await ApkInstallerPlugin.install({ url: otaState.url });
+          if (res?.needsPermission) {
+            setDownloadProgress(null);
+            setApkPermissionAsk(true);
+          }
+        } catch (err) {
+          console.warn('Gagal memasang APK', err);
+          setDownloadProgress(null);
+        }
+        return;
+      }
+
+      // Browser biasa (PWA di desktop/HP): tidak ada installer, jadi unduhan normal.
       setDownloadProgress('apk');
       const link = document.createElement('a');
       link.href = otaState.url;
@@ -274,6 +318,26 @@ export default function App() {
 
   const [theme, setTheme] = useState('dark');
   const { dialog: otaDialog, showAlert: showOtaAlert } = useDialog(theme === 'dark');
+
+  // Izin "Install unknown apps" belum diberikan. Android menolak diam-diam kalau ini dilewat,
+  // jadi user harus diberi tahu DAN diantar ke layar setelannya — kalau tidak, tombol Update
+  // terlihat seperti rusak.
+  useEffect(() => {
+    if (!apkPermissionAsk) return;
+    setApkPermissionAsk(false);
+    showOtaAlert(
+      'Android butuh izinmu sekali saja untuk memasang pembaruan Logym.\n\nNyalakan "Izinkan dari sumber ini" di layar setelan yang terbuka, lalu tekan Update lagi.',
+      { title: 'Izinkan pemasangan' }
+    );
+    ApkInstallerPlugin.openInstallSettings().catch(() => {});
+  }, [apkPermissionAsk, showOtaAlert]);
+
+  useEffect(() => {
+    if (!apkError) return;
+    const pesan = apkError;
+    setApkError(null);
+    showOtaAlert(pesan, { title: 'Pembaruan gagal', type: 'error' });
+  }, [apkError, showOtaAlert]);
   const [language, setLanguage] = useState('ID');
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [healthConnectEnabled, setHealthConnectEnabled] = useState(false);

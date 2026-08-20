@@ -48,6 +48,10 @@
 
     <!-- Permissions Bawaan -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Memasang APK pembaruan dari dalam aplikasi (lihat ApkInstallerPlugin.kt). Android tetap
+         menampilkan dialog "Install" — izin ini cuma menghapus langkah mampir ke browser.
+         CATATAN: izin sensitif di Play Store; cabut kalau Logym nanti didistribusikan lewat Play. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />

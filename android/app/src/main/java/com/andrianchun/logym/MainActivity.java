@@ -14,6 +14,8 @@ public class MainActivity extends BridgeActivity {
         // "Workout" di aplikasi lain. Harus didaftarkan SEBELUM super.onCreate().
         registerPlugin(ExerciseWriterPlugin.class);
         registerPlugin(WorkoutTimerPlugin.class);
+        // Memasang APK pembaruan tanpa melempar user ke browser (jalur rilis APK).
+        registerPlugin(ApkInstallerPlugin.class);
         super.onCreate(savedInstanceState);
 
         Window window = getWindow();
