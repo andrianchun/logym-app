@@ -43,6 +43,23 @@ class WorkoutTimerService : Service() {
         if (action == "STOP") {
             tickerJob?.cancel()
             stopForeground(true)
+            // stopForeground() HANYA mencabut notifikasi kalau service ini memang sedang berjalan
+            // sebagai foreground. Notifikasi 9999 yang dipasang lewat NotificationManager.notify()
+            // (mis. dari cabang UPDATE) tidak ikut tercabut dan bertahan walau prosesnya mati —
+            // dan karena setOngoing(true), user pun tidak bisa menggesernya. Dicabut eksplisit.
+            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancel(9999)
+            currentStartTime = 0
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
+        // UPDATE/APP_STATE_CHANGE yang tiba sebelum sesi pernah di-START tidak boleh
+        // MENGHIDUPKAN service ini. context.startService() menyalakan service yang belum jalan,
+        // jadi satu panggilan updateTimer() yang salah tempat cukup untuk memunculkan notifikasi
+        // "Sesi Latihan Aktif" dengan currentStartTime = 0 — durasinya terhitung sejak 1970
+        // (496444:26:23) dan tidak bisa dicabut siapa pun. Penjaganya di sini, bukan di tiap
+        // pemanggil, supaya berlaku untuk semua jalur.
+        if (action != "START" && currentStartTime == 0L) {
             stopSelf()
             return START_NOT_STICKY
         }

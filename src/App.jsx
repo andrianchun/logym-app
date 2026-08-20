@@ -1391,10 +1391,14 @@ export default function App() {
   // lewat kartu maupun lewat tombol "Latihan Berikutnya" di immersive.
   useEffect(() => {
     if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') return;
-    if (!isWorkoutActive) {
-      WorkoutTimerPlugin.updateTimer({ exerciseName: '' }).catch(() => {});
-      return;
-    }
+    // JANGAN memanggil plugin sama sekali kalau tidak ada sesi berjalan. updateTimer memakai
+    // context.startService(), dan di Android itu MENGHIDUPKAN service yang belum jalan — service
+    // lahir dengan currentStartTime = 0 lalu memasang notifikasi "Sesi Latihan Aktif" berdurasi
+    // sejak 1970 (496444:26:23). Lebih parah: notifikasinya setOngoing(true) tapi service-nya tidak
+    // pernah startForeground, jadi stopTimer tidak bisa mencabutnya dan user pun tidak bisa
+    // menggesernya. Mengosongkan exerciseName di sini juga tidak perlu — sesi yang berakhir sudah
+    // dibersihkan stopTimer.
+    if (!isWorkoutActive) return;
     const ex = (sessionExercises || []).find(e => String(e.id) === String(activeExerciseId));
     // Tidak ketemu = daftar sesi belum sempat dilaporkan WorkoutTab. Biarkan nama lama daripada
     // mengosongkannya bolak-balik tiap pindah tab.
@@ -1501,6 +1505,12 @@ export default function App() {
       try {
         if (Capacitor.getPlatform() === 'android') {
            await WorkoutTimerPlugin.stopTimer();
+           // Pembersih notifikasi 9999 yang terlanjur yatim. stopForeground() cuma mencabut
+           // notifikasi kalau service-nya memang pernah startForeground; notifikasi yang dipasang
+           // lewat NotificationManager.notify() bertahan walau service-nya sudah mati, dan karena
+           // setOngoing(true) user tidak bisa menggesernya sendiri. NotificationManager.cancel(id)
+           // berlaku untuk seluruh aplikasi, jadi ini menyapunya dari mana pun asalnya.
+           await LocalNotifications.cancel({ notifications: [{ id: 9999 }] }).catch(() => {});
         }
       } catch (err) {
         console.warn('Cancel notification error:', err);
