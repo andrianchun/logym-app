@@ -698,7 +698,15 @@ export default function App() {
       if (!bolehSync(days, hcLastQuick.current, hcLastSync.current)) return;
       runHcSync({ days, silent: true });
     };
-    runHcSync({ days: 30, silent: true }).then(runHcDeepBackfill).then(() => healHcHoles()); 
+    // Hari ini + semalam DULU, baru sapuan 30 hari. hcReadRange membaca seluruh rentang sekaligus
+    // (20 kueri untuk rentang apa pun) dan baru menggabungkan hasilnya setelah SEMUANYA selesai —
+    // jadi kalau sapuan 30 hari yang jalan duluan saat app dibuka pagi, tidur semalam baru muncul
+    // setelah 30 hari data selesai dibaca dan diolah. Itu delay yang paling terasa, dan urutannya
+    // saja yang salah: jendela 2 hari selesai dalam hitungan detik.
+    runHcSync({ days: 2, silent: true })
+      .then(() => runHcSync({ days: 30, silent: true }))
+      .then(runHcDeepBackfill)
+      .then(() => healHcHoles()); 
     const onVisible = () => {
       if (document.visibilityState !== 'visible') return;
       sync(2);  // tidur semalam & hari ini — murah, hampir tanpa jeda
