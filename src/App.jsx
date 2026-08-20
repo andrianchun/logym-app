@@ -63,6 +63,7 @@ import UpdaterAlert from './components/UpdaterAlert';
 import { getLocalYMD, resolveProjectedProgramId, isLomealOwned, resolveLoggedExercise, splitSessionLogs, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos, getDayWorkouts, countMissedScheduledDays } from './data/constants';
 import { serializeDay, dayFingerprint, migrateBaseline, reconcileHistory, workoutsToMap, workoutIdsFromBaseline, diffFields, stableStringify } from './utils/historySync';
 import { useBleManager } from './hooks/useBleManager';
+import { bolehSync, gabungAntrean } from './utils/hcSchedule';
 import { Loader2, Download, X } from 'lucide-react';
 
 // Kalau device ini baru aja nulis lokal (dalam LOCAL_WRITE_GUARD_MS terakhir), skip snapshot
@@ -548,10 +549,20 @@ export default function App() {
   };
 
   const hcSyncing = useRef(false);
-  const hcLastSync = useRef(0);
+  const hcLastSync = useRef(0);   // sapuan lebar (>2 hari)
+  const hcLastQuick = useRef(0);  // penyegaran hari ini + semalam
+  const hcQueued = useRef(null);
   const runHcSync = async ({ days = 30, silent = true } = {}) => {
     if (!healthConnectEnabled || !isDataLoaded) return;
-    if (hcSyncing.current) return; 
+    // Permintaan yang datang saat sinkron lain berjalan DIANTRE, bukan dibuang. Dulu di sini cuma
+    // `return` — dan pemanggil terpentingnya, dorongan sesi latihan setelah disimpan, sudah
+    // terlanjur menghapus flag `hcPushAfterSave` sebelum memanggil. Jadi kalau user menyimpan
+    // latihan sementara sinkron 30 hari saat app dibuka masih jalan, sesi itu TIDAK PERNAH
+    // terkirim ke Health Connect sampai sinkron berikutnya — itu "delay" yang dilaporkan.
+    if (hcSyncing.current) {
+      hcQueued.current = gabungAntrean(hcQueued.current, { days, silent });
+      return;
+    }
     hcSyncing.current = true;
     try {
     if (!silent) {
@@ -589,7 +600,13 @@ export default function App() {
     }
     } finally {
       hcSyncing.current = false;
-      hcLastSync.current = Date.now();
+      hcLastQuick.current = Date.now();
+      // Cuma sapuan lebar yang menyetel jam sapuan. Kalau penyegaran 2 hari ikut menyetelnya,
+      // membuka app tiap beberapa menit akan terus menunda sapuan penambal lubang.
+      if (days > 2) hcLastSync.current = Date.now();
+      const antre = hcQueued.current;
+      hcQueued.current = null;
+      if (antre) runHcSync(antre);
     }
   };
 
@@ -651,20 +668,42 @@ export default function App() {
   };
 
   const hcPushAfterSave = useRef(false);
+  const hcRetryTimer = useRef(null);
   useEffect(() => {
     if (!hcPushAfterSave.current) return;
     hcPushAfterSave.current = false;
-    runHcSync({ days: 1, silent: true }); 
+    runHcSync({ days: 1, silent: true });
+    // Percobaan KEDUA beberapa menit kemudian. Nadi sesi hampir pasti belum ada di Health Connect
+    // pada detik latihan disimpan: jam tangan baru mengirimkannya ke Samsung Health belakangan,
+    // dan Samsung baru menuliskannya ke HC sesudah itu. Tanpa ini, nadi sesi baru terisi kalau
+    // user kebetulan menutup lalu membuka aplikasi lagi — padahal setelah menyimpan latihan
+    // user justru bertahan di dalam app (dilempar ke tab Kalender).
+    clearTimeout(hcRetryTimer.current);
+    hcRetryTimer.current = setTimeout(() => runHcSync({ days: 1, silent: true }), 3 * 60 * 1000);
   }, [history]);
 
   useEffect(() => {
     if (!healthConnectEnabled || !isDataLoaded) return;
+    // Health Connect TIDAK BISA memberi tahu aplikasi saat ada data baru — itu tertulis eksplisit
+    // di dokumentasinya ("As your app can't get notified of new data"), jadi menjemput sendiri
+    // adalah satu-satunya cara dan yang memang dianjurkan: tiap app kembali ke depan, lalu berkala
+    // selama app di depan.
+    //
+    // Jedanya dibedakan menurut lebar jendelanya. Dulu semuanya kena satu jeda 10 menit, dan
+    // itulah kenapa data tidur terasa lambat: dibuka jam 06.00 Samsung belum menulis tidurnya,
+    // dibuka lagi 06.03 dan 06.06 permintaannya ditolak jeda, jadi tidurnya baru muncul lewat
+    // 06.10. Penyegaran hari ini + semalam sekarang cuma dijaga 60 detik — cukup untuk mencegah
+    // panggilan dobel saat app bolak-balik, tapi tidak lagi menahan data yang sudah siap.
     const sync = (days) => {
-      if (Date.now() - hcLastSync.current < 10 * 60 * 1000) return;
+      if (!bolehSync(days, hcLastQuick.current, hcLastSync.current)) return;
       runHcSync({ days, silent: true });
     };
     runHcSync({ days: 30, silent: true }).then(runHcDeepBackfill).then(() => healHcHoles()); 
-    const onVisible = () => { if (document.visibilityState === 'visible') sync(7); };
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      sync(2);  // tidur semalam & hari ini — murah, hampir tanpa jeda
+      sync(7);  // sapuan penambal lubang — tetap 10 menit sekali, diantre di belakang yang cepat
+    };
     document.addEventListener('visibilitychange', onVisible);
     const poll = setInterval(() => sync(7), 30 * 60 * 1000);
     return () => {
