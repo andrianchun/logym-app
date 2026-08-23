@@ -347,16 +347,6 @@ const WorkoutTab = ({
     return grouped;
   };
 
-  const isProgramCompleted = (prog) => {
-    const hasExercises = prog.exercises && prog.exercises.length > 0;
-    const activeExs = hasExercises ? prog.exercises.filter(ex => !skippedExercises[ex.id]) : [];
-    if (!hasExercises || activeExs.length === 0) return false;
-    return activeExs.every(ex => {
-       const logs = getSetLogs(ex);
-       return logs.length > 0 && logs.every(s => s.done && !s.skipped);
-    });
-  };
-
   const activeProgram = activeProgramsList[0] || programs[0];
   
   const handleOpenDetail = async (ex) => {
@@ -1038,8 +1028,11 @@ const WorkoutTab = ({
                         onClick={() => { playSoundEffect('click', soundEnabled); toggleSession(prog.workoutId); }}
                         className="flex flex-col items-start gap-0.5 flex-1 min-w-0 pr-4 cursor-pointer"
                       >
+                        {/* Centang "semua set tercatat" dihapus. Statusnya sudah disampaikan di tempat
+                            yang lebih benar dan lebih penting: badge di kalender membedakan "Selesai"
+                            (benar-benar tersimpan) dari "Belum disimpan". Centang di sini cuma berarti
+                            "setnya tercentang", yang gampang dikira sudah aman padahal belum. */}
                         <div className="flex items-center gap-2 mb-1">
-                          {isProgramCompleted(prog) && <CheckCircle size={20} className={`${t.textAccent} shrink-0`} />}
                           <span className="text-xl sm:text-2xl uppercase tracking-widest break-words leading-tight flex-1">Sesi {pIdx + 1}: {prog.name}</span>
                         </div>
                         {prog.planName && (

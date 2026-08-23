@@ -419,3 +419,28 @@ export const filterByGymEquipment = (list, activeGym) => {
     return alat.includes(eq);
   });
 };
+
+/**
+ * Deretan tanggal untuk strip kalender mingguan, `jumlahMinggu` minggu sekaligus.
+ *
+ * Di layar lebar satu baris tujuh hari menyisakan ruang kosong yang sia-sia, jadi jumlah
+ * minggunya mengikuti lebar layar. Minggu tambahan diambil ke BELAKANG (minggu-minggu sebelumnya),
+ * bukan ke depan: yang berguna saat menyisir catatan latihan adalah apa yang sudah dikerjakan,
+ * bukan hari yang belum datang. Minggu berisi `baseDate` selalu jadi yang TERAKHIR.
+ *
+ * @param {Date} baseDate tanggal acuan
+ * @param {number} weekStartDay 0 = Minggu, 1 = Senin
+ * @param {number} jumlahMinggu berapa minggu dirender
+ * @returns {Date[]} 7 x jumlahMinggu tanggal, urut lama -> baru
+ */
+export const weekStripDates = (baseDate, weekStartDay = 0, jumlahMinggu = 1) => {
+  const n = Math.max(1, Math.floor(Number(jumlahMinggu) || 1));
+  const dasar = baseDate instanceof Date && !Number.isNaN(baseDate.getTime()) ? baseDate : new Date();
+  const geser = (dasar.getDay() - weekStartDay + 7) % 7;
+  const mulai = new Date(dasar.getFullYear(), dasar.getMonth(), dasar.getDate() - geser - (n - 1) * 7);
+  const keluar = [];
+  for (let i = 0; i < n * 7; i++) {
+    keluar.push(new Date(mulai.getFullYear(), mulai.getMonth(), mulai.getDate() + i));
+  }
+  return keluar;
+};

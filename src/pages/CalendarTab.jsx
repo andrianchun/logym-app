@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Info, CheckCircle, C
 // "notifikasinya kok tidak pernah bunyi".
 import { Capacitor } from '@capacitor/core';
 import SwipeInput from '../components/SwipeInput';
-import { getLocalYMD, resolveProjectedProgramId, getDayWorkouts as sharedGetDayWorkouts, deletedProjectedMap, hasDeletedProjected } from '../data/constants';
+import { getLocalYMD, resolveProjectedProgramId, getDayWorkouts as sharedGetDayWorkouts, deletedProjectedMap, hasDeletedProjected, weekStripDates } from '../data/constants';
 import { formatNumber } from '../utils/numberFormat';
 import { parseWorkoutDurationMinutes, calculateWorkoutCalories, calculateSmartWorkoutCalories, resolveExerciseKind, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from '../utils/workoutCalc';
 import PanoramicSlider from '../components/PanoramicSlider';
@@ -843,6 +843,19 @@ const CalendarTab = ({
   };
   const selectedWorkouts = getSelectedWorkoutsForDate(selectedDate);
   
+  // Berapa minggu ditampilkan di strip mingguan. Satu baris tujuh hari menyisakan ruang kosong
+  // besar di layar lebar; di ponsel satu minggu tetap yang benar.
+  const hitungMingguStrip = () => {
+    const w = typeof window !== 'undefined' ? window.innerWidth : 375;
+    return w >= 1280 ? 3 : w >= 768 ? 2 : 1;
+  };
+  const [mingguStrip, setMingguStrip] = useState(hitungMingguStrip);
+  useEffect(() => {
+    const onResize = () => setMingguStrip(hitungMingguStrip());
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   const getGridCellsForDate = (baseDate) => {
     const cells = [];
     const y = baseDate.getFullYear();
@@ -854,15 +867,7 @@ const CalendarTab = ({
       for (let i = 0; i < firstDayOfMonth; i++) cells.push(null);
       for (let i = 1; i <= daysInMonth; i++) cells.push(new Date(y, m, i));
     } else {
-      let currentDayOfWeek = baseDate.getDay();
-      currentDayOfWeek = (currentDayOfWeek - weekStartDay + 7) % 7;
-      const startOfWeek = new Date(baseDate);
-      startOfWeek.setDate(baseDate.getDate() - currentDayOfWeek);
-      for (let i = 0; i < 7; i++) {
-        const d = new Date(startOfWeek);
-        d.setDate(startOfWeek.getDate() + i);
-        cells.push(d);
-      }
+      cells.push(...weekStripDates(baseDate, weekStartDay, mingguStrip));
     }
     return cells;
   };
