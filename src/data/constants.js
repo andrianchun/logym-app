@@ -304,7 +304,14 @@ export const getDayWorkouts = (history, programs, activePlanIds, dateStr) => {
     return activePlanIds.includes(p.planId || 'custom');
   });
 
-  const result = [...validHistorical];
+  // URUTAN: sesi program dulu, sesi Ekstra paling bawah.
+  //
+  // Dulu urutannya cuma "yang tersimpan dulu, yang terjadwal ditempel di belakang". Sesi Ekstra
+  // adalah entri tersimpan, sedangkan sesi utama sering masih berstatus terjadwal — jadi Ekstra
+  // naik ke atas sesi utamanya sendiri. Ekstra itu tambahan di luar program; tempatnya di bawah,
+  // apa pun status sesi utamanya.
+  const result = validHistorical.filter(w => w.programId !== 'adhoc');
+  const ekstra = validHistorical.filter(w => w.programId === 'adhoc');
 
   if (activePlanIds.length > 0) {
     const dayName = DAY_MAP[new Date(dateStr).getDay()];
@@ -324,6 +331,8 @@ export const getDayWorkouts = (history, programs, activePlanIds, dateStr) => {
         });
       });
   }
+
+  result.push(...ekstra);
 
   // Pengaman render: buang id kembar (sisa program duplikat yang belum ke-upload bersih).
   const seen = new Set();

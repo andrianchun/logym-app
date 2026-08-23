@@ -2020,15 +2020,22 @@ export default function App() {
         if (Object.keys(settingsChanged).length > 0) payload.settings = settingsChanged;
 
         setSyncStatus('syncing');
+        // BATAS WAKTU, sama seperti jalur history. Tanpa ini, `setDoc` yang tersangkut di antrean
+        // offline Firestore tidak pernah resolve DAN tidak pernah reject — statusnya menggantung
+        // di 'syncing' selamanya, tanpa pernah jadi error yang bisa dilihat atau dilaporkan user.
+        // Ikon yang berputar tanpa akhir terlihat sama persis dengan aplikasi yang sedang bekerja.
+        const peringatanTertunda = setTimeout(() => setSyncStatus('error'), 15000);
         const prevBaseline = mainBaselineRef.current;
         setMainBaseline(nextBaseline);
         try {
           return setDoc(mainDocRef, payload, { merge: true })
             .then(() => {
+              clearTimeout(peringatanTertunda);
               setCloudSaveError(null);
               setSyncStatus('synced');
             })
             .catch(err => {
+              clearTimeout(peringatanTertunda);
               console.error("Auto-save Cloud gagal:", err);
               setSyncStatus('error');
               setCloudSaveError(err?.message || String(err));
