@@ -1,0 +1,21 @@
+{
+  "name": "Logym AI Video & Asset Generator",
+  "short_name": "Logym AI",
+  "start_url": "/generator/index.html",
+  "display": "standalone",
+  "background_color": "#07090e",
+  "theme_color": "#0ea5e9",
+  "description": "PWA Generator Video & Thumbnail Database Logym berbasis Gemini AI",
+  "icons": [
+    {
+      "src": "/icon-192.webp",
+      "sizes": "192x192",
+      "type": "image/webp"
+    },
+    {
+      "src": "/icon-512.webp",
+      "sizes": "512x512",
+      "type": "image/webp"
+    }
+  ]
+}

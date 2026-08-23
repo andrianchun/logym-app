@@ -1,0 +1,1506 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logym AI Video & Asset Generator (PWA)</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0ea5e9">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              400: '#38bdf8',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              electric: '#0088ff',
+              dark: '#07090e',
+              card: '#0f172a',
+              cardBorder: '#1e293b'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    body {
+      background-color: #07090e;
+      color: #f1f5f9;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 0.85; filter: drop-shadow(0 0 12px #0088ff); }
+      50% { opacity: 0.35; filter: drop-shadow(0 0 4px #0088ff); }
+    }
+    .muscle-glow {
+      animation: pulse-glow 2.5s infinite ease-in-out;
+    }
+    .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scroll::-webkit-scrollbar-track { background: #0f172a; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-sky-500 selection:text-white">
+
+  <!-- ================= TOP NAVIGATION & REAL-TIME TOKEN TRACKER ================= -->
+  <header class="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-md border-b border-slate-800/80 px-4 py-3 sm:px-6">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      
+      <!-- Brand & Title -->
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center shadow-lg shadow-sky-500/20">
+            <i data-lucide="sparkles" class="w-5 h-5 text-white"></i>
+          </div>
+          <div>
+            <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+              Logym AI Video Generator
+              <span class="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-400 font-semibold border border-sky-500/30">Gemini 3.6/3.7</span>
+            </h1>
+            <p class="text-xs text-slate-400">Database Video & Thumbnail Generator (~884 Gerakan)</p>
+          </div>
+        </div>
+
+        <button onclick="toggleSettingsModal()" class="md:hidden p-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white">
+          <i data-lucide="key" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Live Token & Quota Tracker Widget -->
+      <div class="flex flex-wrap items-center gap-2 text-xs">
+        <!-- Active Key & Rotator Status -->
+        <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="font-medium text-slate-400">Key:</span>
+          <span id="activeKeyLabel" class="font-bold text-sky-400 font-mono">Key 1 (Auto-Rotated)</span>
+        </div>
+
+        <!-- Token Usage -->
+        <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300">
+          <i data-lucide="cpu" class="w-3.5 h-3.5 text-amber-400"></i>
+          <span class="font-medium text-slate-400">Tokens:</span>
+          <span id="tokenCounter" class="font-bold text-white font-mono">0</span>
+        </div>
+
+        <!-- Progress Summary -->
+        <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300">
+          <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-400"></i>
+          <span class="font-medium text-slate-400">Approved:</span>
+          <span id="approvedCounter" class="font-bold text-emerald-400 font-mono">0 / 884</span>
+        </div>
+
+        <!-- Refresh Data Button -->
+        <button onclick="initApp(true)" title="Muat ulang & sinkronkan data terbaru" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-400 border border-slate-700 font-medium transition active:scale-95">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">Refresh Data</span>
+        </button>
+
+        <!-- Settings Button -->
+        <button onclick="toggleSettingsModal()" class="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium transition">
+          <i data-lucide="settings" class="w-3.5 h-3.5"></i>
+          <span>Pengaturan API</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- ================= MAIN DASHBOARD CONTAINER ================= -->
+  <main class="max-w-7xl mx-auto w-full px-4 py-6 sm:px-6 flex-1 flex flex-col gap-6">
+
+    <!-- Action Toolbar & Quick Batch Generator -->
+    <section class="p-5 rounded-3xl bg-slate-900/90 border border-slate-800 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 shadow-xl">
+      <div class="flex flex-col gap-1">
+        <h2 class="text-base font-bold text-white flex items-center gap-2">
+          <i data-lucide="play-circle" class="w-5 h-5 text-sky-400"></i>
+          Kontrol Batch Generator (Gemini AI)
+        </h2>
+        <p class="text-xs text-slate-400">Generate prompt dinamis, instruksi How-To, dan model visual otot berhighlight Biru Logym.</p>
+      </div>
+
+      <!-- Batch Action Buttons -->
+      <div class="flex flex-wrap items-center gap-2.5">
+        <button id="btnTest3" onclick="startBatchGeneration(3, true)" class="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-bold text-xs shadow-lg shadow-sky-500/25 active:scale-95 transition">
+          <i data-lucide="sparkles" class="w-4 h-4"></i>
+          <span>▶ Uji Coba 3 Terfavorit</span>
+        </button>
+
+        <button id="btnBatch50" onclick="startBatchGeneration(50, false)" class="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs active:scale-95 transition">
+          <i data-lucide="fast-forward" class="w-4 h-4 text-amber-400"></i>
+          <span>▶ Batch 50 Per Hari</span>
+        </button>
+
+        <button id="btnPauseBatch" onclick="pauseBatch()" class="hidden flex items-center gap-1.5 px-3 py-2.5 rounded-2xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-xs font-semibold transition">
+          <i data-lucide="pause" class="w-4 h-4"></i>
+          <span>Jeda</span>
+        </button>
+
+        <button onclick="exportRegistryJson()" class="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold transition">
+          <i data-lucide="download" class="w-4 h-4 text-emerald-400"></i>
+          <span>Export JSON</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Filter & Search Controls -->
+    <section class="flex flex-col gap-3">
+      <div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+        
+        <!-- Search Input -->
+        <div class="relative flex-1 max-w-md">
+          <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+          <input 
+            type="text" 
+            id="searchInput" 
+            placeholder="Cari gerakan (contoh: Bench Press, Squat, Lat Pulldown)..."
+            oninput="handleSearch(this.value)"
+            class="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-slate-900 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 transition"
+          >
+        </div>
+
+        <!-- Muscle & Equipment Filters -->
+        <div class="flex items-center gap-2 overflow-x-auto hide-scrollbar pb-1">
+          <select id="muscleFilter" onchange="handleFilterChange()" class="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+            <option value="all">Semua Otot</option>
+            <option value="Dada">Dada (Chest)</option>
+            <option value="Punggung">Punggung (Back / Lats)</option>
+            <option value="Deltoid">Bahu (Deltoids)</option>
+            <option value="Biceps">Biceps</option>
+            <option value="Triceps">Triceps</option>
+            <option value="Quads">Paha Depan (Quads)</option>
+            <option value="Hams">Paha Belakang (Hams)</option>
+            <option value="Glutes">Bokong (Glutes)</option>
+            <option value="Calves">Betis (Calves)</option>
+            <option value="Core">Perut / Core</option>
+            <option value="Cardio">Cardio</option>
+          </select>
+
+          <select id="equipmentFilter" onchange="handleFilterChange()" class="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+            <option value="all">Semua Alat</option>
+            <option value="Dumbbell">Dumbbell</option>
+            <option value="Barbell">Barbell</option>
+            <option value="Smith Machine">Smith Machine</option>
+            <option value="Cable">Cable</option>
+            <option value="Machine">Machine</option>
+            <option value="Body Weight">Body Weight</option>
+          </select>
+        </div>
+
+      </div>
+
+      <!-- Status Tabs -->
+      <div class="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto hide-scrollbar text-xs font-semibold">
+        <button onclick="setStatusTab('all')" id="tab-all" class="px-3.5 py-1.5 rounded-xl bg-sky-500 text-white transition">Semua (<span id="count-all">0</span>)</button>
+        <button onclick="setStatusTab('favorites')" id="tab-favorites" class="px-3.5 py-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition">⭐ Terfavorit (<span id="count-favorites">0</span>)</button>
+        <button onclick="setStatusTab('pending')" id="tab-pending" class="px-3.5 py-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition">🟡 Belum Digenerate (<span id="count-pending">0</span>)</button>
+        <button onclick="setStatusTab('generated')" id="tab-generated" class="px-3.5 py-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition">🟢 Siap Review (<span id="count-generated">0</span>)</button>
+        <button onclick="setStatusTab('approved')" id="tab-approved" class="px-3.5 py-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition">🔵 Approved (<span id="count-approved">0</span>)</button>
+      </div>
+    </section>
+
+    <!-- ================= EXERCISES INTERACTIVE TABLE ================= -->
+    <section class="rounded-3xl bg-slate-900/90 border border-slate-800 shadow-2xl overflow-hidden flex flex-col">
+      <div class="overflow-x-auto custom-scroll">
+        <table class="w-full text-left border-collapse min-w-[1100px]">
+          <thead>
+            <tr class="bg-slate-950/80 border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider sticky top-0 z-20 backdrop-blur-md">
+              <th class="py-3.5 px-4 w-[170px]">Nama Gerakan</th>
+              <th class="py-3.5 px-3 w-[140px]">Nama File (ID)</th>
+              <th class="py-3.5 px-3 w-[110px]">Otot Target</th>
+              <th class="py-3.5 px-3 w-[220px]">Prompt Image (1:1 Coach Logy)</th>
+              <th class="py-3.5 px-3 w-[220px] text-center">📸 Keyframes (Awal & Akhir)</th>
+              <th class="py-3.5 px-3 w-[230px]">Prompt Video (I2V Loop)</th>
+              <th class="py-3.5 px-3 w-[130px] text-center">Preview Video</th>
+            </tr>
+          </thead>
+          <tbody id="exerciseTableBody" class="divide-y divide-slate-800/60 text-xs">
+            <!-- Loading Skeleton -->
+            <tr>
+              <td colspan="7" class="py-16 text-center text-slate-500">
+                <i data-lucide="loader-2" class="w-7 h-7 animate-spin text-sky-400 mx-auto mb-2"></i>
+                <p class="font-medium text-sm">Memuat tabel database latihan Logym...</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Pagination Controls Bar -->
+    <section id="paginationControls" class="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900 border border-slate-800 text-xs">
+    </section>
+
+  </main>
+
+  <!-- ================= MODAL: SETTINGS & API KEYS ================= -->
+  <div id="settingsModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i data-lucide="key" class="w-5 h-5 text-sky-400"></i>
+          Pengaturan Gemini API Key
+        </h3>
+        <button onclick="toggleSettingsModal()" class="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="flex flex-col gap-3 text-xs">
+        <div>
+          <label class="font-semibold text-slate-300 block mb-1">Gemini API Key 1:</label>
+          <input type="password" id="keyInput1" class="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sky-300 font-mono text-xs focus:outline-none focus:border-sky-500">
+        </div>
+
+        <div>
+          <label class="font-semibold text-slate-300 block mb-1">Gemini API Key 2 (Rotator Backup):</label>
+          <input type="password" id="keyInput2" class="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sky-300 font-mono text-xs focus:outline-none focus:border-sky-500">
+        </div>
+
+        <div class="p-3 rounded-2xl bg-sky-500/10 border border-sky-500/20 text-sky-300 flex items-start gap-2.5">
+          <i data-lucide="info" class="w-4 h-4 shrink-0 mt-0.5"></i>
+          <p class="leading-relaxed">Sistem akan merotasi kedua key ini secara otomatis untuk membagi beban 1.500 request/hari gratis dari Google AI Studio dan mencegah rate limit error.</p>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2">
+  <!-- ================= MODAL: VIDEO LOOP INPUT & PREVIEW ================= -->
+  <div id="videoModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full p-6 shadow-2xl flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 id="videoModalTitle" class="text-base font-bold text-white flex items-center gap-2">
+          <i data-lucide="video" class="w-5 h-5 text-blue-400"></i>
+          Input Video Loop (4s)
+        </h3>
+        <button onclick="closeVideoModal()" class="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Preview Area -->
+      <div class="aspect-square max-h-64 mx-auto rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center w-full" id="videoModalPreview">
+      </div>
+
+      <!-- Video Actions & Generator Button -->
+      <div class="flex items-center gap-2">
+        <button id="btnAutoGenerateVideo" onclick="autoGenerateVideoLoop()" class="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 transition">
+          <i data-lucide="sparkles" class="w-4 h-4"></i>
+          <span id="btnAutoGenerateVideoText">⚡ Auto-Generate Video Loop (4 Detik)</span>
+        </button>
+      </div>
+
+      <!-- Video URL input -->
+      <div class="flex flex-col gap-2 text-xs">
+        <label class="font-bold text-slate-300">URL File Video (MP4 / WebM / WebP):</label>
+        <input 
+          type="text" 
+          id="videoUrlInput" 
+          placeholder="https://... atau /exercise-assets/videos/edb-Smith_Machine_Incline_Bench_Press.mp4" 
+          class="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sky-300 font-mono text-xs focus:outline-none focus:border-sky-500"
+        >
+
+        <label class="font-bold text-slate-300 mt-2">Prompt Video AI (Salin untuk Google Veo / Kling / Runway / Luma):</label>
+        <textarea 
+          id="videoPromptDisplay" 
+          rows="3" 
+          readonly 
+          class="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 font-mono text-xs custom-scroll"
+        ></textarea>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+        <button onclick="closeVideoModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition">
+          Batal
+        </button>
+        <button onclick="saveVideoFromModal()" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-500/25 transition">
+          Simpan Video Loop
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: FULLSCREEN 1:1 HD PREVIEW ================= -->
+  <div id="previewModal" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-md hidden items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full p-5 shadow-2xl flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 id="previewModalTitle" class="text-sm font-bold text-white flex items-center gap-2 truncate">
+          <i data-lucide="image" class="w-4 h-4 text-sky-400"></i>
+          Preview Thumbnail HD (1:1)
+        </h3>
+        <button onclick="closePreviewModal()" class="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- High-Res Image Display -->
+      <div class="aspect-square w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center">
+        <img id="previewModalImg" src="" alt="HD Thumbnail" class="w-full h-full object-cover">
+      </div>
+
+      <div class="flex items-center justify-between pt-2 border-t border-slate-800">
+        <button onclick="closePreviewModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition">
+          Tutup
+        </button>
+        <button id="previewModalDownload" class="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-sky-500/20 transition">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i>
+          <span>Unduh WebP (1080x1080)</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= SCRIPTS & APPLICATION LOGIC ================= -->
+  <script>
+    // Initial State & Pre-configured API Keys
+    const defaultKeys = [];
+
+    let apiKeys = JSON.parse(localStorage.getItem('logym_gen_keys') || '[]');
+    let keyIndex = 0;
+    let totalTokensConsumed = Number(localStorage.getItem('logym_gen_tokens') || 0);
+
+    let exerciseRegistry = {};
+    let filteredList = [];
+    let currentTab = 'all';
+    let currentSearch = '';
+    let currentMuscle = 'all';
+    let currentEquipment = 'all';
+    let isBatchRunning = false;
+    let shouldPauseBatch = false;
+    let currentPage = 1;
+    const itemsPerPage = 18;
+    let currentFilteredList = [];
+
+    // Helper: Rotate Key
+    function getNextApiKey() {
+      if (!apiKeys || apiKeys.length === 0) return defaultKeys[0];
+      const key = apiKeys[keyIndex];
+      const label = `Key ${keyIndex + 1} (${key.slice(0, 8)}...)`;
+      document.getElementById('activeKeyLabel').textContent = label;
+      keyIndex = (keyIndex + 1) % apiKeys.length;
+      return key;
+    }
+
+    // Initialize & Load Database Registry
+    async function initApp(forceRefresh = false) {
+      lucide.createIcons();
+      document.getElementById('keyInput1').value = apiKeys[0] || '';
+      document.getElementById('keyInput2').value = apiKeys[1] || '';
+      document.getElementById('tokenCounter').textContent = totalTokensConsumed.toLocaleString();
+
+      try {
+        const res = await fetch('/exercise-assets/exercise_registry.json?t=' + Date.now());
+        if (res.ok) {
+          const freshData = await res.json();
+          const cachedRaw = localStorage.getItem('logym_exercise_registry_v3');
+          const cached = cachedRaw ? JSON.parse(cachedRaw) : {};
+
+          // Merge: Preserve user status & prompt edits, but take fresh thumbnails, videos & Indonesian translations
+          Object.keys(freshData).forEach(id => {
+            const f = freshData[id];
+            const c = cached[id];
+            if (c) {
+              f.status = c.status || f.status;
+              f.prompt_id = c.prompt_id || f.prompt_id;
+              f.prompt_video = c.prompt_video || f.prompt_video;
+              f.thumbnailUrl = f.thumbnailUrl || c.thumbnailUrl;
+              f.videoUrl = f.videoUrl || c.videoUrl;
+              f.approvedAt = c.approvedAt || f.approvedAt;
+            }
+          });
+
+          exerciseRegistry = freshData;
+          localStorage.setItem('logym_exercise_registry_v3', JSON.stringify(exerciseRegistry));
+        } else {
+          const cachedRegistry = localStorage.getItem('logym_exercise_registry_v3');
+          if (cachedRegistry) exerciseRegistry = JSON.parse(cachedRegistry);
+        }
+      } catch (e) {
+        console.error('Failed loading registry:', e);
+        const cachedRegistry = localStorage.getItem('logym_exercise_registry_v3');
+        if (cachedRegistry) exerciseRegistry = JSON.parse(cachedRegistry);
+      }
+
+      updateCountsAndRender();
+    }
+
+    function saveRegistryState() {
+      localStorage.setItem('logym_exercise_registry_v3', JSON.stringify(exerciseRegistry));
+      updateCountsAndRender();
+    }
+
+    function updateCountsAndRender() {
+      const items = Object.values(exerciseRegistry);
+      const favCount = items.filter(i => i.isFavorite).length;
+      const pendingCount = items.filter(i => i.status === 'pending').length;
+      const genCount = items.filter(i => i.status === 'generated').length;
+      const appCount = items.filter(i => i.status === 'approved').length;
+
+      document.getElementById('count-all').textContent = items.length;
+      document.getElementById('count-favorites').textContent = favCount;
+      document.getElementById('count-pending').textContent = pendingCount;
+      document.getElementById('count-generated').textContent = genCount;
+      document.getElementById('count-approved').textContent = appCount;
+      document.getElementById('approvedCounter').textContent = `${appCount} / ${items.length}`;
+
+      applyFilters();
+    }
+
+    function setStatusTab(tab) {
+      currentTab = tab;
+      currentPage = 1;
+      ['all', 'favorites', 'pending', 'generated', 'approved'].forEach(t => {
+        const el = document.getElementById(`tab-${t}`);
+        if (t === tab) {
+          el.className = 'px-3.5 py-1.5 rounded-xl bg-sky-500 text-white font-semibold shadow transition';
+        } else {
+          el.className = 'px-3.5 py-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 font-semibold transition';
+        }
+      });
+      applyFilters();
+    }
+
+    function handleSearch(q) {
+      currentSearch = (q || '').toLowerCase().trim();
+      currentPage = 1;
+      applyFilters();
+    }
+
+    function handleFilterChange() {
+      currentMuscle = document.getElementById('muscleFilter').value;
+      currentEquipment = document.getElementById('equipmentFilter').value;
+      currentPage = 1;
+      applyFilters();
+    }
+
+    function applyFilters() {
+      let list = Object.values(exerciseRegistry);
+
+      // Status Tab filter
+      if (currentTab === 'favorites') list = list.filter(i => i.isFavorite);
+      else if (currentTab === 'pending') list = list.filter(i => i.status === 'pending');
+      else if (currentTab === 'generated') list = list.filter(i => i.status === 'generated');
+      else if (currentTab === 'approved') list = list.filter(i => i.status === 'approved');
+
+      // Muscle filter
+      if (currentMuscle !== 'all') {
+        list = list.filter(i => {
+          const targets = (i.targetMuscles || []).concat(i.secondaryMuscles || []).join(' ').toLowerCase();
+          return targets.includes(currentMuscle.toLowerCase());
+        });
+      }
+
+      // Equipment filter
+      if (currentEquipment !== 'all') {
+        list = list.filter(i => (i.equipments || []).some(e => e.toLowerCase().includes(currentEquipment.toLowerCase())));
+      }
+
+      // Search filter
+      if (currentSearch) {
+        list = list.filter(i => (i.name || '').toLowerCase().includes(currentSearch));
+      }
+
+      currentFilteredList = list;
+      renderTable();
+    }
+
+    // Generate Default Image Prompt (1:1 Square & Coach Logy)
+    function generateImagePrompt(item) {
+      const primaryTarget = (item.targetMuscles || ['Otot Utama'])[0];
+      const eq = (item.equipments || ['Alat Gym'])[0];
+      const steps = item.instructions_id && item.instructions_id.length > 0
+        ? item.instructions_id.slice(0, 3).join('. ')
+        : 'Lakukan gerakan secara terkontrol dengan form biomekanik yang presisi.';
+
+      return `Render 3D sinematik 4K aspek rasio 1:1 (Square 1080x1080). Karakter model: "Coach Logy" (atlet fitness proporsional) melakukan latihan "${item.name}" menggunakan ${eq}. Otot ${primaryTarget} menyala terang dengan efek neon glow "Biru Elektrik Logym" (#0088ff) saat puncak kontraksi. Instruksi form: ${steps}. Durasi 4 detik, seamless perfect loop, 60fps smooth motion.`;
+    }
+
+    // Generate Default Video Prompt (Image-to-Video English Prompt for Kling/Luma/Veo/Runway)
+    function generateVideoPrompt(item) {
+      const primaryTarget = (item.targetMuscles || ['primary muscle'])[0];
+      const eq = (item.equipments || ['gym equipment'])[0];
+      return `A smooth, continuous 4-second seamless workout loop of an athletic fitness model (Coach Logy) performing ${item.name} using ${eq} in a modern dark fitness studio. The ${primaryTarget} muscles are illuminated with glowing holographic Electric Cyan Blue (#0088FF) muscle fibers during peak contraction. Controlled biomechanical execution, perfect posture, 1:1 square framing, 4k 60fps.`;
+    }
+
+    // 1-Click Copy to Clipboard Helper
+    function copyText(text, btnElement, label = 'Tersalin!') {
+      navigator.clipboard.writeText(text).then(() => {
+        if (btnElement) {
+          const originalHTML = btnElement.innerHTML;
+          btnElement.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400 inline"></i> <span class="text-emerald-400 font-bold">${label}</span>`;
+          lucide.createIcons();
+          setTimeout(() => {
+            btnElement.innerHTML = originalHTML;
+            lucide.createIcons();
+          }, 1800);
+        }
+      });
+    }
+
+    // Render Exercises Table (Paginated for instant 0.01s performance)
+    function renderTable() {
+      const tbody = document.getElementById('exerciseTableBody');
+      const pagin = document.getElementById('paginationControls');
+      const list = currentFilteredList;
+
+      if (!list || list.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" class="py-16 text-center text-slate-500">
+              <i data-lucide="inbox" class="w-10 h-10 mx-auto mb-2 opacity-40"></i>
+              <p class="text-sm font-semibold">Tidak ada gerakan yang cocok dengan filter saat ini.</p>
+            </td>
+          </tr>
+        `;
+        if (pagin) pagin.innerHTML = '';
+        lucide.createIcons();
+        return;
+      }
+
+      const totalItems = list.length;
+      const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+      if (currentPage > totalPages) currentPage = totalPages;
+      if (currentPage < 1) currentPage = 1;
+
+      const startIdx = (currentPage - 1) * itemsPerPage;
+      const pageItems = list.slice(startIdx, startIdx + itemsPerPage);
+
+      tbody.innerHTML = pageItems.map(item => {
+        const imgPrompt = item.prompt_id || generateImagePrompt(item);
+        const vidPrompt = item.prompt_video || generateVideoPrompt(item);
+        const primaryMuscle = (item.targetMuscles || ['Full Body'])[0];
+        const secondaryMuscles = (item.secondaryMuscles || []).slice(0, 2).join(', ');
+
+        const hasThumb = !!item.thumbnailUrl;
+        const hasVideo = !!item.videoUrl;
+
+        return `
+          <tr id="row-${item.id}" class="hover:bg-slate-800/40 transition-colors">
+            
+            <!-- 1. NAMA GERAKAN -->
+            <td class="py-4 px-4 align-top">
+              <div class="flex flex-col gap-1.5 max-w-[200px]">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  ${item.isFavorite ? `<span class="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-bold text-[10px] border border-amber-500/30">⭐ #${item.popularityRank}</span>` : ''}
+                  <span class="px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 font-mono text-[10px] uppercase">${(item.equipments || ['Bodyweight'])[0]}</span>
+                </div>
+                <h4 class="font-bold text-sm text-white leading-snug">${item.name}</h4>
+                <div class="text-[10px] text-slate-500 flex items-center gap-1">
+                  <i data-lucide="list-ordered" class="w-3 h-3"></i>
+                  <span>${(item.instructions_id || item.instructions_en || []).length} Langkah How-To</span>
+                </div>
+              </div>
+            </td>
+
+            <!-- 2. NAMA FILE (ID) -->
+            <td class="py-4 px-3 align-top">
+              <div class="flex flex-col gap-1.5 max-w-[170px]">
+                <span class="font-mono text-xs text-sky-400 font-semibold break-all select-all">${item.id}</span>
+                
+                <div class="flex items-center gap-1">
+                  <button 
+                    onclick="copyText('${item.id}', this, 'Copied!')"
+                    class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-semibold flex items-center gap-1 border border-slate-700 transition"
+                    title="Salin base filename untuk rename thumbnail/video"
+                  >
+                    <i data-lucide="copy" class="w-3 h-3"></i> Salin ID
+                  </button>
+                  <span class="text-[9px] text-slate-500 font-mono">.webp / .mp4</span>
+                </div>
+              </div>
+            </td>
+
+            <!-- 3. OTOT TARGET -->
+            <td class="py-4 px-3 align-top">
+              <div class="flex flex-col gap-1 max-w-[130px]">
+                <span class="px-2.5 py-1 rounded-lg bg-sky-500/20 text-sky-300 font-bold text-xs border border-sky-500/30 inline-block w-fit">
+                  ${primaryMuscle}
+                </span>
+                ${secondaryMuscles ? `<span class="text-[10px] text-slate-400 pl-1">+ ${secondaryMuscles}</span>` : ''}
+              </div>
+            </td>
+
+            <!-- 4. PROMPT IMAGE (1:1 COACH LOGY) -->
+            <td class="py-4 px-3 align-top">
+              <div class="flex flex-col gap-1.5 max-w-[280px]">
+                <textarea 
+                  id="img-prompt-${item.id}"
+                  rows="3"
+                  class="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 text-xs focus:outline-none focus:border-sky-500 custom-scroll resize-none"
+                  onchange="updateExercisePrompt('${item.id}', this.value)"
+                  placeholder="Prompt gambar 3D 1:1 Coach Logy..."
+                >${imgPrompt}</textarea>
+                
+                <div class="flex items-center justify-between">
+                  <button 
+                    onclick="copyText(document.getElementById('img-prompt-${item.id}').value, this, 'Prompt Copied!')"
+                    class="text-[10px] text-slate-400 hover:text-sky-400 flex items-center gap-1 font-medium"
+                  >
+                    <i data-lucide="copy" class="w-3 h-3"></i> Salin Prompt
+                  </button>
+                  <button 
+                    onclick="regenerateSinglePrompt('${item.id}')"
+                    class="text-[10px] text-sky-400 hover:underline flex items-center gap-1 font-medium"
+                  >
+                    <i data-lucide="refresh-cw" class="w-3 h-3"></i> Auto-Draft Gemini
+                  </button>
+                </div>
+              </div>
+            </td>
+
+            <!-- 5. PREVIEW DUAL KEYFRAMES (AWAL & AKHIR) -->
+            <td class="py-4 px-3 align-top text-center">
+              <div class="flex items-center justify-center gap-2">
+                
+                <!-- Frame A: Posisi Awal / Start -->
+                <div class="flex flex-col items-center gap-1">
+                  <span class="text-[9px] font-bold text-sky-400">Frame A (Awal)</span>
+                  ${item.thumbnail_start ? `
+                    <div class="relative group cursor-pointer" onclick="openKeyframePreview('${item.thumbnail_start}', '${item.name} - Posisi Awal')">
+                      <img 
+                        src="${item.thumbnail_start}" 
+                        alt="${item.name} - Awal" 
+                        class="w-16 h-16 rounded-xl object-cover border border-sky-500/40 shadow hover:scale-105 transition"
+                      >
+                      <div class="absolute inset-0 bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                        <i data-lucide="maximize-2" class="w-3.5 h-3.5 text-white"></i>
+                      </div>
+                    </div>
+                    <a 
+                      href="${item.thumbnail_start}" 
+                      download="${item.id}_start.webp"
+                      class="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[9px] text-sky-300 font-medium flex items-center gap-0.5 border border-slate-700"
+                      title="Unduh Frame Awal"
+                    >
+                      <i data-lucide="download" class="w-2.5 h-2.5"></i> Unduh
+                    </a>
+                  ` : `
+                    <div class="w-16 h-16 rounded-xl bg-slate-950 border border-slate-800 flex flex-col items-center justify-center text-slate-600">
+                      <i data-lucide="image" class="w-4 h-4 mb-0.5 opacity-40"></i>
+                      <span class="text-[8px]">Pending</span>
+                    </div>
+                  `}
+                </div>
+
+                <!-- Frame B: Posisi Akhir / Puncak -->
+                <div class="flex flex-col items-center gap-1">
+                  <span class="text-[9px] font-bold text-emerald-400">Frame B (Akhir)</span>
+                  ${item.thumbnail_end || item.thumbnailUrl ? `
+                    <div class="relative group cursor-pointer" onclick="openKeyframePreview('${item.thumbnail_end || item.thumbnailUrl}', '${item.name} - Posisi Akhir')">
+                      <img 
+                        src="${item.thumbnail_end || item.thumbnailUrl}" 
+                        alt="${item.name} - Akhir" 
+                        class="w-16 h-16 rounded-xl object-cover border border-emerald-500/40 shadow hover:scale-105 transition"
+                      >
+                      <div class="absolute inset-0 bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                        <i data-lucide="maximize-2" class="w-3.5 h-3.5 text-white"></i>
+                      </div>
+                    </div>
+                    <a 
+                      href="${item.thumbnail_end || item.thumbnailUrl}" 
+                      download="${item.id}_end.webp"
+                      class="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[9px] text-emerald-300 font-medium flex items-center gap-0.5 border border-slate-700"
+                      title="Unduh Frame Akhir"
+                    >
+                      <i data-lucide="download" class="w-2.5 h-2.5"></i> Unduh
+                    </a>
+                  ` : `
+                    <div class="w-16 h-16 rounded-xl bg-slate-950 border border-slate-800 flex flex-col items-center justify-center text-slate-600">
+                      <i data-lucide="image" class="w-4 h-4 mb-0.5 opacity-40"></i>
+                      <span class="text-[8px]">Pending</span>
+                    </div>
+                  `}
+                </div>
+
+              </div>
+            </td>
+
+            <!-- 6. PROMPT VIDEO (I2V) -->
+            <td class="py-4 px-3 align-top">
+              <div class="flex flex-col gap-1.5 max-w-[280px]">
+                <textarea 
+                  id="vid-prompt-${item.id}"
+                  rows="3"
+                  class="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 font-mono text-xs focus:outline-none focus:border-blue-500 custom-scroll resize-none"
+                  onchange="updateVideoPrompt('${item.id}', this.value)"
+                  placeholder="Prompt video AI (Kling / Luma / Veo / Runway)..."
+                >${vidPrompt}</textarea>
+                
+                <div class="flex items-center justify-between">
+                  <button 
+                    onclick="copyText(document.getElementById('vid-prompt-${item.id}').value, this, 'Video Prompt Copied!')"
+                    class="px-2.5 py-1 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 font-bold text-[10px] flex items-center gap-1 border border-blue-500/30 transition"
+                  >
+                    <i data-lucide="copy" class="w-3 h-3"></i> Salin Prompt Video
+                  </button>
+                  <span class="text-[9px] text-slate-400 font-medium">💡 Pakai Frame A & B</span>
+                </div>
+              </div>
+            </td>
+
+            <!-- 7. PREVIEW VIDEO (AUTOPLAY AUTOLOOP) -->
+            <td class="py-4 px-3 align-top text-center">
+              <div class="flex flex-col items-center gap-2">
+                ${hasVideo ? `
+                  <div class="relative group cursor-pointer" onclick="openVideoModal('${item.id}')">
+                    <video 
+                      src="${item.videoUrl}" 
+                      autoplay 
+                      loop 
+                      muted 
+                      playsinline 
+                      class="w-20 h-20 rounded-2xl object-cover bg-black border border-blue-500/40 shadow-lg group-hover:scale-105 transition"
+                    ></video>
+                    <div class="absolute inset-0 bg-black/40 rounded-2xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                      <i data-lucide="play" class="w-5 h-5 text-white"></i>
+                    </div>
+                  </div>
+                  
+                  <div class="flex items-center gap-1">
+                    <button 
+                      onclick="openVideoModal('${item.id}')" 
+                      class="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-semibold border border-slate-700"
+                    >
+                      Ganti
+                    </button>
+                    <span class="px-2 py-0.5 rounded-md bg-sky-500/20 text-sky-400 text-[10px] font-bold border border-sky-500/30">
+                      🎬 Aktif
+                    </span>
+                  </div>
+                ` : `
+                  <div class="w-20 h-20 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col items-center justify-center text-slate-600">
+                    <i data-lucide="video" class="w-6 h-6 mb-1 opacity-50"></i>
+                    <span class="text-[9px]">Belum Ada</span>
+                  </div>
+
+                  <div class="flex flex-col gap-1 w-full max-w-[100px]">
+                    <button 
+                      onclick="quickGenerateVideoRow('${item.id}')" 
+                      class="px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] flex items-center justify-center gap-1 shadow transition"
+                      title="Auto-render video loop 4 detik"
+                    >
+                      <i data-lucide="sparkles" class="w-3 h-3"></i> Auto Loop
+                    </button>
+                    <button 
+                      onclick="openVideoModal('${item.id}')" 
+                      class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-semibold border border-slate-700"
+                    >
+                      + Input Video
+                    </button>
+                  </div>
+                `}
+              </div>
+            </td>
+
+          </tr>
+        `;
+      }).join('');
+
+      // Render Pagination Bar
+      if (pagin) {
+        pagin.innerHTML = `
+          <div class="text-slate-400 font-medium">
+            Menampilkan <span class="text-white font-bold">${startIdx + 1} - ${Math.min(startIdx + itemsPerPage, totalItems)}</span> dari <span class="text-sky-400 font-bold">${totalItems}</span> gerakan di tabel
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="changePage(-1)" ${currentPage === 1 ? 'disabled class="opacity-40 cursor-not-allowed"' : 'class="hover:bg-slate-800 text-slate-200"'} class="px-3.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 font-semibold transition flex items-center gap-1">
+              <i data-lucide="chevron-left" class="w-4 h-4"></i> Sebelumnya
+            </button>
+            <span class="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-sky-400 font-mono font-bold">
+              Halaman ${currentPage} / ${totalPages}
+            </span>
+            <button onclick="changePage(1)" ${currentPage >= totalPages ? 'disabled class="opacity-40 cursor-not-allowed"' : 'class="hover:bg-slate-800 text-slate-200"'} class="px-3.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 font-semibold transition flex items-center gap-1">
+              Berikutnya <i data-lucide="chevron-right" class="w-4 h-4"></i>
+            </button>
+          </div>
+        `;
+      }
+
+      lucide.createIcons();
+    }
+
+    function changePage(delta) {
+      currentPage += delta;
+      renderTable();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function updateVideoPrompt(id, val) {
+      if (exerciseRegistry[id]) {
+        exerciseRegistry[id].prompt_video = val;
+        saveRegistryState();
+      }
+    }
+
+    async function quickGenerateVideoRow(id) {
+      activeVideoExerciseId = id;
+      openVideoModal(id);
+      setTimeout(() => {
+        autoGenerateVideoLoop();
+      }, 300);
+    }
+
+    // Render Coach Logy (coach-front / coach-back) with 1:1 Square Frame & Glowing Blue Highlights
+    function renderCoachVisual(item) {
+      const primaryTarget = ((item.targetMuscles && item.targetMuscles[0]) || '').toLowerCase();
+      const allTargets = (item.targetMuscles || []).map(t => t.toLowerCase()).join(' ');
+
+      // Determine Front vs Back view STRICTLY based on PRIMARY target muscle
+      const isBackFocus = primaryTarget.includes('back') || 
+                          primaryTarget.includes('lat') || 
+                          primaryTarget.includes('punggung') || 
+                          primaryTarget.includes('hamstring') || 
+                          primaryTarget.includes('glute') || 
+                          primaryTarget.includes('trap') ||
+                          primaryTarget.includes('rear') ||
+                          primaryTarget.includes('spine');
+
+      const coachImg = isBackFocus ? '/coach-back.webp' : '/coach-front.webp';
+      const coachViewLabel = isBackFocus ? 'Tampak Belakang (Posterior)' : 'Tampak Depan (Anterior)';
+
+      const isChest = allTargets.includes('chest') || allTargets.includes('pectoral') || allTargets.includes('dada');
+      const isBack = allTargets.includes('back') || allTargets.includes('lat') || allTargets.includes('punggung') || allTargets.includes('trap');
+      const isShoulder = allTargets.includes('delt') || allTargets.includes('shoulder') || allTargets.includes('bahu');
+      const isBiceps = allTargets.includes('bicep') || (allTargets.includes('arm') && !isBackFocus);
+      const isTriceps = allTargets.includes('tricep') || (allTargets.includes('arm') && isBackFocus);
+      const isAbs = allTargets.includes('ab') || allTargets.includes('core') || allTargets.includes('perut') || allTargets.includes('waist');
+      const isQuads = allTargets.includes('quad') || allTargets.includes('thigh') || (allTargets.includes('leg') && !isBackFocus);
+      const isHamsGlutes = allTargets.includes('ham') || allTargets.includes('glute');
+      const isCalves = allTargets.includes('calf') || allTargets.includes('calves') || allTargets.includes('betis');
+
+      return `
+        <div class="relative w-full h-full flex items-center justify-center overflow-hidden">
+          <!-- Background Ambient Glow -->
+          <div class="absolute inset-0 bg-gradient-to-t from-sky-950/40 via-transparent to-transparent"></div>
+          
+          <!-- Coach Logy 3D Model Image -->
+          <img 
+            src="${coachImg}" 
+            alt="Coach Logy - ${item.name}" 
+            class="relative z-10 w-full h-full object-contain drop-shadow-[0_10px_25px_rgba(0,136,255,0.25)] transition-transform duration-500 hover:scale-105"
+          />
+
+          <!-- Glowing Muscle Highlight Overlay (Electric Blue Logym #0088ff) -->
+          <svg viewBox="0 0 200 240" class="absolute inset-0 w-full h-full z-20 pointer-events-none muscle-glow">
+            <defs>
+              <filter id="blue-glow" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+
+            <g fill="#0088ff" filter="url(#blue-glow)" opacity="0.85">
+              ${!isBackFocus ? `
+                <!-- ================= TAMPAK DEPAN (ANTERIOR) ================= -->
+                ${isChest ? `
+                  <!-- Chest Pecs (Dada Kiri & Kanan) -->
+                  <ellipse cx="86" cy="74" rx="15" ry="11" />
+                  <ellipse cx="114" cy="74" rx="15" ry="11" />
+                ` : ''}
+
+                ${isShoulder ? `
+                  <!-- Front Deltoids (Bahu Depan) -->
+                  <ellipse cx="64" cy="62" rx="10" ry="13" />
+                  <ellipse cx="136" cy="62" rx="10" ry="13" />
+                ` : ''}
+
+                ${isBiceps ? `
+                  <!-- Biceps (Lengan Depan) -->
+                  <ellipse cx="53" cy="95" rx="8" ry="15" />
+                  <ellipse cx="147" cy="95" rx="8" ry="15" />
+                ` : ''}
+
+                ${isAbs ? `
+                  <!-- Abs / Core (Perut 6-pack) -->
+                  <rect x="88" y="92" width="24" height="34" rx="3" />
+                ` : ''}
+
+                ${isQuads ? `
+                  <!-- Quadriceps (Paha Depan) -->
+                  <ellipse cx="81" cy="162" rx="13" ry="24" />
+                  <ellipse cx="119" cy="162" rx="13" ry="24" />
+                ` : ''}
+
+                ${isCalves ? `
+                  <!-- Calves Front -->
+                  <ellipse cx="76" cy="208" rx="8" ry="16" />
+                  <ellipse cx="124" cy="208" rx="8" ry="16" />
+                ` : ''}
+              ` : `
+                <!-- ================= TAMPAK BELAKANG (POSTERIOR) ================= -->
+                ${isBack ? `
+                  <!-- Lats & Upper Back (Sayap & Punggung) -->
+                  <ellipse cx="80" cy="85" rx="16" ry="20" />
+                  <ellipse cx="120" cy="85" rx="16" ry="20" />
+                  <ellipse cx="100" cy="68" rx="18" ry="12" />
+                ` : ''}
+
+                ${isShoulder ? `
+                  <!-- Rear Delts (Bahu Belakang) -->
+                  <ellipse cx="62" cy="62" rx="10" ry="13" />
+                  <ellipse cx="138" cy="62" rx="10" ry="13" />
+                ` : ''}
+
+                ${isTriceps ? `
+                  <!-- Triceps (Lengan Belakang) -->
+                  <ellipse cx="51" cy="93" rx="8" ry="16" />
+                  <ellipse cx="149" cy="93" rx="8" ry="16" />
+                ` : ''}
+
+                ${isHamsGlutes ? `
+                  <!-- Glutes (Bokong) & Hamstrings (Paha Belakang) -->
+                  <ellipse cx="84" cy="128" rx="13" ry="11" />
+                  <ellipse cx="116" cy="128" rx="13" ry="11" />
+                  <ellipse cx="81" cy="162" rx="12" ry="22" />
+                  <ellipse cx="119" cy="162" rx="12" ry="22" />
+                ` : ''}
+
+                ${isCalves ? `
+                  <!-- Calves (Betis Belakang) -->
+                  <ellipse cx="76" cy="208" rx="9" ry="18" />
+                  <ellipse cx="124" cy="208" rx="9" ry="18" />
+                ` : ''}
+              `}
+            </g>
+          </svg>
+
+          <!-- Bottom View Indicator -->
+          <div class="absolute bottom-2 right-2 z-20 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-md border border-white/10 text-[9px] text-slate-300">
+            ${coachViewLabel}
+          </div>
+        </div>
+      `;
+    }
+
+    // Generate Default Indonesian Prompt (1:1 Square & Coach Logy)
+    function generateDefaultPrompt(item) {
+      const primaryTarget = (item.targetMuscles || ['Otot Utama'])[0];
+      const eq = (item.equipments || ['Alat Gym'])[0];
+      const steps = item.instructions_id && item.instructions_id.length > 0
+        ? item.instructions_id.slice(0, 3).join('. ')
+        : 'Lakukan gerakan secara terkontrol dengan form biomekanik yang presisi.';
+
+      return `Render 3D sinematik 4K aspek rasio 1:1 (Square 1080x1080). Karakter model: "Coach Logy" (atlet fitness proporsional) melakukan latihan "${item.name}" menggunakan ${eq}. Otot ${primaryTarget} menyala terang dengan efek neon glow "Biru Elektrik Logym" (#0088ff) saat puncak kontraksi. Instruksi form: ${steps}. Durasi 4 detik, seamless perfect loop (cocok untuk mode portrait maupun landscape), 60fps smooth motion.`;
+    }
+
+    // Call Gemini API for Single Prompt Generation (1:1 Square & Coach Logy)
+    async function regenerateSinglePrompt(id) {
+      const item = exerciseRegistry[id];
+      if (!item) return;
+
+      const textarea = document.getElementById(`prompt-${id}`);
+      if (textarea) textarea.value = 'Sedang membuat prompt via Gemini 3.6 Flash...';
+
+      try {
+        const apiKey = getNextApiKey();
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
+        
+        const primaryTarget = ((item.targetMuscles && item.targetMuscles[0]) || '').toLowerCase();
+        const isBackFocus = primaryTarget.includes('back') || primaryTarget.includes('lat') || primaryTarget.includes('punggung') || primaryTarget.includes('hamstring') || primaryTarget.includes('glute') || primaryTarget.includes('trap');
+        const coachRef = isBackFocus ? 'Coach Logy tampak belakang (coach-back.webp)' : 'Coach Logy tampak depan (coach-front.webp)';
+
+        const systemPrompt = `Anda adalah Prompt Engineer & Pelatih Biomekanik Fitness Logym.
+Buat 1 paragraf prompt visual sinematik dalam Bahasa Indonesia untuk latihan "${item.name}".
+Karakter Model: "${coachRef}".
+Otot target: ${(item.targetMuscles || []).join(', ')}.
+Alat: ${(item.equipments || []).join(', ')}.
+How-to: ${(item.instructions_id || item.instructions_en || []).join('. ')}.
+
+Aturan Wajib:
+1. Wajib cantumkan "Aspek Rasio 1:1 Square (1080x1080)" agar fleksibel digunakan di mode landscape maupun portrait.
+2. Subjek karakter menggunakan model "Coach Logy" dengan sudut kamera three-quarter 45 derajat.
+3. Sebutkan efek otot target menyala "Biru Elektrik Logym" (#0088ff) saat fase kontraksi beban.
+4. Sebutkan durasi 4 detik dan seamless perfect loop (titik awal & akhir menyambung sempurna).
+Kembalikan HANYA teks prompt bahasa Indonesia tanpa pengantar/penutup.`;
+
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: systemPrompt }] }]
+          })
+        });
+
+        const data = await res.json();
+        const generatedPrompt = data.candidates?.[0]?.content?.parts?.[0]?.text || generateDefaultPrompt(item);
+        
+        // Track tokens
+        if (data.usageMetadata?.totalTokenCount) {
+          totalTokensConsumed += data.usageMetadata.totalTokenCount;
+          localStorage.setItem('logym_gen_tokens', totalTokensConsumed);
+          document.getElementById('tokenCounter').textContent = totalTokensConsumed.toLocaleString();
+        }
+
+        item.prompt_id = generatedPrompt.trim();
+        item.status = 'generated';
+        saveRegistryState();
+      } catch (err) {
+        console.error('Error generating prompt:', err);
+        if (textarea) textarea.value = generateDefaultPrompt(item);
+      }
+    }
+
+    // Generate 1080x1080 HD WebP Thumbnail via HTML5 Canvas
+    async function generateThumbnailHD(id) {
+      const item = exerciseRegistry[id];
+      if (!item) return;
+
+      const card = document.getElementById(`card-${id}`);
+      if (card) {
+        card.classList.add('ring-2', 'ring-sky-500');
+      }
+
+      // Also ensure prompt is generated
+      if (!item.prompt_id) {
+        await regenerateSinglePrompt(id);
+      }
+
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1080;
+        canvas.height = 1080;
+        const ctx = canvas.getContext('2d');
+
+        // 1. Dark Studio Gradient Background
+        const bgGradient = ctx.createRadialGradient(540, 540, 100, 540, 540, 750);
+        bgGradient.addColorStop(0, '#0f172a');
+        bgGradient.addColorStop(0.6, '#07090e');
+        bgGradient.addColorStop(1, '#020408');
+        ctx.fillStyle = bgGradient;
+        ctx.fillRect(0, 0, 1080, 1080);
+
+        // 2. Subtle Grid Lines
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.04)';
+        ctx.lineWidth = 1;
+        for (let x = 0; x < 1080; x += 60) {
+          ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 1080); ctx.stroke();
+        }
+        for (let y = 0; y < 1080; y += 60) {
+          ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(1080, y); ctx.stroke();
+        }
+
+        // 3. Load & Draw Coach Logy Image with Accurate Primary Target Perspective
+        const primaryTarget = ((item.targetMuscles && item.targetMuscles[0]) || '').toLowerCase();
+        const allTargets = (item.targetMuscles || []).map(t => t.toLowerCase()).join(' ');
+
+        const isBackFocus = primaryTarget.includes('back') || 
+                            primaryTarget.includes('lat') || 
+                            primaryTarget.includes('punggung') || 
+                            primaryTarget.includes('hamstring') || 
+                            primaryTarget.includes('glute') || 
+                            primaryTarget.includes('trap') ||
+                            primaryTarget.includes('rear') ||
+                            primaryTarget.includes('spine');
+
+        const coachSrc = isBackFocus ? '/coach-back.webp' : '/coach-front.webp';
+
+        const coachImg = new Image();
+        coachImg.src = coachSrc;
+        await new Promise((resolve) => {
+          coachImg.onload = resolve;
+          coachImg.onerror = resolve;
+        });
+
+        if (coachImg.width > 0) {
+          // Draw Coach Logy centered in 1080x1080 frame
+          ctx.shadowColor = 'rgba(0, 136, 255, 0.4)';
+          ctx.shadowBlur = 40;
+          ctx.drawImage(coachImg, 140, 130, 800, 800);
+          ctx.shadowBlur = 0;
+        }
+
+        // 4. Draw Electric Blue Muscle Glow (#0088ff) directly aligned to body
+        ctx.save();
+        ctx.fillStyle = '#0088ff';
+        ctx.shadowColor = '#0088ff';
+        ctx.shadowBlur = 45;
+        ctx.globalAlpha = 0.75;
+
+        if (!isBackFocus) {
+          // ================= FRONT VIEW MUSCLE GLOW =================
+          if (allTargets.includes('chest') || allTargets.includes('pectoral') || allTargets.includes('dada')) {
+            // Chest Pecs (Left & Right)
+            ctx.beginPath(); ctx.ellipse(470, 420, 80, 55, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(610, 420, 80, 55, 0, 0, Math.PI * 2); ctx.fill();
+          }
+          if (allTargets.includes('delt') || allTargets.includes('shoulder') || allTargets.includes('bahu')) {
+            ctx.beginPath(); ctx.arc(360, 360, 55, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(720, 360, 55, 0, Math.PI * 2); ctx.fill();
+          }
+          if (allTargets.includes('bicep') || allTargets.includes('arm')) {
+            ctx.beginPath(); ctx.ellipse(300, 520, 45, 80, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(780, 520, 45, 80, 0, 0, Math.PI * 2); ctx.fill();
+          }
+          if (allTargets.includes('ab') || allTargets.includes('core') || allTargets.includes('perut')) {
+            ctx.beginPath(); ctx.roundRect(475, 500, 130, 180, 15); ctx.fill();
+          }
+          if (allTargets.includes('quad') || allTargets.includes('thigh') || allTargets.includes('leg')) {
+            ctx.beginPath(); ctx.ellipse(440, 850, 65, 120, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(640, 850, 65, 120, 0, 0, Math.PI * 2); ctx.fill();
+          }
+        } else {
+          // ================= BACK VIEW MUSCLE GLOW =================
+          if (allTargets.includes('back') || allTargets.includes('lat') || allTargets.includes('punggung') || allTargets.includes('trap')) {
+            ctx.beginPath(); ctx.ellipse(435, 460, 85, 110, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(645, 460, 85, 110, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(540, 370, 95, 65, 0, 0, Math.PI * 2); ctx.fill();
+          }
+          if (allTargets.includes('delt') || allTargets.includes('shoulder') || allTargets.includes('rear')) {
+            ctx.beginPath(); ctx.arc(350, 360, 55, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(730, 360, 55, 0, Math.PI * 2); ctx.fill();
+          }
+          if (allTargets.includes('tricep') || allTargets.includes('arm')) {
+            ctx.beginPath(); ctx.ellipse(290, 510, 45, 85, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(790, 510, 45, 85, 0, 0, Math.PI * 2); ctx.fill();
+          }
+          if (allTargets.includes('glute') || allTargets.includes('ham')) {
+            ctx.beginPath(); ctx.ellipse(455, 680, 70, 60, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(625, 680, 70, 60, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(440, 850, 60, 115, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(640, 850, 60, 115, 0, 0, Math.PI * 2); ctx.fill();
+          }
+        }
+        ctx.restore();
+
+        // 5. Header Badges Overlay
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+        ctx.beginPath(); ctx.roundRect(50, 50, 240, 60, 20); ctx.fill();
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = '#38bdf8'; ctx.font = 'bold 24px sans-serif'; ctx.fillText('LOGYM 1:1', 80, 88);
+
+        // 6. Bottom Typography Banner
+        ctx.fillStyle = 'rgba(7, 9, 14, 0.9)';
+        ctx.beginPath(); ctx.roundRect(50, 930, 980, 100, 25); ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'; ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 34px sans-serif';
+        ctx.fillText(item.name.length > 34 ? item.name.slice(0, 32) + '...' : item.name, 80, 980);
+
+        ctx.fillStyle = '#38bdf8';
+        ctx.font = '600 22px sans-serif';
+        ctx.fillText((item.targetMuscles || []).join(', ') + ' • ' + (item.equipments || [])[0], 80, 1012);
+
+        // Convert to WebP data URL
+        const dataUrl = canvas.toDataURL('image/webp', 0.92);
+        item.thumbnailUrl = dataUrl;
+        if (item.status === 'pending') {
+          item.status = 'thumbnail_ready';
+        }
+        saveRegistryState();
+      } catch (err) {
+        console.error('Error generating thumbnail canvas:', err);
+      } finally {
+        if (card) setTimeout(() => card.classList.remove('ring-2', 'ring-sky-500'), 1000);
+      }
+    }
+
+    // Preview Full HD Keyframe Modal (Awal / Akhir)
+    function openKeyframePreview(imgSrc, title) {
+      if (!imgSrc) return;
+      const modal = document.getElementById('previewModal');
+      document.getElementById('previewModalTitle').textContent = `Preview Keyframe - ${title}`;
+      document.getElementById('previewModalImg').src = imgSrc;
+      
+      const downloadBtn = document.getElementById('previewModalDownload');
+      downloadBtn.onclick = () => {
+        const a = document.createElement('a');
+        a.href = imgSrc;
+        a.download = `${title.toLowerCase().replace(/[^a-z0-9]/g, '_')}.webp`;
+        a.click();
+      };
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    // Preview Full HD 1:1 Thumbnail Modal
+    function previewThumbnailModal(id) {
+      const item = exerciseRegistry[id];
+      if (!item || !item.thumbnailUrl) return;
+
+      const modal = document.getElementById('previewModal');
+      document.getElementById('previewModalTitle').textContent = `Preview Thumbnail HD (1:1) - ${item.name}`;
+      document.getElementById('previewModalImg').src = item.thumbnailUrl;
+      
+      const downloadBtn = document.getElementById('previewModalDownload');
+      downloadBtn.onclick = () => {
+        const a = document.createElement('a');
+        a.href = item.thumbnailUrl;
+        a.download = `logym_${item.id}.webp`;
+        a.click();
+      };
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closePreviewModal() {
+      const modal = document.getElementById('previewModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    // Toggle Thumbnail Approval
+    function toggleApproveThumbnail(id) {
+      const item = exerciseRegistry[id];
+      if (!item) return;
+
+      if (['thumbnail_approved', 'video_ready', 'approved'].includes(item.status)) {
+        item.status = 'thumbnail_ready';
+      } else {
+        item.status = 'thumbnail_approved';
+        item.thumbnailApprovedAt = new Date().toISOString();
+      }
+      saveRegistryState();
+    }
+
+    // Video Loop Modal Handlers
+    let activeVideoExerciseId = null;
+    function openVideoModal(id) {
+      activeVideoExerciseId = id;
+      const item = exerciseRegistry[id];
+      if (!item) return;
+
+      const modal = document.getElementById('videoModal');
+      document.getElementById('videoModalTitle').textContent = `Input Video Loop (4s) - ${item.name}`;
+      document.getElementById('videoPromptDisplay').value = item.prompt_id || generateDefaultPrompt(item);
+      document.getElementById('videoUrlInput').value = item.videoUrl || '';
+      
+      const previewBox = document.getElementById('videoModalPreview');
+      if (item.videoUrl) {
+        previewBox.innerHTML = `<video src="${item.videoUrl}" autoplay loop muted playsinline class="w-full h-full object-contain rounded-2xl bg-black"></video>`;
+      } else {
+        previewBox.innerHTML = `<div class="text-center text-slate-500 text-xs p-6"><i data-lucide="video" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>Masukkan link video loop (MP4/WebP) atau upload file untuk melihat pratinjau.</div>`;
+        lucide.createIcons();
+      }
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    // Auto-Generate 4s Biomechanical Video Loop (Canvas + MediaRecorder 60fps)
+    async function autoGenerateVideoLoop() {
+      if (!activeVideoExerciseId) return;
+      const item = exerciseRegistry[activeVideoExerciseId];
+      if (!item) return;
+
+      const btn = document.getElementById('btnAutoGenerateVideo');
+      const btnText = document.getElementById('btnAutoGenerateVideoText');
+      const previewBox = document.getElementById('videoModalPreview');
+
+      btn.disabled = true;
+      btn.classList.add('opacity-60');
+      btnText.textContent = '⏳ Merender Video Loop (4s)...';
+
+      try {
+        const bgImg = new Image();
+        bgImg.src = item.thumbnailUrl || (item.targetMuscles[0]?.toLowerCase().includes('back') ? '/coach-back.webp' : '/coach-front.webp');
+        await new Promise(r => { bgImg.onload = r; bgImg.onerror = r; });
+
+        const canvas = document.createElement('canvas');
+        canvas.width = 720;
+        canvas.height = 720;
+        const ctx = canvas.getContext('2d');
+
+        const stream = canvas.captureStream(60);
+        let mimeType = 'video/webm;codecs=vp9';
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+          mimeType = 'video/webm';
+        }
+        const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 3000000 });
+        const chunks = [];
+        recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+
+        const duration = 4000; // 4 seconds loop
+        const startTime = performance.now();
+
+        recorder.start();
+
+        await new Promise(resolve => {
+          function renderFrame(now) {
+            const elapsed = now - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            const cycle = Math.sin(progress * Math.PI * 2); // -1 to 1
+
+            // 1. Dark Gym Background
+            ctx.fillStyle = '#020408';
+            ctx.fillRect(0, 0, 720, 720);
+
+            // 2. Draw 3D Base Image with subtle breathing zoom (1.0 to 1.03)
+            ctx.save();
+            const scale = 1.0 + 0.025 * (cycle * 0.5 + 0.5);
+            ctx.translate(360, 360);
+            ctx.scale(scale, scale);
+            ctx.drawImage(bgImg, -360, -360, 720, 720);
+            ctx.restore();
+
+            // 3. Dynamic Holographic Muscle Fiber Pulse
+            const glowAlpha = 0.4 + 0.55 * Math.pow((cycle * 0.5 + 0.5), 2);
+            ctx.save();
+            ctx.fillStyle = '#0088ff';
+            ctx.shadowColor = '#0088ff';
+            ctx.shadowBlur = 30 + 20 * (cycle * 0.5 + 0.5);
+            ctx.globalAlpha = glowAlpha;
+
+            // Electric scanline ripple across muscles
+            const rippleY = 240 + 180 * (cycle * 0.5 + 0.5);
+            ctx.beginPath();
+            ctx.ellipse(360, rippleY, 140, 15, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            // 4. Time Overlay Badge
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.beginPath(); ctx.roundRect(20, 20, 120, 30, 8); ctx.fill();
+            ctx.fillStyle = '#38bdf8';
+            ctx.font = 'bold 12px monospace';
+            ctx.fillText(`00:0${Math.floor(elapsed/1000)} / 00:04`, 32, 40);
+
+            if (progress < 1) {
+              requestAnimationFrame(renderFrame);
+            } else {
+              recorder.stop();
+            }
+          }
+          recorder.onstop = () => {
+            const blob = new Blob(chunks, { type: mimeType });
+            const videoUrl = URL.createObjectURL(blob);
+            item.videoUrl = videoUrl;
+            item.status = 'video_ready';
+            document.getElementById('videoUrlInput').value = videoUrl;
+            previewBox.innerHTML = `<video src="${videoUrl}" autoplay loop muted playsinline class="w-full h-full object-contain rounded-2xl bg-black shadow-inner"></video>`;
+            saveRegistryState();
+            resolve();
+          };
+          requestAnimationFrame(renderFrame);
+        });
+
+      } catch (err) {
+        console.error('Error auto-generating video loop:', err);
+        alert('Gagal merekam video: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.classList.remove('opacity-60');
+        btnText.textContent = '⚡ Auto-Generate Video Loop (4 Detik)';
+      }
+    }
+
+    function closeVideoModal() {
+      const modal = document.getElementById('videoModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      activeVideoExerciseId = null;
+    }
+
+    function saveVideoFromModal() {
+      if (!activeVideoExerciseId) return;
+      const item = exerciseRegistry[activeVideoExerciseId];
+      if (!item) return;
+
+      const url = document.getElementById('videoUrlInput').value.trim();
+      item.videoUrl = url;
+      if (url) {
+        item.status = 'video_ready';
+      }
+      saveRegistryState();
+      closeVideoModal();
+    }
+
+    // Final Approval (Thumbnail + Video Ready for App)
+    function approveFinal(id) {
+      const item = exerciseRegistry[id];
+      if (!item) return;
+
+      if (item.status === 'approved') {
+        item.status = 'thumbnail_approved';
+      } else {
+        item.status = 'approved';
+        item.approvedAt = new Date().toISOString();
+      }
+      saveRegistryState();
+    }
+
+    // Batch Generation Runner
+    async function startBatchGeneration(count, isFavoritesOnly = false) {
+      if (isBatchRunning) return;
+      isBatchRunning = true;
+      shouldPauseBatch = false;
+
+      document.getElementById('btnTest3').disabled = true;
+      document.getElementById('btnBatch50').disabled = true;
+      document.getElementById('btnPauseBatch').classList.remove('hidden');
+
+      let targets = Object.values(exerciseRegistry);
+      if (isFavoritesOnly) {
+        targets = targets.filter(t => t.isFavorite);
+      }
+      // Target items that are pending or need generation
+      targets = targets.slice(0, count);
+
+      for (let i = 0; i < targets.length; i++) {
+        if (shouldPauseBatch) break;
+        const item = targets[i];
+        await regenerateSinglePrompt(item.id);
+        // Safe rate limiter delay (1.2s between calls)
+        await new Promise(r => setTimeout(r, 1200));
+      }
+
+      isBatchRunning = false;
+      document.getElementById('btnTest3').disabled = false;
+      document.getElementById('btnBatch50').disabled = false;
+      document.getElementById('btnPauseBatch').classList.add('hidden');
+    }
+
+    function pauseBatch() {
+      shouldPauseBatch = true;
+      document.getElementById('btnPauseBatch').textContent = 'Menjeda...';
+    }
+
+    // Export Registry to JSON file
+    function exportRegistryJson() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exerciseRegistry, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `logym_exercise_database_approved_${new Date().toISOString().slice(0,10)}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    }
+
+    // Settings Modal Handlers
+    function toggleSettingsModal() {
+      const modal = document.getElementById('settingsModal');
+      modal.classList.toggle('hidden');
+      modal.classList.toggle('flex');
+    }
+
+    function saveApiKeys() {
+      const k1 = document.getElementById('keyInput1').value.trim();
+      const k2 = document.getElementById('keyInput2').value.trim();
+      if (k1) apiKeys[0] = k1;
+      if (k2) apiKeys[1] = k2;
+      localStorage.setItem('logym_gen_keys', JSON.stringify(apiKeys));
+      toggleSettingsModal();
+      alert('Pengaturan API Key berhasil disimpan!');
+    }
+
+    // Start App
+    window.addEventListener('DOMContentLoaded', initApp);
+  </script>
+</body>
+</html>

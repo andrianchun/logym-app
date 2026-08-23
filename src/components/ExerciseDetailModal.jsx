@@ -195,7 +195,7 @@ const ExerciseDetailModal = ({
 
   React.useEffect(() => {
      setEx(initialEx);
-     if (initialEx && (!initialEx.instructions || initialEx.instructions.length === 0)) {
+     if (initialEx && initialEx.name) {
          import('../utils/exerciseDbApi').then(({ fetchExercisesFromApi }) => {
              fetchExercisesFromApi().then(onlineDb => {
                  const locName = initialEx.name.toLowerCase();
@@ -204,13 +204,15 @@ const ExerciseDetailModal = ({
                      const dbName = e.name.toLowerCase();
                      return dbName === locName || dbName.includes(locName) || locName.includes(dbName);
                  });
-                 if (onlineMatch && (onlineMatch.instructions || onlineMatch.instructions_id)) {
+                 if (onlineMatch) {
                      setEx(prev => ({ 
                          ...prev, 
                          instructions: onlineMatch.instructions,
                          instructions_id: onlineMatch.instructions_id || onlineMatch.instructions,
                          instructions_en: onlineMatch.instructions_en || onlineMatch.instructions,
-                         equipment: prev.equipment || onlineMatch.equipment
+                         videoUrl: onlineMatch.videoUrl || prev?.videoUrl,
+                         thumbnailUrl: onlineMatch.thumbnailUrl || prev?.thumbnailUrl,
+                         equipment: prev?.equipment || onlineMatch.equipment
                      }));
                  }
              });
@@ -230,6 +232,9 @@ const ExerciseDetailModal = ({
   const parseMedia = (exercise) => {
     let items = [];
     if (!exercise) return items; // dipanggil sebelum penjaga `!ex`, jadi harus tahan nilai kosong
+    if (exercise.videoUrl) {
+      items.push({ type: 'video', url: exercise.videoUrl });
+    }
     if (exercise.ytVideo && typeof exercise.ytVideo === 'string') {
       const urls = exercise.ytVideo.split(/(?:,|\s)+/).filter(v => v.trim());
       urls.forEach(u => items.push({ type: 'youtube', url: u }));
@@ -441,7 +446,7 @@ const ExerciseDetailModal = ({
                         }
                       }
                       if (media.type === 'video') {
-                        return <video src={media.url} autoPlay={idx === activeMediaIndex} loop muted playsInline className="w-full h-full object-cover opacity-80 pointer-events-none scale-[1.10]" />;
+                        return <video src={media.url} autoPlay={idx === activeMediaIndex} loop muted playsInline className="w-full h-full object-cover opacity-100 shadow-xl transition-all duration-300" />;
                       }
                       
                       // Animated Image Component for ExerciseDB frames

@@ -181,12 +181,14 @@ export const mapToLyFitFormat = (apiEx) => {
   const mappedYtVideo = ytVideoMap[apiEx.name?.toLowerCase()] || '';
 
   return {
-    id: `edb-${apiEx.exerciseId}`,
+    id: `edb-${apiEx.exerciseId || apiEx.name?.replace(/\s+/g, '_')}`,
     name: capitalizeWords(apiEx.name || 'Unknown Exercise'),
     target: translatedTargets.length > 0 ? translatedTargets : ['Full Body'],
     type,
     equipment,
     defaultWeight: 0,
+    videoUrl: apiEx.videoUrl || '',
+    thumbnailUrl: apiEx.thumbnailUrl || '',
     ytVideo: mappedYtVideo,
     gifUrl: apiEx.gifUrl || '',
     instructions: apiEx.instructions_id || apiEx.instructions || [],

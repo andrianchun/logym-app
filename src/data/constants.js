@@ -211,14 +211,52 @@ export const hasDeletedProjected = (dayData) =>
  * belakang. Urutan itu penting — kalau dari yang terpendek, UUID akan tercocokkan ke potongan
  * pertamanya dan bisa nyasar ke latihan lain.
  */
+export const exerciseAliasMap = {
+  '101': 'edb-Smith_Machine_Incline_Bench_Press',
+  '102': 'edb-Seated_Cable_Rows',
+  '103': 'edb-Dumbbell_Bench_Press',
+  '104': 'edb-Cable_Seated_Lateral_Raise',
+  '105': 'edb-Triceps_Pushdown',
+  '106': 'edb-Dumbbell_Alternate_Bicep_Curl',
+  '108': 'edb-Smith_Machine_Squat',
+  '109': 'edb-Romanian_Deadlift',
+  '110': 'edb-Barbell_Walking_Lunge',
+  '111': 'edb-Rocking_Standing_Calf_Raise',
+  '112': 'edb-Cable_Crunch',
+  '113': 'edb-Wide-Grip_Lat_Pulldown',
+  '114': 'edb-Dumbbell_Shoulder_Press',
+  '115': 'edb-Smith_Machine_Bench_Press',
+  '116': 'edb-Cable_Rear_Delt_Fly',
+  '117': 'edb-Cable_Rope_Overhead_Triceps_Extension',
+  '118': 'edb-High_Cable_Curls',
+  '119': 'edb-Split_Squat_with_Dumbbells',
+  '120': 'edb-Smith_Machine_Squat',
+  '121': 'edb-Pull_Through',
+  '122': 'edb-Seated_Calf_Raise',
+  '123': 'edb-Plank',
+  '124': 'edb-Dumbbell_Shrug',
+  '125': 'edb-Palms-Up_Dumbbell_Wrist_Curl_Over_A_Bench',
+  '132': 'edb-Elliptical_Trainer',
+  '133': 'edb-Jump_Rope',
+  '134': 'edb-Goblet_Squat',
+  '135': 'edb-Barbell_Bench_Press_-_Medium_Grip'
+};
+
 export const resolveLoggedExercise = (logKey, exLookup) => {
   if (logKey === null || logKey === undefined || !exLookup) return undefined;
   const key = String(logKey);
   if (exLookup[key]) return exLookup[key];
+  if (exerciseAliasMap[key] && exLookup[exerciseAliasMap[key]]) {
+    return exLookup[exerciseAliasMap[key]];
+  }
+
   const parts = key.split('-');
   for (let i = parts.length - 1; i > 0; i--) {
     const head = parts.slice(0, i).join('-');
     if (exLookup[head]) return exLookup[head];
+    if (exerciseAliasMap[head] && exLookup[exerciseAliasMap[head]]) {
+      return exLookup[exerciseAliasMap[head]];
+    }
   }
   return undefined;
 };

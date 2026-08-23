@@ -18,7 +18,9 @@ const UnifiedExerciseCard = React.memo(({ t, lang, ex, onEdit, onDelete, onToggl
           className="absolute inset-y-0 right-0 w-[55%] pointer-events-none mix-blend-multiply dark:mix-blend-normal opacity-80"
           style={{ maskImage: 'linear-gradient(105deg, transparent 15%, black 85%)', WebkitMaskImage: 'linear-gradient(105deg, transparent 15%, black 85%)' }}
         >
-          {finalGifUrl ? (
+          {ex.thumbnailUrl ? (
+            <img src={ex.thumbnailUrl} alt={ex.name} loading="lazy" className="w-full h-full object-cover object-center" />
+          ) : finalGifUrl ? (
             // GIF dari API sudah berbentuk landscape/terpotong rapi
             <img src={finalGifUrl} alt={ex.name} loading="lazy" className="w-full h-full object-cover object-[100%_25%]" />
           ) : ytId ? (

@@ -134,19 +134,29 @@ export default function DeveloperTools({ user, setHistory, t, theme }) {
         <p className={`text-[10px] mb-4 ${t.textMuted}`}>
             Only visible to untheryan@gmail.com. Use these tools to inject robust dummy data for testing UI rendering without a connected smartwatch.
         </p>
-        <div className="flex gap-2">
-            <button 
-                onClick={generateDummyData}
-                className="flex-1 py-2 bg-blue-500/10 text-blue-500 rounded-lg text-[10px] font-bold hover:bg-blue-500/20 transition-colors"
+        <div className="flex flex-col gap-2">
+            <a 
+                href="/generator/index.html"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-2.5 bg-gradient-to-r from-sky-500 to-blue-600 text-white rounded-lg text-[10px] font-bold flex items-center justify-center gap-1.5 shadow-md hover:from-sky-400 hover:to-blue-500 transition-all text-center"
             >
-                INJECT DUMMY DATA
-            </button>
-            <button 
-                onClick={clearDummyData}
-                className="flex-1 py-2 bg-red-500/10 text-red-500 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 hover:bg-red-500/20 transition-colors"
-            >
-                <Trash2 size={12} /> CLEAR DUMMIES
-            </button>
+                🚀 BUKA AI VIDEO & ASSET GENERATOR (PWA)
+            </a>
+            <div className="flex gap-2">
+                <button 
+                    onClick={generateDummyData}
+                    className="flex-1 py-2 bg-blue-500/10 text-blue-500 rounded-lg text-[10px] font-bold hover:bg-blue-500/20 transition-colors"
+                >
+                    INJECT DUMMY DATA
+                </button>
+                <button 
+                    onClick={clearDummyData}
+                    className="flex-1 py-2 bg-red-500/10 text-red-500 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 hover:bg-red-500/20 transition-colors"
+                >
+                    <Trash2 size={12} /> CLEAR DUMMIES
+                </button>
+            </div>
         </div>
     </div>
   );
