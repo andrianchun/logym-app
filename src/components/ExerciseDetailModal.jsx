@@ -204,10 +204,12 @@ const ExerciseDetailModal = ({
                      const dbName = e.name.toLowerCase();
                      return dbName === locName || dbName.includes(locName) || locName.includes(dbName);
                  });
-                 if (onlineMatch && onlineMatch.instructions) {
+                 if (onlineMatch && (onlineMatch.instructions || onlineMatch.instructions_id)) {
                      setEx(prev => ({ 
                          ...prev, 
                          instructions: onlineMatch.instructions,
+                         instructions_id: onlineMatch.instructions_id || onlineMatch.instructions,
+                         instructions_en: onlineMatch.instructions_en || onlineMatch.instructions,
                          equipment: prev.equipment || onlineMatch.equipment
                      }));
                  }
@@ -215,6 +217,14 @@ const ExerciseDetailModal = ({
          }).catch(() => {});
      }
   }, [initialEx]);
+
+  const activeInstructions = useMemo(() => {
+    if (!ex) return [];
+    if (lang?.id === 'EN') {
+      return ex.instructions_en || ex.instructions || [];
+    }
+    return ex.instructions_id || ex.instructions || [];
+  }, [ex, lang?.id]);
 
 
   const parseMedia = (exercise) => {
@@ -490,6 +500,12 @@ const ExerciseDetailModal = ({
               </div>
             )}
             
+            {/* Top Left Equipment Badge */}
+            <div className="absolute top-4 left-4 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/60 text-white/90 border border-white/10 backdrop-blur-md text-xs font-semibold shadow-lg">
+              <Dumbbell size={13} className="text-sky-400" />
+              <span>{ex.equipment || 'Body Weight'}</span>
+            </div>
+
             {/* Top gradient for obscuring iframe remnants and better button visibility */}
             <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-black/80 via-black/40 to-transparent z-10 pointer-events-none"></div>
 
@@ -545,11 +561,6 @@ const ExerciseDetailModal = ({
                 {/* Tab 1: Instruksi */}
                 <div className="w-1/3 h-full p-6 pb-24 overflow-y-auto hide-scrollbar">
                   <div className="space-y-4">
-                    <div>
-                      <h3 className={`body-lg font-bold ${t.textMuted} mb-2`}>Peralatan</h3>
-                      <p className={`body-lg font-bold ${t.textMain}`}>{ex.equipment || 'Bodyweight'}</p>
-                    </div>
-  
                     {!ex.ytVideo && (
                       <div className={`p-4 rounded-2xl border ${t.border} bg-rose-500/5`}>
                         <p className={`body-md ${t.textMuted} mb-3`}>Belum ada video tutorial untuk latihan ini.</p>
@@ -565,15 +576,15 @@ const ExerciseDetailModal = ({
                     )}
                     
                     <div>
-                      <h3 className={`body-lg font-bold ${t.textMuted} mb-2`}>Cara Melakukan</h3>
-                      {ex.instructions && ex.instructions.length > 0 ? (
-                        <ol className="list-decimal pl-5 space-y-2">
-                          {ex.instructions.map((step, i) => (
-                            <li key={i} className={`body-lg ${t.textMain} opacity-90 leading-relaxed`}>{step.replace(/^\d+[\.\)]\s*/, '')}</li>
+                      <h3 className={`body-lg font-bold ${t.textMuted} mb-3`}>{lang?.id === 'EN' ? 'Instructions' : 'Instruksi Gerakan'}</h3>
+                      {activeInstructions && activeInstructions.length > 0 ? (
+                        <ol className="list-decimal pl-5 space-y-3">
+                          {activeInstructions.map((step, i) => (
+                            <li key={i} className={`body-lg ${t.textMain} opacity-90 leading-relaxed`}>{String(step).replace(/^\d+[\.\)]\s*/, '')}</li>
                           ))}
                         </ol>
                       ) : (
-                        <p className={`body-lg ${t.textMuted} italic`}>Tidak ada instruksi khusus dari database.</p>
+                        <p className={`body-lg ${t.textMuted} italic`}>{lang?.id === 'EN' ? 'No specific instructions available.' : 'Tidak ada instruksi khusus dari database.'}</p>
                       )}
                     </div>
                   </div>
@@ -618,8 +629,11 @@ const ExerciseDetailModal = ({
                          )}
                          {historyData.map((log, i) => (
                            <div key={i} className={`mb-3 pb-3 border-b border-dashed last:border-b-0 ${t.border}`}>
-                           <div className="flex items-center mb-1.5 px-1">
-                             <div className={`caption ${t.textMuted} w-[65px] shrink-0`}>
+                           {/* gap-2 + w-auto, bukan w-[65px]. Lebarnya dulu dipatok 65px padahal
+                               "23/08/2026" lebih lebar dari itu, jadi tanggalnya meluber ke nama
+                               program dan dua teks itu saling menimpa. */}
+                           <div className="flex items-center gap-2 mb-1.5 px-1">
+                             <div className={`caption ${t.textMuted} shrink-0 whitespace-nowrap`}>
                                {formatDate(log.date)}
                              </div>
                              <div className={`caption font-bold ${t.textMain} flex-1 truncate`}>
@@ -642,8 +656,11 @@ const ExerciseDetailModal = ({
                                       <>
                                         <th className="py-1 text-center w-8">Set</th>
                                         <th className="py-1 text-center w-14">Beban</th>
+                                        {/* Beban aktual = yang benar-benar diangkat (input x rasio + beban dasar alat).
+                                            Sebelumnya cuma hidup di dalam perhitungan dan tidak pernah terlihat di riwayat. */}
+                                        <th className="py-1 text-center w-14">Aktual</th>
                                         <th className="py-1 text-center w-10">Reps</th>
-                                        <th className="py-1 text-center border-l border-black/5 dark:border-white/5 w-10">RPE</th>
+                                        <th className="py-1 text-center border-l border-black/5 dark:border-white/5 w-8">RPE</th>
                                         <th className="py-1 px-2 text-left">Notes</th>
                                       </>
                                    )}
@@ -675,6 +692,12 @@ const ExerciseDetailModal = ({
                                       <tr key={idx} className={`border-t border-black/5 dark:border-white/5 ${t.textMain}`}>
                                         <td className="py-1.5 text-center font-bold opacity-70">{idx + 1}</td>
                                         <td className={`py-1.5 text-center font-bold ${t.textAccent}`}>{isImp ? Number((s.w * 2.20462).toFixed(1)) : s.w} <span className="text-[8px]">{isImp ? 'lbs' : 'kg'}</span></td>
+                                        {/* Diredupkan kalau sama dengan beban yang diketik — alat tanpa beban dasar
+                                            dan tanpa katrol memang menghasilkan angka yang sama, dan mengulangnya
+                                            dengan penekanan yang sama cuma bikin mata bekerja dua kali. */}
+                                        <td className={`py-1.5 text-center font-bold ${Number(s.total_w) !== Number(s.w) ? '' : 'opacity-30'}`}>
+                                          {isImp ? Number((Number(s.total_w || s.w) * 2.20462).toFixed(1)) : Number(s.total_w || s.w)} <span className="text-[8px]">{isImp ? 'lbs' : 'kg'}</span>
+                                        </td>
                                         <td className="py-1.5 text-center font-bold">{s.r}</td>
                                         <td className={`py-1.5 text-center border-l border-black/5 dark:border-white/5 ${s.rpe ? '' : 'opacity-30'}`}>{s.rpe || '-'}</td>
                                         <td className={`py-1.5 px-2 text-left italic truncate ${s.notes ? '' : 'opacity-30'}`} title={s.notes}>{s.notes || '-'}</td>

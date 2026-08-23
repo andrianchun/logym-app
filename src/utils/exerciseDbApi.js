@@ -189,7 +189,9 @@ export const mapToLyFitFormat = (apiEx) => {
     defaultWeight: 0,
     ytVideo: mappedYtVideo,
     gifUrl: apiEx.gifUrl || '',
-    instructions: apiEx.instructions || [],
+    instructions: apiEx.instructions_id || apiEx.instructions || [],
+    instructions_id: apiEx.instructions_id || apiEx.instructions || [],
+    instructions_en: apiEx.instructions_en || apiEx.instructions || [],
     source: 'exercisedb',
   };
 };
