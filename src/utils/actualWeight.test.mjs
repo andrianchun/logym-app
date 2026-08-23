@@ -90,3 +90,39 @@ const deloadWeight = Math.round(normalWeight * 0.825);
 assert.ok(deloadWeight >= 80 && deloadWeight <= 85, 'Deload should cut ~17.5%');
 
 console.log('✅ All Actual Weight & 10RM unit tests PASSED successfully!');
+
+// ---- Beban dasar custom per gym untuk alat NON-BAR ----
+// Permintaan 23/08/2026: "cable, dumbbell, smith machine kayaknya ada yg ga bener2 0 beban
+// alaminya, di aku sekitaran 2,5 apa 5 kg". Mesinnya sudah mendukung ini sejak awal — yang
+// hilang cuma kolom inputnya di GymManagerModal, yang dulu hanya dirender untuk alat berbasis bar.
+{
+  const gym = (config) => [{ id: 'g1', name: 'Gym Saya', equipment: 'all', config }];
+
+  // 1. Cable dengan tumpukan berbeban dasar 2,5 kg.
+  const cableEx = { id: 1, name: 'Cable Row', equipment: 'Cable' };
+  const cCable = getEquipmentConfig(gym({ Cable: { baseWeight: 2.5, ratio: 1 } }), 'g1', cableEx);
+  assert.equal(cCable.baseWeight, 2.5, 'baseWeight custom untuk Cable harus terbaca');
+  assert.equal(calculateActualWeight(20, cCable), 22.5, '20 kg di tumpukan + 2,5 kg dasar = 22,5');
+
+  // 2. Dumbbell dengan pegangan 5 kg.
+  const dbEx = { id: 2, name: 'DB Curl', equipment: 'Dumbbell' };
+  const cDb = getEquipmentConfig(gym({ Dumbbell: { baseWeight: 5 } }), 'g1', dbEx);
+  assert.equal(calculateActualWeight(10, cDb), 15, 'pelat 10 kg + pegangan 5 kg = 15');
+
+  // 3. Beban dasar 0 yang DISENGAJA tetap dihormati, bukan jatuh ke default alat.
+  const smithEx = { id: 3, name: 'Smith Squat', equipment: 'Smith Machine' };
+  const cSmith0 = getEquipmentConfig(gym({ 'Smith Machine': { baseWeight: 0 } }), 'g1', smithEx);
+  assert.equal(cSmith0.baseWeight, 0, 'nol eksplisit harus menang atas default');
+
+  // 4. Tanpa config gym, default bawaan alat tetap dipakai (jangan regresi).
+  const cSmithDefault = getEquipmentConfig(null, null, smithEx);
+  assert.ok(cSmithDefault.baseWeight >= 0);
+  assert.equal(getEquipmentConfig(gym({}), 'g1', cableEx).baseWeight,
+    getEquipmentConfig(null, null, cableEx).baseWeight, 'config kosong = perilaku default');
+
+  // 5. Rasio katrol tetap ikut terhitung bersama beban dasar.
+  const cKatrol = getEquipmentConfig(gym({ Cable: { baseWeight: 2.5, ratio: 0.5 } }), 'g1', cableEx);
+  assert.equal(calculateActualWeight(20, cKatrol), 12.5, '(20 x 0,5) + 2,5 = 12,5');
+
+  console.log('beban dasar custom OK');
+}

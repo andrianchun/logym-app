@@ -155,21 +155,29 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
 
     return (
       <div className={`mt-3 p-3 rounded-xl ${t.bg} border ${t.border} grid grid-cols-2 gap-3 text-left`}>
-        {isBarbellBased && (
-          <div>
-            <label className={`text-[10px] uppercase font-bold tracking-wider ${t.textMuted} block mb-1`}>Berat Bar/Alat (kg)</label>
-            <SwipeInput language={language} 
-              value={conf.baseWeight ?? conf.barWeight ?? (eqName.includes('Sled') ? 45 : 20)}
-              onChange={val => {
-                updateConfig(eqName, 'baseWeight', val);
-                updateConfig(eqName, 'barWeight', val);
-              }}
-              step={0.5} min={0} soundEnabled={soundEnabled}
-              className={`w-full bg-transparent border-b border-slate-500/30 pb-1 outline-none ${t.textMain} font-semibold text-center`}
-              placeholder="0"
-            />
-          </div>
-        )}
+        {/* Beban dasar dulu HANYA muncul untuk alat berbasis bar. Cable, Machine, Dumbbell, dan
+            Kettlebell tidak punya kolomnya sama sekali — padahal getEquipmentConfig membaca
+            `baseWeight` untuk alat APA PUN, jadi yang hilang cuma inputnya, bukan dukungannya.
+            Akibatnya beban aktual di alat-alat itu selalu dihitung seolah beban dasarnya nol,
+            padahal di gym sungguhan tumpukan cable, rangka mesin, dan pegangan dumbbell punya
+            berat bawaan sendiri — sering 2,5 sampai 5 kg. */}
+        <div>
+          <label className={`text-[10px] uppercase font-bold tracking-wider ${t.textMuted} block mb-1`}>
+            {isBarbellBased ? 'Berat Bar/Alat (kg)' : isDumbbell ? 'Berat Pegangan (kg)' : 'Beban Dasar Alat (kg)'}
+          </label>
+          <SwipeInput language={language} 
+            value={conf.baseWeight ?? conf.barWeight ?? (isBarbellBased ? (eqName.includes('Sled') ? 45 : 20) : 0)}
+            onChange={val => {
+              updateConfig(eqName, 'baseWeight', val);
+              // barWeight ikut ditulis: nama lama yang masih dibaca getEquipmentConfig sebagai
+              // cadangan, jadi profil gym lama tidak mendadak berubah artinya.
+              updateConfig(eqName, 'barWeight', val);
+            }}
+            step={0.5} min={0} soundEnabled={soundEnabled}
+            className={`w-full bg-transparent border-b border-slate-500/30 pb-1 outline-none ${t.textMain} font-semibold text-center`}
+            placeholder="0"
+          />
+        </div>
 
         {isCableOrMachine && (
           <div>
