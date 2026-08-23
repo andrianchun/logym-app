@@ -2212,7 +2212,7 @@ export default function App() {
   useEffect(() => {
     const flush = () => {
       if (document.visibilityState === 'visible') return;
-      [pendingHistorySaveRef, pendingMainSaveRef].forEach(ref => {
+      [pendingHistorySaveRef, pendingMainSaveRef, pendingCloudSessionRef].forEach(ref => {
         if (!ref.current) return;
         clearTimeout(ref.current.timer);
         try { ref.current.attemptSave(); } catch (e) { console.warn('flush gagal:', e); }
@@ -2320,6 +2320,7 @@ export default function App() {
   }
   const cloudSessionRef = () => (user?.uid ? doc(db, 'logym_users', user.uid, 'active_sessions', deviceId.current) : null);
   const lastCloudSessionPush = useRef(0);
+  const pendingCloudSessionRef = useRef(null);
 
   useEffect(() => {
     if (!user?.uid || !isDataLoaded) return;
@@ -2329,16 +2330,38 @@ export default function App() {
       localStorage.setItem(`lyfit_active_session_${user.uid}`, JSON.stringify(payload));
     } catch { /* storage penuh/diblokir — abaikan, sesi tetap jalan di memori */ }
 
-    if (Date.now() - lastCloudSessionPush.current < 30_000) return;
-    lastCloudSessionPush.current = Date.now();
-    const ref = cloudSessionRef();
-    if (!ref) return;
-    setDoc(ref, {
-      deviceId: deviceId.current,
-      date: selectedDate,
-      savedAt: payload.savedAt,
-      payload: JSON.stringify({ exerciseLogs, skippedExercises, extraExercises }),
-    }).catch(e => console.warn('[Sesi] gagal menulis sesi berjalan ke cloud:', e?.message || e));
+    // DEBOUNCE EKOR, bukan throttle kepala. Versi lama: `if (now - last < 30_000) return` —
+    // perubahannya tidak ditunda, tapi DIBUANG, dan tidak ada yang menjadwalkannya lagi. Artinya
+    // set terakhir yang dicentang sebelum app ditutup atau crash sangat mungkin tidak pernah
+    // sampai ke cloud sama sekali, betapapun lamanya sesi itu berjalan. Yang paling akhir justru
+    // yang paling rawan hilang.
+    //
+    // Sekarang setiap centang menjadwalkan tulisan 2 detik ke depan, dan setiap centang baru
+    // menggeser jadwalnya. Yang tertulis SELALU keadaan terakhir, dan tidak ada satu pun
+    // perubahan yang berakhir tanpa jadwal. Tidak sekali-tulis-per-centang: mencentang 40 set
+    // beruntun tetap satu tulisan, bukan 40.
+    const kirim = () => {
+      const ref = cloudSessionRef();
+      const p = pendingCloudSessionRef.current?.payload;
+      if (!ref || !p) return;
+      lastCloudSessionPush.current = Date.now();
+      return setDoc(ref, {
+        deviceId: deviceId.current,
+        date: p.date,
+        savedAt: p.savedAt,
+        payload: JSON.stringify({
+          exerciseLogs: p.exerciseLogs,
+          skippedExercises: p.skippedExercises,
+          extraExercises: p.extraExercises,
+        }),
+      }).catch(e => console.warn('[Sesi] gagal menulis sesi berjalan ke cloud:', e?.message || e));
+    };
+    if (pendingCloudSessionRef.current?.timer) clearTimeout(pendingCloudSessionRef.current.timer);
+    const timer = setTimeout(kirim, 2000);
+    // Bentuk { timer, attemptSave } sengaja sama dengan pendingHistorySaveRef/pendingMainSaveRef
+    // supaya efek flush di bawah bisa memperlakukan ketiganya identik saat app disembunyikan.
+    pendingCloudSessionRef.current = { timer, attemptSave: kirim, payload };
+    return () => clearTimeout(timer);
   }, [exerciseLogs, skippedExercises, extraExercises, selectedDate, user?.uid, isDataLoaded]);
 
   const clearCloudSession = () => {
@@ -4257,6 +4280,7 @@ export default function App() {
                userProfile={userProfile}
                logyPersona={logyPersona}
                activityTargets={activityTargets}
+               workoutStartTime={workoutStartTime}
              />
          )}
 

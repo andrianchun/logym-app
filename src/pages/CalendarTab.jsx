@@ -22,8 +22,37 @@ const CalendarTab = ({
   setActiveTab, soundEnabled, playSoundEffect, navigateToWorkoutDate,
   exerciseLogs, skippedExercises, handleEditPastWorkout,
   weekStartDay = 0, defaultReminderTime = "15:00", reminderEnabled = true,
-  unitSystem, setConfirmModal, activePlanIds = [], userProfile, logyPersona = 'santai', activityTargets, sessionToRun, isWorkoutActive
+  unitSystem, setConfirmModal, activePlanIds = [], userProfile, logyPersona = 'santai', activityTargets, sessionToRun, isWorkoutActive, workoutStartTime
 }) => {
+
+  // DURASI & KALORI SESI YANG SEDANG BERJALAN.
+  //
+  // Kalender membaca `w.duration` dari workout tersimpan, dan field itu baru lahir di
+  // handleSaveWorkout — jadi selama latihan masih jalan, hari ini selalu tampak kosong walau
+  // set demi set sudah dicentang.
+  //
+  // Kalorinya TIDAK dihitung dengan rumus baru: tetap lewat calculateSmartWorkoutCalories dengan
+  // bentuk workout yang sama seperti sesi tersimpan, supaya angka berjalan dan angka final tidak
+  // pernah berbeda untuk data yang sama.
+  const [tickBerjalan, setTickBerjalan] = useState(0);
+  useEffect(() => {
+    if (!isWorkoutActive || !workoutStartTime) return;
+    const id = setInterval(() => setTickBerjalan(n => n + 1), 30000);
+    return () => clearInterval(id);
+  }, [isWorkoutActive, workoutStartTime]);
+
+  const sesiBerjalan = React.useMemo(() => {
+    if (!isWorkoutActive || !workoutStartTime) return null;
+    const menit = Math.max(0, Math.floor((Date.now() - workoutStartTime) / 60000));
+    const adaLog = Object.keys(exerciseLogs || {}).length > 0;
+    if (menit < 1 && !adaLog) return null;
+    const w = { duration: menit, log: exerciseLogs, exercises: [] };
+    return { menit, kkal: Math.round(calculateSmartWorkoutCalories(userProfile?.weight, w, exerciseLogs) || 0) };
+    // tickBerjalan sengaja jadi dependensi: dialah satu-satunya yang membuat angka ini maju
+    // sementara user diam di tab kalender.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isWorkoutActive, workoutStartTime, exerciseLogs, userProfile?.weight, tickBerjalan]);
+
   const isImp = unitSystem === 'imperial';
   const [calendarDate, setCalendarDate] = useState(() => {
     if (selectedDate) {
@@ -962,12 +991,15 @@ const CalendarTab = ({
             let ringRender = null;
             const dayData = history[dateKey] || {};
             const totalSteps = parseInt(dayData.bioData?.steps) || 0;
-            const hasActivity = workouts.length > 0 || totalSteps > 0;
+            const berjalan = dateKey === todayStr ? sesiBerjalan : null;
+            const hasActivity = workouts.length > 0 || totalSteps > 0 || !!berjalan;
 
             if (showMonthlyStats && hasActivity) {
                const completedWorkouts = workouts.filter(w => checkIsCompletedStrict(w, dateKey));
-               let totalDuration = 0;
-               let totalCalories = 0;
+               // Sesi berjalan jadi nilai awal, sesi tersimpan ditumpuk di atasnya — hari dengan
+               // satu sesi selesai plus satu sesi berjalan tetap benar.
+               let totalDuration = berjalan?.menit || 0;
+               let totalCalories = berjalan?.kkal || 0;
                completedWorkouts.forEach(w => {
                  const dur = parseWorkoutDurationMinutes(w.duration) || 0;
                  totalDuration += dur;
