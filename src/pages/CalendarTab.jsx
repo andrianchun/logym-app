@@ -8,7 +8,7 @@ import { Capacitor } from '@capacitor/core';
 import SwipeInput from '../components/SwipeInput';
 import { getLocalYMD, resolveProjectedProgramId, getDayWorkouts as sharedGetDayWorkouts, deletedProjectedMap, hasDeletedProjected } from '../data/constants';
 import { formatNumber } from '../utils/numberFormat';
-import { parseWorkoutDurationMinutes, calculateWorkoutCalories, calculateSmartWorkoutCalories, resolveExerciseKind } from '../utils/workoutCalc';
+import { parseWorkoutDurationMinutes, calculateWorkoutCalories, calculateSmartWorkoutCalories, resolveExerciseKind, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from '../utils/workoutCalc';
 import PanoramicSlider from '../components/PanoramicSlider';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { getLogyNotification } from '../utils/aiAgent';
@@ -340,10 +340,10 @@ const CalendarTab = ({
     if (touchStart.current === null || touchEnd.current === null || touchStartY.current === null || touchEndY.current === null) return;
     const distanceX = touchStart.current - touchEnd.current;
     const distanceY = touchStartY.current - touchEndY.current;
-    const isLeftSwipe = distanceX > 40 && Math.abs(distanceX) > Math.abs(distanceY);
-    const isRightSwipe = distanceX < -40 && Math.abs(distanceX) > Math.abs(distanceY);
-    const isUpSwipe = distanceY > 40 && Math.abs(distanceY) > Math.abs(distanceX);
-    const isDownSwipe = distanceY < -40 && Math.abs(distanceY) > Math.abs(distanceX);
+    const isLeftSwipe = distanceX > 85 && Math.abs(distanceX) > Math.abs(distanceY) * 1.4;
+    const isRightSwipe = distanceX < -85 && Math.abs(distanceX) > Math.abs(distanceY) * 1.4;
+    const isUpSwipe = distanceY > 85 && Math.abs(distanceY) > Math.abs(distanceX) * 1.4;
+    const isDownSwipe = distanceY < -85 && Math.abs(distanceY) > Math.abs(distanceX) * 1.4;
 
     if (isUpSwipe && calendarMode === 'monthly') { setCalendarDate(new Date(selectedDate)); setCalendarMode('weekly'); }
     else if (isDownSwipe && calendarMode === 'weekly') { setCalendarMode('monthly'); }
@@ -1175,7 +1175,7 @@ const CalendarTab = ({
                 const panelCells = getGridCellsForDate(panelDate);
 
                 return (
-                  <div className="grid grid-cols-7 gap-0 px-2 py-1">
+                  <div className="grid grid-cols-7 gap-0 px-2 py-1 max-w-xl mx-auto w-full">
                     {panelCells.map((dateObj, idx) => {
                       if (!dateObj) return <div key={`blank-${idx}`} className="p-1"></div>;
                       const dateKey = getLocalYMD(dateObj);
@@ -1679,7 +1679,7 @@ const CalendarTab = ({
                                                     padahal masih menggantung di sesi berjalan, dan yang tersimpan cuma di
                                                     perangkat itu. Durasi 0 menit di kartunya adalah gejala yang sama. */}
                                                 <div className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
-                                                  isRunningSession ? 'bg-emerald-500/20 text-emerald-500 border border-emerald-500/40 animate-pulse'
+                                                  isRunningSession ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 animate-pulse'
                                                     : w.status === 'completed' ? c.badge
                                                     : isCompleted ? 'bg-amber-500/20 text-amber-500 border border-amber-500/40'
                                                     : 'bg-black/10 dark:bg-white/10 ' + c.text}`}>
@@ -1738,13 +1738,19 @@ const CalendarTab = ({
                                                               }
                                                             }
                                                         } else {
-                                                            const maxW = Math.max(...doneSets.map(s => Number(s.w) || 0)) || ex.defaultWeight || 0;
+                                                            const maxW = Math.max(...doneSets.map(s => Number(s.input_w !== undefined ? s.input_w : s.w) || 0)) || ex.defaultWeight || 0;
+                                                            const eqConf = getEquipmentConfig(null, null, ex, userProfile);
+                                                            const maxActW = Math.max(...doneSets.map(s => getSetActualWeight(s, eqConf))) || calculateActualWeight(maxW, eqConf);
                                                             const maxR = Math.max(...doneSets.map(s => Number(s.r) || 0)) || ex.reps || 0;
                                                             const maxD = Math.max(...doneSets.map(s => Number(s.d) || 0)) || ex.duration || 0;
                                                             
                                                             if (exType === 'time') textStr = `${doneSets.length} x ${formatNumber(maxD, langId)}s`;
                                                             else if (exType === 'reps') textStr = `${doneSets.length} x ${formatNumber(maxR, langId)}`;
-                                                            else textStr = `${doneSets.length} x ${formatNumber(maxR, langId)} x ${isImp ? formatNumber(Math.round(maxW * 2.20462 * 10)/10, langId) + ' lbs' : formatNumber(maxW, langId) + ' kg'}`;
+                                                            else {
+                                                              const wStr = isImp ? formatNumber(Math.round(maxW * 2.20462 * 10)/10, langId) + ' lbs' : formatNumber(maxW, langId) + ' kg';
+                                                              const actWStr = isImp ? formatNumber(Math.round(maxActW * 2.20462 * 10)/10, langId) + ' lbs' : formatNumber(maxActW, langId) + ' kg';
+                                                              textStr = `${doneSets.length} x ${formatNumber(maxR, langId)} x ${wStr}${maxActW !== maxW && maxActW > 0 ? ` (Aktual: ${actWStr})` : ''}`;
+                                                            }
                                                         }
                                                      } else textStr = "Belum dimulai";
                       
@@ -1914,7 +1920,7 @@ const CalendarTab = ({
 
       {/* Clipboard Banner */}
       {clipboardAction && clipboardSourceDate && (
-        <div className={`fixed bottom-[calc(5rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 flex justify-center animate-in slide-in-from-bottom-8 fade-in duration-300 pointer-events-none`}>
+        <div className={`fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 flex justify-center animate-in slide-in-from-bottom-8 fade-in duration-300 pointer-events-none`}>
           <div className={`pointer-events-auto w-full max-w-md mx-auto p-4 rounded-2xl shadow-xl flex items-center justify-between gap-4 ${t.bgCard} border ${t.border}`}>
             <div className="flex-1">
               <div className="font-bold body-md">Pilih Tanggal Tujuan</div>

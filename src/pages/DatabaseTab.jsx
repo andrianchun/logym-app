@@ -823,62 +823,61 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
             </button>
           </div>
 
-          {/* Filter Panel */}
+          {/* Filter Panel (Compact 3-Row Layout) */}
           {showFilters && (
-            <div className={`p-3 rounded-xl border ${t.border} ${t.bgCard} space-y-2 animate-in fade-in duration-200`}>
+            <div className={`p-3 rounded-2xl border ${t.border} ${theme === 'dark' ? 'bg-slate-900/90' : 'bg-white/95'} backdrop-blur-xl space-y-2 animate-in fade-in duration-200 shadow-md`}>
+              {/* Baris 1: Otot */}
               <FilterChips
                 t={t}
-                label={lang?.muscleGroup || 'Grup Otot'}
+                label={lang?.muscleGroup || 'Otot'}
                 options={muscleOptions}
                 selected={muscleFilter}
                 onToggle={(v) => toggleFilter(muscleFilter, setMuscleFilter, v)}
                 formatOption={(opt) => formatTarget(opt, lang?.id)}
               />
+              {/* Baris 2: Alat */}
               <FilterChips
                 t={t}
-                label="Equipment"
+                label="Alat"
                 options={allEquipOptions.length > 0 ? allEquipOptions : equipmentOptions}
                 selected={equipFilter}
                 onToggle={(v) => toggleFilter(equipFilter, setEquipFilter, v)}
               />
-              <FilterChips
-                t={t}
-                label="Level"
-                options={levelOptions}
-                selected={levelFilter}
-                onToggle={(v) => toggleFilter(levelFilter, setLevelFilter, v)}
-                formatOption={(opt) => levelLabels[opt] || opt.charAt(0).toUpperCase() + opt.slice(1)}
-              />
-
-              {/* Sort + Clear */}
-              <div className={`flex items-center justify-between pt-3 mt-1 border-t ${t.border}`}>
-                <div className="flex items-center gap-2">
-                  <span className={`text-[10px] font-black uppercase tracking-wider ${t.textMuted}`}>
-                    {lang?.sortBy || 'Urutkan'}
-                  </span>
+              {/* Baris 3: Level + Sort + Reset */}
+              <div className={`flex items-center gap-2 w-full pt-1.5 border-t ${t.border}`}>
+                <div className="flex-1 min-w-0">
+                  <FilterChips
+                    t={t}
+                    label="Level"
+                    options={levelOptions}
+                    selected={levelFilter}
+                    onToggle={(v) => toggleFilter(levelFilter, setLevelFilter, v)}
+                    formatOption={(opt) => levelLabels[opt] || opt.charAt(0).toUpperCase() + opt.slice(1)}
+                  />
+                </div>
+                <div className={`flex items-center gap-1.5 shrink-0 pl-2 border-l ${t.border}`}>
                   <div className="relative">
                     <select 
                       value={sortOrder}
                       onChange={(e) => setSortOrder(e.target.value)}
-                      className={`px-3 py-1.5 rounded-lg ${t.inputBg} ${t.textMain} body-md outline-none appearance-none cursor-pointer pr-7`}
+                      className={`px-2.5 py-1.5 rounded-xl ${t.inputBg} ${t.textMain} text-[11px] font-bold outline-none appearance-none cursor-pointer pr-6 border ${t.border}`}
                     >
-                      <option value="popular">Terpopuler</option>
-                      <option value="newest">Terbaru Ditambahkan</option>
+                      <option value="popular">Sering Dilatih</option>
+                      <option value="newest">Terbaru</option>
                       <option value="az">A - Z</option>
                       <option value="za">Z - A</option>
                     </select>
-                    <ChevronDown size={12} className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${t.textMuted}`} />
+                    <ChevronDown size={11} className={`absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none ${t.textMuted}`} />
                   </div>
+                  {(muscleFilter.length > 0 || equipFilter.length > 0 || levelFilter.length > 0) && (
+                    <button
+                      onClick={() => { setMuscleFilter([]); setEquipFilter([]); setLevelFilter([]); }}
+                      className="px-2 py-1 rounded-lg text-[10px] font-black text-rose-500 hover:bg-rose-500/10 transition-colors shrink-0"
+                    >
+                      Reset
+                    </button>
+                  )}
                 </div>
-                
-                {(muscleFilter.length > 0 || equipFilter.length > 0 || levelFilter.length > 0) && (
-                  <button
-                    onClick={() => { setMuscleFilter([]); setEquipFilter([]); setLevelFilter([]); }}
-                    className="text-[10px] font-black text-rose-500 hover:opacity-80 whitespace-nowrap ml-2"
-                  >
-                    Reset Filter
-                  </button>
-                )}
               </div>
             </div>
           )}

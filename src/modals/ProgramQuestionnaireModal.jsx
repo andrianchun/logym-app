@@ -68,6 +68,8 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
 
   const [touchStart, setTouchStart] = useState(null);
   const [touchEnd, setTouchEnd] = useState(null);
+  const [touchStartY, setTouchStartY] = useState(null);
+  const [touchEndY, setTouchEndY] = useState(null);
 
   const canProceed = () => {
     const currentStep = steps[step];
@@ -91,19 +93,24 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
 
   const handleTouchStart = (e) => {
     setTouchEnd(null);
+    setTouchEndY(null);
     setTouchStart(e.targetTouches[0].clientX);
+    setTouchStartY(e.targetTouches[0].clientY);
   };
 
   const handleTouchMove = (e) => {
     e.stopPropagation();
     setTouchEnd(e.targetTouches[0].clientX);
+    setTouchEndY(e.targetTouches[0].clientY);
   };
 
   const handleTouchEnd = () => {
     if (!touchStart || !touchEnd) return;
     const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > 50;
-    const isRightSwipe = distance < -50;
+    const distanceY = (touchStartY && touchEndY) ? (touchStartY - touchEndY) : 0;
+    if (Math.abs(distance) < Math.abs(distanceY) * 1.4) return; // scroll vertikal — abaikan
+    const isLeftSwipe = distance > 85;
+    const isRightSwipe = distance < -85;
 
     if (isRightSwipe && step > 0) {
       handleBack();
@@ -116,7 +123,7 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
     }
   };
 
-  const isDark = t.bgCard !== 'bg-white';
+  const isDark = t?.bgApp?.includes('dark') ?? true;
   const { dialog, showConfirm, showAlert } = useDialog(isDark, t.bgCard);
   const isImp = units?.weight === 'lbs';
   const isImpHeight = units?.height === 'ft';

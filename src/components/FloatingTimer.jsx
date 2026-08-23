@@ -40,8 +40,8 @@ const FloatingTimer = ({
           // menumpuk — dua penerbit untuk satu kejadian terdengar sebagai gema. App.jsx
           // pemilik tunggalnya; di sini cukup hitungan mundur 3-2-1.
           prevRestRef.current = remaining;
+          setLocalRestTimer(remaining);
         }
-        setLocalRestTimer(remaining);
       };
       updateTimer();
       interval = setInterval(updateTimer, 500); // 500ms for more responsive UI
@@ -51,6 +51,42 @@ const FloatingTimer = ({
     }
     return () => clearInterval(interval);
   }, [restTargetTime, soundEnabled]);
+
+  const [activeSetTimerInfo, setActiveSetTimerInfo] = React.useState(null);
+
+  useEffect(() => {
+    const handleTimerChange = () => {
+      if (window.logymActiveTimer?.timer) {
+        setActiveSetTimerInfo({ ...window.logymActiveTimer });
+      } else {
+        setActiveSetTimerInfo(null);
+      }
+    };
+    window.addEventListener('logym_active_timer_change', handleTimerChange);
+    handleTimerChange();
+
+    const interval = setInterval(() => {
+      if (window.logymActiveTimer?.timer) {
+        const cur = window.logymActiveTimer.timer;
+        let left = 0;
+        if (cur.mode === 'down' && cur.targetTime) {
+          left = Math.max(0, Math.ceil((cur.targetTime - Date.now()) / 1000));
+        } else if (cur.mode === 'up' && cur.startTime) {
+          left = Math.floor((Date.now() - cur.startTime) / 1000);
+        } else {
+          left = cur.timeLeft || 0;
+        }
+        setActiveSetTimerInfo({ ...window.logymActiveTimer, currentSeconds: left });
+      } else {
+        setActiveSetTimerInfo(null);
+      }
+    }, 500);
+
+    return () => {
+      window.removeEventListener('logym_active_timer_change', handleTimerChange);
+      clearInterval(interval);
+    };
+  }, []);
 
   useEffect(() => {
     let interval;
@@ -110,7 +146,7 @@ const FloatingTimer = ({
   const activeExerciseName = (sessionExercises || []).find(e => String(e.id) === String(activeExerciseId))?.name || '';
 
   return (
-    <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 pointer-events-none flex justify-center animate-in slide-in-from-bottom-8 fade-in duration-300">
+    <div className="fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 pointer-events-none flex justify-center animate-in slide-in-from-bottom-8 fade-in duration-300">
       <div 
         className={`pointer-events-auto w-full max-w-2xl mx-auto flex items-center justify-between px-6 py-4 rounded-full ${t.bgAccent} text-white shadow-xl shadow-[color:var(--tw-shadow-color)] cursor-pointer active:scale-95 transition-all border border-white/20`} 
         style={{ shadowColor: 'rgba(0,0,0,0.3)' }}
@@ -127,19 +163,31 @@ const FloatingTimer = ({
       </div>
 
       <div className="flex items-center gap-2">
-        {showTimer && (
-          <div className="flex items-center bg-black/20 rounded-full shadow-inner px-4 py-1.5 min-w-[90px] justify-center gap-2">
-            <span className="text-[10px] font-black uppercase text-white/70 tracking-widest mr-1">
+        {showTimer ? (
+          <div className={`flex items-center rounded-full shadow-inner px-4 py-1.5 min-w-[90px] justify-center gap-2 transition-colors ${
+            localRestTimer < -30 ? 'bg-rose-600 animate-pulse text-white' :
+            localRestTimer <= 0 ? 'bg-amber-500 text-white' :
+            'bg-black/20 text-white'
+          }`}>
+            <span className="text-[10px] font-black uppercase text-white/80 tracking-widest mr-1">
                REST
             </span>
-            <Clock size={16} className={`animate-pulse ${localRestTimer < 0 ? 'text-rose-300' : 'text-white'}`} />
-            <span className={`font-mono font-black h2 ${localRestTimer < 0 ? 'text-rose-300' : 'text-white'}`}>
+            <Clock size={16} className={`animate-pulse ${localRestTimer < -30 ? 'text-white' : localRestTimer <= 0 ? 'text-white' : 'text-white'}`} />
+            <span className="font-mono font-black h2 text-white">
               {formatTime(localRestTimer)}
             </span>
           </div>
-        )}
-        
-        {!showTimer && (
+        ) : activeSetTimerInfo && activeSetTimerInfo.currentSeconds !== undefined ? (
+          <div className="flex items-center rounded-full shadow-inner px-4 py-1.5 min-w-[90px] justify-center gap-2 bg-rose-500 text-white animate-pulse">
+            <span className="text-[10px] font-black uppercase text-white/90 tracking-widest mr-1">
+               SET
+            </span>
+            <Clock size={16} className="text-white" />
+            <span className="font-mono font-black h2 text-white">
+              {formatTime(activeSetTimerInfo.currentSeconds)}
+            </span>
+          </div>
+        ) : (
           <div className="bg-black/20 px-5 py-2 rounded-full text-white font-black body-md uppercase tracking-wider">
              Lanjutkan
           </div>

@@ -2,9 +2,9 @@ import React from 'react';
 
 const FilterChips = ({ t, label, options, selected, onToggle, formatOption }) => {
   return (
-    <div className="space-y-1.5">
-      <span className={`text-[10px] font-black uppercase tracking-wider ${t.textMuted}`}>{label}</span>
-      <div className={`no-swipe flex gap-1.5 overflow-x-auto hide-scrollbar pb-1.5`}>
+    <div className="flex items-center gap-2 w-full overflow-hidden">
+      <span className={`text-[11px] font-black uppercase tracking-wider shrink-0 w-14 text-left ${t.textMuted}`}>{label}</span>
+      <div className="no-swipe flex-1 flex gap-1.5 overflow-x-auto hide-scrollbar py-0.5">
         {options.map(opt => (
           <button
             key={opt}
@@ -12,7 +12,7 @@ const FilterChips = ({ t, label, options, selected, onToggle, formatOption }) =>
             className={`px-3 py-1.5 rounded-xl text-[11px] font-bold whitespace-nowrap transition-all duration-150 flex-shrink-0 ${
               selected.includes(opt)
                 ? `${t.bgAccent} text-white shadow-sm border border-transparent`
-                : `bg-transparent border border-solid ${t.border} ${t.textMuted} hover:border-[rgba(183,147,71,0.5)]`
+                : `bg-transparent border border-solid ${t.border} ${t.textMuted} hover:border-[rgba(59,130,246,0.5)]`
             }`}
           >
             {formatOption ? formatOption(opt) : opt}

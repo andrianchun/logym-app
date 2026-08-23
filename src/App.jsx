@@ -53,7 +53,7 @@ import { fetchExercisesFromApi } from './utils/exerciseDbApi';
 import { AI_MODELS, detectPlateaus, getLogyNotification } from './utils/aiAgent';
 import { calculateReadiness, restingHrBaseline } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
-import { calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, recomputeStrengthRecords, buildHcSessionDetail, estimate10RM, defaultSetWeight, gymStepFor, mergeRm10 } from './utils/workoutCalc';
+import { calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, recomputeStrengthRecords, buildHcSessionDetail, estimate10RM, defaultSetWeight, gymStepFor, mergeRm10, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from './utils/workoutCalc';
 import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcReadHeartRateWindow, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission, capIntradayLog, HC_FIELDS, fillOnlyPatch, hcDroppedTypes } from './utils/healthConnect';
 import { bumpExercisePopularity } from './utils/exercisePopularity';
 import { rapikanNamaProgram, rapikanNamaSesi, pertahankanNamaSesi } from './utils/programNaming';
@@ -111,7 +111,10 @@ export default function App() {
   // --- STATE AUTH & LOADING ---
   const __previewUser = readCache('__PREVIEW_USER', null);
   const __cachedUid = localStorage.getItem('__CACHED_UID');
-  const __cachedUser = __cachedUid ? { uid: __cachedUid, name: 'Sobat Logym' } : null;
+  const __cachedProfile = readCache('__CACHED_PROFILE', null);
+  const __cachedUserName = __cachedProfile?.name || localStorage.getItem('__CACHED_USER_NAME') || '';
+  const __cachedUserPhoto = __cachedProfile?.photoURL || localStorage.getItem('__CACHED_USER_PHOTO') || null;
+  const __cachedUser = __cachedUid ? { uid: __cachedUid, name: __cachedUserName, photoURL: __cachedUserPhoto } : null;
   const [user, setUser] = useState(__previewUser || __cachedUser);
   const [isAuthChecking, setIsAuthChecking] = useState(!__previewUser);
   const [isDataLoaded, setIsDataLoaded] = useState(!!__previewUser || !!__cachedUser);
@@ -317,7 +320,7 @@ export default function App() {
     }
   };
 
-  const [theme, setTheme] = useState('dark');
+  const [theme, setTheme] = useState(() => readCache('__CACHED_THEME', 'dark'));
   const { dialog: otaDialog, showAlert: showOtaAlert } = useDialog(theme === 'dark');
 
   // Izin "Install unknown apps" belum diberikan. Android menolak diam-diam kalau ini dilewat,
@@ -339,20 +342,20 @@ export default function App() {
     setApkError(null);
     showOtaAlert(pesan, { title: 'Pembaruan gagal', type: 'error' });
   }, [apkError, showOtaAlert]);
-  const [language, setLanguage] = useState('ID');
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [language, setLanguage] = useState(() => readCache('__CACHED_LANGUAGE', 'ID'));
+  const [soundEnabled, setSoundEnabled] = useState(() => readCache('__CACHED_SOUND_ENABLED', true));
   const [healthConnectEnabled, setHealthConnectEnabled] = useState(false);
-  const [defaultRestTime, setDefaultRestTime] = useState(120);
+  const [defaultRestTime, setDefaultRestTime] = useState(() => readCache('__CACHED_DEFAULT_REST_TIME', 120));
   const [warmupVideos, _setWarmupVideos] = useState(defaultWarmupVideos);
   const setWarmupVideos = _setWarmupVideos;
   const [cooldownVideos, _setCooldownVideos] = useState(defaultCooldownVideos);
   const setCooldownVideos = _setCooldownVideos;
-  const [weekStartDay, setWeekStartDay] = useState(0); 
-  const [defaultReminderTime, setDefaultReminderTime] = useState("15:00");
-  const [reminderEnabled, setReminderEnabled] = useState(true);
-  const [biometricStandard, setBiometricStandard] = useState('asia'); 
-  const [unitSystem, setUnitSystem] = useState('metric'); 
-  const [units, setUnits] = useState({ weight: 'kg', height: 'cm', distance: 'km', temp: 'c' });
+  const [weekStartDay, setWeekStartDay] = useState(() => readCache('__CACHED_WEEK_START_DAY', 0)); 
+  const [defaultReminderTime, setDefaultReminderTime] = useState(() => readCache('__CACHED_REMINDER_TIME', "15:00"));
+  const [reminderEnabled, setReminderEnabled] = useState(() => readCache('__CACHED_REMINDER_ENABLED', true));
+  const [biometricStandard, setBiometricStandard] = useState(() => readCache('__CACHED_BIOMETRIC_STANDARD', 'asia')); 
+  const [unitSystem, setUnitSystem] = useState(() => readCache('__CACHED_UNIT_SYSTEM', 'metric')); 
+  const [units, setUnits] = useState(() => readCache('__CACHED_UNITS', { weight: 'kg', height: 'cm', distance: 'km', temp: 'c' }));
   const [userProfile, _setUserProfile] = useState(() => __previewUser ? null : readCache('__CACHED_PROFILE', null));
   const setUserProfile = _setUserProfile;
 
@@ -361,20 +364,44 @@ export default function App() {
     writeCache('__CACHED_PROFILE', userProfile);
   }, [userProfile]);
 
-  const [gymProfiles, _setGymProfiles] = useState([{ id: 'default', name: 'Logym', equipment: 'all', config: {} }]);
+  const [gymProfiles, _setGymProfiles] = useState(() => __previewUser ? [{ id: 'default', name: 'Logym', equipment: 'all', config: {} }] : readCache('__CACHED_GYM_PROFILES', [{ id: 'default', name: 'Logym', equipment: 'all', config: {} }]));
   const setGymProfiles = _setGymProfiles;
-  const [activeGymId, _setActiveGymId] = useState('default');
+  const [activeGymId, _setActiveGymId] = useState(() => __previewUser ? 'default' : readCache('__CACHED_ACTIVE_GYM_ID', 'default'));
   const setActiveGymId = _setActiveGymId;
+
+  useEffect(() => {
+    if (__previewUser) return;
+    writeCache('__CACHED_GYM_PROFILES', gymProfiles);
+  }, [gymProfiles]);
+
+  useEffect(() => {
+    if (__previewUser) return;
+    writeCache('__CACHED_ACTIVE_GYM_ID', activeGymId);
+  }, [activeGymId]);
+
   const [userApiKeys, _setUserApiKeys] = useState([]);
   const setUserApiKeys = _setUserApiKeys;
   const [keyStatuses, setKeyStatuses] = useState({});
-  const [logyPersona, setLogyPersona] = useState('santai');
+  const [logyPersona, setLogyPersona] = useState(() => readCache('__CACHED_LOGY_PERSONA', 'santai'));
   const [logyCustomInstruction, setLogyCustomInstruction] = useState('');
   const [logyMemory, _setLogyMemory] = useState([]);
   const setLogyMemory = _setLogyMemory;
   const [hasUnreadChat, setHasUnreadChat] = useState(false);
-  const [activityTargets, _setActivityTargets] = useState({ steps: 10000, dailyActiveMinutes: 30, sleep: 8 });
+  const [activityTargets, _setActivityTargets] = useState(() => readCache('__CACHED_ACTIVITY_TARGETS', { steps: 10000, dailyActiveMinutes: 30, sleep: 8 }));
   const setActivityTargets = _setActivityTargets;
+
+  useEffect(() => { writeCache('__CACHED_THEME', theme); }, [theme]);
+  useEffect(() => { writeCache('__CACHED_LANGUAGE', language); }, [language]);
+  useEffect(() => { writeCache('__CACHED_SOUND_ENABLED', soundEnabled); }, [soundEnabled]);
+  useEffect(() => { writeCache('__CACHED_DEFAULT_REST_TIME', defaultRestTime); }, [defaultRestTime]);
+  useEffect(() => { writeCache('__CACHED_WEEK_START_DAY', weekStartDay); }, [weekStartDay]);
+  useEffect(() => { writeCache('__CACHED_REMINDER_TIME', defaultReminderTime); }, [defaultReminderTime]);
+  useEffect(() => { writeCache('__CACHED_REMINDER_ENABLED', reminderEnabled); }, [reminderEnabled]);
+  useEffect(() => { writeCache('__CACHED_BIOMETRIC_STANDARD', biometricStandard); }, [biometricStandard]);
+  useEffect(() => { writeCache('__CACHED_UNIT_SYSTEM', unitSystem); }, [unitSystem]);
+  useEffect(() => { writeCache('__CACHED_UNITS', units); }, [units]);
+  useEffect(() => { writeCache('__CACHED_ACTIVITY_TARGETS', activityTargets); }, [activityTargets]);
+  useEffect(() => { writeCache('__CACHED_LOGY_PERSONA', logyPersona); }, [logyPersona]);
 
   useEffect(() => {
     if (!isDataLoaded) return;
@@ -1214,6 +1241,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+
     if (Capacitor.isNativePlatform()) {
       import('@capacitor/status-bar').then(({ StatusBar, Style }) => {
           StatusBar.setOverlaysWebView({ overlay: true }).catch(err => console.log(err));
@@ -1585,15 +1618,21 @@ export default function App() {
           setMainBaseline(null);
           localStorage.removeItem('__CACHED_HISTORY');
         }
+        const profileCached = readCache('__CACHED_PROFILE', null);
+        const resolvedName = currentUser.displayName || profileCached?.name || localStorage.getItem('__CACHED_USER_NAME') || '';
         setUser({
            uid: currentUser.uid, 
            email: currentUser.email, 
-           name: currentUser.displayName || 'Sobat Logym',
-           photoURL: currentUser.photoURL
+           name: resolvedName,
+           photoURL: currentUser.photoURL || profileCached?.photoURL || localStorage.getItem('__CACHED_USER_PHOTO') || null
         });
         localStorage.setItem('__CACHED_UID', currentUser.uid);
+        if (resolvedName) localStorage.setItem('__CACHED_USER_NAME', resolvedName);
+        if (currentUser.photoURL) localStorage.setItem('__CACHED_USER_PHOTO', currentUser.photoURL);
       } else {
         localStorage.removeItem('__CACHED_UID');
+        localStorage.removeItem('__CACHED_USER_NAME');
+        localStorage.removeItem('__CACHED_USER_PHOTO');
         setHistoryBaseline(null);
         setMainBaseline(null);
         setUser(null);
@@ -2958,11 +2997,23 @@ export default function App() {
     // ini pencocokan cuma jalan lewat nama — dan dua salinan lain dari fungsi yang sama
     // (WorkoutTab, ImmersiveWorkout) sudah punya klausa itu sejak dulu.
     const libMatch = exerciseLibrary.find(e => e.id === ex?.originalId || e.id === ex?.id || e.name?.toLowerCase() === ex?.name?.toLowerCase());
-    const suggestedWeight = defaultSetWeight(libMatch, ex,
-      gymStepFor(gymProfiles, activeGymId, ex?.equipment, units?.weight === 'lbs'));
+    const step = gymStepFor(gymProfiles, activeGymId, ex?.equipment, units?.weight === 'lbs');
+    let suggestedWeight = defaultSetWeight(libMatch, ex, step);
+    
+    const isDeload = history?.[selectedDate]?.wellness === 'deload' || history?.[selectedDate]?.isDeloadWeek;
+    if (isDeload && suggestedWeight > 0) {
+      suggestedWeight = Math.max(0, Math.round((suggestedWeight * 0.825) / step) * step);
+    }
+
+    const eqConf = getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile);
+    const total_w = calculateActualWeight(suggestedWeight, eqConf);
 
     return Array.from({length: ex?.sets || 3}).map(() => ({ 
       w: suggestedWeight, 
+      input_w: suggestedWeight,
+      base_w: eqConf.baseWeight,
+      ratio: eqConf.ratio,
+      total_w: total_w,
       r: ex?.reps || 10, 
       d: ex?.duration || 10, 
       done: false 
@@ -2975,13 +3026,40 @@ export default function App() {
       const currentLogs = prev[exId] ? [...prev[exId]] : getSetLogs(ex, exId);
       
       const finalVal = (field === 'notes') ? val : Number(val);
-      currentLogs[setIdx] = { ...currentLogs[setIdx], [field]: finalVal };
+      const eqConf = getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile);
+      
+      let updatedSet = { ...currentLogs[setIdx], [field]: finalVal };
+      if (field === 'w' || field === 'input_w') {
+        const input_w = Number(val) || 0;
+        const total_w = calculateActualWeight(input_w, eqConf);
+        updatedSet = {
+          ...updatedSet,
+          w: input_w,
+          input_w: input_w,
+          base_w: eqConf.baseWeight,
+          ratio: eqConf.ratio,
+          total_w: total_w
+        };
+      }
 
-      if (['w', 'r', 'd'].includes(field)) {
+      currentLogs[setIdx] = updatedSet;
+
+      if (['w', 'r', 'd', 'input_w'].includes(field)) {
         if (currentLogs[setIdx].type !== 'warmup') {
           for (let i = setIdx + 1; i < currentLogs.length; i++) {
             if (!currentLogs[i].done && currentLogs[i].type !== 'warmup') {
-              currentLogs[i] = { ...currentLogs[i], [field]: finalVal };
+              if (field === 'w' || field === 'input_w') {
+                currentLogs[i] = {
+                  ...currentLogs[i],
+                  w: updatedSet.w,
+                  input_w: updatedSet.input_w,
+                  base_w: updatedSet.base_w,
+                  ratio: updatedSet.ratio,
+                  total_w: updatedSet.total_w
+                };
+              } else {
+                currentLogs[i] = { ...currentLogs[i], [field]: finalVal };
+              }
             }
           }
         }
@@ -4092,7 +4170,7 @@ export default function App() {
          {activeTab === 'workout' && (
              <WorkoutTab 
               setConfirmModal={setConfirmModal}
-              t={t} lang={lang} language={language} programs={programs} selectedDate={selectedDate} setSelectedDate={setSelectedDate}
+              t={t} theme={theme} lang={lang} language={language} programs={programs} selectedDate={selectedDate} setSelectedDate={setSelectedDate}
               history={history} setHistory={setHistory} setActiveTab={setActiveTab}
               units={units} userProfile={userProfile}
               tabSlideDir={tabSlideDir}
@@ -4144,7 +4222,7 @@ export default function App() {
          {activeTab === 'program' && (
              <ProgramTab setConfirmModal={setConfirmModal} 
                onPostCreated={handlePostCreated}
-               t={t} lang={lang} programs={programs} setPrograms={setPrograms} 
+               t={t} theme={theme} lang={lang} programs={programs} setPrograms={setPrograms} 
                user={user} exerciseLibrary={exerciseLibrary} soundEnabled={soundEnabled}
                setActiveAddModalTarget={setActiveAddModalTarget}
                saveStateToHistory={saveStateToHistory}

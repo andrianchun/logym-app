@@ -1,6 +1,23 @@
 export const equipmentOptions = ["Assisted", "Band", "Barbell", "Body Weight", "Bosu Ball", "Cable", "Dumbbell", "Elliptical Machine", "EZ Barbell", "Hammer", "Kettlebell", "Leverage Machine", "Machine", "Medicine Ball", "Olympic Barbell", "Resistance Band", "Roller", "Rope", "Rowing Machine", "Skierg", "Sled Machine", "Smith Machine", "Stability Ball", "Stationary Bike", "Stepmill Machine", "Tire", "Trap Bar", "Treadmill", "Upper Body Ergometer", "Weighted", "Wheel Roller", "Lainnya"];
 export const levelOptions = ["beginner", "intermediate", "advanced"];
 
+export const defaultEquipmentConfig = {
+  'Olympic Barbell': { baseWeight: 20, ratio: 1, inputRule: 'total_plates', label: 'Total Plat (2 Sisi)', placeholder: 'Ketikan total plat' },
+  'Barbell': { baseWeight: 20, ratio: 1, inputRule: 'total_plates', label: 'Total Plat (2 Sisi)', placeholder: 'Ketikan total plat' },
+  'EZ Barbell': { baseWeight: 10, ratio: 1, inputRule: 'total_plates', label: 'Total Plat (2 Sisi)', placeholder: 'Ketikan total plat' },
+  'Trap Bar': { baseWeight: 20, ratio: 1, inputRule: 'total_plates', label: 'Total Plat (2 Sisi)', placeholder: 'Ketikan total plat' },
+  'Smith Machine': { baseWeight: 15, ratio: 1, inputRule: 'total_plates', label: 'Total Plat (2 Sisi)', placeholder: 'Ketikan total plat' },
+  'Dumbbell': { baseWeight: 0, ratio: 1, inputRule: 'per_side', label: 'Beban 1 Sisi', placeholder: 'Ketikan beban 1 sisi' },
+  'Kettlebell': { baseWeight: 0, ratio: 1, inputRule: 'per_side', label: 'Beban 1 Sisi', placeholder: 'Ketikan beban 1 sisi' },
+  'Cable': { baseWeight: 0, ratio: 1, inputRule: 'per_side_or_pin', label: 'Beban 1 Sisi / Pin', placeholder: 'Ketikan beban 1 sisi / pin' },
+  'Machine': { baseWeight: 0, ratio: 1, inputRule: 'pin_number', label: 'Angka di Pin', placeholder: 'Ketikan angka di pin' },
+  'Leverage Machine': { baseWeight: 20, ratio: 1, inputRule: 'total_plates', label: 'Total Plat (2 Sisi)', placeholder: 'Ketikan total plat' },
+  'Sled Machine': { baseWeight: 45, ratio: 1, inputRule: 'total_plates', label: 'Total Plat (2 Sisi)', placeholder: 'Ketikan total plat' },
+  'Weighted': { baseWeight: 0, ratio: 1, isBodyweightPlus: true, inputRule: 'extra_weight', label: 'Beban Tambahan', placeholder: 'Ketikan beban tambahan' },
+  'Body Weight': { baseWeight: 0, ratio: 1, inputRule: 'bodyweight', label: 'Berat Badan', placeholder: '0' },
+  'Assisted': { baseWeight: 0, ratio: 1, inputRule: 'assisted', label: 'Bantuan Pin', placeholder: 'Beban bantuan' },
+};
+
 export const exerciseTypeLabels = {
   weight: 'Beban & Repetisi',
   reps: 'Repetisi',

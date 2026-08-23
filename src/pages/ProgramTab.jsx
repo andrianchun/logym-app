@@ -140,7 +140,7 @@ const SortableExerciseItem = ({ ex, prevEx, idx, routineId, t, lang, soundEnable
 };
 
 const ProgramTab = ({
-  t, lang, programs, setPrograms, user, exerciseLibrary, soundEnabled,
+  t, theme, lang, programs, setPrograms, user, exerciseLibrary, soundEnabled,
   setActiveAddModalTarget, saveStateToHistory, openQuestionnaire,
   activePlanIds, setActivePlanIds, gymProfiles, activeGymId,
   focusRoutineId, setFocusRoutineId, setConfirmModal, activityTargets,
@@ -149,7 +149,7 @@ const ProgramTab = ({
   setHighlightPostId, setShowProfileModal, setProfileForceTab, onPostCreated
 }) => {
   
-  const isDark = t.bgCard !== 'bg-white';
+  const isDark = theme === 'dark' || (t?.bgApp?.includes('dark') ?? true);
   const { dialog, showAlert } = useDialog(isDark);
   const [expandedRoutineId, setExpandedRoutineId] = useState(null);
   // Rincian sesi yang sedang dibuka di KARTU program (bukan di editor). SATU id saja — membuka
@@ -704,11 +704,10 @@ const ProgramTab = ({
   };
 
   const renderPlanCard = (planId, group, isActive, layout = 'mobile') => {
-    const bgConfig = group.isAI 
-        ? { url: '/bg-calendar.webp', position: 'center', bgSize: 'cover' } 
-        : getPlanBgConfig(group.planName);
+    const bgConfig = getPlanBgConfig(group.planName, planId);
 
-    return (      <div id={`plan-${layout}-${planId}`} key={planId} className={`scroll-mt-24 rounded-[2rem] border ${isActive ? t.borderAccent : 'border-white/10'} shadow-[0_8px_30px_rgb(0,0,0,0.12)] overflow-hidden transition-all flex flex-col relative min-h-[350px] group/card ${t.bgCard}`}>
+    return (
+      <div id={`plan-${layout}-${planId}`} key={planId} className={`scroll-mt-24 rounded-[2rem] border ${isActive ? t.borderAccent : 'border-white/10'} shadow-[0_8px_30px_rgb(0,0,0,0.25)] overflow-hidden transition-all flex flex-col relative min-h-[350px] group/card bg-[#0c1427]/85 backdrop-blur-2xl`}>
               
         {/* Split Header (Left empty, Right glassmorphism) */}
         <div className="flex-none flex flex-row relative z-10 w-full min-h-[350px]">
@@ -717,7 +716,7 @@ const ProgramTab = ({
           <div className="absolute inset-0 z-0 pointer-events-none">
             {/* Base Layer for Glassmorphism */}
             <div 
-              className={`absolute inset-0 ${group.isAI ? 'opacity-20 blur-2xl scale-110' : 'opacity-60'}`}
+              className={`absolute inset-0 opacity-60`}
               style={{
                 backgroundImage: `url('${bgConfig.url}')`,
                 backgroundSize: bgConfig.bgSize || 'cover',
@@ -749,11 +748,11 @@ const ProgramTab = ({
 
           {/* Left Side: Empty space so image shows */}
           <div className="w-[45%] relative">
-             <div className={`absolute inset-0 bg-gradient-to-r ${isDark ? 'from-transparent via-transparent to-[#05070d]/70' : 'from-transparent via-transparent to-black/30'} z-10`} />
+             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-[#05070d]/70 z-10" />
           </div>
           
           {/* Right Side: Content */}
-          <div className={`w-[55%] flex flex-col p-4 sm:p-5 border-l ${isDark ? 'bg-black/60 backdrop-blur-xl border-white/5' : 'bg-black/30 backdrop-blur-xl border-white/10'} shadow-[-10px_0_30px_rgba(0,0,0,0.3)]`}>
+          <div className="w-[55%] flex flex-col p-4 sm:p-5 border-l bg-black/60 backdrop-blur-xl border-white/5 shadow-[-10px_0_30px_rgba(0,0,0,0.3)]">
             
             {/* PLAN HEADER */}
             <div className="flex items-start justify-between gap-2 mb-3">
@@ -764,12 +763,12 @@ const ProgramTab = ({
                       <PlanNameInput
                         initialValue={group.planName}
                         onSave={(newName) => handleRenamePlan(planId, newName)}
-                        className={`w-full bg-transparent font-black text-lg text-white outline-none border-b-2 border-transparent focus:border-white/50 transition-colors pr-2`}
+                        className="w-full bg-transparent font-black text-lg text-white outline-none border-b-2 border-transparent focus:border-white/50 transition-colors pr-2"
                         placeholder="Nama Program..."
                       />
                     </div>
                   ) : (
-                    <h2 className={`font-black text-xl flex-1 flex items-center gap-2 text-white drop-shadow-md leading-tight`}>
+                    <h2 className="font-black text-xl flex-1 flex items-center gap-2 text-white drop-shadow-md leading-tight">
                       {group.planName}
                     </h2>
                   )}
@@ -780,29 +779,38 @@ const ProgramTab = ({
                       ⚠️ {group.planGoal.replace('_', ' ')}
                     </div>
                   )}
-                  {group.planLevel && (
-                    <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded-md bg-white/20 text-white backdrop-blur-md border border-white/10 shadow-sm`}>
-                      {group.planLevel === 'beginner' ? 'Pemula' : group.planLevel === 'intermediate' ? 'Menengah' : group.planLevel === 'advanced' ? 'Mahir' : group.planLevel}
-                    </span>
-                  )}
-                  {planId.startsWith('custom') && (
-                    <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded-md bg-white/20 text-white backdrop-blur-md border border-white/10 shadow-sm`}>
-                      Custom
-                    </span>
-                  )}
-                  {group.isAI && (
-                    <span className={`flex items-center gap-1 px-2 py-0.5 text-[9px] font-black uppercase rounded-md bg-blue-500/30 text-blue-100 backdrop-blur-md border border-blue-400/40 shadow-sm shadow-blue-500/20`}>
-                      <Brain size={10} /> Coach Logy
-                    </span>
-                  )}
+
+                  {/* Origin Badge (Semua satu style biru aksen Logym, program bawaan polos tanpa badge) */}
+                  {(() => {
+                    const isAiPlan = group.isAI || group.routines?.some(r => r.source === 'ai' || r.isAI) || planId.startsWith('plan_ai_') || planId.startsWith('ai-');
+                    const isCommunityPlan = group.routines?.some(r => r.source === 'community' || r.isCommunity || r.sharedBy);
+                    const isCustomPlan = planId.startsWith('custom') || group.routines?.some(r => r.source === 'custom' || r.isCustom);
+
+                    let badgeText = null;
+                    if (isAiPlan) {
+                      badgeText = 'Coach Logy';
+                    } else if (isCommunityPlan) {
+                      const rawUser = group.routines?.find(r => r.sharedBy || r.authorName || r.authorUsername)?.sharedBy ||
+                                      group.routines?.find(r => r.authorName)?.authorName ||
+                                      'komunitas';
+                      badgeText = rawUser.startsWith('@') ? rawUser : `@${rawUser}`;
+                    } else if (isCustomPlan) {
+                      badgeText = 'Custom';
+                    }
+
+                    if (!badgeText) return null; // Program bawaan polos tanpa badge
+
+                    return (
+                      <span className="px-2 py-0.5 text-[9px] font-black uppercase rounded-md bg-blue-500/30 text-blue-100 backdrop-blur-md border border-blue-400/40 shadow-sm shadow-blue-500/20">
+                        {badgeText}
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
 
-            {/* SCHEDULE LIST — badge hari + chevron buka/tutup rincian set x reps x kg.
-                Chevron menggantikan bullet biru yang dulu tidak bisa diapa-apakan: rincian latihan
-                jadi bisa dilihat tanpa masuk mode editor. Badge harinya TAMPILAN saja — nama sesi
-                tetap ramping ("Full Body A", bukan "Rabu: Full Body A"). */}
+            {/* SCHEDULE LIST — badge hari + chevron buka/tutup rincian set x reps x kg. */}
             <div className="flex-1 overflow-y-auto mb-3 border-t border-white/10 pt-3">
                  <div className="flex flex-col gap-1.5">
                      {group.routines.map(r => {
@@ -873,7 +881,7 @@ const ProgramTab = ({
                   {isActive ? 'Aktif' : 'Aktifkan'}
                 </button>
                 <button 
-                  onClick={() => {
+                  onClick={() => { 
                     playSoundEffect('click', soundEnabled);
                     setEditingPlanId(planId);
                     setProgramsSnapshot(JSON.parse(JSON.stringify(programs)));
@@ -882,7 +890,7 @@ const ProgramTab = ({
                       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     }, 150);
                   }}
-                  className={`w-[38px] h-[38px] p-0 rounded-full transition-all flex items-center justify-center bg-white/10 hover:bg-white/20 border border-white/20 text-white shadow-sm shrink-0 active:scale-95`}
+                  className="w-[38px] h-[38px] p-0 rounded-full transition-all flex items-center justify-center bg-white/10 hover:bg-white/20 border border-white/20 text-white shadow-sm shrink-0 active:scale-95"
                   title="Edit Program"
                 >
                   <Edit2 size={15} />
@@ -897,7 +905,7 @@ const ProgramTab = ({
                         await showAlert('Kamu harus login untuk membagikan program.', { type: 'info' });
                       }
                     }}
-                    className={`w-[38px] h-[38px] p-0 rounded-full transition-all flex items-center justify-center bg-white/10 hover:bg-white/20 border border-white/20 text-white shadow-sm shrink-0 active:scale-95`}
+                    className="w-[38px] h-[38px] p-0 rounded-full transition-all flex items-center justify-center bg-white/10 hover:bg-white/20 border border-white/20 text-white shadow-sm shrink-0 active:scale-95"
                     title="Bagikan ke Komunitas"
                   >
                     <Share2 size={15} />
@@ -906,7 +914,6 @@ const ProgramTab = ({
               </div>
             </div>
           </div>
-
       </div>
     );
   };
@@ -1059,26 +1066,26 @@ const ProgramTab = ({
             backgroundRepeat: 'no-repeat',
           }}
         />
-        <div className={`absolute inset-0 z-0 bg-gradient-to-t ${isDark ? 'from-[#05070d]/90 via-[#05070d]/50 to-transparent' : 'from-black/80 via-black/40 to-transparent'} pointer-events-none`} />
+        <div className={`absolute inset-0 z-0 bg-gradient-to-t ${isDark ? 'from-[#05070d]/90 via-[#05070d]/50 to-transparent' : 'from-[#eef3fb] via-[#eef3fb]/60 to-transparent'} pointer-events-none`} />
         {/* ------------------------------ */}
         
         <div className="mt-auto relative z-10 w-full flex flex-col">
-          {/* TEXT HEADER (NO BLUR) */}
+          {/* TEXT HEADER */}
           <div className="w-full sm:w-3/4 p-5 pb-4 sm:p-6 sm:pb-5">
             <div className="flex items-center gap-2 mb-2">
-              <h3 className={`font-black text-3xl text-white drop-shadow-lg`}>Program Latihan</h3>
+              <h3 className={`font-black text-3xl ${isDark ? 'text-white drop-shadow-lg' : 'text-slate-900'}`}>Program Latihan</h3>
             </div>
-            <p className={`text-sm font-medium text-white/90 drop-shadow-md leading-relaxed`}>
+            <p className={`text-sm font-medium ${isDark ? 'text-white/90 drop-shadow-md' : 'text-slate-700'} leading-relaxed`}>
               Jawab beberapa pertanyaan untuk mendapatkan program latihan terbaik yang dipersonalisasi untuk Anda.
             </p>
           </div>
 
           {/* GLASSMORPHISM BUTTONS OVERLAY */}
-          <div className={`w-full ${isDark ? 'bg-black/10 backdrop-blur-sm border-t border-white/10' : 'bg-black/5 backdrop-blur-sm border-t border-white/20'} p-5 pt-4 sm:p-6 sm:pt-4 transition-all duration-300`}>
+          <div className={`w-full ${isDark ? 'bg-black/10 backdrop-blur-sm border-t border-white/10' : 'bg-white/50 backdrop-blur-sm border-t border-black/10'} p-5 pt-4 sm:p-6 sm:pt-4 transition-all duration-300`}>
             <div className="grid grid-cols-2 gap-3">
               <button 
                 onClick={() => { playSoundEffect('click', soundEnabled); openQuestionnaire(); }}
-                className={`w-full py-3.5 rounded-[14px] font-black text-black bg-white shadow-[0_0_20px_rgba(255,255,255,0.3)] active:scale-95 transition-all flex items-center justify-center text-sm`}
+                className={`w-full py-3.5 rounded-[14px] font-black ${isDark ? 'text-black bg-white shadow-[0_0_20px_rgba(255,255,255,0.3)]' : 'text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-500/25'} active:scale-95 transition-all flex items-center justify-center text-sm`}
               >
                 Coach Logy
               </button>
@@ -1086,7 +1093,7 @@ const ProgramTab = ({
                 onClick={() => { 
                   handleCreateCustomPlan(); 
                 }}
-                className={`w-full py-3.5 rounded-[14px] font-bold text-white transition-all active:scale-95 flex items-center justify-center text-sm bg-white/10 hover:bg-white/20 border border-white/20 shadow-sm`}
+                className={`w-full py-3.5 rounded-[14px] font-bold transition-all active:scale-95 flex items-center justify-center text-sm ${isDark ? 'text-white bg-white/10 hover:bg-white/20 border border-white/20 shadow-sm' : 'text-slate-800 bg-black/5 hover:bg-black/10 border border-black/10 shadow-sm'}`}
               >
                 Program Custom
               </button>
@@ -1136,12 +1143,48 @@ const ProgramTab = ({
               name: pendingShareProgram.name || pendingShareProgram.planName || 'Custom Program',
               planName: pendingShareProgram.planName || 'Custom',
               routines: (pendingShareProgram.routines || []).map(r => ({
+                id: r.id,
                 name: r.name,
-                exercises: (r.exercises || []).map(e => ({ name: e.name })),
+                assignedDays: r.assignedDays || [],
+                restTime: r.restTime || pendingShareProgram.restTime || 90,
+                exercises: (r.exercises || []).map(e => ({
+                  id: e.id,
+                  name: e.name,
+                  sets: e.sets || 3,
+                  reps: e.reps || 10,
+                  duration: e.duration || 0,
+                  target: e.target || [],
+                  type: e.type || 'weight',
+                  equipment: e.equipment || 'Lainnya',
+                  defaultWeight: e.defaultWeight || 0,
+                  ytVideo: e.ytVideo || ''
+                })),
               })),
               exercises: pendingShareProgram.routines
-                ? pendingShareProgram.routines.flatMap(r => (r.exercises || []).map(e => ({ name: e.name })))
-                : (pendingShareProgram.exercises || []).map(e => ({ name: e.name })),
+                ? pendingShareProgram.routines.flatMap(r => (r.exercises || []).map(e => ({
+                    id: e.id,
+                    name: e.name,
+                    sets: e.sets || 3,
+                    reps: e.reps || 10,
+                    duration: e.duration || 0,
+                    target: e.target || [],
+                    type: e.type || 'weight',
+                    equipment: e.equipment || 'Lainnya',
+                    defaultWeight: e.defaultWeight || 0,
+                    ytVideo: e.ytVideo || ''
+                  })))
+                : (pendingShareProgram.exercises || []).map(e => ({
+                    id: e.id,
+                    name: e.name,
+                    sets: e.sets || 3,
+                    reps: e.reps || 10,
+                    duration: e.duration || 0,
+                    target: e.target || [],
+                    type: e.type || 'weight',
+                    equipment: e.equipment || 'Lainnya',
+                    defaultWeight: e.defaultWeight || 0,
+                    ytVideo: e.ytVideo || ''
+                  })),
               restTime: pendingShareProgram.restTime || 90,
               userName: user?.name || user?.email?.split('@')[0] || 'Anonim',
             }

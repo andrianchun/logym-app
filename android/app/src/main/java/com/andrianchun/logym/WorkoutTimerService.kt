@@ -34,6 +34,30 @@ class WorkoutTimerService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.Main + serviceJob)
     private var tickerJob: Job? = null
 
+    private val notificationManager by lazy {
+        getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    }
+
+    private var cachedPendingIntent: PendingIntent? = null
+
+    private fun getOrCreatePendingIntent(): PendingIntent {
+        if (cachedPendingIntent == null) {
+            val intent = packageManager.getLaunchIntentForPackage(packageName)
+            cachedPendingIntent = PendingIntent.getActivity(
+                this,
+                0,
+                intent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+        }
+        return cachedPendingIntent!!
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        createNotificationChannel()
+    }
+
     override fun onBind(intent: Intent?): IBinder? {
         return null
     }
@@ -47,7 +71,7 @@ class WorkoutTimerService : Service() {
             // sebagai foreground. Notifikasi 9999 yang dipasang lewat NotificationManager.notify()
             // (mis. dari cabang UPDATE) tidak ikut tercabut dan bertahan walau prosesnya mati —
             // dan karena setOngoing(true), user pun tidak bisa menggesernya. Dicabut eksplisit.
-            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancel(9999)
+            notificationManager.cancel(9999)
             currentStartTime = 0
             stopSelf()
             return START_NOT_STICKY
@@ -110,8 +134,7 @@ class WorkoutTimerService : Service() {
     }
 
     private fun updateNotification() {
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        manager.notify(9999, buildNotification())
+        notificationManager.notify(9999, buildNotification())
     }
 
     private fun formatTime(totalSeconds: Long): String {
@@ -125,15 +148,7 @@ class WorkoutTimerService : Service() {
     }
 
     private fun buildNotification(): android.app.Notification {
-        createNotificationChannel()
-
-        val intent = packageManager.getLaunchIntentForPackage(packageName)
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            intent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
+        val pendingIntent = getOrCreatePendingIntent()
 
         val elapsedSec = (System.currentTimeMillis() - currentStartTime) / 1000
         val durationStr = formatTime(elapsedSec)
@@ -372,10 +387,12 @@ class WorkoutTimerService : Service() {
         if (isResting) {
             val restLeft = kotlin.math.ceil((restTargetTime - System.currentTimeMillis()) / 1000.0).toLong()
             restContainer?.visibility = android.view.View.VISIBLE
-            val formattedRest = formatTime(Math.abs(restLeft))
-            if (restLeft >= 0) {
+            if (restLeft > 0) {
                 tvRestTime?.text = formattedRest
                 tvRestTime?.setTextColor(android.graphics.Color.WHITE)
+            } else if (restLeft >= -30) {
+                tvRestTime?.text = "-$formattedRest"
+                tvRestTime?.setTextColor(android.graphics.Color.parseColor("#F59E0B"))
             } else {
                 tvRestTime?.text = "-$formattedRest"
                 tvRestTime?.setTextColor(android.graphics.Color.parseColor("#F43F5E"))

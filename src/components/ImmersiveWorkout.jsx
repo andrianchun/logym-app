@@ -4,7 +4,7 @@ import { X, Play, Pause, ChevronRight, ChevronLeft, Dumbbell, Check, Info, Clock
 import ScrollPicker from './ScrollPicker';
 import { exerciseTypeLabels } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
-import { calculateWorkoutCalories, calculateLiveWorkoutCalories, resolveExerciseKind, defaultSetWeight, gymStepFor } from '../utils/workoutCalc';
+import { calculateWorkoutCalories, calculateLiveWorkoutCalories, resolveExerciseKind, defaultSetWeight, gymStepFor, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from '../utils/workoutCalc';
 import { WorkoutTimerPlugin } from '../App';
 
 const LiveWorkoutStats = ({ workoutStartTime, isPaused, userProfile, validExercises, exerciseLogs, t, formatTime }) => {
@@ -29,9 +29,13 @@ const LiveWorkoutStats = ({ workoutStartTime, isPaused, userProfile, validExerci
   // `?.let`, jadi nilainya tidak pernah terhapus — begitu immersive di-minimize dan user lanjut
   // lewat kartu, notifikasi terus menyebut latihan lama (bahkan dari sesi lain). Sekarang App.jsx
   // yang memiliki field itu, diturunkan dari activeExerciseId.
+  const lastSentCalories = React.useRef(-1);
   useEffect(() => {
     if (window.Capacitor?.isNativePlatform() && window.Capacitor?.getPlatform() === 'android') {
-      WorkoutTimerPlugin.updateTimer({ calories: caloriesBurned.toString() }).catch(() => {});
+      if (lastSentCalories.current !== caloriesBurned) {
+        lastSentCalories.current = caloriesBurned;
+        WorkoutTimerPlugin.updateTimer({ calories: caloriesBurned.toString() }).catch(() => {});
+      }
     }
   }, [caloriesBurned]);
 
@@ -53,6 +57,7 @@ const LiveSetTimer = ({ timer, onTimerEnd, formatTime, soundEnabled, playSoundEf
     if (timer.mode === 'down') return Math.max(0, Math.ceil((timer.targetTime - Date.now()) / 1000));
     return Math.floor((Date.now() - timer.startTime) / 1000);
   });
+  const prevTimeLeftRef = React.useRef(timeLeft);
 
   useEffect(() => {
     if (timer.idx === null) return;
@@ -62,11 +67,16 @@ const LiveSetTimer = ({ timer, onTimerEnd, formatTime, soundEnabled, playSoundEf
         if (remaining <= 0) {
           playSoundEffect('timerEnd', soundEnabled);
           onTimerEnd();
-        } else {
+        } else if (prevTimeLeftRef.current !== remaining) {
+          prevTimeLeftRef.current = remaining;
           setTimeLeft(remaining);
         }
       } else {
-        setTimeLeft(Math.floor((Date.now() - timer.startTime) / 1000));
+        const elapsed = Math.floor((Date.now() - timer.startTime) / 1000);
+        if (prevTimeLeftRef.current !== elapsed) {
+          prevTimeLeftRef.current = elapsed;
+          setTimeLeft(elapsed);
+        }
       }
     }, 500);
     return () => clearInterval(interval);
@@ -77,17 +87,23 @@ const LiveSetTimer = ({ timer, onTimerEnd, formatTime, soundEnabled, playSoundEf
 
 const LiveRestStats = ({ restTargetTime, setRestTargetTime, isAllDone, theme, t, formatTime }) => {
   const [restTimer, setRestTimer] = useState(0);
+  const prevRestTimerRef = React.useRef(null);
 
   useEffect(() => {
     let interval;
     if (restTargetTime !== null) {
       const updateTimer = () => {
-        setRestTimer(Math.max(0, Math.ceil((restTargetTime - Date.now()) / 1000)));
+        const remaining = Math.max(0, Math.ceil((restTargetTime - Date.now()) / 1000));
+        if (prevRestTimerRef.current !== remaining) {
+          prevRestTimerRef.current = remaining;
+          setRestTimer(remaining);
+        }
       };
       updateTimer();
       interval = setInterval(updateTimer, 500);
     } else {
       setRestTimer(0);
+      prevRestTimerRef.current = null;
     }
     return () => clearInterval(interval);
   }, [restTargetTime]);
@@ -218,18 +234,28 @@ const ImmersiveWorkout = ({
   };
 
 
+  const [showWeightInfo, setShowWeightInfo] = useState(false);
   const [localRestTimer, setLocalRestTimer] = useState(0);
+  const prevLocalRestRef = React.useRef(null);
 
   useEffect(() => {
     let interval;
     if (restTargetTime !== null) {
       const updateTimer = () => {
-        setLocalRestTimer(Math.max(0, Math.ceil((restTargetTime - Date.now()) / 1000)));
+        const remaining = Math.ceil((restTargetTime - Date.now()) / 1000);
+        if (prevLocalRestRef.current !== remaining) {
+          prevLocalRestRef.current = remaining;
+          setLocalRestTimer(remaining);
+          if (remaining <= 0 && remaining >= -30 && Math.abs(remaining) % 5 === 0 && navigator.vibrate) {
+            try { navigator.vibrate([200, 100, 200]); } catch(e) {}
+          }
+        }
       };
       updateTimer();
       interval = setInterval(updateTimer, 500);
     } else {
       setLocalRestTimer(0);
+      prevLocalRestRef.current = null;
     }
     return () => clearInterval(interval);
   }, [restTargetTime]);
@@ -243,10 +269,19 @@ const ImmersiveWorkout = ({
   const getLogsForEx = (exItem) => {
     if (exerciseLogs[exItem.id]) return exerciseLogs[exItem.id];
     const libMatch = exerciseLibrary?.find(e => e.id === exItem.originalId || e.id === exItem.id || e.name?.toLowerCase() === exItem.name?.toLowerCase());
-    const suggestedWeight = defaultSetWeight(libMatch, exItem,
-      gymStepFor(gymProfiles, activeGymId, exItem.equipment, units?.weight === 'lbs'));
+    const step = gymStepFor(gymProfiles, activeGymId, exItem.equipment, units?.weight === 'lbs');
+    let suggestedWeight = defaultSetWeight(libMatch, exItem, step);
+    const eqConf = getEquipmentConfig(gymProfiles, activeGymId, exItem, userProfile);
+    const total_w = calculateActualWeight(suggestedWeight, eqConf);
     return Array.from({length: exItem.sets || 3}).map(() => ({
-      w: suggestedWeight, r: exItem.reps || 10, d: exItem.duration || 10, done: false
+      w: suggestedWeight,
+      input_w: suggestedWeight,
+      base_w: eqConf.baseWeight,
+      ratio: eqConf.ratio,
+      total_w: total_w,
+      r: exItem.reps || 10,
+      d: exItem.duration || 10,
+      done: false
     }));
   };
 
@@ -628,7 +663,7 @@ const ImmersiveWorkout = ({
     >
       
       {/* HEADER (UNIFIED BAR) */}
-      <div className={`flex items-center justify-between p-4 absolute top-0 w-full z-10`} style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
+      <div className={`flex items-center justify-between px-4 pb-2 w-full z-20 shrink-0`} style={{ paddingTop: 'max(1.25rem, env(safe-area-inset-top, 24px))' }}>
         
         {/* Durasi Group */}
         <div className="flex items-center gap-4">
@@ -661,19 +696,19 @@ const ImmersiveWorkout = ({
       </div>
 
       {/* PROGRESS BAR */}
-      <div className="absolute top-0 left-0 w-full h-1 ${t.bgApp}/10 dark:bg-white/10 z-20">
+      <div className="w-full h-1 bg-black/10 dark:bg-white/10 shrink-0">
         <div 
-          className="h-full  transition-all duration-300"
+          className="h-full bg-[#3b82f6] transition-all duration-300"
           style={{ width: `${((currentIndex + 1) / validExercises.length) * 100}%` }}
         />
       </div>
 
       {/* TABLET SPLIT WRAPPER */}
-      <div className="flex-1 flex flex-col sm:flex-row w-full mt-16 overflow-hidden">
+      <div className="flex-1 flex flex-col sm:flex-row w-full overflow-hidden">
 
         {/* MAIN VISUAL (Center) */}
         <div 
-          className="flex-1 relative mb-6 sm:mb-4 rounded-3xl mx-4 sm:mr-0 overflow-hidden shadow-lg border border-black/5 dark:border-white/10 group touch-pan-y bg-black"
+          className="flex-1 relative mt-3 mb-6 sm:mb-4 rounded-3xl mx-4 sm:mr-0 overflow-hidden shadow-lg border border-black/5 dark:border-white/10 group touch-pan-y bg-black"
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
@@ -793,41 +828,53 @@ const ImmersiveWorkout = ({
               </button>
               {showHint && createPortal(
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                  <div className="absolute inset-0 bg-black/60 backdrop-blur-md animate-in fade-in" onClick={() => setShowHint(false)} />
-                    <div className={`relative overflow-hidden w-[90%] max-w-[340px] min-h-[480px] p-6 flex flex-col justify-between rounded-[32px] ${t.bgCard} shadow-2xl ring-1 ring-black/5 dark:ring-white/10 z-10 text-center leading-snug animate-in fade-in zoom-in-95 duration-300`} onClick={e => e.stopPropagation()}>
-                      <div 
-                        className="absolute inset-0 z-0 pointer-events-none"
-                        style={{ 
-                           backgroundImage: `url('${getOverloadHint && getOverloadHint(ex)?.mode === 'praise' ? '/coach-praise.webp' : getOverloadHint && getOverloadHint(ex)?.mode === 'push' ? '/coach-push.webp' : '/bg-dashboard.webp'}')`,
-                           backgroundSize: '180%',
-                                          backgroundPosition: 'center 40px',
-                           backgroundRepeat: 'no-repeat',
-                           maskImage: 'linear-gradient(to bottom, black 30%, transparent 90%)',
-                           WebkitMaskImage: 'linear-gradient(to bottom, black 30%, transparent 90%)'
-                        }}
-                      />
-                      <div className="relative z-10 flex flex-col h-full flex-1">
-                          <div className="flex justify-center w-full">
-                            <div className="flex items-center gap-2.5 bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 pl-2.5 pr-4 py-2 rounded-full shadow-inner mt-2">
-                              <div className={`w-8 h-8 rounded-full ${t.bgAccent} flex items-center justify-center shadow-lg`}>
-                                <Brain size={16} className="text-white" />
-                              </div>
-                              <span className={`font-black text-[11px] tracking-widest uppercase ${t.textMain}`}>Coach Logy</span>
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-center mt-auto pt-32 pb-2">
-                            {getOverloadHint && getOverloadHint(ex) ? (
-                               <>
-                                 <span className={`font-black text-lg tracking-widest uppercase block mb-3 ${t.textMain}`}>{getOverloadHint(ex).title}</span>
-                                 <span className={`${t.textMuted} text-sm block whitespace-pre-wrap font-medium leading-relaxed`}>{getOverloadHint(ex).text}</span>
-                               </>
-                            ) : (
-                               <span className={`${t.textMuted} text-sm font-medium whitespace-pre-wrap leading-relaxed`}>Belum ada rekor 10RM.\n\nGunakan beban yang menantang tapi sanggup diangkat 10x dengan benar (RPE 8).</span>
-                            )}
-                          </div>
+                  <div className="absolute inset-0 bg-black/70 backdrop-blur-md animate-in fade-in" onClick={() => setShowHint(false)} />
+                  <div 
+                    className="relative w-full max-w-[340px] mt-28 animate-in fade-in zoom-in-95 duration-300 pointer-events-auto text-center"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    {/* Glassmorphism Card */}
+                    <div className="relative w-full rounded-[32px] bg-[#0c1427]/90 border border-white/15 backdrop-blur-2xl shadow-2xl shadow-black/90 overflow-visible text-center">
+                      
+                      {/* Coach Popout Avatar (Atas keluar kotak, Bawah terpotong pas di rounded bottom kotak) */}
+                      <div className="absolute -top-44 inset-x-0 bottom-0 pointer-events-none z-10 overflow-hidden rounded-b-[32px] flex items-start justify-center">
+                        <img 
+                          src={getOverloadHint && getOverloadHint(ex)?.mode === 'praise' ? '/coach-praise.webp' : '/coach-push.webp'} 
+                          alt="Coach"
+                          className="w-[230%] max-w-none h-auto -translate-y-6 drop-shadow-[0_16px_32px_rgba(0,0,0,0.95)] opacity-85"
+                          style={{
+                            maskImage: 'linear-gradient(to bottom, black 40%, rgba(0,0,0,0.7) 65%, transparent 95%)',
+                            WebkitMaskImage: 'linear-gradient(to bottom, black 40%, rgba(0,0,0,0.7) 65%, transparent 95%)'
+                          }}
+                        />
                       </div>
+
+                      {/* Content Container (Z-Index di DEPAN Coach, tanpa kotak di dalam kotak) */}
+                      <div className="relative z-20 w-full pt-32 pb-6 px-6 flex flex-col items-center">
+                        {getOverloadHint && getOverloadHint(ex) ? (
+                          <>
+                            <h3 className="font-black text-lg text-white tracking-wider uppercase mb-3 drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]">
+                              {getOverloadHint(ex).title}
+                            </h3>
+                            <p className="text-zinc-100 text-sm font-semibold whitespace-pre-wrap leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
+                              {getOverloadHint(ex).text}
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <h3 className="font-black text-lg text-white tracking-wider uppercase mb-3 drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]">
+                              TARGET HARI INI
+                            </h3>
+                            <p className="text-zinc-100 text-sm font-semibold whitespace-pre-wrap leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
+                              Belum ada rekor 10RM.{"\n\n"}Gunakan beban yang menantang tapi sanggup diangkat 10x dengan benar (RPE 8).
+                            </p>
+                          </>
+                        )}
+                      </div>
+
                     </div>
-                  </div>,
+                  </div>
+                </div>,
                 document.body
               )}
             </div>
@@ -856,18 +903,70 @@ const ImmersiveWorkout = ({
             return (
               <div key={ex.id} className="w-full flex flex-col">
                   <div className="flex items-center justify-center gap-4">
-                    {exType === 'weight' && (
-                      <div className="flex-1 flex flex-col items-center relative">
-                        <div className="flex items-center gap-1.5 mb-2 relative z-20">
-                           <span className="body-md uppercase">{isImp ? 'LBS' : 'KG'}</span>
+                    {exType === 'weight' && (() => {
+                      const eqConf = getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile);
+                      const actW = getSetActualWeight(itemSet, eqConf);
+                      const inputW = Number(itemSet?.input_w !== undefined ? itemSet?.input_w : itemSet?.w) || 0;
+                      const hasWeightDiff = (eqConf.baseWeight > 0 || eqConf.ratio !== 1) && actW !== inputW && actW > 0;
+                      return (
+                        <div className="flex-1 flex flex-col items-center relative">
+                          <div className="h-7 mb-2 flex items-center justify-center gap-1.5 relative z-30">
+                             <span className="body-md uppercase font-bold">{isImp ? 'LBS' : 'KG'}</span>
+                             <div className="relative">
+                               <button 
+                                 type="button"
+                                 onClick={(e) => { e.stopPropagation(); setShowWeightInfo(prev => !prev); }}
+                                 className={`p-0.5 rounded-full transition-all ${showWeightInfo ? 'text-sky-400 scale-110' : 'text-zinc-400 hover:text-sky-400'}`}
+                                 title="Info Beban Aktual"
+                               >
+                                 <Info size={14} strokeWidth={2.2} />
+                               </button>
+
+                               {/* Tooltip Popover (Glassmorphism Dark, Ringkas, Klik luar untuk tutup) */}
+                               {showWeightInfo && (
+                                 <>
+                                   <div 
+                                     className="fixed inset-0 z-40 bg-transparent" 
+                                     onClick={(e) => { e.stopPropagation(); setShowWeightInfo(false); }} 
+                                   />
+                                   <div 
+                                     className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-max max-w-[240px] px-3.5 py-2 rounded-2xl bg-[#0c1427]/85 border border-white/15 backdrop-blur-2xl text-left shadow-2xl shadow-black/80 z-50 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto"
+                                     onClick={(e) => e.stopPropagation()}
+                                   >
+                                     <div className="font-bold text-xs text-sky-400 whitespace-nowrap">
+                                       {eqConf.inputRule === 'plates_total' ? 'Input Total Plat 2 Sisi' :
+                                        eqConf.inputRule === 'plate_per_side' ? 'Input Plat 1 Sisi' :
+                                        eqConf.inputRule === 'pin' ? 'Input Pin Beban' :
+                                        eqConf.inputRule === 'dumbbell_single' ? 'Input 1 Dumbbell' :
+                                        eqConf.inputRule === 'bodyweight_plus' ? 'Input Tambahan Beban' :
+                                        `Input ${eqConf.label}`}
+                                     </div>
+                                     {(eqConf.baseWeight > 0 || eqConf.ratio !== 1) && (
+                                       <div className="flex items-center gap-2 mt-0.5 text-[11px] text-zinc-300 font-medium">
+                                         {eqConf.baseWeight > 0 && <span>Bar {eqConf.baseWeight} kg</span>}
+                                         {eqConf.ratio !== 1 && <span>Katrol {eqConf.ratio}:1</span>}
+                                       </div>
+                                     )}
+                                   </div>
+                                 </>
+                               )}
+                             </div>
+                          </div>
+                          <ScrollPicker 
+                            value={isImp ? Math.round(Number(itemSet?.w || 0) * 2.20462 * 10)/10 : (itemSet?.w || 0)} 
+                            onChange={(val) => onSetChange(ex.id, activeSetIdx, 'w', isImp ? Number((val / 2.20462).toFixed(2)) : val)}
+                            min={0} max={isImp ? 440 : 200} step={eqConf.increment || (isImp ? 5 : 2.5)} width="w-full" theme={theme} t={t}
+                          />
+                          {hasWeightDiff && (
+                            <div className="h-5 mt-1 flex items-center justify-center">
+                              <span className="text-[11px] text-sky-400 font-bold">
+                                Aktual: {isImp ? Number((actW * 2.20462).toFixed(1)) + ' lbs' : actW + ' kg'}
+                              </span>
+                            </div>
+                          )}
                         </div>
-                        <ScrollPicker 
-                        value={isImp ? Math.round(Number(itemSet?.w || 0) * 2.20462 * 10)/10 : (itemSet?.w || 0)} 
-                        onChange={(val) => onSetChange(ex.id, activeSetIdx, 'w', isImp ? Number((val / 2.20462).toFixed(2)) : val)}
-                        min={0} max={isImp ? 440 : 200} step={isImp ? 5 : 2.5} width="w-full" theme={theme} t={t}
-                      />
-                    </div>
-                  )}
+                      );
+                    })()}
                   
                   {isCardio ? (
                     (() => {
@@ -883,8 +982,8 @@ const ImmersiveWorkout = ({
                          return (
                            <>
                              <div className="flex-1 flex flex-col items-center">
-                               <div className="h-8 mb-2 w-full flex items-center justify-center relative">
-                                 <span className="body-md uppercase">KM</span>
+                               <div className="h-7 mb-2 w-full flex items-center justify-center relative">
+                                 <span className="body-md uppercase font-bold">KM</span>
                                </div>
                                <ScrollPicker 
                                  value={itemSet?.distance || 0} 
@@ -893,8 +992,8 @@ const ImmersiveWorkout = ({
                                />
                              </div>
                              <div className="flex-1 flex flex-col items-center">
-                               <div className="h-8 mb-2 w-full flex items-center justify-center gap-2 relative">
-                                 <span className="body-md uppercase">Mnt</span>
+                               <div className="h-7 mb-2 w-full flex items-center justify-center gap-2 relative">
+                                 <span className="body-md uppercase font-bold">Mnt</span>
                                  <button onClick={() => toggleTimer(activeSetIdx, itemSet?.duration, true)} className={`p-1.5 rounded-full text-white transition-all ${activeTimer.idx === activeSetIdx ? 'bg-rose-500 shadow-md scale-110' : t.bgAccent}`}>
                                    {activeTimer.idx === activeSetIdx ? <Square size={12}/> : <Play size={12} className="ml-[1px]"/>}
                                  </button>
@@ -912,8 +1011,8 @@ const ImmersiveWorkout = ({
                                )}
                              </div>
                              <div className="flex-1 flex flex-col items-center">
-                               <div className="h-8 mb-2 w-full flex items-center justify-center relative">
-                                 <span className="body-md uppercase">
+                               <div className="h-7 mb-2 w-full flex items-center justify-center relative">
+                                 <span className="body-md uppercase font-bold">
                                    {isTreadmillMode ? 'Kec (km/j)' : 'Pace'}
                                  </span>
                                  <button onClick={handleToggleTreadmill} className={`absolute right-0 sm:right-2 p-1.5 rounded-full ${t.bgAccentSoft} ${t.textAccent} hover:scale-110 transition`} title="Ganti Mode (Treadmill / Lari)">
@@ -938,8 +1037,8 @@ const ImmersiveWorkout = ({
                     })()
                   ) : exType === 'time' ? (
                     <div className="flex-1 flex flex-col items-center">
-                      <div className="mb-2 w-full flex items-center justify-center gap-2 relative">
-                         <span className="body-md uppercase">Durasi (dtk)</span>
+                      <div className="h-7 mb-2 w-full flex items-center justify-center gap-2 relative">
+                         <span className="body-md uppercase font-bold">Durasi (dtk)</span>
                          <button onClick={() => toggleTimer(activeSetIdx, itemSet?.d, false)} className={`p-1.5 rounded-full text-white transition-all ${activeTimer.idx === activeSetIdx ? 'bg-rose-500 shadow-md scale-110' : t.bgAccent}`}>
                            {activeTimer.idx === activeSetIdx ? <Square size={12}/> : <Play size={12} className="ml-[1px]"/>}
                          </button>
@@ -957,16 +1056,25 @@ const ImmersiveWorkout = ({
                       )}
                     </div>
                   ) : (
-                    (exType === 'weight' || exType === 'reps') && (
-                      <div className="flex-1 flex flex-col items-center">
-                        <span className="body-md mb-2 uppercase">Repetisi</span>
-                        <ScrollPicker 
-                          value={itemSet?.r || 10} 
-                          onChange={(val) => onSetChange(ex.id, activeSetIdx, 'r', val)}
-                          min={1} max={50} step={1} width="w-full" theme={theme} t={t}
-                        />
-                      </div>
-                    )
+                    (exType === 'weight' || exType === 'reps') && (() => {
+                      const eqConf = getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile);
+                      const actW = getSetActualWeight(itemSet, eqConf);
+                      const inputW = Number(itemSet?.input_w !== undefined ? itemSet?.input_w : itemSet?.w) || 0;
+                      const hasWeightDiff = exType === 'weight' && (eqConf.baseWeight > 0 || eqConf.ratio !== 1) && actW !== inputW && actW > 0;
+                      return (
+                        <div className="flex-1 flex flex-col items-center">
+                          <div className="h-7 mb-2 flex items-center justify-center">
+                            <span className="body-md uppercase font-bold">Repetisi</span>
+                          </div>
+                          <ScrollPicker 
+                            value={itemSet?.r || 10} 
+                            onChange={(val) => onSetChange(ex.id, activeSetIdx, 'r', val)}
+                            min={1} max={50} step={1} width="w-full" theme={theme} t={t}
+                          />
+                          {hasWeightDiff && <div className="h-5 mt-1"></div>}
+                        </div>
+                      );
+                    })()
                   )}
                 </div>
               </div>
@@ -1012,9 +1120,19 @@ const ImmersiveWorkout = ({
 
         {/* Actions Row (Full Width) */}
         <div className="w-full relative">
+          {/* Negative Rest Warning Banner */}
+          {localRestTimer < -30 && !isAllDone && (
+            <div className="w-full mb-3 p-3 rounded-2xl bg-rose-600 text-white text-center text-xs font-black animate-bounce shadow-xl flex items-center justify-center gap-2 border border-rose-400">
+              <span className="text-base">⚠️</span>
+              <span>Otot mulai dingin! Letakkan HP-mu dan mulai set berikutnya sekarang!</span>
+            </div>
+          )}
+
           {localRestTimer !== 0 && !isAllDone ? (
             <div className={`w-full relative flex items-stretch justify-between rounded-2xl shadow-xl transition-colors overflow-hidden border ${
-              localRestTimer < 0 ? 'bg-rose-500 border-rose-500' : `${t.bgAccentSoft} ${t.borderAccent}`
+              localRestTimer < -30 ? 'bg-rose-600 border-rose-600 animate-pulse text-white' :
+              localRestTimer <= 0 ? 'bg-amber-500 border-amber-500 text-white' :
+              `${t.bgAccentSoft} ${t.borderAccent}`
             }`}>
               {localRestTimer > 0 && maxRestTimer > 0 && (
                 <div 
@@ -1022,11 +1140,11 @@ const ImmersiveWorkout = ({
                   style={{ width: `${Math.min(100, Math.max(0, ((maxRestTimer - localRestTimer) / maxRestTimer) * 100))}%` }}
                 />
               )}
-              <button onClick={(e) => { e.stopPropagation(); setRestTargetTime(prev => (prev || Date.now()) - 5000); }} className={`relative z-10 w-16 sm:w-20 flex items-center justify-center bg-transparent ${theme === 'dark' ? 'hover:bg-white/10 active:bg-white/20 border-white/20' : 'hover:bg-black/10 active:bg-black/20 border-black/10'} ${t.textMain} font-black transition-colors border-r h2`}>-5</button>
-              <button onClick={() => setRestTargetTime(null)} className={`relative z-10 flex-1 py-4 flex items-center justify-center font-black h2 ${t.textMain} ${theme === 'dark' ? 'active:bg-white/10' : 'active:bg-black/10'} transition-colors`}>
+              <button onClick={(e) => { e.stopPropagation(); setRestTargetTime(prev => (prev || Date.now()) - 5000); }} className={`relative z-10 w-16 sm:w-20 flex items-center justify-center bg-transparent ${theme === 'dark' ? 'hover:bg-white/10 active:bg-white/20 border-white/20' : 'hover:bg-black/10 active:bg-black/20 border-black/10'} ${localRestTimer <= 0 ? 'text-white' : t.textMain} font-black transition-colors border-r h2`}>-5</button>
+              <button onClick={() => setRestTargetTime(null)} className={`relative z-10 flex-1 py-4 flex items-center justify-center font-black h2 ${localRestTimer <= 0 ? 'text-white' : t.textMain} ${theme === 'dark' ? 'active:bg-white/10' : 'active:bg-black/10'} transition-colors`}>
                 REST: {formatTime(localRestTimer)}
               </button>
-              <button onClick={(e) => { e.stopPropagation(); setRestTargetTime(prev => (prev || Date.now()) + 5000); }} className={`relative z-10 w-16 sm:w-20 flex items-center justify-center bg-transparent ${theme === 'dark' ? 'hover:bg-white/10 active:bg-white/20 border-white/20' : 'hover:bg-black/10 active:bg-black/20 border-black/10'} ${t.textMain} font-black transition-colors border-l h2`}>+5</button>
+              <button onClick={(e) => { e.stopPropagation(); setRestTargetTime(prev => (prev || Date.now()) + 5000); }} className={`relative z-10 w-16 sm:w-20 flex items-center justify-center bg-transparent ${theme === 'dark' ? 'hover:bg-white/10 active:bg-white/20 border-white/20' : 'hover:bg-black/10 active:bg-black/20 border-black/10'} ${localRestTimer <= 0 ? 'text-white' : t.textMain} font-black transition-colors border-l h2`}>+5</button>
             </div>
           ) : !isAllDone ? (
             <div className="flex gap-2 w-full">

@@ -5,7 +5,7 @@ import EquipmentIcon from './EquipmentIcon';
 import SwipeInput from './SwipeInput';
 import { formatTarget, exerciseTypeLabels, getVideoId } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
-import { resolveExerciseKind } from '../utils/workoutCalc';
+import { resolveExerciseKind, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from '../utils/workoutCalc';
 import { getCachedExercises } from '../utils/exerciseDbApi';
 
 const ExerciseCard = ({
@@ -14,7 +14,8 @@ const ExerciseCard = ({
   isSkip, onToggleSkip, onRemoveExtra, onOpenVideo, onReplaceClick,
   sets, onUpdateSet, onToggleSet, onSkipSet, onAddSet, onAddWarmupSets, onRemoveSet,
   gymProfiles, activeGymId, overloadHint,
-  canDeleteCompleted = false, onRemoveProgramExercise
+  canDeleteCompleted = false, onRemoveProgramExercise,
+  isWorkoutActive, onStartWorkout
 }) => {
   const isImp = units?.weight === 'lbs';
   const exType = resolveExerciseKind(ex);
@@ -25,6 +26,8 @@ const ExerciseCard = ({
   const progressPercent = totalSets > 0 ? (doneCount / totalSets) * 100 : 0;
   const [showHint, setShowHint] = useState(false);
   const [canCloseHint, setCanCloseHint] = useState(false);
+  const [showWeightInfo, setShowWeightInfo] = useState(false);
+  const eqConfig = getEquipmentConfig(gymProfiles, activeGymId, ex);
   const playedRecordSound = React.useRef(false);
 
   useEffect(() => {
@@ -159,17 +162,21 @@ const ExerciseCard = ({
 
   useEffect(() => {
     if (activeTimer.idx !== null) {
-       // Ekspor dalam format jam dinding yang dimengerti ImmersiveWorkout (lihat catatan di atas).
+       // Ekspor dalam format jam dinding yang dimengerti ImmersiveWorkout dan FloatingTimer
        window.logymActiveTimer = {
          exId: ex?.id,
+         exName: ex?.name,
+         setIdx: activeTimer.idx,
          timer: activeTimer.mode === 'down'
-           ? { idx: activeTimer.idx, mode: 'down', targetTime: Date.now() + activeTimer.timeLeft * 1000, startTime: null }
-           : { idx: activeTimer.idx, mode: 'up', startTime: Date.now() - activeTimer.timeLeft * 1000, targetTime: null }
+           ? { idx: activeTimer.idx, mode: 'down', targetTime: Date.now() + activeTimer.timeLeft * 1000, startTime: null, timeLeft: activeTimer.timeLeft }
+           : { idx: activeTimer.idx, mode: 'up', startTime: Date.now() - activeTimer.timeLeft * 1000, targetTime: null, timeLeft: activeTimer.timeLeft }
        };
+       window.dispatchEvent(new CustomEvent('logym_active_timer_change'));
     } else if (window.logymActiveTimer?.exId === ex?.id) {
        window.logymActiveTimer = null;
+       window.dispatchEvent(new CustomEvent('logym_active_timer_change'));
     }
-  }, [activeTimer, ex?.id]);
+  }, [activeTimer, ex?.id, ex?.name]);
 
   const toggleTimer = (setIdx, durationMins) => {
     playSoundEffect('click', soundEnabled);
@@ -186,7 +193,10 @@ const ExerciseCard = ({
         }
         setActiveTimer({ idx: null, timeLeft: 0, mode: 'down' });
     } else {
-        // Mulai timer
+        // Mulai timer -> Otomatis mulai sesi latihan jika belum dimulai!
+        if (!isWorkoutActive && onStartWorkout) {
+          onStartWorkout();
+        }
         const d = Number(durationMins || 0);
         if (d > 0) {
            const timeInSeconds = exType === 'cardio' ? Math.round(d * 60) : Math.round(d);
@@ -198,9 +208,11 @@ const ExerciseCard = ({
   };
 
   const formatTime = (seconds) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s < 10 ? '0' : ''}${s}`;
+    const isNegative = seconds < 0;
+    const abs = Math.abs(seconds);
+    const m = Math.floor(abs / 60);
+    const s = abs % 60;
+    return `${isNegative ? '-' : ''}${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -341,40 +353,50 @@ const ExerciseCard = ({
                           <Brain size={18} className="animate-pulse" />
                       </button>
                       {showHint && createPortal(
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300" onClick={() => { if (canCloseHint || !overloadHint?.isNewRecord) setShowHint(false); }}>
-                          <div className={`relative w-[90%] max-w-[340px] min-h-[480px] p-6 flex flex-col justify-between rounded-[32px] z-10 text-center leading-snug animate-in fade-in zoom-in-95 duration-300 ${overloadHint?.isNewRecord ? 'bg-zinc-900 border border-blue-500/50' : 'bg-zinc-900 border border-white/10'}`}>
-                            {overloadHint?.isNewRecord && (
-                              <div className="absolute top-0 inset-x-0 h-full w-full pointer-events-none z-0">
-                                 <div className="absolute -top-[20%] -left-[20%] w-[140%] h-[140%] bg-[radial-gradient(ellipse_at_center,rgba(59,130,246,0.25)_0%,transparent_70%)] animate-spin-slow"></div>
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-300" onClick={() => { if (canCloseHint || !overloadHint?.isNewRecord) setShowHint(false); }}>
+                          <div 
+                            className="relative w-full max-w-[340px] mt-28 animate-in fade-in zoom-in-95 duration-300 pointer-events-auto text-center"
+                            onClick={e => e.stopPropagation()}
+                          >
+                            {/* Glassmorphism Card */}
+                            <div className={`relative w-full rounded-[32px] ${overloadHint?.isNewRecord ? 'bg-[#0c1427]/90 border border-sky-400/40 shadow-[0_0_30px_rgba(56,189,248,0.25)]' : 'bg-[#0c1427]/90 border border-white/15'} backdrop-blur-2xl shadow-2xl shadow-black/90 overflow-visible text-center`}>
+                              
+                              {/* Coach Popout Avatar (Atas keluar kotak, Bawah terpotong pas di rounded bottom kotak) */}
+                              <div className="absolute -top-44 inset-x-0 bottom-0 pointer-events-none z-10 overflow-hidden rounded-b-[32px] flex items-start justify-center">
+                                <img 
+                                  src={overloadHint?.mode === 'praise' ? '/coach-praise.webp' : '/coach-push.webp'} 
+                                  alt="Coach"
+                                  className="w-[230%] max-w-none h-auto -translate-y-6 drop-shadow-[0_16px_32px_rgba(0,0,0,0.95)] opacity-85"
+                                  style={{
+                                    maskImage: 'linear-gradient(to bottom, black 40%, rgba(0,0,0,0.7) 65%, transparent 95%)',
+                                    WebkitMaskImage: 'linear-gradient(to bottom, black 40%, rgba(0,0,0,0.7) 65%, transparent 95%)'
+                                  }}
+                                />
                               </div>
-                            )}
-                            <div 
-                              className="absolute inset-0 z-0 pointer-events-none"
-                              style={{ 
-                                 backgroundImage: `url('${overloadHint?.mode === 'praise' ? '/coach-praise.webp' : overloadHint?.mode === 'push' ? '/coach-push.webp' : '/bg-dashboard.webp'}')`,
-                                 backgroundSize: '180%',
-                                 backgroundPosition: 'center 40px',
-                                 backgroundRepeat: 'no-repeat',
-                                 maskImage: 'linear-gradient(to bottom, black 30%, transparent 90%)',
-                                 WebkitMaskImage: 'linear-gradient(to bottom, black 30%, transparent 90%)'
-                              }}
-                            />
-                            <div className="relative z-10 flex flex-col h-full flex-1">
-                                {/* Removed Coach Logy top badge */}
-                                <div className="flex flex-col items-center mt-auto pt-32 pb-2">
-                                  {overloadHint ? (
-                                     <>
-                                       <span className={`font-black ${overloadHint.isNewRecord ? 'text-2xl text-white drop-shadow-[0_0_8px_rgba(59,130,246,0.8)] scale-110 animate-bounce mt-4 mb-4' : 'text-lg text-white mb-3 drop-shadow-md'} tracking-widest uppercase block relative z-10 transition-all`}>{overloadHint.title}</span>
-                                       <div className={`relative z-10 p-4 rounded-2xl w-full ${overloadHint.isNewRecord ? 'bg-blue-500/10 border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.2)] backdrop-blur-sm' : 'bg-black/30 dark:bg-white/10 backdrop-blur-sm border border-white/10 shadow-lg'}`}>
-                                         <span className={`${overloadHint.isNewRecord ? 'text-blue-500 dark:text-blue-400 font-bold' : 'text-white/90 font-medium'} text-sm block whitespace-pre-wrap leading-relaxed`}>{overloadHint.text}</span>
-                                       </div>
-                                     </>
-                                  ) : (
-                                     <div className={`relative z-10 p-4 rounded-2xl w-full bg-black/30 dark:bg-white/10 backdrop-blur-sm border border-white/10 shadow-lg`}>
-                                       <span className={`text-white/90 text-sm font-medium whitespace-pre-wrap leading-relaxed block`}>Belum ada rekor 10RM.\n\nGunakan beban yang menantang tapi sanggup diangkat 10x dengan benar (RPE 8).</span>
-                                     </div>
-                                  )}
-                                </div>
+
+                              {/* Content Container (Z-Index di DEPAN Coach, tanpa kotak di dalam kotak) */}
+                              <div className="relative z-20 w-full pt-32 pb-6 px-6 flex flex-col items-center">
+                                {overloadHint ? (
+                                  <>
+                                    <h3 className={`font-black ${overloadHint.isNewRecord ? 'text-xl text-sky-400 drop-shadow-[0_0_12px_rgba(56,189,248,0.8)] animate-pulse' : 'text-lg text-white'} tracking-wider uppercase mb-3 drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]`}>
+                                      {overloadHint.title}
+                                    </h3>
+                                    <p className="text-zinc-100 text-sm font-semibold whitespace-pre-wrap leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
+                                      {overloadHint.text}
+                                    </p>
+                                  </>
+                                ) : (
+                                  <>
+                                    <h3 className="font-black text-lg text-white tracking-wider uppercase mb-3 drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]">
+                                      TARGET HARI INI
+                                    </h3>
+                                    <p className="text-zinc-100 text-sm font-semibold whitespace-pre-wrap leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
+                                      Belum ada rekor 10RM.{"\n\n"}Gunakan beban yang menantang tapi sanggup diangkat 10x dengan benar (RPE 8).
+                                    </p>
+                                  </>
+                                )}
+                              </div>
+
                             </div>
                           </div>
                         </div>,
@@ -523,120 +545,182 @@ const ExerciseCard = ({
              ) : (
                  <>
                      <div className={`grid ${exType==='weight' ? 'grid-cols-[1fr_2fr_2fr_1fr_1fr]' : 'grid-cols-[1fr_3fr_1fr_1fr]'} gap-2 mb-3 text-[10px] font-black text-zinc-400 uppercase tracking-widest text-center items-center`}>
-                       <div>Set</div>
-                         {exType === 'weight' && (
-                           <div>{isImp ? 'LBS' : 'KG'}</div>
-                         )}
-                       {/* Detik, bukan menit: kolom ini mengisi set.d yang disimpan dalam detik
-                           (lihat isSecondsFormat di bawah). ImmersiveWorkout memberi label sama. */}
-                       {exType === 'time' && <div>Detik</div>}
-                       {exType !== 'time' && <div>Reps</div>}
-                       <div></div>
-                       <div></div>
-                     </div>
+                        <div>Set</div>
+                          {exType === 'weight' && (
+                            <div className="flex items-center justify-center gap-1 relative z-20">
+                              <span>{isImp ? 'LBS' : 'KG'}</span>
+                              <div className="relative inline-flex items-center">
+                                <button 
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); setShowWeightInfo(prev => !prev); }}
+                                  className={`p-0.5 rounded-full transition-all ${showWeightInfo ? 'text-sky-400 scale-110' : 'text-zinc-400 hover:text-sky-400'}`}
+                                  title="Info Aturan Input & Total Beban Aktual"
+                                >
+                                  <Info size={13} strokeWidth={2.2} />
+                                </button>
+
+                                {/* Tooltip Popover (Menempel langsung di bawah ikon Info, Glassmorphism, dismiss klik luar) */}
+                                {showWeightInfo && (
+                                  <>
+                                    <div 
+                                      className="fixed inset-0 z-40 bg-transparent" 
+                                      onClick={(e) => { e.stopPropagation(); setShowWeightInfo(false); }} 
+                                    />
+                                    <div 
+                                      className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-max max-w-[240px] px-3.5 py-2 rounded-2xl bg-[#0c1427]/85 border border-white/15 backdrop-blur-2xl text-left shadow-2xl shadow-black/80 z-50 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto normal-case tracking-normal font-normal"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <div className="font-bold text-xs text-sky-400 whitespace-nowrap">
+                                        {eqConfig.inputRule === 'plates_total' ? 'Input Total Plat 2 Sisi' :
+                                         eqConfig.inputRule === 'plate_per_side' ? 'Input Plat 1 Sisi' :
+                                         eqConfig.inputRule === 'pin' ? 'Input Pin Beban' :
+                                         eqConfig.inputRule === 'dumbbell_single' ? 'Input 1 Dumbbell' :
+                                         eqConfig.inputRule === 'bodyweight_plus' ? 'Input Tambahan Beban' :
+                                         `Input ${eqConfig.label}`}
+                                      </div>
+                                      {(eqConfig.baseWeight > 0 || eqConfig.ratio !== 1) && (
+                                        <div className="flex items-center gap-2 mt-0.5 text-[11px] text-zinc-300 font-medium">
+                                          {eqConfig.baseWeight > 0 && <span>Bar {eqConfig.baseWeight} kg</span>}
+                                          {eqConfig.ratio !== 1 && <span>Katrol {eqConfig.ratio}:1</span>}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        {/* Detik, bukan menit: kolom ini mengisi set.d yang disimpan dalam detik
+                            (lihat isSecondsFormat di bawah). ImmersiveWorkout memberi label sama. */}
+                        {exType === 'time' && <div>Detik</div>}
+                        {exType !== 'time' && <div>Reps</div>}
+                        <div></div>
+                        <div></div>
+                      </div>
 
              <div className="space-y-3">
-             {sets.map((s, setIdx) => (
-                 <div key={setIdx} className={`grid ${exType==='weight' ? 'grid-cols-[1fr_2fr_2fr_1fr_1fr]' : 'grid-cols-[1fr_3fr_1fr_1fr]'} gap-2 items-center text-center transition-all ${s.skipped ? 'opacity-50' : s.done ? 'opacity-60' : ''}`}>
-                   
-                   <div className="flex justify-center">
-                     <button 
-                       onClick={() => {
-                         if (deletingSetIdx === setIdx) {
-                           playSoundEffect('click', soundEnabled);
-                           onRemoveSet(ex.id, setIdx);
-                           setDeletingSetIdx(null);
-                         } else {
-                           playSoundEffect('click', soundEnabled);
-                           setDeletingSetIdx(setIdx);
-                         }
-                       }}
-                       onBlur={() => setDeletingSetIdx(null)}
-                       className={`w-11 h-11 rounded-full flex items-center justify-center transition-all font-black text-sm ${deletingSetIdx === setIdx ? 'bg-rose-500 text-white shadow-lg scale-110' : (s.type === 'warmup' ? 'bg-orange-500/10 text-orange-500' : 'bg-black/5 dark:bg-white/5 text-zinc-500 dark:text-zinc-400')}`}
-                     >
-                       {deletingSetIdx === setIdx ? <X size={16}/> : (s.type === 'warmup' ? <Flame size={16} className="opacity-80"/> : getWorkingSetNumber(setIdx))}
-                     </button>
-                   </div>
+              {sets.map((s, setIdx) => {
+                const actW = getSetActualWeight(s, eqConfig);
+                const inputW = Number(s.input_w !== undefined ? s.input_w : s.w) || 0;
+                const hasWeightDiff = exType === 'weight' && (eqConfig.baseWeight > 0 || eqConfig.ratio !== 1) && actW !== inputW && actW > 0;
 
-                   {s.skipped ? (
-                     <div className={`${exType === 'weight' ? 'col-span-2' : 'col-span-1'} flex items-center justify-center font-bold text-rose-500 bg-rose-500/10 rounded-2xl h-12 border border-rose-500/20 tracking-wider text-xs sm:text-sm`}>
-                       SKIPPED
-                     </div>
-                   ) : (
-                     <>
-                       {exType === 'weight' && (
-                         <div>
-                           {(() => {
-                             let customStep = isImp ? 5 : 2.5;
-                             let customMin = 0;
-                             if (gymProfiles && activeGymId) {
-                               const activeGym = gymProfiles.find(g => g.id === activeGymId) || gymProfiles[0];
-                               if (activeGym && ex.equipment && activeGym.config && activeGym.config[ex.equipment]) {
-                                 const conf = activeGym.config[ex.equipment];
-                                 if (conf.increment) customStep = conf.increment;
-                                 if (conf.barWeight) customMin = conf.barWeight;
-                               }
-                             }
-                             return (
-                               <SwipeInput language={lang?.id || 'ID'} 
-                                 value={isImp ? Math.round(Number(s.w || 0) * 2.20462 * 10)/10 : s.w} 
-                                 onChange={(val)=>onUpdateSet(ex.id, setIdx, 'w', isImp ? Number((val / 2.20462).toFixed(2)) : val)} 
-                                 disabled={s.done} 
-                                 step={customStep} 
-                                 min={customMin}
-                                 soundEnabled={soundEnabled} 
-                                 className={`w-full bg-black/5 dark:bg-white/5 h-11 rounded-2xl text-center font-black ${t.textMain} no-spinners transition-colors text-lg focus:bg-black/10 dark:focus:bg-white/10`} 
-                               />
-                             );
-                           })()}
-                         </div>
-                       )}
-                       
-                       {/* KHUSUS TIMER DURASI */}
-                        {exType === 'time' && (
-                         <div className="flex items-center justify-center relative">
-                            {activeTimer.idx === setIdx ? (
-                               <div className={`w-full bg-black/5 dark:bg-white/5 h-11 ${s.done ? 'rounded-2xl' : 'rounded-l-2xl'} flex items-center justify-center font-black ${t.textAccent} text-lg ring-2 ring-inset ${t.ringAccent}`}>
-                                  {formatTime(activeTimer.timeLeft)}
-                               </div>
-                            ) : (
-                               <SwipeInput language={lang?.id || 'ID'} value={s.d || ''} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'd', val)} disabled={s.done} step={1} min={0} soundEnabled={soundEnabled} isTimeFormat={true} isSecondsFormat={true} className={`w-full bg-black/5 dark:bg-white/5 h-11 ${s.done ? 'rounded-2xl' : 'rounded-l-2xl'} text-center font-black ${t.textMain} no-spinners transition-colors text-lg focus:bg-black/10 dark:focus:bg-white/10`} />
-                            )}
-                            {!s.done && (
-                              <button onClick={() => toggleTimer(setIdx, s.d)} className={`h-11 w-12 shrink-0 rounded-r-2xl flex items-center justify-center text-white transition-all ${activeTimer.idx === setIdx ? 'bg-rose-500 shadow-md' : t.bgAccent + ' hover:opacity-80'}`}>
-                                 {activeTimer.idx === setIdx ? <Square size={18}/> : <Play size={18} className="ml-[2px]"/>}
-                              </button>
-                            )}
-                         </div>
-                       )}
+                return (
+                  <div key={setIdx} className={`grid ${exType==='weight' ? 'grid-cols-[1fr_2fr_2fr_1fr_1fr]' : 'grid-cols-[1fr_3fr_1fr_1fr]'} gap-2 ${hasWeightDiff ? 'items-start' : 'items-center'} text-center transition-all ${s.skipped ? 'opacity-50' : s.done ? 'opacity-60' : ''}`}>
+                    
+                    <div className="flex flex-col items-center justify-center">
+                      <button 
+                        onClick={() => {
+                          if (deletingSetIdx === setIdx) {
+                            playSoundEffect('click', soundEnabled);
+                            onRemoveSet(ex.id, setIdx);
+                            setDeletingSetIdx(null);
+                          } else {
+                            playSoundEffect('click', soundEnabled);
+                            setDeletingSetIdx(setIdx);
+                          }
+                        }}
+                        onBlur={() => setDeletingSetIdx(null)}
+                        className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all font-black text-sm ${deletingSetIdx === setIdx ? 'bg-rose-500 text-white shadow-lg scale-110' : (s.type === 'warmup' ? 'bg-orange-500/10 text-orange-500' : 'bg-black/5 dark:bg-white/5 text-zinc-500 dark:text-zinc-400')}`}
+                      >
+                        {deletingSetIdx === setIdx ? <X size={16}/> : (s.type === 'warmup' ? <Flame size={16} className="opacity-80"/> : getWorkingSetNumber(setIdx))}
+                      </button>
+                      {hasWeightDiff && <div className="h-3.5 mt-1"></div>}
+                    </div>
 
-                       {(exType === 'weight' || exType === 'reps') && (
-                         <div><SwipeInput language={lang?.id || 'ID'} value={s.r} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'r', val)} disabled={s.done} step={1} soundEnabled={soundEnabled} className={`w-full bg-black/5 dark:bg-white/5 h-11 rounded-2xl text-center font-black ${t.textMain} no-spinners transition-colors text-lg focus:bg-black/10 dark:focus:bg-white/10`} /></div>
-                       )}
-                     </>
-                   )}
+                    {s.skipped ? (
+                      <div className={`${exType === 'weight' ? 'col-span-2' : 'col-span-1'} flex items-center justify-center font-bold text-rose-500 bg-rose-500/10 rounded-2xl h-11 border border-rose-500/20 tracking-wider text-xs sm:text-sm`}>
+                        SKIPPED
+                      </div>
+                    ) : (
+                      <>
+                        {exType === 'weight' && (
+                          <div className="flex flex-col items-center w-full">
+                            {(() => {
+                              let customStep = isImp ? 5 : 2.5;
+                              let customMin = 0;
+                              if (gymProfiles && activeGymId) {
+                                const activeGym = gymProfiles.find(g => g.id === activeGymId) || gymProfiles[0];
+                                if (activeGym && ex.equipment && activeGym.config && activeGym.config[ex.equipment]) {
+                                  const conf = activeGym.config[ex.equipment];
+                                  if (conf.increment) customStep = conf.increment;
+                                  if (conf.barWeight) customMin = conf.barWeight;
+                                }
+                              }
+                              return (
+                                <>
+                                  <SwipeInput language={lang?.id || 'ID'} 
+                                    value={isImp ? Math.round(Number(s.w || 0) * 2.20462 * 10)/10 : s.w} 
+                                    onChange={(val)=>onUpdateSet(ex.id, setIdx, 'w', isImp ? Number((val / 2.20462).toFixed(2)) : val)} 
+                                    disabled={s.done} 
+                                    step={customStep} 
+                                    min={customMin} 
+                                    soundEnabled={soundEnabled} 
+                                    className={`w-full bg-black/5 dark:bg-white/5 h-11 rounded-2xl text-center font-black ${t.textMain} no-spinners transition-colors text-lg focus:bg-black/10 dark:focus:bg-white/10`} 
+                                  />
+                                  {hasWeightDiff && (
+                                    <div className="h-3.5 mt-1 flex items-center justify-center">
+                                      <span className="text-[9px] text-sky-400 font-bold tracking-tight whitespace-nowrap">
+                                        Aktual: {isImp ? Number((actW * 2.20462).toFixed(1)) + ' lbs' : actW + ' kg'}
+                                      </span>
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
+                          </div>
+                        )}
+                        
+                        {/* KHUSUS TIMER DURASI */}
+                         {exType === 'time' && (
+                          <div className="flex items-center justify-center relative">
+                             {activeTimer.idx === setIdx ? (
+                                <div className={`w-full bg-black/5 dark:bg-white/5 h-11 ${s.done ? 'rounded-2xl' : 'rounded-l-2xl'} flex items-center justify-center font-black ${t.textAccent} text-lg ring-2 ring-inset ${t.ringAccent}`}>
+                                   {formatTime(activeTimer.timeLeft)}
+                                </div>
+                             ) : (
+                                <SwipeInput language={lang?.id || 'ID'} value={s.d || ''} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'd', val)} disabled={s.done} step={1} min={0} soundEnabled={soundEnabled} isTimeFormat={true} isSecondsFormat={true} className={`w-full bg-black/5 dark:bg-white/5 h-11 ${s.done ? 'rounded-2xl' : 'rounded-l-2xl'} text-center font-black ${t.textMain} no-spinners transition-colors text-lg focus:bg-black/10 dark:focus:bg-white/10`} />
+                             )}
+                             {!s.done && (
+                               <button onClick={() => toggleTimer(setIdx, s.d)} className={`h-11 w-12 shrink-0 rounded-r-2xl flex items-center justify-center text-white transition-all ${activeTimer.idx === setIdx ? 'bg-rose-500 shadow-md' : t.bgAccent + ' hover:opacity-80'}`}>
+                                  {activeTimer.idx === setIdx ? <Square size={18}/> : <Play size={18} className="ml-[2px]"/>}
+                               </button>
+                             )}
+                          </div>
+                        )}
 
-                   <div className="flex justify-center">
-                     <button 
-                       onClick={() => { playSoundEffect('click', soundEnabled); setActiveSetDetail({ setIdx, rir: s.rir !== undefined ? s.rir : '', rpe: s.rpe !== undefined ? s.rpe : '', notes: s.notes || '' }); }}
-                       className={`w-11 h-11 flex justify-center items-center rounded-full transition-all ${(s.notes || s.rir || s.rpe) ? `${t.bgAccent} text-white shadow-md` : `text-zinc-400 bg-black/5 dark:bg-white/5 hover:${t.textAccent} hover:bg-black/10 dark:hover:bg-white/10`}`}
-                     >
-                       <ClipboardEdit size={16} />
-                     </button>
-                   </div>
+                        {(exType === 'weight' || exType === 'reps') && (
+                          <div className="flex flex-col items-center w-full">
+                            <SwipeInput language={lang?.id || 'ID'} value={s.r} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'r', val)} disabled={s.done} step={1} soundEnabled={soundEnabled} className={`w-full bg-black/5 dark:bg-white/5 h-11 rounded-2xl text-center font-black ${t.textMain} no-spinners transition-colors text-lg focus:bg-black/10 dark:focus:bg-white/10`} />
+                            {hasWeightDiff && <div className="h-3.5 mt-1"></div>}
+                          </div>
+                        )}
+                      </>
+                    )}
 
-                   <div className="flex justify-center">
-                     {/* Sama seperti set beban di atas: mencentang berbunyi 'done_set', membatalkan
-                         berbunyi 'click'. Dulu set durasi selalu 'click' — menyelesaikan plank
-                         terdengar sama saja dengan menekan tombol biasa. */}
-                     <button onClick={() => { playSoundEffect(s.done ? 'click' : 'done_set', soundEnabled); onToggleSet(ex.id, setIdx); }} disabled={activeTimer.idx === setIdx} className={`w-11 h-11 rounded-full flex justify-center items-center font-bold transition-all ${s.skipped ? 'bg-rose-500/20 text-rose-500 border border-rose-500/50 hover:bg-rose-500/30' : s.done ? t.bgAccent + ' text-white shadow-lg scale-105' : 'bg-transparent border-2 ' + t.borderAccentSoft + ' ' + t.textAccent + ' hover:bg-black/5 dark:hover:bg-white/5'} ${activeTimer.idx === setIdx ? 'opacity-30 cursor-not-allowed' : ''}`}>
-                       {s.skipped ? <X size={18} /> : <CheckCircle size={18} />}
-                     </button>
-                   </div>
+                    <div className="flex flex-col items-center justify-center">
+                      <button 
+                        onClick={() => { playSoundEffect('click', soundEnabled); setActiveSetDetail({ setIdx, rir: s.rir !== undefined ? s.rir : '', rpe: s.rpe !== undefined ? s.rpe : '', notes: s.notes || '' }); }}
+                        className={`w-11 h-11 flex justify-center items-center rounded-2xl transition-all ${(s.notes || s.rir || s.rpe) ? `${t.bgAccent} text-white shadow-md` : `text-zinc-400 bg-black/5 dark:bg-white/5 hover:${t.textAccent} hover:bg-black/10 dark:hover:bg-white/10`}`}
+                      >
+                        <ClipboardEdit size={16} />
+                      </button>
+                      {hasWeightDiff && <div className="h-3.5 mt-1"></div>}
+                    </div>
 
-                 </div>
-               ))}
-               </div>
+                    <div className="flex flex-col items-center justify-center">
+                      {/* Sama seperti set beban di atas: mencentang berbunyi 'done_set', membatalkan
+                          berbunyi 'click'. Dulu set durasi selalu 'click' — menyelesaikan plank
+                          terdengar sama saja dengan menekan tombol biasa. */}
+                      <button onClick={() => { playSoundEffect(s.done ? 'click' : 'done_set', soundEnabled); onToggleSet(ex.id, setIdx); }} disabled={activeTimer.idx === setIdx} className={`w-11 h-11 rounded-2xl flex justify-center items-center font-bold transition-all ${s.skipped ? 'bg-rose-500/20 text-rose-500 border border-rose-500/50 hover:bg-rose-500/30' : s.done ? t.bgAccent + ' text-white shadow-lg scale-105' : 'bg-transparent border-2 ' + t.borderAccentSoft + ' ' + t.textAccent + ' hover:bg-black/5 dark:hover:bg-white/5'} ${activeTimer.idx === setIdx ? 'opacity-30 cursor-not-allowed' : ''}`}>
+                        {s.skipped ? <X size={18} /> : <CheckCircle size={18} />}
+                      </button>
+                      {hasWeightDiff && <div className="h-3.5 mt-1"></div>}
+                    </div>
+
+                  </div>
+                );
+              })}
+              </div>
                </>
              )}
                

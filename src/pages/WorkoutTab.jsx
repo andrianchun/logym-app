@@ -4,7 +4,7 @@ import { Plus, Wind, Play, CalendarDays, X, CheckCircle, ChevronDown, ChevronUp,
 import { fetchExercisesFromApi } from '../utils/exerciseDbApi';
 import { shareWorkoutToFeed } from '../utils/communityApi';
 import { normalizeMuscleKey, resolveProjectedProgramId, getDayWorkouts } from '../data/constants';
-import { estimate10RM, defaultSetWeight, gymStepFor } from '../utils/workoutCalc';
+import { estimate10RM, defaultSetWeight, gymStepFor, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from '../utils/workoutCalc';
 
 // Import Komponen Pecahan
 import WorkoutHeader from '../components/WorkoutHeader';
@@ -13,6 +13,7 @@ import ImmersiveWorkout from '../components/ImmersiveWorkout';
 import ExerciseDetailModal from '../components/ExerciseDetailModal';
 import AlternativeExerciseModal from '../components/AlternativeExerciseModal';
 import EmptyWorkoutState from '../components/EmptyWorkoutState';
+import WellnessCheckModal from '../components/WellnessCheckModal';
 import useDialog from '../hooks/useDialog';
 
 const WorkoutTab = ({
@@ -21,7 +22,7 @@ const WorkoutTab = ({
   // Identifier yang tidak dideklarasikan MELEMPAR ReferenceError, bukan bernilai undefined,
   // jadi penjaga itu justru yang menjatuhkan layarnya.
   setConfirmModal,
-  t, lang, language, programs,
+  t, theme, lang, language, programs,
   selectedDate, setSelectedDate,
   history, setHistory, setActiveTab,
   activeProgramId, setActiveProgramId,
@@ -59,7 +60,9 @@ const WorkoutTab = ({
   const [showProgramSelect, setShowProgramSelect] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebrationSession, setCelebrationSession] = useState(null);
-  const isDark = t?.bgCard !== 'bg-white';
+  const [showWellnessModal, setShowWellnessModal] = useState(false);
+  const [pendingProgId, setPendingProgId] = useState(null);
+  const isDark = theme === 'dark' || (t?.bgApp?.includes('dark') ?? true);
   const { dialog, showAlert } = useDialog(isDark);
 
   const getLocalYMD = (d) => {
@@ -482,11 +485,23 @@ const WorkoutTab = ({
 
     // 3. Default: empty template
     const libMatch = exerciseLibrary?.find(e => e.id === ex?.originalId || e.id === ex?.id || e.name?.toLowerCase() === ex?.name?.toLowerCase());
-    const suggestedWeight = defaultSetWeight(libMatch, ex,
-      gymStepFor(gymProfiles, activeGymId, ex?.equipment, units?.weight === 'lbs'));
+    const step = gymStepFor(gymProfiles, activeGymId, ex?.equipment, units?.weight === 'lbs');
+    let suggestedWeight = defaultSetWeight(libMatch, ex, step);
+    
+    const isDeload = history?.[selectedDate]?.wellness === 'deload' || history?.[selectedDate]?.isDeloadWeek;
+    if (isDeload && suggestedWeight > 0) {
+      suggestedWeight = Math.max(0, Math.round((suggestedWeight * 0.825) / step) * step);
+    }
+
+    const eqConf = getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile);
+    const total_w = calculateActualWeight(suggestedWeight, eqConf);
 
     return Array.from({length: ex.sets || 3}).map(() => ({
         w: suggestedWeight,
+        input_w: suggestedWeight,
+        base_w: eqConf.baseWeight,
+        ratio: eqConf.ratio,
+        total_w: total_w,
         r: ex.reps || 10,
         d: ex.duration || 10,
         done: false,
@@ -624,6 +639,17 @@ const WorkoutTab = ({
       const hasLastSession = lastSessionWeight > 0;
       const isImp = units?.weight === 'lbs';
       const uStr = isImp ? 'lbs' : 'kg';
+      const isDeload = history?.[selectedDate]?.wellness === 'deload' || history?.[selectedDate]?.isDeloadWeek;
+
+      if (isDeload && hasLastSession) {
+        const deloadWeight = Math.max(0, Math.round(lastSessionWeight * 0.825 * 2) / 2);
+        return {
+          title: "🛡️ MODE DELOAD (PEMULIHAN AKTIF)",
+          text: `Target beban dipangkas ~17.5% untuk pemulihan sendi & sistem saraf:\n(${deloadWeight} ${uStr} x ${lastSessionReps} Reps)\n\nFokus pada kontrol gerakan dan tempo yang sempurna. Jangan memaksakan beban berat!`,
+          mode: 'push',
+          isDeload: true
+        };
+      }
 
       if (hasLastSession) {
         const targetReps = exItem.reps || 10;
@@ -723,6 +749,40 @@ const WorkoutTab = ({
   }, [exerciseLogs, sessionExercises, isWorkoutActive, selectedDate]);
 
   const handleStartWorkout = (progId) => {
+    const todayWellness = history?.[selectedDate]?.wellness || history?.[selectedDate]?.isDeloadWeek;
+    let isCheckedSession = false;
+    try { isCheckedSession = Boolean(sessionStorage.getItem(`wellness_checked_${selectedDate}`)); } catch (e) {}
+
+    if (!todayWellness && !isCheckedSession) {
+      setPendingProgId(progId);
+      setShowWellnessModal(true);
+      return;
+    }
+
+    proceedStartWorkout(progId);
+  };
+
+  const handleSelectWellness = (option) => {
+    try { sessionStorage.setItem(`wellness_checked_${selectedDate}`, option); } catch (e) {}
+    setShowWellnessModal(false);
+    if (setHistory) {
+      setHistory(prev => ({
+        ...prev,
+        [selectedDate]: {
+          ...(prev[selectedDate] || {}),
+          wellness: option,
+          isDeloadWeek: option === 'deload'
+        }
+      }));
+    }
+    const targetProg = pendingProgId;
+    setPendingProgId(null);
+    if (targetProg) {
+      proceedStartWorkout(targetProg);
+    }
+  };
+
+  const proceedStartWorkout = (progId) => {
     const doStart = () => {
       playSoundEffect('success', soundEnabled);
       setSessionToRun(progId);
@@ -980,6 +1040,35 @@ const WorkoutTab = ({
         aria-hidden={isImmersiveMode || undefined}
         style={{ paddingBottom: showsFloatingStartButton ? 'calc(9.5rem + env(safe-area-inset-bottom, 20px))' : '2rem' }}
       >
+        {/* DELOAD BANNER */}
+        {(history?.[selectedDate]?.wellness === 'deload' || history?.[selectedDate]?.isDeloadWeek) && (
+          <div className="mb-4 p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-between gap-3 animate-in fade-in">
+            <div className="flex items-center gap-2.5">
+              <span className="text-xl">🛡️</span>
+              <div>
+                <h4 className="text-xs font-black text-rose-400">Mode Deload / Pemulihan Aktif</h4>
+                <p className="text-[11px] text-zinc-400">Target beban dipangkas 15-20% untuk memulihkan sendi & sistem saraf.</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => {
+                if (setHistory) {
+                  setHistory(prev => ({
+                    ...prev,
+                    [selectedDate]: {
+                      ...(prev[selectedDate] || {}),
+                      wellness: 'prima',
+                      isDeloadWeek: false
+                    }
+                  }));
+                }
+              }}
+              className="text-[10px] font-bold text-zinc-300 hover:text-white px-2.5 py-1.5 rounded-xl bg-black/30 shrink-0 transition active:scale-95"
+            >
+              Ubah
+            </button>
+          </div>
+        )}
         
         {isCompletelyEmpty ? (
           createPortal(
@@ -1063,6 +1152,8 @@ const WorkoutTab = ({
                                 onReplaceClick={() => { setDetailExercise(ex); setShowAlternativeModal(true); }}
                                 sets={getSetLogs(ex)}
                                 overloadHint={getOverloadHint(ex)}
+                                isWorkoutActive={isWorkoutActive}
+                                onStartWorkout={() => handleStartWorkout(prog.workoutId || prog.id)}
                                 onUpdateSet={(exId, setIdx, field, val) => {
                                   setSessionToRun(prog.workoutId);
                                   onSetChange(exId, setIdx, field, val);
@@ -1153,6 +1244,8 @@ const WorkoutTab = ({
                                 onRemoveExtra={onRemoveExtra} 
                                 onOpenVideo={() => handleOpenDetail(ex)}
                                 sets={getSetLogs(ex)}
+                                isWorkoutActive={isWorkoutActive}
+                                onStartWorkout={() => handleStartWorkout('extra')}
                                 onUpdateSet={(exId, setIdx, field, val) => {
                                   setSessionToRun('extra');
                                   onSetChange(exId, setIdx, field, val);
@@ -1289,7 +1382,7 @@ const WorkoutTab = ({
         }
 
         return (
-          <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 pointer-events-none flex justify-center animate-in slide-in-from-bottom-8 fade-in duration-300">
+          <div className="fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 pointer-events-none flex justify-center animate-in slide-in-from-bottom-8 fade-in duration-300">
             <button 
               onClick={() => handleStartWorkout(sessionData.workoutId)}
               disabled={isDisabled}
@@ -1317,6 +1410,15 @@ const WorkoutTab = ({
         </div>,
         document.body
       )}
+      
+      {/* WELLNESS CHECK MODAL */}
+      <WellnessCheckModal 
+        isOpen={showWellnessModal} 
+        onSelect={handleSelectWellness} 
+        onClose={() => setShowWellnessModal(false)} 
+        t={t} 
+        soundEnabled={soundEnabled} 
+      />
       
       {/* FOOTER PADDING */}
       <div className="h-24"></div>

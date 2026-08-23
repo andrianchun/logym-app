@@ -1,4 +1,4 @@
-import { manualFieldValue, resolveLoggedExercise } from '../data/constants.js';
+import { manualFieldValue, resolveLoggedExercise, defaultEquipmentConfig } from '../data/constants.js';
 import { dayBmr } from './bmr.js';
 
 // MET (Metabolic Equivalent) untuk latihan beban/resistance training. Dipakai konsisten di
@@ -587,6 +587,91 @@ export const estimate10RM = (weightKg, reps) => {
 };
 
 /**
+ * Dapatkan konfigurasi master alat untuk satu jenis latihan di gym yang aktif.
+ * Menggabungkan preset defaultEquipmentConfig dengan custom config di gymProfiles.
+ */
+export const getEquipmentConfig = (gymProfiles, activeGymId, ex, userProfile = null) => {
+  const eq = ex?.equipment;
+  if (!eq) {
+    return {
+      equipment: '',
+      baseWeight: 0,
+      ratio: 1,
+      increment: 2.5,
+      inputRule: 'custom',
+      label: 'Beban',
+      placeholder: '0',
+      isBodyweightPlus: false,
+    };
+  }
+  const def = defaultEquipmentConfig[eq] || { baseWeight: 0, ratio: 1, inputRule: 'custom', label: 'Beban', placeholder: '0' };
+  
+  let baseWeight = def.baseWeight;
+  let ratio = def.ratio;
+  let increment = eq.includes('Barbell') || eq.includes('Smith') ? 2.5 : 5;
+
+  if (def.isBodyweightPlus) {
+    baseWeight = Number(userProfile?.biometrics?.weight || userProfile?.weight || 60);
+  }
+
+  if (gymProfiles && activeGymId) {
+    const gym = gymProfiles.find((g) => g.id === activeGymId) || gymProfiles[0];
+    const custom = gym?.config?.[eq];
+    if (custom) {
+      if (custom.baseWeight !== undefined && custom.baseWeight !== null && custom.baseWeight !== '') {
+        baseWeight = Number(custom.baseWeight) || 0;
+      } else if (custom.barWeight !== undefined && custom.barWeight !== null && custom.barWeight !== '') {
+        baseWeight = Number(custom.barWeight) || 0;
+      }
+      if (custom.ratio !== undefined && custom.ratio !== null && custom.ratio !== '') {
+        ratio = Number(custom.ratio) || 1;
+      }
+      if (custom.increment !== undefined && custom.increment !== null && custom.increment !== '') {
+        increment = Number(custom.increment) || increment;
+      }
+    }
+  }
+
+  return {
+    equipment: eq,
+    baseWeight: Number(baseWeight) || 0,
+    ratio: Number(ratio) || 1,
+    increment: Number(increment) || 2.5,
+    inputRule: def.inputRule || 'custom',
+    label: def.label || 'Beban',
+    placeholder: def.placeholder || '0',
+    isBodyweightPlus: Boolean(def.isBodyweightPlus),
+  };
+};
+
+/**
+ * Hitung beban aktual dari input mentah user (plat/pin).
+ * Rumus Wajib: total_w = (input_w * ratio) + baseWeight
+ */
+export const calculateActualWeight = (inputWeight, config) => {
+  const inputW = Number(inputWeight) || 0;
+  if (!config) return inputW;
+  const ratio = config.ratio !== undefined ? Number(config.ratio) : 1;
+  const baseWeight = config.baseWeight !== undefined ? Number(config.baseWeight) : 0;
+  return Math.round(((inputW * ratio) + baseWeight) * 100) / 100;
+};
+
+/**
+ * Ambil beban aktual dari satu record set.
+ * Jika set.total_w sudah tersimpan, pakai itu.
+ * Jika belum (data lama), hitung fallback dari set.w / set.input_w dan config.
+ */
+export const getSetActualWeight = (set, config = null) => {
+  if (!set) return 0;
+  if (set.total_w !== undefined && set.total_w !== null && Number(set.total_w) > 0) {
+    return Number(set.total_w);
+  }
+  const rawW = Number(set.input_w !== undefined ? set.input_w : set.w) || 0;
+  if (!config) return rawW;
+  return calculateActualWeight(rawW, config);
+};
+
+/**
  * Bulatkan KE BAWAH ke kelipatan yang benar-benar tersedia di alat. Ke bawah, bukan ke terdekat:
  * menawarkan beban yang lebih berat dari kemampuan terukur itu saran yang bisa mencederai.
  * 10RM 42,5 kg di alat berkelipatan 5 -> 40 kg.
@@ -642,32 +727,23 @@ export const recomputeStrengthRecords = (history, logKeys, exLookup) => {
     (history[dateStr]?.workouts || []).forEach((wk) => {
       if (wk?.status !== 'completed' || !wk.log) return;
       Object.keys(wk.log).forEach((k) => {
-        const id = String(resolveLoggedExercise(k, exLookup)?.id);
+        const exObj = resolveLoggedExercise(k, exLookup);
+        const id = String(exObj?.id);
         if (!ids.has(id)) return;
         const rec = (out[id] = out[id] || { rm10: 0, rm10At: 0, rm10Best: 0, lastWeight: 0, _at: 0 });
         let bestInSession = 0;
         let rm10InSession = 0;
-        // Object.values, bukan .forEach langsung: set bisa berbentuk objek ber-key angka setelah
-        // bolak-balik lewat penyimpanan, dan `.forEach` pada objek melempar TypeError — satu sesi
-        // berbentuk begitu dulu menjatuhkan seluruh proses simpan latihan.
+        const eqConf = exObj ? getEquipmentConfig(null, null, exObj) : null;
+        
         Object.values(wk.log[k] || {}).forEach((s) => {
-          if (!s || s.skipped || !(Number(s.w) > 0) || !(Number(s.r) > 0)) return;
-          const c10RM = estimate10RM(s.w, s.r);
+          if (!s || s.skipped || !(Number(s.w) > 0 || Number(s.total_w) > 0) || !(Number(s.r) > 0)) return;
+          const actW = getSetActualWeight(s, eqConf);
+          const c10RM = estimate10RM(actW, s.r);
           if (c10RM > rm10InSession) rm10InSession = c10RM;
           if (c10RM > rec.rm10Best) rec.rm10Best = c10RM; // rekor sepanjang masa, buat grafik/PR
-          if (Number(s.w) > bestInSession) bestInSession = Number(s.w);
+          if (actW > bestInSession) bestInSession = actW;
         });
-        // 10RM = set terberat dari sesi TERAKHIR, bukan rekor sepanjang masa.
-        //
-        // Dulu ini `Math.max` seumur hidup, jadi angkanya tidak pernah bisa turun: sekali salah
-        // ketik 100 kg (harusnya 10), acuan beban ikut ngaco selamanya, dan deload sengaja pun
-        // tidak tercermin. Konsekuensi yang disadari: sesi ringan menurunkan saran beban sesi
-        // berikutnya — itu memang yang diminta ("bener-bener pakai 10RM terakhir"), dan rekor
-        // sepanjang masa tetap tersimpan di rm10Best.
-        // `>=`: sesi yang baru disimpan bisa bertanggal sama dengan yang terakhir tercatat.
         if (rm10InSession > 0 && dateMs >= rec.rm10At) { rec.rm10 = rm10InSession; rec.rm10At = dateMs; }
-        // `>=`: sesi yang baru saja disimpan bertanggal sama dengan rekor terakhir, dan yang
-        // terbaru harus menang.
         if (bestInSession > 0 && dateMs >= rec._at) { rec._at = dateMs; rec.lastWeight = bestInSession; }
       });
     });
@@ -682,10 +758,7 @@ export const recomputeStrengthRecords = (history, logKeys, exLookup) => {
 
 /**
  * Riwayat 10RM satu latihan, satu titik per sesi — bahan grafik progressive overload.
- *
- * Beban mentah per sesi tidak bisa dibandingkan langsung (5x5 @80 kg vs 3x12 @60 kg mana yang
- * lebih kuat?). 10RM menormalkan set/reps jadi satu angka, jadi garis yang naik benar-benar
- * berarti lebih kuat, bukan cuma "hari ini repsnya banyak".
+ * Sumbu Y wajib menggunakan actual weight (total_w).
  *
  * @returns {Array<{date: string, rm10: number, weight: number, reps: number}>} urut lama -> baru
  */
@@ -697,11 +770,14 @@ export const rm10Series = (history, exerciseId, exLookup) => {
     (history[dateStr]?.workouts || []).forEach((wk) => {
       if (wk?.status !== 'completed' || !wk.log) return;
       Object.keys(wk.log).forEach((k) => {
-        if (String(resolveLoggedExercise(k, exLookup)?.id) !== target) return;
+        const exObj = resolveLoggedExercise(k, exLookup);
+        if (String(exObj?.id) !== target) return;
+        const eqConf = exObj ? getEquipmentConfig(null, null, exObj) : null;
         Object.values(wk.log[k] || {}).forEach((s) => {
-          if (!s || s.skipped || !(Number(s.w) > 0) || !(Number(s.r) > 0)) return;
-          const c = estimate10RM(s.w, s.r);
-          if (c > rm10) { rm10 = c; weight = Number(s.w); reps = Number(s.r); }
+          if (!s || s.skipped || !(Number(s.w) > 0 || Number(s.total_w) > 0) || !(Number(s.r) > 0)) return;
+          const actW = getSetActualWeight(s, eqConf);
+          const c = estimate10RM(actW, s.r);
+          if (c > rm10) { rm10 = c; weight = actW; reps = Number(s.r); }
         });
       });
     });
@@ -712,14 +788,6 @@ export const rm10Series = (history, exerciseId, exLookup) => {
 
 /**
  * Gabungkan 10RM tersimpan dengan yang dihitung dari riwayat (sesi TERAKHIR).
- *
- *  1. Riwayat punya angka -> angka itu yang dipakai, TERMASUK kalau lebih rendah. Inilah yang
- *     bikin deload dan salah ketik bisa terkoreksi; dulu di sini `Math.max` dan akibatnya 10RM
- *     tidak pernah bisa turun seumur hidup akun.
- *  2. Ada override manual yang tanggalnya SAMA/LEBIH BARU dari sesi terakhir -> pertahankan nilai
- *     manual. Itu gunanya tombol simpan di kalkulator 10RM; sesi lama tidak boleh menimpanya.
- *  3. Riwayat kosong (belum tersinkron / dipangkas) -> pertahankan yang tersimpan, jangan
- *     dinolkan.
  */
 export const mergeRm10 = (tersimpan, manualAt, dariRiwayat, rm10At) => {
   const a = Number(tersimpan) || 0;

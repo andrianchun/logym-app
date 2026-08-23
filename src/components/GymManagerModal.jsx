@@ -141,31 +141,62 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
   };
 
   const renderConfigFields = (eqName) => {
-    const isBarbellBased = eqName.includes('Barbell') || eqName.includes('Smith') || eqName.includes('Leverage');
-    const isMachine = eqName.includes('Cable') || eqName.includes('Machine') && !eqName.includes('Smith');
+    const isBarbellBased = eqName.includes('Barbell') || eqName.includes('Smith') || eqName.includes('Leverage') || eqName.includes('Sled');
+    const isCableOrMachine = eqName.includes('Cable') || eqName.includes('Machine');
+    const isDumbbell = eqName.includes('Dumbbell') || eqName.includes('Kettlebell');
     
-    if (!isBarbellBased && !isMachine) return null;
+    if (!isBarbellBased && !isCableOrMachine && !isDumbbell) return null;
 
-    const conf = editingGym.config[eqName] || { barWeight: isBarbellBased ? 20 : 0, increment: isBarbellBased ? 2.5 : 5 };
+    const conf = editingGym.config[eqName] || { 
+      baseWeight: isBarbellBased ? (eqName.includes('Sled') ? 45 : (eqName.includes('Smith') ? 15 : 20)) : 0, 
+      ratio: isCableOrMachine ? 1 : 1,
+      increment: isBarbellBased ? 2.5 : 5 
+    };
 
     return (
-      <div className={`mt-3 p-3 rounded-xl ${t.bg} border ${t.border} grid grid-cols-2 gap-3`}>
+      <div className={`mt-3 p-3 rounded-xl ${t.bg} border ${t.border} grid grid-cols-2 gap-3 text-left`}>
         {isBarbellBased && (
           <div>
-            <label className={`text-[10px] uppercase font-bold tracking-wider ${t.textMuted} block mb-1`}>Berat Bar (kg)</label>
+            <label className={`text-[10px] uppercase font-bold tracking-wider ${t.textMuted} block mb-1`}>Berat Bar/Alat (kg)</label>
             <SwipeInput language={language} 
-              value={conf.barWeight}
-              onChange={val => updateConfig(eqName, 'barWeight', val)}
+              value={conf.baseWeight ?? conf.barWeight ?? (eqName.includes('Sled') ? 45 : 20)}
+              onChange={val => {
+                updateConfig(eqName, 'baseWeight', val);
+                updateConfig(eqName, 'barWeight', val);
+              }}
               step={0.5} min={0} soundEnabled={soundEnabled}
               className={`w-full bg-transparent border-b border-slate-500/30 pb-1 outline-none ${t.textMain} font-semibold text-center`}
               placeholder="0"
             />
           </div>
         )}
+
+        {isCableOrMachine && (
+          <div>
+            <label className={`text-[10px] uppercase font-bold tracking-wider ${t.textMuted} block mb-1`}>Rasio Katrol</label>
+            <div className="flex gap-1.5 pt-1">
+              <button 
+                type="button"
+                onClick={() => updateConfig(eqName, 'ratio', 1)}
+                className={`flex-1 py-1 rounded-lg text-xs font-bold transition-all ${conf.ratio === 1 || !conf.ratio ? `${t.bgAccent} text-white shadow-sm` : 'bg-black/10 dark:bg-white/10 opacity-60'}`}
+              >
+                1:1
+              </button>
+              <button 
+                type="button"
+                onClick={() => updateConfig(eqName, 'ratio', 0.5)}
+                className={`flex-1 py-1 rounded-lg text-xs font-bold transition-all ${conf.ratio === 0.5 ? `${t.bgAccent} text-white shadow-sm` : 'bg-black/10 dark:bg-white/10 opacity-60'}`}
+              >
+                2:1 (0.5x)
+              </button>
+            </div>
+          </div>
+        )}
+
         <div>
           <label className={`text-[10px] uppercase font-bold tracking-wider ${t.textMuted} block mb-1`}>Kenaikan Beban (kg)</label>
           <SwipeInput language={language} 
-            value={conf.increment}
+            value={conf.increment || (isBarbellBased ? 2.5 : 5)}
             onChange={val => updateConfig(eqName, 'increment', val)}
             step={0.5} min={0} soundEnabled={soundEnabled}
             className={`w-full bg-transparent border-b border-slate-500/30 pb-1 outline-none ${t.textMain} font-semibold text-center`}

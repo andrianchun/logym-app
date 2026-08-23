@@ -35,7 +35,7 @@ const SwipeInput = ({ value, onChange, disabled, step = 1, className, min = 0, m
         e.stopPropagation(); // Mencegah global swipe
         
         const diffY = dragRef.current.startY - e.touches[0].clientY;
-        const steps = Math.round(diffY / 15); 
+        const steps = Math.round(diffY / 24); 
         
         // Ensure step and startVal are valid numbers
         const validStep = isNaN(Number(step)) ? 1 : Number(step);

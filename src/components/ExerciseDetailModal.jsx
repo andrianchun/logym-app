@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Dumbbell, History, Calculator, Replace, Video, Info, ChevronLeft, ChevronRight, Loader2, Play } from 'lucide-react';
 import { formatTarget, resolveProjectedProgramId } from '../data/constants';
-import { resolveExerciseKind, estimate10RM, estimate1RM } from '../utils/workoutCalc';
+import { resolveExerciseKind, estimate10RM, estimate1RM, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from '../utils/workoutCalc';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 import SwipeInput from './SwipeInput';
 
@@ -83,18 +83,27 @@ const ExerciseDetailModal = ({
           }
         }
 
+        const eqConf = getEquipmentConfig(null, null, initialEx);
         if (completedSets.length > 0) {
           logs.push({
             date,
             programName: pName,
-            sets: completedSets.map(s => ({
-              w: Number(s.w) || 0,
-              r: Number(s.r) || 0,
-              distance: Number(s.distance) || 0,
-              duration: Number(s.duration) || 0,
-              rpe: s.rpe || '',
-              notes: s.notes || ''
-            }))
+            sets: completedSets.map(s => {
+              const inputW = Number(s.input_w !== undefined ? s.input_w : s.w) || 0;
+              const totalW = getSetActualWeight(s, eqConf);
+              return {
+                w: inputW,
+                input_w: inputW,
+                total_w: totalW,
+                base_w: s.base_w !== undefined ? s.base_w : eqConf.baseWeight,
+                ratio: s.ratio !== undefined ? s.ratio : eqConf.ratio,
+                r: Number(s.r) || 0,
+                distance: Number(s.distance) || 0,
+                duration: Number(s.duration) || 0,
+                rpe: s.rpe || '',
+                notes: s.notes || ''
+              };
+            })
           });
         }
       });
@@ -106,14 +115,12 @@ const ExerciseDetailModal = ({
     let max = 0;
     historyData.forEach(day => {
       day.sets.forEach(s => {
-        const c10RM = estimate10RM(s.w, s.r);
+        const c10RM = estimate10RM(s.total_w !== undefined ? s.total_w : s.w, s.r);
         if (c10RM > max) max = c10RM;
       });
     });
     return max;
   }, [historyData]);
-
-
 
   const existingLibEx = exerciseLibrary?.find(e => e.name?.toLowerCase() === initialEx.name?.toLowerCase() || e.id === initialEx.id);
   const stored10RM = existingLibEx?.rm10 || 0;
@@ -146,7 +153,7 @@ const ExerciseDetailModal = ({
     [...historyData].reverse().forEach(day => {
       let max10RM = 0;
       day.sets.forEach(s => {
-        const c = estimate10RM(s.w, s.r);
+        const c = estimate10RM(s.total_w !== undefined ? s.total_w : s.w, s.r);
         if (c > max10RM) max10RM = c;
       });
       if (max10RM > 0) {

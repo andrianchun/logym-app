@@ -490,12 +490,19 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
         {/* Edit mode */}
         {isEditingThis ? (
           <div className="mb-3 flex flex-col gap-2">
-            <textarea
-              value={editingPost.text}
-              onChange={e => setEditingPost(prev => ({ ...prev, text: e.target.value }))}
-              className={`w-full p-3 rounded-2xl resize-none outline-none text-sm border ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`}
-              rows={3}
-            />
+            <div className="relative">
+              <textarea
+                value={editingPost.text}
+                maxLength={500}
+                onChange={e => setEditingPost(prev => ({ ...prev, text: e.target.value }))}
+                className={`w-full p-3 pb-6 rounded-2xl resize-none outline-none text-sm border ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`}
+                rows={3}
+                placeholder="Tulis caption postingan..."
+              />
+              <span className={`absolute right-3 bottom-2 text-[10px] font-bold ${t.textMuted}`}>
+                {(editingPost.text || '').length}/500
+              </span>
+            </div>
             <div className="flex gap-2 justify-end">
               <button onClick={() => setEditingPost(null)} className={`px-3 py-1.5 rounded-xl text-xs font-bold ${isDark ? 'bg-white/10 text-white' : 'bg-black/10 text-black'}`}>Batal</button>
               <button onClick={handleEditSave} className={`px-3 py-1.5 rounded-xl text-xs font-bold ${t.bgAccent} flex items-center gap-1`}><Check size={12}/> Simpan</button>
@@ -652,18 +659,59 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
               const handleImportProgram = async () => {
                 if (!setPrograms) { await showAlert('Tidak bisa menyimpan program saat ini.', { type: 'error' }); return; }
                 const routines = post.routines || post.programData?.routines || [];
-                const newProgram = {
-                  id: 'custom-imported-' + Date.now(), planId: 'custom-' + Date.now(),
-                  name: programName, planName,
-                  routines: routines.map((r, ri) => ({
-                    id: 'routine-' + Date.now() + ri, name: r.name,
-                    exercises: (r.exercises || []).map(e => ({ ...e, id: 'ex-' + Date.now() + '-' + Math.random().toString(36).substr(2,5), sets: e.sets || 3, reps: e.reps || 10 })),
-                  })),
-                  exercises: exercises.map(ex => ({ ...ex, id: 'ex-' + Date.now() + '-' + Math.random().toString(36).substr(2,5), sets: ex.sets || 3, reps: ex.reps || 10 })),
-                  restTime: post.restTime || post.programData?.restTime || 90,
-                  source: 'community', sharedBy: sharedByName,
-                };
-                setPrograms(prev => [...prev, newProgram]);
+                const planId = 'custom-' + Date.now();
+                const restTime = post.restTime || post.programData?.restTime || 90;
+                
+                if (routines.length > 0) {
+                  // Simpan sebagai multi-day split yang rapi per hari
+                  const newPrograms = routines.map((r, ri) => ({
+                    id: `prog-imported-${Date.now()}-${ri}`,
+                    planId: planId,
+                    planName: planName || programName,
+                    name: r.name || `Hari ${ri + 1}`,
+                    assignedDays: r.assignedDays || [],
+                    restTime: r.restTime || restTime,
+                    source: 'community',
+                    sharedBy: sharedByName,
+                    exercises: (r.exercises || []).map((e, ei) => ({
+                      ...e,
+                      id: typeof e.id === 'number' ? e.id : (Date.now() + ri * 100 + ei),
+                      sets: e.sets || 3,
+                      reps: e.reps || 10,
+                      duration: e.duration || 0,
+                      type: e.type || 'weight',
+                      equipment: e.equipment || 'Lainnya',
+                      target: Array.isArray(e.target) ? e.target : (e.target ? [e.target] : []),
+                      defaultWeight: e.defaultWeight || 0,
+                      ytVideo: e.ytVideo || ''
+                    }))
+                  }));
+                  setPrograms(prev => [...prev, ...newPrograms]);
+                } else {
+                  // Fallback sesi tunggal
+                  const newProgram = {
+                    id: 'prog-imported-' + Date.now(),
+                    planId: planId,
+                    planName: planName || programName,
+                    name: programName,
+                    restTime: restTime,
+                    source: 'community',
+                    sharedBy: sharedByName,
+                    exercises: (exercises || []).map((ex, ei) => ({
+                      ...ex,
+                      id: typeof ex.id === 'number' ? ex.id : (Date.now() + ei),
+                      sets: ex.sets || 3,
+                      reps: ex.reps || 10,
+                      duration: ex.duration || 0,
+                      type: ex.type || 'weight',
+                      equipment: ex.equipment || 'Lainnya',
+                      target: Array.isArray(ex.target) ? ex.target : (ex.target ? [ex.target] : []),
+                      defaultWeight: ex.defaultWeight || 0,
+                      ytVideo: ex.ytVideo || ''
+                    }))
+                  };
+                  setPrograms(prev => [...prev, newProgram]);
+                }
                 await showAlert(`Program "${programName}" berhasil disimpan ke daftar programmu!`, { type: 'success', title: 'Program Tersimpan' });
               };
               return (
@@ -792,7 +840,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
     <div className={`w-full flex flex-col pb-24 ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}>
       
       {/* Top Sheet (Header + Leaderboard) */}
-      <div className={`relative pt-4 pb-8 px-4 rounded-b-[2.5rem] shadow-lg z-20 transition-colors duration-300 ${isDark ? 'bg-slate-900/90 border-b border-white/5' : 'bg-white/95'} backdrop-blur-2xl`}>
+      <div className={`relative pb-8 px-4 rounded-b-[2.5rem] shadow-lg z-20 transition-colors duration-300 ${isDark ? 'bg-slate-900/90 border-b border-white/5' : 'bg-white/95'} backdrop-blur-2xl`} style={{ paddingTop: 'max(1.25rem, env(safe-area-inset-top, 24px))' }}>
         {/* Search Bar as floating pill */}
         {activeFilter === 'Semua' && (
           <div className="relative mb-6">

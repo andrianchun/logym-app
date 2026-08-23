@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { TrendingUp } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
 import { getLocalYMD, formatTarget, normalizeMuscleKey, resolveLoggedExercise, resolveProjectedProgramId } from '../data/constants';
-import { estimate10RM } from '../utils/workoutCalc';
+import { estimate10RM, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from '../utils/workoutCalc';
 
 const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibrary, soundEnabled, playSoundEffect, selectedDate, units, activePlanIds, isSubCard = false, expandedSessions = {} }) => {
   const [chartType, setChartType] = useState(() => {
@@ -113,11 +113,13 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
               const exTargets = Array.isArray(ex.target) ? ex.target : [ex.target || 'Lainnya'];
               const isImp = units?.weight === 'lbs';
               
+              const eqConf = getEquipmentConfig(null, null, ex);
               Object.values(sets).forEach(s => {
                   if (s && s.done && !s.skipped) {
+                      const actW = getSetActualWeight(s, eqConf);
                       if (isMusc) {
                           let volume = 0;
-                          if (exType === 'weight') volume = (Number(s.w) * Number(s.r)) * (isImp ? 2.20462 : 1);
+                          if (exType === 'weight') volume = (actW * Number(s.r)) * (isImp ? 2.20462 : 1);
                           else if (exType === 'reps') volume = Number(s.r);
                           else if (exType === 'time') volume = Number(s.d);
 
@@ -135,8 +137,8 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                               // Di mode 10RM hanya latihan berbeban yang punya arti — latihan
                               // reps/waktu dilewati, bukan digambar dengan angka yang salah makna.
                               val = isRm10
-                                ? estimate10RM(Number(s.w), Number(s.r)) * (isImp ? 2.20462 : 1)
-                                : Number(s.w) * (isImp ? 2.20462 : 1);
+                                ? estimate10RM(actW, Number(s.r)) * (isImp ? 2.20462 : 1)
+                                : actW * (isImp ? 2.20462 : 1);
                           }
                           else if (!isRm10 && exType === 'reps') val = Number(s.r);
                           else if (!isRm10 && exType === 'time') val = Number(s.d);
@@ -527,22 +529,22 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
   return (
     <div className={`${!isSubCard ? 'px-4 pt-4 pb-1' : ''} animate-in fade-in duration-300`}>
         {!isSubCard && (
-        <div className="flex justify-between items-center mb-5">
-           <h3 className={`h3 ${t.textMain}`}>Progres Latihan</h3>
+        <div className="flex justify-between items-center mb-4">
+           <h3 className={`h2 ${t.textMain}`}>Progres Latihan</h3>
         </div>
         )}
         
         {!isSubCard && (
         <div className={`mb-5 border-b border-dashed ${t.border} pb-5 no-swipe`} onTouchStart={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
-           <div className={`relative flex w-full p-1.5 rounded-full ${t.btnBg}`}>
-               <div className={`absolute top-1.5 bottom-1.5 w-[calc(33.333%-5px)] rounded-full transition-transform duration-300 ease-out ${t.bgAccent} shadow-sm`} style={{ transform: chartType === 'exercise' ? 'translateX(0)' : chartType === 'muscle' ? 'translateX(100%)' : 'translateX(200%)', left: '6px' }}></div>
+           <div className={`relative flex w-full p-1 rounded-full ${t.btnBg}`}>
+               <div className={`absolute top-1 bottom-1 w-[calc(33.333%-4px)] rounded-full transition-transform duration-300 ease-out ${t.bgAccent} shadow-sm`} style={{ transform: chartType === 'exercise' ? 'translateX(0)' : chartType === 'muscle' ? 'translateX(100%)' : 'translateX(200%)', left: '4px' }}></div>
 
-               <button onClick={() => { playSoundEffect('click', soundEnabled); setChartType('exercise');}} className={`flex-1 py-3 rounded-full body-lg font-black relative z-10 transition-colors duration-300 ${chartType === 'exercise' ? 'text-white' : t.textMuted}`}>{lang?.progExercise || 'Per Latihan'}</button>
-               <button onClick={() => { playSoundEffect('click', soundEnabled); setChartType('muscle');}} className={`flex-1 py-3 rounded-full body-lg font-black relative z-10 transition-colors duration-300 ${chartType === 'muscle' ? 'text-white' : t.textMuted}`}>{lang?.progMuscle || 'Per Otot'}</button>
-               <button onClick={() => { playSoundEffect('click', soundEnabled); setChartType('rm10');}} className={`flex-1 py-3 rounded-full body-lg font-black relative z-10 transition-colors duration-300 ${chartType === 'rm10' ? 'text-white' : t.textMuted}`}>10RM</button>
+               <button onClick={() => { playSoundEffect('click', soundEnabled); setChartType('exercise');}} className={`flex-1 py-2 rounded-full body-md font-bold relative z-10 transition-colors duration-300 ${chartType === 'exercise' ? 'text-white' : t.textMuted}`}>{lang?.progExercise || 'Per Latihan'}</button>
+               <button onClick={() => { playSoundEffect('click', soundEnabled); setChartType('muscle');}} className={`flex-1 py-2 rounded-full body-md font-bold relative z-10 transition-colors duration-300 ${chartType === 'muscle' ? 'text-white' : t.textMuted}`}>{lang?.progMuscle || 'Per Otot'}</button>
+               <button onClick={() => { playSoundEffect('click', soundEnabled); setChartType('rm10');}} className={`flex-1 py-2 rounded-full body-md font-bold relative z-10 transition-colors duration-300 ${chartType === 'rm10' ? 'text-white' : t.textMuted}`}>10RM</button>
            </div>
            {chartType === 'rm10' && (
-             <p className={`mt-3 text-[10px] leading-snug ${t.textMuted}`}>
+             <p className={`mt-2.5 caption font-medium normal-case leading-snug ${t.textMuted}`}>
                Estimasi 10RM per sesi — beban dan reps dinormalkan jadi satu angka, jadi garis naik = benar-benar makin kuat. Hanya latihan berbeban.
              </p>
            )}

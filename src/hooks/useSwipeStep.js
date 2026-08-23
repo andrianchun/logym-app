@@ -27,10 +27,10 @@ export default function useSwipeStep({ step, maxStep, canProceed, onNext, onBack
   const handleTouchEnd = () => {
     if (!touchStart || !touchEnd) return;
     const deltaX = touchStart - touchEnd;
-    const deltaY = touchStartY - touchEndY;
-    if (Math.abs(deltaX) < Math.abs(deltaY)) return; // gestur vertikal (scroll) — abaikan
-    if (deltaX < -50 && step > 0) onBack();
-    else if (deltaX > 50 && step < maxStep && canProceed()) onNext();
+    const deltaY = (touchStartY && touchEndY) ? (touchStartY - touchEndY) : 0;
+    if (Math.abs(deltaX) < Math.abs(deltaY) * 1.4) return; // gestur vertikal (scroll) — abaikan
+    if (deltaX < -85 && step > 0) onBack();
+    else if (deltaX > 85 && step < maxStep && canProceed()) onNext();
   };
 
   return { handleTouchStart, handleTouchMove, handleTouchEnd };

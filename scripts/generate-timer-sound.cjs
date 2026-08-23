@@ -73,15 +73,12 @@ const blast = (freq, ms, gain = 0.92) => {
   return out;
 };
 
-// Tangga naik empat nada. Durasinya SENGAJA pendek: versi 450/450/450/650 ms (2,06 detik)
-// terdengar seperti aplikasi nge-lag, bukan seperti alarm — tiap nada ditahan penuh (envelope
-// tidak meluruh), jadi durasi panjang langsung terasa lambat. 170 ms per rung dengan nada
-// penutup 400 ms memberi bunyi yang tetap nyaring tapi jatuhnya normal.
+// Tangga naik empat nada dengan tempo normal alami (~1.3s total)
 const samples = [
-  ...blast(600, 170),
-  ...blast(800, 170),
-  ...blast(1000, 170),
-  ...blast(1200, 400),
+  ...blast(600, 250),
+  ...blast(800, 250),
+  ...blast(1000, 250),
+  ...blast(1200, 550),
   ...silence(60),
 ];
 

@@ -818,7 +818,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
       {/* HEADER & INTEGRASI APPS */}
       <div className="pt-2 px-4 flex justify-between items-center mb-2 anim-rise">
          <div>
-            <h1 className="h1"><span className={t.textMain}>Halo, </span><span className={`bg-gradient-to-r ${t.gradientText} bg-clip-text text-transparent`}>{user?.name || 'Kawan'}</span></h1>
+            <h1 className="h1"><span className={t.textMain}>Halo, </span><span className={`bg-gradient-to-r ${t.gradientText} bg-clip-text text-transparent`}>{user?.name || userProfile?.name || 'Kawan'}</span></h1>
             <p className={`body-base font-medium ${t.textMuted} mt-1 leading-snug`}>{t.greetingText}</p>
             <div className="flex items-center space-x-2 mt-1">
                <p className={`body-md ${t.textMuted}`}>{new Date().toLocaleDateString(lang.workout === 'Latihan' ? 'id-ID' : 'en-US', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
