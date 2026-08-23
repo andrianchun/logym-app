@@ -236,3 +236,57 @@ console.log('workoutCalc OK', { cardioKcal, plankKcal, liftKcal });
 
   console.log('buildHcSessionDetail OK');
 }
+
+// ---- sessionSpanSeconds: sesi bersatu-set tidak boleh mewarisi timer global ----
+// Gejala 23/08/2026: "extra plank cuma sebentar 1 detik udah 130 kalori". Penjaga lamanya
+// `if (stamps.length < 2) return 0`, dan 0 artinya "pakai timer global" — plank satu set
+// mewarisi ~45 menit, lalu baseline MET 2.5 mengubahnya jadi ~130 kkal di badan 70 kg.
+{
+  const { sessionSpanSeconds, setSeconds, calculateSmartWorkoutCalories } = await import('./workoutCalc.js');
+  const T = 1787490000000;
+
+  const plank = { id: 'p1', name: 'Plank', type: 'time' };
+
+  // 1. KASUS UTAMA: satu set plank 1 detik -> 1 detik, bukan 0 (yang berarti timer global).
+  const satu = sessionSpanSeconds([plank], { p1: [{ done: true, at: T, d: 1 }] });
+  assert.equal(satu, 1, 'plank 1 detik harus jadi 1 detik, bukan 0');
+  assert.ok(satu > 0, 'nilai 0 akan membuat pemanggil jatuh ke timer global — itu bugnya');
+
+  // 2. Dan kalorinya jadi masuk akal, bukan 130.
+  const kkal = calculateSmartWorkoutCalories(70,
+    { duration: satu / 60, exercises: [plank] },
+    { p1: [{ done: true, at: T, d: 1 }] });
+  assert.ok(kkal < 5, `plank 1 detik harus < 5 kkal, dapat ${kkal}`);
+  // Bandingkan dengan perilaku lama: durasi 45 menit -> ~130 kkal. Ini yang dikeluhkan user.
+  const lama = calculateSmartWorkoutCalories(70,
+    { duration: 45, exercises: [plank] },
+    { p1: [{ done: true, at: T, d: 1 }] });
+  assert.ok(lama > 100, `sanity: jalur lama memang meledak (${lama} kkal)`);
+
+  // 3. Plank 60 detik -> 60 detik. Satuan `d` adalah DETIK, jangan pernah dibaca sebagai menit.
+  assert.equal(sessionSpanSeconds([plank], { p1: [{ done: true, at: T, d: 60 }] }), 60);
+
+  // 4. Dua set atau lebih tetap memakai rentang stempel seperti sebelumnya (jangan regresi).
+  assert.equal(sessionSpanSeconds([plank], { p1: [
+    { done: true, at: T, d: 30 }, { done: true, at: T + 480000, d: 30 },
+  ] }), 480, 'rentang dua stempel = 8 menit');
+
+  // 5. Tanpa jejak `at` sama sekali -> 0, supaya data lama tetap memakai timer global.
+  assert.equal(sessionSpanSeconds([plank], { p1: [{ done: true, d: 30 }] }), 0);
+  assert.equal(sessionSpanSeconds([], {}), 0);
+  assert.equal(sessionSpanSeconds(null, null), 0);
+
+  // 6. Set yang belum dicentang tidak ikut.
+  assert.equal(sessionSpanSeconds([plank], { p1: [{ at: T, d: 99 }] }), 0);
+
+  // 7. Kunci majemuk (latihan ekstra `${id}-${stempel}`) tetap ketemu.
+  assert.equal(sessionSpanSeconds([plank], { 'p1-1787490000000': [{ done: true, at: T, d: 45 }] }), 45);
+
+  // 8. Set BEBAN bersatu-set: tidak punya durasi, pakai asumsi TUT 4 detik/rep yang sama
+  //    dengan setExtraCalories — bukan timer global.
+  const bench = { id: 'b1', name: 'Bench', type: 'weight', reps: 10 };
+  assert.equal(setSeconds(bench, { r: 10 }), 40);
+  assert.equal(sessionSpanSeconds([bench], { b1: [{ done: true, at: T, w: 60, r: 10 }] }), 40);
+
+  console.log('sessionSpanSeconds OK', { plank1dtk: kkal, jalurLama: lama });
+}

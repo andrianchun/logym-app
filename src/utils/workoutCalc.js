@@ -173,6 +173,49 @@ const setDurationKm = (set) => {
 // Latihan berbasis waktu. Library punya dua penamaan ('time' & 'cardio'), keduanya bukan set beban.
 const isTimeBased = (ex) => ex?.type === 'time' || ex?.type === 'cardio';
 
+/**
+ * Durasi SATU set dalam detik, memakai aturan satuan yang sama dengan setDurationKm — jadi tidak
+ * ada tempat kedua yang bisa salah menebak apakah angkanya detik atau menit.
+ *
+ * Set beban tidak menyimpan durasi sama sekali, jadi dipakai asumsi TUT yang SUDAH dipakai
+ * setExtraCalories: 4 detik per repetisi. Satu asumsi, satu angka.
+ */
+export const setSeconds = (ex, set) => {
+  if (isTimeBased(ex)) return Math.round(setDurationKm(set)[0] * 60);
+  const reps = Number(set?.r) || Number(ex?.reps) || 10;
+  return reps * 4;
+};
+
+/**
+ * Berapa lama SESI INI berlangsung, dalam detik, diukur dari stempel `at` set-set miliknya.
+ * Mengembalikan 0 hanya kalau tidak ada jejak sama sekali — pemanggil boleh jatuh ke timer global.
+ *
+ * KENAPA BUKAN TIMER GLOBAL. Timer berjalan sejak "Mulai Latihan". Kalau dalam satu periode ada
+ * dua sesi (Full Body B lalu sesi ekstra), sesi yang disimpan lebih dulu menelan seluruh waktu itu.
+ *
+ * SATU SET ADALAH KASUS YANG DULU BOCOR. Penjaga lamanya `if (stamps.length < 2) return 0`, dan
+ * 0 berarti "pakai timer global" — jadi sesi ekstra berisi satu set (plank 1 detik) justru
+ * mewarisi SELURUH durasi latihan. Lewat baseline MET 2.5, 45 menit di badan 70 kg keluar jadi
+ * ~130 kkal untuk plank satu detik. Dua stempel memang perlu untuk membentuk rentang, tapi satu
+ * set bukan berarti tidak ada informasi: durasinya ya durasi set itu sendiri.
+ */
+export const sessionSpanSeconds = (exercises, exerciseLogs) => {
+  const selesai = [];
+  (exercises || []).forEach((ex) => {
+    if (!ex) return;
+    const langsung = exerciseLogs?.[ex.id];
+    const cocok = langsung
+      || Object.entries(exerciseLogs || {}).find(([k]) => String(k).startsWith(`${ex.id}-`))?.[1];
+    Object.values(cocok || {}).forEach((s) => {
+      if (s?.done && Number(s.at) > 0) selesai.push({ at: Number(s.at), ex, s });
+    });
+  });
+  if (selesai.length === 0) return 0;
+  if (selesai.length === 1) return Math.max(1, setSeconds(selesai[0].ex, selesai[0].s));
+  const stamps = selesai.map((x) => x.at);
+  return Math.round((Math.max(...stamps) - Math.min(...stamps)) / 1000);
+};
+
 // MET kardio berdasar kecepatan rata-rata. Tanpa data jarak, pakai default sedang (7.0).
 const cardioMet = (durationMins, distKm) => {
   if (!(distKm > 0) || !(durationMins > 0)) return 7.0;

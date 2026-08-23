@@ -53,7 +53,7 @@ import { fetchExercisesFromApi } from './utils/exerciseDbApi';
 import { AI_MODELS, detectPlateaus, getLogyNotification } from './utils/aiAgent';
 import { calculateReadiness, restingHrBaseline } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
-import { calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, recomputeStrengthRecords, buildExLookupByName, canonicalExId, buildHcSessionDetail, estimate10RM, defaultSetWeight, gymStepFor, mergeRm10, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from './utils/workoutCalc';
+import { calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, recomputeStrengthRecords, buildExLookupByName, canonicalExId, sessionSpanSeconds, buildHcSessionDetail, estimate10RM, defaultSetWeight, gymStepFor, mergeRm10, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from './utils/workoutCalc';
 import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcReadHeartRateWindow, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission, capIntradayLog, HC_FIELDS, fillOnlyPatch, hcDroppedTypes } from './utils/healthConnect';
 import { bumpExercisePopularity } from './utils/exercisePopularity';
 import { rapikanNamaProgram, rapikanNamaSesi, pertahankanNamaSesi } from './utils/programNaming';
@@ -3532,19 +3532,15 @@ export default function App() {
     // menelan seluruh waktu itu — treadmill 8 menit tercatat 1 jam 4 menit, dan sesi bebannya
     // kehilangan durasinya. Sekarang rentangnya dihitung dari stempel `at` set-set MILIK sesi ini.
     // Sesi/riwayat tanpa stempel (data lama) tetap memakai timer global seperti sebelumnya.
-    const rentangSesiSecs = (() => {
-      const exs = progId === 'extra'
+    // sessionSpanSeconds dipindah ke workoutCalc.js supaya ada tesnya: versi di sini dulu
+    // menyerah pada sesi bersatu-set (`stamps.length < 2`) dan mengembalikan 0, yang berarti
+    // "pakai timer global" — plank ekstra 1 detik jadi mewarisi 45 menit dan ~130 kkal.
+    const rentangSesiSecs = sessionSpanSeconds(
+      progId === 'extra'
         ? (extraExercises || [])
-        : (programs.find(p => p.id === progId)?.exercises || sessionExercises || []);
-      const stamps = [];
-      exs.forEach(ex => {
-        const langsung = exerciseLogs[ex.id];
-        const cocok = langsung || Object.entries(exerciseLogs || {}).find(([k]) => k.startsWith(`${ex.id}-`))?.[1];
-        Object.values(cocok || {}).forEach(s => { if (s?.done && Number(s.at) > 0) stamps.push(Number(s.at)); });
-      });
-      if (stamps.length < 2) return 0;
-      return Math.round((Math.max(...stamps) - Math.min(...stamps)) / 1000);
-    })();
+        : (programs.find(p => p.id === progId)?.exercises || sessionExercises || []),
+      exerciseLogs
+    );
 
     const durationSecs = rentangSesiSecs > 0
       ? rentangSesiSecs
