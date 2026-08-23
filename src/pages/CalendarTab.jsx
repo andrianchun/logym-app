@@ -1743,6 +1743,10 @@ const CalendarTab = ({
                       
                                                      let textStr = "";
                                                      let zoneNode = null;
+                                                     // Beban aktual dipisah dari baris utama, bukan diselipkan sebagai "(Aktual: x kg)".
+                                                     // Digabung, barisnya jadi panjang dan angka yang diketik user tenggelam di antara
+                                                     // angka turunan — padahal yang dicari mata saat menyisir riwayat adalah yang diketik.
+                                                     let aktualStr = null;
                                                      
                                                      const exType = resolveExerciseKind(ex);
 
@@ -1781,7 +1785,8 @@ const CalendarTab = ({
                                                             else {
                                                               const wStr = isImp ? formatNumber(Math.round(maxW * 2.20462 * 10)/10, langId) + ' lbs' : formatNumber(maxW, langId) + ' kg';
                                                               const actWStr = isImp ? formatNumber(Math.round(maxActW * 2.20462 * 10)/10, langId) + ' lbs' : formatNumber(maxActW, langId) + ' kg';
-                                                              textStr = `${doneSets.length} x ${formatNumber(maxR, langId)} x ${wStr}${maxActW !== maxW && maxActW > 0 ? ` (Aktual: ${actWStr})` : ''}`;
+                                                              textStr = `${doneSets.length} x ${formatNumber(maxR, langId)} x ${wStr}`;
+                                                              if (maxActW !== maxW && maxActW > 0) aktualStr = `Aktual ${actWStr}`;
                                                             }
                                                         }
                                                      } else textStr = "Belum dimulai";
@@ -1789,9 +1794,16 @@ const CalendarTab = ({
                                                      return (
                                                        <div key={ex.id} className={`p-2 px-3 rounded-lg bg-black/5 dark:bg-white/5 flex justify-between items-center`}>
                                                          <div className={`body-md truncate mr-2 ${c.text}`}>{idx + 1}. {ex.name}</div>
-                                                         <div className={`body-md font-mono whitespace-nowrap opacity-80 flex items-center ${c.text}`}>
-                                                           {textStr}
-                                                           {zoneNode}
+                                                         <div className={`flex flex-col items-end shrink-0 ${c.text}`}>
+                                                           <div className="body-md font-mono whitespace-nowrap opacity-80 flex items-center">
+                                                             {textStr}
+                                                             {zoneNode}
+                                                           </div>
+                                                           {aktualStr && (
+                                                             <div className="font-mono whitespace-nowrap text-[10px] opacity-50 leading-tight">
+                                                               {aktualStr}
+                                                             </div>
+                                                           )}
                                                          </div>
                                                        </div>
                                                      );
