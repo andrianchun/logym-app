@@ -19,6 +19,7 @@ export default function SettingsModal({
   setShowLibManager, setShowHelp,
   exportData, handleImportFile,
   backupList, isRestoring, onLoadBackups, onRestoreBackup,
+  onRepairActualWeights,
   user, handleLogout, handleDeleteAccount,
   setConfirmModal,
   biometricStandard, setBiometricStandard,
@@ -508,6 +509,26 @@ export default function SettingsModal({
                     <Upload size={16} /> <span>Import</span>
                     <input type="file" accept=".json" onChange={handleImportFile} className="hidden" />
                 </label>
+                </div>
+
+                {/* HITUNG ULANG BEBAN AKTUAL RIWAYAT.
+                    Kolom beban dasar untuk Cable/Machine/Dumbbell baru ada belakangan, jadi set
+                    lama menyimpan beban aktual yang dihitung seolah dasarnya nol. Ini membetulkan
+                    yang lama; yang baru sudah benar sejak dicatat. */}
+                <div className={`pt-3 border-t ${t.border}`}>
+                    <p className={`body-sm ${t.textMuted} mb-2`}>
+                        Set lama dihitung sebelum beban dasar alat bisa diisi, jadi beban aktualnya
+                        menganggap dasarnya nol. Ini menghitung ulang set-set itu memakai setelan
+                        gym aktif. <span className="font-bold">Beban yang kamu ketik tidak berubah</span>,
+                        dan kamu akan melihat pratinjaunya dulu sebelum apa pun disimpan.
+                    </p>
+                    <button
+                        onClick={onRepairActualWeights}
+                        className={`w-full flex items-center justify-center space-x-2 py-3 rounded-xl font-bold ${t.btnBg} ${t.textMain} body-lg border ${t.border} active:scale-95 transition-all`}
+                    >
+                        <RefreshCw size={16} />
+                        <span>Hitung Ulang Beban Aktual</span>
+                    </button>
                 </div>
 
                 {/* PULIHKAN DARI BACKUP OTOMATIS DI CLOUD.

@@ -53,7 +53,7 @@ import { fetchExercisesFromApi } from './utils/exerciseDbApi';
 import { AI_MODELS, detectPlateaus, getLogyNotification } from './utils/aiAgent';
 import { calculateReadiness, restingHrBaseline } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
-import { calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, recomputeStrengthRecords, buildExLookupByName, canonicalExId, sessionSpanSeconds, buildHcSessionDetail, estimate10RM, defaultSetWeight, gymStepFor, mergeRm10, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from './utils/workoutCalc';
+import { calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, recomputeStrengthRecords, buildExLookupByName, canonicalExId, sessionSpanSeconds, repairActualWeights, buildHcSessionDetail, estimate10RM, defaultSetWeight, gymStepFor, mergeRm10, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from './utils/workoutCalc';
 import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcReadHeartRateWindow, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission, capIntradayLog, HC_FIELDS, fillOnlyPatch, hcDroppedTypes } from './utils/healthConnect';
 import { bumpExercisePopularity } from './utils/exercisePopularity';
 import { rapikanNamaProgram, rapikanNamaSesi, pertahankanNamaSesi } from './utils/programNaming';
@@ -3505,6 +3505,48 @@ export default function App() {
       : `Tidak ada yang perlu dipulihkan — semua ${tanggalBackup.length} tanggal dan sesi di backup ini sudah ada di perangkat.`);
   };
 
+  // Hitung ulang beban aktual seluruh riwayat setelah beban dasar alat diisi di Kelola Gym.
+  //
+  // Selalu PRATINJAU dulu, tidak pernah langsung menulis: ini menyentuh setiap set di seluruh
+  // riwayat, dan riwayat tidak menyimpan di gym mana sesi dikerjakan. Kalau user punya lebih dari
+  // satu gym, dia yang harus memutuskan apakah gym aktif memang tempat sesi-sesi itu dikerjakan —
+  // bukan aku yang menebak.
+  const perbaikiBebanRiwayat = () => {
+    const lookup = buildExLookupByName(history, exerciseLibrary, extraExercises,
+      ...programs.map(p => p.exercises));
+    const eqConfOf = (ex) => getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile);
+    const { next, diubah, contoh } = repairActualWeights(history, lookup, eqConfOf);
+
+    if (diubah === 0) {
+      showOtaAlert('Tidak ada yang perlu dihitung ulang. Semua set sudah memakai beban dasar yang tercatat, atau alatnya memang berbeban dasar nol.');
+      return;
+    }
+
+    const namaGym = gymProfiles.find(g => g.id === activeGymId)?.name || 'gym aktif';
+    const daftar = contoh.map(c => `• ${c.tanggal} — ${c.latihan}: ${c.dari} → ${c.ke} kg`).join('\n');
+    const banyakGym = (gymProfiles || []).length > 1;
+
+    setConfirmModal({
+      isOpen: true,
+      title: 'Hitung Ulang Beban Aktual',
+      message: `${diubah} set akan dihitung ulang memakai beban dasar alat dari "${namaGym}".
+
+${daftar}${diubah > contoh.length ? `
+…dan ${diubah - contoh.length} set lainnya` : ''}
+
+Beban yang kamu ketik TIDAK berubah — yang dihitung ulang cuma beban aktualnya. Hanya set yang beban dasarnya tercatat nol yang disentuh.${banyakGym ? `
+
+PERHATIAN: kamu punya ${gymProfiles.length} profil gym, dan riwayat tidak mencatat sesi dikerjakan di gym mana. Semua set akan memakai konfigurasi "${namaGym}".` : ''}
+
+Ini tidak bisa dibatalkan otomatis.`,
+      confirmText: 'Ya, Hitung Ulang',
+      onConfirm: () => {
+        setHistory(next);
+        showOtaAlert(`${diubah} set dihitung ulang memakai beban dasar "${namaGym}".`);
+      },
+    });
+  };
+
   const pendingRmLogKeys = useRef(null);
   useEffect(() => {
     const keys = pendingRmLogKeys.current;
@@ -4259,6 +4301,7 @@ export default function App() {
          healthAvailable={healthAvailable} onHcBackfill={handleHcBackfill}
          setHistory={setHistory}
          backupList={backupList} isRestoring={isRestoring} onLoadBackups={loadBackupList} onRestoreBackup={restoreFromBackup}
+         onRepairActualWeights={perbaikiBebanRiwayat}
       />
 
       <Header

@@ -126,3 +126,90 @@ console.log('✅ All Actual Weight & 10RM unit tests PASSED successfully!');
 
   console.log('beban dasar custom OK');
 }
+
+// ---- repairActualWeights: hitung ulang riwayat setelah beban dasar dibetulkan ----
+// Permintaan 23/08/2026: "bisa ga kalo riwayat semua dibenerin?" — setelah beban dasar Cable/
+// Dumbbell bisa diisi, set-set lama masih menyimpan total_w yang dihitung seolah dasarnya nol.
+{
+  const { repairActualWeights } = await import('./workoutCalc.js');
+  const cable = { id: 'c1', name: 'Cable Row', equipment: 'Cable' };
+  const lookup = { c1: cable };
+  const conf = { baseWeight: 2.5, ratio: 1, increment: 5 };
+  const eqConfOf = () => conf;
+
+  const hari = (sets) => ({ '2026-08-01': { workouts: [{ id: 'w1', status: 'completed', log: { c1: sets } }] } });
+
+  // 1. KASUS UTAMA: set lama tanpa base_w -> total_w dihitung ulang.
+  {
+    const h = hari([{ input_w: 20, w: 20, r: 10, total_w: 20, done: true }]);
+    const r = repairActualWeights(h, lookup, eqConfOf);
+    assert.equal(r.diubah, 1);
+    assert.equal(r.next['2026-08-01'].workouts[0].log.c1[0].total_w, 22.5);
+    assert.equal(r.next['2026-08-01'].workouts[0].log.c1[0].base_w, 2.5);
+    // Yang DIKETIK user tidak boleh berubah — cuma turunannya.
+    assert.equal(r.next['2026-08-01'].workouts[0].log.c1[0].input_w, 20);
+    assert.equal(r.next['2026-08-01'].workouts[0].log.c1[0].w, 20);
+    // Masukan asli tidak dimutasi.
+    assert.equal(h['2026-08-01'].workouts[0].log.c1[0].total_w, 20, 'history asli tidak boleh berubah');
+  }
+
+  // 2. Set yang SUDAH punya beban dasar sungguhan tidak disentuh — itu batas pengamannya.
+  {
+    const h = hari([{ input_w: 20, base_w: 5, ratio: 1, total_w: 25, r: 10, done: true }]);
+    const r = repairActualWeights(h, lookup, eqConfOf);
+    assert.equal(r.diubah, 0);
+    assert.equal(r.next, h, 'tanpa perubahan, objek yang sama dikembalikan');
+  }
+
+  // 3. Rasio katrol yang tersimpan di set tetap dihormati, bukan ditimpa konfigurasi gym.
+  {
+    const h = hari([{ input_w: 20, ratio: 0.5, total_w: 10, r: 10, done: true }]);
+    const r = repairActualWeights(h, lookup, eqConfOf);
+    assert.equal(r.next['2026-08-01'].workouts[0].log.c1[0].total_w, 12.5, '(20 x 0,5) + 2,5');
+  }
+
+  // 4. Alat yang beban dasarnya nol di gym sekarang tidak diapa-apakan.
+  {
+    const h = hari([{ input_w: 20, total_w: 20, r: 10, done: true }]);
+    assert.equal(repairActualWeights(h, lookup, () => ({ baseWeight: 0, ratio: 1 })).diubah, 0);
+  }
+
+  // 5. Set kosong, set tanpa beban, dan latihan tak dikenal dilewati tanpa melempar.
+  {
+    const h = hari([null, { r: 10, done: true }, { input_w: 0, total_w: 0 }]);
+    assert.equal(repairActualWeights(h, lookup, eqConfOf).diubah, 0);
+    assert.equal(repairActualWeights(hari([{ input_w: 20 }]), {}, eqConfOf).diubah, 0, 'latihan tak dikenal dilewati');
+    assert.deepEqual(repairActualWeights(null, lookup, eqConfOf).next, {});
+  }
+
+  // 6. Set berbentuk objek ber-key angka (hasil bolak-balik penyimpanan) ikut diperbaiki.
+  {
+    const h = hari({ 0: { input_w: 20, total_w: 20, r: 10, done: true } });
+    const r = repairActualWeights(h, lookup, eqConfOf);
+    assert.equal(r.diubah, 1);
+    assert.equal(r.next['2026-08-01'].workouts[0].log.c1[0].total_w, 22.5);
+  }
+
+  // 7. Idempoten: menjalankannya dua kali tidak menambah beban dasar dua kali.
+  {
+    const h = hari([{ input_w: 20, total_w: 20, r: 10, done: true }]);
+    const sekali = repairActualWeights(h, lookup, eqConfOf);
+    const dua = repairActualWeights(sekali.next, lookup, eqConfOf);
+    assert.equal(dua.diubah, 0, 'jalan kedua tidak boleh mengubah apa pun');
+    assert.equal(dua.next['2026-08-01'].workouts[0].log.c1[0].total_w, 22.5);
+  }
+
+  // 8. Contoh untuk pratinjau terisi, dibatasi 5.
+  {
+    const banyak = {};
+    for (let i = 1; i <= 8; i++) {
+      banyak[`2026-08-0${i}`] = { workouts: [{ id: 'w' + i, log: { c1: [{ input_w: 10 + i, total_w: 10 + i, done: true }] } }] };
+    }
+    const r = repairActualWeights(banyak, lookup, eqConfOf);
+    assert.equal(r.diubah, 8);
+    assert.equal(r.contoh.length, 5, 'pratinjau dibatasi 5 contoh');
+    assert.equal(r.contoh[0].ke, r.contoh[0].dari + 2.5);
+  }
+
+  console.log('repairActualWeights OK');
+}

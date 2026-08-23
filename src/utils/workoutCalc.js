@@ -1091,3 +1091,82 @@ export const calculateLiveWorkoutCalories = (weightKg, exercises, logs, currentD
 
   return Math.round(baselineCalories + extraCalories);
 };
+
+/**
+ * Hitung ulang beban aktual di SELURUH riwayat setelah beban dasar alat dibetulkan.
+ *
+ * ATURANNYA SENGAJA SEMPIT: hanya set yang beban dasarnya tercatat NOL (atau tidak tercatat sama
+ * sekali) yang diperbaiki, dan hanya kalau konfigurasi gym sekarang memberi beban dasar > 0.
+ * Set yang sudah menyimpan beban dasar sungguhan tidak disentuh.
+ *
+ * Kenapa sesempit itu: riwayat TIDAK menyimpan di gym mana sesi dikerjakan. Menghitung ulang
+ * semuanya dengan konfigurasi gym aktif akan membetulkan sesi di gym itu dan merusak sesi di gym
+ * lain. Membatasi pada set yang jelas-jelas "dihitung seolah dasarnya nol" membuat perbaikan ini
+ * hanya menyentuh yang memang salah karena kolom inputnya dulu tidak ada.
+ *
+ * Murni: mengembalikan objek history BARU dan tidak mengubah masukannya. Pemanggil yang
+ * memutuskan menyimpannya atau tidak, setelah pratinjau.
+ *
+ * @param {object} history seluruh riwayat
+ * @param {object} exLookup peta id -> latihan (pakai buildExLookupByName)
+ * @param {function} eqConfOf (ex) => konfigurasi alat untuk gym yang dipilih
+ * @returns {{ next: object, diubah: number, contoh: Array }}
+ */
+export const repairActualWeights = (history, exLookup, eqConfOf) => {
+  let diubah = 0;
+  const contoh = [];
+  const next = { ...(history || {}) };
+
+  Object.keys(history || {}).forEach((tanggal) => {
+    const hari = history[tanggal];
+    if (!hari || !Array.isArray(hari.workouts)) return;
+    let hariBerubah = false;
+
+    const workouts = hari.workouts.map((wk) => {
+      if (!wk || !wk.log) return wk;
+      let sesiBerubah = false;
+      const log = {};
+
+      Object.keys(wk.log).forEach((kunci) => {
+        const ex = resolveLoggedExercise(kunci, exLookup);
+        const conf = ex ? eqConfOf(ex) : null;
+        const dasarBaru = Number(conf?.baseWeight) || 0;
+        const sets = wk.log[kunci];
+        if (!conf || dasarBaru <= 0 || !sets) { log[kunci] = sets; return; }
+
+        const daftar = Array.isArray(sets) ? sets : Object.values(sets);
+        let adaYangBerubah = false;
+        const baru = daftar.map((set) => {
+          if (!set) return set;
+          const dasarLama = Number(set.base_w) || 0;
+          if (dasarLama > 0) return set;                       // sudah punya dasar sungguhan
+          const input = Number(set.input_w !== undefined ? set.input_w : set.w) || 0;
+          if (input <= 0) return set;                          // set kosong / bukan set beban
+          const rasio = Number(set.ratio) || Number(conf.ratio) || 1;
+          const totalBaru = Math.round((input * rasio + dasarBaru) * 100) / 100;
+          if (totalBaru === (Number(set.total_w) || 0)) return set;
+          adaYangBerubah = true;
+          diubah++;
+          if (contoh.length < 5) {
+            contoh.push({ tanggal, latihan: ex?.name || String(kunci), dari: Number(set.total_w) || input, ke: totalBaru });
+          }
+          return { ...set, base_w: dasarBaru, ratio: rasio, total_w: totalBaru };
+        });
+
+        if (adaYangBerubah) { sesiBerubah = true; log[kunci] = Array.isArray(sets) ? baru : { ...baru }; }
+        else log[kunci] = sets;
+      });
+
+      if (!sesiBerubah) return wk;
+      hariBerubah = true;
+      return { ...wk, log };
+    });
+
+    if (hariBerubah) next[tanggal] = { ...hari, workouts };
+  });
+
+  // Tanpa perubahan, kembalikan objek yang SAMA. `history` baru — walau isinya identik — memicu
+  // efek auto-save dan satu penulisan penuh ke cloud tanpa isi apa pun.
+  if (diubah === 0) return { next: history || {}, diubah: 0, contoh: [] };
+  return { next, diubah, contoh };
+};
