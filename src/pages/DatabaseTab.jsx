@@ -729,7 +729,14 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
     <>
       <div className="w-full max-w-full overflow-x-hidden">
         
-        <div className={`sticky top-0 z-30 ${theme === 'dark' ? 'bg-[#05070d]/85' : 'bg-[#eef3fb]/85'} backdrop-blur-md pt-3 pb-3 -mx-4 px-4 space-y-3`}>
+        {/* Tanpa warna latar, cuma backdrop-blur.
+            Sebelumnya bar ini memakai #05070d datar yang di-hardcode. Latar aplikasi memakai hex
+            yang SAMA tapi ditimpa tiga gradien radial biru (lihat .app-bg-dark di index.css),
+            jadi bar datarnya tidak pernah cocok dengan apa pun di belakangnya — terbaca sebagai
+            kotak biru tua memanjang dari pemilih gym sampai kolom cari.
+            Blur-nya dipertahankan: itu yang menjaga teks tetap terbaca saat daftar latihan
+            menggulung di bawahnya, dan blur tidak punya tepi berwarna yang bisa jadi kotak. */}
+        <div className={`sticky top-0 z-30 backdrop-blur-md pt-3 pb-3 -mx-4 px-4 space-y-3`}>
         
         {/* ── Gym Selector ───────────────────────────────────────── */}
         <div className="flex items-center gap-2">
