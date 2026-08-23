@@ -146,7 +146,18 @@ const FloatingTimer = ({
   const activeExerciseName = (sessionExercises || []).find(e => String(e.id) === String(activeExerciseId))?.name || '';
 
   return (
-    <div className="fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 pointer-events-none flex justify-center animate-in slide-in-from-bottom-8 fade-in duration-300">
+    // TANPA `fade-in`, dan itu disengaja.
+    //
+    // `fade-in` bermula dari opacity 0 dengan fill-mode. Kalau animasi masuknya tidak sempat
+    // berjalan sampai selesai, pil ini tetap ter-mount, tetap mengambil ruang, tetap bisa
+    // diklik — tapi sepenuhnya TAK TERLIHAT. Kegagalan yang tidak meninggalkan jejak apa pun,
+    // dan sembuh sendiri di minimize berikutnya, sehingga mudah dikira "kadang muncul kadang
+    // tidak". Dilaporkan 23/08/2026: pil tidak muncul di minimize pertama, normal di kedua dst.
+    //
+    // `slide-in-from-bottom-8` aman untuk hal yang sama: animasi macet paling banter menyisakan
+    // pil bergeser 2rem — masih terlihat. Gerakannya tetap ada, mode gagalnya tidak lagi
+    // "hilang total".
+    <div className="fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 pointer-events-none flex justify-center animate-in slide-in-from-bottom-8 duration-300">
       <div 
         className={`pointer-events-auto w-full max-w-2xl mx-auto flex items-center justify-between px-6 py-4 rounded-full ${t.bgAccent} text-white shadow-xl shadow-[color:var(--tw-shadow-color)] cursor-pointer active:scale-95 transition-all border border-white/20`} 
         style={{ shadowColor: 'rgba(0,0,0,0.3)' }}

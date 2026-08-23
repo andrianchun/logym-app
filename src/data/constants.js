@@ -381,3 +381,32 @@ export const getVideoId = (url) => {
     return match ? match[1] : null;
   } catch (e) { return null;  }
 };
+
+/**
+ * Saring pustaka menurut alat yang tersedia di gym aktif.
+ *
+ * DUA KEKECUALIAN, dan keduanya memperbaiki latihan yang selama ini hilang diam-diam:
+ *
+ * 1. BODY WEIGHT SELALU ADA. Kamu tidak pernah kekurangan badanmu sendiri. Selama ini Plank,
+ *    Aerobic, HIIT, Pilates, Yoga, Jogging, dan Walking ikut lenyap dari "Ganti Latihan" begitu
+ *    sebuah gym tidak mencentang "Body Weight" — sehingga plank cuma bisa dimasukkan lewat
+ *    Latihan Ekstra dan tidak bisa menggantikan latihan yang sudah ada.
+ *
+ * 2. ALAT YANG TIDAK ADA DI equipmentOptions TIDAK PERNAH DISEMBUNYIKAN. Kalau sebuah nilai tidak
+ *    bisa dicentang di GymManagerModal, ketidakhadirannya di daftar gym bukan keputusan user —
+ *    itu cuma nilai yang tidak dikenal. Menyaringnya berarti menyembunyikan selamanya tanpa ada
+ *    setelan apa pun yang bisa mengembalikannya. Yang kena: "Swimming (Renang)" (alat `Pool`)
+ *    dan "Cycling / Sepeda" (alat `Bicycle`), plus SEMUA latihan online — translateEquipment
+ *    mengembalikan Title Case dari nilai API apa pun, jadi sebagian besar jatuh di luar 32 opsi.
+ */
+export const filterByGymEquipment = (list, activeGym) => {
+  const alat = activeGym?.equipment;
+  if (alat === 'all' || !Array.isArray(alat)) return list || [];
+  const dikenal = new Set(equipmentOptions);
+  return (list || []).filter((ex) => {
+    const eq = ex?.equipment;
+    if (eq === 'Body Weight') return true;
+    if (!dikenal.has(eq)) return true;
+    return alat.includes(eq);
+  });
+};

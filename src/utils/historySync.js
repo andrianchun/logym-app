@@ -303,3 +303,55 @@ export const mergeBackupIntoHistory = (history, backupData) => {
 
   return { next, tanggalBaru, sesiDitambal };
 };
+
+/**
+ * Apakah SEMUA set sesi ini sudah tercentang — "selesai dikerjakan", terlepas dari sudah
+ * tersimpan atau belum. Inilah aturan di balik badge "Belum disimpan" di kalender.
+ *
+ * Diangkat dari checkIsCompletedStrict di CalendarTab supaya cuma ada SATU aturan. Sebelumnya
+ * aturan itu terkunci di dalam closure komponen, jadi jalur simpan tidak punya cara memakainya
+ * dan terpaksa akan menebak ulang — dua definisi "selesai" yang bisa berbeda jawaban adalah
+ * persis cara sesi menggantung tanpa ada yang sadar.
+ *
+ * @param {object} workout sesi yang diperiksa
+ * @param {Array} exercises daftar latihan milik sesi itu (pemanggil yang meresolve)
+ * @param {object} exerciseLogs log satu HARI
+ * @param {object} skippedExercises latihan yang dilewati, satu HARI
+ */
+export const isSessionFullyLogged = (workout, exercises, exerciseLogs, skippedExercises) => {
+  if (!workout || !Array.isArray(exercises) || exercises.length === 0) return false;
+  const aktif = exercises.filter((ex) =>
+    ex && !skippedExercises?.[`${ex.id}-${workout.id}`] && !skippedExercises?.[ex.id]);
+  if (aktif.length === 0) return false;
+  return aktif.every((ex) => {
+    const logs = exerciseLogs?.[`${ex.id}-${workout.id}`] || exerciseLogs?.[ex.id] || [];
+    const arr = Array.isArray(logs) ? logs : Object.values(logs || {});
+    return arr.length > 0 && arr.every((s) => s?.done && !s?.skipped);
+  });
+};
+
+/**
+ * Sesi lain di hari yang sama yang setnya sudah tercentang penuh tapi BELUM tersimpan.
+ *
+ * Kenapa ini ada: sesi yang belum tersimpan hidup di `exerciseLogs`/`_activeSession`, dan
+ * `_activeSession` sengaja dibuang sebelum ditulis ke cloud. Artinya sesi "Belum disimpan" itu
+ * ada di SATU perangkat saja — bentuk yang sama persis dengan kehilangan data. Menyimpan sesi
+ * kedua sementara sesi pertama dibiarkan menggantung berarti membiarkan data itu tetap rapuh.
+ *
+ * Yang setnya BELUM penuh sengaja tidak ikut: user mungkin masih mengerjakannya, dan menutup
+ * sesi yang masih berjalan tidak bisa dibatalkan.
+ *
+ * @param {Array} workouts sesi-sesi hari itu
+ * @param {Function} exercisesOf (workout) => daftar latihannya
+ * @param {object} exerciseLogs log satu HARI (yang TERSISA setelah sesi target diambil)
+ * @param {object} skippedExercises latihan dilewati, satu HARI
+ * @param {Set|Array} idDikecualikan id sesi yang sedang/sudah disimpan di putaran ini
+ * @returns {string[]} id sesi yang layak ikut disimpan
+ */
+export const sessionsPendingSave = (workouts, exercisesOf, exerciseLogs, skippedExercises, idDikecualikan = []) => {
+  const kecuali = new Set([...(idDikecualikan || [])].map(String));
+  return (workouts || [])
+    .filter((w) => w && w.status !== 'completed' && !kecuali.has(String(w.id)))
+    .filter((w) => isSessionFullyLogged(w, exercisesOf(w) || [], exerciseLogs, skippedExercises))
+    .map((w) => String(w.id));
+};

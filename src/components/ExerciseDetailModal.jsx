@@ -313,7 +313,7 @@ const ExerciseDetailModal = ({
     }).filter(v => v.videoId);
 
     return createPortal(
-      <div className={`fixed inset-0 z-[100] flex flex-col ${t.bgApp}`}>
+      <div role="dialog" aria-modal="true" className={`fixed inset-0 z-[100] flex flex-col ${t.bgApp} no-swipe`}>
         <div className="p-4 flex justify-between items-center bg-black/80 absolute top-0 w-full z-20" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
           <h2 className="h2 text-white drop-shadow-md">{ex.name}</h2>
           <button data-close-modal="true" onClick={onClose} className="p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition">

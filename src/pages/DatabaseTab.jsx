@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Search, Filter, Edit2, Plus, Dumbbell, Loader2, RefreshCw, Link as LinkIcon, X, Check, AlertCircle, ChevronDown, Database, Globe, Heart } from 'lucide-react';
-import { formatTarget, normalizeMuscleKey, muscleOptions, equipmentOptions, getVideoId, levelOptions } from '../data/constants';
+import { formatTarget, normalizeMuscleKey, muscleOptions, equipmentOptions, getVideoId, levelOptions, filterByGymEquipment } from '../data/constants';
 import EquipmentIcon from '../components/EquipmentIcon';
 import { fetchExercisesFromApi, clearExerciseDbCache, getCachedExercises } from '../utils/exerciseDbApi';
 import { playSoundEffect } from '../utils/audio';
@@ -502,9 +502,7 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
   const gymFilteredLibrary = useMemo(() => {
     let list = [...combinedLibrary];
     const activeGym = gymProfiles.find(g => g.id === activeGymId) || gymProfiles[0];
-    if (activeGym && activeGym.equipment !== 'all' && Array.isArray(activeGym.equipment)) {
-      list = list.filter(ex => activeGym.equipment.includes(ex.equipment));
-    }
+    list = filterByGymEquipment(list, activeGym);
     return list;
   }, [combinedLibrary, gymProfiles, activeGymId]);
 

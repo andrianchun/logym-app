@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Search, Filter, Dumbbell, Heart, ChevronDown } from 'lucide-react';
-import { formatTarget, getVideoId, muscleOptions, equipmentOptions, normalizeMuscleKey } from '../data/constants';
+import { formatTarget, getVideoId, muscleOptions, equipmentOptions, normalizeMuscleKey, filterByGymEquipment } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
 import { fetchExercisesFromApi } from '../utils/exerciseDbApi';
 import EquipmentIcon from './EquipmentIcon';
@@ -39,12 +39,10 @@ const AlternativeExerciseModal = ({
     const onlineToAdd = onlineExercises.filter(ex => !localNames.has(ex.name.toLowerCase()));
     let list = [...exerciseLibrary, ...onlineToAdd];
 
-    // Filter by Active Gym Equipment
+    // Filter by Active Gym Equipment — aturannya di filterByGymEquipment (data/constants.js),
+    // termasuk kekecualian Body Weight dan alat tak dikenal yang dulu bikin Plank dkk lenyap.
     if (gymProfiles && activeGymId) {
-      const activeGym = gymProfiles.find(g => g.id === activeGymId) || gymProfiles[0];
-      if (activeGym && activeGym.equipment !== 'all' && Array.isArray(activeGym.equipment)) {
-        list = list.filter(ex => activeGym.equipment.includes(ex.equipment));
-      }
+      list = filterByGymEquipment(list, gymProfiles.find(g => g.id === activeGymId) || gymProfiles[0]);
     }
 
     return list;

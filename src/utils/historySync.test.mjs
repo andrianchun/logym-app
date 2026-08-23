@@ -381,3 +381,50 @@ console.log('historySync OK');
 
   console.log('mergeBackupIntoHistory OK');
 }
+
+// ---- sessionsPendingSave: sesi lain yang sudah selesai ikut tersimpan ----
+// Permintaan 23/08/2026: kalau dalam satu hari ada dua sesi dan yang pertama masih "Belum
+// disimpan", menyimpan sesi kedua harus ikut menyimpannya. Alasannya bukan kenyamanan: sesi
+// yang belum tersimpan hidup di _activeSession, dan _activeSession dibuang sebelum ditulis ke
+// cloud — jadi sesi menggantung itu cuma ada di satu perangkat.
+{
+  const { isSessionFullyLogged, sessionsPendingSave } = await import('./historySync.js');
+
+  const exA = [{ id: 'e1' }, { id: 'e2' }];
+  const exB = [{ id: 'e3' }];
+  const wA = { id: 'wA', status: 'planned' };
+  const wB = { id: 'wB', status: 'planned' };
+  const exercisesOf = (w) => (w.id === 'wA' ? exA : exB);
+  const done = [{ done: true }, { done: true }];
+
+  // 1. KASUS UTAMA: sesi A penuh & belum tersimpan -> ikut disimpan saat B disimpan.
+  const logs = { 'e1-wA': done, 'e2-wA': done, 'e3-wB': done };
+  assert.deepEqual(sessionsPendingSave([wA, wB], exercisesOf, logs, {}, ['wB']), ['wA']);
+
+  // 2. Sesi yang setnya BELUM penuh tidak boleh ikut — user mungkin masih mengerjakannya.
+  const separuh = { 'e1-wA': done, 'e2-wA': [{ done: false }], 'e3-wB': done };
+  assert.deepEqual(sessionsPendingSave([wA, wB], exercisesOf, separuh, {}, ['wB']), []);
+
+  // 3. Sesi yang sudah tersimpan tidak diproses ulang.
+  assert.deepEqual(
+    sessionsPendingSave([{ ...wA, status: 'completed' }, wB], exercisesOf, logs, {}, ['wB']), []);
+
+  // 4. Latihan yang di-skip tidak menghalangi "penuh"; kalau SEMUA di-skip, bukan selesai.
+  assert.equal(isSessionFullyLogged(wA, exA, { 'e1-wA': done }, { 'e2-wA': true }), true);
+  assert.equal(isSessionFullyLogged(wA, exA, {}, { 'e1-wA': true, 'e2-wA': true }), false);
+
+  // 5. Set yang ditandai skipped tidak dihitung selesai.
+  assert.equal(isSessionFullyLogged(wB, exB, { 'e3-wB': [{ done: true, skipped: true }] }, {}), false);
+
+  // 6. Kunci polos (riwayat lama tanpa sufiks sesi) tetap dikenali.
+  assert.equal(isSessionFullyLogged(wB, exB, { e3: done }, {}), true);
+
+  // 7. Set berbentuk objek ber-key angka (hasil bolak-balik penyimpanan) tetap terbaca.
+  assert.equal(isSessionFullyLogged(wB, exB, { 'e3-wB': { 0: { done: true } } }, {}), true);
+
+  // 8. Sesi tanpa latihan bukan "selesai" — jangan sampai sesi kosong ikut ditutup.
+  assert.equal(isSessionFullyLogged(wB, [], {}, {}), false);
+  assert.deepEqual(sessionsPendingSave(null, exercisesOf, {}, {}, []), []);
+
+  console.log('sessionsPendingSave OK');
+}

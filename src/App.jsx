@@ -61,7 +61,7 @@ import useDialog from './hooks/useDialog';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import UpdaterAlert from './components/UpdaterAlert';
 import { getLocalYMD, resolveProjectedProgramId, isLomealOwned, resolveLoggedExercise, splitSessionLogs, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos, getDayWorkouts, countMissedScheduledDays } from './data/constants';
-import { serializeDay, dayFingerprint, migrateBaseline, reconcileHistory, workoutsToMap, workoutIdsFromBaseline, diffFields, stableStringify, mergeBackupIntoHistory } from './utils/historySync';
+import { serializeDay, dayFingerprint, migrateBaseline, reconcileHistory, workoutsToMap, workoutIdsFromBaseline, diffFields, stableStringify, mergeBackupIntoHistory, sessionsPendingSave } from './utils/historySync';
 import { useBleManager } from './hooks/useBleManager';
 import { bolehSync, gabungAntrean } from './utils/hcSchedule';
 import { Loader2, Download, X } from 'lucide-react';
@@ -848,6 +848,7 @@ export default function App() {
   const setActivePlanIds = _setActivePlanIds;
   const [activeProgramId, setActiveProgramId] = useState(defaultPrograms[0]?.id || null);
   const [focusWorkoutId, setFocusWorkoutId] = useState(null);
+  const autoSaveQueue = useRef([]);
   // Latihan yang SEDANG dikerjakan = latihan yang set-nya terakhir dicentang user. Dipakai untuk
   // memutuskan di mana mode immersive terbuka dan ke mana daftar kartu digulirkan.
   //
@@ -3522,7 +3523,11 @@ export default function App() {
     });
   }, [history]);
 
-  const handleSaveWorkout = (progId) => {
+  // opts.workoutId menunjuk sesi yang disimpan SECARA EKSPLISIT. Tanpa itu, penyimpanan
+  // beruntun harus lewat setFocusWorkoutId dan menunggu state — dan sesi kedua akan memakai
+  // fokus sesi pertama yang belum sempat berubah.
+  const handleSaveWorkout = (progId, opts = {}) => {
+    const fokusSesi = opts.workoutId !== undefined ? opts.workoutId : focusWorkoutId;
     playSoundEffect('success', soundEnabled);
 
     // DURASI SESI INI SAJA, bukan seluruh waktu timer.
@@ -3558,7 +3563,7 @@ export default function App() {
         .filter(([, sets]) => Object.values(sets || {}).some(s => s?.done))
         .map(([k]) => resolveLoggedExercise(k, lookup)?.name)
         .filter(Boolean);
-      if (doneNames.length > 0) bumpExercisePopularity(doneNames, `${selectedDate}_${progId || focusWorkoutId || 'sesi'}`);
+      if (doneNames.length > 0) bumpExercisePopularity(doneNames, `${selectedDate}_${progId || fokusSesi || 'sesi'}`);
     }
     const endedAt = Date.now();
     const endStamp = `${String(new Date(endedAt).getHours()).padStart(2, '0')}:${String(new Date(endedAt).getMinutes()).padStart(2, '0')}`;
@@ -3579,11 +3584,31 @@ export default function App() {
     // exerciseLogs/skippedExercises/extraExercises tanpa syarat dan menulis SELURUH log hari itu
     // ke sesi yang kebetulan disimpan duluan — treadmill di sesi Ekstra yang belum disimpan ikut
     // masuk ke sesi beban, lalu kartu Ekstranya lenyap bersama datanya.
-    const belah = splitSessionLogs(exerciseLogs, { progId, workoutId: focusWorkoutId, extraExercises });
-    const belahSkip = splitSessionLogs(skippedExercises, { progId, workoutId: focusWorkoutId, extraExercises });
+    const belah = splitSessionLogs(exerciseLogs, { progId, workoutId: fokusSesi, extraExercises });
+    const belahSkip = splitSessionLogs(skippedExercises, { progId, workoutId: fokusSesi, extraExercises });
     // extras cuma dibersihkan kalau yang disimpan memang sesi Ekstra — invarian lama yang sempat
     // hilang (lihat memori extra-exercises-are-adhoc-only).
     const isSesiEkstra = progId === 'extra';
+
+    // SESI LAIN YANG SUDAH SELESAI IKUT DISIMPAN.
+    //
+    // Sesi yang belum tersimpan hidup di exerciseLogs/_activeSession, dan _activeSession sengaja
+    // dibuang sebelum ditulis ke cloud — jadi sesi "Belum disimpan" itu ada di SATU perangkat
+    // saja. Membiarkannya menggantung setelah user menyimpan sesi berikutnya berarti membiarkan
+    // data itu tetap rapuh, bentuk yang sama dengan kehilangan data.
+    //
+    // Hanya yang SETNYA SUDAH PENUH yang ikut; yang masih separuh dibiarkan, karena user mungkin
+    // masih mengerjakannya dan menutup sesi berjalan tidak bisa dibatalkan.
+    if (!opts.auto) {
+      const hariIni = history[activeWorkoutDate || selectedDate]?.workouts || [];
+      const exerciseOf = (w) => (w.programId === 'adhoc'
+        ? (w.exercises || [])
+        : (w.overriddenExercises || programs.find(pr => pr.id === w.programId)?.exercises || []));
+      autoSaveQueue.current = sessionsPendingSave(
+        hariIni, exerciseOf, belah.sisa, belahSkip.sisa,
+        [progId, fokusSesi, focusWorkoutId].filter(Boolean)
+      );
+    }
 
     setExerciseLogs(belah.sisa);
     setSkippedExercises(belahSkip.sisa);
@@ -3627,7 +3652,7 @@ export default function App() {
             duration: formatDur(durationSecs)
           };
         } else {
-          const isSameAdhoc = (w) => w.programId === 'adhoc' && (w.id === focusWorkoutId || focusWorkoutId === 'extra');
+          const isSameAdhoc = (w) => w.programId === 'adhoc' && (w.id === fokusSesi || fokusSesi === 'extra');
           const completedAdhocIdx = workouts.map((w, i) => (isSameAdhoc(w) ? i : -1)).filter(i => i >= 0).pop() ?? -1;
           if (completedAdhocIdx >= 0) {
               const existingW = workouts[completedAdhocIdx];
@@ -3669,8 +3694,8 @@ export default function App() {
       } else {
         let isTargetFound = false;
         workouts = workouts.map(w => {
-          const isTargetWorkout = focusWorkoutId 
-            ? (w.id === focusWorkoutId || w.programId === focusWorkoutId)
+          const isTargetWorkout = fokusSesi 
+            ? (w.id === fokusSesi || w.programId === fokusSesi)
             : (progId ? (w.id === progId || w.programId === progId) : w.status === 'planned');
             
           if (isTargetWorkout) {
@@ -3824,6 +3849,23 @@ export default function App() {
     setActiveTab('calendar');
   };
 
+  // Kuras antrean sesi yang ikut disimpan, SATU per render.
+  //
+  // Sengaja lewat efek, bukan panggilan beruntun di dalam handleSaveWorkout: fungsi itu membaca
+  // exerciseLogs dari closure-nya, jadi pemanggilan kedua di tick yang sama masih akan melihat
+  // log sesi pertama yang belum terpotong dan menuliskannya dua kali. Menunggu state turun dulu
+  // membuat tiap sesi memakai sisa log miliknya sendiri — dan durasinya sendiri, lewat
+  // sessionSpanSeconds.
+  //
+  // opts.auto mencegah putaran ini menambah antrean baru dari dalam dirinya sendiri.
+  useEffect(() => {
+    if (autoSaveQueue.current.length === 0) return;
+    const id = autoSaveQueue.current.shift();
+    const t = setTimeout(() => handleSaveWorkout(id, { workoutId: id, auto: true }), 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exerciseLogs]);
+
   const handleEditPastWorkout = (dateStr, w) => {
     const doEdit = () => {
       playSoundEffect('click', soundEnabled);
@@ -3964,16 +4006,33 @@ export default function App() {
 
   const globalTouchStartX = useRef(null);
   const globalTouchStartY = useRef(null);
+  const swipeAreaRef = useRef(null);
+
+  // SATU penjaga untuk semua dialog, bukan satu penanda per dialog.
+  //
+  // Modal di app ini dirender lewat createPortal ke document.body — tapi React mengalirkan event
+  // lewat pohon KOMPONEN, bukan pohon DOM, jadi sentuhan di dalam modal tetap sampai ke handler
+  // swipe ini. Penjaga lama mengandalkan tiap modal menandai dirinya (`no-swipe` atau
+  // role="dialog"), dan dari ~14 root portal cuma 2 yang melakukannya. Sisanya bocor: swipe di
+  // dalam Detail Latihan layar penuh ikut menggeser tab di belakangnya.
+  //
+  // Pemeriksaan containment DOM menutup semuanya sekaligus, termasuk modal yang belum ditulis:
+  // apa pun yang tidak berada di dalam area swipe secara fisik bukan gestur untuk area ini.
+  const diLuarAreaSwipe = (e) => {
+    const el = e.target;
+    if (swipeAreaRef.current && el instanceof Node && !swipeAreaRef.current.contains(el)) return true;
+    return !!(el.closest?.('input[type="range"]') || el.closest?.('[role="dialog"]') || el.closest?.('.no-swipe'));
+  };
 
   const handleGlobalTouchStart = (e) => {
-    if (e.target.closest('input[type="range"]') || e.target.closest('[role="dialog"]') || e.target.closest('.no-swipe')) return;
+    if (diLuarAreaSwipe(e)) return;
     globalTouchStartX.current = e.touches[0].clientX;
     globalTouchStartY.current = e.touches[0].clientY;
   };
 
   const handleGlobalTouchEnd = (e) => {
     if (globalTouchStartX.current === null || globalTouchStartY.current === null) return;
-    if (e.target.closest('input[type="range"]') || e.target.closest('[role="dialog"]') || e.target.closest('.no-swipe')) return;
+    if (diLuarAreaSwipe(e)) return;
     
     const touchEndX = e.changedTouches[0].clientX;
     const touchEndY = e.changedTouches[0].clientY;
@@ -4060,6 +4119,7 @@ export default function App() {
     <>
       <div 
       className={`min-h-screen flex flex-col ${t.bgApp} ${t.textMain} font-sans ${contentTab === 'calendar' ? 'h-[100dvh] overflow-hidden' : 'pb-32'} transition-colors duration-300 w-full`}
+      ref={swipeAreaRef}
       onTouchStart={handleGlobalTouchStart}
       onTouchEnd={handleGlobalTouchEnd}
     >

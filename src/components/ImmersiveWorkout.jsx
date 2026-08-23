@@ -460,6 +460,7 @@ const ImmersiveWorkout = ({
   const minSwipeDistance = 50;
 
   const onTouchStart = (e) => {
+    if (diLuarImmersive(e)) return;
     setTouchEnd(null);
     setTouchStart(e.targetTouches[0].clientX);
   };
@@ -484,11 +485,25 @@ const ImmersiveWorkout = ({
   };
 
   // Root swipe logic for minimizing (swipe down)
+  const rootRef = React.useRef(null);
   const [rootTouchStart, setRootTouchStart] = React.useState(null);
   const [rootTouchEnd, setRootTouchEnd] = React.useState(null);
 
+  // Dialog dirender lewat createPortal ke document.body, tapi React mengalirkan event lewat pohon
+  // KOMPONEN — jadi sentuhan di dalam Detail Latihan, hint, atau panel detail set tetap sampai ke
+  // handler swipe di sini. Menandai tiap dialog satu per satu selalu ketinggalan satu; memeriksa
+  // apakah sentuhannya benar-benar berada DI DALAM layar immersive menutup semuanya sekaligus.
+  const diLuarImmersive = (e) => {
+    const el = e.target;
+    if (!(el instanceof Node)) return false;
+    return !!(rootRef.current && !rootRef.current.contains(el));
+  };
+
   const onRootTouchStart = (e) => {
     if (activeSetDetail !== null || showFinishConfirm) return;
+    if (diLuarImmersive(e)) return;
+    // Zona picker beban/reps memang dikecualikan: itu kontrol geser, menariknya tidak boleh
+    // menutup layar. Sisa layar — media, header, area kosong — tetap bisa dipakai.
     if (e.target.closest('.no-swipe-minimize')) return;
     setRootTouchEnd(null);
     setRootTouchStart(e.targetTouches[0].clientY);
@@ -500,7 +515,9 @@ const ImmersiveWorkout = ({
   const onRootTouchEnd = () => {
     if (activeSetDetail !== null || showFinishConfirm || !rootTouchStart || !rootTouchEnd) return;
     const distance = rootTouchStart - rootTouchEnd;
-    if (distance < -100) { // Swipe down
+    // Ambang 60px, bukan 100. Swipe ganti latihan di layar yang sama sudah pakai 50, jadi gestur
+    // minimize dulu dua kali lebih berat daripada tetangganya — itu yang terasa "susah banget".
+    if (distance < -60) { // Swipe down
       playSoundEffect('click', soundEnabled);
       handleMinimize();
     }
@@ -656,6 +673,7 @@ const ImmersiveWorkout = ({
 
   return (
     <div 
+      ref={rootRef}
       className={`fixed inset-0 z-[100] flex flex-col ${t.bgApp} ${t.textMain} overflow-hidden duration-300 ${isClosing ? 'animate-out slide-out-to-bottom-full' : 'animate-in slide-in-from-bottom-full'} no-swipe`}
       onTouchStart={onRootTouchStart}
       onTouchMove={onRootTouchMove}
@@ -1120,13 +1138,11 @@ const ImmersiveWorkout = ({
 
         {/* Actions Row (Full Width) */}
         <div className="w-full relative">
-          {/* Negative Rest Warning Banner */}
-          {localRestTimer < -30 && !isAllDone && (
-            <div className="w-full mb-3 p-3 rounded-2xl bg-rose-600 text-white text-center text-xs font-black animate-bounce shadow-xl flex items-center justify-center gap-2 border border-rose-400">
-              <span className="text-base">⚠️</span>
-              <span>Otot mulai dingin! Letakkan HP-mu dan mulai set berikutnya sekarang!</span>
-            </div>
-          )}
+          {/* Spanduk "Otot mulai dingin!" DIHAPUS, dan tidak perlu diganti apa pun.
+              Bar istirahat di bawah ini SUDAH berubah warna untuk keadaan yang sama persis:
+              amber saat istirahat habis, rose + pulse saat lewat 30 detik. Spanduknya cuma
+              mengulang informasi itu dengan kalimat panjang, animate-bounce, dan emoji —
+              berisik untuk sesuatu yang sudah tersampaikan lewat warna. */}
 
           {localRestTimer !== 0 && !isAllDone ? (
             <div className={`w-full relative flex items-stretch justify-between rounded-2xl shadow-xl transition-colors overflow-hidden border ${
