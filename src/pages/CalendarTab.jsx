@@ -195,6 +195,26 @@ const CalendarTab = ({
   // tersembunyi yang selalu ter-mount dengan struktur identik ke grid mingguan asli — supaya
   // tidak pernah menangkap ukuran di tengah animasi transisi kolom header (pernah kejadian
   // terukur 655-779px, jauh melebihi ukuran compact aslinya ~168px).
+  // Berapa minggu ditampilkan di strip mingguan. Satu baris tujuh hari menyisakan ruang kosong
+  // besar di layar lebar; di ponsel satu minggu tetap yang benar. Dideklarasikan DI SINI, di atas
+  // efek pengukur tinggi di bawah, karena efek itu memakainya sebagai dependensi.
+  const hitungMingguStrip = () => {
+    if (typeof window === 'undefined') return 1;
+    // TINGGI, bukan lebar. Minggu tambahan menumpuk sebagai BARIS BARU di grid tujuh kolom, jadi
+    // yang dimakan ruang vertikal — persis ruang yang sama dipakai daftar sesi di bawahnya.
+    // Memutuskannya dari lebar layar (versi pertama fitur ini) salah sumbu: jendela lebar tapi
+    // pendek malah dapat tiga baris dan daftar sesinya terhimpit.
+    const { innerHeight: h, innerWidth: w } = window;
+    if (w < 480) return 1;              // ponsel: satu minggu, apa pun tingginya
+    return h >= 860 ? 3 : h >= 700 ? 2 : 1;
+  };
+  const [mingguStrip, setMingguStrip] = useState(hitungMingguStrip);
+  useEffect(() => {
+    const onResize = () => setMingguStrip(hitungMingguStrip());
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   const [weeklyBlockHeight, setWeeklyBlockHeight] = useState(168);
   const [peekHeight, setPeekHeight] = useState(48);
 
@@ -208,7 +228,9 @@ const CalendarTab = ({
     measure();
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
-  }, []);
+    // mingguStrip ikut jadi dependensi: jumlah baris strip berubah berarti tinggi penggarisnya
+    // berubah, dan tanpa pengukuran ulang tingginya tertinggal di nilai satu baris.
+  }, [mingguStrip]);
 
   // Bottom nav mengambang (fixed, tidak makan ruang layout) di atas konten — jadi peek sheet
   // perlu ekstra jarak seukuran tinggi nav supaya tombol di dalam peek tidak ketutupan olehnya.
@@ -843,19 +865,6 @@ const CalendarTab = ({
   };
   const selectedWorkouts = getSelectedWorkoutsForDate(selectedDate);
   
-  // Berapa minggu ditampilkan di strip mingguan. Satu baris tujuh hari menyisakan ruang kosong
-  // besar di layar lebar; di ponsel satu minggu tetap yang benar.
-  const hitungMingguStrip = () => {
-    const w = typeof window !== 'undefined' ? window.innerWidth : 375;
-    return w >= 1280 ? 3 : w >= 768 ? 2 : 1;
-  };
-  const [mingguStrip, setMingguStrip] = useState(hitungMingguStrip);
-  useEffect(() => {
-    const onResize = () => setMingguStrip(hitungMingguStrip());
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-
   const getGridCellsForDate = (baseDate) => {
     const cells = [];
     const y = baseDate.getFullYear();
@@ -1117,7 +1126,9 @@ const CalendarTab = ({
             >
               {calendarMode === 'yearPicker' ? `${year - 5} – ${year + 6}` : (calendarMode === 'monthPicker' ? year : year)}
             </button>
-            <div className="w-[75px] flex justify-end items-center">
+            {/* Lebarnya disamakan dengan sisi kiri (w-[90px]). Selisih 15px itu yang membuat
+                judul tahun tidak pernah benar-benar di tengah. */}
+            <div className="w-[90px] flex justify-end items-center">
               {(selectedDate !== todayStr || calendarDate.getMonth() !== new Date().getMonth() || calendarDate.getFullYear() !== new Date().getFullYear()) && (
                 <button
                   onClick={() => {
@@ -1142,8 +1153,11 @@ const CalendarTab = ({
               <div key={i} className="text-center text-[9px] font-medium uppercase tracking-wider">D</div>
             ))}
           </div>
+          {/* Sebanyak minggu yang BENAR-BENAR dirender. Penggaris ini yang menentukan tinggi
+              area kalender; kalau dia tetap satu baris sementara strip-nya tiga baris, dua baris
+              sisanya terpotong dan stripnya terlihat seolah tidak pernah berubah. */}
           <div className="grid grid-cols-7 gap-0 px-2 py-1">
-            {[0, 1, 2, 3, 4, 5, 6].map(i => (
+            {Array.from({ length: 7 * mingguStrip }, (_, i) => (
               <div key={i} className="py-1"><div className="h-10 w-8 mx-auto" /></div>
             ))}
           </div>
@@ -1212,7 +1226,7 @@ const CalendarTab = ({
                 const panelCells = getGridCellsForDate(panelDate);
 
                 return (
-                  <div className="grid grid-cols-7 gap-0 px-2 py-1 max-w-xl mx-auto w-full">
+                  <div className="grid grid-cols-7 gap-0 px-2 py-1 w-full">
                     {panelCells.map((dateObj, idx) => {
                       if (!dateObj) return <div key={`blank-${idx}`} className="p-1"></div>;
                       const dateKey = getLocalYMD(dateObj);
