@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback, startTransition } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, useDeferredValue } from 'react';
 
 // --- IMPORT CAPACITOR (FULLSCREEN) ---
 import { Capacitor, registerPlugin } from '@capacitor/core';
@@ -761,6 +761,11 @@ export default function App() {
 
 
   const [activeTab, _setActiveTab] = useState('dashboard');
+  // BottomNav pakai activeTab (urgent, pindah seketika), isi <main> pakai contentTab.
+  // Sebelumnya _setActiveTab dibungkus startTransition — itu ikut menahan animasi navnya
+  // sampai tab berat selesai render, jadi tap terasa nyangkut. useDeferredValue menunda
+  // yang beratnya saja, dan render tundaannya bisa dipotong React supaya frame animasi lewat.
+  const contentTab = useDeferredValue(activeTab);
   const [tabSlideDir, setTabSlideDir] = useState('');
   
   const [expandedSessions, _setExpandedSessions] = useState(() => {
@@ -805,19 +810,19 @@ export default function App() {
                playSoundEffect('success', soundEnabled);
                setPrograms(prev => prev.filter(p => !emptyCustomPrograms.some(emp => emp.id === p.id)));
                setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null, onCancel: null });
-               startTransition(() => _setActiveTab(newTab));
+               _setActiveTab(newTab);
            },
            onCancel: () => {
                const targetProg = emptyCustomPrograms[0];
                setFocusRoutineId(targetProg.id);
-               startTransition(() => _setActiveTab('program'));
+               _setActiveTab('program');
                setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null, onCancel: null });
            }
        });
        return;
     }
 
-    startTransition(() => _setActiveTab(newTab));
+    _setActiveTab(newTab);
   };
 
   const [focusRoutineId, setFocusRoutineId] = useState(null);
@@ -1210,12 +1215,14 @@ export default function App() {
 
   useEffect(() => {
     const timers = [];
-    if (prevTab.current !== activeTab) {
-      prevTab.current = activeTab;
+    // Sengaja contentTab, bukan activeTab: yang menentukan tinggi dokumen adalah isi yang
+    // benar-benar sudah ter-commit, bukan pill nav yang sudah pindah duluan.
+    if (prevTab.current !== contentTab) {
+      prevTab.current = contentTab;
       // Posisi dibaca SEKARANG, bukan di dalam timeout. Begitu tab lama dilepas dokumen
       // memendek, browser menembakkan event scroll (clamp ke 0) yang mendarat di listener
       // tab BARU — jadi posisi tersimpan sudah jadi 0 sebelum sempat dipulihkan.
-      const target = scrollPositions.current[activeTab] || 0;
+      const target = scrollPositions.current[contentTab] || 0;
       restoringUntil.current = Date.now() + 300; // abaikan clamp selama tab baru menata diri
       const restore = () => window.scrollTo(0, target);
       restore();
@@ -1225,14 +1232,14 @@ export default function App() {
 
     const handleScroll = () => {
       if (Date.now() < restoringUntil.current) return;
-      scrollPositions.current[activeTab] = window.scrollY;
+      scrollPositions.current[contentTab] = window.scrollY;
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => {
       timers.forEach(clearTimeout);
       window.removeEventListener('scroll', handleScroll);
     };
-  }, [activeTab]);
+  }, [contentTab]);
 
   useEffect(() => {
     if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
@@ -2268,7 +2275,7 @@ export default function App() {
   }, [soundEnabled]);
 
   useEffect(() => {
-    if (activeTab === 'workout') {
+    if (contentTab === 'workout') {
       setHistory(prev => {
         const dayData = prev[selectedDate];
         if (dayData && dayData.workouts) {
@@ -2285,7 +2292,7 @@ export default function App() {
         return prev;
       });
     }
-  }, [exerciseLogs, skippedExercises, extraExercises, activeTab, selectedDate]);
+  }, [exerciseLogs, skippedExercises, extraExercises, contentTab, selectedDate]);
 
   const deviceId = useRef(null);
   if (!deviceId.current) {
@@ -4020,7 +4027,7 @@ export default function App() {
   return (
     <>
       <div 
-      className={`min-h-screen flex flex-col ${t.bgApp} ${t.textMain} font-sans ${activeTab === 'calendar' ? 'h-[100dvh] overflow-hidden' : 'pb-32'} transition-colors duration-300 w-full`}
+      className={`min-h-screen flex flex-col ${t.bgApp} ${t.textMain} font-sans ${contentTab === 'calendar' ? 'h-[100dvh] overflow-hidden' : 'pb-32'} transition-colors duration-300 w-full`}
       onTouchStart={handleGlobalTouchStart}
       onTouchEnd={handleGlobalTouchEnd}
     >
@@ -4162,9 +4169,9 @@ export default function App() {
         }}
       />
       
-      <main className={`${activeTab === 'calendar' ? 'p-0 flex-1 flex flex-col min-h-0 overflow-hidden' : activeTab === 'database' ? 'px-4 pb-4 pt-0 min-h-[70vh] max-w-5xl mx-auto w-full' : 'p-4 min-h-[70vh] max-w-5xl mx-auto w-full'}`}>
-        <TabSlider activeTab={activeTab} tabIndex={['dashboard','workout','calendar','program','database'].indexOf(activeTab)} className={activeTab === 'calendar' ? 'flex-1 flex flex-col min-h-0' : ''}>
-         <div style={{ display: activeTab === 'dashboard' ? 'contents' : 'none' }}>
+      <main className={`${contentTab === 'calendar' ? 'p-0 flex-1 flex flex-col min-h-0 overflow-hidden' : contentTab === 'database' ? 'px-4 pb-4 pt-0 min-h-[70vh] max-w-5xl mx-auto w-full' : 'p-4 min-h-[70vh] max-w-5xl mx-auto w-full'}`}>
+        <TabSlider activeTab={contentTab} tabIndex={['dashboard','workout','calendar','program','database'].indexOf(contentTab)} className={contentTab === 'calendar' ? 'flex-1 flex flex-col min-h-0' : ''}>
+         <div style={{ display: contentTab === 'dashboard' ? 'contents' : 'none' }}>
              <DashboardTab setConfirmModal={setConfirmModal} 
                t={t} lang={lang} language={language} user={user} 
                history={history} setHistory={setHistory} 
@@ -4188,7 +4195,7 @@ export default function App() {
              />
          </div>
          
-         {activeTab === 'workout' && (
+         {contentTab === 'workout' && (
              <WorkoutTab 
               setConfirmModal={setConfirmModal}
               t={t} theme={theme} lang={lang} language={language} programs={programs} selectedDate={selectedDate} setSelectedDate={setSelectedDate}
@@ -4224,7 +4231,7 @@ export default function App() {
              />
          )}
          
-         {activeTab === 'calendar' && (
+         {contentTab === 'calendar' && (
              <CalendarTab setConfirmModal={setConfirmModal} 
                t={t} lang={lang} theme={theme} history={history} setHistory={setHistory} programs={programs} 
                soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} navigateToWorkoutDate={navigateToWorkoutDate} 
@@ -4240,7 +4247,7 @@ export default function App() {
              />
          )}
 
-         {activeTab === 'program' && (
+         {contentTab === 'program' && (
              <ProgramTab setConfirmModal={setConfirmModal} 
                onPostCreated={handlePostCreated}
                t={t} theme={theme} lang={lang} programs={programs} setPrograms={setPrograms} 
@@ -4265,7 +4272,7 @@ export default function App() {
              />
          )}
 
-         {activeTab === 'database' && (
+         {contentTab === 'database' && (
              <DatabaseTab setConfirmModal={setConfirmModal} 
                 t={t} lang={lang}
                 exerciseLibrary={exerciseLibrary} setExerciseLibrary={setExerciseLibrary} 
