@@ -1986,13 +1986,6 @@ export default function App() {
           retryTimer = setTimeout(attemptSave, 500);
           return;
         }
-        if (!hasSyncedMainRef.current) {
-          // COBA LAGI, jangan menyerah. Lihat catatan panjang di penjaga kembarnya di auto-save
-          // history — `return` polos di sini adalah lubang kehilangan data, bukan penundaan.
-          retryTimer = setTimeout(attemptSave, 2000);
-          setSyncStatus('syncing');
-          return;
-        }
         const mainDocRef = doc(db, "logym_users", user.uid);
 
         const localMain = {
@@ -2004,7 +1997,20 @@ export default function App() {
           logyPersona, logyCustomInstruction, logyMemory
         };
         const { changed, nextBaseline, changedKeys } = diffFields(localMain, mainBaselineRef.current);
-        if (changedKeys.length === 0) return; 
+        if (changedKeys.length === 0) return;
+
+        // Menunggu snapshot pertama — TAPI hanya setelah tahu memang ada yang perlu ditulis.
+        //
+        // Versi sebelumnya menyalakan status 'syncing' sebelum diff dihitung, jadi ikon sinkron
+        // berputar tanpa henti walau tidak ada satu pun perubahan tertunda. Berputar selamanya
+        // untuk pekerjaan yang tidak ada adalah alarm palsu, dan alarm palsu membuat alarm yang
+        // sungguhan berhenti dipercaya. Sekarang berputar hanya kalau ada yang benar-benar
+        // menunggu dikirim.
+        if (!hasSyncedMainRef.current) {
+          retryTimer = setTimeout(attemptSave, 2000);
+          setSyncStatus('syncing');
+          return;
+        }
 
         const { programs: pChanged, exerciseLibrary: lChanged, userAchievements: aChanged, ...settingsChanged } = changed;
         const payload = { updatedAt: new Date().toISOString() };
@@ -2071,8 +2077,14 @@ export default function App() {
           // cuma di localStorage perangkat itu. Persis gejala 23/08/2026: sesi ada di HP,
           // tidak ada di web app, tidak ada peringatan apa pun.
           //
-          // Menunggu itu benar; menyerah tidak. Status 'syncing' menahan ikon sinkron tetap
-          // berputar supaya penantiannya kelihatan, bukan diam-diam.
+          // Menunggu itu benar; menyerah tidak. TAPI hanya kalau memang ada yang menunggu:
+          // memutar ikon sinkron tanpa henti untuk pekerjaan yang tidak ada adalah alarm palsu,
+          // dan alarm palsu membuat alarm sungguhan berhenti dipercaya. Kalau tidak ada tanggal
+          // yang berbeda dari baseline, tidak ada yang perlu ditulis — diam saja, dan jangan
+          // menjadwalkan percobaan ulang sama sekali.
+          const dasar = lastSavedHistoryJson.current || {};
+          const adaYangMenunggu = Object.keys(history).some(d => dasar[d] !== dayFingerprint(history[d]));
+          if (!adaYangMenunggu) return;
           retryTimer = setTimeout(attemptSave, 2000);
           setSyncStatus('syncing');
           return;
