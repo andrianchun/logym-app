@@ -995,14 +995,16 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
 
           <div id="komposisi-subcard" className={`grid relative z-10 transition-all duration-300 ease-in-out ${isKomposisiExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
             <div className="overflow-hidden">
-              <div className={`rounded-b-2xl border border-t-0 ${t.border} ${t.bgSunken} shadow-inner relative z-10 no-swipe`} onTouchStart={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
-              <DashboardChart 
-                 t={t} theme={theme} history={history} 
-                 soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
-                 onPointClick={handleChartPointClick}
-                 units={units} userProfile={userProfile}
-              />
-              </div>
+              {isKomposisiExpanded && (
+                <div className={`rounded-b-2xl border border-t-0 ${t.border} ${t.bgSunken} shadow-inner relative z-10 no-swipe`} onTouchStart={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
+                <DashboardChart 
+                   t={t} theme={theme} history={history} 
+                   soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
+                   onPointClick={handleChartPointClick}
+                   units={units} userProfile={userProfile}
+                />
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1184,22 +1186,24 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
           
           <div id="aktivitas-subcard" className={`grid relative z-10 transition-all duration-300 ease-in-out ${isAktivitasExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
              <div className="overflow-hidden">
-               <div className={`rounded-b-2xl border border-t-0 ${t.border} ${t.bgSunken} shadow-inner relative z-10 no-swipe`} onTouchStart={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
-                 <ActivityChart
-                    t={t} theme={theme} history={history}
-                    soundEnabled={soundEnabled} playSoundEffect={playSoundEffect}
-                    onPointClick={navigateToWorkoutDate}
-                    language={language}
-                    lomealToday={lomealToday}
-                    activityTargets={activityTargets} lomealTargets={lomealTargets}
-                    userWeight={bioData.weight} userProfile={userProfile}
-                    metricKeys={['steps', 'calories', 'activeMinutes']}
-                    extraTabs={VITALS_METRICS(theme)}
-                    renderExtra={(key) => (
-                       <VitalsChart t={t} theme={theme} history={history} language={language} activeMetric={key} />
-                    )}
-                 />
-               </div>
+               {isAktivitasExpanded && (
+                 <div className={`rounded-b-2xl border border-t-0 ${t.border} ${t.bgSunken} shadow-inner relative z-10 no-swipe`} onTouchStart={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
+                   <ActivityChart
+                      t={t} theme={theme} history={history}
+                      soundEnabled={soundEnabled} playSoundEffect={playSoundEffect}
+                      onPointClick={navigateToWorkoutDate}
+                      language={language}
+                      lomealToday={lomealToday}
+                      activityTargets={activityTargets} lomealTargets={lomealTargets}
+                      userWeight={bioData.weight} userProfile={userProfile}
+                      metricKeys={['steps', 'calories', 'activeMinutes']}
+                      extraTabs={VITALS_METRICS(theme)}
+                      renderExtra={(key) => (
+                         <VitalsChart t={t} theme={theme} history={history} language={language} activeMetric={key} />
+                      )}
+                   />
+                 </div>
+               )}
              </div>
           </div>
          </div>
@@ -1273,14 +1277,16 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
         </div>
       <div id="progress-subcard" className={`grid relative z-10 transition-all duration-300 ease-in-out ${isProgressExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
         <div className="overflow-hidden">
-          <div className={`rounded-b-2xl border border-t-0 ${t.border} ${t.bgSunken} shadow-inner relative z-10`}>
-            <MuscleProgress 
-              t={t} theme={theme} lang={lang}
-              history={history} programs={programs} exerciseLibrary={exerciseLibrary}
-              soundEnabled={soundEnabled} playSoundEffect={playSoundEffect}
-              isSubCard={false}
-            />
-          </div>
+          {isProgressExpanded && (
+            <div className={`rounded-b-2xl border border-t-0 ${t.border} ${t.bgSunken} shadow-inner relative z-10`}>
+              <MuscleProgress 
+                t={t} theme={theme} lang={lang}
+                history={history} programs={programs} exerciseLibrary={exerciseLibrary}
+                soundEnabled={soundEnabled} playSoundEffect={playSoundEffect}
+                isSubCard={false}
+              />
+            </div>
+          )}
         </div>
       </div>
       </div> {/* <-- Closes progress-accordion */}
@@ -1464,7 +1470,8 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
         
         <div id="sleep-subcard" className={`grid relative z-10 transition-all duration-300 ease-in-out ${isSleepExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
           <div className="overflow-hidden">
-            <div className={`rounded-b-2xl border border-t-0 ${t.border} ${t.bgSunken} shadow-inner relative z-10 p-6 no-swipe`} onTouchStart={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
+            {isSleepExpanded && (
+              <div className={`rounded-b-2xl border border-t-0 ${t.border} ${t.bgSunken} shadow-inner relative z-10 p-6 no-swipe`} onTouchStart={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
                 <div className={`relative flex w-full p-1.5 rounded-full ${t.btnBg} mb-6`} style={{ zIndex: 10 }}>
                      <div className={`absolute top-1.5 bottom-1.5 w-[calc(33.333%-5px)] rounded-full transition-transform duration-300 ease-out ${t.bgAccent} shadow-sm`} style={{ transform: sleepSubTab === 'durasi' ? 'translateX(0)' : sleepSubTab === 'detail' ? 'translateX(100%)' : 'translateX(200%)', left: '6px', zIndex: 1 }}></div>
                      <button onClick={() => { playSoundEffect('click', soundEnabled); setSleepSubTab('durasi'); }} className={`flex-1 py-2.5 rounded-full body-md font-black relative transition-colors duration-300 ${sleepSubTab === 'durasi' ? 'text-white' : t.textMuted}`} style={{ zIndex: 2 }}>Durasi</button>
@@ -1771,6 +1778,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                     );
                 })()}
             </div>
+            )}
           </div>
         </div>
       </div> {/* <-- Closes sleep-accordion */}
@@ -2036,4 +2044,13 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   );
 };
 
-export default DashboardTab;
+// Skip re-render when only function props changed (always new references but same behavior).
+// Data props are compared shallowly — if any data prop changes, component re-renders.
+export default React.memo(DashboardTab, (prev, next) => {
+  const keys = Object.keys(next);
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i];
+    if (prev[k] !== next[k] && typeof next[k] !== 'function') return false;
+  }
+  return true;
+});

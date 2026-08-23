@@ -143,10 +143,8 @@ const VitalsChart = ({ t, theme, history, language, activeMetric }) => {
   const pointWidthRef = useRef(pointWidth);
   useEffect(() => { pointWidthRef.current = pointWidth; }, [pointWidth]);
   const rafRef = useRef(null);
-  const [yDomain, setYDomain] = useState(['auto', 'auto']);
-
-  useEffect(() => {
-    if (chartData.length === 0) { setYDomain(['auto', 'auto']); return; }
+  const yDomain = useMemo(() => {
+    if (chartData.length === 0) return ['auto', 'auto'];
     let min = Infinity, max = -Infinity;
     chartData.forEach((d) => {
       [d.value, d.dia].forEach((v) => {
@@ -156,9 +154,9 @@ const VitalsChart = ({ t, theme, history, language, activeMetric }) => {
         }
       });
     });
-    if (min === Infinity) { setYDomain([0, 100]); return; }
+    if (min === Infinity) return [0, 100];
     const diff = max - min;
-    setYDomain([Math.floor(min - (diff * 0.15 || 5)), Math.ceil(max + (diff * 0.15 || 5))]);
+    return [Math.floor(min - (diff * 0.15 || 5)), Math.ceil(max + (diff * 0.15 || 5))];
   }, [chartData]);
 
   const handleScroll = () => {

@@ -580,12 +580,20 @@ export default function ProfileModal({
                                 className="w-24 h-24 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800 shrink-0 border-4 border-slate-300 dark:border-slate-700 relative cursor-pointer group"
                             >
                                 {user?.photoURL ? (
-                                    <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover group-hover:opacity-75 transition-opacity" />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-700 to-slate-900 group-hover:opacity-75 transition-opacity">
-                                        <span className="text-3xl font-black text-white/50">{user?.name?.substring(0,2)?.toUpperCase()}</span>
-                                    </div>
-                                )}
+                                    <img
+                                        src={user.photoURL}
+                                        alt="Profile"
+                                        referrerPolicy="no-referrer"
+                                        crossOrigin="anonymous"
+                                        decoding="async"
+                                        loading="lazy"
+                                        className="w-full h-full object-cover group-hover:opacity-75 transition-opacity"
+                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                    />
+                                ) : null}
+                                <div className={`w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-700 to-slate-900 group-hover:opacity-75 transition-opacity ${user?.photoURL ? 'hidden' : ''}`}>
+                                    <span className="text-3xl font-black text-white/50">{user?.name?.substring(0,2)?.toUpperCase()}</span>
+                                </div>
                                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                                     <Camera size={28} className="text-white" />
                                 </div>

@@ -29,11 +29,11 @@ const BottomNav = ({ t, lang, activeTab, setActiveTab, setIsEditingMode }) => {
             <button
               key={tab.id}
               onClick={() => handleTabClick(tab.id)}
-              className={`relative flex items-center justify-center h-[52px] rounded-[22px] transition-all duration-300 border ${isActive ? `flex-1 ${t.bgAccentSoft} ${t.navBorderActive} px-3` : 'w-[52px] bg-transparent border-transparent'} group`}
+              className={`relative flex items-center justify-center h-[52px] rounded-[22px] transition-all duration-300 border ${isActive ? `flex-[1.8] min-w-0 ${t.bgAccentSoft} ${t.navBorderActive} px-2` : 'flex-1 min-w-0 bg-transparent border-transparent px-1'} group overflow-hidden`}
             >
-              <span className={`flex items-center justify-center transition-all duration-300 ${isActive ? t.navIconActive : t.navIconInactive + ' group-hover:' + t.textMuted}`}>
+              <span className={`flex items-center justify-center transition-all duration-300 min-w-0 ${isActive ? t.navIconActive : t.navIconInactive + ' group-hover:' + t.textMuted}`}>
                 <tab.icon size={22} strokeWidth={isActive ? 2.5 : 2} className="shrink-0" />
-                <span className={`font-black text-[10px] sm:text-[11px] uppercase tracking-wider whitespace-nowrap transition-all duration-300 ${isActive ? 'max-w-[100px] opacity-100 ml-2' : 'max-w-0 opacity-0 overflow-hidden ml-0'}`}>
+                <span className={`font-black text-[10px] sm:text-[11px] uppercase tracking-wider whitespace-nowrap transition-all duration-300 ${isActive ? 'max-w-[85px] opacity-100 ml-1.5' : 'max-w-0 opacity-0 overflow-hidden ml-0'}`}>
                   {tab.label}
                 </span>
               </span>

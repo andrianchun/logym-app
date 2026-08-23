@@ -290,16 +290,14 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
      }
   }, [multiChartData.length]);
   const scrollTarget = useRef(null);
-
-  const [yDomain, setYDomain] = useState(['auto', 'auto']);
   const pointWidthRef = useRef(pointWidth);
   useEffect(() => { pointWidthRef.current = pointWidth; }, [pointWidth]);
   const rafRef = useRef(null);
 
-  useEffect(() => {
-      if (multiChartData.length === 0) return;
+  const yDomain = useMemo(() => {
+      if (multiChartData.length === 0) return ['auto', 'auto'];
       const activeObj = chartMetricsList.find(m => m.key === activeMetric);
-      if (!activeObj || activeObj.isExtra) return;
+      if (!activeObj || activeObj.isExtra) return ['auto', 'auto'];
 
       let min = Infinity;
       let max = -Infinity;
@@ -331,11 +329,11 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
 
       if (min !== Infinity && max !== -Infinity) {
           const diff = max - min;
-          setYDomain([0, max + diff * 0.15 || max * 1.1]);
+          return [0, max + diff * 0.15 || max * 1.1];
       } else {
-          setYDomain([0, 100]);
+          return [0, 100];
       }
-  }, [multiChartData, activeMetric]);
+  }, [multiChartData, activeMetric, chartMetricsList]);
 
   const handleScroll = () => {
       if (!rafRef.current) {

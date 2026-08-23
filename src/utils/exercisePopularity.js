@@ -56,6 +56,17 @@ export const bumpExercisePopularity = async (exerciseNames, dedupeKey) => {
   }
 };
 
+export const getCachedPopularity = () => {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (raw) {
+      const cached = JSON.parse(raw);
+      return cached.scores || {};
+    }
+  } catch { /* ignore */ }
+  return {};
+};
+
 /**
  * Ambil peringkat global: { slug: count }. Di-cache 24 jam di localStorage — daftar ini berubah
  * pelan, sementara membacanya berarti ratusan pembacaan dokumen tiap kali tab Database dibuka.

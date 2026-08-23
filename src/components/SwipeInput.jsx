@@ -158,7 +158,7 @@ const SwipeInput = ({ value, onChange, disabled, step = 1, className, min = 0, m
         const el = inputRef.current;
         if (!el) return;
         const handleMove = (e) => {
-            if (dragRef.current.isDragging) e.preventDefault();
+            if (dragRef.current.isDragging && e.cancelable) e.preventDefault();
         };
         el.addEventListener('touchmove', handleMove, { passive: false });
         return () => el.removeEventListener('touchmove', handleMove);

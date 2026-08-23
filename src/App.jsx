@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, startTransition } from 'react';
 
 // --- IMPORT CAPACITOR (FULLSCREEN) ---
 import { Capacitor, registerPlugin } from '@capacitor/core';
@@ -805,19 +805,19 @@ export default function App() {
                playSoundEffect('success', soundEnabled);
                setPrograms(prev => prev.filter(p => !emptyCustomPrograms.some(emp => emp.id === p.id)));
                setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null, onCancel: null });
-               _setActiveTab(newTab);
+               startTransition(() => _setActiveTab(newTab));
            },
            onCancel: () => {
                const targetProg = emptyCustomPrograms[0];
                setFocusRoutineId(targetProg.id);
-               _setActiveTab('program');
+               startTransition(() => _setActiveTab('program'));
                setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null, onCancel: null });
            }
        });
        return;
     }
 
-    _setActiveTab(newTab);
+    startTransition(() => _setActiveTab(newTab));
   };
 
   const [focusRoutineId, setFocusRoutineId] = useState(null);
@@ -1201,6 +1201,7 @@ export default function App() {
   const backPressedOnce = useRef(false);
   const scrollPositions = useRef({});
   const prevTab = useRef(activeTab);
+  const restoringUntil = useRef(0);
 
   const profileModalOpened = useRef(false);
   if (showProfileModal) profileModalOpened.current = true;
@@ -1208,18 +1209,29 @@ export default function App() {
   if (showQuestionnaire) questionnaireOpened.current = true;
 
   useEffect(() => {
+    const timers = [];
     if (prevTab.current !== activeTab) {
-      setTimeout(() => {
-        window.scrollTo(0, scrollPositions.current[activeTab] || 0);
-      }, 10);
       prevTab.current = activeTab;
+      // Posisi dibaca SEKARANG, bukan di dalam timeout. Begitu tab lama dilepas dokumen
+      // memendek, browser menembakkan event scroll (clamp ke 0) yang mendarat di listener
+      // tab BARU — jadi posisi tersimpan sudah jadi 0 sebelum sempat dipulihkan.
+      const target = scrollPositions.current[activeTab] || 0;
+      restoringUntil.current = Date.now() + 300; // abaikan clamp selama tab baru menata diri
+      const restore = () => window.scrollTo(0, target);
+      restore();
+      // Konten tab baru sering belum setinggi target di frame pertama → scrollTo ke-clamp.
+      if (target > 0) timers.push(setTimeout(restore, 80), setTimeout(restore, 250));
     }
-    
+
     const handleScroll = () => {
+      if (Date.now() < restoringUntil.current) return;
       scrollPositions.current[activeTab] = window.scrollY;
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    return () => {
+      timers.forEach(clearTimeout);
+      window.removeEventListener('scroll', handleScroll);
+    };
   }, [activeTab]);
 
   useEffect(() => {
@@ -2260,6 +2272,11 @@ export default function App() {
       setHistory(prev => {
         const dayData = prev[selectedDate];
         if (dayData && dayData.workouts) {
+          // Efek ini juga jalan cuma gara-gara pindah tab. Tanpa cek ini, history diganti
+          // objek baru → seluruh useMemo yang bergantung padanya dihitung ulang tepat saat
+          // animasi BottomNav berjalan, dan navnya kelihatan macet di tengah.
+          const cur = dayData._activeSession;
+          if (cur && cur.exerciseLogs === exerciseLogs && cur.skippedExercises === skippedExercises && cur.extraExercises === extraExercises) return prev;
           return {
             ...prev,
             [selectedDate]: { ...dayData, _activeSession: { exerciseLogs, skippedExercises, extraExercises } }
@@ -2835,9 +2852,9 @@ export default function App() {
       customEx: 'Create Custom Exercise', searchLib: 'Search Library...', ytLink: 'YouTube Video URL'
     }
   };
-  const lang = { ...(dict[language] || dict['ID']), id: language };
+  const lang = useMemo(() => ({ ...(dict[language] || dict['ID']), id: language }), [language]);
 
-  const t = {
+  const t = useMemo(() => ({
     bgApp: theme === 'dark' ? 'app-bg-dark' : 'app-bg-light',
     bgCard: theme === 'dark' ? 'bg-white/[0.045] glass-card' : 'bg-white/60 glass-card',
     bgCardSoft: theme === 'dark' ? 'bg-white/[0.02] glass-card' : 'bg-black/[0.02] glass-card',
@@ -2869,7 +2886,7 @@ export default function App() {
     borderDashed: theme === 'dark' ? 'border-white/10' : 'border-black/10',
     bgBox: theme === 'dark' ? 'bg-black/20' : 'bg-[#3b82f6]/10',
     glow: theme === 'dark' ? 'shadow-[0_8px_32px_-10px_rgba(59,130,246,0.35)]' : 'shadow-[0_8px_32px_-14px_rgba(59,130,246,0.25)]'
-  };
+  }), [theme]);
 
   const navigateToWorkoutDate = (dateStr, progId) => {
     const doNav = () => {
@@ -3928,6 +3945,10 @@ export default function App() {
     globalTouchStartX.current = null;
     globalTouchStartY.current = null;
 
+    if (window.scrollX !== 0) {
+      window.scrollTo(0, window.scrollY);
+    }
+
     if (Math.abs(distanceX) > 60 && Math.abs(distanceX) > Math.abs(distanceY) * 1.5) {
       const tabs = ['dashboard', 'workout', 'calendar', 'program', 'database'];
       const currentIndex = tabs.indexOf(activeTab);
@@ -3999,7 +4020,7 @@ export default function App() {
   return (
     <>
       <div 
-      className={`min-h-screen flex flex-col ${t.bgApp} ${t.textMain} font-sans ${activeTab === 'calendar' ? 'h-[100dvh] overflow-hidden' : 'pb-32'} transition-colors duration-300`}
+      className={`min-h-screen flex flex-col ${t.bgApp} ${t.textMain} font-sans ${activeTab === 'calendar' ? 'h-[100dvh] overflow-hidden' : 'pb-32'} transition-colors duration-300 w-full`}
       onTouchStart={handleGlobalTouchStart}
       onTouchEnd={handleGlobalTouchEnd}
     >
@@ -4143,7 +4164,7 @@ export default function App() {
       
       <main className={`${activeTab === 'calendar' ? 'p-0 flex-1 flex flex-col min-h-0 overflow-hidden' : activeTab === 'database' ? 'px-4 pb-4 pt-0 min-h-[70vh] max-w-5xl mx-auto w-full' : 'p-4 min-h-[70vh] max-w-5xl mx-auto w-full'}`}>
         <TabSlider activeTab={activeTab} tabIndex={['dashboard','workout','calendar','program','database'].indexOf(activeTab)} className={activeTab === 'calendar' ? 'flex-1 flex flex-col min-h-0' : ''}>
-         {activeTab === 'dashboard' && (
+         <div style={{ display: activeTab === 'dashboard' ? 'contents' : 'none' }}>
              <DashboardTab setConfirmModal={setConfirmModal} 
                t={t} lang={lang} language={language} user={user} 
                history={history} setHistory={setHistory} 
@@ -4165,7 +4186,7 @@ export default function App() {
                expandedSessions={expandedSessions}
                bleManager={bleManager}
              />
-         )}
+         </div>
          
          {activeTab === 'workout' && (
              <WorkoutTab 

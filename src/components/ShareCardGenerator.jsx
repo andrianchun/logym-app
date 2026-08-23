@@ -443,8 +443,8 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
             let isNewUpload = false;
 
             if (!downloadUrl) {
-                // Delete old background from Firebase if exists (cleaning up transition to Cloudinary)
-                if (user?.customCardBg?.includes('firebasestorage')) {
+                // Delete old background from Firebase if exists (ignore legacy bucket)
+                if (user?.customCardBg?.includes('firebasestorage') && !user.customCardBg.includes('logym-id.firebasestorage.app')) {
                     try {
                         await deleteObject(ref(storage, user.customCardBg));
                     } catch (e) { console.log("Old bg not found or already deleted"); }
@@ -480,7 +480,7 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
         if (!bgImage) return;
         setIsUploadingBg(true);
         try {
-            if (bgImage.includes('firebasestorage')) {
+            if (bgImage.includes('firebasestorage') && !bgImage.includes('logym-id.firebasestorage.app')) {
                 try {
                     await deleteObject(ref(storage, bgImage));
                 } catch(e) { console.log("Failed to delete bg object", e); }
@@ -489,9 +489,11 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
             setBgZoom(100);
             setBgRotate(0);
             setBgOffset({x: 0, y: 0});
-            const userRef = doc(db, 'logym_users', user.uid);
-            await updateDoc(userRef, { customCardBg: null, customCardSettings: null });
-            if (setUser) setUser(prev => ({ ...prev, customCardBg: null, customCardSettings: null }));
+            if (user?.uid) {
+                const userRef = doc(db, 'logym_users', user.uid);
+                await updateDoc(userRef, { customCardBg: null, customCardSettings: null });
+                if (setUser) setUser(prev => ({ ...prev, customCardBg: null, customCardSettings: null }));
+            }
             showToast("Foto background dihapus.");
         } catch (err) {
             console.error("Error deleting background:", err);
@@ -701,6 +703,14 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                                     src={getBgForTemplate()}
                                     alt="Background"
                                     crossOrigin="anonymous"
+                                    onError={() => {
+                                        console.warn("Custom background image unavailable (404), resetting");
+                                        setBgImage(null);
+                                        if (user?.uid) {
+                                            updateDoc(doc(db, 'logym_users', user.uid), { customCardBg: null }).catch(() => {});
+                                            if (setUser) setUser(prev => ({ ...prev, customCardBg: null }));
+                                        }
+                                    }}
                                     className="max-w-full max-h-full opacity-70 origin-center transition-transform"
                                     style={{
                                         transform: `translate(${bgOffset.x}px, ${bgOffset.y}px) scale(${bgZoom / 100}) rotate(${bgRotate}deg)`,

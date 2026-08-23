@@ -901,46 +901,8 @@ const WorkoutTab = ({
   })();
   const showsFloatingStartButton = hasExpandedSessionWithExercises && !isImmersiveMode && !isWorkoutActive;
 
-  // Fungsi untuk mendapatkan background lokal (harus sinkron dengan ProgramTab)
-  const getBackgroundForProgram = (prog) => {
-    if (!prog) return '/bg-activity.webp';
-    const lowerName = (prog.planName || prog.name || '').toLowerCase();
-    
-    if (lowerName.includes('full body')) return '/bg-full-body.webp';
-    if (lowerName.includes('ppl basic')) return '/bg-ppl-basic.webp';
-    if (lowerName.includes('up-low')) return '/bg-up-low.webp';
-    if (lowerName.includes('bro split')) return '/bg-bro-split.webp';
-    if (lowerName.includes('ppl advanced')) return '/bg-ppl-advanced.webp';
-    if (lowerName.includes('beast mode')) return '/bg-beast-mode.webp';
-    
-    return '/bg-custom.webp';
-  };
-
-  // Tentukan program mana yang menjadi acuan background
-  let bgSourceProgram = activeProgram;
-  const activeExpandedId = Object.keys(expandedSessions || {}).find(k => (expandedSessions || {})[k]);
-  
-  if (activeExpandedId === 'extra') {
-    bgSourceProgram = { planId: 'custom', name: 'Latihan Ekstra' };
-  } else if (activeExpandedId) {
-    const expandedProg = activeProgramsList.find(p => p.workoutId === activeExpandedId);
-    if (expandedProg) bgSourceProgram = expandedProg;
-  }
-
-  const bgImageSrc = getBackgroundForProgram(bgSourceProgram);
-
   return (
     <>
-      {/* BACKGROUND IMAGE UNTUK GLASSMORPHISM */}
-      <div className="fixed inset-0 z-0 pointer-events-none transition-all duration-700">
-         <img 
-            key={bgImageSrc}
-            src={bgImageSrc} 
-            className="w-full h-full object-cover opacity-80 dark:opacity-60 animate-in fade-in duration-700" 
-            alt="Workout Background" 
-         />
-         <div className="absolute inset-0 bg-gradient-to-b from-white/60 via-white/60 to-white/90 dark:from-black/60 dark:via-black/60 dark:to-black/90"></div>
-      </div>
       
       {(isImmersiveMode || isClosingImmersive) && (
         <ImmersiveWorkout 
@@ -1381,8 +1343,8 @@ const WorkoutTab = ({
           btnClass = "bg-zinc-800 text-white shadow-none";
         }
 
-        return (
-          <div className="fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 pointer-events-none flex justify-center animate-in slide-in-from-bottom-8 fade-in duration-300">
+        return createPortal(
+          <div className="fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 pointer-events-none flex justify-center">
             <button 
               onClick={() => handleStartWorkout(sessionData.workoutId)}
               disabled={isDisabled}
@@ -1390,7 +1352,8 @@ const WorkoutTab = ({
             >
               {btnIcon} {btnText}
             </button>
-          </div>
+          </div>,
+          document.body
         );
       })()}
       {dialog}

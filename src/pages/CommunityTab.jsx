@@ -23,15 +23,9 @@ import UnifiedBadge from '../components/UnifiedBadge';
 import useDialog from '../hooks/useDialog';
 
 const FILTERS = ['Semua', 'Diikuti', 'Teman'];
-const SOURCE_FILTERS = [
-  { id: 'all', label: 'Semua App' },
-  { id: 'Logym', label: 'Logym' },
-  { id: 'lomeal', label: 'Lomeal' },
-];
 
 const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, playSoundEffect, activeFilter = 'Semua', highlightPostId = null, onClearHighlight = null, onEditOwnProfile = null }) => {
   const [feed, setFeed] = useState([]);
-  const [sourceFilter, setSourceFilter] = useState('all');
   const [isLoading, setIsLoading] = useState(true);
   const [selectedImages, setSelectedImages] = useState(null);
   const [isCreatingPost, setIsCreatingPost] = useState(false);
@@ -366,14 +360,24 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
         {isTopTen && (
           <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-cyan-300 via-blue-500 to-indigo-600 animate-pulse-slow opacity-80 blur-[2px]" />
         )}
-        <div className={`relative ${isTopTen ? 'ring-2 ring-blue-400 p-[2px]' : ''} rounded-full bg-${isDark ? 'slate-800' : 'white'} z-10`}>
+        <div className={`relative ${isTopTen ? 'ring-2 ring-blue-400 p-[2px]' : ''} rounded-full bg-${isDark ? 'slate-800' : 'white'} z-10 w-9 h-9 flex items-center justify-center overflow-hidden`}>
           {userPhoto ? (
-            <img src={userPhoto} alt={userName} className={`w-9 h-9 rounded-full object-cover ${!isTopTen ? `ring-2 ${t.ringAccent} ring-opacity-20 hover:ring-opacity-50` : ''} transition-all`} />
-          ) : (
-            <div className={`w-9 h-9 rounded-full ${!isTopTen ? t.bgAccentSoft : 'bg-blue-100'} ${!isTopTen ? t.textAccent : 'text-blue-600'} flex items-center justify-center font-black text-sm transition-all`}>
-              {(userName || '?').charAt(0).toUpperCase()}
-            </div>
-          )}
+            <img
+              src={userPhoto}
+              alt={userName || ''}
+              referrerPolicy="no-referrer"
+              crossOrigin="anonymous"
+              decoding="async"
+              loading="lazy"
+              className={`w-full h-full rounded-full object-cover ${!isTopTen ? `ring-2 ${t.ringAccent} ring-opacity-20 hover:ring-opacity-50` : ''} transition-all`}
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+          ) : null}
+          <div className={`w-full h-full rounded-full ${!isTopTen ? t.bgAccentSoft : 'bg-blue-100'} ${!isTopTen ? t.textAccent : 'text-blue-600'} flex items-center justify-center font-black text-sm transition-all ${userPhoto ? 'hidden' : ''}`}>
+            {(userName || '?').charAt(0).toUpperCase()}
+          </div>
         </div>
       </button>
     );
@@ -386,6 +390,9 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
     const commentsOpen = expandedComments[post.id] || false;
     const postComments = comments[post.id] || [];
     const isEditingThis = editingPost?.id === post.id;
+    const postImages = Array.isArray(post.imageUrls) && post.imageUrls.length > 0
+      ? post.imageUrls.filter(Boolean)
+      : (post.imageUrl ? [post.imageUrl] : (post.mealPhoto ? [post.mealPhoto] : (post.photoUrl ? [post.photoUrl] : (post.dishPhoto ? [post.dishPhoto] : (post.photo ? [post.photo] : [])))));
 
     return (
       <div
@@ -410,10 +417,12 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
                 {post.userName}
               </button>
               {post.sourceApp && (
-                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
-                  post.sourceApp === 'lomeal' ? 'bg-green-500/20 text-green-600' : 'bg-blue-500/20 text-blue-600'
+                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                  String(post.sourceApp).toLowerCase() === 'lomeal'
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
                 }`}>
-                  {post.sourceApp === 'lomeal' ? 'Lomeal' : 'Logym'}
+                  {String(post.sourceApp).toLowerCase() === 'lomeal' ? 'Lomeal' : 'Logym'}
                 </span>
               )}
             </div>
@@ -520,7 +529,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
               >
                 {post.originalImageUrls?.[0] ? (
                   <>
-                    <img src={post.originalImageUrls[0]} alt="" className="w-full aspect-[4/3] sm:aspect-video object-cover object-top block" />
+                    <img src={post.originalImageUrls[0]} alt="" referrerPolicy="no-referrer" crossOrigin="anonymous" decoding="async" loading="lazy" className="w-full aspect-[4/3] sm:aspect-video object-cover object-top block" />
                     <div className="absolute inset-x-0 bottom-0 p-3 bg-[#061626]/60 backdrop-blur-md border-t border-white/10">
                       <div className="flex items-center gap-2 mb-1.5">
                         {renderAvatar(post.originalUserName, post.originalUserPhoto, post.originalUserId)}
@@ -592,61 +601,67 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
               </>
             )}
 
-            {/* WORKOUT LOG */}
-            {(!post.type || post.type === 'workout_log') && (
-              <div className="mb-3">
-                {post.text && <p className={`text-sm ${t.textMain} mb-3 whitespace-pre-wrap`}>{post.text}</p>}
-                {post.imageUrl && !post.imageUrls && (
-                  <div className={`w-full h-[240px] rounded-2xl overflow-hidden cursor-pointer mb-2`} onClick={() => setSelectedImages({ urls: [post.imageUrl], index: 0 })}>
-                    <img src={post.imageUrl} alt="Shared workout" className="w-full h-full object-cover object-top block" loading="lazy" />
-                  </div>
-                )}
-                {post.imageUrls && post.imageUrls.length > 0 && (
+            {/* Post Media Images (Single or Multi-image carousel for all post types) */}
+            {postImages.length > 0 && (
+              <div
+                className="overflow-x-auto hide-scrollbar mb-3 gap-1.5"
+                style={{display:'flex', touchAction:'pan-x pan-y', WebkitOverflowScrolling:'touch'}}
+                onTouchStart={e => e.stopPropagation()}
+                onTouchMove={e => e.stopPropagation()}
+                onTouchEnd={e => e.stopPropagation()}
+              >
+                {postImages.map((url, i) => (
                   <div
-                    className="overflow-x-auto hide-scrollbar mb-2 gap-1.5"
-                    style={{display:'flex', touchAction:'pan-x pan-y', WebkitOverflowScrolling:'touch'}}
-                    onTouchStart={e => e.stopPropagation()}
-                    onTouchMove={e => e.stopPropagation()}
-                    onTouchEnd={e => e.stopPropagation()}
+                    key={i}
+                    style={{minWidth: postImages.length === 1 ? '100%' : '85%', height:'240px'}}
+                    className={`shrink-0 overflow-hidden cursor-pointer bg-slate-900/30 ${postImages.length === 1 ? 'rounded-2xl' : i === 0 ? 'rounded-l-2xl' : ''} ${i === postImages.length - 1 && postImages.length > 1 ? 'rounded-r-2xl' : ''}`}
+                    onClick={() => setSelectedImages({ urls: postImages, index: i })}
                   >
-                    {post.imageUrls.map((url, i) => (
-                      <div key={i} style={{minWidth: post.imageUrls.length === 1 ? '100%' : '85%', height:'240px'}} className={`shrink-0 overflow-hidden cursor-pointer ${post.imageUrls.length === 1 ? 'rounded-2xl' : i === 0 ? 'rounded-l-2xl' : ''} ${i === post.imageUrls.length - 1 && post.imageUrls.length > 1 ? 'rounded-r-2xl' : ''}`} onClick={() => setSelectedImages({ urls: post.imageUrls, index: i })}>
-                        <img src={url} alt="" className="w-full h-full object-cover object-top block" loading="lazy" />
-                      </div>
-                    ))}
+                    <img
+                      src={url}
+                      alt=""
+                      referrerPolicy="no-referrer"
+                      crossOrigin="anonymous"
+                      decoding="async"
+                      loading="lazy"
+                      className="w-full h-full object-cover object-center block"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
                   </div>
-                )}
-                {(!post.imageUrl && (!post.imageUrls || post.imageUrls.length === 0)) && (
-                  <div className={`p-3 rounded-2xl ${isDark ? 'bg-black/20' : 'bg-slate-50'} border ${t.borderDashed} border-dashed`}>
-                    <h5 className={`font-black text-lg ${t.textMain} mb-1`}>{post.workoutName || post.programName}</h5>
-                    <div className="flex gap-4">
-                      <span className={`text-xs font-bold ${t.textMuted} flex items-center gap-1`}><Flame size={12}/> {post.duration}</span>
-                      <span className={`text-xs font-bold ${t.textMuted} flex items-center gap-1`}><Trophy size={12}/> {formatNumber(post.totalVolume || 0, 'id')} kg</span>
-                    </div>
-                  </div>
-                )}
+                ))}
               </div>
             )}
 
-            {/* USER POST */}
-            {post.type === 'user_post' && (
-              <div className="mb-3">
-                {post.text && <p className={`text-sm ${t.textMain} mb-3 whitespace-pre-wrap`}>{post.text}</p>}
-                {post.imageUrls && post.imageUrls.length > 0 && (
-                  <div
-                    className="overflow-x-auto hide-scrollbar gap-1.5"
-                    style={{display:'flex', touchAction:'pan-x pan-y', WebkitOverflowScrolling:'touch'}}
-                    onTouchStart={e => e.stopPropagation()}
-                    onTouchMove={e => e.stopPropagation()}
-                    onTouchEnd={e => e.stopPropagation()}
-                  >
-                    {post.imageUrls.map((url, i) => (
-                      <div key={i} style={{minWidth: post.imageUrls.length === 1 ? '100%' : '85%', height:'240px'}} className={`shrink-0 overflow-hidden cursor-pointer ${post.imageUrls.length === 1 ? 'rounded-2xl' : i === 0 ? 'rounded-l-2xl' : ''} ${i === post.imageUrls.length - 1 && post.imageUrls.length > 1 ? 'rounded-r-2xl' : ''}`} onClick={() => setSelectedImages({ urls: post.imageUrls, index: i })}>
-                        <img src={url} alt="" className="w-full h-full object-cover object-top block" loading="lazy" />
-                      </div>
-                    ))}
+            {/* Post Text */}
+            {post.text && post.type !== 'repost' && (
+              <p className={`text-sm ${t.textMain} mb-3 whitespace-pre-wrap leading-relaxed`}>{post.text}</p>
+            )}
+
+            {/* WORKOUT LOG STATS (when no image is present) */}
+            {(!post.type || post.type === 'workout_log') && postImages.length === 0 && (
+              <div className={`p-3 rounded-2xl ${isDark ? 'bg-black/20' : 'bg-slate-50'} border ${t.borderDashed} border-dashed mb-3`}>
+                <h5 className={`font-black text-lg ${t.textMain} mb-1`}>{post.workoutName || post.programName || 'Sesi Latihan'}</h5>
+                <div className="flex gap-4">
+                  {post.duration && <span className={`text-xs font-bold ${t.textMuted} flex items-center gap-1`}><Flame size={12}/> {post.duration}</span>}
+                  <span className={`text-xs font-bold ${t.textMuted} flex items-center gap-1`}><Trophy size={12}/> {formatNumber(post.totalVolume || 0, 'id')} kg</span>
+                </div>
+              </div>
+            )}
+
+            {/* LOMEAL / MEAL LOG CARD */}
+            {(String(post.sourceApp).toLowerCase() === 'lomeal' || post.type === 'meal_log' || post.type === 'meal') && (post.calories || post.macros || post.mealName) && (
+              <div className={`p-3.5 rounded-2xl ${isDark ? 'bg-emerald-950/25 border-emerald-500/20' : 'bg-emerald-50 border-emerald-200'} border mb-3 flex items-center justify-between`}>
+                <div>
+                  <h5 className={`font-black text-sm ${t.textMain}`}>{post.mealName || 'Catatan Nutrisi'}</h5>
+                  <div className="flex gap-3 mt-1 text-xs font-bold text-emerald-500">
+                    {post.calories ? <span>{Math.round(post.calories)} kkal</span> : null}
+                    {post.macros?.protein ? <span>P: {Math.round(post.macros.protein)}g</span> : null}
+                    {post.macros?.carbs ? <span>K: {Math.round(post.macros.carbs)}g</span> : null}
+                    {post.macros?.fat ? <span>L: {Math.round(post.macros.fat)}g</span> : null}
                   </div>
-                )}
+                </div>
               </div>
             )}
 
@@ -792,12 +807,20 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
             {postComments.map((c, ci) => (
               <div key={c.id || ci} className="flex gap-2 items-start">
                 {c.userPhoto ? (
-                  <img src={c.userPhoto} alt="" className="w-6 h-6 rounded-full object-cover shrink-0 mt-0.5" />
-                ) : (
-                  <div className={`w-6 h-6 rounded-full shrink-0 mt-0.5 flex items-center justify-center text-[9px] font-black ${isDark ? 'bg-white/10 text-white/60' : 'bg-black/8 text-black/50'}`}>
-                    {(c.userName || '?').charAt(0).toUpperCase()}
-                  </div>
-                )}
+                  <img
+                    src={c.userPhoto}
+                    alt=""
+                    referrerPolicy="no-referrer"
+                    crossOrigin="anonymous"
+                    decoding="async"
+                    loading="lazy"
+                    className="w-6 h-6 rounded-full object-cover shrink-0 mt-0.5"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                ) : null}
+                <div className={`w-6 h-6 rounded-full shrink-0 mt-0.5 flex items-center justify-center text-[9px] font-black ${isDark ? 'bg-white/10 text-white/60' : 'bg-black/8 text-black/50'} ${c.userPhoto ? 'hidden' : ''}`}>
+                  {(c.userName || '?').charAt(0).toUpperCase()}
+                </div>
                 <div className={`flex-1 px-3 py-2 rounded-2xl rounded-tl-sm text-xs ${isDark ? 'bg-white/5' : 'bg-black/5'}`}>
                   <span className={`font-black mr-1.5 ${t.textMain}`}>{c.userName}</span>
                   <span className={t.textMuted}>{c.text}</span>
@@ -810,12 +833,20 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
             {/* Comment input */}
             <div className="flex gap-2 items-center mt-1">
               {user?.photoURL ? (
-                <img src={user.photoURL} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
-              ) : (
-                <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black ${t.bgAccentSoft} ${t.textAccent}`}>
-                  {(user?.email || '?').charAt(0).toUpperCase()}
-                </div>
-              )}
+                <img
+                  src={user.photoURL}
+                  alt=""
+                  referrerPolicy="no-referrer"
+                  crossOrigin="anonymous"
+                  decoding="async"
+                  loading="lazy"
+                  className="w-6 h-6 rounded-full object-cover shrink-0"
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                />
+              ) : null}
+              <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black ${t.bgAccentSoft} ${t.textAccent} ${user?.photoURL ? 'hidden' : ''}`}>
+                {(user?.email || '?').charAt(0).toUpperCase()}
+              </div>
               <div className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-2xl border ${isDark ? 'bg-white/5 border-white/10' : 'bg-black/4 border-black/8'}`}>
                 <input
                   type="text"
@@ -825,8 +856,12 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
                   placeholder="Tulis komentar..."
                   className={`flex-1 text-xs bg-transparent outline-none ${isDark ? 'text-white placeholder-white/30' : 'text-black placeholder-black/30'}`}
                 />
-                <button onClick={() => handleSendComment(post)} className={`${t.textAccent} hover:opacity-80 transition-colors shrink-0`}>
-                  <Send size={14} />
+                <button
+                  onClick={() => handleSendComment(post)}
+                  disabled={!commentInput[post.id]?.trim()}
+                  className={`p-1.5 rounded-xl ${commentInput[post.id]?.trim() ? `${t.bgAccent} text-white` : `${t.textMuted} opacity-40`} transition-all`}
+                >
+                  <Send size={12} />
                 </button>
               </div>
             </div>
@@ -837,99 +872,98 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
   };
 
   return (
-    <div className={`w-full flex flex-col pb-24 ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}>
-      
-      {/* Top Sheet (Header + Leaderboard) */}
-      <div className={`relative pb-8 px-4 rounded-b-[2.5rem] shadow-lg z-20 transition-colors duration-300 ${isDark ? 'bg-slate-900/90 border-b border-white/5' : 'bg-white/95'} backdrop-blur-2xl`} style={{ paddingTop: 'max(1.25rem, env(safe-area-inset-top, 24px))' }}>
-        {/* Search Bar as floating pill */}
-        {activeFilter === 'Semua' && (
-          <div className="relative mb-6">
-            <div className="relative flex items-center">
-              <Search size={18} className={`absolute left-4 ${isDark ? 'text-white/40' : 'text-slate-400'}`} />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Cari pengguna..."
-                className={`w-full pl-11 pr-4 py-3.5 rounded-full border-0 font-medium text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/50 shadow-sm ${isDark ? 'bg-slate-800 text-white placeholder-white/30' : 'bg-slate-100/70 text-slate-800 placeholder-slate-400'}`}
-              />
-              {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className="absolute right-4 p-1">
-                  <X size={16} className={t.textMuted} />
-                </button>
-              )}
-            </div>
-            
-            {/* Search Results Dropdown */}
-            {searchQuery.trim() && (
-              <div className={`absolute top-full left-0 right-0 mt-2 z-30 rounded-2xl overflow-hidden shadow-xl border glass-card ${isDark ? 'bg-slate-800/95 border-slate-700' : 'bg-white/95 border-slate-100'}`}>
-                {isSearching ? (
-                  <div className="flex items-center justify-center py-6">
-                    <Loader2 className="animate-spin text-blue-500" size={24} />
-                  </div>
-                ) : searchResults.length > 0 ? (
-                  <div className="max-h-60 overflow-y-auto">
-                    {searchResults.map(resultUser => (
-                      <button
-                        key={resultUser.id}
-                        onClick={() => setViewingProfile({ userId: resultUser.id, userName: resultUser.name, userPhoto: resultUser.photoUrl })}
-                        className={`w-full flex items-center gap-4 p-4 text-left transition-colors border-b last:border-b-0 ${isDark ? 'border-slate-700 hover:bg-slate-700/50' : 'border-slate-100 hover:bg-slate-50'}`}
-                      >
-                        <div className="shrink-0 w-12 h-12 rounded-[16px] overflow-hidden border border-blue-100 dark:border-blue-900 bg-blue-50 flex items-center justify-center">
-                          {resultUser.photoUrl ? (
-                            <img src={resultUser.photoUrl} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="font-black text-blue-500 text-lg">{resultUser.name?.charAt(0).toUpperCase()}</span>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className={`font-bold text-base truncate ${t.textMain}`}>{resultUser.name}</p>
-                          {resultUser.username && (
-                            <p className={`text-xs font-medium mt-0.5 truncate ${t.textMuted}`}>@{resultUser.username}</p>
-                          )}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="py-6 text-center">
-                    <p className={`text-sm font-medium ${t.textMuted}`}>Tidak ditemukan "{searchQuery}"</p>
-                  </div>
-                )}
-              </div>
+    <div className="w-full max-w-full overflow-x-hidden min-h-screen pb-32">
+        {/* Search Bar */}
+        <div className="p-4 relative z-20">
+          <div className={`flex items-center gap-2 px-4 py-3 rounded-2xl ${t.inputBg} border ${t.border}`}>
+            <Search size={18} className={t.textMuted} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Cari atlet atau teman..."
+              className={`flex-1 bg-transparent text-sm ${t.textMain} outline-none placeholder:${t.textMuted}`}
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className={t.textMuted}>
+                <X size={16} />
+              </button>
             )}
           </div>
-        )}
-
-        {/* Leaderboard Section */}
-        {activeFilter === 'Semua' && (
-          <div className="flex flex-col">
-            <div className="flex items-center justify-between mb-4 px-1">
-              <div className="flex items-center gap-2">
-                <Trophy size={18} className="text-blue-500" />
-                <span className={`text-sm font-black uppercase tracking-wider ${isDark ? 'text-white' : 'text-slate-800'}`}>Leaderboard</span>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-4 overflow-x-auto hide-scrollbar pb-2 px-1">
-              {leaderboard.length === 0 ? (
-                <span className={`text-sm font-medium ${t.textMuted}`}>Jadilah juara minggu ini!</span>
+          {/* Search Dropdown */}
+          {searchQuery && (
+            <div className={`mt-2 p-2 rounded-2xl ${t.bgCard} border ${t.border} shadow-xl max-h-60 overflow-y-auto space-y-1 animate-in fade-in slide-in-from-top-2 duration-200`}>
+              {isSearching ? (
+                <div className="p-4 text-center text-xs font-bold text-muted flex items-center justify-center gap-2">
+                  <Loader2 size={16} className="animate-spin text-accent" /> Mencari atlet...
+                </div>
+              ) : searchResults.length === 0 ? (
+                <div className="p-4 text-center text-xs font-bold text-muted">
+                  Atlet tidak ditemukan.
+                </div>
               ) : (
-                leaderboard.map((lbUser, idx) => (
+                searchResults.map(u => (
+                  <div
+                    key={u.id}
+                    onClick={() => {
+                      setViewingProfile({ userId: u.id, userName: u.name, userPhoto: u.photoUrl });
+                      setSearchQuery('');
+                    }}
+                    className={`flex items-center gap-3 p-2 rounded-xl hover:${t.bgAccentSoft} cursor-pointer transition-colors`}
+                  >
+                    {u.photoUrl ? (
+                      <img src={u.photoUrl} alt="" referrerPolicy="no-referrer" crossOrigin="anonymous" decoding="async" loading="lazy" className="w-8 h-8 rounded-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                    ) : null}
+                    <div className={`w-8 h-8 rounded-full ${t.bgAccentSoft} ${t.textAccent} flex items-center justify-center font-bold text-xs ${u.photoUrl ? 'hidden' : ''}`}>
+                      {(u.name || '?').charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className={`text-xs font-bold ${t.textMain} truncate`}>{u.name}</div>
+                      <div className={`text-[10px] ${t.textMuted}`}>Level {u.level || 1} • {u.totalWorkouts || 0} Sesi</div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Leaderboard Podium Mini */}
+        <div className="px-4 pb-4 relative z-10">
+          <div className={`p-4 rounded-3xl ${isDark ? 'bg-gradient-to-b from-blue-950/20 to-slate-900/30' : 'bg-gradient-to-b from-blue-50/50 to-white'} border ${isDark ? 'border-blue-500/10' : 'border-blue-100'} shadow-sm`}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Trophy size={18} className="text-yellow-500" />
+                <span className={`text-xs font-black uppercase tracking-wider ${t.textMain}`}>Top Atlet Minggu Ini</span>
+              </div>
+              <span className={`text-[10px] font-bold ${t.textMuted}`}>Reset Senin</span>
+            </div>
+            <div className="flex items-center gap-3 overflow-x-auto hide-scrollbar pt-2 pb-1">
+              {leaderboard.length === 0 ? (
+                <div className={`text-xs font-bold ${t.textMuted} py-4 text-center w-full`}>Memuat papan peringkat...</div>
+              ) : (
+                leaderboard.slice(0, 10).map((lbUser, idx) => (
                   <button
-                    key={lbUser.id}
+                    key={lbUser.id || idx}
                     onClick={() => setViewingProfile({ userId: lbUser.id, userName: lbUser.name, userPhoto: lbUser.photoUrl })}
-                    className="flex flex-col items-center gap-2 shrink-0"
-                    title={lbUser.name}
+                    className="flex flex-col items-center shrink-0 group focus:outline-none"
                   >
                     <div className="relative">
                       {lbUser.photoUrl ? (
-                        <img src={lbUser.photoUrl} alt="" className={`w-[72px] h-[72px] rounded-[24px] object-cover border-[3px] ${idx === 0 ? 'border-yellow-400' : idx === 1 ? 'border-slate-300' : idx === 2 ? 'border-amber-600' : 'border-blue-400'} shadow-md`} />
-                      ) : (
-                        <div className={`w-[72px] h-[72px] rounded-[24px] bg-blue-50 text-blue-500 flex items-center justify-center font-black text-3xl border-[3px] ${idx === 0 ? 'border-yellow-400' : idx === 1 ? 'border-slate-300' : idx === 2 ? 'border-amber-600' : 'border-blue-400'} shadow-md`}>
-                          {(lbUser.name || '?').charAt(0).toUpperCase()}
-                        </div>
-                      )}
+                        <img
+                          src={lbUser.photoUrl}
+                          alt=""
+                          referrerPolicy="no-referrer"
+                          crossOrigin="anonymous"
+                          decoding="async"
+                          loading="lazy"
+                          className={`w-[72px] h-[72px] rounded-[24px] object-cover border-[3px] ${idx === 0 ? 'border-yellow-400' : idx === 1 ? 'border-slate-300' : idx === 2 ? 'border-amber-600' : 'border-blue-400'} shadow-md`}
+                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                        />
+                      ) : null}
+                      <div className={`w-[72px] h-[72px] rounded-[24px] bg-blue-50 text-blue-500 flex items-center justify-center font-black text-3xl border-[3px] ${idx === 0 ? 'border-yellow-400' : idx === 1 ? 'border-slate-300' : idx === 2 ? 'border-amber-600' : 'border-blue-400'} shadow-md ${lbUser.photoUrl ? 'hidden' : ''}`}>
+                        {(lbUser.name || '?').charAt(0).toUpperCase()}
+                      </div>
                       <div className={`absolute -bottom-2.5 left-1/2 -translate-x-1/2 px-2.5 py-0.5 ${idx === 0 ? 'bg-yellow-400 text-yellow-900' : idx === 1 ? 'bg-slate-300 text-slate-800' : idx === 2 ? 'bg-amber-600 text-amber-50' : 'bg-blue-500 text-white'} rounded-full flex items-center justify-center text-[11px] font-black border-2 ${isDark ? 'border-slate-900' : 'border-white'} shadow-sm`}>
                         #{idx + 1}
                       </div>
@@ -942,40 +976,27 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
               )}
             </div>
           </div>
-        )}
-      </div>
+        </div>
 
-      <div className="px-4 pb-2 relative z-10 flex gap-2">
-        {SOURCE_FILTERS.map((f) => (
-          <button
-            key={f.id}
-            onClick={() => setSourceFilter(f.id)}
-            className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-colors ${sourceFilter === f.id ? `${t.bgAccentSoft} ${t.textAccent} border ${t.borderAccentSoft}` : `${t.textMuted} border ${t.border}`}`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Feed */}
-      <div className="px-4 pt-4 relative z-10">
-        {isLoading ? (
-          <div className={`flex flex-col items-center justify-center py-20 ${t.textAccent} opacity-60`}>
-            <Loader2 className="animate-spin mb-4" size={32} />
-            <p className="font-bold text-sm">Memuat feed komunitas...</p>
-          </div>
-        ) : (
-          <div className="flex flex-col space-y-6">
-            {feed.filter(p => sourceFilter === 'all' || p.sourceApp === sourceFilter).length === 0 ? (
-              <p className={`text-center py-10 ${t.textMuted} text-sm font-bold`}>
-                {activeFilter === 'Diikuti' ? 'Ikuti seseorang untuk melihat postingan mereka.' : 'Belum ada post di komunitas dengan filter ini.'}
-              </p>
-            ) : (
-              feed.filter(p => sourceFilter === 'all' || p.sourceApp === sourceFilter).map((post, idx) => renderPostCard(post, idx))
-            )}
-          </div>
-        )}
-      </div>
+        {/* Feed */}
+        <div className="px-4 pt-2 relative z-10">
+          {isLoading ? (
+            <div className={`flex flex-col items-center justify-center py-20 ${t.textAccent} opacity-60`}>
+              <Loader2 className="animate-spin mb-4" size={32} />
+              <p className="font-bold text-sm">Memuat feed komunitas...</p>
+            </div>
+          ) : (
+            <div className="flex flex-col space-y-6">
+              {feed.length === 0 ? (
+                <p className={`text-center py-10 ${t.textMuted} text-sm font-bold`}>
+                  {activeFilter === 'Diikuti' ? 'Ikuti seseorang untuk melihat postingan mereka.' : 'Belum ada postingan di komunitas.'}
+                </p>
+              ) : (
+                feed.map((post, idx) => renderPostCard(post, idx))
+              )}
+            </div>
+          )}
+        </div>
 
       {/* FAB Create Post */}
       <button

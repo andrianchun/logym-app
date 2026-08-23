@@ -2,10 +2,11 @@ import React from 'react';
 import { Heart, Edit2, X } from 'lucide-react';
 import { formatTarget, getVideoId, exerciseTypeLabels } from '../data/constants';
 import EquipmentIcon from './EquipmentIcon';
-import { getCachedExercises } from '../utils/exerciseDbApi';
 
-const UnifiedExerciseCard = ({ t, lang, ex, onEdit, onDelete, onToggleFavorite, index, onOpenDetail, isCustom, actionButton }) => {
+const UnifiedExerciseCard = React.memo(({ t, lang, ex, onEdit, onDelete, onToggleFavorite, index, onOpenDetail, isCustom, actionButton }) => {
   const isFav = !!ex.isFavorite;
+  const finalGifUrl = ex.gifUrl;
+  const ytId = getVideoId(ex.ytVideo);
   
   return (
     <div
@@ -17,33 +18,24 @@ const UnifiedExerciseCard = ({ t, lang, ex, onEdit, onDelete, onToggleFavorite, 
           className="absolute inset-y-0 right-0 w-[55%] pointer-events-none mix-blend-multiply dark:mix-blend-normal opacity-80"
           style={{ maskImage: 'linear-gradient(105deg, transparent 15%, black 85%)', WebkitMaskImage: 'linear-gradient(105deg, transparent 15%, black 85%)' }}
         >
-          {(() => {
-             const apiExercises = getCachedExercises();
-             const apiMatch = (!ex.gifUrl && !isCustom) ? apiExercises.find(e => e.name.toLowerCase() === ex.name.toLowerCase()) : null;
-             const finalGifUrl = ex.gifUrl || apiMatch?.gifUrl;
-             const ytId = getVideoId(ex.ytVideo);
-             
-             if (finalGifUrl) {
-                // GIF dari API sudah berbentuk landscape/terpotong rapi
-                return <img src={finalGifUrl} alt={ex.name} loading="lazy" className="w-full h-full object-cover object-[100%_25%]" />;
-             } else if (ytId) {
-                // Gunakan w-[320%] untuk memotong pilar hitam dari thumbnail Shorts (9:16 di dalam 16:9). 
-                return <img 
-                  src={`https://img.youtube.com/vi/${ytId}/maxresdefault.jpg`} 
-                  onError={(e) => {
-                    if (e.target.src.includes('maxresdefault')) {
-                      e.target.src = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
-                      e.target.className = "absolute top-1/2 left-1/2 w-[240%] h-auto max-w-none -translate-x-1/2 -translate-y-[25%] object-cover";
-                    }
-                  }}
-                  alt={ex.name} 
-                  loading="lazy" 
-                  className="absolute top-1/2 left-1/2 w-[320%] h-auto max-w-none -translate-x-1/2 -translate-y-[25%] object-cover" 
-                />;
-             } else {
-                return null;
-             }
-          })()}
+          {finalGifUrl ? (
+            // GIF dari API sudah berbentuk landscape/terpotong rapi
+            <img src={finalGifUrl} alt={ex.name} loading="lazy" className="w-full h-full object-cover object-[100%_25%]" />
+          ) : ytId ? (
+            // Gunakan w-[320%] untuk memotong pilar hitam dari thumbnail Shorts (9:16 di dalam 16:9). 
+            <img 
+              src={`https://img.youtube.com/vi/${ytId}/maxresdefault.jpg`} 
+              onError={(e) => {
+                if (e.target.src.includes('maxresdefault')) {
+                  e.target.src = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+                  e.target.className = "absolute top-1/2 left-1/2 w-[240%] h-auto max-w-none -translate-x-1/2 -translate-y-[25%] object-cover";
+                }
+              }}
+              alt={ex.name} 
+              loading="lazy" 
+              className="absolute top-1/2 left-1/2 w-[320%] h-auto max-w-none -translate-x-1/2 -translate-y-[25%] object-cover" 
+            />
+          ) : null}
         </div>
 
         {/* Info */}
@@ -108,6 +100,6 @@ const UnifiedExerciseCard = ({ t, lang, ex, onEdit, onDelete, onToggleFavorite, 
       </div>
     </div>
   );
-};
+});
 
 export default UnifiedExerciseCard;

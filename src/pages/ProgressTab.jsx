@@ -228,10 +228,103 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
     return { data: finalDataPoints, items: sortedItems, recentItems: Array.from(recentItems) };
   }, [chartType, language, history, programs, exerciseLibrary, selectedDate, units]);
 
+  const effectiveActiveLines = useMemo(() => {
+    const stillRelevant = activeChartLines.length > 0 && activeChartLines.some(item => chartDataObj.items.includes(item));
+    if (stillRelevant) {
+      return activeChartLines.filter(item => chartDataObj.items.includes(item));
+    }
+
+    let activeItems = [];
+    const todayStr = selectedDate || getLocalYMD(new Date());
+
+    const todayWorkouts = history[todayStr]?.workouts || [];
+    const activeExpandedId = expandedSessions ? Object.keys(expandedSessions).find(k => expandedSessions[k]) : null;
+    
+    const relevantTodayWorkouts = todayWorkouts.filter(w => {
+      if (activeExpandedId) {
+         if (activeExpandedId === 'extra') {
+            if (w.programId !== 'adhoc') return false;
+         } else {
+            if (w.id !== activeExpandedId) return false;
+         }
+      }
+      if (!activePlanIds || activePlanIds.length === 0) return true;
+      const prog = programs.find(p => p.id === w.programId);
+      const wPlanId = (prog ? prog.planId : null) || 'custom';
+      return activePlanIds.includes(wPlanId) || w.programId === 'adhoc';
+    });
+
+    if (relevantTodayWorkouts.length > 0) {
+      relevantTodayWorkouts.forEach(w => {
+        const prog = programs.find(p => p.id === w.programId);
+        const exercises = w.overriddenExercises || prog?.exercises || [];
+        exercises.forEach(ex => {
+          if (chartType !== 'muscle') {
+            const libEx = exerciseLibrary.find(e => e.id === ex.id) || ex;
+            if (libEx?.name) activeItems.push(libEx.name);
+          } else if (chartType === 'muscle') {
+            const libEx = exerciseLibrary.find(e => e.id === ex.id) || ex;
+            if (libEx?.target) {
+              const targets = Array.isArray(libEx.target) ? libEx.target : [libEx.target];
+              targets.forEach(muscle => {
+                if (typeof muscle === 'string' && muscle) {
+                  activeItems.push(normalizeMuscleKey(muscle));
+                }
+              });
+            }
+          }
+        });
+      });
+    } else if (activePlanIds && activePlanIds.length > 0) {
+        let activeProgs = programs.filter(p => activePlanIds.includes(p.planId || 'custom'));
+        if (activeExpandedId && activeExpandedId !== 'extra') {
+           const targetProgId = resolveProjectedProgramId(activeExpandedId);
+           activeProgs = activeProgs.filter(p => p.id === targetProgId);
+        }
+      
+      activeProgs.forEach(prog => {
+        prog.exercises?.forEach(ex => {
+          if (chartType !== 'muscle') {
+            activeItems.push(ex.name);
+          } else if (chartType === 'muscle') {
+            const libEx = exerciseLibrary.find(e => e.id === ex.id);
+            if (libEx && libEx.target) {
+              const targets = Array.isArray(libEx.target) ? libEx.target : [libEx.target];
+              targets.forEach(muscle => {
+                if (typeof muscle === 'string' && muscle) {
+                  activeItems.push(normalizeMuscleKey(muscle));
+                }
+              });
+            }
+          }
+        });
+      });
+    }
+    
+    activeItems = [...new Set(activeItems)];
+    
+    if (activeItems.length > 0) {
+        return activeItems.slice(0, 6);
+    } else {
+        return chartDataObj.items.slice(0, 6);
+    }
+  }, [activeChartLines, chartType, chartDataObj, activePlanIds, programs, exerciseLibrary, history, selectedDate, expandedSessions]);
+
+  // Pinch-to-zoom logic
+  const [pointWidth, setPointWidth] = useState(() => {
+      try {
+          const saved = localStorage.getItem('lyfit_prog_pointWidth');
+          if (saved) return Number(saved);
+      } catch(e) {}
+      return 55;
+  });
+  useEffect(() => { localStorage.setItem('lyfit_prog_pointWidth', pointWidth); }, [pointWidth]);
+  const touchState = useRef({ initialDist: 0, initialPointWidth: 55, pinchRatio: 0, scrollRelCenterX: 0 });
+  const scrollTarget = useRef(null);
   const scrollRef = useRef(null);
 
   useEffect(() => {
-     if(scrollRef.current && chartDataObj.data.length > 0 && activeChartLines.length > 0) {
+     if(scrollRef.current && chartDataObj.data.length > 0 && effectiveActiveLines.length > 0) {
         if (isSubCard) {
             const savedScroll = localStorage.getItem('lyfit_prog_scrollLeft');
             if (savedScroll !== null) {
@@ -244,7 +337,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
         
         let latestIdxWithData = -1;
         for (let i = data.length - 1; i >= 0; i--) {
-            if (activeChartLines.some(line => {
+            if (effectiveActiveLines.some(line => {
                 const val = data[i][line];
                 return val !== undefined && val !== null && val !== 0;
             })) {
@@ -279,143 +372,24 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
              const clientW = scrollRef.current.clientWidth || (window.innerWidth - 40);
              scrollTarget.current = Math.max(0, (data.length * pointWidth) - clientW);
         }
-     }
-  }, [chartDataObj, selectedDate, activeChartLines]);
-
-  const prevExpandedRef = useRef(expandedSessions);
-  const prevChartTypeRef = useRef(chartType);
-  const prevPlanIdsRef = useRef(activePlanIds);
-
-  useEffect(() => {
-    if (isSubCard) return;
-
-    const expandedChanged = prevExpandedRef.current !== expandedSessions;
-    const chartTypeChanged = prevChartTypeRef.current !== chartType;
-    const planIdsChanged = prevPlanIdsRef.current !== activePlanIds;
-    
-    prevExpandedRef.current = expandedSessions;
-    prevChartTypeRef.current = chartType;
-    prevPlanIdsRef.current = activePlanIds;
-
-    // Kalau pilihan yang ada sekarang (dari localStorage atau klik manual user) masih relevan
-    // buat chartType saat ini, JANGAN ditimpa ?" sebelumnya efek ini rerun tiap history/programs
-    // berubah dan selalu reset balik ke "latihan aktif hari ini", jadi toggle user kerasa
-    // "kacau" ke-reset terus. Auto-pilih default cuma kalau selection kosong atau sudah gak
-    // nyambung sama sekali (misal abis ganti tab Per Latihan/Per Otot).
-    const stillRelevant = activeChartLines.length > 0 && activeChartLines.some(item => chartDataObj.items.includes(item));
-    if (stillRelevant && !expandedChanged && !chartTypeChanged && !planIdsChanged) return;
-
-    let activeItems = [];
-    const todayStr = selectedDate || getLocalYMD(new Date());
-
-    // Priority 1: Look at today's actual workouts in history, 
-    // including overriddenExercises (alternative exercise swaps)
-    const todayWorkouts = history[todayStr]?.workouts || [];
-    const activeExpandedId = expandedSessions ? Object.keys(expandedSessions).find(k => expandedSessions[k]) : null;
-    
-    const relevantTodayWorkouts = todayWorkouts.filter(w => {
-      if (activeExpandedId) {
-         if (activeExpandedId === 'extra') {
-            if (w.programId !== 'adhoc') return false;
-         } else {
-            if (w.id !== activeExpandedId) return false;
-         }
       }
-      if (!activePlanIds || activePlanIds.length === 0) return true;
-      const prog = programs.find(p => p.id === w.programId);
-      const wPlanId = (prog ? prog.planId : null) || 'custom';
-      return activePlanIds.includes(wPlanId) || w.programId === 'adhoc';
-    });
+   }, [chartDataObj, selectedDate, effectiveActiveLines]);
 
-    if (relevantTodayWorkouts.length > 0) {
-      relevantTodayWorkouts.forEach(w => {
-        const prog = programs.find(p => p.id === w.programId);
-        // Use overriddenExercises first (alternative swaps), fall back to program exercises
-        const exercises = w.overriddenExercises || prog?.exercises || [];
-        exercises.forEach(ex => {
-          // 10RM memakai daftar item yang sama dengan 'exercise' (nama latihan), cuma nilainya beda.
-          if (chartType !== 'muscle') {
-            const libEx = exerciseLibrary.find(e => e.id === ex.id) || ex;
-            if (libEx?.name) activeItems.push(libEx.name);
-          } else if (chartType === 'muscle') {
-            const libEx = exerciseLibrary.find(e => e.id === ex.id) || ex;
-            if (libEx?.target) {
-              const targets = Array.isArray(libEx.target) ? libEx.target : [libEx.target];
-              targets.forEach(muscle => {
-                if (typeof muscle === 'string' && muscle) {
-                  activeItems.push(normalizeMuscleKey(muscle));
-                }
-              });
-            }
-          }
-        });
-      });
-    } else if (activePlanIds && activePlanIds.length > 0) {
-      // Fallback: use exercises from active plan programs
-        let activeProgs = programs.filter(p => activePlanIds.includes(p.planId || 'custom'));
-        if (activeExpandedId && activeExpandedId !== 'extra') {
-           const targetProgId = resolveProjectedProgramId(activeExpandedId);
-           activeProgs = activeProgs.filter(p => p.id === targetProgId);
-        }
-      
-      activeProgs.forEach(prog => {
-        prog.exercises?.forEach(ex => {
-          if (chartType !== 'muscle') {
-            activeItems.push(ex.name);
-          } else if (chartType === 'muscle') {
-            const libEx = exerciseLibrary.find(e => e.id === ex.id);
-            if (libEx && libEx.target) {
-              const targets = Array.isArray(libEx.target) ? libEx.target : [libEx.target];
-              targets.forEach(muscle => {
-                if (typeof muscle === 'string' && muscle) {
-                  activeItems.push(normalizeMuscleKey(muscle));
-                }
-              });
-            }
-          }
-        });
-      });
-    }
-    
-    // Ensure uniqueness
-    activeItems = [...new Set(activeItems)];
-    
-    if (activeItems.length > 0) {
-        setActiveChartLines(activeItems.slice(0, 6));
-    } else {
-        // Fallback to top 6 most frequent/recent items
-        setActiveChartLines(chartDataObj.items.slice(0, 6)); 
-    }
-  }, [chartType, chartDataObj, activePlanIds, programs, exerciseLibrary, history, selectedDate, lang.progress, expandedSessions]);
-
-  // Pinch-to-zoom logic
-  const [pointWidth, setPointWidth] = useState(() => {
-      try {
-          const saved = localStorage.getItem('lyfit_prog_pointWidth');
-          if (saved) return Number(saved);
-      } catch(e) {}
-      return 55;
-  });
-  useEffect(() => { localStorage.setItem('lyfit_prog_pointWidth', pointWidth); }, [pointWidth]);
-  const touchState = useRef({ initialDist: 0, initialPointWidth: 55, pinchRatio: 0, scrollRelCenterX: 0 });
-  const scrollTarget = useRef(null);
-
-  const [yDomain, setYDomain] = useState(['auto', 'auto']);
   const pointWidthRef = useRef(pointWidth);
   useEffect(() => { pointWidthRef.current = pointWidth; }, [pointWidth]);
   const rafRef = useRef(null);
 
   const allDisplayItems = useMemo(() => {
-     return [...new Set([...activeChartLines, ...chartDataObj.items])];
-  }, [activeChartLines, chartDataObj.items]);
+     return [...new Set([...effectiveActiveLines, ...chartDataObj.items])];
+  }, [effectiveActiveLines, chartDataObj.items]);
 
-  useEffect(() => {
-      if (chartDataObj.data.length === 0) return;
+  const yDomain = useMemo(() => {
+      if (chartDataObj.data.length === 0) return ['auto', 'auto'];
       
       let min = Infinity;
       let max = -Infinity;
       chartDataObj.data.forEach(d => {
-          activeChartLines.forEach(key => {
+          effectiveActiveLines.forEach(key => {
               let val = d[key];
               if (val !== undefined && val !== null) {
                   val = Number(val);
@@ -428,16 +402,16 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
       });
       
       if (min === Infinity || max === -Infinity) {
-          setYDomain(['auto', 'auto']);
+          return ['auto', 'auto'];
       } else {
           const diff = max - min;
           if (diff === 0) {
-              setYDomain([Math.floor(Math.max(0, min - 10)), Math.ceil(max + 10)]);
+              return [Math.floor(Math.max(0, min - 10)), Math.ceil(max + 10)];
           } else {
-              setYDomain([Math.floor(Math.max(0, min - diff * 0.1)), Math.ceil(max + diff * 0.1)]);
+              return [Math.floor(Math.max(0, min - diff * 0.1)), Math.ceil(max + diff * 0.1)];
           }
       }
-  }, [chartDataObj.data, activeChartLines]);
+  }, [chartDataObj.data, effectiveActiveLines]);
 
   const handleScroll = () => {
       if (!rafRef.current) {
@@ -511,16 +485,17 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
   const toggleChartLine = (item) => {
     playSoundEffect('click', soundEnabled);
     setActiveChartLines(prev => {
-        if (prev.includes(item)) return prev.filter(i => i !== item);
-        if (prev.length >= 6) {
+        const currentLines = (prev.length > 0 && prev.some(it => chartDataObj.items.includes(it))) ? prev : effectiveActiveLines;
+        if (currentLines.includes(item)) return currentLines.filter(i => i !== item);
+        if (currentLines.length >= 6) {
             // Jangan auto-lepas yang paling lama — user harus manual matiin salah satu dulu.
             // Cuma kasih hint kecil sebentar, bukan block diam-diam.
             setLimitHintVisible(true);
             if (limitHintTimeoutRef.current) clearTimeout(limitHintTimeoutRef.current);
             limitHintTimeoutRef.current = setTimeout(() => setLimitHintVisible(false), 2000);
-            return prev;
+            return currentLines;
         }
-        return [...prev, item]; // ditaruh di akhir -> render-nya jadi paling kanan-bawah di antara yang aktif
+        return [...currentLines, item]; // ditaruh di akhir -> render-nya jadi paling kanan-bawah di antara yang aktif
     });
   };
 
@@ -557,7 +532,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
               <div className={`w-12 shrink-0 pointer-events-none flex items-center border-r border-slate-500/10 z-10 bg-transparent py-3`}>
                     <LineChart width={48} height={isSubCard ? 250 : 288} data={chartDataObj.data} margin={{ top: 5, right: 0, left: 4, bottom: 5 }}>
                        <YAxis stroke={theme === 'dark' ? '#a1a1aa' : '#64748b'} fontSize={10} tickLine={false} axisLine={false} width={40} domain={yDomain} allowDataOverflow={true} tickFormatter={(v) => v > 999 ? (v/1000).toFixed(1)+'k' : v} />
-                       {allDisplayItems.map((item, idx) => ( activeChartLines.includes(item) && <Line key={item} type="monotone" dataKey={item} stroke="transparent" dot={false} activeDot={false} isAnimationActive={false} /> ))}
+                       {allDisplayItems.map((item, idx) => ( effectiveActiveLines.includes(item) && <Line key={item} type="monotone" dataKey={item} stroke="transparent" dot={false} activeDot={false} isAnimationActive={false} /> ))}
                     </LineChart>
               </div>
           )}
@@ -612,7 +587,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                   />
                   <XAxis dataKey="date" stroke={theme === 'dark' ? '#a1a1aa' : '#64748b'} fontSize={10} tickLine={false} axisLine={false} padding={{ left: 20, right: 20 }} interval={Math.max(0, Math.ceil(50 / pointWidth) - 1)} />
                   <YAxis hide={true} domain={yDomain} allowDataOverflow={true} />
-                  {allDisplayItems.map((item, idx) => ( activeChartLines.includes(item) && <Line key={item} type="monotone" name={chartType === 'muscle' ? formatTarget(item, lang?.id) : item} dataKey={item} stroke={chartColors[idx % chartColors.length]} strokeWidth={1.5} dot={false} activeDot={{ r: 5, strokeWidth: 0, fill: chartColors[idx % chartColors.length] }} connectNulls={true} isAnimationActive={false} /> ))}
+                  {allDisplayItems.map((item, idx) => ( effectiveActiveLines.includes(item) && <Line key={item} type="monotone" name={chartType === 'muscle' ? formatTarget(item, lang?.id) : item} dataKey={item} stroke={chartColors[idx % chartColors.length]} strokeWidth={1.5} dot={false} activeDot={{ r: 5, strokeWidth: 0, fill: chartColors[idx % chartColors.length] }} connectNulls={true} isAnimationActive={false} /> ))}
                 </LineChart>
                </div>
             ) : ( 
@@ -625,7 +600,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
 
         {isSubCard ? (
              <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 mt-0 mb-0">
-                 {allDisplayItems.filter(item => activeChartLines.includes(item)).map((item, idx) => (
+                 {allDisplayItems.filter(item => effectiveActiveLines.includes(item)).map((item, idx) => (
                      <div key={item} className="flex items-center space-x-1.5">
                          <div className="w-2.5 h-2.5 rounded-[3px]" style={{ backgroundColor: chartColors[allDisplayItems.indexOf(item) % chartColors.length] }}></div>
                          <span className="text-[9px] font-bold text-white/70 uppercase tracking-widest">{chartType === 'muscle' ? formatTarget(item, lang?.id) : item}</span>
@@ -640,16 +615,16 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                 Maksimal pilih 6 item — matikan salah satu dulu.
             </div>
             <div key={chartType} className="grid grid-rows-2 grid-flow-col gap-2 overflow-x-auto pb-2 hide-scrollbar auto-cols-max" style={{ WebkitOverflowScrolling: 'touch' }} onTouchStart={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
-              {/* Aktif dikumpulkan ke kiri, urutannya ngikutin urutan aktivasi di activeChartLines
+              {/* Aktif dikumpulkan ke kiri, urutannya ngikutin urutan aktivasi di effectiveActiveLines
                   (baru diaktifkan = ditaruh paling akhir di grup aktif = kanan-bawah). Sisanya
                   (yang belum aktif) tetap di urutan asli chartDataObj.items. Warna tetap dikunci
                   ke index asli biar konsisten sama warna garis di grafik. */}
               {[
-                ...activeChartLines.filter(item => allDisplayItems.includes(item)),
-                ...allDisplayItems.filter(item => !activeChartLines.includes(item))
+                ...effectiveActiveLines.filter(item => allDisplayItems.includes(item)),
+                ...allDisplayItems.filter(item => !effectiveActiveLines.includes(item))
               ].map((item) => {
                  const idx = allDisplayItems.indexOf(item);
-                 const isActive = activeChartLines.includes(item);
+                 const isActive = effectiveActiveLines.includes(item);
                  return (
                    <button key={item} onClick={() => toggleChartLine(item)} className="px-3 py-1.5 rounded-full caption font-black transition-all border active:scale-95 whitespace-nowrap snap-start flex items-center justify-center h-8" style={{ backgroundColor: isActive ? chartColors[idx % chartColors.length] : 'transparent', borderColor: chartColors[idx % chartColors.length], color: isActive ? '#fff' : chartColors[idx % chartColors.length], opacity: isActive ? 1 : 0.5 }}>
                       {chartType === 'muscle' ? formatTarget(item, lang?.id) : item}

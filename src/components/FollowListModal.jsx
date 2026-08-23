@@ -129,12 +129,20 @@ export default function FollowListModal({ currentUser, type, isDark, t, onClose,
         <div className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer group" onClick={() => setSelectedUser(u)}>
           {/* Avatar */}
           {u.photo ? (
-            <img src={u.photo} alt={u.name} className="w-10 h-10 rounded-full object-cover shrink-0 group-hover:opacity-80 transition-opacity" />
-          ) : (
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-sm shrink-0 group-hover:opacity-80 transition-opacity ${t?.bgAccentSoft || 'bg-[#3b82f6]/10'} ${t?.textAccent || 'text-[#3b82f6]'}`}>
-              {(u.name || '?').charAt(0).toUpperCase()}
-            </div>
-          )}
+            <img
+              src={u.photo}
+              alt={u.name}
+              referrerPolicy="no-referrer"
+              crossOrigin="anonymous"
+              decoding="async"
+              loading="lazy"
+              className="w-10 h-10 rounded-full object-cover shrink-0 group-hover:opacity-80 transition-opacity"
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            />
+          ) : null}
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-sm shrink-0 group-hover:opacity-80 transition-opacity ${t?.bgAccentSoft || 'bg-[#3b82f6]/10'} ${t?.textAccent || 'text-[#3b82f6]'} ${u.photo ? 'hidden' : ''}`}>
+            {(u.name || '?').charAt(0).toUpperCase()}
+          </div>
 
           {/* Name */}
           <p className={`font-bold text-sm truncate group-hover:underline ${isDark ? 'text-white' : 'text-black'}`}>{u.name}</p>

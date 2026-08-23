@@ -171,12 +171,20 @@ export default function SharedProfileView({
       {/* HERO SECTION */}
       <div className="relative w-full h-[45vh] min-h-[350px] bg-slate-900">
         {profileUserPhoto ? (
-          <img src={profileUserPhoto} alt={profileUserName} className="absolute inset-0 w-full h-full object-cover" />
-        ) : (
-          <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center">
-            <span className="text-6xl font-black text-white/10 uppercase">{profileUserName?.substring(0,2)}</span>
-          </div>
-        )}
+          <img
+            src={profileUserPhoto}
+            alt={profileUserName || ''}
+            referrerPolicy="no-referrer"
+            crossOrigin="anonymous"
+            decoding="async"
+            loading="lazy"
+            className="absolute inset-0 w-full h-full object-cover"
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+          />
+        ) : null}
+        <div className={`absolute inset-0 w-full h-full bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center ${profileUserPhoto ? 'hidden' : ''}`}>
+          <span className="text-6xl font-black text-white/10 uppercase">{profileUserName?.substring(0,2)}</span>
+        </div>
         
         {/* Gradient Overlay for Text Readability */}
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/20" />
@@ -189,7 +197,7 @@ export default function SharedProfileView({
             </span>
           )}
           <span className="text-white/80 text-xs font-bold">
-            Skor Sosial <span className="text-white font-black">{scoreData.score}</span>
+            Skor Sosial <span className="text-white font-black">{isLoading ? '...' : scoreData.score}</span>
           </span>
         </div>
 
@@ -273,17 +281,35 @@ export default function SharedProfileView({
           <div className="flex justify-between items-center text-center">
             <div className="flex flex-col items-center flex-1">
               <ClipboardList size={22} className={`mb-2 ${isDark ? 'text-white/70' : 'text-slate-700'}`} />
-              <span className={`text-lg font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{posts.length}</span>
+              <span className={`text-lg font-black min-h-[28px] flex items-center justify-center ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                {isLoading ? (
+                  <span className="inline-block w-6 h-5 rounded bg-black/10 dark:bg-white/10 animate-pulse" />
+                ) : (
+                  posts.length
+                )}
+              </span>
               <span className={`text-[10px] font-bold mt-0.5 uppercase tracking-wider ${isDark ? 'text-white/50' : 'text-slate-500'}`}>Postingan</span>
             </div>
             <div className="flex flex-col items-center flex-1">
               <UserCheck size={22} className={`mb-2 ${isDark ? 'text-white/70' : 'text-slate-700'}`} />
-              <span className={`text-lg font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{followerCount}</span>
+              <span className={`text-lg font-black min-h-[28px] flex items-center justify-center ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                {isLoading ? (
+                  <span className="inline-block w-6 h-5 rounded bg-black/10 dark:bg-white/10 animate-pulse" />
+                ) : (
+                  followerCount
+                )}
+              </span>
               <span className={`text-[10px] font-bold mt-0.5 uppercase tracking-wider ${isDark ? 'text-white/50' : 'text-slate-500'}`}>Pengikut</span>
             </div>
             <div className="flex flex-col items-center flex-1">
               <UserPlus size={22} className={`mb-2 ${isDark ? 'text-white/70' : 'text-slate-700'}`} />
-              <span className={`text-lg font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{followingCount}</span>
+              <span className={`text-lg font-black min-h-[28px] flex items-center justify-center ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                {isLoading ? (
+                  <span className="inline-block w-6 h-5 rounded bg-black/10 dark:bg-white/10 animate-pulse" />
+                ) : (
+                  followingCount
+                )}
+              </span>
               <span className={`text-[10px] font-bold mt-0.5 uppercase tracking-wider ${isDark ? 'text-white/50' : 'text-slate-500'}`}>Mengikuti</span>
             </div>
           </div>
@@ -389,13 +415,24 @@ export default function SharedProfileView({
           ) : regularPosts.length > 0 ? (
             <div className="space-y-4">
               {regularPosts.map((post, i) => {
-                const images = post.imageUrls || (post.imageUrl ? [post.imageUrl] : []);
+                const images = Array.isArray(post.imageUrls) && post.imageUrls.length > 0
+                  ? post.imageUrls.filter(Boolean)
+                  : (post.imageUrl ? [post.imageUrl] : (post.mealPhoto ? [post.mealPhoto] : (post.photoUrl ? [post.photoUrl] : (post.dishPhoto ? [post.dishPhoto] : (post.photo ? [post.photo] : [])))));
                 return (
                   <div key={post.id || i} onClick={() => onPostClick && onPostClick(post.id)} className={`p-4 rounded-3xl flex gap-4 cursor-pointer transition-transform active:scale-95 ${isDark ? 'bg-slate-800/50 hover:bg-slate-800/70' : 'bg-slate-50 hover:bg-slate-100'}`}>
                     {/* Post Icon/Avatar */}
-                    <div className={`w-12 h-12 shrink-0 rounded-2xl flex items-center justify-center ${isDark ? 'bg-slate-800' : 'bg-white shadow-sm'}`}>
+                    <div className={`w-12 h-12 shrink-0 rounded-2xl flex items-center justify-center overflow-hidden ${isDark ? 'bg-slate-800' : 'bg-white shadow-sm'}`}>
                       {images.length > 0 ? (
-                        <img src={images[0]} alt="" className="w-full h-full object-cover rounded-2xl" />
+                        <img
+                          src={images[0]}
+                          alt=""
+                          referrerPolicy="no-referrer"
+                          crossOrigin="anonymous"
+                          decoding="async"
+                          loading="lazy"
+                          className="w-full h-full object-cover rounded-2xl"
+                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                        />
                       ) : (
                         <ClipboardList size={20} className={isDark ? 'text-white/50' : 'text-slate-400'} />
                       )}

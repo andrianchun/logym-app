@@ -128,6 +128,9 @@ export default function ImageModal({ images = [], initialIndex = 0, onClose }) {
             <img 
               src={img} 
               alt={`Fullscreen view ${idx + 1}`} 
+              referrerPolicy="no-referrer"
+              crossOrigin="anonymous"
+              decoding="async"
               className={`max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-6rem)] object-contain rounded-xl shadow-2xl ${scale === 1 ? 'transition-transform duration-300' : ''}`}
               style={{ 
                 transform: idx === currentIndex && scale > 1 ? `translate(${position.x}px, ${position.y}px) scale(${scale})` : 'none',

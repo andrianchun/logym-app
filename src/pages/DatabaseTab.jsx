@@ -9,7 +9,7 @@ import UnifiedExerciseCard from '../components/UnifiedExerciseCard';
 import FilterChips from '../components/FilterChips';
 import SwipeInput from '../components/SwipeInput';
 import GymManagerModal from '../components/GymManagerModal';
-import { fetchExercisePopularity, exerciseSlug } from '../utils/exercisePopularity';
+import { fetchExercisePopularity, getCachedPopularity, exerciseSlug } from '../utils/exercisePopularity';
 
 // ─── Blank exercise template ───────────────────────────────────────
 const blankExercise = () => ({
@@ -333,7 +333,11 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
   };
 
   const onTouchEnd = (e) => {
-    if (!touchStartX.current || !touchEndX.current) return;
+    if (!touchStartX.current || !touchEndX.current) {
+      touchStartX.current = null;
+      touchEndX.current = null;
+      return;
+    }
     const distance = touchStartX.current - touchEndX.current;
     const isLeftSwipe = distance > minSwipeDistance;
     const isRightSwipe = distance < -minSwipeDistance;
@@ -346,6 +350,12 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
     } else if (isRightSwipe && viewMode === 'custom') {
       setViewMode('all');
       e.stopPropagation(); // Prevent global swipe
+    }
+    touchStartX.current = null;
+    touchEndX.current = null;
+
+    if (window.scrollX !== 0) {
+      window.scrollTo(0, window.scrollY);
     }
   };
 
@@ -365,10 +375,11 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
   // ── Online API State ─────────────────────────────────────────────
-  const [onlineExercises, setOnlineExercises] = useState(getCachedExercises());
-  const [onlineLoading, setOnlineLoading] = useState(false);
+  const initialCached = getCachedExercises();
+  const [onlineExercises, setOnlineExercises] = useState(initialCached);
+  const [onlineLoading, setOnlineLoading] = useState(initialCached.length === 0);
   const [onlineError, setOnlineError] = useState(null);
-  const [onlineFetched, setOnlineFetched] = useState(false);
+  const [onlineFetched, setOnlineFetched] = useState(initialCached.length > 0);
 
   // ── Toggle filter helper ─────────────────────────────────────────
   const toggleFilter = (arr, setArr, val) => {
@@ -377,6 +388,11 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
 
   // ── Fetch online exercises automatically ─────────────────────────
   const handleFetchOnline = useCallback(async (force = false) => {
+    if (!force && getCachedExercises().length > 0) {
+      setOnlineExercises(getCachedExercises());
+      setOnlineFetched(true);
+      return;
+    }
     setOnlineLoading(true);
     setOnlineError(null);
     try {
@@ -446,8 +462,14 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
   // ── Peringkat global (semua pengguna Logym) ──────────────────────
   // Diambil sekali per buka tab, di-cache 24 jam di localStorage. Kosong saat offline atau
   // sebelum ada datanya — urutannya jatuh ke pemakaian sendiri, bukan jadi acak.
-  const [globalScores, setGlobalScores] = useState({});
-  useEffect(() => { fetchExercisePopularity().then(setGlobalScores); }, []);
+  const [globalScores, setGlobalScores] = useState(getCachedPopularity);
+  useEffect(() => {
+    fetchExercisePopularity().then(scores => {
+      if (scores && Object.keys(scores).length > 0) {
+        setGlobalScores(scores);
+      }
+    });
+  }, []);
 
   // ── Pemakaian sendiri ─────────────────────────────────────────────
   const ownScores = useMemo(() => {
@@ -570,8 +592,16 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
     return list;
   }, [gymFilteredLibrary, viewMode, showFavoritesOnly, searchQuery, muscleFilter, equipFilter, levelFilter, sortOrder, popularityScores]);
 
-  // Pagination for performance (Render top 100 max)
-  const displayedList = filteredList.slice(0, 100);
+  // Pagination for performance (Render top 30 initially, load more on demand)
+  const [displayCount, setDisplayCount] = useState(30);
+
+  useEffect(() => {
+    setDisplayCount(30);
+  }, [searchQuery, muscleFilter, equipFilter, levelFilter, viewMode, showFavoritesOnly]);
+
+  const displayedList = useMemo(() => {
+    return filteredList.slice(0, displayCount);
+  }, [filteredList, displayCount]);
 
   // Dynamic Equip Options for Filter Panel
   const allEquipOptions = useMemo(() => {
@@ -699,9 +729,9 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
   // ═══════════════════════════════════════════════════════════════
   return (
     <>
-      <div className={`animate-in fade-in duration-300`}>
+      <div className="w-full max-w-full overflow-x-hidden">
         
-        <div className={`sticky top-0 z-30 ${t.bgApp} pt-4 pb-3 -mx-4 px-4 space-y-4 border-b ${t.border}`}>
+        <div className={`sticky top-0 z-30 ${theme === 'dark' ? 'bg-[#05070d]/85' : 'bg-[#eef3fb]/85'} backdrop-blur-md pt-3 pb-3 -mx-4 px-4 space-y-3`}>
         
         {/* ── Gym Selector ───────────────────────────────────────── */}
         <div className="flex items-center gap-2">
@@ -780,7 +810,7 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
             </button>
         </div>
 
-        <div key={viewMode} className={`space-y-4 animate-in fade-in duration-300 ${viewMode === 'all' ? 'slide-in-from-left-12' : 'slide-in-from-right-12'}`}>
+        <div className="space-y-3">
           {/* Unified Search Bar */}
           <div className="flex gap-2 items-center">
             <div className={`flex-1 flex items-center gap-2 px-3 py-3 rounded-xl ${t.inputBg}`}>
@@ -900,7 +930,7 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
         {/* Exercise List */}
         <div 
           key={viewMode}
-          className={`-mx-4 px-4 pt-4 pb-6 animate-in fade-in duration-300 ${viewMode === 'all' ? 'slide-in-from-left-12' : 'slide-in-from-right-12'}`}
+          className="w-full pt-4 pb-6 animate-in fade-in duration-200 overflow-x-hidden"
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
@@ -938,6 +968,19 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
                   />
                 );
               })}
+            </div>
+          )}
+
+          {/* Load More Button for Large Search/Filter Results */}
+          {filteredList.length > displayCount && (
+            <div className="flex justify-center pt-2 pb-6">
+              <button
+                type="button"
+                onClick={() => setDisplayCount(prev => prev + 40)}
+                className={`px-6 py-3 rounded-full font-black text-xs uppercase tracking-wider ${t.bgCard} border ${t.border} ${t.textMain} shadow-sm active:scale-95 transition-all`}
+              >
+                Tampilkan Lebih Banyak (+{filteredList.length - displayCount} lagi)
+              </button>
             </div>
           )}
 

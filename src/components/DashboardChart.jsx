@@ -125,14 +125,12 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
      }
   }, [multiChartData, activeChartMetrics]);
   const scrollTarget = useRef(null);
-
-  const [yDomains, setYDomains] = useState({});
   const pointWidthRef = useRef(pointWidth);
   useEffect(() => { pointWidthRef.current = pointWidth; }, [pointWidth]);
   const rafRef = useRef(null);
 
-  useEffect(() => {
-      if (multiChartData.length === 0) return;
+  const yDomains = useMemo(() => {
+      if (multiChartData.length === 0) return {};
       
       const newDomains = {};
       activeChartMetrics.forEach(metric => {
@@ -161,20 +159,7 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
               newDomains[metric] = [0, 100];
           }
       });
-      
-      setYDomains(prev => {
-          let changed = false;
-          for (let m of activeChartMetrics) {
-              const p = prev[m] || ['auto', 'auto'];
-              const n = newDomains[m] || ['auto', 'auto'];
-              if (p[0] !== n[0] || p[1] !== n[1]) {
-                  changed = true;
-                  break;
-              }
-          }
-          if (changed) return newDomains;
-          return prev;
-      });
+      return newDomains;
   }, [multiChartData, activeChartMetrics]);
 
   const handleScroll = () => {
