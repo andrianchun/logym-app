@@ -1078,7 +1078,12 @@ const CalendarTab = ({
         (teks tanggal polos tanpa kotak solid, gampang tenggelam di foto). */}
     <div className={`flex flex-col sm:flex-row flex-1 min-h-0 w-full overflow-hidden ${t.textMain} sm:gap-2 relative z-10`}>
       {/* STICKY CALENDAR HEADER */}
-      <div ref={headerColRef} className={`z-10 pt-2 relative sm:w-[55%] md:w-[60%] lg:w-[65%] sm:h-full sm:overflow-y-auto hide-scrollbar sm:pr-2 flex flex-col transition-all duration-300 ease-out min-h-0 ${calendarMode === 'monthly' ? 'flex-1' : 'shrink-0 pb-6'}`}>
+      <div ref={headerColRef} className={`z-10 pt-2 relative w-full sm:h-full sm:overflow-y-auto hide-scrollbar sm:pr-2 flex flex-col transition-all duration-300 ease-out min-h-0 ${calendarMode === 'monthly' ? 'flex-1' : 'shrink-0 pb-6'}`}>
+        {/* Lebar kolom TIDAK dipatok 55/60/65% lagi. Patokan itu menyisakan ruang untuk panel
+            detail di sebelah kanan — padahal panel itu dirender `absolute inset-x-0 bottom-0`,
+            sheet selebar layar yang berada di luar alur flex. Jadi 35% sisanya bukan panel apa
+            pun, cuma ruang mati: strip kalender berhenti di 65% sementara kartu sesi di bawahnya
+            mentok ke tepi, dan judul tahun ikut tergeser dari tengah layar. */}
         {/* --- FIXED HEADER: Mode toggle + Year label + Today btn --- */}
         <div ref={fixedHeaderRef} className="shrink-0 relative z-[50] px-2">
           <div className="flex justify-between items-center mb-4 px-1">
