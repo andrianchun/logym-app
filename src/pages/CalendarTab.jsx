@@ -200,13 +200,12 @@ const CalendarTab = ({
   // efek pengukur tinggi di bawah, karena efek itu memakainya sebagai dependensi.
   const hitungMingguStrip = () => {
     if (typeof window === 'undefined') return 1;
-    // TINGGI, bukan lebar. Minggu tambahan menumpuk sebagai BARIS BARU di grid tujuh kolom, jadi
-    // yang dimakan ruang vertikal — persis ruang yang sama dipakai daftar sesi di bawahnya.
-    // Memutuskannya dari lebar layar (versi pertama fitur ini) salah sumbu: jendela lebar tapi
-    // pendek malah dapat tiga baris dan daftar sesinya terhimpit.
-    const { innerHeight: h, innerWidth: w } = window;
-    if (w < 480) return 1;              // ponsel: satu minggu, apa pun tingginya
-    return h >= 860 ? 3 : h >= 700 ? 2 : 1;
+    // SELALU SATU BARIS. Minggu tambahan memanjangkan baris ke samping (14 atau 21 kolom),
+    // bukan menumpuk jadi baris baru — strip yang jadi tiga baris memakan ruang daftar sesi dan
+    // berubah rasa jadi kalender bulanan mini. Jadi yang membatasi memang LEBAR: tiap hari butuh
+    // ruang minimum supaya angkanya masih terbaca.
+    const w = window.innerWidth;
+    return w >= 900 ? 3 : w >= 560 ? 2 : 1;
   };
   const [mingguStrip, setMingguStrip] = useState(hitungMingguStrip);
   useEffect(() => {
@@ -1153,11 +1152,10 @@ const CalendarTab = ({
               <div key={i} className="text-center text-[9px] font-medium uppercase tracking-wider">D</div>
             ))}
           </div>
-          {/* Sebanyak minggu yang BENAR-BENAR dirender. Penggaris ini yang menentukan tinggi
-              area kalender; kalau dia tetap satu baris sementara strip-nya tiga baris, dua baris
-              sisanya terpotong dan stripnya terlihat seolah tidak pernah berubah. */}
+          {/* Tetap satu baris: strip mingguan sekarang memanjang ke samping, tingginya tidak
+              pernah berubah berapa pun jumlah minggunya. */}
           <div className="grid grid-cols-7 gap-0 px-2 py-1">
-            {Array.from({ length: 7 * mingguStrip }, (_, i) => (
+            {Array.from({ length: 7 }, (_, i) => (
               <div key={i} className="py-1"><div className="h-10 w-8 mx-auto" /></div>
             ))}
           </div>
@@ -1193,10 +1191,14 @@ const CalendarTab = ({
           </div>
         ) : calendarMode === 'weekly' ? (
           <div className="animate-in fade-in slide-in-from-top-2 duration-300 ease-out no-swipe" onTouchStart={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
-            <div className="grid grid-cols-7 gap-1 mb-1 px-2 py-1">
-              {(weekStartDay === 1 ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'] : ['S', 'M', 'T', 'W', 'T', 'F', 'S']).map((day, i) => (
-                <div key={i} className={`text-center text-[9px] font-medium uppercase text-zinc-500 tracking-wider`}>{day}</div>
-              ))}
+            {/* Kolomnya 7 x jumlah minggu dalam SATU baris, lewat inline style karena nama kelas
+                Tailwind yang dirakit dinamis tidak terbaca pemindainya. */}
+            <div className="grid gap-1 mb-1 px-2 py-1" style={{ gridTemplateColumns: `repeat(${7 * mingguStrip}, minmax(0, 1fr))` }}>
+              {Array.from({ length: mingguStrip }).flatMap((_, m) =>
+                (weekStartDay === 1 ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'] : ['S', 'M', 'T', 'W', 'T', 'F', 'S']).map((day, i) => (
+                  <div key={`${m}-${i}`} className={`text-center text-[9px] font-medium uppercase text-zinc-500 tracking-wider`}>{day}</div>
+                ))
+              )}
             </div>
             <PanoramicSlider
               ref={calendarSliderRef}
@@ -1226,7 +1228,7 @@ const CalendarTab = ({
                 const panelCells = getGridCellsForDate(panelDate);
 
                 return (
-                  <div className="grid grid-cols-7 gap-0 px-2 py-1 w-full">
+                  <div className="grid gap-0 px-2 py-1 w-full" style={{ gridTemplateColumns: `repeat(${7 * mingguStrip}, minmax(0, 1fr))` }}>
                     {panelCells.map((dateObj, idx) => {
                       if (!dateObj) return <div key={`blank-${idx}`} className="p-1"></div>;
                       const dateKey = getLocalYMD(dateObj);
@@ -1237,11 +1239,11 @@ const CalendarTab = ({
                       
                       // Ukuran & scale disamakan persis dengan sel mode bulanan (w/h-11 = 44px,
                       // scale-[1.1]) supaya "cursor" biru terasa konsisten saat mode berpindah.
-                      let cellStyle = `w-11 h-11 mx-auto relative flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer border border-transparent hover:bg-black/5 dark:hover:bg-white/5 text-zinc-500 dark:text-zinc-300`;
+                      let cellStyle = `w-full h-11 max-w-[44px] mx-auto relative flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer border border-transparent hover:bg-black/5 dark:hover:bg-white/5 text-zinc-500 dark:text-zinc-300`;
                       if (isSelected) {
-                        cellStyle = `w-11 h-11 mx-auto relative flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer ${t.bgAccent} text-white shadow-lg ${t.shadowAccent} scale-[1.1] z-10`;
+                        cellStyle = `w-full h-11 max-w-[44px] mx-auto relative flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer ${t.bgAccent} text-white shadow-lg ${t.shadowAccent} scale-[1.1] z-10`;
                       } else if (isToday) {
-                        cellStyle = `w-11 h-11 mx-auto relative flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer border-2 ${t.borderAccentSoft} ${t.textAccent} font-bold hover:bg-black/5 dark:hover:bg-white/5`;
+                        cellStyle = `w-full h-11 max-w-[44px] mx-auto relative flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer border-2 ${t.borderAccentSoft} ${t.textAccent} font-bold hover:bg-black/5 dark:hover:bg-white/5`;
                       }
 
                       return (
