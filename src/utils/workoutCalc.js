@@ -712,6 +712,45 @@ export const defaultSetWeight = (libEx, ex, step) => {
   return Number(libEx?.lastWeight) || Number(ex?.defaultWeight) || 0;
 };
 
+/**
+ * Id kanonik satu latihan = NAMANYA. Id angka/UUID bukan identitas: latihan yang sama punya id
+ * berbeda di tiap program, dan `handleAddExerciseToProgram`/`handleReplaceExercise` memberi
+ * crypto.randomUUID() baru setiap kali user menambah atau mengganti latihan.
+ */
+export const canonicalExId = (name) => `nm:${String(name || '').trim().toLowerCase()}`;
+
+/**
+ * Peta "setiap id yang pernah dipakai latihan ini" -> satu objek kanonik per NAMA, untuk dipakai
+ * sebagai exLookup di resolveLoggedExercise/rm10Series/recomputeStrengthRecords.
+ *
+ * Tanpa ini, riwayat 10RM hanya terbaca dari program yang sedang dibuka: Smith Machine Squat di
+ * "Full Body A" dan di "PPL Legs & Core" adalah dua id berbeda, jadi kartu Coach menampilkan
+ * "10RM terakhir: -" padahal riwayatnya jelas ada di modal detail (yang memang mencocokkan nama).
+ *
+ * `history` ikut dipindai karena snapshot `w.exercises` / `w.overriddenExercises` adalah
+ * SATU-SATUNYA tempat UUID lama (dari latihan yang sudah diganti/dihapus) masih bisa dipetakan
+ * ke namanya. Sumber yang didaftarkan lebih dulu menang, jadi objek kanoniknya memakai definisi
+ * latihan yang masih hidup (target/equipment terbaru) — bukan salinan beku dari riwayat.
+ */
+export const buildExLookupByName = (history, ...exLists) => {
+  const kanonik = {};
+  const out = {};
+  const daftarkan = (ex) => {
+    const id = ex?.id;
+    const nama = String(ex?.name || '').trim().toLowerCase();
+    if (id === undefined || id === null || !nama) return;
+    const c = kanonik[nama] || (kanonik[nama] = { ...ex, id: canonicalExId(nama) });
+    if (!out[String(id)]) out[String(id)] = c;
+  };
+  exLists.forEach((list) => (list || []).forEach(daftarkan));
+  Object.values(history || {}).forEach((day) =>
+    (day?.workouts || []).forEach((w) => {
+      (w?.exercises || []).forEach(daftarkan);
+      (w?.overriddenExercises || []).forEach(daftarkan);
+    }));
+  return out;
+};
+
 export const recomputeStrengthRecords = (history, logKeys, exLookup) => {
   const ids = new Set();
   (logKeys || []).forEach((k) => {

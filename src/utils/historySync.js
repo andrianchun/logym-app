@@ -260,3 +260,46 @@ export const reconcileHistory = (prev, serverData, baseline, snapshotYear) => {
 
   return { next, baseline: nextBaseline, kept, taken, blockedDeletes };
 };
+
+/**
+ * Gabungkan isi sebuah backup ke history yang ada — MENAMBAH, tidak pernah menimpa.
+ *
+ * Versi lama restoreFromBackup berhenti di `if (next[d] !== undefined) return`: tanggal yang
+ * sudah ada dilewati utuh. Itu membuat backup tidak berguna persis di kasus yang paling
+ * membutuhkannya — tanggal yang ADA tapi sesinya hilang, misalnya karena versi server yang
+ * `workouts`-nya kosong menimpa versi lokal. Yang muncul cuma "tidak ada yang perlu dipulihkan",
+ * padahal sesinya ada di dalam backup.
+ *
+ * Sekarang penggabungannya per SESI: sesi di backup yang id-nya belum ada di tanggal itu
+ * ditambahkan; sesi yang sudah ada tidak pernah disentuh, dan tidak ada yang dihapus. Aturan
+ * "menambah saja" ini yang membuat tombol Pulihkan aman ditekan berkali-kali.
+ *
+ * @returns {{ next: object, tanggalBaru: number, sesiDitambal: number }}
+ */
+export const mergeBackupIntoHistory = (history, backupData) => {
+  const next = { ...(history || {}) };
+  let tanggalBaru = 0;
+  let sesiDitambal = 0;
+
+  Object.keys(backupData || {}).forEach((d) => {
+    const { _activeSession, _delete, ...bersih } = backupData[d] || {};
+    if (_delete) return;
+
+    if (next[d] === undefined) {
+      next[d] = bersih;
+      tanggalBaru++;
+      return;
+    }
+
+    const sekarang = Array.isArray(next[d].workouts) ? next[d].workouts : [];
+    const idSekarang = new Set(sekarang.map((w) => String(w?.id)));
+    const tambahan = (Array.isArray(bersih.workouts) ? bersih.workouts : [])
+      .filter((w) => w?.id !== undefined && w?.id !== null && !idSekarang.has(String(w.id)));
+    if (tambahan.length === 0) return;
+
+    next[d] = { ...next[d], workouts: [...sekarang, ...tambahan] };
+    sesiDitambal += tambahan.length;
+  });
+
+  return { next, tanggalBaru, sesiDitambal };
+};

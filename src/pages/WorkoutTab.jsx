@@ -4,7 +4,7 @@ import { Plus, Wind, Play, CalendarDays, X, CheckCircle, ChevronDown, ChevronUp,
 import { fetchExercisesFromApi } from '../utils/exerciseDbApi';
 import { shareWorkoutToFeed } from '../utils/communityApi';
 import { normalizeMuscleKey, resolveProjectedProgramId, getDayWorkouts } from '../data/constants';
-import { estimate10RM, defaultSetWeight, gymStepFor, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from '../utils/workoutCalc';
+import { estimate10RM, defaultSetWeight, gymStepFor, getEquipmentConfig, calculateActualWeight, getSetActualWeight, rm10Series, buildExLookupByName, canonicalExId } from '../utils/workoutCalc';
 
 // Import Komponen Pecahan
 import WorkoutHeader from '../components/WorkoutHeader';
@@ -524,87 +524,53 @@ const WorkoutTab = ({
     };
 
     const historicalStatsRef = React.useRef({});
-    
+
     React.useEffect(() => {
       historicalStatsRef.current = {};
     }, [history]);
 
+    // Riwayat 10RM dicari lewat NAMA latihan, bukan id. Latihan yang sama punya id berbeda di
+    // setiap program (dan UUID baru tiap kali ditambah/diganti), jadi pencocokan per-id hanya
+    // menemukan sesi dari program yang sedang dibuka — sisanya tampil "10RM terakhir: -" padahal
+    // riwayatnya ada. Modal detail sudah lama mencocokkan nama; ini menyamakannya.
+    const rmLookup = React.useMemo(
+      () => buildExLookupByName(history, exerciseLibrary, extraExercises, ...(programs || []).map(p => p.exercises)),
+      [history, exerciseLibrary, extraExercises, programs]);
+
     const getOverloadHint = (exItem) => {
       if (!exItem || !exerciseLibrary || exItem.type === 'time' || exItem.type === 'cardio' || exItem.target?.includes('Cardio')) return null;
-      
+
       if (!historicalStatsRef.current[exItem.id]) {
         // DUA angka, bukan satu. `best10RM` = rekor sepanjang masa (acuan "rekor baru dipecahkan"),
         // `last10RM` = 10RM sesi TERAKHIR (acuan beban hari ini, dan boleh turun kalau user deload
         // atau mengoreksi salah ketik 100 kg jadi 10 kg). Dulu keduanya satu variabel bernilai
         // maksimum seumur hidup, jadi 10RM tidak pernah bisa turun.
-        let best10RM = 0;
-        let last10RM = 0;
-        let last10RMDateMs = 0;
-        let lastSessionWeight = 0;
-        let lastSessionReps = 0;
-        let mostRecentDateMs = 0;
-        
-        Object.keys(history || {}).forEach(dateStr => {
-          const day = history[dateStr];
-          const dateMs = new Date(dateStr).getTime();
-          
-          if (day.workouts) {
-            day.workouts.forEach(w => {
-              // split('-')[0] hanya untuk id BERBENTUK ANGKA + id sesi ("101-w1"). Untuk id UUID
-              // pola itu memotong di tanda hubung pertama, latihannya tidak pernah ketemu, dan
-              // datanya hilang diam-diam (lihat resolveLoggedExercise di data/constants.js).
-              const rawId = String(exItem.id);
-              const baseId = exItem.originalId ?? (/^d+-/.test(rawId) ? rawId.split('-')[0] : rawId);
-              const targetLog = w.log && (w.log[`${baseId}-${w.id}`] || w.log[baseId] || w.log[exItem.id]);
-  
-              if (w.status === 'completed' && targetLog) {
-                let bestWeightInSession = 0;
-                let bestRepsAtWeight = 0;
-                let rm10InSession = 0;
-                
-                Object.values(targetLog || {}).forEach(s => {
-                  if (!s.skipped && s.w > 0 && s.r > 0) {
-                    const c10RM = estimate10RM(s.w, s.r);
-                    if (c10RM > best10RM) best10RM = c10RM;
-                    if (c10RM > rm10InSession) rm10InSession = c10RM;
-
-                    if (Number(s.w) > bestWeightInSession) {
-                      bestWeightInSession = Number(s.w);
-                      bestRepsAtWeight = Number(s.r);
-                    } else if (Number(s.w) === bestWeightInSession && Number(s.r) > bestRepsAtWeight) {
-                      bestRepsAtWeight = Number(s.r);
-                    }
-                  }
-                });
-                
-                // `>=`: sesi yang baru saja disimpan bisa bertanggal sama dengan sesi terakhir
-                // yang tercatat, dan yang terbaru harus menang.
-                if (rm10InSession > 0 && dateMs >= last10RMDateMs) {
-                  last10RMDateMs = dateMs;
-                  last10RM = rm10InSession;
-                }
-                if (bestWeightInSession > 0 && dateMs >= mostRecentDateMs) {
-                  mostRecentDateMs = dateMs;
-                  lastSessionWeight = bestWeightInSession;
-                  lastSessionReps = bestRepsAtWeight;
-                }
-              }
-            });
-          }
-        });
-        
-        historicalStatsRef.current[exItem.id] = { best10RM, last10RM, lastSessionWeight, lastSessionReps };
+        //
+        // rm10Series = rumus yang sama dengan grafik progres & rekor pustaka, termasuk actual
+        // weight (total_w). Salinan lokal di sini dulu memakai `s.w` mentah, jadi beban barbel
+        // 80 kg + bar 20 kg dihitung sebagai 80.
+        const seri = rm10Series(history, canonicalExId(exItem.name), rmLookup);
+        const terakhir = seri[seri.length - 1];
+        historicalStatsRef.current[exItem.id] = {
+          best10RM: seri.reduce((m, p) => Math.max(m, p.rm10), 0),
+          last10RM: terakhir?.rm10 || 0,
+          lastSessionWeight: terakhir?.weight || 0,
+          lastSessionReps: terakhir?.reps || 0,
+        };
       }
-      
+
       let { best10RM, last10RM, lastSessionWeight, lastSessionReps } = historicalStatsRef.current[exItem.id];
 
 
-      // 2. Scan current session
+      // 2. Scan current session — pakai beban AKTUAL, sama seperti riwayat di atas. Kalau di sini
+      // `s.w` mentah sementara rekornya dari total_w, barbel 80 kg + bar 20 kg selalu kalah dari
+      // rekornya sendiri dan badge REKOR BARU tidak pernah muncul untuk alat berbasis bar.
       let currentMax10RM = 0;
+      const eqConfNow = getEquipmentConfig(gymProfiles, activeGymId, exItem, userProfile);
       const currentLogs = exerciseLogs[exItem.id] || getSetLogs(exItem);
       currentLogs.forEach(s => {
-        if (s.done && !s.skipped && s.w > 0 && s.r > 0) {
-          const c10RM = estimate10RM(s.w, s.r);
+        if (s.done && !s.skipped && (Number(s.w) > 0 || Number(s.total_w) > 0) && s.r > 0) {
+          const c10RM = estimate10RM(getSetActualWeight(s, eqConfNow), s.r);
           if (c10RM > currentMax10RM) currentMax10RM = c10RM;
         }
       });

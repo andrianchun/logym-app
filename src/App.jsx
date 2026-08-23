@@ -53,7 +53,7 @@ import { fetchExercisesFromApi } from './utils/exerciseDbApi';
 import { AI_MODELS, detectPlateaus, getLogyNotification } from './utils/aiAgent';
 import { calculateReadiness, restingHrBaseline } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
-import { calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, recomputeStrengthRecords, buildHcSessionDetail, estimate10RM, defaultSetWeight, gymStepFor, mergeRm10, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from './utils/workoutCalc';
+import { calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, recomputeStrengthRecords, buildExLookupByName, canonicalExId, buildHcSessionDetail, estimate10RM, defaultSetWeight, gymStepFor, mergeRm10, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from './utils/workoutCalc';
 import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcReadHeartRateWindow, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission, capIntradayLog, HC_FIELDS, fillOnlyPatch, hcDroppedTypes } from './utils/healthConnect';
 import { bumpExercisePopularity } from './utils/exercisePopularity';
 import { rapikanNamaProgram, rapikanNamaSesi, pertahankanNamaSesi } from './utils/programNaming';
@@ -61,7 +61,7 @@ import useDialog from './hooks/useDialog';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import UpdaterAlert from './components/UpdaterAlert';
 import { getLocalYMD, resolveProjectedProgramId, isLomealOwned, resolveLoggedExercise, splitSessionLogs, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos, getDayWorkouts, countMissedScheduledDays } from './data/constants';
-import { serializeDay, dayFingerprint, migrateBaseline, reconcileHistory, workoutsToMap, workoutIdsFromBaseline, diffFields, stableStringify } from './utils/historySync';
+import { serializeDay, dayFingerprint, migrateBaseline, reconcileHistory, workoutsToMap, workoutIdsFromBaseline, diffFields, stableStringify, mergeBackupIntoHistory } from './utils/historySync';
 import { useBleManager } from './hooks/useBleManager';
 import { bolehSync, gabungAntrean } from './utils/hcSchedule';
 import { Loader2, Download, X } from 'lucide-react';
@@ -1986,7 +1986,10 @@ export default function App() {
           return;
         }
         if (!hasSyncedMainRef.current) {
-          console.log('[Auto-save] Belum sinkron dari server — skip save, tunggu snapshot pertama selesai.');
+          // COBA LAGI, jangan menyerah. Lihat catatan panjang di penjaga kembarnya di auto-save
+          // history — `return` polos di sini adalah lubang kehilangan data, bukan penundaan.
+          retryTimer = setTimeout(attemptSave, 2000);
+          setSyncStatus('syncing');
           return;
         }
         const mainDocRef = doc(db, "logym_users", user.uid);
@@ -2058,7 +2061,19 @@ export default function App() {
           return;
         }
         if (!hasSyncedHistoryRef.current) {
-          console.log('[Auto-save] History belum sinkron dari server — skip save.');
+          // Penjaganya benar — menulis sebelum snapshot pertama tiba bisa menimpa sesi device
+          // lain (invarian 1). Yang salah dulu adalah `return` POLOS: efek ini cuma dijalankan
+          // ulang kalau `history` berubah lagi, dan `flush` di pagehide memanggil attemptSave
+          // yang sama lalu tertahan di penjaga ini juga. Jadi sesi yang disimpan sebelum
+          // snapshot pertama sampai (jaringan lambat, offline, atau app baru dibuka lalu
+          // langsung latihan) TIDAK PERNAH terkirim — tanpa error, tanpa banner, datanya hidup
+          // cuma di localStorage perangkat itu. Persis gejala 23/08/2026: sesi ada di HP,
+          // tidak ada di web app, tidak ada peringatan apa pun.
+          //
+          // Menunggu itu benar; menyerah tidak. Status 'syncing' menahan ikon sinkron tetap
+          // berputar supaya penantiannya kelihatan, bukan diam-diam.
+          retryTimer = setTimeout(attemptSave, 2000);
+          setSyncStatus('syncing');
           return;
         }
 
@@ -3434,22 +3449,17 @@ export default function App() {
     const tanggalBackup = Object.keys(data);
     if (tanggalBackup.length === 0) { showOtaAlert('Backup ini kosong.'); return; }
 
-    let dipulihkan = 0;
-    setHistory(prev => {
-      const next = { ...prev };
-      tanggalBackup.forEach(d => {
-        if (next[d] !== undefined) return;
-        const { _activeSession, _delete, ...bersih } = data[d] || {};
-        if (_delete) return; 
-        next[d] = bersih;
-        dipulihkan++;
-      });
-      return dipulihkan > 0 ? next : prev;
-    });
+    // Penghitungnya dihitung DI LUAR updater: updater React boleh dipanggil dua kali (StrictMode),
+    // dan pesan "3 sesi dipulihkan" yang jadi 6 di layar bikin user tidak percaya pemulihannya.
+    const { next, tanggalBaru, sesiDitambal } = mergeBackupIntoHistory(historyMirror.current, data);
+    if (tanggalBaru > 0 || sesiDitambal > 0) setHistory(next);
 
-    showOtaAlert(dipulihkan > 0
-      ? `${dipulihkan} tanggal dipulihkan dari backup ${backup.id}. Data yang sudah ada di perangkat ini tidak diubah sama sekali.`
-      : `Tidak ada yang perlu dipulihkan — semua ${tanggalBackup.length} tanggal di backup ini sudah ada di perangkat.`);
+    const bagian = [];
+    if (tanggalBaru > 0) bagian.push(`${tanggalBaru} tanggal`);
+    if (sesiDitambal > 0) bagian.push(`${sesiDitambal} sesi ke tanggal yang sudah ada`);
+    showOtaAlert(bagian.length > 0
+      ? `${bagian.join(' dan ')} dipulihkan dari backup ${backup.id}. Tidak ada data lama yang ditimpa atau dihapus.`
+      : `Tidak ada yang perlu dipulihkan — semua ${tanggalBackup.length} tanggal dan sesi di backup ini sudah ada di perangkat.`);
   };
 
   const pendingRmLogKeys = useRef(null);
@@ -3457,16 +3467,19 @@ export default function App() {
     const keys = pendingRmLogKeys.current;
     if (!keys) return;
     pendingRmLogKeys.current = null;
-    const lookup = {};
-    programs.forEach(p => p.exercises?.forEach(ex => { lookup[ex.id] = ex; }));
-    exerciseLibrary.forEach(ex => { lookup[ex.id] = ex; });
-    (extraExercises || []).forEach(ex => { lookup[ex.id] = ex; });
+    // Dikunci per NAMA, bukan per id. Latihan program adalah salinan ber-UUID (crypto.randomUUID
+    // di handleAddExerciseToProgram/handleReplaceExercise) yang tidak pernah sama dengan id
+    // pustaka, jadi versi lama — `records[String(e.id)]` di bawah — praktis tidak pernah cocok:
+    // rm10 tidak pernah sampai ke pustaka untuk latihan apa pun yang ditambahkan user, dan
+    // riwayat dari program LAIN tidak ikut terhitung.
+    const lookup = buildExLookupByName(history, exerciseLibrary, extraExercises,
+      ...programs.map(p => p.exercises));
     const records = recomputeStrengthRecords(history, keys, lookup);
     if (Object.keys(records).length === 0) return;
     setExerciseLibrary(lib => {
       let changed = false;
       const next = lib.map(e => {
-        const r = records[String(e.id)];
+        const r = records[canonicalExId(e.name)];
         if (!r) return e;
         // Versi lama menimpa rm10 TANPA SYARAT dengan nilai turunan riwayat setiap kali latihan
         // disimpan — 10RM yang disimpan manual hilang di sesi berikutnya, dan rekor yang sesi

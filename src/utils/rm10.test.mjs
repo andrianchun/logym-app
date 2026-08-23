@@ -162,6 +162,60 @@ console.log('rm10 OK', { r100x10: estimate10RM(100, 10), bulat42_5step5: roundDo
   console.log('rm10Best OK');
 }
 
+// ---- Latihan yang sama di program BERBEDA harus tetap terbaca 10RM-nya ----
+// Gejala: "Smith Machine Squat" punya riwayat di Full Body A (05/08) dan PPL Legs (03/08), modal
+// detail menampilkannya (dia mencocokkan nama), tapi kartu Coach bilang "10RM terakhir: -".
+// Sebabnya pencocokan per-id: tiap program menyimpan SALINAN ber-id sendiri, dan setiap
+// Tambah/Ganti Latihan membuat crypto.randomUUID() baru.
+{
+  const { buildExLookupByName, canonicalExId, rm10Series } = await import('./workoutCalc.js');
+
+  const NAMA = 'Smith Machine Squat';
+  const dariFullBody = { id: 'uuid-fullbody', name: NAMA };   // salinan di program A
+  const dariPPL = { id: 'uuid-ppl', name: NAMA };             // salinan di program B
+  const sudahDihapus = { id: 'uuid-lama', name: NAMA };       // sudah diganti user, hanya ada di riwayat
+
+  const hist = {
+    '2026-08-03': { workouts: [{ status: 'completed', id: 'w-ppl', exercises: [dariPPL],
+      log: { 'uuid-ppl-w-ppl': [{ w: 60, r: 10, done: true }] } }] },
+    '2026-08-05': { workouts: [{ status: 'completed', id: 'w-fb', exercises: [dariFullBody],
+      log: { 'uuid-fullbody-w-fb': [{ w: 70, r: 10, done: true }] } }] },
+    // Riwayat dari salinan yang sudah tidak ada di program mana pun. Satu-satunya jejak namanya
+    // ada di snapshot w.exercises — kalau itu tidak dipindai, sesi ini hilang selamanya.
+    '2026-08-01': { workouts: [{ status: 'completed', id: 'w-x', exercises: [sudahDihapus],
+      log: { 'uuid-lama-w-x': [{ w: 50, r: 10, done: true }] } }] },
+  };
+
+  const lookup = buildExLookupByName(hist, [{ id: 901, name: NAMA }], [], [dariFullBody]);
+  const seri = rm10Series(hist, canonicalExId(NAMA), lookup);
+  assert.deepEqual(seri.map(p => p.date), ['2026-08-01', '2026-08-03', '2026-08-05'],
+    'ketiga sesi harus terbaca, dari program mana pun asalnya');
+  assert.equal(seri[seri.length - 1].rm10, estimate10RM(70, 10), '10RM terakhir = sesi 05/08');
+  assert.equal(seri.reduce((m, p) => Math.max(m, p.rm10), 0), estimate10RM(70, 10));
+
+  // Id pustaka juga harus menunjuk ke objek kanonik yang sama, supaya App.jsx bisa menulis
+  // rm10 balik ke pustaka lewat records[canonicalExId(e.name)].
+  assert.equal(lookup['901'].id, canonicalExId(NAMA));
+  assert.equal(lookup['uuid-lama'].id, canonicalExId(NAMA));
+  assert.equal(canonicalExId('  Smith Machine SQUAT '), canonicalExId(NAMA), 'nama tidak case/spasi sensitif');
+
+  // Latihan lain tidak boleh ikut tersedot.
+  assert.deepEqual(rm10Series(hist, canonicalExId('Bench Press'), lookup), []);
+
+  // Tanpa nama / tanpa id -> diabaikan, bukan bikin entri sampah.
+  const kotor = buildExLookupByName(null, [{ id: 1 }, { name: 'X' }, null]);
+  assert.deepEqual(Object.keys(kotor), []);
+
+  // Beban aktual (total_w) ikut dipakai, sama seperti grafik progres.
+  const histBar = { '2026-08-05': { workouts: [{ status: 'completed', id: 'w1', exercises: [dariPPL],
+    log: { 'uuid-ppl-w1': [{ w: 80, input_w: 80, base_w: 20, ratio: 1, total_w: 100, r: 10, done: true }] } }] } };
+  const lookupBar = buildExLookupByName(histBar, [dariPPL]);
+  assert.equal(rm10Series(histBar, canonicalExId(NAMA), lookupBar)[0].rm10, estimate10RM(100, 10),
+    '10RM dari beban aktual 100 kg, bukan input 80 kg');
+
+  console.log('10RM lintas program OK');
+}
+
 // ---- Saran beban ikut turun setelah koreksi (gejala yang dilaporkan user) ----
 {
   const { defaultSetWeight } = await import('./workoutCalc.js');

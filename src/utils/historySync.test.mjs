@@ -324,3 +324,60 @@ function stableStringifyLike(o) {
 }
 
 console.log('historySync OK');
+
+// ---- mergeBackupIntoHistory: tombol Pulihkan harus bisa menambal tanggal yang SUDAH ADA ----
+// Gejala 23/08/2026: sesi hari itu hilang dari perangkat, tanggalnya masih ada (bioData/wellness
+// saja), user menekan Pulihkan dan app menjawab "tidak ada yang perlu dipulihkan" — padahal
+// sesinya ada di dalam backup. Penyebabnya `if (next[d] !== undefined) return`.
+{
+  const { mergeBackupIntoHistory } = await import('./historySync.js');
+
+  const sesi = (id) => ({ id, status: 'completed', log: { 101: [{ w: 60, r: 10, done: true }] } });
+
+  // 1. KASUS UTAMA: tanggal ada tapi workouts kosong -> sesi dari backup ditambal.
+  const lokal = { '2026-08-23': { bioData: { steps: 4000 }, wellness: 'normal', workouts: [] } };
+  const backup = { '2026-08-23': { bioData: { steps: 1 }, workouts: [sesi('w-hp')] } };
+  const a = mergeBackupIntoHistory(lokal, backup);
+  assert.equal(a.sesiDitambal, 1, 'sesi harus ditambal ke tanggal yang sudah ada');
+  assert.equal(a.tanggalBaru, 0);
+  assert.deepEqual(a.next['2026-08-23'].workouts.map(w => w.id), ['w-hp']);
+  // Field lain di perangkat TIDAK boleh ikut tertimpa versi backup.
+  assert.equal(a.next['2026-08-23'].bioData.steps, 4000, 'bioData perangkat tidak boleh ditimpa');
+  assert.equal(a.next['2026-08-23'].wellness, 'normal');
+
+  // 2. Sesi yang sudah ada tidak diduplikasi, dan tidak ada yang dihapus.
+  const b = mergeBackupIntoHistory(a.next, backup);
+  assert.equal(b.sesiDitambal, 0, 'menekan Pulihkan dua kali tidak boleh menggandakan sesi');
+  assert.deepEqual(b.next['2026-08-23'].workouts.map(w => w.id), ['w-hp']);
+
+  const c = mergeBackupIntoHistory(
+    { '2026-08-23': { workouts: [sesi('w-lokal')] } },
+    { '2026-08-23': { workouts: [sesi('w-hp')] } });
+  assert.deepEqual(c.next['2026-08-23'].workouts.map(w => w.id), ['w-lokal', 'w-hp'],
+    'sesi lokal tetap, sesi backup ditambahkan');
+
+  // 3. Tanggal yang benar-benar hilang tetap dipulihkan utuh (perilaku lama dipertahankan).
+  const d = mergeBackupIntoHistory({}, { '2026-08-01': { workouts: [sesi('w1')] } });
+  assert.equal(d.tanggalBaru, 1);
+  assert.equal(d.sesiDitambal, 0);
+
+  // 4. Tanggal bertanda _delete tidak dihidupkan lagi, dan _activeSession tidak ikut terbawa.
+  const e = mergeBackupIntoHistory({}, {
+    '2026-08-02': { _delete: true, workouts: [sesi('w2')] },
+    '2026-08-03': { _activeSession: { x: 1 }, workouts: [sesi('w3')] },
+  });
+  assert.equal(e.next['2026-08-02'], undefined, 'tanggal yang sudah dihapus jangan dibangkitkan');
+  assert.equal(e.next['2026-08-03']._activeSession, undefined, '_activeSession milik device, jangan ikut');
+
+  // 5. Masukan rusak tidak melempar dan tidak mengubah apa-apa.
+  assert.deepEqual(mergeBackupIntoHistory(null, null).next, {});
+  const f = mergeBackupIntoHistory({ '2026-08-04': { workouts: 'bukan array' } },
+    { '2026-08-04': { workouts: [sesi('w4')] } });
+  assert.deepEqual(f.next['2026-08-04'].workouts.map(w => w.id), ['w4']);
+  // Sesi tanpa id tidak bisa dibandingkan — jangan ditambahkan, nanti menggandakan tiap klik.
+  const g = mergeBackupIntoHistory({ '2026-08-05': { workouts: [] } },
+    { '2026-08-05': { workouts: [{ status: 'completed' }] } });
+  assert.equal(g.sesiDitambal, 0, 'sesi tanpa id dilewati, bukan digandakan tiap Pulihkan');
+
+  console.log('mergeBackupIntoHistory OK');
+}
