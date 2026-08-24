@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Wind, Play, CalendarDays, X, CheckCircle, ChevronDown, ChevronUp, Dumbbell, Share2, Flame, Brain } from 'lucide-react';
+import { Plus, Snowflake, Play, CalendarDays, X, CheckCircle, ChevronDown, ChevronUp, Dumbbell, Share2, Flame, Brain } from 'lucide-react';
 import { fetchExercisesFromApi } from '../utils/exerciseDbApi';
 import { shareWorkoutToFeed } from '../utils/communityApi';
 import { normalizeMuscleKey, resolveProjectedProgramId, getDayWorkouts } from '../data/constants';
@@ -1233,7 +1233,7 @@ const WorkoutTab = ({
                     className={`shrink-0 flex items-center justify-center w-16 h-16 rounded-[2rem] transition-all active:scale-95 ${t.btnBg} ${t.textMuted} hover:${t.textAccent}`}
                     title="Pendinginan"
                   >
-                    <Wind size={24} strokeWidth={2} />
+                    <Snowflake size={24} strokeWidth={2} />
                   </button>
                 )}
               </div>

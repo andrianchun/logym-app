@@ -1,0 +1,19 @@
+=== EXERCISE: High Cable Curls ===
+ID: High_Cable_Curls
+Target Muscles: 
+Equipment: cable
+
+[CARA MELAKUKAN (ID)]:
+Berdirilah di antara dua katrol tinggi (high pulley) dan pegang satu handle di masing-masing tangan. Posisikan lengan atas sejajar dengan lantai dengan telapak tangan menghadap ke arah Anda. Ini adalah posisi awal Anda.
+Tekuk lengan Anda untuk menarik handle ke arah Anda hingga berada di samping telinga. Pastikan Anda mengontraksikan otot bisep dan mengembuskan napas saat melakukannya. Lengan atas harus tetap diam dan hanya lengan bawah yang bergerak. Tahan selama satu detik pada posisi puncak kontraksi sambil meremas otot bisep.
+Kembalikan lengan secara perlahan ke posisi awal.
+Ulangi sesuai dengan jumlah repetisi yang direkomendasikan.
+
+[INSTRUCTIONS (EN)]:
+Stand between a couple of high pulleys and grab a handle in each arm. Position your upper arms in a way that they are parallel to the floor with the palms of your hands facing you. This will be your starting position.
+Curl the handles towards you until they are next to your ears. Make sure that as you do so you flex your biceps and exhale. The upper arms should remain stationary and only the forearms should move. Hold for a second in the contracted position as you squeeze the biceps.
+Slowly bring back the arms to the starting position.
+Repeat for the recommended amount of repetitions.
+
+[AI VIDEO PROMPT SUGGESTION]:
+A muscular fitness athlete performing High Cable Curls with proper gym form, clean repetition, starting from start pose (0_start_pose.jpg) to end contraction pose (1_end_pose.jpg) and returning smoothly, cinematic gym lighting, 4k resolution, hyperrealistic.

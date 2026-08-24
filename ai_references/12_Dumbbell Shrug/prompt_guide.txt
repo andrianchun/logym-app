@@ -1,0 +1,19 @@
+=== EXERCISE: Dumbbell Shrug ===
+ID: Dumbbell_Shrug
+Target Muscles: 
+Equipment: dumbbell
+
+[CARA MELAKUKAN (ID)]:
+Berdiri tegak dengan dumbbell di masing-masing tangan (telapak menghadap tubuh), lengan lurus di samping.
+Hembuskan napas, angkat bahu setinggi mungkin. Tahan kontraksi selama satu detik. Pastikan lengan tetap lurus dan tidak menggunakan otot bisep.
+Turunkan kembali dumbbell ke posisi semula.
+Ulangi sesuai repetisi yang ditentukan.
+
+[INSTRUCTIONS (EN)]:
+Stand erect with a dumbbell on each hand (palms facing your torso), arms extended on the sides.
+Lift the dumbbells by elevating the shoulders as high as possible while you exhale. Hold the contraction at the top for a second. Tip: The arms should remain extended at all times. Refrain from using the biceps to help lift the dumbbells. Only the shoulders should be moving up and down.
+Lower the dumbbells back to the original position.
+Repeat for the recommended amount of repetitions.
+
+[AI VIDEO PROMPT SUGGESTION]:
+A muscular fitness athlete performing Dumbbell Shrug with proper gym form, clean repetition, starting from start pose (0_start_pose.jpg) to end contraction pose (1_end_pose.jpg) and returning smoothly, cinematic gym lighting, 4k resolution, hyperrealistic.

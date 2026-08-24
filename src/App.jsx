@@ -4494,6 +4494,10 @@ Ini tidak bisa dibatalkan otomatis.`,
         user={user}
         setConfirmModal={setConfirmModal}
         avatarOrigin={avatarPos}
+        lomealToday={lomealToday}
+        lomealTargets={lomealTargets}
+        readiness={readiness}
+        activityTargets={activityTargets}
       />
       {aiDialog}
       {/* Toast "Tekan Back Sekali Lagi" */}

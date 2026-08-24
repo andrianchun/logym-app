@@ -1557,7 +1557,14 @@
       "Setelah selesai, kembalikan barbel ke rak."
     ],
     "thumbnailUrl": "/exercise-assets/thumbnails/edb-Barbell_Bench_Press_-_Medium_Grip.webp",
-    "videoUrl": "/exercise-assets/videos/edb-Barbell_Bench_Press_-_Medium_Grip.webm"
+    "videoUrl": "/exercise-assets/videos/edb-Barbell_Bench_Press_-_Medium_Grip.mp4",
+    "ytVideo": "https://youtu.be/rT7DgCr-3pg",
+    "defaultWeight": 20,
+    "level": "intermediate",
+    "type": "weight",
+    "aliases": [
+      "Barbell Bench Press"
+    ]
   },
   {
     "exerciseId": "Barbell_Curl",
@@ -2434,6 +2441,14 @@
       "Melangkahlah ke depan dengan satu kaki, lalu tekuk kedua lutut untuk menurunkan pinggul hingga lutut belakang hampir menyentuh lantai. Jaga postur tubuh tetap tegak dan lutut depan tetap sejajar di atas pergelangan kaki.",
       "Dorong tubuh ke atas menggunakan tumit kaki depan dan luruskan kedua kaki untuk kembali ke posisi berdiri.",
       "Melangkahlah ke depan dengan kaki belakang, lalu ulangi gerakan lunge dengan kaki yang lain."
+    ],
+    "videoUrl": "https://youtu.be/mJilHWIBWO8?si=2NCYOofB0EUrY22X",
+    "ytVideo": "https://youtu.be/mJilHWIBWO8?si=2NCYOofB0EUrY22X",
+    "defaultWeight": 5,
+    "level": "intermediate",
+    "type": "weight",
+    "aliases": [
+      "Dumbbell Walking Lunges"
     ]
   },
   {
@@ -4106,7 +4121,12 @@
       "Jaga pinggul tetap diam, tekuk pinggang saat mengontraksikan otot perut sehingga siku bergerak ke arah tengah paha. Hembuskan napas saat melakukan gerakan ini dan tahan kontraksi selama satu detik.",
       "Kembali ke posisi awal secara perlahan sambil menarik napas. Tips: Pastikan otot perut Anda tetap tegang sepanjang gerakan. Selain itu, jangan memilih beban yang terlalu berat agar punggung bawah tidak menanggung beban utama.",
       "Ulangi sesuai jumlah repetisi yang direkomendasikan."
-    ]
+    ],
+    "videoUrl": "https://youtu.be/K2m0jj6RfYg?si=CZMLt6PF0Yxvgb6V",
+    "ytVideo": "https://youtu.be/K2m0jj6RfYg?si=CZMLt6PF0Yxvgb6V",
+    "defaultWeight": 40,
+    "level": "intermediate",
+    "type": "weight"
   },
   {
     "exerciseId": "Cable_Deadlifts",
@@ -4529,7 +4549,7 @@
   {
     "exerciseId": "Cable_Rear_Delt_Fly",
     "name": "Cable Rear Delt Fly",
-    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Rear_Delt_Fly/0.jpg",
+    "gifUrl": "/exercise-assets/thumbnails/edb-Cable_Rear_Delt_Fly.webp",
     "bodyParts": [
       "strength"
     ],
@@ -4557,6 +4577,14 @@
       "Pegang pulley kiri dengan tangan kanan dan pulley kanan dengan tangan kiri, sehingga kabel menyilang di depan dada. Ini posisi awal Anda.",
       "Gerakkan kedua lengan ke arah belakang dan luar, jaga lengan tetap lurus selama gerakan.",
       "Tahan sejenak di titik akhir gerakan sebelum kembali ke posisi awal."
+    ],
+    "videoUrl": "https://youtu.be/cGXBVOc5xIk?si=ve9zzcNdiyNqYF5I https://youtu.be/IeOqdw9WI90?si=J4oHxFNn7257r3ak",
+    "ytVideo": "https://youtu.be/cGXBVOc5xIk?si=ve9zzcNdiyNqYF5I https://youtu.be/IeOqdw9WI90?si=J4oHxFNn7257r3ak",
+    "defaultWeight": 5,
+    "level": "advanced",
+    "type": "weight",
+    "aliases": [
+      "Cross Cable Rear Delt"
     ]
   },
   {
@@ -4632,6 +4660,14 @@
       "Turunkan tali secara perlahan ke belakang kepala sambil menjaga lengan atas tetap diam. Tarik napas saat melakukan gerakan ini dan tahan sejenak saat otot trisep teregang sepenuhnya.",
       "Kembali ke posisi awal dengan mengontraksikan otot trisep sambil mengembuskan napas.",
       "Ulangi gerakan ini sesuai jumlah repetisi yang dianjurkan."
+    ],
+    "videoUrl": "https://youtu.be/9Ark9S11uXw?si=pEAe5tf66v5yUToU https://youtu.be/NTk0Igxqcsk?si=zX7dHQL0VyHURoC_",
+    "ytVideo": "https://youtu.be/9Ark9S11uXw?si=pEAe5tf66v5yUToU https://youtu.be/NTk0Igxqcsk?si=zX7dHQL0VyHURoC_",
+    "defaultWeight": 40,
+    "level": "intermediate",
+    "type": "weight",
+    "aliases": [
+      "Overhead Cable Triceps Extension"
     ]
   },
   {
@@ -4797,6 +4833,14 @@
       "Sambil mempertahankan sudut siku, angkat lengan atas ke samping hingga sejajar dengan lantai dan setinggi bahu. Hembuskan napas saat melakukan gerakan ini dan tahan kontraksi otot selama satu detik.",
       "Turunkan kembali lengan secara perlahan ke posisi awal sambil menarik napas.",
       "Ulangi gerakan ini sesuai jumlah repetisi yang dianjurkan. Tips: Jaga agar lengan atas tetap tegak lurus dengan torso dan pertahankan sudut siku yang konstan (sudut 10 hingga 30 derajat) sepanjang latihan."
+    ],
+    "videoUrl": "https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA",
+    "ytVideo": "https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA",
+    "defaultWeight": 20,
+    "level": "beginner",
+    "type": "weight",
+    "aliases": [
+      "Cable Lateral Raise"
     ]
   },
   {
@@ -8145,6 +8189,14 @@
       "Turunkan kembali dumbbell secara perlahan ke posisi awal sambil menarik napas. Catatan: Putar kembali telapak tangan menghadap paha saat turun.",
       "Ulangi gerakan yang sama untuk tangan kiri. Ini dihitung satu repetisi.",
       "Lanjutkan gerakan bergantian ini sesuai jumlah repetisi yang ditentukan."
+    ],
+    "videoUrl": "https://youtu.be/MKWBV29S6c0?si=JV1BM77vAR6VuQYG https://youtu.be/_aoad2yuP5w?si=PRXDFoozz45AB_VO",
+    "ytVideo": "https://youtu.be/MKWBV29S6c0?si=JV1BM77vAR6VuQYG https://youtu.be/_aoad2yuP5w?si=PRXDFoozz45AB_VO",
+    "defaultWeight": 20,
+    "level": "beginner",
+    "type": "weight",
+    "aliases": [
+      "Dumbbell Biceps Curl"
     ]
   },
   {
@@ -8186,7 +8238,14 @@
       "Ulangi gerakan sesuai dengan jumlah repetisi yang ditentukan dalam program latihan Anda."
     ],
     "thumbnailUrl": "/exercise-assets/thumbnails/edb-Dumbbell_Bench_Press.webp",
-    "videoUrl": "/exercise-assets/videos/edb-Dumbbell_Bench_Press.webm"
+    "videoUrl": "/exercise-assets/videos/edb-Dumbbell_Bench_Press.mp4",
+    "ytVideo": "https://youtu.be/WbCEvFA0NJs?si=n6uJrVnL8SbZLnii",
+    "defaultWeight": 10,
+    "level": "beginner",
+    "type": "weight",
+    "aliases": [
+      "Flat Dumbbell Bench Press"
+    ]
   },
   {
     "exerciseId": "Dumbbell_Bench_Press_with_Neutral_Grip",
@@ -8978,7 +9037,7 @@
   {
     "exerciseId": "Dumbbell_Shoulder_Press",
     "name": "Dumbbell Shoulder Press",
-    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Shoulder_Press/0.jpg",
+    "gifUrl": "/exercise-assets/thumbnails/edb-Dumbbell_Shoulder_Press.webp",
     "bodyParts": [
       "strength"
     ],
@@ -9014,7 +9073,12 @@
       "Hembuskan napas, dorong dumbbell ke atas hingga hampir bersentuhan.",
       "Tahan sejenak, lalu tarik napas sambil menurunkan dumbbell secara perlahan ke posisi awal.",
       "Ulangi sesuai repetisi yang ditentukan."
-    ]
+    ],
+    "videoUrl": "/exercise-assets/videos/edb-Dumbbell_Shoulder_Press.mp4",
+    "ytVideo": "https://youtu.be/k6tzKisR3NY?si=g67rT52vc6oWjiFC https://youtu.be/E7ngsffMPR0?si=FJGsgUxb7aoAZ_ub",
+    "defaultWeight": 5,
+    "level": "intermediate",
+    "type": "weight"
   },
   {
     "exerciseId": "Dumbbell_Shrug",
@@ -9047,7 +9111,12 @@
       "Hembuskan napas, angkat bahu setinggi mungkin. Tahan kontraksi selama satu detik. Pastikan lengan tetap lurus dan tidak menggunakan otot bisep.",
       "Turunkan kembali dumbbell ke posisi semula.",
       "Ulangi sesuai repetisi yang ditentukan."
-    ]
+    ],
+    "videoUrl": "https://youtu.be/rFsSeClGnNA?si=EfUCHpJdjSbWFObO https://youtu.be/2BrmhGze7sk?si=PSt1tUQjaI2liYby",
+    "ytVideo": "https://youtu.be/rFsSeClGnNA?si=EfUCHpJdjSbWFObO https://youtu.be/2BrmhGze7sk?si=PSt1tUQjaI2liYby",
+    "defaultWeight": 15,
+    "level": "beginner",
+    "type": "weight"
   },
   {
     "exerciseId": "Dumbbell_Side_Bend",
@@ -9565,6 +9634,12 @@
     "instructions_id": [
       "Naiki mesin elliptical dan pilih opsi latihan pada menu. Anda dapat menggunakan mode manual atau program otomatis, serta memasukkan usia dan berat badan untuk estimasi kalori. Sesuaikan tingkat kemiringan (elevation) untuk mengatur intensitas.",
       "Gunakan sensor pada handle untuk memantau detak jantung agar intensitas tetap terjaga."
+    ],
+    "defaultWeight": 0,
+    "level": "beginner",
+    "type": "cardio",
+    "aliases": [
+      "Elliptical"
     ]
   },
   {
@@ -11068,6 +11143,14 @@
       "Berdiri tegak sambil memegang kettlebell ringan di bagian pegangan dekat dada. Ini adalah posisi awal.",
       "Jongkok di antara kedua kaki hingga hamstring menyentuh betis. Pastikan dada dan kepala tetap tegak serta punggung lurus.",
       "Tahan posisi di bawah sejenak dan gunakan siku untuk mendorong lutut ke arah luar. Kembali ke posisi awal, ulangi 10-20 repetisi."
+    ],
+    "videoUrl": "https://youtu.be/MeIiIdhgPgl",
+    "ytVideo": "https://youtu.be/MeIiIdhgPgl",
+    "defaultWeight": 10,
+    "level": "beginner",
+    "type": "weight",
+    "aliases": [
+      "Dumbbell Goblet Squat"
     ]
   },
   {
@@ -11830,6 +11913,14 @@
       "Tekuk lengan Anda untuk menarik handle ke arah Anda hingga berada di samping telinga. Pastikan Anda mengontraksikan otot bisep dan mengembuskan napas saat melakukannya. Lengan atas harus tetap diam dan hanya lengan bawah yang bergerak. Tahan selama satu detik pada posisi puncak kontraksi sambil meremas otot bisep.",
       "Kembalikan lengan secara perlahan ke posisi awal.",
       "Ulangi sesuai dengan jumlah repetisi yang direkomendasikan."
+    ],
+    "videoUrl": "https://youtu.be/CrbTqNOlFgE?si=xKanrhppuvUAudTj",
+    "ytVideo": "https://youtu.be/CrbTqNOlFgE?si=xKanrhppuvUAudTj",
+    "defaultWeight": 30,
+    "level": "beginner",
+    "type": "weight",
+    "aliases": [
+      "Biceps Cable Curl"
     ]
   },
   {
@@ -12611,7 +12702,7 @@
       "Setelah selesai, letakkan kembali dumbbell ke paha lalu ke lantai. Ini adalah cara paling aman untuk melepaskan dumbbell."
     ],
     "thumbnailUrl": "/exercise-assets/thumbnails/edb-Incline_Dumbbell_Press.webp",
-    "videoUrl": "/exercise-assets/videos/edb-Incline_Dumbbell_Press.webm"
+    "videoUrl": "/exercise-assets/videos/edb-Incline_Dumbbell_Press.mp4"
   },
   {
     "exerciseId": "Incline_Hammer_Curls",
@@ -19362,6 +19453,14 @@
       "Turunkan pergelangan tangan kembali ke posisi awal secara perlahan sambil menarik napas.",
       "Pastikan lengan bawah tetap diam dan hanya pergelangan tangan yang bergerak.",
       "Ulangi sebanyak repetisi yang dianjurkan."
+    ],
+    "videoUrl": "https://youtu.be/0-c4s051u6E?si=K-4Z9iKq2d8r0N1M",
+    "ytVideo": "https://youtu.be/0-c4s051u6E?si=K-4Z9iKq2d8r0N1M",
+    "defaultWeight": 5,
+    "level": "beginner",
+    "type": "weight",
+    "aliases": [
+      "Dumbbell Wrist Curl"
     ]
   },
   {
@@ -19613,7 +19712,12 @@
     "instructions_id": [
       "Ambil posisi telungkup di lantai, topang berat badan dengan jari kaki dan lengan bawah. Siku ditekuk tepat di bawah bahu.",
       "Jaga tubuh tetap lurus setiap saat dan tahan posisi ini selama mungkin. Untuk meningkatkan kesulitan, angkat satu tangan atau kaki."
-    ]
+    ],
+    "videoUrl": "https://youtu.be/xe2MXatLTUw?si=U5L4UwgiNv19R7lh",
+    "ytVideo": "https://youtu.be/xe2MXatLTUw?si=U5L4UwgiNv19R7lh",
+    "defaultWeight": 0,
+    "level": "beginner",
+    "type": "time"
   },
   {
     "exerciseId": "Plate_Pinch",
@@ -20419,6 +20523,14 @@
       "Berdiri beberapa langkah di depan mesin katrol rendah yang sudah dipasangi tali atau pegangan. Posisikan tubuh membelakangi mesin, buka kaki lebar, dan posisikan kabel di antara kedua kaki.",
       "Mulai gerakan dengan mendorong pinggul ke belakang dan menjangkaukan tangan melalui celah kaki sejauh mungkin dengan lutut sedikit ditekuk.",
       "Jaga lengan tetap lurus, lalu dorong pinggul ke depan hingga posisi berdiri tegak. Hindari menarik beban dengan bahu; seluruh tenaga harus berasal dari dorongan pinggul."
+    ],
+    "videoUrl": "https://youtu.be/sFQtAuiVwyo?si=GQLiGcITyE4Yzp3G",
+    "ytVideo": "https://youtu.be/sFQtAuiVwyo?si=GQLiGcITyE4Yzp3G",
+    "defaultWeight": 20,
+    "level": "intermediate",
+    "type": "weight",
+    "aliases": [
+      "Cable Pull-Through"
     ]
   },
   {
@@ -21970,6 +22082,14 @@
       "Angkat jari kaki dengan mengontraksikan otot kering (tibia) sambil mengembuskan napas.",
       "Tahan selama satu detik lalu turunkan kembali sambil menarik napas.",
       "Ulangi gerakan sesuai jumlah repetisi yang dianjurkan."
+    ],
+    "videoUrl": "https://youtu.be/wdOkFomQNp8?si=PWlxiKYPBMlfLoek",
+    "ytVideo": "https://youtu.be/wdOkFomQNp8?si=PWlxiKYPBMlfLoek",
+    "defaultWeight": 10,
+    "level": "beginner",
+    "type": "weight",
+    "aliases": [
+      "Standing Calf Raise"
     ]
   },
   {
@@ -22053,6 +22173,14 @@
       "Dengan punggung dan lengan tetap lurus, gunakan otot pinggul untuk mengangkat barbel sambil mengembuskan napas secara terkontrol.",
       "Saat posisi tegak, turunkan barbel dengan mendorong pinggul ke belakang. Tekuk lutut hanya sedikit, berbeda dengan gerakan squat. Jaga dada tetap membusung dan napas terkontrol.",
       "Ulangi gerakan sesuai jumlah repetisi yang dianjurkan."
+    ],
+    "videoUrl": "https://youtu.be/xY8BywOKkLQ?si=B1A9ulZ-Cz67GNw6",
+    "ytVideo": "https://youtu.be/xY8BywOKkLQ?si=B1A9ulZ-Cz67GNw6",
+    "defaultWeight": 5,
+    "level": "intermediate",
+    "type": "weight",
+    "aliases": [
+      "Romanian Deadlift (RDL)"
     ]
   },
   {
@@ -22848,7 +22976,14 @@
       "Ulangi gerakan tersebut sesuai jumlah repetisi yang dianjurkan."
     ],
     "thumbnailUrl": "/exercise-assets/thumbnails/edb-Seated_Cable_Rows.webp",
-    "videoUrl": "/exercise-assets/videos/edb-Seated_Cable_Rows.mp4"
+    "videoUrl": "/exercise-assets/videos/edb-Seated_Cable_Rows.mp4",
+    "ytVideo": "https://youtu.be/qD1WZ5pSuvk?si=JbbritEwFpnqjPHz",
+    "defaultWeight": 10,
+    "level": "beginner",
+    "type": "weight",
+    "aliases": [
+      "Cable Seated Row"
+    ]
   },
   {
     "exerciseId": "Seated_Cable_Shoulder_Press",
@@ -22922,6 +23057,14 @@
       "Turunkan tumit secara perlahan dengan menekuk pergelangan kaki hingga otot betis teregang sepenuhnya. Tarik napas saat melakukan gerakan ini.",
       "Angkat tumit setinggi mungkin dengan meluruskan pergelangan kaki sembari mengontraksikan betis dan mengembuskan napas. Tahan kontraksi di posisi atas selama satu detik.",
       "Ulangi gerakan sesuai jumlah repetisi yang dianjurkan."
+    ],
+    "videoUrl": "https://youtu.be/ar8nav0jGoE?si=owieb0xbPHFg7zMA",
+    "ytVideo": "https://youtu.be/ar8nav0jGoE?si=owieb0xbPHFg7zMA",
+    "defaultWeight": 30,
+    "level": "beginner",
+    "type": "weight",
+    "aliases": [
+      "Seated Dumbbell Calf Raise"
     ]
   },
   {
@@ -25341,7 +25484,7 @@
   {
     "exerciseId": "Smith_Machine_Bench_Press",
     "name": "Smith Machine Bench Press",
-    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Smith_Machine_Bench_Press/0.jpg",
+    "gifUrl": "/exercise-assets/thumbnails/edb-Smith_Machine_Bench_Press.png",
     "bodyParts": [
       "strength"
     ],
@@ -25375,6 +25518,14 @@
       "Setelah jeda satu detik, dorong palang kembali ke posisi awal sambil mengembuskan napas, gunakan otot dada. Kunci lengan di posisi atas, tahan sedetik, lalu turunkan kembali perlahan (durasi turun sebaiknya dua kali lebih lama daripada saat naik).",
       "Ulangi gerakan sesuai target repetisi.",
       "Kunci kembali palang pada rak setelah selesai."
+    ],
+    "videoUrl": "/exercise-assets/videos/edb-Smith_Machine_Bench_Press.mp4",
+    "ytVideo": "https://youtu.be/gQ3afio08V8?si=DfCKjmSAhUMXjMl_",
+    "defaultWeight": 7.5,
+    "level": "beginner",
+    "type": "weight",
+    "aliases": [
+      "SM Flat Bench Press"
     ]
   },
   {
@@ -25615,7 +25766,7 @@
   {
     "exerciseId": "Smith_Machine_Incline_Bench_Press",
     "name": "Smith Machine Incline Bench Press",
-    "gifUrl": "/exercise-assets/thumbnails/edb-Smith_Machine_Incline_Bench_Press.webp",
+    "gifUrl": "/exercise-assets/thumbnails/edb-Smith_Machine_Incline_Bench_Press.png",
     "bodyParts": [
       "strength"
     ],
@@ -25651,7 +25802,11 @@
       "Setelah selesai, kunci kembali bar ke rak dengan aman."
     ],
     "thumbnailUrl": "/exercise-assets/thumbnails/edb-Smith_Machine_Incline_Bench_Press.webp",
-    "videoUrl": "/exercise-assets/videos/edb-Smith_Machine_Incline_Bench_Press.mp4"
+    "videoUrl": "/exercise-assets/videos/edb-Smith_Machine_Incline_Bench_Press.mp4",
+    "ytVideo": "https://youtu.be/VXaBbUYMfIs?si=pOB-MkazqZiMP_KX",
+    "defaultWeight": 10,
+    "level": "intermediate",
+    "type": "weight"
   },
   {
     "exerciseId": "Smith_Machine_Leg_Press",
@@ -25846,7 +26001,7 @@
   {
     "exerciseId": "Smith_Machine_Squat",
     "name": "Smith Machine Squat",
-    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Smith_Machine_Squat/0.jpg",
+    "gifUrl": "/exercise-assets/thumbnails/edb-Smith_Machine_Squat.webp",
     "bodyParts": [
       "strength"
     ],
@@ -25885,7 +26040,12 @@
       "Tarik napas perlahan sambil menurunkan bar dengan menekuk lutut. Turun hingga sudut paha dan betis kurang dari 90 derajat (paha di bawah paralel lantai). Pastikan lutut tidak melebihi ujung jari kaki untuk mencegah cedera.",
       "Buang napas sambil mendorong lantai dengan tumit untuk kembali ke posisi berdiri tegak.",
       "Ulangi gerakan sesuai repetisi yang dianjurkan."
-    ]
+    ],
+    "videoUrl": "/exercise-assets/videos/edb-Smith_Machine_Squat.mp4",
+    "ytVideo": "https://youtu.be/iKCJCydYYrE?si=ICtqLU9ov9eFaHfL https://youtu.be/LwsG-1xgP2E?si=Ptr7dUVcsJFKMLYC",
+    "defaultWeight": 0,
+    "level": "intermediate",
+    "type": "weight"
   },
   {
     "exerciseId": "Smith_Machine_Stiff-Legged_Deadlift",
@@ -25924,7 +26084,8 @@
       "Buang napas, turunkan bar ke arah punggung kaki dengan menekuk pinggang tanpa menggerakkan lutut. Jaga punggung tetap lurus hingga otot hamstring terasa teregang.",
       "Tarik napas, segera kembali ke posisi tegak dengan mendorong pinggul dan pinggang ke depan.",
       "Ulangi gerakan sesuai repetisi yang dianjurkan."
-    ]
+    ],
+    "videoUrl": "/exercise-assets/videos/edb-Smith_Machine_Stiff-Legged_Deadlift.mp4"
   },
   {
     "exerciseId": "Smith_Machine_Upright_Row",
@@ -26727,6 +26888,14 @@
       "Pegang dumbbell di masing-masing tangan dengan posisi lengan tergantung di samping tubuh.",
       "Turunkan tubuh dengan menekuk lutut dan pinggul depan. Jaga postur tetap tegak dan pastikan lutut depan tetap sejajar dengan kaki.",
       "Dorong melalui tumit kaki depan untuk meluruskan lutut dan pinggul hingga kembali ke posisi berdiri."
+    ],
+    "videoUrl": "https://youtu.be/or1frhkjBDc?si=FR7v-hKp_QP4-Rpn",
+    "ytVideo": "https://youtu.be/or1frhkjBDc?si=FR7v-hKp_QP4-Rpn",
+    "defaultWeight": 30,
+    "level": "advanced",
+    "type": "weight",
+    "aliases": [
+      "DB Bulgarian Split Squat"
     ]
   },
   {
@@ -30086,6 +30255,14 @@
       "Gunakan otot tricep untuk mendorong bar ke bawah hingga menyentuh bagian depan paha dan lengan lurus sempurna tegak lurus dengan lantai. Lengan atas harus tetap diam di samping torso dan hanya lengan bawah yang bergerak. Hembuskan napas saat melakukan gerakan ini.",
       "Tahan selama satu detik di posisi kontraksi, lalu kembalikan bar secara perlahan ke posisi awal sambil menarik napas.",
       "Ulangi gerakan ini sesuai jumlah repetisi yang dianjurkan."
+    ],
+    "videoUrl": "https://youtu.be/1FjkhpZsaxc?si=UF5-0LJTCd_pEhy3 https://youtu.be/u36jNfqh8_U?si=AEMeWXqnBvpOWNOj https://youtu.be/9qupVR7pKtk?si=FtLIHZmKuqXcK0ne",
+    "ytVideo": "https://youtu.be/1FjkhpZsaxc?si=UF5-0LJTCd_pEhy3 https://youtu.be/u36jNfqh8_U?si=AEMeWXqnBvpOWNOj https://youtu.be/9qupVR7pKtk?si=FtLIHZmKuqXcK0ne",
+    "defaultWeight": 20,
+    "level": "beginner",
+    "type": "weight",
+    "aliases": [
+      "Cable Triceps Pushdown"
     ]
   },
   {
@@ -31223,7 +31400,7 @@
   {
     "exerciseId": "Wide-Grip_Lat_Pulldown",
     "name": "Wide-Grip Lat Pulldown",
-    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Wide-Grip_Lat_Pulldown/0.jpg",
+    "gifUrl": "/exercise-assets/thumbnails/edb-Wide-Grip_Lat_Pulldown.png",
     "bodyParts": [
       "strength"
     ],
@@ -31261,6 +31438,14 @@
       "Buang napas dan tarik bar ke bawah hingga menyentuh dada atas dengan menggerakkan bahu serta lengan atas ke bawah dan ke belakang. Tips: Fokuskan pada kontraksi otot punggung saat mencapai titik kontraksi penuh. Torso atas harus tetap diam dan hanya lengan yang bergerak. Lengan bawah hanya berfungsi sebagai pengait bar, jadi jangan menarik bar menggunakan tenaga lengan bawah.",
       "Setelah menahan selama satu detik pada posisi kontraksi dengan merapatkan belikat, perlahan angkat kembali bar ke posisi awal hingga lengan lurus penuh dan otot latissimus merenggang maksimal. Tarik napas selama fase ini.",
       "Ulangi gerakan ini sesuai jumlah repetisi yang ditentukan."
+    ],
+    "videoUrl": "/exercise-assets/videos/edb-Wide-Grip_Lat_Pulldown.mp4",
+    "ytVideo": "https://youtu.be/bNmvKpJSWKM?si=E7zZ3a3qeG4Ij7bb https://youtu.be/7Cjc_aXoQ_I?si=ZqhPV5iSMoTOLSIf",
+    "defaultWeight": 40,
+    "level": "beginner",
+    "type": "weight",
+    "aliases": [
+      "Lat Pulldown"
     ]
   },
   {
@@ -31824,5 +32009,428 @@
       "Remas bisep selama satu detik di posisi atas, lalu putar kembali pergelangan tangan hingga telapak menghadap ke bawah.",
       "Ulangi sesuai jumlah repetisi."
     ]
+  },
+  {
+    "exerciseId": "107",
+    "name": "Cardio",
+    "targetMuscles": [
+      "Cardio"
+    ],
+    "bodyParts": [
+      "cardio"
+    ],
+    "equipments": [
+      "Stationary Bike"
+    ],
+    "secondaryMuscles": [],
+    "instructions": [
+      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+    ],
+    "instructions_id": [
+      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+    ],
+    "instructions_en": [
+      "Perform the movement with proper form and comfortable intensity."
+    ],
+    "videoUrl": "",
+    "ytVideo": "",
+    "gifUrl": "",
+    "thumbnailUrl": "",
+    "level": "beginner",
+    "type": "cardio",
+    "defaultWeight": 0,
+    "duration": 15,
+    "source": "logym_master"
+  },
+  {
+    "exerciseId": "120",
+    "name": "SM Romanian Deadlift (RDL)",
+    "targetMuscles": [
+      "Hams",
+      "Glutes"
+    ],
+    "bodyParts": [
+      "waist"
+    ],
+    "equipments": [
+      "Smith Machine"
+    ],
+    "secondaryMuscles": [],
+    "instructions": [
+      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+    ],
+    "instructions_id": [
+      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+    ],
+    "instructions_en": [
+      "Perform the movement with proper form and comfortable intensity."
+    ],
+    "videoUrl": "https://youtu.be/xWnlfJaQZ3k?si=z0FRk3rh4UO7JdUC",
+    "ytVideo": "https://youtu.be/xWnlfJaQZ3k?si=z0FRk3rh4UO7JdUC",
+    "gifUrl": "",
+    "thumbnailUrl": "",
+    "level": "beginner",
+    "type": "weight",
+    "defaultWeight": 20,
+    "duration": 0,
+    "source": "logym_master"
+  },
+  {
+    "exerciseId": "126",
+    "name": "Treadmill Running",
+    "targetMuscles": [
+      "Cardio"
+    ],
+    "bodyParts": [
+      "cardio"
+    ],
+    "equipments": [
+      "Treadmill"
+    ],
+    "secondaryMuscles": [],
+    "instructions": [
+      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+    ],
+    "instructions_id": [
+      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+    ],
+    "instructions_en": [
+      "Perform the movement with proper form and comfortable intensity."
+    ],
+    "videoUrl": "",
+    "ytVideo": "",
+    "gifUrl": "",
+    "thumbnailUrl": "",
+    "level": "beginner",
+    "type": "cardio",
+    "defaultWeight": 0,
+    "duration": 15,
+    "source": "logym_master"
+  },
+  {
+    "exerciseId": "127",
+    "name": "Stationary Bike",
+    "targetMuscles": [
+      "Cardio"
+    ],
+    "bodyParts": [
+      "cardio"
+    ],
+    "equipments": [
+      "Stationary Bike"
+    ],
+    "secondaryMuscles": [],
+    "instructions": [
+      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+    ],
+    "instructions_id": [
+      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+    ],
+    "instructions_en": [
+      "Perform the movement with proper form and comfortable intensity."
+    ],
+    "videoUrl": "",
+    "ytVideo": "",
+    "gifUrl": "",
+    "thumbnailUrl": "",
+    "level": "beginner",
+    "type": "cardio",
+    "defaultWeight": 0,
+    "duration": 15,
+    "source": "logym_master"
+  },
+  {
+    "exerciseId": "128",
+    "name": "Aerobic",
+    "targetMuscles": [
+      "Cardio"
+    ],
+    "bodyParts": [
+      "cardio"
+    ],
+    "equipments": [
+      "Body Weight"
+    ],
+    "secondaryMuscles": [],
+    "instructions": [
+      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+    ],
+    "instructions_id": [
+      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+    ],
+    "instructions_en": [
+      "Perform the movement with proper form and comfortable intensity."
+    ],
+    "videoUrl": "",
+    "ytVideo": "",
+    "gifUrl": "",
+    "thumbnailUrl": "",
+    "level": "beginner",
+    "type": "cardio",
+    "defaultWeight": 0,
+    "duration": 20,
+    "source": "logym_master"
+  },
+  {
+    "exerciseId": "129",
+    "name": "HIIT",
+    "targetMuscles": [
+      "Cardio",
+      "Core"
+    ],
+    "bodyParts": [
+      "cardio"
+    ],
+    "equipments": [
+      "Body Weight"
+    ],
+    "secondaryMuscles": [],
+    "instructions": [
+      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+    ],
+    "instructions_id": [
+      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+    ],
+    "instructions_en": [
+      "Perform the movement with proper form and comfortable intensity."
+    ],
+    "videoUrl": "",
+    "ytVideo": "",
+    "gifUrl": "",
+    "thumbnailUrl": "",
+    "level": "advanced",
+    "type": "cardio",
+    "defaultWeight": 0,
+    "duration": 15,
+    "source": "logym_master"
+  },
+  {
+    "exerciseId": "130",
+    "name": "Pilates",
+    "targetMuscles": [
+      "Core"
+    ],
+    "bodyParts": [
+      "waist"
+    ],
+    "equipments": [
+      "Body Weight"
+    ],
+    "secondaryMuscles": [],
+    "instructions": [
+      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+    ],
+    "instructions_id": [
+      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+    ],
+    "instructions_en": [
+      "Perform the movement with proper form and comfortable intensity."
+    ],
+    "videoUrl": "",
+    "ytVideo": "",
+    "gifUrl": "",
+    "thumbnailUrl": "",
+    "level": "intermediate",
+    "type": "time",
+    "defaultWeight": 0,
+    "duration": 1200,
+    "source": "logym_master"
+  },
+  {
+    "exerciseId": "131",
+    "name": "Yoga / Relaksasi",
+    "targetMuscles": [
+      "Core"
+    ],
+    "bodyParts": [
+      "waist"
+    ],
+    "equipments": [
+      "Body Weight"
+    ],
+    "secondaryMuscles": [],
+    "instructions": [
+      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+    ],
+    "instructions_id": [
+      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+    ],
+    "instructions_en": [
+      "Perform the movement with proper form and comfortable intensity."
+    ],
+    "videoUrl": "",
+    "ytVideo": "",
+    "gifUrl": "",
+    "thumbnailUrl": "",
+    "level": "beginner",
+    "type": "time",
+    "defaultWeight": 0,
+    "duration": 600,
+    "source": "logym_master"
+  },
+  {
+    "exerciseId": "133",
+    "name": "Jump Rope",
+    "targetMuscles": [
+      "Cardio"
+    ],
+    "bodyParts": [
+      "cardio"
+    ],
+    "equipments": [
+      "Rope"
+    ],
+    "secondaryMuscles": [],
+    "instructions": [
+      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+    ],
+    "instructions_id": [
+      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+    ],
+    "instructions_en": [
+      "Perform the movement with proper form and comfortable intensity."
+    ],
+    "videoUrl": "",
+    "ytVideo": "",
+    "gifUrl": "",
+    "thumbnailUrl": "",
+    "level": "intermediate",
+    "type": "cardio",
+    "defaultWeight": 0,
+    "duration": 5,
+    "source": "logym_master"
+  },
+  {
+    "exerciseId": "136",
+    "name": "Swimming (Renang)",
+    "targetMuscles": [
+      "Cardio",
+      "Core",
+      "Lats"
+    ],
+    "bodyParts": [
+      "cardio"
+    ],
+    "equipments": [
+      "Pool"
+    ],
+    "secondaryMuscles": [],
+    "instructions": [
+      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+    ],
+    "instructions_id": [
+      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+    ],
+    "instructions_en": [
+      "Perform the movement with proper form and comfortable intensity."
+    ],
+    "videoUrl": "",
+    "ytVideo": "",
+    "gifUrl": "",
+    "thumbnailUrl": "",
+    "level": "intermediate",
+    "type": "cardio",
+    "defaultWeight": 0,
+    "duration": 30,
+    "source": "logym_master"
+  },
+  {
+    "exerciseId": "137",
+    "name": "Jogging / Running",
+    "targetMuscles": [
+      "Cardio",
+      "Quads",
+      "Calves"
+    ],
+    "bodyParts": [
+      "cardio"
+    ],
+    "equipments": [
+      "Body Weight"
+    ],
+    "secondaryMuscles": [],
+    "instructions": [
+      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+    ],
+    "instructions_id": [
+      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+    ],
+    "instructions_en": [
+      "Perform the movement with proper form and comfortable intensity."
+    ],
+    "videoUrl": "",
+    "ytVideo": "",
+    "gifUrl": "",
+    "thumbnailUrl": "",
+    "level": "beginner",
+    "type": "cardio",
+    "defaultWeight": 0,
+    "duration": 20,
+    "source": "logym_master"
+  },
+  {
+    "exerciseId": "138",
+    "name": "Walking / Jalan Kaki",
+    "targetMuscles": [
+      "Cardio"
+    ],
+    "bodyParts": [
+      "cardio"
+    ],
+    "equipments": [
+      "Body Weight"
+    ],
+    "secondaryMuscles": [],
+    "instructions": [
+      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+    ],
+    "instructions_id": [
+      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+    ],
+    "instructions_en": [
+      "Perform the movement with proper form and comfortable intensity."
+    ],
+    "videoUrl": "",
+    "ytVideo": "",
+    "gifUrl": "",
+    "thumbnailUrl": "",
+    "level": "beginner",
+    "type": "cardio",
+    "defaultWeight": 0,
+    "duration": 30,
+    "source": "logym_master"
+  },
+  {
+    "exerciseId": "139",
+    "name": "Cycling / Sepeda",
+    "targetMuscles": [
+      "Cardio",
+      "Quads"
+    ],
+    "bodyParts": [
+      "cardio"
+    ],
+    "equipments": [
+      "Bicycle"
+    ],
+    "secondaryMuscles": [],
+    "instructions": [
+      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+    ],
+    "instructions_id": [
+      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+    ],
+    "instructions_en": [
+      "Perform the movement with proper form and comfortable intensity."
+    ],
+    "videoUrl": "",
+    "ytVideo": "",
+    "gifUrl": "",
+    "thumbnailUrl": "",
+    "level": "beginner",
+    "type": "cardio",
+    "defaultWeight": 0,
+    "duration": 30,
+    "source": "logym_master"
   }
 ]

@@ -1,5 +1,5 @@
 import { httpsCallable } from 'firebase/functions';
-import { functions } from '../firebase';
+import { functions } from '../firebase.js';
 
 // Shared API keys sekarang hidup di backend (functions/.env), bukan di bundle client.
 // Alur: key pribadi user dipanggil langsung dari browser; tanpa key -> proxy Cloud Functions.
@@ -39,7 +39,11 @@ export const isTrivialMessage = (text) => {
 const PERSONAL_DATA_SIGNALS = [
     /\d/, // any digit: weight, reps, sets, dates, percentages
     /\b(latihan(ku|mu|nya)?|progres(s)?|progress(ku|mu)?|riwayat|rekap|history|hari ini|kemarin|minggu (ini|lalu|kemarin)|bulan (ini|lalu)|kg|berat( badan)?|tinggi( badan)?|bmi|body ?fat|lemak|otot|kalori|massa otot|\bset(ku)?\b|\brep(ku)?\b|beban(ku)?|angkat(anku)?|sesi(ku)?|jadwal(ku|mu)?|program(ku|mu)?|plan(ku|mu)?|plateau|stuck|stagnan|mentok)\b/i,
-    /\b(aku|gue|gua|saya)\b.{0,15}\b(udah|sudah|belum|baru|lagi)\b/i, // "aku udah/belum ..." biasanya nanya progres sendiri
+    /\b(tidur|sleep|begadang|insomnia|nyenyak|deep sleep|rem|bangun|istirahat|capek|lelah|segar|fit|energi|tenaga|kondisi fisik|readiness|kesiapan|pemulihan|recovery)\b/i,
+    /\b(makan(an)?|nutrisi|diet|defisit|surplus|tdee|bmr|protein|karbo|lemak|air|minum|hidrasi|lomeal|macro|kalori|gizi)\b/i,
+    /\b(langkah|step|steps|jalan|menit aktif|kardio|cardio|nadi|rhr|detak jantung|heart rate|tensi|darah|spo2)\b/i,
+    /\b(database|katalog|catalog|ada latihan|ada gerakan|gerakan apa|latihan apa|variasi|alternatif|crunch|squat|bench|press|curl|row|pull|push|deadlift|lunge|dip|plank)\b/i,
+    /\b(aku|gue|gua|saya)\b.{0,15}\b(udah|sudah|belum|baru|lagi|bisa|mau|perlu)\b/i, // "aku udah/belum ..." biasanya nanya progres sendiri
 ];
 
 // Pertanyaan pengetahuan umum ("apa itu X", "kenapa X", "gimana cara X secara umum")
@@ -126,7 +130,7 @@ export const getAvailableModels = () => {
 
 // Teks notifikasi Coach Logy pindah ke logyNotif.js: modul ini mengimpor firebase, jadi
 // batas panjang teksnya tidak bisa diuji dari Node polos selama isinya masih di sini.
-export { LOGI_NOTIF_TEMPLATES, NOTIF_MAX_TITLE, NOTIF_MAX_BODY, getLogyNotification } from './logyNotif';
+export { LOGI_NOTIF_TEMPLATES, NOTIF_MAX_TITLE, NOTIF_MAX_BODY, getLogyNotification } from './logyNotif.js';
 
 // A key that hit a rate limit / error is benched for a few minutes, not forever —
 // free-tier quotas reset per minute/day, so permanent "exhausted" was wrong.
@@ -172,7 +176,7 @@ export const PERSONA_PRESETS = {
     }
 };
 
-export const buildSystemPrompt = (userProfile, exerciseLibraryStr, workoutLogsSummary = '', bioSummary = '', activeProgramsSummary = '', persona = 'santai', customInstruction = '', memory = [], favoriteProgramSummary = '', appHelpBlock = '', extraCatalogStr = '') => {
+export const buildSystemPrompt = (userProfile, exerciseLibraryStr, workoutLogsSummary = '', healthRecoverySummary = '', activeProgramsSummary = '', persona = 'santai', customInstruction = '', memory = [], favoriteProgramSummary = '', appHelpBlock = '', extraCatalogStr = '') => {
     let bioString = "";
     if (userProfile) {
         bioString = `
@@ -209,7 +213,7 @@ Check the conversation history before replying: if you already explained somethi
 
 ${bioString}
 ${memoryBlock}
-${bioSummary ? `\n${bioSummary}\n` : ''}
+${healthRecoverySummary ? `\n${healthRecoverySummary}\nUse the sleep, readiness, nutrition, and biometric data above to give holistic, adaptive coaching (e.g. if sleep/readiness is low, advise lighter loads or deload; if in calorie deficit/surplus, align volume and recovery expectations; if asked about food/sleep/calories/vitals, reference the real logged numbers).\n` : ''}
 ${workoutLogsSummary ? `\n${workoutLogsSummary}\nThe workout history above is REAL logged data pulled directly from the user's app (including calendar/backdated entries). Trust it — never claim you cannot see the user's history. When the user asks about a specific past day, look it up in "Recent sessions" and answer with the exact date and numbers. Use the weekly progression to set appropriate weights/volumes when designing future programs.\n` : ''}
 ${activeProgramsSummary ? `\n${activeProgramsSummary}\n` : ''}
 ${favoriteProgramSummary ? `\n${favoriteProgramSummary}\n` : ''}
@@ -245,66 +249,165 @@ Rules for "create": always use action "create" with no targetPlanId when the use
 Available Exercise Library — already in the user's app (format: name (muscles, equipment)). Prefer these, and match the names exactly:
 ${exerciseLibraryStr}
 ${extraCatalogStr ? `
-Extra Catalog — NOT yet in the user's app, but the app can add them automatically. Use these when the user asks for alternatives, variations, or says they are bored with their current routine. Never invent a name that is not in either list:
+Extra Catalog / ExerciseDB — available in the app's master database of 873+ exercises (can be searched and added anytime in the Database tab or used in programs):
 ${extraCatalogStr}
 ` : ''}
+
+[Exercise Database Guidance]
+When the user asks if an exercise exists in the database (e.g. "Ab Crunch ada di database gak?"), check BOTH [Available Exercise Library] and [Extra Catalog / ExerciseDB]. If it is present in either list, confirm that it IS available in the LOGYM database and describe the movement, targeted muscles, and equipment!
 
 Only use the <program_proposal> tags if you are explicitly generating or editing a program for the user to use in the app. Otherwise, just reply with normal text.`;
 };
 
 /**
- * Latest known biometrics (weight/height/body-fat/etc) plus a simple trend, read
- * straight from history[date].bioData (same field the Dashboard/Vision-extract write to).
+ * Lightweight, token-efficient summary of Biometrics, Sleep, Nutrition, Readiness, and Activity.
+ * Formats high-density 1-line micro-summaries per category (~80-120 tokens total).
  */
-export const summarizeBiometrics = (historyObj, userProfile, days = 90) => {
-    if (!historyObj || Object.keys(historyObj).length === 0) {
-        if (userProfile?.weight || userProfile?.height) {
-            return `[Latest Biometrics]\nWeight: ${userProfile.weight || '-'}kg | Height: ${userProfile.height || '-'}cm`;
-        }
-        return '';
-    }
-
+export const summarizeHealthAndRecovery = (historyObj, userProfile, lomealToday = null, lomealTargets = null, readiness = null, activityTargets = null, days = 90) => {
+    const todayStr = new Date().toLocaleDateString('en-CA');
     const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
-    const hasCoreData = (b) => b && (Number(b.weight) > 0 || Number(b.bodyFat) > 0 || Number(b.musclePercent) > 0 || Number(b.bmr) > 0 || Number(b.bodyScore) > 0);
+    const history = historyObj || {};
 
-    const dates = Object.keys(historyObj)
+    const dates = Object.keys(history)
         .filter(d => !isNaN(new Date(d).getTime()) && new Date(d).getTime() >= cutoff)
         .sort((a, b) => a.localeCompare(b)); // oldest -> newest
 
-    let latest = null, latestDate = null, oldest = null;
+    const hasCoreBio = (b) => b && (Number(b.weight) > 0 || Number(b.bodyFat) > 0 || Number(b.musclePercent) > 0 || Number(b.bmr) > 0 || Number(b.bodyScore) > 0);
+
+    let latestBio = null, latestBioDate = null, oldestBio = null;
     dates.forEach(d => {
-        const b = historyObj[d]?.bioData;
-        if (hasCoreData(b)) {
-            if (!oldest) oldest = b;
-            latest = b;
-            latestDate = d;
+        const b = history[d]?.bioData;
+        if (hasCoreBio(b)) {
+            if (!oldestBio) oldestBio = b;
+            latestBio = b;
+            latestBioDate = d;
         }
     });
 
-    if (!latest) {
-        if (userProfile?.weight || userProfile?.height) {
-            return `[Latest Biometrics]\nWeight: ${userProfile.weight || '-'}kg | Height: ${userProfile.height || '-'}cm`;
-        }
-        return '';
-    }
+    const todayBio = history[todayStr]?.bioData || {};
+    const lines = [];
 
-    const w = latest.weight || userProfile?.weight;
-    const h = latest.height || userProfile?.height;
-    let line = `[Latest Biometrics — as of ${latestDate}]\n`;
-    line += `Weight: ${w || '-'}kg | Height: ${h || '-'}cm`;
-    if (latest.bmi) line += ` | BMI: ${latest.bmi}${latest.bmiStatus ? ` (${latest.bmiStatus})` : ''}`;
-    if (latest.bodyFat) line += ` | Body Fat: ${latest.bodyFat}%`;
-    if (latest.musclePercent) line += ` | Muscle: ${latest.musclePercent}%`;
-    if (latest.bmr) line += ` | BMR: ${latest.bmr}kcal`;
+    // 1. BIOMETRICS
+    const w = latestBio?.weight || todayBio?.weight || userProfile?.weight;
+    const h = latestBio?.height || todayBio?.height || userProfile?.height;
+    const bmrVal = todayBio?.bmr || latestBio?.bmr;
+    let bioParts = [];
+    if (w) bioParts.push(`Weight: ${w}kg`);
+    if (h) bioParts.push(`Height: ${h}cm`);
+    if (latestBio?.bmi) bioParts.push(`BMI: ${latestBio.bmi}${latestBio.bmiStatus ? ` (${latestBio.bmiStatus})` : ''}`);
+    if (latestBio?.bodyFat) bioParts.push(`Body Fat: ${latestBio.bodyFat}%`);
+    if (latestBio?.musclePercent) bioParts.push(`Muscle: ${latestBio.musclePercent}%`);
+    if (bmrVal) bioParts.push(`BMR: ${bmrVal}kcal`);
+    if (latestBio?.waist) bioParts.push(`Waist: ${latestBio.waist}cm`);
 
-    if (oldest && oldest !== latest && oldest.weight && latest.weight) {
-        const delta = (Number(latest.weight) - Number(oldest.weight)).toFixed(1);
+    if (oldestBio && oldestBio !== latestBio && oldestBio.weight && latestBio.weight) {
+        const delta = (Number(latestBio.weight) - Number(oldestBio.weight)).toFixed(1);
         if (Math.abs(delta) >= 0.5) {
-            line += `\nWeight trend (last ${days}d): ${oldest.weight}kg -> ${latest.weight}kg (${delta > 0 ? '+' : ''}${delta}kg)`;
+            bioParts.push(`Trend (${days}d): ${oldestBio.weight}kg -> ${latestBio.weight}kg (${delta > 0 ? '+' : ''}${delta}kg)`);
         }
     }
+    if (bioParts.length > 0) {
+        lines.push(`- Biometrics${latestBioDate ? ` (as of ${latestBioDate})` : ''}: ${bioParts.join(' | ')}`);
+    }
 
-    return line;
+    // 2. SLEEP & RECOVERY
+    const recent7Days = dates.slice(-7);
+    const sleepVals = recent7Days.map(d => Number(history[d]?.bioData?.sleep)).filter(v => v > 0);
+    const avgSleep = sleepVals.length > 0 ? (sleepVals.reduce((a, b) => a + b, 0) / sleepVals.length).toFixed(1) : null;
+    const targetSleep = activityTargets?.sleep || todayBio.targetSleep || 8;
+    const currentSleep = Number(todayBio.sleep) > 0 ? Number(todayBio.sleep) : (sleepVals.length > 0 ? sleepVals[sleepVals.length - 1] : null);
+
+    const sleepParts = [];
+    if (currentSleep) {
+        let sleepStr = `Last night: ${currentSleep}h`;
+        const stageParts = [];
+        if (todayBio.sleepDeep) stageParts.push(`Deep: ${todayBio.sleepDeep}h`);
+        if (todayBio.sleepRem) stageParts.push(`REM: ${todayBio.sleepRem}h`);
+        if (stageParts.length > 0) sleepStr += ` (${stageParts.join(', ')})`;
+        sleepParts.push(sleepStr);
+    }
+    if (avgSleep && sleepVals.length > 1) sleepParts.push(`7d Avg: ${avgSleep}h`);
+    if (targetSleep) sleepParts.push(`Target: ${targetSleep}h`);
+
+    if (readiness?.score !== undefined) {
+        sleepParts.push(`Readiness: ${readiness.score}/100 (${readiness.status || 'Normal'}${readiness.message ? ` - ${readiness.message.slice(0, 80)}` : ''})`);
+    }
+    if (todayBio.restingHeartRate || readiness?.parts?.rhr) {
+        const rhr = todayBio.restingHeartRate || readiness.parts.rhr;
+        sleepParts.push(`RHR: ${rhr} bpm`);
+    }
+    if (todayBio.hrv) sleepParts.push(`HRV: ${todayBio.hrv}ms`);
+
+    if (sleepParts.length > 0) {
+        lines.push(`- Sleep & Recovery: ${sleepParts.join(' | ')}`);
+    }
+
+    // 3. NUTRITION & ENERGY BALANCE
+    const eatenCal = lomealToday?.calories || lomealToday?.totalCalories || Number(todayBio.nutritionCalories) || 0;
+    const activeBurn = Number(todayBio.activityCalories) || 0;
+    const totalBurn = (bmrVal || 1600) + activeBurn;
+    const nutParts = [];
+
+    if (eatenCal > 0) {
+        let eatenStr = `Eaten: ${eatenCal} kcal`;
+        const p = lomealToday?.protein || todayBio.protein;
+        const c = lomealToday?.carbs || todayBio.carbs;
+        const f = lomealToday?.fat || todayBio.fat;
+        const macroParts = [];
+        if (p) macroParts.push(`P: ${p}g`);
+        if (c) macroParts.push(`C: ${c}g`);
+        if (f) macroParts.push(`F: ${f}g`);
+        if (macroParts.length > 0) eatenStr += ` (${macroParts.join(', ')})`;
+        nutParts.push(eatenStr);
+    }
+
+    if (activeBurn > 0 || bmrVal > 0) {
+        nutParts.push(`Burned: ~${totalBurn} kcal (BMR: ${bmrVal || 1600}${activeBurn > 0 ? `, Active: ${activeBurn}` : ''})`);
+    }
+
+    if (eatenCal > 0 && totalBurn > 0) {
+        const delta = eatenCal - totalBurn;
+        nutParts.push(`Net: ${delta > 0 ? '+' : ''}${delta} kcal (${delta < -100 ? 'Deficit' : delta > 100 ? 'Surplus' : 'Maintenance'})`);
+    }
+
+    const calTarget = lomealTargets?.calories || activityTargets?.activityCalories || activityTargets?.tdee;
+    if (calTarget) nutParts.push(`Target: ${calTarget} kcal`);
+
+    if (Number(todayBio.waterIntake) > 0) {
+        nutParts.push(`Water: ${todayBio.waterIntake}ml`);
+    }
+
+    if (nutParts.length > 0) {
+        lines.push(`- Nutrition & Energy: ${nutParts.join(' | ')}`);
+    }
+
+    // 4. DAILY ACTIVITY & VITALS
+    const actParts = [];
+    if (Number(todayBio.steps) > 0) {
+        const stepTarget = activityTargets?.steps || todayBio.targetSteps || 10000;
+        actParts.push(`Steps: ${todayBio.steps} / ${stepTarget}`);
+    }
+    if (Number(todayBio.activeMinutes) > 0) {
+        const minTarget = activityTargets?.dailyActiveMinutes || 30;
+        actParts.push(`Active: ${todayBio.activeMinutes} / ${minTarget} min`);
+    }
+    if (Number(todayBio.distance) > 0) actParts.push(`Dist: ${todayBio.distance}km`);
+    if (todayBio.bloodPressure) actParts.push(`BP: ${todayBio.bloodPressure}`);
+    if (todayBio.oxygenSaturation) actParts.push(`SpO2: ${todayBio.oxygenSaturation}%`);
+
+    if (actParts.length > 0) {
+        lines.push(`- Activity & Vitals: ${actParts.join(' | ')}`);
+    }
+
+    if (lines.length === 0) return '';
+    return `[Daily Health, Sleep & Nutrition Context — as of ${todayStr}]\n${lines.join('\n')}`;
+};
+
+/**
+ * Backward compatibility alias for summarizeHealthAndRecovery.
+ */
+export const summarizeBiometrics = (historyObj, userProfile, days = 90) => {
+    return summarizeHealthAndRecovery(historyObj, userProfile, null, null, null, null, days);
 };
 
 /**

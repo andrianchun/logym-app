@@ -39,8 +39,8 @@ assert.equal(filterByGymEquipment(online, gym(['Dumbbell'])).length, 1);
 
 // 6. Tapi alat yang DIKENAL dan sengaja tidak dicentang tetap disaring — penyaringnya harus
 //    tetap berguna, bukan dilumpuhkan.
-assert.equal(nama(cumaDumbbell).includes('Cable Seated Row'), false, 'Cable tidak dicentang, harus hilang');
-assert.ok(nama(cumaDumbbell).includes('Dumbbell Biceps Curl'));
+assert.equal(nama(cumaDumbbell).includes('Seated Cable Rows'), false, 'Cable tidak dicentang, harus hilang');
+assert.ok(nama(cumaDumbbell).includes('Dumbbell Alternate Bicep Curl'));
 
 // 7. Gym tanpa alat sama sekali: yang tersisa hanya berat badan + alat tak dikenal.
 const kosong = filterByGymEquipment(defaultMasterExercises, gym([]));

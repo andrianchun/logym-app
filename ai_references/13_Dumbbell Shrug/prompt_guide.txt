@@ -1,0 +1,48 @@
+=== EXERCISE: Dumbbell Shrug ===
+ID: Dumbbell_Shrug
+Target Muscles: upper trapezius, neck muscles
+Equipment: heavy pair of dumbbells held at sides
+Layout: 1:1 Square Asymmetric Multi-Angle 3D (Left Hero)
+
+[CARA MELAKUKAN (ID)]:
+Berdiri tegak dengan dumbbell di masing-masing tangan (telapak menghadap tubuh), lengan lurus di samping.
+Hembuskan napas, angkat bahu setinggi mungkin. Tahan kontraksi selama satu detik. Pastikan lengan tetap lurus dan tidak menggunakan otot bisep.
+Turunkan kembali dumbbell ke posisi semula.
+Ulangi sesuai repetisi yang ditentukan.
+
+[INSTRUCTIONS (EN)]:
+Stand erect with a dumbbell on each hand (palms facing your torso), arms extended on the sides.
+Lift the dumbbells by elevating the shoulders as high as possible while you exhale. Hold the contraction at the top for a second. Tip: The arms should remain extended at all times. Refrain from using the biceps to help lift the dumbbells. Only the shoulders should be moving up and down.
+Lower the dumbbells back to the original position.
+Repeat for the recommended amount of repetitions.
+
+==================================================
+1. PROMPT IMAGE (THUMBNAIL 1:1 KOLASE 3-PANEL)
+(Upload: 00_coach_reference.jpg, 0_start_pose.jpg, 1_end_pose.jpg)
+==================================================
+Generate a high-end visual exercise guide in 1:1 square aspect ratio, featuring the identical shredded muscular Asian male fitness coach character from Image 1 in a moody dark luxury gym.
+
+Composition (Strict Multi-Angle 3D Rules):
+1:1 square canvas with an asymmetric 3-panel multi-angle 3D layout (MANDATORY: Every panel MUST show a completely different camera perspective):
+- Left Half (Dominant Tall Hero Panel): Front 3/4 three-quarter isometric vertical full-body perspective capturing posture, lockout, and balance matching Image 3 with glowing cyan anatomical muscle highlights
+- Top-Right Panel (Setup View): Direct rear back perspective or 90-degree lateral side view showing setup posture, grip, and starting position matching Image 2
+- Bottom-Right Panel (Macro Anatomy): Dynamic low-to-high angled cinematic macro close-up perspective highlighting intense 3D muscle fiber tension
+
+The coach is performing "Dumbbell Shrug" with heavy pair of dumbbells held at sides, strictly adhering to the biomechanics in Image 2 (start position) and Image 3 (end position).
+
+Include hyper-detailed glowing cyan / neon electric blue anatomical muscle fiber highlight overlays specifically emphasizing active engagement on the upper trapezius, neck muscles. Ensure deep 3D spatial depth between foreground and background, moody gym environment, dramatic cinematic rim lighting accentuating muscle striations, 8k resolution, ultra-photorealistic, 1:1 square aspect ratio.
+
+==================================================
+2. PROMPT VIDEO (1 FRAME FULL DINAMIS / MOVING CAMERA)
+(Kling AI / Runway Gen-3 / Luma Dream Machine / Haiper)
+==================================================
+A cinematic single-camera full-scene gym video featuring the identical shredded muscular Asian male fitness coach from Image 1 executing "Dumbbell Shrug" with perfect biomechanics using heavy pair of dumbbells held at sides.
+
+Camera Movement:
+Close-up torso orbit focusing on the upper traps and neck elevation, capturing full body control and sharp muscle striations in continuous fluid motion.
+
+Action & Biomechanics:
+Elevating shoulders straight up toward ears in a powerful shrug, holding for 1 second at the peak, and lowering with full stretch. Target muscles engaged: upper trapezius, neck muscles.
+
+Visual Aesthetics:
+Moody dark luxury fitness gym, dramatic volumetric rim lighting, deep 3D shadow depth, hyper-realistic sweat and vascularity, authentic gym acoustics, 8k resolution, 60fps, seamless looping repetition, masterpiece.

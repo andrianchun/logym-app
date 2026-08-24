@@ -1,0 +1,19 @@
+=== EXERCISE: Bent Over Two-Dumbbell Row ===
+ID: Bent_Over_Two-Dumbbell_Row
+Target Muscles: 
+Equipment: dumbbell
+
+[CARA MELAKUKAN (ID)]:
+Pegang dumbbell di masing-masing tangan (telapak tangan menghadap ke tubuh), tekuk sedikit lutut Anda, dan condongkan tubuh ke depan dengan menekuk pinggang. Jaga punggung tetap lurus hingga posisi tubuh hampir sejajar dengan lantai. Tips: Pastikan kepala tetap tegak. Biarkan beban menggantung tepat di depan Anda dengan lengan tegak lurus dengan lantai dan batang tubuh. Ini adalah posisi awal Anda.
+Sambil menjaga posisi tubuh tetap diam, angkat dumbbell ke samping tubuh (sambil mengembuskan napas) dengan siku tetap rapat ke tubuh (jangan gunakan kekuatan lengan bawah selain untuk menggenggam beban). Pada posisi puncak kontraksi, remas otot punggung dan tahan selama satu detik.
+Turunkan kembali beban secara perlahan ke posisi awal sambil menarik napas.
+Ulangi sesuai jumlah repetisi yang direkomendasikan.
+
+[INSTRUCTIONS (EN)]:
+With a dumbbell in each hand (palms facing your torso), bend your knees slightly and bring your torso forward by bending at the waist; as you bend make sure to keep your back straight until it is almost parallel to the floor. Tip: Make sure that you keep the head up. The weights should hang directly in front of you as your arms hang perpendicular to the floor and your torso. This is your starting position.
+While keeping the torso stationary, lift the dumbbells to your side (as you breathe out), keeping the elbows close to the body (do not exert any force with the forearm other than holding the weights). On the top contracted position, squeeze the back muscles and hold for a second.
+Slowly lower the weight again to the starting position as you inhale.
+Repeat for the recommended amount of repetitions.
+
+[AI VIDEO PROMPT SUGGESTION]:
+A muscular fitness athlete performing Bent Over Two-Dumbbell Row with proper gym form, clean repetition, starting from start pose (0_start_pose.jpg) to end contraction pose (1_end_pose.jpg) and returning smoothly, cinematic gym lighting, 4k resolution, hyperrealistic.

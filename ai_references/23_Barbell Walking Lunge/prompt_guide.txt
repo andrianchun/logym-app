@@ -1,0 +1,48 @@
+=== EXERCISE: Barbell Walking Lunge ===
+ID: Barbell_Walking_Lunge
+Target Muscles: quadriceps, glutes, calves, core
+Equipment: barbell on upper back walking forward
+Layout: 1:1 Square Asymmetric Multi-Angle 3D (Left Hero)
+
+[CARA MELAKUKAN (ID)]:
+Berdirilah tegak dengan kaki dibuka selebar bahu dan barbel bersandar di punggung atas Anda.
+Melangkahlah ke depan dengan satu kaki, lalu tekuk kedua lutut untuk menurunkan pinggul hingga lutut belakang hampir menyentuh lantai. Jaga postur tubuh tetap tegak dan lutut depan tetap sejajar di atas pergelangan kaki.
+Dorong tubuh ke atas menggunakan tumit kaki depan dan luruskan kedua kaki untuk kembali ke posisi berdiri.
+Melangkahlah ke depan dengan kaki belakang, lalu ulangi gerakan lunge dengan kaki yang lain.
+
+[INSTRUCTIONS (EN)]:
+Begin standing with your feet shoulder width apart and a barbell across your upper back.
+Step forward with one leg, flexing the knees to drop your hips. Descend until your rear knee nearly touches the ground. Your posture should remain upright, and your front knee should stay above the front foot.
+Drive through the heel of your lead foot and extend both knees to raise yourself back up.
+Step forward with your rear foot, repeating the lunge on the opposite leg.
+
+==================================================
+1. PROMPT IMAGE (THUMBNAIL 1:1 KOLASE 3-PANEL)
+(Upload: 00_coach_reference.jpg, 0_start_pose.jpg, 1_end_pose.jpg)
+==================================================
+Generate a high-end visual exercise guide in 1:1 square aspect ratio, featuring the identical shredded muscular Asian male fitness coach character from Image 1 in a moody dark luxury gym.
+
+Composition (Strict Multi-Angle 3D Rules):
+1:1 square canvas with an asymmetric 3-panel multi-angle 3D layout (MANDATORY: Every panel MUST show a completely different camera perspective):
+- Left Half (Dominant Tall Hero Panel): Front 3/4 three-quarter isometric vertical full-body perspective capturing posture, lockout, and balance matching Image 3 with glowing cyan anatomical muscle highlights
+- Top-Right Panel (Setup View): Direct rear back perspective or 90-degree lateral side view showing setup posture, grip, and starting position matching Image 2
+- Bottom-Right Panel (Macro Anatomy): Dynamic low-to-high angled cinematic macro close-up perspective highlighting intense 3D muscle fiber tension
+
+The coach is performing "Barbell Walking Lunge" with barbell on upper back walking forward, strictly adhering to the biomechanics in Image 2 (start position) and Image 3 (end position).
+
+Include hyper-detailed glowing cyan / neon electric blue anatomical muscle fiber highlight overlays specifically emphasizing active engagement on the quadriceps, glutes, calves, core. Ensure deep 3D spatial depth between foreground and background, moody gym environment, dramatic cinematic rim lighting accentuating muscle striations, 8k resolution, ultra-photorealistic, 1:1 square aspect ratio.
+
+==================================================
+2. PROMPT VIDEO (1 FRAME FULL DINAMIS / MOVING CAMERA)
+(Kling AI / Runway Gen-3 / Luma Dream Machine / Haiper)
+==================================================
+A cinematic single-camera full-scene gym video featuring the identical shredded muscular Asian male fitness coach from Image 1 executing "Barbell Walking Lunge" with perfect biomechanics using barbell on upper back walking forward.
+
+Camera Movement:
+Smooth tracking dolly moving backwards ahead of the coach walking forward, capturing full body control and sharp muscle striations in continuous fluid motion.
+
+Action & Biomechanics:
+Stepping forward into alternating deep lunges with upright posture, knee gently kissing floor, driving smoothly into the next step. Target muscles engaged: quadriceps, glutes, calves, core.
+
+Visual Aesthetics:
+Moody dark luxury fitness gym, dramatic volumetric rim lighting, deep 3D shadow depth, hyper-realistic sweat and vascularity, authentic gym acoustics, 8k resolution, 60fps, seamless looping repetition, masterpiece.

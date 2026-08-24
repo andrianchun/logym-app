@@ -1,0 +1,50 @@
+=== EXERCISE: Barbell Deadlift ===
+ID: Barbell_Deadlift
+Target Muscles: erector spinae, glutes, hamstrings, traps, lats
+Equipment: Olympic barbell with bumper plates on lifting platform
+Layout: 1:1 Square Asymmetric Multi-Angle 3D (Left Hero)
+
+[CARA MELAKUKAN (ID)]:
+Berdirilah di depan barbel yang sudah dimuati beban.
+Jaga punggung tetap lurus, tekuk lutut, condongkan tubuh ke depan, dan pegang bar dengan genggaman atas (overhand) selebar bahu. Ini adalah posisi awal. Tips: Jika genggaman sulit dipertahankan, gunakan genggaman campuran atau strap pergelangan tangan.
+Sambil memegang bar, mulailah mengangkat dengan mendorong menggunakan kaki dan secara bersamaan menegakkan batang tubuh sambil membuang napas. Dalam posisi tegak, busungkan dada dan kontraksikan punggung dengan menarik tulang belikat ke belakang.
+Kembali ke posisi awal dengan menekuk lutut dan mencondongkan tubuh ke depan di pinggul sambil tetap menjaga punggung lurus. Saat beban menyentuh lantai, Anda siap untuk repetisi berikutnya.
+Lakukan repetisi sesuai jumlah yang ditentukan dalam program.
+
+[INSTRUCTIONS (EN)]:
+Stand in front of a loaded barbell.
+While keeping the back as straight as possible, bend your knees, bend forward and grasp the bar using a medium (shoulder width) overhand grip. This will be the starting position of the exercise. Tip: If it is difficult to hold on to the bar with this grip, alternate your grip or use wrist straps.
+While holding the bar, start the lift by pushing with your legs while simultaneously getting your torso to the upright position as you breathe out. In the upright position, stick your chest out and contract the back by bringing the shoulder blades back. Think of how the soldiers in the military look when they are in standing in attention.
+Go back to the starting position by bending at the knees while simultaneously leaning the torso forward at the waist while keeping the back straight. When the weights on the bar touch the floor you are back at the starting position and ready to perform another repetition.
+Perform the amount of repetitions prescribed in the program.
+
+==================================================
+1. PROMPT IMAGE (THUMBNAIL 1:1 KOLASE 3-PANEL)
+(Upload: 00_coach_reference.jpg, 0_start_pose.jpg, 1_end_pose.jpg)
+==================================================
+Generate a high-end visual exercise guide in 1:1 square aspect ratio, featuring the identical shredded muscular Asian male fitness coach character from Image 1 in a moody dark luxury gym.
+
+Composition (Strict Multi-Angle 3D Rules):
+1:1 square canvas with an asymmetric 3-panel multi-angle 3D layout (MANDATORY: Every panel MUST show a completely different camera perspective):
+- Left Half (Dominant Tall Hero Panel): Front 3/4 three-quarter isometric vertical full-body perspective capturing posture, lockout, and balance matching Image 3 with glowing cyan anatomical muscle highlights
+- Top-Right Panel (Setup View): Direct rear back perspective or 90-degree lateral side view showing setup posture, grip, and starting position matching Image 2
+- Bottom-Right Panel (Macro Anatomy): Dynamic low-to-high angled cinematic macro close-up perspective highlighting intense 3D muscle fiber tension
+
+The coach is performing "Barbell Deadlift" with Olympic barbell with bumper plates on lifting platform, strictly adhering to the biomechanics in Image 2 (start position) and Image 3 (end position).
+
+Include hyper-detailed glowing cyan / neon electric blue anatomical muscle fiber highlight overlays specifically emphasizing active engagement on the erector spinae, glutes, hamstrings, traps, lats. Ensure deep 3D spatial depth between foreground and background, moody gym environment, dramatic cinematic rim lighting accentuating muscle striations, 8k resolution, ultra-photorealistic, 1:1 square aspect ratio.
+
+==================================================
+2. PROMPT VIDEO (1 FRAME FULL DINAMIS / MOVING CAMERA)
+(Kling AI / Runway Gen-3 / Luma Dream Machine / Haiper)
+==================================================
+A cinematic single-camera full-scene gym video featuring the identical shredded muscular Asian male fitness coach from Image 1 executing "Barbell Deadlift" with perfect biomechanics using Olympic barbell with bumper plates on lifting platform.
+
+Camera Movement:
+Low dynamic wide orbit panning from front-diagonal to full side lockout, capturing full body control and sharp muscle striations in continuous fluid motion.
+
+Action & Biomechanics:
+Hinging at hips and knees, lifting barbell off floor keeping bar close to shins, standing tall into a firm upright lockout with glutes engaged, then lowering with control. Target muscles engaged: erector spinae, glutes, hamstrings, traps, lats.
+
+Visual Aesthetics:
+Moody dark luxury fitness gym, dramatic volumetric rim lighting, deep 3D shadow depth, hyper-realistic sweat and vascularity, authentic gym acoustics, 8k resolution, 60fps, seamless looping repetition, masterpiece.

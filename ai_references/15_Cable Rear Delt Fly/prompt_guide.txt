@@ -1,0 +1,19 @@
+=== EXERCISE: Cable Rear Delt Fly ===
+ID: Cable_Rear_Delt_Fly
+Target Muscles: 
+Equipment: cable
+
+[CARA MELAKUKAN (ID)]:
+Atur tinggi pulley sedikit di atas kepala dan sesuaikan beban.
+Pegang pulley kiri dengan tangan kanan dan pulley kanan dengan tangan kiri, sehingga kabel menyilang di depan dada. Ini posisi awal Anda.
+Gerakkan kedua lengan ke arah belakang dan luar, jaga lengan tetap lurus selama gerakan.
+Tahan sejenak di titik akhir gerakan sebelum kembali ke posisi awal.
+
+[INSTRUCTIONS (EN)]:
+Adjust the pulleys to the appropriate height and adjust the weight. The pulleys should be above your head.
+Grab the left pulley with your right hand and the right pulley with your left hand, crossing them in front of you. This will be your starting position.
+Initiate the movement by moving your arms back and outward, keeping your arms straight as you execute the movement.
+Pause at the end of the motion before returning the handles to the start position.
+
+[AI VIDEO PROMPT SUGGESTION]:
+A muscular fitness athlete performing Cable Rear Delt Fly with proper gym form, clean repetition, starting from start pose (0_start_pose.jpg) to end contraction pose (1_end_pose.jpg) and returning smoothly, cinematic gym lighting, 4k resolution, hyperrealistic.

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Search, Filter, Edit2, Plus, Dumbbell, Loader2, RefreshCw, Link as LinkIcon, X, Check, AlertCircle, ChevronDown, Database, Globe, Heart } from 'lucide-react';
-import { formatTarget, normalizeMuscleKey, muscleOptions, equipmentOptions, getVideoId, levelOptions, filterByGymEquipment } from '../data/constants';
+import { formatTarget, normalizeMuscleKey, muscleOptions, equipmentOptions, getVideoId, levelOptions, filterByGymEquipment, exerciseAliasMap } from '../data/constants';
 import EquipmentIcon from '../components/EquipmentIcon';
 import { fetchExercisesFromApi, clearExerciseDbCache, getCachedExercises } from '../utils/exerciseDbApi';
 import { playSoundEffect } from '../utils/audio';
@@ -9,6 +9,7 @@ import UnifiedExerciseCard from '../components/UnifiedExerciseCard';
 import FilterChips from '../components/FilterChips';
 import SwipeInput from '../components/SwipeInput';
 import GymManagerModal from '../components/GymManagerModal';
+import GeneralVideosModal from '../components/GeneralVideosModal';
 import { fetchExercisePopularity, getCachedPopularity, exerciseSlug } from '../utils/exercisePopularity';
 
 // ─── Blank exercise template ───────────────────────────────────────
@@ -373,6 +374,7 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
   const [sortOrder, setSortOrder] = useState('popular');
   const [showFilters, setShowFilters] = useState(false);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [showGeneralVideosModal, setShowGeneralVideosModal] = useState(false);
 
   // ── Online API State ─────────────────────────────────────────────
   const initialCached = getCachedExercises();
@@ -422,17 +424,28 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
   // ── Combine Local and Online Library ─────────────────────────────
   const combinedLibrary = useMemo(() => {
     const onlineMap = new Map();
-    onlineExercises.forEach(ex => onlineMap.set(ex.name.trim().toLowerCase(), ex));
+    onlineExercises.forEach(ex => {
+      onlineMap.set(ex.name.trim().toLowerCase(), ex);
+      if (ex.id) onlineMap.set(String(ex.id), ex);
+    });
 
     const localMap = new Map();
     exerciseLibrary.forEach(localEx => {
-      const key = localEx.name.trim().toLowerCase();
+      // Periksa apakah nama / ID localEx punya padanan ExerciseDB via alias
+      const aliasTargetId = exerciseAliasMap?.[String(localEx.id)];
+      const onlineExByAlias = aliasTargetId ? onlineMap.get(aliasTargetId) : null;
       
-      let enrichedEx = { ...localEx };
-      if (onlineMap.has(key)) {
-        const onlineEx = onlineMap.get(key);
+      const canonicalName = onlineExByAlias ? onlineExByAlias.name : localEx.name;
+      const key = canonicalName.trim().toLowerCase();
+      
+      let enrichedEx = { ...localEx, name: canonicalName };
+      if (onlineMap.has(key) || onlineExByAlias) {
+        const onlineEx = onlineExByAlias || onlineMap.get(key);
         enrichedEx.instructions = onlineEx.instructions || enrichedEx.instructions;
         enrichedEx.gifUrl = onlineEx.gifUrl || enrichedEx.gifUrl;
+        if (!enrichedEx.ytVideo && (onlineEx.ytVideo || onlineEx.videoUrl)) {
+          enrichedEx.ytVideo = onlineEx.ytVideo || onlineEx.videoUrl;
+        }
       }
 
       if (!localMap.has(key)) {
@@ -951,7 +964,7 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
                 {onlineLoading ? 'Memuat data...' : 'Tidak ada hasil'}
               </p>
               <p className={`body-md ${t.textMuted} mt-1 opacity-70`}>
-                {onlineLoading ? 'Membuka database ExerciseDB API...' : 'Coba ubah kata kunci atau tambah latihan baru.'}
+                {onlineLoading ? 'Membuka database ExerciseDB...' : 'Coba ubah kata kunci atau tambah latihan baru.'}
               </p>
             </div>
           ) : (
@@ -1007,37 +1020,19 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
                     <div className={`flex-1 h-px bg-black/10 dark:bg-white/10`}></div>
                  </div>
 
-                 <div className={`p-4 rounded-2xl border ${t.border} ${t.bgCard} space-y-3 shadow-sm`}>
-                   <div className="mb-3">
-                     <div className="flex items-center gap-2 mb-1">
-                       <Globe size={18} className={t.textAccent} />
-                       <h3 className={`body-lg font-black ${t.textMain}`}>Video Instruksi Umum</h3>
-                     </div>
-                     <p className={`text-[10px] font-bold ${t.textMuted}`}>Pisahkan URL video dengan spasi jika lebih dari satu.</p>
-                   </div>
-                   
-                   <div>
-                     <label className={`text-[10px] font-bold ${t.textMuted} uppercase tracking-wider mb-1 block`}>Pemanasan</label>
-                     <input
-                       type="text"
-                       value={warmupVideos}
-                       onChange={(e) => setWarmupVideos(e.target.value)}
-                       placeholder="https://youtu.be/... https://youtu.be/..."
-                       className={`w-full px-3 py-2 rounded-xl ${t.inputBg} ${t.textMain} body-md outline-none focus:ring-1 ${t.ringAccent} transition-all`}
-                     />
-                   </div>
-
-                   <div>
-                     <label className={`text-[10px] font-bold ${t.textMuted} uppercase tracking-wider mb-1 block`}>Pendinginan</label>
-                     <input
-                       type="text"
-                       value={cooldownVideos}
-                       onChange={(e) => setCooldownVideos(e.target.value)}
-                       placeholder="https://youtu.be/... https://youtu.be/..."
-                       className={`w-full px-3 py-2 rounded-xl ${t.inputBg} ${t.textMain} body-md outline-none focus:ring-1 ${t.ringAccent} transition-all`}
-                     />
-                   </div>
-                 </div>
+                 <button
+                   type="button"
+                   onClick={() => {
+                     playSoundEffect('click', soundEnabled);
+                     setShowGeneralVideosModal(true);
+                   }}
+                   className={`w-full p-4 sm:p-5 rounded-2xl border ${t.border} ${t.bgCard} hover:bg-black/5 dark:hover:bg-white/5 active:scale-[0.99] transition-all text-left shadow-sm`}
+                 >
+                   <h3 className={`body-lg font-black ${t.textMain}`}>Video Instruksi Umum</h3>
+                   <p className={`text-xs ${t.textMuted} mt-0.5`}>
+                     {(warmupVideos?.split(/\s+/).filter(Boolean).length || 0)} Pemanasan • {(cooldownVideos?.split(/\s+/).filter(Boolean).length || 0)} Pendinginan
+                   </p>
+                 </button>
               </div>
             </>
           )}
@@ -1071,6 +1066,21 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
           setActiveGymId={setActiveGymId} 
           onClose={() => setShowGymManager(false)} 
           t={t} 
+          soundEnabled={soundEnabled}
+          setConfirmModal={setConfirmModal}
+        />
+      )}
+
+      {showGeneralVideosModal && (
+        <GeneralVideosModal
+          isOpen={showGeneralVideosModal}
+          onClose={() => setShowGeneralVideosModal(false)}
+          warmupVideos={warmupVideos}
+          setWarmupVideos={setWarmupVideos}
+          cooldownVideos={cooldownVideos}
+          setCooldownVideos={setCooldownVideos}
+          t={t}
+          lang={lang}
           soundEnabled={soundEnabled}
           setConfirmModal={setConfirmModal}
         />

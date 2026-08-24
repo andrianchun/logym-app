@@ -4,7 +4,7 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getFunctions } from "firebase/functions";
-import { initAppCheck } from "./utils/appCheck";
+import { initAppCheck } from "./utils/appCheck.js";
 
 // Logym dimigrasi dari project sendiri (logym-id) ke hexa-life — project Firebase yang sama
 // kayak Darka/Domus/Lomeal, biar "seamless" dalam 1 database (1 identitas Auth bareng Lomeal,

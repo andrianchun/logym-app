@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { doc, setDoc, deleteDoc, getDocs, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Send, X, Check, Loader2, Dumbbell, Menu, Plus, MessageSquare, Trash2, Bookmark, ChevronDown, ChevronRight } from 'lucide-react';
-import { buildSystemPrompt, summarizeWorkoutLogs, summarizeBiometrics, summarizeActivePrograms, summarizeFavoriteProgram, needsPersonalContext, needsAppHelpContext, APP_HELP_REFERENCE, chatWithAI, AI_MODELS, getAvailableModels, getProviderStatus, checkOverallAIStatus } from '../utils/aiAgent';
+import { buildSystemPrompt, summarizeWorkoutLogs, summarizeHealthAndRecovery, summarizeBiometrics, summarizeActivePrograms, summarizeFavoriteProgram, needsPersonalContext, needsAppHelpContext, APP_HELP_REFERENCE, chatWithAI, AI_MODELS, getAvailableModels, getProviderStatus, checkOverallAIStatus } from '../utils/aiAgent';
 import { fetchExercisesFromApi, pickRelevantExercises } from '../utils/exerciseDbApi';
 import renderMiniMarkdown from '../utils/miniMarkdown';
 import { db } from '../firebase';
@@ -44,6 +44,10 @@ export default function GymAIChat({
     setShowSettings,
     setConfirmModal,
     avatarOrigin = null,  // { x, y } posisi tengah avatar di layar
+    lomealToday = null,
+    lomealTargets = null,
+    readiness = null,
+    activityTargets = null,
 }) {
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
@@ -428,18 +432,18 @@ export default function GymAIChat({
                 // Katalog tambahan itu bonus — kalau gagal dimuat, chat tetap jalan dengan library user.
             }
 
-            // Cuma tarik data pribadi (riwayat, biometrik, program aktif) kalau pesannya
+            // Cuma tarik data pribadi (riwayat, kesehatan/tidur/nutrisi, biometrik, program aktif) kalau pesannya
             // memang kelihatan butuh itu — basa-basi atau pertanyaan umum di luar
             // program/progress user gak usah, biar hemat token. Default aman: kalau ragu,
             // tetap disertakan (lihat needsPersonalContext).
             const needsContext = needsPersonalContext(userMsg.content);
             const logsSummary = needsContext ? summarizeWorkoutLogs(history, exerciseLibrary, programs) : '';
-            const bioSummary = needsContext ? summarizeBiometrics(history, userProfile) : '';
+            const healthRecoverySummary = needsContext ? summarizeHealthAndRecovery(history, userProfile, lomealToday, lomealTargets, readiness, activityTargets) : '';
             const activeProgramsSummary = needsContext ? summarizeActivePrograms(programs, activePlanIds) : '';
             const favoriteProgramSummary = needsContext ? summarizeFavoriteProgram(history) : '';
             // Referensi cara-pakai-app juga cuma nempel kalau pesannya kelihatan nanya soal fitur/navigasi app.
             const appHelpBlock = needsAppHelpContext(userMsg.content) ? APP_HELP_REFERENCE : '';
-            const systemContent = buildSystemPrompt(userProfile, exLibStr, logsSummary, bioSummary, activeProgramsSummary, logyPersona, logyCustomInstruction, logyMemory, favoriteProgramSummary, appHelpBlock, extraCatalogStr);
+            const systemContent = buildSystemPrompt(userProfile, exLibStr, logsSummary, healthRecoverySummary, activeProgramsSummary, logyPersona, logyCustomInstruction, logyMemory, favoriteProgramSummary, appHelpBlock, extraCatalogStr);
 
             // Keep only last 10 real messages; local error/warning bubbles never go to the API
             const recentHistory = messages.filter(m => !m.isError && !m.isSystemWarning).slice(-10);

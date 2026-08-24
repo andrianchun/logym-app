@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Search, Filter } from 'lucide-react';
-import { formatTarget, normalizeMuscleKey, muscleOptions, equipmentOptions, levelOptions } from '../data/constants';
+import { formatTarget, normalizeMuscleKey, muscleOptions, equipmentOptions, levelOptions, exerciseAliasMap } from '../data/constants';
 import { fetchExercisesFromApi, getCachedExercises } from '../utils/exerciseDbApi';
 import FilterChips from '../components/FilterChips';
 import UnifiedExerciseCard from '../components/UnifiedExerciseCard';
@@ -28,9 +28,26 @@ const AddExerciseModal = ({
   }, []);
 
   const combinedLibrary = React.useMemo(() => {
-    const localNames = new Set(exerciseLibrary.map(ex => ex.name.toLowerCase()));
-    const onlineToAdd = onlineExercises.filter(ex => !localNames.has(ex.name.toLowerCase()));
-    return [...exerciseLibrary, ...onlineToAdd];
+    const onlineMap = new Map();
+    onlineExercises.forEach(ex => {
+      onlineMap.set(ex.name.trim().toLowerCase(), ex);
+      if (ex.id) onlineMap.set(String(ex.id), ex);
+    });
+
+    const localMap = new Map();
+    exerciseLibrary.forEach(localEx => {
+      const aliasTargetId = exerciseAliasMap?.[String(localEx.id)];
+      const onlineExByAlias = aliasTargetId ? onlineMap.get(aliasTargetId) : null;
+      const canonicalName = onlineExByAlias ? onlineExByAlias.name : localEx.name;
+      const key = canonicalName.trim().toLowerCase();
+      if (!localMap.has(key)) {
+        localMap.set(key, { ...localEx, name: canonicalName });
+      }
+    });
+
+    const deduplicatedLocal = Array.from(localMap.values());
+    const onlineToAdd = onlineExercises.filter(ex => !localMap.has(ex.name.trim().toLowerCase()));
+    return [...deduplicatedLocal, ...onlineToAdd];
   }, [exerciseLibrary, onlineExercises]);
 
 

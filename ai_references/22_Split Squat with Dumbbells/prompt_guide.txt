@@ -1,0 +1,48 @@
+=== EXERCISE: Split Squat with Dumbbells ===
+ID: Split_Squat_with_Dumbbells
+Target Muscles: quadriceps, glutes, hamstrings
+Equipment: pair of dumbbells held at sides in split stance lunge position
+Layout: 1:1 Square Asymmetric Multi-Angle 3D (Left Hero)
+
+[CARA MELAKUKAN (ID)]:
+Ambil posisi melangkah dengan kaki belakang diletakkan di atas tumpuan dan kaki depan menapak di lantai.
+Pegang dumbbell di masing-masing tangan dengan posisi lengan tergantung di samping tubuh.
+Turunkan tubuh dengan menekuk lutut dan pinggul depan. Jaga postur tetap tegak dan pastikan lutut depan tetap sejajar dengan kaki.
+Dorong melalui tumit kaki depan untuk meluruskan lutut dan pinggul hingga kembali ke posisi berdiri.
+
+[INSTRUCTIONS (EN)]:
+Position yourself into a staggered stance with the rear foot elevated and front foot forward.
+Hold a dumbbell in each hand, letting them hang at the sides. This will be your starting position.
+Begin by descending, flexing your knee and hip to lower your body down. Maintain good posture througout the movement. Keep the front knee in line with the foot as you perform the exercise.
+At the bottom of the movement, drive through the heel to extend the knee and hip to return to the starting position.
+
+==================================================
+1. PROMPT IMAGE (THUMBNAIL 1:1 KOLASE 3-PANEL)
+(Upload: 00_coach_reference.jpg, 0_start_pose.jpg, 1_end_pose.jpg)
+==================================================
+Generate a high-end visual exercise guide in 1:1 square aspect ratio, featuring the identical shredded muscular Asian male fitness coach character from Image 1 in a moody dark luxury gym.
+
+Composition (Strict Multi-Angle 3D Rules):
+1:1 square canvas with an asymmetric 3-panel multi-angle 3D layout (MANDATORY: Every panel MUST show a completely different camera perspective):
+- Left Half (Dominant Tall Hero Panel): Front 3/4 three-quarter isometric vertical full-body perspective capturing posture, lockout, and balance matching Image 3 with glowing cyan anatomical muscle highlights
+- Top-Right Panel (Setup View): Direct rear back perspective or 90-degree lateral side view showing setup posture, grip, and starting position matching Image 2
+- Bottom-Right Panel (Macro Anatomy): Dynamic low-to-high angled cinematic macro close-up perspective highlighting intense 3D muscle fiber tension
+
+The coach is performing "Split Squat with Dumbbells" with pair of dumbbells held at sides in split stance lunge position, strictly adhering to the biomechanics in Image 2 (start position) and Image 3 (end position).
+
+Include hyper-detailed glowing cyan / neon electric blue anatomical muscle fiber highlight overlays specifically emphasizing active engagement on the quadriceps, glutes, hamstrings. Ensure deep 3D spatial depth between foreground and background, moody gym environment, dramatic cinematic rim lighting accentuating muscle striations, 8k resolution, ultra-photorealistic, 1:1 square aspect ratio.
+
+==================================================
+2. PROMPT VIDEO (1 FRAME FULL DINAMIS / MOVING CAMERA)
+(Kling AI / Runway Gen-3 / Luma Dream Machine / Haiper)
+==================================================
+A cinematic single-camera full-scene gym video featuring the identical shredded muscular Asian male fitness coach from Image 1 executing "Split Squat with Dumbbells" with perfect biomechanics using pair of dumbbells held at sides in split stance lunge position.
+
+Camera Movement:
+Low lateral pan focusing on front quad and rear knee depth, capturing full body control and sharp muscle striations in continuous fluid motion.
+
+Action & Biomechanics:
+Dropping back knee straight toward the floor until front thigh is parallel, driving through front heel to return to top split stance. Target muscles engaged: quadriceps, glutes, hamstrings.
+
+Visual Aesthetics:
+Moody dark luxury fitness gym, dramatic volumetric rim lighting, deep 3D shadow depth, hyper-realistic sweat and vascularity, authentic gym acoustics, 8k resolution, 60fps, seamless looping repetition, masterpiece.

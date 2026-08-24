@@ -36,3 +36,8 @@ public/apk/*.apk
 
 # Berisi kunci API GCP — jangan pernah ikut ter-commit lewat `git add -A` di skrip rilis.
 scripts/translate-instructions.cjs
+
+# Local CLI tools & temporary audit files
+scripts/bin/
+audit_*.json
+
