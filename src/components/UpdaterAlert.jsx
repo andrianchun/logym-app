@@ -1,8 +1,34 @@
+import React, { useState, useEffect, useRef } from 'react';
 import { DownloadCloud, X, Loader2 } from 'lucide-react';
 
-// Bar progres unduhan. Bundle OTA puluhan MB, jadi tanpa indikator user ngira
-// tombolnya macet dan menekan berulang kali.
+// Bar progres unduhan. Bundle OTA puluhan MB, diinterpolasi halus agar tidak melompat-lompat,
+// dan memberi status transparan saat fase ekstraksi/pemasangan ke disk berlangsung.
 function DownloadProgress({ progress, t }) {
+  const [smoothProgress, setSmoothProgress] = useState(typeof progress === 'number' ? progress : 0);
+  const targetRef = useRef(typeof progress === 'number' ? progress : 0);
+
+  useEffect(() => {
+    if (typeof progress === 'number') {
+      targetRef.current = progress;
+    }
+  }, [progress]);
+
+  useEffect(() => {
+    if (typeof progress !== 'number') return;
+    const interval = setInterval(() => {
+      setSmoothProgress(prev => {
+        const target = targetRef.current;
+        if (prev === target) return prev;
+        if (prev < target) {
+          const step = Math.max(1, Math.ceil((target - prev) / 3));
+          return Math.min(target, prev + step);
+        }
+        return target;
+      });
+    }, 40);
+    return () => clearInterval(interval);
+  }, [progress]);
+
   if (progress === 'apk') {
     return (
       <div className="w-full flex flex-col items-center justify-center p-4">
@@ -15,20 +41,31 @@ function DownloadProgress({ progress, t }) {
     );
   }
 
+  const isExtracting = smoothProgress >= 100;
+
   return (
-    <div className="w-full">
+    <div className="w-full text-left">
       <div className="flex items-center justify-between mb-2">
-        <span className={`text-xs font-bold ${t.textMuted}`}>Mengunduh pembaruan…</span>
-        <span className={`text-xs font-bold ${t.textMain} tabular-nums`}>{progress}%</span>
+        <span className={`text-xs font-bold ${t.textMuted}`}>
+          {isExtracting ? 'Mengekstrak & memasang…' : 'Mengunduh pembaruan…'}
+        </span>
+        <span className={`text-xs font-bold ${t.textMain} tabular-nums`}>
+          {smoothProgress}%
+        </span>
       </div>
-      <div className="w-full h-2 rounded-full bg-black/20 overflow-hidden">
+      <div className="w-full h-2.5 rounded-full bg-black/20 overflow-hidden relative">
         <div
-          className={`${t.bgAccent} h-full rounded-full transition-all duration-200 ease-out`}
-          style={{ width: `${Math.max(progress, 3)}%` }}
+          className={`${t.bgAccent} h-full rounded-full transition-all duration-150 ease-out`}
+          style={{ width: `${Math.min(100, Math.max(smoothProgress, 3))}%` }}
         />
+        {isExtracting && (
+          <div className="absolute inset-0 bg-white/30 animate-pulse rounded-full" />
+        )}
       </div>
       <p className={`text-[10px] ${t.textMuted} mt-2 leading-tight`}>
-        Jangan tutup aplikasi. LOGYM akan otomatis dimuat ulang setelah selesai.
+        {isExtracting
+          ? 'Memasang berkas baru ke aplikasi. LOGYM akan segera dimuat ulang…'
+          : 'Jangan tutup aplikasi. LOGYM akan otomatis dimuat ulang setelah selesai.'}
       </p>
     </div>
   );
@@ -39,6 +76,19 @@ export default function UpdaterAlert({
   currentVersion, newVersion, progress,
 }) {
   const downloading = progress !== null && progress !== undefined;
+
+  // Kunci scroll background saat dialog update wajib terbuka
+  useEffect(() => {
+    if (!open || !force) return;
+    const originalOverflow = document.body.style.overflow;
+    const originalTouchAction = document.body.style.touchAction;
+    document.body.style.overflow = 'hidden';
+    document.body.style.touchAction = 'none';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.touchAction = originalTouchAction;
+    };
+  }, [open, force]);
 
   if (!open) return null;
 
@@ -51,8 +101,8 @@ export default function UpdaterAlert({
     // Scrim sengaja TIDAK ikut di-fade: elemen ber-backdrop-filter yang animasi opacity-nya
     // sendiri bikin blur baru menyala setelah animasi selesai (kedipan layer).
     return (
-      <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center p-6 bg-black/80 backdrop-blur-md">
-        <div className={`w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl ${t.bgCardSolid} border ${t.border} ${t.textMain} flex flex-col items-center text-center animate-in zoom-in-95 duration-500`}>
+      <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center p-6 bg-black/80 backdrop-blur-md overscroll-contain touch-none select-none">
+        <div className={`w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl ${t.bgCardSolid} border ${t.border} ${t.textMain} flex flex-col items-center text-center animate-in zoom-in-95 duration-500 overscroll-contain`}>
           <div className="pt-8 pb-4">
             <img src="/icon-512.webp" alt="LOGYM Logo" className="w-24 h-24 mx-auto rounded-2xl shadow-lg mb-4 bg-white/5 border border-white/10 p-2" />
             <h2 className={`text-2xl font-bold tracking-tight mb-2 bg-clip-text text-transparent bg-gradient-to-br ${t.gradientText}`}>Update Penting!</h2>
