@@ -1,10 +1,35 @@
 import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Dumbbell, History, Calculator, Replace, Video, Info, ChevronLeft, ChevronRight, Loader2, Play } from 'lucide-react';
-import { formatTarget, resolveProjectedProgramId, defaultMasterExercises } from '../data/constants';
+import { formatTarget, resolveProjectedProgramId, defaultMasterExercises, findMatchingMasterExercise, cleanExerciseNameForMatching } from '../data/constants';
 import { resolveExerciseKind, estimate10RM, estimate1RM, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from '../utils/workoutCalc';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 import SwipeInput from './SwipeInput';
+
+export const isSameExerciseEntity = (e1, e2) => {
+  if (!e1 || !e2) return false;
+  if (e1.id && e2.id && String(e1.id) === String(e2.id)) return true;
+  if (e1.originalId && e2.originalId && String(e1.originalId) === String(e2.originalId)) return true;
+  if (e1.originalId && String(e1.originalId) === String(e2.id)) return true;
+  if (e2.originalId && String(e2.originalId) === String(e1.id)) return true;
+  const n1 = cleanExerciseNameForMatching(e1.name);
+  const n2 = cleanExerciseNameForMatching(e2.name);
+  if (!n1 || !n2) return false;
+  if (n1 === n2) return true;
+  // Lat Pulldown <-> Wide-Grip Lat Pulldown merger
+  if ((n1.includes('lat pulldown') || n1 === 'wide grip lat pulldown') && (n2.includes('lat pulldown') || n2 === 'wide grip lat pulldown')) return true;
+  // Romanian / Rumanian Deadlift merger
+  if (n1.includes('romanian deadlift') && n2.includes('romanian deadlift')) return true;
+  // Dumbbell Bench Press <-> Flat Dumbbell Bench Press merger
+  if (n1.includes('dumbbell bench press') && n2.includes('dumbbell bench press')) return true;
+  // Pull Through <-> Cable Pull Through merger
+  if (n1.includes('pull through') && n2.includes('pull through')) return true;
+  // Lateral Raise <-> Cable Lateral Raise merger
+  if (n1.includes('lateral raise') && n2.includes('lateral raise')) return true;
+  // Triceps Pushdown <-> Cable Triceps Pushdown merger
+  if (n1.includes('triceps pushdown') && n2.includes('triceps pushdown')) return true;
+  return false;
+};
 
 const ExerciseDetailModal = ({ 
   ex: initialEx, 
@@ -49,13 +74,13 @@ const ExerciseDetailModal = ({
 
           if (realProgId === 'adhoc' || realProgId === 'custom') {
             if (w.exercises) {
-               const matchingExs = w.exercises.filter(e => e.id === initialEx.id || e.name?.trim().toLowerCase() === initialEx.name?.trim().toLowerCase());
+               const matchingExs = w.exercises.filter(e => isSameExerciseEntity(e, initialEx));
                targetExIds = matchingExs.map(e => e.id);
             }
           } else {
             const p = programs?.find(prog => prog.id === realProgId);
             if (p && p.exercises) {
-               const matchingExs = p.exercises.filter(e => e.id === initialEx.id || e.name?.trim().toLowerCase() === initialEx.name?.trim().toLowerCase());
+               const matchingExs = p.exercises.filter(e => isSameExerciseEntity(e, initialEx));
                targetExIds = matchingExs.map(e => e.id);
             }
           }
@@ -77,7 +102,7 @@ const ExerciseDetailModal = ({
         }
         
         if (completedSets.length === 0 && w.exercises) {
-          const targetEx = w.exercises.find(e => e.id === initialEx.id || e.name?.trim().toLowerCase() === initialEx.name?.trim().toLowerCase());
+          const targetEx = w.exercises.find(e => isSameExerciseEntity(e, initialEx));
           if (targetEx && Array.isArray(targetEx.sets)) {
             completedSets = targetEx.sets.filter(s => s.done);
           }
@@ -193,15 +218,14 @@ const ExerciseDetailModal = ({
 
   const resolveFullExercise = (raw) => {
     if (!raw) return null;
-    const locName = (raw.name || '').toLowerCase();
-    const masterMatch = defaultMasterExercises.find(m => m.id === raw.id || m.name.toLowerCase() === locName);
+    const masterMatch = findMatchingMasterExercise(raw, defaultMasterExercises);
     return {
       ...masterMatch,
       ...raw,
-      videoUrl: raw.videoUrl || masterMatch?.videoUrl || '',
-      thumbnailUrl: raw.thumbnailUrl || masterMatch?.thumbnailUrl || masterMatch?.gifUrl || '',
-      gifUrl: raw.gifUrl || masterMatch?.gifUrl || '',
-      ytVideo: raw.ytVideo || masterMatch?.ytVideo || '',
+      videoUrl: masterMatch?.videoUrl || raw.videoUrl || '',
+      thumbnailUrl: masterMatch?.thumbnailUrl || raw.thumbnailUrl || masterMatch?.gifUrl || raw.gifUrl || '',
+      gifUrl: masterMatch?.gifUrl || raw.gifUrl || '',
+      ytVideo: masterMatch?.ytVideo || raw.ytVideo || '',
     };
   };
 
@@ -252,7 +276,7 @@ const ExerciseDetailModal = ({
       const urls = exercise.videoUrl.split(/(?:,|\s)+/).filter(v => v.trim());
       urls.forEach(u => {
         if (u.match(/\.(mp4|webm)$/i)) {
-          items.push({ type: 'video', url: u });
+          if (!items.some(it => it.url === u)) items.push({ type: 'video', url: u });
         }
       });
     }
@@ -262,9 +286,14 @@ const ExerciseDetailModal = ({
         if (u.match(/\.(mp4|webm)$/i)) {
           if (!items.some(it => it.url === u)) items.push({ type: 'video', url: u });
         } else {
-          items.push({ type: 'image', url: u });
+          if (!items.some(it => it.url === u)) items.push({ type: 'image', url: u });
         }
       });
+    }
+    if (exercise.thumbnailUrl && !exercise.thumbnailUrl.match(/\.(mp4|webm)$/i)) {
+      if (!items.some(it => it.url === exercise.thumbnailUrl)) {
+        items.push({ type: 'image', url: exercise.thumbnailUrl });
+      }
     }
     return items;
   };

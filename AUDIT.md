@@ -195,6 +195,15 @@ Setiap perubahan pada struktur latihan atau timer wajib lolos verifikasi di 5 la
   1. **Unified History Fallback di `getSetLogs`**: `getSetLogs(ex, idToCheck)` di `App.jsx` sebelumnya mensyaratkan `ex?.workoutId`, padahal objek latihan dari `getBaseEx` tidak membawa `workoutId`. Hal ini menyebabkan `getSetLogs` gagal menarik log tersimpan dari `history[selectedDate]` dan malah menginstansiasi array template kosong `[done: false, done: false, done: false]`.
   2. **Resolusi Kunci Majemuk Lengkap**: `getSetLogs` **WAJIB** menyisir seluruh workout di `history[selectedDate]` dengan kandidat kunci: `idToCheck`, `ex.id`, `ex.originalId`, compound key `${id}-${workout.id}`, dan pencocokan prefiks. Dengan begitu, toggle set pada sesi yang telah selesai bekerja secara presisi (Set 1 menjadi *undone*, Set 2 & 3 tetap *done*).
 
+### Insiden 10: Delay Scrollbar pada Swipe Down Immersive Mode & Inkonsistensi Alias Latihan (25 Agustus 2026)
+* **Gejala**: 
+  1. Saat mengusap ke bawah pada area video di Immersive Mode, browser WebView memunculkan scrollbar vertikal dan mengharuskan pengguna menggulir ke atas/bawah hingga mentok sebelum gesture minimize terpicu.
+  2. Latihan dengan variasi nama seperti "Lat Pulldown" vs "Wide-Grip Lat Pulldown", "Cable Pull Through" vs "Pull Through", "Flat Dumbbell Bench Press" vs "Dumbbell Bench Press", "Cable Lateral Raises" vs "Cable Seated Lateral Raise", "Cable Triceps Pushdown" vs "Triceps Pushdown", dan "Rumanian Deadlift" vs "Romanian Deadlift" gagal mencocokkan video/thumbnail lokal resmi dan riwayatnya tidak terhubung.
+* **Pelajaran**:
+  1. **Instant Swipe-Down Minimization (`touch-none select-none`)**: Kontainer visual video di `ImmersiveWorkout.jsx` **WAJIB** memakai `touch-none select-none` dan mendeteksi tarikan ke bawah langsung di `onTouchMove`/`onRootTouchMove` (>35px) untuk memicu `handleMinimize()` seketika tanpa delay scrollbar native. Area picker bawah wajib dilengkapi `overscroll-contain scrollbar-none`.
+  2. **Smart Alias Normalization (`cleanExerciseNameForMatching` & `findMatchingMasterExercise`)**: Seluruh pencarian latihan di `ImmersiveWorkout.jsx`, `ExerciseDetailModal.jsx`, `ExerciseCard.jsx`, dan `exerciseDbApi.js` **WAJIB** memakai fungsi normalisasi cerdas yang menangani typo fonetik (e.g. *rumanian* -> *romanian*), variasi alat/posisi (*cable*, *flat*, *wide-grip*), bentuk jamak (*raises* -> *raise*), dan singkatan (*rdl* -> *romanian deadlift*).
+  3. **History Entity Merger (`isSameExerciseEntity`)**: Tab detail latihan **WAJIB** menggabungkan riwayat sesi untuk entitas yang sama (misal *Lat Pulldown* dan *Wide-Grip Lat Pulldown*) sehingga grafik progres dan 1RM selalu lengkap.
+
 ---
 
 ## 5. Checklist Wajib Sebelum Rilis / Selesai Debugging
@@ -209,4 +218,5 @@ Setiap perubahan pada struktur latihan atau timer wajib lolos verifikasi di 5 la
 - [ ] 8. Apakah ukuran bundle OTA sudah diverifikasi di bawah batas wajar?
 - [ ] 9. Apakah sesi dengan 0 set selesai mengembalikan 0 kcal dan pemisahan log per-sesi tidak mencemari daftar latihan sesi lain?
 - [ ] 10. Apakah toggle set pada sesi selesai menarik set tersimpan dari riwayat secara akurat tanpa mereset set lain menjadi undone?
+- [ ] 11. Apakah gesture swipe-down di Immersive Mode memicu minimize seketika dan pencocokan media/riwayat latihan mendukung normalisasi alias?
 

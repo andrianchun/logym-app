@@ -29,91 +29,85 @@ export const defaultMasterExercises = [
   {
     "id": 101,
     "name": "Smith Machine Incline Bench Press",
-    "target": [
-      "Dada Atas",
-      "Deltoid Depan",
-      "Triceps"
-    ],
+    "target": ["Dada Atas", "Deltoid Depan", "Triceps"],
     "type": "weight",
     "defaultWeight": 10,
     "equipment": "Smith Machine",
     "level": "intermediate",
     "ytVideo": "https://youtu.be/VXaBbUYMfIs?si=pOB-MkazqZiMP_KX",
-    "videoUrl": "/exercise-assets/edb-Smith_Machine_Incline_Bench_Press.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Incline_Bench_Press.mp4"
+    "videoUrl": "/exercise-assets/edb-Smith_Machine_Incline_Bench_Press.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Incline_Bench_Press.mp4",
+    "thumbnailUrl": "/exercise-assets/edb-Smith_Machine_Incline_Bench_Press.webp",
+    "gifUrl": "/exercise-assets/edb-Smith_Machine_Incline_Bench_Press.webp"
   },
   {
     "id": 102,
     "name": "Seated Cable Rows",
-    "target": [
-      "Punggung Atas",
-      "Biceps"
-    ],
+    "target": ["Punggung Atas", "Biceps"],
     "type": "weight",
     "defaultWeight": 10,
     "equipment": "Cable",
     "level": "beginner",
     "ytVideo": "https://youtu.be/qD1WZ5pSuvk?si=JbbritEwFpnqjPHz",
-    "videoUrl": "/exercise-assets/edb-Seated_Cable_Rows.mp4 /exercise-assets/youtube-backup/edb-Seated_Cable_Rows.mp4"
+    "videoUrl": "/exercise-assets/edb-Seated_Cable_Rows.mp4 /exercise-assets/youtube-backup/edb-Seated_Cable_Rows.mp4",
+    "thumbnailUrl": "/exercise-assets/edb-Seated_Cable_Rows.webp",
+    "gifUrl": "/exercise-assets/edb-Seated_Cable_Rows.webp"
   },
   {
     "id": 103,
     "name": "Dumbbell Bench Press",
-    "target": [
-      "Dada Tengah",
-      "Triceps"
-    ],
+    "target": ["Dada Tengah", "Triceps"],
     "type": "weight",
     "defaultWeight": 10,
     "equipment": "Dumbbell",
     "level": "beginner",
     "ytVideo": "https://youtu.be/WbCEvFA0NJs?si=n6uJrVnL8SbZLnii",
-    "videoUrl": "/exercise-assets/edb-Dumbbell_Bench_Press.mp4 /exercise-assets/youtube-backup/edb-Dumbbell_Bench_Press.mp4"
+    "videoUrl": "/exercise-assets/edb-Dumbbell_Bench_Press.mp4 /exercise-assets/youtube-backup/edb-Dumbbell_Bench_Press.mp4",
+    "thumbnailUrl": "/exercise-assets/edb-Dumbbell_Bench_Press.webp",
+    "gifUrl": "/exercise-assets/edb-Dumbbell_Bench_Press.webp"
   },
   {
     "id": 104,
     "name": "Cable Seated Lateral Raise",
-    "target": [
-      "Deltoid Samping"
-    ],
+    "target": ["Deltoid Samping"],
     "type": "weight",
     "defaultWeight": 20,
     "equipment": "Cable",
     "level": "beginner",
     "ytVideo": "https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA",
-    "videoUrl": "/exercise-assets/youtube-backup/edb-Cable_Seated_Lateral_Raise.mp4"
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Cable_Seated_Lateral_Raise.mp4",
+    "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Seated_Lateral_Raise/0.jpg",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Seated_Lateral_Raise/0.jpg"
   },
   {
     "id": 105,
     "name": "Triceps Pushdown",
-    "target": [
-      "Triceps"
-    ],
+    "target": ["Triceps"],
     "type": "weight",
     "defaultWeight": 20,
     "equipment": "Cable",
     "level": "beginner",
     "ytVideo": "https://youtu.be/1FjkhpZsaxc?si=UF5-0LJTCd_pEhy3 https://youtu.be/u36jNfqh8_U?si=AEMeWXqnBvpOWNOj https://youtu.be/9qupVR7pKtk?si=FtLIHZmKuqXcK0ne",
-    "videoUrl": "/exercise-assets/edb-Triceps_Pushdown.mp4 /exercise-assets/youtube-backup/edb-Triceps_Pushdown.mp4"
+    "videoUrl": "/exercise-assets/edb-Triceps_Pushdown.mp4 /exercise-assets/youtube-backup/edb-Triceps_Pushdown.mp4",
+    "thumbnailUrl": "/exercise-assets/edb-Triceps_Pushdown.webp",
+    "gifUrl": "/exercise-assets/edb-Triceps_Pushdown.webp"
   },
   {
     "id": 106,
     "name": "Dumbbell Alternate Bicep Curl",
-    "target": [
-      "Biceps"
-    ],
+    "target": ["Biceps"],
     "type": "weight",
     "defaultWeight": 20,
     "equipment": "Dumbbell",
     "level": "beginner",
     "ytVideo": "https://youtu.be/MKWBV29S6c0?si=JV1BM77vAR6VuQYG https://youtu.be/_aoad2yuP5w?si=PRXDFoozz45AB_VO",
-    "videoUrl": "/exercise-assets/edb-Dumbbell_Alternate_Bicep_Curl.mp4 /exercise-assets/youtube-backup/edb-Dumbbell_Alternate_Bicep_Curl.mp4"
+    "videoUrl": "/exercise-assets/edb-Dumbbell_Alternate_Bicep_Curl.mp4 /exercise-assets/youtube-backup/edb-Dumbbell_Alternate_Bicep_Curl.mp4",
+    "thumbnailUrl": "/exercise-assets/edb-Dumbbell_Alternate_Bicep_Curl.webp",
+    "gifUrl": "/exercise-assets/edb-Dumbbell_Alternate_Bicep_Curl.webp"
   },
   {
     "id": 107,
     "name": "Cardio",
-    "target": [
-      "Cardio"
-    ],
+    "target": ["Cardio"],
     "type": "cardio",
     "defaultWeight": 0,
     "duration": 15,
@@ -124,135 +118,124 @@ export const defaultMasterExercises = [
   {
     "id": 108,
     "name": "Smith Machine Squat",
-    "target": [
-      "Quads",
-      "Hams",
-      "Glutes"
-    ],
+    "target": ["Quads", "Hams", "Glutes"],
     "type": "weight",
     "defaultWeight": 0,
     "equipment": "Smith Machine",
     "level": "intermediate",
     "ytVideo": "https://youtu.be/iKCJCydYYrE?si=ICtqLU9ov9eFaHfL https://youtu.be/LwsG-1xgP2E?si=Ptr7dUVcsJFKMLYC",
-    "videoUrl": "/exercise-assets/edb-Smith_Machine_Squat.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Squat.mp4"
+    "videoUrl": "/exercise-assets/edb-Smith_Machine_Squat.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Squat.mp4",
+    "thumbnailUrl": "/exercise-assets/edb-Smith_Machine_Squat.webp",
+    "gifUrl": "/exercise-assets/edb-Smith_Machine_Squat.webp"
   },
   {
     "id": 109,
     "name": "Romanian Deadlift",
-    "target": [
-      "Hams",
-      "Glutes"
-    ],
+    "target": ["Hams", "Glutes"],
     "type": "weight",
     "defaultWeight": 5,
     "equipment": "Barbell",
     "level": "intermediate",
     "ytVideo": "https://youtu.be/xY8BywOKkLQ?si=B1A9ulZ-Cz67GNw6",
-    "videoUrl": "/exercise-assets/edb-Romanian_Deadlift.mp4 /exercise-assets/youtube-backup/edb-Romanian_Deadlift.mp4"
+    "videoUrl": "/exercise-assets/edb-Romanian_Deadlift.mp4 /exercise-assets/youtube-backup/edb-Romanian_Deadlift.mp4",
+    "thumbnailUrl": "/exercise-assets/edb-Romanian_Deadlift.webp",
+    "gifUrl": "/exercise-assets/edb-Romanian_Deadlift.webp"
   },
   {
     "id": 110,
     "name": "Barbell Walking Lunge",
-    "target": [
-      "Quads",
-      "Hams",
-      "Glutes"
-    ],
+    "target": ["Quads", "Hams", "Glutes"],
     "type": "weight",
     "defaultWeight": 5,
     "equipment": "Dumbbell",
     "level": "intermediate",
     "ytVideo": "https://youtu.be/mJilHWIBWO8?si=2NCYOofB0EUrY22X",
-    "videoUrl": "/exercise-assets/youtube-backup/edb-Barbell_Walking_Lunge.mp4"
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Barbell_Walking_Lunge.mp4",
+    "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Walking_Lunge/0.jpg",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Walking_Lunge/0.jpg"
   },
   {
     "id": 111,
     "name": "Rocking Standing Calf Raise",
-    "target": [
-      "Calves"
-    ],
+    "target": ["Calves"],
     "type": "weight",
     "defaultWeight": 10,
     "equipment": "Machine",
     "level": "beginner",
     "ytVideo": "https://youtu.be/wdOkFomQNp8?si=PWlxiKYPBMlfLoek",
-    "videoUrl": "/exercise-assets/youtube-backup/edb-Rocking_Standing_Calf_Raise.mp4"
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Rocking_Standing_Calf_Raise.mp4",
+    "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Rocking_Standing_Calf_Raise/0.jpg",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Rocking_Standing_Calf_Raise/0.jpg"
   },
   {
     "id": 112,
     "name": "Cable Crunch",
-    "target": [
-      "Core"
-    ],
+    "target": ["Core"],
     "type": "weight",
     "defaultWeight": 40,
     "equipment": "Cable",
     "level": "intermediate",
     "ytVideo": "https://youtu.be/K2m0jj6RfYg?si=CZMLt6PF0Yxvgb6V",
-    "videoUrl": "/exercise-assets/youtube-backup/edb-Cable_Crunch.mp4"
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Cable_Crunch.mp4",
+    "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Crunch/0.jpg",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Crunch/0.jpg"
   },
   {
     "id": 113,
     "name": "Wide-Grip Lat Pulldown",
-    "target": [
-      "Lats",
-      "Biceps"
-    ],
+    "target": ["Lats", "Biceps"],
     "type": "weight",
     "defaultWeight": 40,
     "equipment": "Machine",
     "level": "beginner",
     "ytVideo": "https://youtu.be/bNmvKpJSWKM?si=E7zZ3a3qeG4Ij7bb https://youtu.be/7Cjc_aXoQ_I?si=ZqhPV5iSMoTOLSIf",
-    "videoUrl": "/exercise-assets/youtube-backup/edb-Wide-Grip_Lat_Pulldown.mp4"
+    "videoUrl": "/exercise-assets/edb-Wide-Grip_Lat_Pulldown.mp4 /exercise-assets/youtube-backup/edb-Wide-Grip_Lat_Pulldown.mp4",
+    "thumbnailUrl": "/exercise-assets/edb-Wide-Grip_Lat_Pulldown.webp",
+    "gifUrl": "/exercise-assets/edb-Wide-Grip_Lat_Pulldown.webp"
   },
   {
     "id": 114,
     "name": "Dumbbell Shoulder Press",
-    "target": [
-      "Deltoid Depan",
-      "Triceps"
-    ],
+    "target": ["Deltoid Depan", "Triceps"],
     "type": "weight",
     "defaultWeight": 5,
     "equipment": "Dumbbell",
     "level": "intermediate",
     "ytVideo": "https://youtu.be/k6tzKisR3NY?si=g67rT52vc6oWjiFC https://youtu.be/E7ngsffMPR0?si=FJGsgUxb7aoAZ_ub",
-    "videoUrl": "/exercise-assets/edb-Dumbbell_Shoulder_Press.mp4 /exercise-assets/youtube-backup/edb-Dumbbell_Shoulder_Press.mp4"
+    "videoUrl": "/exercise-assets/edb-Dumbbell_Shoulder_Press.mp4 /exercise-assets/youtube-backup/edb-Dumbbell_Shoulder_Press.mp4",
+    "thumbnailUrl": "/exercise-assets/edb-Dumbbell_Shoulder_Press.webp",
+    "gifUrl": "/exercise-assets/edb-Dumbbell_Shoulder_Press.webp"
   },
   {
     "id": 124,
     "name": "Dumbbell Shrug",
-    "target": [
-      "Traps",
-      "Leher"
-    ],
+    "target": ["Traps", "Leher"],
     "type": "weight",
     "defaultWeight": 15,
     "equipment": "Dumbbell",
     "level": "beginner",
     "ytVideo": "https://youtu.be/rFsSeClGnNA?si=EfUCHpJdjSbWFObO https://youtu.be/2BrmhGze7sk?si=PSt1tUQjaI2liYby",
-    "videoUrl": "/exercise-assets/youtube-backup/edb-Dumbbell_Shrug.mp4"
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Dumbbell_Shrug.mp4",
+    "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Shrug/0.jpg",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Shrug/0.jpg"
   },
   {
     "id": 115,
     "name": "Smith Machine Bench Press",
-    "target": [
-      "Dada Tengah",
-      "Triceps"
-    ],
+    "target": ["Dada Tengah", "Triceps"],
     "type": "weight",
     "defaultWeight": 7.5,
     "equipment": "Smith Machine",
     "level": "beginner",
     "ytVideo": "https://youtu.be/gQ3afio08V8?si=DfCKjmSAhUMXjMl_",
-    "videoUrl": "/exercise-assets/edb-Smith_Machine_Bench_Press.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Bench_Press.mp4"
+    "videoUrl": "/exercise-assets/edb-Smith_Machine_Bench_Press.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Bench_Press.mp4",
+    "thumbnailUrl": "/exercise-assets/edb-Smith_Machine_Bench_Press.webp",
+    "gifUrl": "/exercise-assets/edb-Smith_Machine_Bench_Press.webp"
   },
   {
     "id": 116,
     "name": "Cable Rear Delt Fly",
-    "target": [
-      "Deltoid Belakang"
-    ],
+    "target": ["Deltoid Belakang"],
     "type": "weight",
     "defaultWeight": 5,
     "equipment": "Cable",
@@ -265,118 +248,112 @@ export const defaultMasterExercises = [
   {
     "id": 117,
     "name": "Cable Rope Overhead Triceps Extension",
-    "target": [
-      "Triceps"
-    ],
+    "target": ["Triceps"],
     "type": "weight",
     "defaultWeight": 40,
     "equipment": "Cable",
     "level": "intermediate",
     "ytVideo": "https://youtu.be/9Ark9S11uXw?si=pEAe5tf66v5yUToU https://youtu.be/NTk0Igxqcsk?si=zX7dHQL0VyHURoC_",
-    "videoUrl": "/exercise-assets/edb-Cable_Rope_Overhead_Triceps_Extension.mp4 /exercise-assets/youtube-backup/edb-Cable_Rope_Overhead_Triceps_Extension.mp4"
+    "videoUrl": "/exercise-assets/edb-Cable_Rope_Overhead_Triceps_Extension.mp4 /exercise-assets/youtube-backup/edb-Cable_Rope_Overhead_Triceps_Extension.mp4",
+    "thumbnailUrl": "/exercise-assets/edb-Cable_Rope_Overhead_Triceps_Extension.webp",
+    "gifUrl": "/exercise-assets/edb-Cable_Rope_Overhead_Triceps_Extension.webp"
   },
   {
     "id": 118,
     "name": "High Cable Curls",
-    "target": [
-      "Biceps"
-    ],
+    "target": ["Biceps"],
     "type": "weight",
     "defaultWeight": 30,
     "equipment": "Cable",
     "level": "beginner",
     "ytVideo": "https://youtu.be/CrbTqNOlFgE?si=xKanrhppuvUAudTj",
-    "videoUrl": "/exercise-assets/youtube-backup/edb-High_Cable_Curls.mp4"
+    "videoUrl": "/exercise-assets/youtube-backup/edb-High_Cable_Curls.mp4",
+    "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/High_Cable_Curls/0.jpg",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/High_Cable_Curls/0.jpg"
   },
   {
     "id": 119,
     "name": "Split Squat with Dumbbells",
-    "target": [
-      "Quads",
-      "Hams",
-      "Glutes"
-    ],
+    "target": ["Quads", "Hams", "Glutes"],
     "type": "weight",
     "defaultWeight": 30,
     "equipment": "Dumbbell",
     "level": "advanced",
     "ytVideo": "https://youtu.be/or1frhkjBDc?si=FR7v-hKp_QP4-Rpn",
-    "videoUrl": "/exercise-assets/edb-Split_Squat_with_Dumbbells.mp4 /exercise-assets/youtube-backup/edb-Split_Squat_with_Dumbbells.mp4"
+    "videoUrl": "/exercise-assets/edb-Split_Squat_with_Dumbbells.mp4 /exercise-assets/youtube-backup/edb-Split_Squat_with_Dumbbells.mp4",
+    "thumbnailUrl": "/exercise-assets/edb-Split_Squat_with_Dumbbells.webp",
+    "gifUrl": "/exercise-assets/edb-Split_Squat_with_Dumbbells.webp"
   },
   {
     "id": 120,
     "name": "SM Romanian Deadlift (RDL)",
-    "target": [
-      "Hams",
-      "Glutes"
-    ],
+    "target": ["Hams", "Glutes"],
     "type": "weight",
     "defaultWeight": 20,
     "equipment": "Smith Machine",
     "level": "beginner",
     "ytVideo": "https://youtu.be/xWnlfJaQZ3k?si=z0FRk3rh4UO7JdUC",
-    "videoUrl": "/exercise-assets/youtube-backup/edb-Smith_Machine_Romanian_Deadlift.mp4"
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Smith_Machine_Romanian_Deadlift.mp4",
+    "thumbnailUrl": "/exercise-assets/edb-Smith_Machine_Stiff-Legged_Deadlift.webp",
+    "gifUrl": "/exercise-assets/edb-Smith_Machine_Stiff-Legged_Deadlift.webp"
   },
   {
     "id": 121,
     "name": "Pull Through",
-    "target": [
-      "Hams",
-      "Glutes"
-    ],
+    "target": ["Hams", "Glutes"],
     "type": "weight",
     "defaultWeight": 20,
     "equipment": "Cable",
     "level": "intermediate",
     "ytVideo": "https://youtu.be/sFQtAuiVwyo?si=GQLiGcITyE4Yzp3G",
-    "videoUrl": "/exercise-assets/youtube-backup/edb-Pull_Through.mp4"
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Pull_Through.mp4",
+    "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Pull_Through/0.jpg",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Pull_Through/0.jpg"
   },
   {
     "id": 122,
     "name": "Seated Calf Raise",
-    "target": [
-      "Calves"
-    ],
+    "target": ["Calves"],
     "type": "weight",
     "defaultWeight": 30,
     "equipment": "Dumbbell",
     "level": "beginner",
     "ytVideo": "https://youtu.be/ar8nav0jGoE?si=owieb0xbPHFg7zMA",
-    "videoUrl": "/exercise-assets/youtube-backup/edb-Seated_Calf_Raise.mp4"
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Seated_Calf_Raise.mp4",
+    "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Seated_Calf_Raise/0.jpg",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Seated_Calf_Raise/0.jpg"
   },
   {
     "id": 123,
     "name": "Plank",
-    "target": [
-      "Core"
-    ],
+    "target": ["Core"],
     "type": "time",
     "defaultWeight": 0,
     "duration": 30,
     "equipment": "Body Weight",
     "level": "beginner",
     "ytVideo": "https://youtu.be/xe2MXatLTUw?si=U5L4UwgiNv19R7lh",
-    "videoUrl": "/exercise-assets/youtube-backup/edb-Plank.mp4"
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Plank.mp4",
+    "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Plank/0.jpg",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Plank/0.jpg"
   },
   {
     "id": 125,
     "name": "Palms-Up Dumbbell Wrist Curl Over A Bench",
-    "target": [
-      "Forearm"
-    ],
+    "target": ["Forearm"],
     "type": "weight",
     "defaultWeight": 5,
     "equipment": "Dumbbell",
     "level": "beginner",
-    "ytVideo": "https://youtu.be/0-c4s051u6E?si=K-4Z9iKq2d8r0N1M",
-    "videoUrl": "/exercise-assets/youtube-backup/edb-Palms-Up_Dumbbell_Wrist_Curl_Over_A_Bench.mp4"
+    "ytVideo": "",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Palms-Up_Dumbbell_Wrist_Curl_Over_A_Bench.mp4",
+    "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Palms-Up_Dumbbell_Wrist_Curl_Over_A_Bench/0.jpg",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Palms-Up_Dumbbell_Wrist_Curl_Over_A_Bench/0.jpg"
   },
   {
     "id": 126,
     "name": "Treadmill Running",
-    "target": [
-      "Cardio"
-    ],
+    "target": ["Cardio"],
     "type": "cardio",
     "defaultWeight": 0,
     "duration": 15,
@@ -387,9 +364,7 @@ export const defaultMasterExercises = [
   {
     "id": 127,
     "name": "Stationary Bike",
-    "target": [
-      "Cardio"
-    ],
+    "target": ["Cardio"],
     "type": "cardio",
     "defaultWeight": 0,
     "duration": 15,
@@ -400,9 +375,7 @@ export const defaultMasterExercises = [
   {
     "id": 128,
     "name": "Aerobic",
-    "target": [
-      "Cardio"
-    ],
+    "target": ["Cardio"],
     "type": "cardio",
     "defaultWeight": 0,
     "duration": 20,
@@ -563,6 +536,67 @@ export const defaultMasterExercises = [
     "ytVideo": ""
   }
 ];
+
+export const cleanExerciseNameForMatching = (name) => {
+  if (!name) return '';
+  return String(name)
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ')
+    .replace(/\brumanian\b/g, 'romanian')
+    .replace(/\brdl\b/g, 'romanian deadlift')
+    .replace(/\bdumbell\b/g, 'dumbbell')
+    .replace(/\bdumbel\b/g, 'dumbbell')
+    .replace(/\bpull\s+thru\b/g, 'pull through')
+    .replace(/\blat\s+pull\s+down\b/g, 'lat pulldown')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+/**
+ * Mencocokkan exercise dengan defaultMasterExercises atau daftar katalog lainnya secara cerdas.
+ * Mendukung variasi nama seperti "Lat Pulldown" -> "Wide-Grip Lat Pulldown",
+ * "Cable Pull Through" -> "Pull Through", "Flat Dumbbell Bench Press" -> "Dumbbell Bench Press",
+ * "Cable Lateral Raises" -> "Cable Seated Lateral Raise", "Rumanian Deadlift" -> "Romanian Deadlift", dll.
+ */
+export const findMatchingMasterExercise = (targetEx, masterList = defaultMasterExercises) => {
+  if (!targetEx) return null;
+  const rawId = targetEx.originalId || targetEx.id;
+  const rawName = cleanExerciseNameForMatching(targetEx.name);
+
+  // 1. Cocokkan berdasarkan ID
+  if (rawId !== undefined && rawId !== null) {
+    const byId = masterList.find(m => String(m.id) === String(rawId));
+    if (byId) return byId;
+  }
+
+  if (!rawName) return null;
+
+  // 2. Cocokkan nama persis / setelah normalisasi typo
+  const byExact = masterList.find(m => cleanExerciseNameForMatching(m.name) === rawName);
+  if (byExact) return byExact;
+
+  // 3. Substring (satu nama mengandung nama lainnya)
+  const bySub = masterList.find(m => {
+    const mName = cleanExerciseNameForMatching(m.name);
+    return mName.includes(rawName) || rawName.includes(mName);
+  });
+  if (bySub) return bySub;
+
+  // 4. Token inti (mengabaikan awalan alat/posisi seperti cable, dumbbell, smith, flat, wide-grip, dll)
+  const IGNORE_WORDS = new Set(['cable', 'machine', 'dumbbell', 'barbell', 'smith', 'seated', 'standing', 'lying', 'flat', 'incline', 'decline', 'wide', 'grip', 'close', 'sm']);
+  const targetWords = rawName.split(/[\s-]+/).filter(w => !IGNORE_WORDS.has(w));
+  if (targetWords.length > 0) {
+    const targetCore = targetWords.join(' ').replace(/raises?/, 'raise').replace(/curls?/, 'curl').replace(/presses?/, 'press');
+    const byCore = masterList.find(m => {
+      const mWords = cleanExerciseNameForMatching(m.name).split(/[\s-]+/).filter(w => !IGNORE_WORDS.has(w));
+      const mCore = mWords.join(' ').replace(/raises?/, 'raise').replace(/curls?/, 'curl').replace(/presses?/, 'press');
+      return mCore.includes(targetCore) || targetCore.includes(mCore);
+    });
+    if (byCore) return byCore;
+  }
+
+  return null;
+};
 
 export const defaultPrograms = [
   {

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { SkipForward, Video, CheckCircle, Play, Square, Info, ArrowLeftRight, X, Dumbbell, ClipboardEdit, Flame, Brain, Plus, ChevronUp, ChevronDown, Activity } from 'lucide-react';
 import EquipmentIcon from './EquipmentIcon';
 import SwipeInput from './SwipeInput';
-import { formatTarget, exerciseTypeLabels, getVideoId } from '../data/constants';
+import { formatTarget, exerciseTypeLabels, getVideoId, defaultMasterExercises, findMatchingMasterExercise } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
 import { resolveExerciseKind, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from '../utils/workoutCalc';
 import { getCachedExercises } from '../utils/exerciseDbApi';
@@ -221,10 +221,12 @@ const ExerciseCard = ({
       {/* HEADER IMAGE / GIF FULL WIDTH */}
       <div className="relative w-full h-[280px] sm:h-[320px] bg-zinc-100 dark:bg-zinc-800">
          {(() => {
+            const masterMatch = findMatchingMasterExercise(ex, defaultMasterExercises);
             const apiExercises = getCachedExercises();
-            const apiMatch = (!ex.gifUrl && !ex.thumbnailUrl && !isCustom) ? apiExercises.find(e => e.name.toLowerCase() === ex.name.toLowerCase()) : null;
-            const finalImgUrl = ex.thumbnailUrl || ex.gifUrl || apiMatch?.thumbnailUrl || apiMatch?.gifUrl;
-            const ytId = getVideoId(ex.ytVideo || apiMatch?.ytVideo);
+            const locName = (ex.name || '').toLowerCase();
+            const apiMatch = (!ex.gifUrl && !ex.thumbnailUrl && !isCustom) ? apiExercises.find(e => e.name?.toLowerCase() === locName || locName.includes(e.name?.toLowerCase())) : null;
+            const finalImgUrl = masterMatch?.thumbnailUrl || ex.thumbnailUrl || masterMatch?.gifUrl || ex.gifUrl || apiMatch?.thumbnailUrl || apiMatch?.gifUrl;
+            const ytId = getVideoId(masterMatch?.ytVideo || ex.ytVideo || apiMatch?.ytVideo);
             
             if (finalImgUrl) {
                 return (

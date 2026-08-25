@@ -14,8 +14,12 @@ const ytVideoMap = {
   'smith machine incline bench press': 'https://youtu.be/VXaBbUYMfIs?si=pOB-MkazqZiMP_KX',
   'seated cable rows': 'https://youtu.be/qD1WZ5pSuvk?si=JbbritEwFpnqjPHz',
   'dumbbell bench press': 'https://youtu.be/WbCEvFA0NJs?si=n6uJrVnL8SbZLnii',
+  'flat dumbbell bench press': 'https://youtu.be/WbCEvFA0NJs?si=n6uJrVnL8SbZLnii',
   'cable seated lateral raise': 'https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA',
+  'cable lateral raise': 'https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA',
+  'cable lateral raises': 'https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA',
   'triceps pushdown': 'https://youtu.be/1FjkhpZsaxc?si=UF5-0LJTCd_pEhy3 https://youtu.be/u36jNfqh8_U?si=AEMeWXqnBvpOWNOj https://youtu.be/9qupVR7pKtk?si=FtLIHZmKuqXcK0ne',
+  'cable triceps pushdown': 'https://youtu.be/1FjkhpZsaxc?si=UF5-0LJTCd_pEhy3 https://youtu.be/u36jNfqh8_U?si=AEMeWXqnBvpOWNOj https://youtu.be/9qupVR7pKtk?si=FtLIHZmKuqXcK0ne',
   'dumbbell alternate bicep curl': 'https://youtu.be/MKWBV29S6c0?si=JV1BM77vAR6VuQYG https://youtu.be/_aoad2yuP5w?si=PRXDFoozz45AB_VO',
   'smith machine squat': 'https://youtu.be/iKCJCydYYrE?si=ICtqLU9ov9eFaHfL https://youtu.be/LwsG-1xgP2E?si=Ptr7dUVcsJFKMLYC',
   'barbell romanian deadlift': 'https://youtu.be/xY8BywOKkLQ?si=B1A9ulZ-Cz67GNw6 https://youtu.be/xWnlfJaQZ3k?si=z0FRk3rh4UO7JdUC',
@@ -23,6 +27,7 @@ const ytVideoMap = {
   'rocking standing calf raise': 'https://youtu.be/wdOkFomQNp8?si=PWlxiKYPBMlfLoek',
   'cable crunch': 'https://youtu.be/K2m0jj6RfYg?si=CZMLt6PF0Yxvgb6V',
   'wide-grip lat pulldown': 'https://youtu.be/bNmvKpJSWKM?si=E7zZ3a3qeG4Ij7bb https://youtu.be/7Cjc_aXoQ_I?si=ZqhPV5iSMoTOLSIf',
+  'lat pulldown': 'https://youtu.be/bNmvKpJSWKM?si=E7zZ3a3qeG4Ij7bb https://youtu.be/7Cjc_aXoQ_I?si=ZqhPV5iSMoTOLSIf',
   'dumbbell shoulder press': 'https://youtu.be/k6tzKisR3NY?si=g67rT52vc6oWjiFC https://youtu.be/E7ngsffMPR0?si=FJGsgUxb7aoAZ_ub',
   'dumbbell shrug': 'https://youtu.be/rFsSeClGnNA?si=EfUCHpJdjSbWFObO https://youtu.be/2BrmhGze7sk?si=PSt1tUQjaI2liYby',
   'smith machine bench press': 'https://youtu.be/gQ3afio08V8?si=DfCKjmSAhUMXjMl_',
@@ -31,6 +36,7 @@ const ytVideoMap = {
   'high cable curls': 'https://youtu.be/CrbTqNOlFgE?si=xKanrhppuvUAudTj',
   'split squat with dumbbells': 'https://youtu.be/or1frhkjBDc?si=FR7v-hKp_QP4-Rpn',
   'pull through': 'https://youtu.be/sFQtAuiVwyo?si=GQLiGcITyE4Yzp3G',
+  'cable pull through': 'https://youtu.be/sFQtAuiVwyo?si=GQLiGcITyE4Yzp3G',
   'seated calf raise': 'https://youtu.be/ar8nav0jGoE?si=owieb0xbPHFg7zMA',
   'plank': 'https://youtu.be/xe2MXatLTUw?si=U5L4UwgiNv19R7lh'
 };

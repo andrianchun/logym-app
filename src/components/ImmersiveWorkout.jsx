@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Play, Pause, ChevronRight, ChevronLeft, Dumbbell, Check, Info, Clock, Minimize2, SkipForward, ClipboardEdit, Brain, Flame, Activity, ArrowLeftRight, Square } from 'lucide-react';
 import ScrollPicker from './ScrollPicker';
-import { exerciseTypeLabels, defaultMasterExercises } from '../data/constants';
+import { exerciseTypeLabels, defaultMasterExercises, findMatchingMasterExercise } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
 import { calculateWorkoutCalories, calculateLiveWorkoutCalories, resolveExerciseKind, defaultSetWeight, gymStepFor, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from '../utils/workoutCalc';
 import { getCachedExercises } from '../utils/exerciseDbApi';
@@ -380,18 +380,18 @@ const ImmersiveWorkout = ({
 
   const resolvedEx = React.useMemo(() => {
     if (!ex) return null;
-    const locName = (ex.name || '').toLowerCase();
-    const masterMatch = defaultMasterExercises.find(m => m.id === ex.id || m.name.toLowerCase() === locName);
+    const masterMatch = findMatchingMasterExercise(ex, defaultMasterExercises);
     const apiExercises = getCachedExercises();
-    const apiMatch = apiExercises.find(a => a.id === ex.id || a.name.toLowerCase() === locName);
+    const locName = (ex.name || '').toLowerCase();
+    const apiMatch = apiExercises.find(a => a.id === ex.id || a.name?.toLowerCase() === locName || (a.name && locName.includes(a.name.toLowerCase())));
     return {
       ...apiMatch,
       ...masterMatch,
       ...ex,
-      videoUrl: ex.videoUrl || masterMatch?.videoUrl || apiMatch?.videoUrl || '',
-      thumbnailUrl: ex.thumbnailUrl || masterMatch?.thumbnailUrl || masterMatch?.gifUrl || apiMatch?.thumbnailUrl || apiMatch?.gifUrl || '',
-      gifUrl: ex.gifUrl || masterMatch?.gifUrl || apiMatch?.gifUrl || '',
-      ytVideo: ex.ytVideo || masterMatch?.ytVideo || apiMatch?.ytVideo || '',
+      videoUrl: masterMatch?.videoUrl || ex.videoUrl || apiMatch?.videoUrl || '',
+      thumbnailUrl: masterMatch?.thumbnailUrl || ex.thumbnailUrl || masterMatch?.gifUrl || apiMatch?.thumbnailUrl || apiMatch?.gifUrl || '',
+      gifUrl: masterMatch?.gifUrl || ex.gifUrl || apiMatch?.gifUrl || '',
+      ytVideo: masterMatch?.ytVideo || ex.ytVideo || apiMatch?.ytVideo || '',
     };
   }, [ex]);
 
@@ -402,7 +402,7 @@ const ImmersiveWorkout = ({
       const urls = exercise.videoUrl.split(/(?:,|\s)+/).filter(v => v.trim());
       urls.forEach(u => {
         if (u.match(/\.(mp4|webm)$/i)) {
-          items.push({ type: 'video', url: u });
+          if (!items.some(it => it.url === u)) items.push({ type: 'video', url: u });
         }
       });
     }
@@ -412,9 +412,14 @@ const ImmersiveWorkout = ({
         if (u.match(/\.(mp4|webm)$/i)) {
           if (!items.some(it => it.url === u)) items.push({ type: 'video', url: u });
         } else {
-          items.push({ type: 'image', url: u });
+          if (!items.some(it => it.url === u)) items.push({ type: 'image', url: u });
         }
       });
+    }
+    if (exercise.thumbnailUrl && !exercise.thumbnailUrl.match(/\.(mp4|webm)$/i)) {
+      if (!items.some(it => it.url === exercise.thumbnailUrl)) {
+        items.push({ type: 'image', url: exercise.thumbnailUrl });
+      }
     }
     return items;
   };
@@ -511,8 +516,18 @@ const ImmersiveWorkout = ({
 
   const onTouchMove = (e) => {
     if (diLuarImmersive(e)) return;
-    setTouchEndX(e.targetTouches[0].clientX);
-    setTouchEndY(e.targetTouches[0].clientY);
+    const curX = e.targetTouches[0].clientX;
+    const curY = e.targetTouches[0].clientY;
+    setTouchEndX(curX);
+    setTouchEndY(curY);
+
+    // Langsung minimize seketika saat tarikan ke bawah terdeteksi > 35px!
+    if (touchStartY !== null && (curY - touchStartY) > 35 && (curY - touchStartY) > Math.abs(curX - (touchStartX || curX)) * 1.1) {
+      setTouchStartY(null);
+      setTouchStartX(null);
+      playSoundEffect('click', soundEnabled);
+      handleMinimize();
+    }
   };
 
   const onTouchEnd = () => {
@@ -521,7 +536,7 @@ const ImmersiveWorkout = ({
     const deltaY = touchEndY - touchStartY; // positive = swipe down
 
     // 1. Swipe Down -> MINIMIZE LANGSUNG DARI AREA VIDEO!
-    if (deltaY > 50 && deltaY > Math.abs(deltaX) * 1.1) {
+    if (deltaY > 35 && deltaY > Math.abs(deltaX) * 1.1) {
       playSoundEffect('click', soundEnabled);
       handleMinimize();
       return;
@@ -568,8 +583,18 @@ const ImmersiveWorkout = ({
 
   const onRootTouchMove = (e) => {
     if (activeSetDetail !== null || showFinishConfirm) return;
-    setRootTouchEndX(e.targetTouches[0].clientX);
-    setRootTouchEndY(e.targetTouches[0].clientY);
+    const curX = e.targetTouches[0].clientX;
+    const curY = e.targetTouches[0].clientY;
+    setRootTouchEndX(curX);
+    setRootTouchEndY(curY);
+
+    // Langsung minimize seketika dari area header/root saat ditarik ke bawah > 40px!
+    if (rootTouchStartY !== null && (curY - rootTouchStartY) > 40 && (curY - rootTouchStartY) > Math.abs(curX - (rootTouchStartX || curX)) * 1.1) {
+      setRootTouchStartY(null);
+      setRootTouchStartX(null);
+      playSoundEffect('click', soundEnabled);
+      handleMinimize();
+    }
   };
 
   const onRootTouchEnd = () => {
@@ -577,8 +602,8 @@ const ImmersiveWorkout = ({
     const deltaY = rootTouchEndY - rootTouchStartY; // positive = swipe down
     const deltaX = (rootTouchEndX !== null && rootTouchStartX !== null) ? rootTouchEndX - rootTouchStartX : 0;
     
-    // Tarik ke bawah > 50px dan arah dominan ke bawah -> Langsung Minimize!
-    if (deltaY > 50 && deltaY > Math.abs(deltaX) * 1.1) {
+    // Tarik ke bawah > 40px dan arah dominan ke bawah -> Langsung Minimize!
+    if (deltaY > 40 && deltaY > Math.abs(deltaX) * 1.1) {
       playSoundEffect('click', soundEnabled);
       handleMinimize();
     }
@@ -796,7 +821,7 @@ const ImmersiveWorkout = ({
 
         {/* MAIN VISUAL (Center) */}
         <div 
-          className="flex-1 relative mt-3 mb-6 sm:mb-4 rounded-3xl mx-4 sm:mr-0 overflow-hidden shadow-lg border border-black/5 dark:border-white/10 group touch-pan-y bg-black"
+          className="flex-1 relative mt-3 mb-6 sm:mb-4 rounded-3xl mx-4 sm:mr-0 overflow-hidden shadow-lg border border-black/5 dark:border-white/10 group touch-none select-none bg-black"
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
@@ -965,7 +990,7 @@ const ImmersiveWorkout = ({
       </div>
 
       {/* CONTROLS (Bottom) */}
-      <div className="w-full sm:w-[45%] lg:w-[40%] px-4 pb-8 sm:pb-4 space-y-6 sm:space-y-8 flex flex-col justify-center overflow-y-auto shrink-0 relative z-10">
+      <div className="w-full sm:w-[45%] lg:w-[40%] px-4 pb-8 sm:pb-4 space-y-6 sm:space-y-8 flex flex-col justify-center overflow-y-auto overscroll-contain scrollbar-none shrink-0 relative z-10">
         
 
         {/* Scroll Pickers */}
