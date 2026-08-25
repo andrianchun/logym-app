@@ -1,7 +1,18 @@
 import assert from 'node:assert/strict';
-import { defaultMasterExercises, findMatchingMasterExercise } from '../data/constants.js';
+import { defaultMasterExercises, findMatchingMasterExercise, canonicalizeExercise } from '../data/constants.js';
 
 console.log('Testing exercise matching and entity merging...');
+
+// Canonicalize tests
+assert.equal(canonicalizeExercise({ name: 'Lat Pulldown' }).name, 'Wide-Grip Lat Pulldown');
+assert.equal(canonicalizeExercise({ name: 'Cross Cable Rear Delt' }).name, 'Cable Rear Delt Fly');
+assert.equal(canonicalizeExercise({ name: 'Dumbbell Biceps Curl' }).name, 'Dumbbell Alternate Bicep Curl');
+assert.equal(canonicalizeExercise({ name: 'Biceps Curl' }).name, 'Dumbbell Alternate Bicep Curl');
+assert.equal(canonicalizeExercise({ name: 'Rumanian Deadlift' }).name, 'Romanian Deadlift');
+assert.equal(canonicalizeExercise({ name: 'Flat Dumbbell Bench Press' }).name, 'Dumbbell Bench Press');
+assert.equal(canonicalizeExercise({ name: 'Cable Lateral Raises' }).name, 'Cable Seated Lateral Raise');
+assert.equal(canonicalizeExercise({ name: 'Cable Pull Through' }).name, 'Pull Through');
+assert.equal(canonicalizeExercise({ name: 'Cable Triceps Pushdown' }).name, 'Triceps Pushdown');
 
 // 1. Lat Pulldown -> Wide-Grip Lat Pulldown
 const matchLatPulldown = findMatchingMasterExercise({ name: 'Lat Pulldown' }, defaultMasterExercises);
@@ -39,5 +50,19 @@ assert.ok(matchRumanian, 'Rumanian Deadlift harus menemukan Romanian Deadlift');
 assert.equal(matchRumanian.name, 'Romanian Deadlift');
 assert.ok(matchRumanian.thumbnailUrl.includes('Romanian_Deadlift.webp'));
 assert.ok(matchRumanian.videoUrl.includes('Romanian_Deadlift.mp4'));
+
+// 7. Dumbbell Biceps Curl / Biceps Curl -> Dumbbell Alternate Bicep Curl
+const matchBicep = findMatchingMasterExercise({ name: 'Dumbbell Biceps Curl' }, defaultMasterExercises);
+assert.ok(matchBicep, 'Dumbbell Biceps Curl harus menemukan Dumbbell Alternate Bicep Curl');
+assert.equal(matchBicep.name, 'Dumbbell Alternate Bicep Curl');
+assert.ok(matchBicep.thumbnailUrl.includes('Dumbbell_Alternate_Bicep_Curl.webp'));
+assert.ok(matchBicep.videoUrl.includes('Dumbbell_Alternate_Bicep_Curl.mp4'));
+
+// 8. Cross Cable Rear Delt -> Cable Rear Delt Fly
+const matchRearDelt = findMatchingMasterExercise({ name: 'Cross Cable Rear Delt' }, defaultMasterExercises);
+assert.ok(matchRearDelt, 'Cross Cable Rear Delt harus menemukan Cable Rear Delt Fly');
+assert.equal(matchRearDelt.name, 'Cable Rear Delt Fly');
+assert.ok(matchRearDelt.thumbnailUrl.includes('Cable_Rear_Delt_Fly.webp'));
+assert.ok(matchRearDelt.videoUrl.includes('Cable_Rear_Delt_Fly_1.mp4'));
 
 console.log('exerciseMatching OK');

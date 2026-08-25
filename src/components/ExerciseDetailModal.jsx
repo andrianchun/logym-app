@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Dumbbell, History, Calculator, Replace, Video, Info, ChevronLeft, ChevronRight, Loader2, Play } from 'lucide-react';
-import { formatTarget, resolveProjectedProgramId, defaultMasterExercises, findMatchingMasterExercise, cleanExerciseNameForMatching } from '../data/constants';
+import { formatTarget, resolveProjectedProgramId, defaultMasterExercises, findMatchingMasterExercise, cleanExerciseNameForMatching, canonicalizeExercise } from '../data/constants';
 import { resolveExerciseKind, estimate10RM, estimate1RM, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from '../utils/workoutCalc';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 import SwipeInput from './SwipeInput';
@@ -12,14 +12,23 @@ export const isSameExerciseEntity = (e1, e2) => {
   if (e1.originalId && e2.originalId && String(e1.originalId) === String(e2.originalId)) return true;
   if (e1.originalId && String(e1.originalId) === String(e2.id)) return true;
   if (e2.originalId && String(e2.originalId) === String(e1.id)) return true;
+
+  const m1 = findMatchingMasterExercise(e1, defaultMasterExercises);
+  const m2 = findMatchingMasterExercise(e2, defaultMasterExercises);
+  if (m1 && m2 && m1.id === m2.id) return true;
+
   const n1 = cleanExerciseNameForMatching(e1.name);
   const n2 = cleanExerciseNameForMatching(e2.name);
   if (!n1 || !n2) return false;
   if (n1 === n2) return true;
   // Lat Pulldown <-> Wide-Grip Lat Pulldown merger
-  if ((n1.includes('lat pulldown') || n1 === 'wide grip lat pulldown') && (n2.includes('lat pulldown') || n2 === 'wide grip lat pulldown')) return true;
+  if (n1.includes('lat pulldown') && n2.includes('lat pulldown')) return true;
   // Romanian / Rumanian Deadlift merger
   if (n1.includes('romanian deadlift') && n2.includes('romanian deadlift')) return true;
+  // Rear Delt Fly merger
+  if (n1.includes('rear delt') && n2.includes('rear delt')) return true;
+  // Dumbbell Bicep Curl merger
+  if (n1.includes('bicep curl') && n2.includes('bicep curl') && !n1.includes('high cable') && !n2.includes('high cable')) return true;
   // Dumbbell Bench Press <-> Flat Dumbbell Bench Press merger
   if (n1.includes('dumbbell bench press') && n2.includes('dumbbell bench press')) return true;
   // Pull Through <-> Cable Pull Through merger
@@ -218,14 +227,18 @@ const ExerciseDetailModal = ({
 
   const resolveFullExercise = (raw) => {
     if (!raw) return null;
-    const masterMatch = findMatchingMasterExercise(raw, defaultMasterExercises);
+    const canonical = canonicalizeExercise(raw);
+    const masterMatch = findMatchingMasterExercise(canonical, defaultMasterExercises);
     return {
       ...masterMatch,
-      ...raw,
-      videoUrl: masterMatch?.videoUrl || raw.videoUrl || '',
-      thumbnailUrl: masterMatch?.thumbnailUrl || raw.thumbnailUrl || masterMatch?.gifUrl || raw.gifUrl || '',
-      gifUrl: masterMatch?.gifUrl || raw.gifUrl || '',
-      ytVideo: masterMatch?.ytVideo || raw.ytVideo || '',
+      ...canonical,
+      instructions: masterMatch?.instructions || canonical.instructions,
+      instructions_id: masterMatch?.instructions_id || canonical.instructions_id,
+      instructions_en: masterMatch?.instructions_en || canonical.instructions_en,
+      videoUrl: masterMatch?.videoUrl || canonical.videoUrl || '',
+      thumbnailUrl: masterMatch?.thumbnailUrl || canonical.thumbnailUrl || masterMatch?.gifUrl || canonical.gifUrl || '',
+      gifUrl: masterMatch?.gifUrl || canonical.gifUrl || '',
+      ytVideo: masterMatch?.ytVideo || canonical.ytVideo || '',
     };
   };
 
@@ -237,12 +250,7 @@ const ExerciseDetailModal = ({
      if (initialEx && initialEx.name) {
          import('../utils/exerciseDbApi').then(({ fetchExercisesFromApi }) => {
              fetchExercisesFromApi().then(onlineDb => {
-                 const locName = initialEx.name.toLowerCase();
-                 // Pemasangan yang lebih fleksibel: exact, locName ada di dbName, atau dbName ada di locName
-                 const onlineMatch = onlineDb.find(e => {
-                     const dbName = e.name.toLowerCase();
-                     return dbName === locName || dbName.includes(locName) || locName.includes(dbName);
-                 });
+                 const onlineMatch = findMatchingMasterExercise(resolved || initialEx, onlineDb);
                  if (onlineMatch) {
                      setEx(prev => ({ 
                          ...prev, 

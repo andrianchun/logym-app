@@ -60,7 +60,7 @@ import { rapikanNamaProgram, rapikanNamaSesi, pertahankanNamaSesi } from './util
 import useDialog from './hooks/useDialog';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import UpdaterAlert from './components/UpdaterAlert';
-import { getLocalYMD, resolveProjectedProgramId, isLomealOwned, resolveLoggedExercise, splitSessionLogs, buildLogymSyncPayload, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos, getDayWorkouts, countMissedScheduledDays } from './data/constants';
+import { getLocalYMD, resolveProjectedProgramId, isLomealOwned, resolveLoggedExercise, splitSessionLogs, buildLogymSyncPayload, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos, getDayWorkouts, countMissedScheduledDays, canonicalizeExercise } from './data/constants';
 import { serializeDay, dayFingerprint, migrateBaseline, reconcileHistory, workoutsToMap, workoutIdsFromBaseline, diffFields, cleanFirestoreData, stableStringify, mergeBackupIntoHistory, sessionsPendingSave } from './utils/historySync';
 import { useBleManager } from './hooks/useBleManager';
 import { bolehSync, gabungAntrean } from './utils/hcSchedule';
@@ -426,12 +426,21 @@ export default function App() {
   }, [userAchievements]);
   const [unlockedAchievementsPopup, setUnlockedAchievementsPopup] = useState([]);
 
-  const [exerciseLibrary, _setExerciseLibrary] = useState(() => __previewUser ? defaultMasterExercises : readCache('__CACHED_EXERCISE_LIBRARY', defaultMasterExercises));
+  const [exerciseLibrary, _setExerciseLibrary] = useState(() => {
+    const raw = __previewUser ? defaultMasterExercises : readCache('__CACHED_EXERCISE_LIBRARY', defaultMasterExercises);
+    return (raw || []).map(canonicalizeExercise);
+  });
   useEffect(() => {
     writeCache('__CACHED_EXERCISE_LIBRARY', exerciseLibrary);
   }, [exerciseLibrary]);
   const setExerciseLibrary = _setExerciseLibrary;
-  const [programs, _setPrograms] = useState(() => __previewUser ? defaultPrograms : readCache('__CACHED_PROGRAMS', defaultPrograms));
+  const [programs, _setPrograms] = useState(() => {
+    const raw = __previewUser ? defaultPrograms : readCache('__CACHED_PROGRAMS', defaultPrograms);
+    return (raw || []).map(p => ({
+      ...p,
+      exercises: (p.exercises || []).map(canonicalizeExercise)
+    }));
+  });
   useEffect(() => {
     writeCache('__CACHED_PROGRAMS', programs);
   }, [programs]);
@@ -1802,17 +1811,13 @@ export default function App() {
                 planId: p.planId ?? (DEFAULT_DAYS[p.id] ? 'custom' : null),
                 planName: p.planName ?? (DEFAULT_DAYS[p.id] ? 'Program Default' : null),
                 assignedDays: p.assignedDays ?? DEFAULT_DAYS[p.id] ?? [],
-                exercises: p.exercises ? p.exercises.map(ex => 
-                  (ex.id === 101 && ex.name === 'Incline Smith Machine Press') ? { ...ex, name: 'Smith Machine Incline Bench Press' } : ex
-                ) : []
+                exercises: p.exercises ? p.exercises.map(canonicalizeExercise) : []
               }));
               setPrograms(prev => (!takeServer('programs', prev) || JSON.stringify(prev) === JSON.stringify(migratedPrograms)) ? prev : migratedPrograms);
             }
             if (data.exerciseLibrary) {
               const parsedLib = typeof data.exerciseLibrary === 'string' ? JSON.parse(data.exerciseLibrary) : data.exerciseLibrary;
-              const migratedLib = parsedLib.map(ex => 
-                (ex.id === 101 && ex.name === 'Incline Smith Machine Press') ? { ...ex, name: 'Smith Machine Incline Bench Press' } : ex
-              );
+              const migratedLib = parsedLib.map(canonicalizeExercise);
               
               const existingIds = new Set(migratedLib.map(ex => ex.id));
               defaultMasterExercises.forEach(defaultEx => {

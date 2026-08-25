@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Play, Pause, ChevronRight, ChevronLeft, Dumbbell, Check, Info, Clock, Minimize2, SkipForward, ClipboardEdit, Brain, Flame, Activity, ArrowLeftRight, Square } from 'lucide-react';
 import ScrollPicker from './ScrollPicker';
-import { exerciseTypeLabels, defaultMasterExercises, findMatchingMasterExercise } from '../data/constants';
+import { exerciseTypeLabels, defaultMasterExercises, findMatchingMasterExercise, canonicalizeExercise } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
 import { calculateWorkoutCalories, calculateLiveWorkoutCalories, resolveExerciseKind, defaultSetWeight, gymStepFor, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from '../utils/workoutCalc';
 import { getCachedExercises } from '../utils/exerciseDbApi';
@@ -380,18 +380,18 @@ const ImmersiveWorkout = ({
 
   const resolvedEx = React.useMemo(() => {
     if (!ex) return null;
-    const masterMatch = findMatchingMasterExercise(ex, defaultMasterExercises);
+    const canonical = canonicalizeExercise(ex);
+    const masterMatch = findMatchingMasterExercise(canonical, defaultMasterExercises);
     const apiExercises = getCachedExercises();
-    const locName = (ex.name || '').toLowerCase();
-    const apiMatch = apiExercises.find(a => a.id === ex.id || a.name?.toLowerCase() === locName || (a.name && locName.includes(a.name.toLowerCase())));
+    const apiMatch = findMatchingMasterExercise(canonical, apiExercises);
     return {
       ...apiMatch,
       ...masterMatch,
-      ...ex,
-      videoUrl: masterMatch?.videoUrl || ex.videoUrl || apiMatch?.videoUrl || '',
-      thumbnailUrl: masterMatch?.thumbnailUrl || ex.thumbnailUrl || masterMatch?.gifUrl || apiMatch?.thumbnailUrl || apiMatch?.gifUrl || '',
-      gifUrl: masterMatch?.gifUrl || ex.gifUrl || apiMatch?.gifUrl || '',
-      ytVideo: masterMatch?.ytVideo || ex.ytVideo || apiMatch?.ytVideo || '',
+      ...canonical,
+      videoUrl: masterMatch?.videoUrl || canonical.videoUrl || apiMatch?.videoUrl || '',
+      thumbnailUrl: masterMatch?.thumbnailUrl || canonical.thumbnailUrl || masterMatch?.gifUrl || apiMatch?.thumbnailUrl || apiMatch?.gifUrl || '',
+      gifUrl: masterMatch?.gifUrl || canonical.gifUrl || apiMatch?.gifUrl || '',
+      ytVideo: masterMatch?.ytVideo || canonical.ytVideo || apiMatch?.ytVideo || '',
     };
   }, [ex]);
 

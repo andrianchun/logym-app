@@ -539,7 +539,7 @@ export const defaultMasterExercises = [
 
 export const cleanExerciseNameForMatching = (name) => {
   if (!name) return '';
-  return String(name)
+  let str = String(name)
     .toLowerCase()
     .replace(/[^\w\s]/g, ' ')
     .replace(/\brumanian\b/g, 'romanian')
@@ -547,14 +547,28 @@ export const cleanExerciseNameForMatching = (name) => {
     .replace(/\bdumbell\b/g, 'dumbbell')
     .replace(/\bdumbel\b/g, 'dumbbell')
     .replace(/\bpull\s+thru\b/g, 'pull through')
-    .replace(/\blat\s+pull\s+down\b/g, 'lat pulldown')
+    .replace(/\blat\s+pull\s*down\b/g, 'lat pulldown')
+    .replace(/\bcross\s+cable\s+rear\s+delt(\s+fly)?\b/g, 'cable rear delt fly')
     .replace(/\s+/g, ' ')
     .trim();
+
+  // Normalisasi bentuk jamak/tunggal istilah umum
+  str = str.replace(/\bbiceps\b/g, 'bicep')
+           .replace(/\bcurls\b/g, 'curl')
+           .replace(/\braises\b/g, 'raise')
+           .replace(/\bpresses\b/g, 'press')
+           .replace(/\bshrugs\b/g, 'shrug')
+           .replace(/\blunges\b/g, 'lunge')
+           .replace(/\bcrunches\b/g, 'crunch')
+           .replace(/\bextensions\b/g, 'extension');
+
+  return str;
 };
 
 /**
  * Mencocokkan exercise dengan defaultMasterExercises atau daftar katalog lainnya secara cerdas.
  * Mendukung variasi nama seperti "Lat Pulldown" -> "Wide-Grip Lat Pulldown",
+ * "Cross Cable Rear Delt" -> "Cable Rear Delt Fly", "Dumbbell Biceps Curl" -> "Dumbbell Alternate Bicep Curl",
  * "Cable Pull Through" -> "Pull Through", "Flat Dumbbell Bench Press" -> "Dumbbell Bench Press",
  * "Cable Lateral Raises" -> "Cable Seated Lateral Raise", "Rumanian Deadlift" -> "Romanian Deadlift", dll.
  */
@@ -565,7 +579,7 @@ export const findMatchingMasterExercise = (targetEx, masterList = defaultMasterE
 
   // 1. Cocokkan berdasarkan ID
   if (rawId !== undefined && rawId !== null) {
-    const byId = masterList.find(m => String(m.id) === String(rawId));
+    const byId = masterList.find(m => String(m.id || m.exerciseId) === String(rawId));
     if (byId) return byId;
   }
 
@@ -582,20 +596,73 @@ export const findMatchingMasterExercise = (targetEx, masterList = defaultMasterE
   });
   if (bySub) return bySub;
 
-  // 4. Token inti (mengabaikan awalan alat/posisi seperti cable, dumbbell, smith, flat, wide-grip, dll)
-  const IGNORE_WORDS = new Set(['cable', 'machine', 'dumbbell', 'barbell', 'smith', 'seated', 'standing', 'lying', 'flat', 'incline', 'decline', 'wide', 'grip', 'close', 'sm']);
+  // 4. Token inti (mengabaikan awalan alat/posisi seperti cable, dumbbell, smith, flat, wide-grip, alternate, dll)
+  const IGNORE_WORDS = new Set(['cable', 'machine', 'dumbbell', 'barbell', 'smith', 'seated', 'standing', 'lying', 'flat', 'incline', 'decline', 'wide', 'grip', 'close', 'sm', 'alternate', 'alternating', 'with']);
   const targetWords = rawName.split(/[\s-]+/).filter(w => !IGNORE_WORDS.has(w));
   if (targetWords.length > 0) {
-    const targetCore = targetWords.join(' ').replace(/raises?/, 'raise').replace(/curls?/, 'curl').replace(/presses?/, 'press');
+    const targetCore = targetWords.join(' ');
     const byCore = masterList.find(m => {
       const mWords = cleanExerciseNameForMatching(m.name).split(/[\s-]+/).filter(w => !IGNORE_WORDS.has(w));
-      const mCore = mWords.join(' ').replace(/raises?/, 'raise').replace(/curls?/, 'curl').replace(/presses?/, 'press');
-      return mCore.includes(targetCore) || targetCore.includes(mCore);
+      const mCore = mWords.join(' ');
+      return mCore === targetCore || mCore.includes(targetCore) || targetCore.includes(mCore);
     });
     if (byCore) return byCore;
   }
 
   return null;
+};
+
+/**
+ * Menormalkan objek latihan ke nama dan atribut kanonikal master resmi.
+ * Menjamin sinkronisasi nama:
+ *  - "Lat Pulldown" -> "Wide-Grip Lat Pulldown"
+ *  - "Cross Cable Rear Delt" -> "Cable Rear Delt Fly"
+ *  - "Dumbbell Biceps Curl" / "Biceps Curl" -> "Dumbbell Alternate Bicep Curl"
+ *  - "Rumanian Deadlift" / "RDL" -> "Romanian Deadlift"
+ *  - "Flat Dumbbell Bench Press" -> "Dumbbell Bench Press"
+ *  - "Cable Lateral Raises" -> "Cable Seated Lateral Raise"
+ *  - "Cable Pull Through" -> "Pull Through"
+ *  - "Cable Triceps Pushdown" -> "Triceps Pushdown"
+ */
+export const canonicalizeExercise = (ex) => {
+  if (!ex) return ex;
+  const masterMatch = findMatchingMasterExercise(ex, defaultMasterExercises);
+  let name = ex.name || '';
+  const locName = cleanExerciseNameForMatching(name);
+
+  if (locName.includes('lat pulldown') || locName === 'wide grip lat pulldown') {
+    name = 'Wide-Grip Lat Pulldown';
+  } else if (locName.includes('rear delt') || locName.includes('cross cable rear delt')) {
+    name = 'Cable Rear Delt Fly';
+  } else if (locName.includes('romanian deadlift') || locName.includes('rumanian deadlift')) {
+    name = 'Romanian Deadlift';
+  } else if (locName.includes('dumbbell bench press') || locName === 'flat dumbbell bench press') {
+    name = 'Dumbbell Bench Press';
+  } else if (locName.includes('pull through')) {
+    name = 'Pull Through';
+  } else if (locName.includes('lateral raise')) {
+    name = 'Cable Seated Lateral Raise';
+  } else if (locName.includes('triceps pushdown') || locName.includes('tricep pushdown')) {
+    name = 'Triceps Pushdown';
+  } else if (locName.includes('bicep curl') && !locName.includes('high cable')) {
+    name = 'Dumbbell Alternate Bicep Curl';
+  } else if (masterMatch && masterMatch.name && masterMatch.id === (ex.originalId || ex.id)) {
+    name = masterMatch.name;
+  }
+
+  return {
+    ...ex,
+    name,
+    videoUrl: masterMatch?.videoUrl || ex.videoUrl || '',
+    thumbnailUrl: masterMatch?.thumbnailUrl || ex.thumbnailUrl || masterMatch?.gifUrl || ex.gifUrl || '',
+    gifUrl: masterMatch?.gifUrl || ex.gifUrl || '',
+    ytVideo: masterMatch?.ytVideo || ex.ytVideo || '',
+    ...(masterMatch ? {
+      target: (ex.target && ex.target.length > 0) ? ex.target : masterMatch.target,
+      equipment: ex.equipment || masterMatch.equipment,
+      type: ex.type || masterMatch.type,
+    } : {})
+  };
 };
 
 export const defaultPrograms = [
@@ -879,7 +946,9 @@ export const defaultPrograms = [
         "defaultWeight": 5,
         "equipment": "Cable",
         "ytVideo": "https://youtu.be/cGXBVOc5xIk?si=ve9zzcNdiyNqYF5I https://youtu.be/IeOqdw9WI90?si=J4oHxFNn7257r3ak",
-        "videoUrl": "https://youtu.be/cGXBVOc5xIk?si=ve9zzcNdiyNqYF5I https://youtu.be/IeOqdw9WI90?si=J4oHxFNn7257r3ak"
+        "videoUrl": "/exercise-assets/edb-Cable_Rear_Delt_Fly_1.mp4 /exercise-assets/edb-Cable_Rear_Delt_Fly_2.mp4 /exercise-assets/youtube-backup/edb-Cable_Rear_Delt_Fly_1.mp4",
+        "thumbnailUrl": "/exercise-assets/edb-Cable_Rear_Delt_Fly.webp",
+        "gifUrl": "/exercise-assets/edb-Cable_Rear_Delt_Fly.webp"
       },
       {
         "id": 117,

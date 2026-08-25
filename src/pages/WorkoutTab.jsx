@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Plus, Snowflake, Play, CalendarDays, X, CheckCircle, ChevronDown, ChevronUp, Dumbbell, Share2, Flame, Brain } from 'lucide-react';
 import { fetchExercisesFromApi } from '../utils/exerciseDbApi';
 import { shareWorkoutToFeed } from '../utils/communityApi';
-import { normalizeMuscleKey, resolveProjectedProgramId, getDayWorkouts } from '../data/constants';
+import { normalizeMuscleKey, resolveProjectedProgramId, getDayWorkouts, defaultMasterExercises, findMatchingMasterExercise, canonicalizeExercise } from '../data/constants';
 import { estimate10RM, defaultSetWeight, gymStepFor, getEquipmentConfig, calculateActualWeight, getSetActualWeight, rm10Series, buildExLookupByName, canonicalExId } from '../utils/workoutCalc';
 
 // Import Komponen Pecahan
@@ -363,17 +363,15 @@ const WorkoutTab = ({
   
   const handleOpenDetail = async (ex) => {
      playSoundEffect('click', soundEnabled);
-     // Ambil data dari library lokal
-     let fullEx = exerciseLibrary?.find(e => String(e.id) === String(ex.id));
-     if (!fullEx) {
-         fullEx = exerciseLibrary?.find(e => e.name.toLowerCase() === ex.name.toLowerCase());
-     }
+     const canonical = canonicalizeExercise(ex);
+     // Ambil data dari library lokal / master
+     let fullEx = findMatchingMasterExercise(canonical, exerciseLibrary || defaultMasterExercises) || canonical;
 
      // Ambil instruksi & gif dari database lengkap jika belum ada
      if (!fullEx || !fullEx.instructions || fullEx.instructions.length === 0) {
          try {
              const onlineDb = await fetchExercisesFromApi();
-             const onlineMatch = onlineDb.find(e => e.name.toLowerCase() === (fullEx?.name || ex.name).toLowerCase());
+             const onlineMatch = findMatchingMasterExercise(fullEx || canonical, onlineDb);
              if (onlineMatch) {
                  // Gabungkan dan utamakan instruksi/gif/equipment dari onlineDb
                  fullEx = { ...onlineMatch, ...fullEx, instructions: onlineMatch.instructions, equipment: onlineMatch.equipment || fullEx?.equipment };
@@ -381,7 +379,7 @@ const WorkoutTab = ({
          } catch (err) {}
      }
 
-     let mergedEx = { ...(fullEx || {}), ...ex };
+     let mergedEx = { ...(fullEx || {}), ...canonical };
      if (fullEx) {
          if (!mergedEx.instructions || mergedEx.instructions.length === 0) mergedEx.instructions = fullEx.instructions;
          if (!mergedEx.ytVideo) mergedEx.ytVideo = fullEx.ytVideo;

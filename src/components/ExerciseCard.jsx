@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { SkipForward, Video, CheckCircle, Play, Square, Info, ArrowLeftRight, X, Dumbbell, ClipboardEdit, Flame, Brain, Plus, ChevronUp, ChevronDown, Activity } from 'lucide-react';
 import EquipmentIcon from './EquipmentIcon';
 import SwipeInput from './SwipeInput';
-import { formatTarget, exerciseTypeLabels, getVideoId, defaultMasterExercises, findMatchingMasterExercise } from '../data/constants';
+import { formatTarget, exerciseTypeLabels, getVideoId, defaultMasterExercises, findMatchingMasterExercise, canonicalizeExercise } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
 import { resolveExerciseKind, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from '../utils/workoutCalc';
 import { getCachedExercises } from '../utils/exerciseDbApi';
@@ -221,18 +221,18 @@ const ExerciseCard = ({
       {/* HEADER IMAGE / GIF FULL WIDTH */}
       <div className="relative w-full h-[280px] sm:h-[320px] bg-zinc-100 dark:bg-zinc-800">
          {(() => {
-            const masterMatch = findMatchingMasterExercise(ex, defaultMasterExercises);
+            const canonical = canonicalizeExercise(ex);
+            const masterMatch = findMatchingMasterExercise(canonical, defaultMasterExercises);
             const apiExercises = getCachedExercises();
-            const locName = (ex.name || '').toLowerCase();
-            const apiMatch = (!ex.gifUrl && !ex.thumbnailUrl && !isCustom) ? apiExercises.find(e => e.name?.toLowerCase() === locName || locName.includes(e.name?.toLowerCase())) : null;
-            const finalImgUrl = masterMatch?.thumbnailUrl || ex.thumbnailUrl || masterMatch?.gifUrl || ex.gifUrl || apiMatch?.thumbnailUrl || apiMatch?.gifUrl;
-            const ytId = getVideoId(masterMatch?.ytVideo || ex.ytVideo || apiMatch?.ytVideo);
+            const apiMatch = (!canonical.gifUrl && !canonical.thumbnailUrl && !isCustom) ? findMatchingMasterExercise(canonical, apiExercises) : null;
+            const finalImgUrl = masterMatch?.thumbnailUrl || canonical.thumbnailUrl || masterMatch?.gifUrl || canonical.gifUrl || apiMatch?.thumbnailUrl || apiMatch?.gifUrl;
+            const ytId = getVideoId(masterMatch?.ytVideo || canonical.ytVideo || apiMatch?.ytVideo);
             
             if (finalImgUrl) {
                 return (
                   <img 
                     src={finalImgUrl} 
-                    alt={ex.name} 
+                    alt={canonical.name || ex.name} 
                     loading="lazy" 
                     className="absolute inset-0 w-full h-full object-cover" 
                     onError={(e) => {
@@ -252,12 +252,12 @@ const ExerciseCard = ({
                       e.target.src = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
                     }
                   }}
-                  alt={ex.name} 
+                  alt={canonical.name || ex.name} 
                   loading="lazy" 
                   className="absolute inset-0 w-full h-full object-cover" 
                 />;
             } else {
-                return <div className="absolute inset-0 flex items-center justify-center opacity-10"><EquipmentIcon equipment={ex.equipment} size={120} /></div>;
+                return <div className="absolute inset-0 flex items-center justify-center opacity-10"><EquipmentIcon equipment={canonical.equipment || ex.equipment} size={120} /></div>;
             }
          })()}
          
@@ -327,7 +327,7 @@ const ExerciseCard = ({
                   )}
                </div>
                <h3 className="text-2xl sm:text-3xl font-black text-white leading-[1.1] drop-shadow-md pr-4 mt-2">
-                  {idx + 1}. {ex.name}
+                  {idx + 1}. {canonicalizeExercise(ex)?.name || ex.name}
                </h3>
             </div>
          </div>
