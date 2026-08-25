@@ -133,6 +133,14 @@ Setiap perubahan pada struktur latihan atau timer wajib lolos verifikasi di 5 la
 | ✅ **Tampilkan Status Ekstraksi Transparan**: Saat unduhan mencapai 100%, ubah status menjadi *"Mengekstrak & memasang..."* dengan animasi halus. | ❌ **Jangan biarkan progress bar diam membeku di angka 70% atau 100%** tanpa memberi tahu bahwa aplikasi sedang mengekstrak file ke penyimpanan lokal. |
 | ✅ **Rilis selalu lewat `npm run release`**: Script ini otomatis menaikkan versi, mem-build OTA, membersihkan cache Firebase, mendeploy, dan melakukan git push. | ❌ **Jangan buat file `public/ota/version.json` secara manual**, file manifest hanya boleh dibuat otomatis oleh build script. |
 
+### 3.8. Subsistem Media Video & Thumbnail Latihan (`exercise-assets`)
+
+| DOs (Wajib Dilakukan) | DON'Ts (Dilarang Keras) |
+|---|---|
+| ✅ **Wajib Gunakan Video Codec H.264 (avc1/yuv420p Baseline)**: Semua file MP4 baik video AI maupun backup YouTube wajib di-encode dengan H.264 standar agar 100% kompatibel di Android WebView, iOS Safari, dan Chrome. | ❌ **Jangan biarkan video berformat AV1 (av01) atau VP9**, karena Android WebView tidak memiliki hardware decoder AV1 sehingga video akan macet dan hanya menampilkan kotak hitam dengan ikon play rusak! |
+| ✅ **Format Gambar Wajib WebP Sejati (True WebP)**: Gambar thumbnail `.webp` wajib memiliki header magic bytes `RIFF....WEBP` dengan ukuran terkompresi (~80-150 KB). | ❌ **Jangan me-rename file `.png` menjadi `.webp` tanpa re-encoding**, karena browser akan mendeteksi `Content-Type: image/webp` mismatch dengan isi PNG dan menyebabkan gambar tidak muncul / korup di kartu latihan. |
+| ✅ **Preserve Semua Properti Media saat Enrich / Merge**: Komponen `DatabaseTab`, `WorkoutTab`, dan `ExerciseDetailModal` wajib memelihara `videoUrl`, `thumbnailUrl`, `gifUrl`, dan `ytVideo` saat menggabungkan latihan lokal dengan ExerciseDB online. | ❌ **Jangan biarkan spread `{ ...fullEx, ...ex }` menimpa `videoUrl` menjadi `undefined`** jika objek latihan di histori/program belum memiliki field tersebut. |
+
 ---
 
 ## 4. Log Insiden Historis & Pelajaran Berharga
@@ -153,6 +161,13 @@ Setiap perubahan pada struktur latihan atau timer wajib lolos verifikasi di 5 la
 * **Gejala**: Download update OTA di HP mencapai 128 MB dan sangat lambat.
 * **Pelajaran**: Script `build-generator-site.cjs` menyalin video ke `dist/generator-site`, dan `build-ota.js` tidak mengabaikannya, sehingga 60 MB video ter-zip dua kali. Mengabaikan `generator-site/**` langsung memangkas bundle menjadi 66 MB.
 
+### Insiden 5: Video Freeze di Play Button & Thumbnail Corrupted (25 Agustus 2026)
+* **Gejala**: Video kedua Smith Machine Squat hanya menampilkan tombol Play rusak tanpa video, Smith Machine Bench Press tidak memutar video di HP, dan thumbnail Cable Crossover tidak muncul / tampak rusak di kartu.
+* **Pelajaran**:
+  1. File video YouTube backup sebelumnya terunduh dengan codec modern **AV1 (av01)** yang tidak didukung WebView Android. Semua MP4 wajib ditranscode ke **H.264 Baseline**.
+  2. Gambar thumbnail sebelumnya berupa file PNG 2.3 MB yang hanya diganti ekstensi `.webp`. Server mengirim header `image/webp` yang bentrok dengan payload PNG. Semua thumbnail wajib di-encode ke True WebP (~80 KB).
+  3. `ExerciseDetailModal` dan `WorkoutTab` perlu menyinkronkan pemutaran HTML5 video saat swipe serta memelihara `videoUrl` saat enrichment.
+
 ---
 
 ## 5. Checklist Wajib Sebelum Rilis / Selesai Debugging
@@ -162,4 +177,5 @@ Setiap perubahan pada struktur latihan atau timer wajib lolos verifikasi di 5 la
 - [ ] 3. Apakah data yang dikirim ke Firestore sudah melewati `cleanFirestoreData`?
 - [ ] 4. Apakah Floating Bar, Immersive Mode, dan Kalender menampilkan angka kalori/durasi yang konsisten?
 - [ ] 5. Apakah modal baru memiliki proteksi scroll lock (`overscroll-contain touch-none`) dan `data-close-modal="true"`?
-- [ ] 6. Apakah ukuran bundle OTA sudah diverifikasi di bawah batas wajar?
+- [ ] 6. Apakah semua video MP4 berformat H.264 (avc1) dan thumbnail berformat True WebP?
+- [ ] 7. Apakah ukuran bundle OTA sudah diverifikasi di bawah batas wajar?

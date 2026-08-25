@@ -19,10 +19,34 @@ const UnifiedExerciseCard = React.memo(({ t, lang, ex, onEdit, onDelete, onToggl
           style={{ maskImage: 'linear-gradient(105deg, transparent 15%, black 85%)', WebkitMaskImage: 'linear-gradient(105deg, transparent 15%, black 85%)' }}
         >
           {ex.thumbnailUrl ? (
-            <img src={ex.thumbnailUrl} alt={ex.name} loading="lazy" className="w-full h-full object-cover object-center" />
+            <img 
+              src={ex.thumbnailUrl} 
+              alt={ex.name} 
+              loading="lazy" 
+              className="w-full h-full object-cover object-center" 
+              onError={(e) => {
+                if (finalGifUrl && e.target.src !== finalGifUrl) {
+                  e.target.src = finalGifUrl;
+                } else if (ytId) {
+                  e.target.src = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+                }
+              }}
+            />
           ) : finalGifUrl ? (
-            // GIF dari API sudah berbentuk landscape/terpotong rapi
-            <img src={finalGifUrl} alt={ex.name} loading="lazy" className="w-full h-full object-cover object-[100%_25%]" />
+            // GIF / WebP dari lokal & API sudah berbentuk landscape/terpotong rapi
+            <img 
+              src={finalGifUrl} 
+              alt={ex.name} 
+              loading="lazy" 
+              className="w-full h-full object-cover object-[100%_25%]" 
+              onError={(e) => {
+                if (e.target.src.endsWith('.webp')) {
+                  e.target.src = e.target.src.replace('.webp', '.png');
+                } else if (ytId) {
+                  e.target.src = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+                }
+              }}
+            />
           ) : ytId ? (
             // Gunakan w-[320%] untuk memotong pilar hitam dari thumbnail Shorts (9:16 di dalam 16:9). 
             <img 

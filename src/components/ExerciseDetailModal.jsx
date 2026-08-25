@@ -240,9 +240,13 @@ const ExerciseDetailModal = ({
       const urls = exercise.gifUrl.split(/(?:,|\s)+/).filter(v => v.trim());
       urls.forEach(u => items.push({ type: u.match(/\.(mp4|webm)$/i) ? 'video' : 'image', url: u }));
     }
-    if (exercise.ytVideo && typeof exercise.ytVideo === 'string' && items.length === 0) {
+    if (exercise.ytVideo && typeof exercise.ytVideo === 'string') {
       const urls = exercise.ytVideo.split(/(?:,|\s)+/).filter(v => v.trim());
-      urls.forEach(u => items.push({ type: 'youtube', url: u }));
+      urls.forEach(u => {
+        if (!items.some(it => it.url === u)) {
+          items.push({ type: 'youtube', url: u });
+        }
+      });
     }
     return items;
   };
@@ -271,10 +275,11 @@ const ExerciseDetailModal = ({
     setIsVideoReady(false);
   }, [activeMediaIndex]);
 
-  // Sinkronisasi pemutaran video YouTube via postMessage tanpa memanipulasi `iframe.src`,
-  // sehingga browser history TIDAK tercemar saat user menggeser/swipe ke video lain.
+  // Sinkronisasi pemutaran video YouTube & HTML5 video saat swipe media
   React.useEffect(() => {
     const iframes = document.querySelectorAll('.exercise-video-iframe');
+    const videoObjs = document.querySelectorAll('.exercise-video-html5');
+
     iframes.forEach((iframe, idx) => {
       try {
         if (iframe && iframe.contentWindow) {
@@ -284,6 +289,16 @@ const ExerciseDetailModal = ({
             iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
             iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'seekTo', args: [0, true] }), '*');
           }
+        }
+      } catch (err) {}
+    });
+
+    videoObjs.forEach((v, idx) => {
+      try {
+        if (idx === activeMediaIndex) {
+          v.play().catch(() => {});
+        } else {
+          v.pause();
         }
       } catch (err) {}
     });
@@ -484,7 +499,7 @@ const ExerciseDetailModal = ({
                         }
                       }
                       if (media.type === 'video') {
-                        return <video src={media.url} autoPlay={idx === activeMediaIndex} loop muted playsInline className="w-full h-full object-cover opacity-100 shadow-xl transition-all duration-300" />;
+                        return <video src={media.url} autoPlay={idx === activeMediaIndex} loop muted playsInline preload="auto" className="exercise-video-html5 w-full h-full object-cover opacity-100 shadow-xl transition-all duration-300" />;
                       }
                       
                       // Animated Image Component for ExerciseDB frames

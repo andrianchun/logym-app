@@ -373,6 +373,8 @@ const WorkoutTab = ({
      if (fullEx) {
          if (!mergedEx.instructions || mergedEx.instructions.length === 0) mergedEx.instructions = fullEx.instructions;
          if (!mergedEx.ytVideo) mergedEx.ytVideo = fullEx.ytVideo;
+         if (!mergedEx.videoUrl) mergedEx.videoUrl = fullEx.videoUrl;
+         if (!mergedEx.thumbnailUrl) mergedEx.thumbnailUrl = fullEx.thumbnailUrl;
          if (!mergedEx.gifUrl) mergedEx.gifUrl = fullEx.gifUrl;
          if (!mergedEx.equipment) mergedEx.equipment = fullEx.equipment;
      }

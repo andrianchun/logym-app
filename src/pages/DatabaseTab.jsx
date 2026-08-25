@@ -442,7 +442,9 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
       if (onlineMap.has(key) || onlineExByAlias) {
         const onlineEx = onlineExByAlias || onlineMap.get(key);
         enrichedEx.instructions = onlineEx.instructions || enrichedEx.instructions;
-        enrichedEx.gifUrl = onlineEx.gifUrl || enrichedEx.gifUrl;
+        enrichedEx.gifUrl = localEx.gifUrl || onlineEx.gifUrl || enrichedEx.gifUrl;
+        enrichedEx.videoUrl = localEx.videoUrl || onlineEx.videoUrl || enrichedEx.videoUrl;
+        enrichedEx.thumbnailUrl = localEx.thumbnailUrl || onlineEx.thumbnailUrl || enrichedEx.thumbnailUrl;
         if (!enrichedEx.ytVideo && (onlineEx.ytVideo || onlineEx.videoUrl)) {
           enrichedEx.ytVideo = onlineEx.ytVideo || onlineEx.videoUrl;
         }

@@ -222,12 +222,26 @@ const ExerciseCard = ({
       <div className="relative w-full h-[280px] sm:h-[320px] bg-zinc-100 dark:bg-zinc-800">
          {(() => {
             const apiExercises = getCachedExercises();
-            const apiMatch = (!ex.gifUrl && !isCustom) ? apiExercises.find(e => e.name.toLowerCase() === ex.name.toLowerCase()) : null;
-            const finalGifUrl = ex.gifUrl || apiMatch?.gifUrl;
-            const ytId = getVideoId(ex.ytVideo);
+            const apiMatch = (!ex.gifUrl && !ex.thumbnailUrl && !isCustom) ? apiExercises.find(e => e.name.toLowerCase() === ex.name.toLowerCase()) : null;
+            const finalImgUrl = ex.thumbnailUrl || ex.gifUrl || apiMatch?.thumbnailUrl || apiMatch?.gifUrl;
+            const ytId = getVideoId(ex.ytVideo || apiMatch?.ytVideo);
             
-            if (finalGifUrl) {
-                return <img src={finalGifUrl} alt={ex.name} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />;
+            if (finalImgUrl) {
+                return (
+                  <img 
+                    src={finalImgUrl} 
+                    alt={ex.name} 
+                    loading="lazy" 
+                    className="absolute inset-0 w-full h-full object-cover" 
+                    onError={(e) => {
+                      if (e.target.src.endsWith('.webp')) {
+                        e.target.src = e.target.src.replace('.webp', '.png');
+                      } else if (ytId) {
+                        e.target.src = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+                      }
+                    }}
+                  />
+                );
             } else if (ytId) {
                 return <img 
                   src={`https://img.youtube.com/vi/${ytId}/maxresdefault.jpg`} 
