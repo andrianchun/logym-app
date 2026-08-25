@@ -228,16 +228,7 @@ const ExerciseCard = ({
             const finalImgUrl = masterMatch?.thumbnailUrl || canonical.thumbnailUrl || masterMatch?.gifUrl || canonical.gifUrl || apiMatch?.thumbnailUrl || apiMatch?.gifUrl;
             const ytId = getVideoId(masterMatch?.ytVideo || canonical.ytVideo || apiMatch?.ytVideo);
             
-            if (finalImgUrl && (finalImgUrl.includes('/0.jpg') || finalImgUrl.includes('/1.jpg'))) {
-                return (
-                  <TwoFrameMotionLoop 
-                    exerciseId={apiMatch?.exerciseId || masterMatch?.exerciseId} 
-                    gifUrl={finalImgUrl} 
-                    name={canonical.name || ex.name} 
-                    className="absolute inset-0 w-full h-full object-cover" 
-                  />
-                );
-            } else if (finalImgUrl) {
+            if (finalImgUrl) {
                 return (
                   <img 
                     src={finalImgUrl} 
