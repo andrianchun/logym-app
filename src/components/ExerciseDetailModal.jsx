@@ -5,6 +5,7 @@ import { formatTarget, resolveProjectedProgramId, defaultMasterExercises, findMa
 import { resolveExerciseKind, estimate10RM, estimate1RM, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from '../utils/workoutCalc';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 import SwipeInput from './SwipeInput';
+import TwoFrameMotionLoop from './TwoFrameMotionLoop';
 
 export const isSameExerciseEntity = (e1, e2) => {
   if (!e1 || !e2) return false;
@@ -288,21 +289,42 @@ const ExerciseDetailModal = ({
         }
       });
     }
-    if (exercise.gifUrl) {
-      const urls = exercise.gifUrl.split(/(?:,|\s)+/).filter(v => v.trim());
-      urls.forEach(u => {
-        if (u.match(/\.(mp4|webm)$/i)) {
-          if (!items.some(it => it.url === u)) items.push({ type: 'video', url: u });
-        } else {
-          if (!items.some(it => it.url === u)) items.push({ type: 'image', url: u });
-        }
-      });
-    }
     if (exercise.thumbnailUrl && !exercise.thumbnailUrl.match(/\.(mp4|webm)$/i)) {
       if (!items.some(it => it.url === exercise.thumbnailUrl)) {
         items.push({ type: 'image', url: exercise.thumbnailUrl });
       }
     }
+    if (exercise.gifUrl) {
+      const urls = exercise.gifUrl.split(/(?:,|\s)+/).filter(v => v.trim());
+      urls.forEach(u => {
+        if (u.match(/\.(mp4|webm)$/i)) {
+          if (!items.some(it => it.url === u)) items.push({ type: 'video', url: u });
+        } else if (!items.some(it => it.url === u)) {
+          items.push({ type: 'image', url: u });
+        }
+      });
+    }
+
+    // Lini 3 (Backup): Looping 2-frame ExerciseDB Motion
+    const exId = exercise.exerciseId || (exercise.id && String(exercise.id).startsWith('edb-') ? String(exercise.id).replace(/^edb-/, '') : null);
+    const rawGif = exercise.gifUrl || '';
+    let loopExId = exId;
+    let loopGif = null;
+
+    if (rawGif.includes('/0.jpg') || rawGif.includes('/1.jpg')) {
+      loopGif = rawGif;
+      const match = rawGif.match(/exercises\/([^/]+)\/[01]\.jpg/);
+      if (match) loopExId = match[1];
+    } else if (loopExId) {
+      loopGif = `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/${loopExId}/0.jpg`;
+    }
+
+    if (loopExId || loopGif) {
+      if (!items.some(it => it.type === 'motion-loop')) {
+        items.push({ type: 'motion-loop', exerciseId: loopExId, gifUrl: loopGif, url: loopGif });
+      }
+    }
+
     return items;
   };
   const mediaItems = React.useMemo(() => parseMedia(ex), [ex]);
@@ -539,6 +561,12 @@ const ExerciseDetailModal = ({
                         playsInline 
                         preload="auto" 
                         className="exercise-video-html5 w-full h-full object-cover opacity-100 shadow-xl transition-all duration-300 bg-black" 
+                      />
+                    ) : media.type === 'motion-loop' ? (
+                      <TwoFrameMotionLoop 
+                        exerciseId={media.exerciseId} 
+                        gifUrl={media.gifUrl} 
+                        name={ex?.name} 
                       />
                     ) : (
                       <div className="relative w-full h-full flex items-center justify-center">
