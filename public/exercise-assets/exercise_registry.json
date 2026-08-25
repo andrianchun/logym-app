@@ -1819,7 +1819,7 @@
     "status": "approved",
     "isFavorite": true,
     "popularityRank": 25,
-    "thumbnailUrl": "/exercise-assets/thumbnails/edb-Barbell_Bench_Press_-_Medium_Grip.webp",
+    "thumbnailUrl": "/exercise-assets/edb-Barbell_Bench_Press_-_Medium_Grip.webp",
     "videoUrl": "/exercise-assets/videos/edb-Barbell_Bench_Press_-_Medium_Grip.webm",
     "prompt_id": "",
     "approvedAt": null,
@@ -4930,7 +4930,7 @@
     "status": "approved",
     "isFavorite": false,
     "popularityRank": 1110,
-    "thumbnailUrl": "/exercise-assets/thumbnails/edb-Cable_Crossover.webp",
+    "thumbnailUrl": "/exercise-assets/edb-Cable_Crossover.webp",
     "videoUrl": "/exercise-assets/videos/edb-Cable_Crossover.mp4",
     "prompt_id": "",
     "approvedAt": null,
@@ -10046,7 +10046,7 @@
     "status": "approved",
     "isFavorite": true,
     "popularityRank": 3,
-    "thumbnailUrl": "/exercise-assets/thumbnails/edb-Dumbbell_Bench_Press.webp",
+    "thumbnailUrl": "/exercise-assets/edb-Dumbbell_Bench_Press.webp",
     "videoUrl": "/exercise-assets/videos/edb-Dumbbell_Bench_Press.webm",
     "prompt_id": "Video animasi 3D sinematik berdurasi 4 detik dengan seamless perfect loop yang memperlihatkan karakter atlet fitness 3D proporsional \"Coach Logy\" (tampak belakang dengan referensi coach-back.webp) dari sudut kamera three-quarter 45 derajat sedang melakukan latihan Dumbbell Bench Press di atas bench secara presisi dan terkontrol. Pencahayaan studio gym bernuansa modern dan dramatis menyorot gerak anatomi Coach Logy saat menurunkan serta mendorong sepasang dumbbell; pada saat beban mencapai titik puncak fase kontraksi, area otot target chest (dada) menyala terang secara biomekanis dengan efek radiasi \"Biru Elektrik Logym\" (#0088ff). Gerakan transisi awal dan akhir menyambung secara sempurna dengan Aspek Rasio 1:1 Square (1080x1080).",
     "approvedAt": null,
@@ -15565,7 +15565,7 @@
     "status": "approved",
     "isFavorite": false,
     "popularityRank": 1343,
-    "thumbnailUrl": "/exercise-assets/thumbnails/edb-Incline_Dumbbell_Press.webp",
+    "thumbnailUrl": "/exercise-assets/edb-Incline_Dumbbell_Press.webp",
     "videoUrl": "/exercise-assets/videos/edb-Incline_Dumbbell_Press.webm",
     "prompt_id": "",
     "approvedAt": null,
@@ -28333,7 +28333,7 @@
     "status": "approved",
     "isFavorite": true,
     "popularityRank": 2,
-    "thumbnailUrl": "/exercise-assets/thumbnails/edb-Seated_Cable_Rows_1.webp",
+    "thumbnailUrl": "/exercise-assets/edb-Seated_Cable_Rows_1.webp",
     "videoUrl": "/exercise-assets/videos/edb-Seated_Cable_Rows.mp4",
     "prompt_id": "Video animasi 3D fotorealistik sinematik dengan Aspek Rasio 1:1 Square (1080x1080) menampilkan karakter \"Coach Logy\" (atlet fitness 3D proporsional) dari sudut kamera three-quarter 45 derajat bagian belakang (referensi coach-back.webp) sedang memperagakan gerakan \"Seated Cable Rows\" menggunakan alat cable machine secara anatomis dan presisi. Dalam durasi tepat 4 detik dengan format seamless perfect loop (titik awal dan akhir gerakan menyambung sempurna), Coach Logy menarik pegangan kabel ke arah perut bawah sambil menjaga postur tulang belakang tetap tegap; saat memasuki puncak fase kontraksi beban, area otot target punggung tengah (middle back) secara dramatis menyala dengan efek visual \"Biru Elektrik Logym\" (#0088ff) yang berkilau terang sebelum secara terkontrol kembali ke posisi ekstensi awal.",
     "approvedAt": null,
@@ -28345,8 +28345,8 @@
       "Ulangi gerakan tersebut sesuai jumlah repetisi yang dianjurkan."
     ],
     "frames": [
-      "/exercise-assets/thumbnails/edb-Seated_Cable_Rows_0.webp",
-      "/exercise-assets/thumbnails/edb-Seated_Cable_Rows_1.webp"
+      "/exercise-assets/edb-Seated_Cable_Rows_0.webp",
+      "/exercise-assets/edb-Seated_Cable_Rows_1.webp"
     ]
   },
   "edb-Seated_Cable_Shoulder_Press": {
@@ -31856,7 +31856,7 @@
     "status": "approved",
     "isFavorite": true,
     "popularityRank": 1,
-    "thumbnailUrl": "/exercise-assets/thumbnails/edb-Smith_Machine_Incline_Bench_Press_1.webp",
+    "thumbnailUrl": "/exercise-assets/edb-Smith_Machine_Incline_Bench_Press_1.webp",
     "videoUrl": "/exercise-assets/videos/edb-Smith_Machine_Incline_Bench_Press.mp4",
     "prompt_id": "Video animasi 3D sinematik dengan Aspek Rasio 1:1 Square (1080x1080) di dalam studio fitness modern, menampilkan subjek karakter model \"Coach Logy\" (atlet fitness 3D proporsional) yang diambil dari sudut kamera three-quarter 45 derajat (tampak belakang berotot sesuai referensi coach-back.webp). Coach Logy mengeksekusi gerakan Smith Machine Incline Bench Press dengan teknik biomekanika presisi, menurunkan barbel miring ke dada atas lalu mengontraksikannya ke atas secara terkontrol. Pada puncak fase kontraksi saat mendorong beban, bagian otot target dada (chest) menyala terang dengan efek visual \"Biru Elektrik Logym\" (#0088ff) yang futuristik. Gerakan berdurasi 4 detik ini tereksekusi secara mulus dalam format seamless perfect loop, di mana titik awal dan titik akhir animasi menyambung sempurna tanpa jeda.",
     "approvedAt": null,
@@ -31868,8 +31868,8 @@
       "Setelah selesai, kunci kembali bar ke rak dengan aman."
     ],
     "frames": [
-      "/exercise-assets/thumbnails/edb-Smith_Machine_Incline_Bench_Press_0.webp",
-      "/exercise-assets/thumbnails/edb-Smith_Machine_Incline_Bench_Press_1.webp"
+      "/exercise-assets/edb-Smith_Machine_Incline_Bench_Press_0.webp",
+      "/exercise-assets/edb-Smith_Machine_Incline_Bench_Press_1.webp"
     ]
   },
   "edb-Smith_Machine_Leg_Press": {

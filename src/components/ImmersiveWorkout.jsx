@@ -2,9 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Play, Pause, ChevronRight, ChevronLeft, Dumbbell, Check, Info, Clock, Minimize2, SkipForward, ClipboardEdit, Brain, Flame, Activity, ArrowLeftRight, Square } from 'lucide-react';
 import ScrollPicker from './ScrollPicker';
-import { exerciseTypeLabels } from '../data/constants';
+import { exerciseTypeLabels, defaultMasterExercises } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
 import { calculateWorkoutCalories, calculateLiveWorkoutCalories, resolveExerciseKind, defaultSetWeight, gymStepFor, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from '../utils/workoutCalc';
+import { getCachedExercises } from '../utils/exerciseDbApi';
 import { WorkoutTimerPlugin } from '../App';
 
 const LiveWorkoutStats = ({ workoutStartTime, isPaused, userProfile, validExercises, exerciseLogs, t, formatTime }) => {
@@ -365,6 +366,23 @@ const ImmersiveWorkout = ({
     onUpdateExercise?.({ ...ex, isTreadmillMode: newMode });
   };
 
+  const resolvedEx = React.useMemo(() => {
+    if (!ex) return null;
+    const locName = (ex.name || '').toLowerCase();
+    const masterMatch = defaultMasterExercises.find(m => m.id === ex.id || m.name.toLowerCase() === locName);
+    const apiExercises = getCachedExercises();
+    const apiMatch = apiExercises.find(a => a.id === ex.id || a.name.toLowerCase() === locName);
+    return {
+      ...apiMatch,
+      ...masterMatch,
+      ...ex,
+      videoUrl: ex.videoUrl || masterMatch?.videoUrl || apiMatch?.videoUrl || '',
+      thumbnailUrl: ex.thumbnailUrl || masterMatch?.thumbnailUrl || masterMatch?.gifUrl || apiMatch?.thumbnailUrl || apiMatch?.gifUrl || '',
+      gifUrl: ex.gifUrl || masterMatch?.gifUrl || apiMatch?.gifUrl || '',
+      ytVideo: ex.ytVideo || masterMatch?.ytVideo || apiMatch?.ytVideo || '',
+    };
+  }, [ex]);
+
   const parseMedia = (exercise) => {
     if (!exercise) return [];
     let items = [];
@@ -376,14 +394,15 @@ const ImmersiveWorkout = ({
       const urls = exercise.gifUrl.split(/(?:,|\s)+/).filter(v => v.trim());
       urls.forEach(u => items.push({ type: u.match(/\.(mp4|webm)$/i) ? 'video' : 'image', url: u }));
     }
-    if (exercise.ytVideo && items.length === 0) {
+    // HANYA jika TIDAK ADA video sama sekali, gunakan ytVideo YouTube
+    if (items.length === 0 && exercise.ytVideo) {
       const urls = exercise.ytVideo.split(/(?:,|\s)+/).filter(v => v.trim());
       urls.forEach(u => items.push({ type: 'youtube', url: u }));
     }
     return items;
   };
 
-  const mediaItems = React.useMemo(() => parseMedia(ex), [ex]);
+  const mediaItems = React.useMemo(() => parseMedia(resolvedEx), [resolvedEx]);
   const [ytLoaded, setYtLoaded] = React.useState(false);
   // (activeExerciseIdx dihapus: state kembar dari currentIndex yang tidak pernah dibaca
   //  maupun ditulis di mana pun.)
@@ -774,7 +793,7 @@ const ImmersiveWorkout = ({
                     }
                   }
                   if (media.type === 'video') {
-                    return <video src={media.url} autoPlay={idx === activeMediaIndex && !isPaused} loop muted playsInline disablePictureInPicture controlsList="nodownload nofullscreen noremoteplayback" className="immersive-video-html5 w-full h-full object-cover opacity-80 pointer-events-none scale-[1.10]" />;
+                    return <video src={media.url} poster={resolvedEx?.thumbnailUrl || resolvedEx?.gifUrl || ''} autoPlay={idx === activeMediaIndex && !isPaused} loop muted playsInline preload="auto" disablePictureInPicture controlsList="nodownload nofullscreen noremoteplayback" className="immersive-video-html5 w-full h-full object-cover opacity-80 pointer-events-none scale-[1.10] bg-black" />;
                   }
                   return <img src={media.url} alt={ex.name} className="w-full h-full object-cover opacity-80 pointer-events-none scale-[1.10]" />;
                 })()}

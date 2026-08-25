@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Dumbbell, History, Calculator, Replace, Video, Info, ChevronLeft, ChevronRight, Loader2, Play } from 'lucide-react';
-import { formatTarget, resolveProjectedProgramId } from '../data/constants';
+import { formatTarget, resolveProjectedProgramId, defaultMasterExercises } from '../data/constants';
 import { resolveExerciseKind, estimate10RM, estimate1RM, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from '../utils/workoutCalc';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 import SwipeInput from './SwipeInput';
@@ -191,10 +191,25 @@ const ExerciseDetailModal = ({
     setTimeout(() => setIsRmSaved(false), 2000);
   };
 
-  const [ex, setEx] = useState(initialEx);
+  const resolveFullExercise = (raw) => {
+    if (!raw) return null;
+    const locName = (raw.name || '').toLowerCase();
+    const masterMatch = defaultMasterExercises.find(m => m.id === raw.id || m.name.toLowerCase() === locName);
+    return {
+      ...masterMatch,
+      ...raw,
+      videoUrl: raw.videoUrl || masterMatch?.videoUrl || '',
+      thumbnailUrl: raw.thumbnailUrl || masterMatch?.thumbnailUrl || masterMatch?.gifUrl || '',
+      gifUrl: raw.gifUrl || masterMatch?.gifUrl || '',
+      ytVideo: raw.ytVideo || masterMatch?.ytVideo || '',
+    };
+  };
+
+  const [ex, setEx] = useState(() => resolveFullExercise(initialEx));
 
   React.useEffect(() => {
-     setEx(initialEx);
+     const resolved = resolveFullExercise(initialEx);
+     setEx(resolved);
      if (initialEx && initialEx.name) {
          import('../utils/exerciseDbApi').then(({ fetchExercisesFromApi }) => {
              fetchExercisesFromApi().then(onlineDb => {
@@ -207,11 +222,12 @@ const ExerciseDetailModal = ({
                  if (onlineMatch) {
                      setEx(prev => ({ 
                          ...prev, 
-                         instructions: onlineMatch.instructions,
-                         instructions_id: onlineMatch.instructions_id || onlineMatch.instructions,
-                         instructions_en: onlineMatch.instructions_en || onlineMatch.instructions,
-                         videoUrl: onlineMatch.videoUrl || prev?.videoUrl,
-                         thumbnailUrl: onlineMatch.thumbnailUrl || prev?.thumbnailUrl,
+                         instructions: onlineMatch.instructions || prev?.instructions,
+                         instructions_id: onlineMatch.instructions_id || onlineMatch.instructions || prev?.instructions_id,
+                         instructions_en: onlineMatch.instructions_en || onlineMatch.instructions || prev?.instructions_en,
+                         videoUrl: prev?.videoUrl || onlineMatch.videoUrl,
+                         thumbnailUrl: prev?.thumbnailUrl || onlineMatch.thumbnailUrl || onlineMatch.gifUrl,
+                         gifUrl: prev?.gifUrl || onlineMatch.gifUrl,
                          equipment: prev?.equipment || onlineMatch.equipment
                      }));
                  }
@@ -231,7 +247,7 @@ const ExerciseDetailModal = ({
 
   const parseMedia = (exercise) => {
     let items = [];
-    if (!exercise) return items; // dipanggil sebelum penjaga `!ex`, jadi harus tahan nilai kosong
+    if (!exercise) return items;
     if (exercise.videoUrl) {
       const urls = exercise.videoUrl.split(/(?:,|\s)+/).filter(v => v.trim());
       urls.forEach(u => items.push({ type: u.match(/\.(mp4|webm)$/i) ? 'video' : (u.includes('youtu') ? 'youtube' : 'video'), url: u }));
@@ -240,12 +256,11 @@ const ExerciseDetailModal = ({
       const urls = exercise.gifUrl.split(/(?:,|\s)+/).filter(v => v.trim());
       urls.forEach(u => items.push({ type: u.match(/\.(mp4|webm)$/i) ? 'video' : 'image', url: u }));
     }
-    if (exercise.ytVideo && typeof exercise.ytVideo === 'string') {
+    // HANYA jika TIDAK ADA video sama sekali di videoUrl, gunakan ytVideo YouTube sebagai fallback
+    if (items.length === 0 && exercise.ytVideo && typeof exercise.ytVideo === 'string') {
       const urls = exercise.ytVideo.split(/(?:,|\s)+/).filter(v => v.trim());
       urls.forEach(u => {
-        if (!items.some(it => it.url === u)) {
-          items.push({ type: 'youtube', url: u });
-        }
+        items.push({ type: 'youtube', url: u });
       });
     }
     return items;
@@ -499,7 +514,7 @@ const ExerciseDetailModal = ({
                         }
                       }
                       if (media.type === 'video') {
-                        return <video src={media.url} autoPlay={idx === activeMediaIndex} loop muted playsInline preload="auto" className="exercise-video-html5 w-full h-full object-cover opacity-100 shadow-xl transition-all duration-300" />;
+                        return <video src={media.url} poster={ex?.thumbnailUrl || ex?.gifUrl || ''} autoPlay={idx === activeMediaIndex} loop muted playsInline preload="auto" className="exercise-video-html5 w-full h-full object-cover opacity-100 shadow-xl transition-all duration-300 bg-black" />;
                       }
                       
                       // Animated Image Component for ExerciseDB frames

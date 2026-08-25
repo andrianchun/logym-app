@@ -1556,7 +1556,7 @@
       "Ulangi gerakan untuk jumlah repetisi yang ditentukan.",
       "Setelah selesai, kembalikan barbel ke rak."
     ],
-    "thumbnailUrl": "/exercise-assets/thumbnails/edb-Barbell_Bench_Press_-_Medium_Grip.webp",
+    "thumbnailUrl": "/exercise-assets/edb-Barbell_Bench_Press_-_Medium_Grip.webp",
     "videoUrl": "/exercise-assets/edb-Barbell_Bench_Press_-_Medium_Grip.mp4 /exercise-assets/youtube-backup/edb-Barbell_Bench_Press_-_Medium_Grip.mp4",
     "ytVideo": "https://youtu.be/rT7DgCr-3pg",
     "defaultWeight": 20,
@@ -4082,7 +4082,7 @@
       "Kembalikan lengan ke posisi awal sambil mengembusen napas. Pastikan untuk mengikuti jalur gerakan melingkar yang sama saat menurunkan beban.",
       "Tahan selama satu detik di posisi awal, lalu ulangi gerakan sesuai jumlah repetisi yang ditentukan."
     ],
-    "thumbnailUrl": "/exercise-assets/thumbnails/edb-Cable_Crossover.webp",
+    "thumbnailUrl": "/exercise-assets/edb-Cable_Crossover.webp",
     "videoUrl": "/exercise-assets/edb-Cable_Crossover.mp4"
   },
   {
@@ -8238,7 +8238,7 @@
       "Buang napas saat mendorong dumbbell ke atas hingga lengan lurus, remas otot dada selama satu detik, lalu turunkan beban secara perlahan (durasi turun dua kali lebih lama dari saat naik).",
       "Ulangi gerakan sesuai dengan jumlah repetisi yang ditentukan dalam program latihan Anda."
     ],
-    "thumbnailUrl": "/exercise-assets/thumbnails/edb-Dumbbell_Bench_Press.webp",
+    "thumbnailUrl": "/exercise-assets/edb-Dumbbell_Bench_Press.webp",
     "videoUrl": "/exercise-assets/edb-Dumbbell_Bench_Press.mp4 /exercise-assets/youtube-backup/edb-Dumbbell_Bench_Press.mp4",
     "ytVideo": "https://youtu.be/WbCEvFA0NJs?si=n6uJrVnL8SbZLnii",
     "defaultWeight": 10,
@@ -12703,7 +12703,7 @@
       "Ulangi gerakan ini sesuai jumlah repetisi yang ditentukan.",
       "Setelah selesai, letakkan kembali dumbbell ke paha lalu ke lantai. Ini adalah cara paling aman untuk melepaskan dumbbell."
     ],
-    "thumbnailUrl": "/exercise-assets/thumbnails/edb-Incline_Dumbbell_Press.webp",
+    "thumbnailUrl": "/exercise-assets/edb-Incline_Dumbbell_Press.webp",
     "videoUrl": "/exercise-assets/edb-Incline_Dumbbell_Press.mp4"
   },
   {
@@ -22977,7 +22977,7 @@
       "Tahan posisi tubuh tetap diam, lalu tarik pegangan ke arah perut (abdomen) dengan siku dekat dengan tubuh sambil mengembuskan napas. Remas otot punggung sekuat tenaga, tahan selama sedetik, lalu kembali ke posisi awal secara perlahan sambil menarik napas.",
       "Ulangi gerakan tersebut sesuai jumlah repetisi yang dianjurkan."
     ],
-    "thumbnailUrl": "/exercise-assets/thumbnails/edb-Seated_Cable_Rows.webp",
+    "thumbnailUrl": "/exercise-assets/edb-Seated_Cable_Rows.webp",
     "videoUrl": "/exercise-assets/edb-Seated_Cable_Rows.mp4 /exercise-assets/youtube-backup/edb-Seated_Cable_Rows.mp4",
     "ytVideo": "https://youtu.be/qD1WZ5pSuvk?si=JbbritEwFpnqjPHz",
     "defaultWeight": 10,
@@ -25803,7 +25803,7 @@
       "Ulangi gerakan ini sesuai dengan jumlah repetisi yang dianjurkan.",
       "Setelah selesai, kunci kembali bar ke rak dengan aman."
     ],
-    "thumbnailUrl": "/exercise-assets/thumbnails/edb-Smith_Machine_Incline_Bench_Press.webp",
+    "thumbnailUrl": "/exercise-assets/edb-Smith_Machine_Incline_Bench_Press.webp",
     "videoUrl": "/exercise-assets/edb-Smith_Machine_Incline_Bench_Press.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Incline_Bench_Press.mp4",
     "ytVideo": "https://youtu.be/VXaBbUYMfIs?si=pOB-MkazqZiMP_KX",
     "defaultWeight": 10,
