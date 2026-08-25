@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict';
 import { splitWorkoutCalories, isCardioExercise, calculateSmartWorkoutCalories, dailyBurnCalories, dailyActiveMinutes, heartRateCalories } from './workoutCalc.js';
 import { sleepHoursToParts, formatSleepDuration } from './numberFormat.js';
+import { buildLogymSyncPayload } from '../data/constants.js';
 
 // --- isCardioExercise ----------------------------------------------------
 
@@ -413,5 +414,45 @@ assert.equal(formatSleepDuration('7.5'), '7 jam 30 mnt');
 // bagian jam dihitung sebelum menitnya dibulatkan.
 assert.deepEqual(sleepHoursToParts(5.999), { jam: 6, menit: 0 });
 assert.equal(formatSleepDuration(5.999), '6 jam');
+
+// --- buildLogymSyncPayload (Lomeal Sync Contract) ------------------------
+{
+  const hist = {
+    '2026-08-25': {
+      workouts: [
+        {
+          id: 'sesi_1',
+          status: 'completed',
+          exercises: [
+            { id: 101, name: 'Squat' },
+            { id: 102, name: 'Leg Extension' },
+            { id: 103, name: 'Calf Raise' },
+            { id: 104, name: 'Plank' },
+          ],
+          log: {
+            '101-sesi_1': [{ done: true, w: 50, r: 10 }],
+            '102-sesi_1': [{ done: true, w: 30, r: 10 }],
+            '103-sesi_1': [{ done: true, w: 20, r: 15 }],
+            '104-sesi_1': [{ done: true, d: 60 }],
+          },
+        },
+      ],
+      bioData: { activityCalories: 350 },
+    },
+  };
+
+  const payload = buildLogymSyncPayload(hist, 70, '2026-08-25');
+  assert.equal(payload.logymSync.today.workoutsCount, 1);
+  assert.equal(payload.logymSync.today.exercisesCount, 4);
+  assert.equal(payload.logymSync.today.kcal, 350);
+  assert.equal(payload.logymSync.today.ymd, '2026-08-25');
+}
+
+// History kosong tidak error
+{
+  const emptyPayload = buildLogymSyncPayload({}, 70, '2026-08-25');
+  assert.equal(emptyPayload.logymSync.today.workoutsCount, 0);
+  assert.equal(emptyPayload.logymSync.today.exercisesCount, 0);
+}
 
 console.log('dashboardCalc OK');

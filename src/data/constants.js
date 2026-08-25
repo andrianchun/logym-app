@@ -1253,6 +1253,44 @@ export const manualFieldValue = (bioData, field) => {
   return Number(flag) || 0;
 };
 
+/**
+ * Payload ringkasan aktivitas Logym untuk disinkronkan ke dokumen root user (`logym_users/{uid}`)
+ * agar aplikasi Lomeal dapat membaca jumlah sesi/latihan dan kalori terbakar hari ini secara live.
+ */
+export const buildLogymSyncPayload = (history, userWeight = 70, targetDateStr = null) => {
+  const todayStr = targetDateStr || getLocalYMD(new Date());
+  const todayData = history?.[todayStr] || {};
+  const completedWorkouts = (todayData.workouts || []).filter(w => w?.status === 'completed');
+
+  let completedExercisesCount = 0;
+  completedWorkouts.forEach(w => {
+    const exs = w.overriddenExercises || w.exercises || [];
+    const log = w.log || {};
+    exs.forEach(ex => {
+      const sLog = log[ex.id] || Object.entries(log).find(([k]) => k === String(ex.id) || k.startsWith(`${ex.id}-`))?.[1];
+      if (sLog && Object.values(sLog).some(s => s?.done && !s?.skipped)) {
+        completedExercisesCount++;
+      }
+    });
+  });
+
+  const activityKcal = Number(todayData.bioData?.activityCalories) || 0;
+
+  return {
+    logymSync: {
+      today: {
+        ymd: todayStr,
+        kcal: activityKcal,
+        workoutCalories: activityKcal,
+        workoutsCount: completedWorkouts.length,
+        sessionsCount: completedWorkouts.length,
+        exercisesCount: completedExercisesCount,
+        updatedAt: Date.now()
+      }
+    }
+  };
+};
+
 export const getDayWorkouts = (history, programs, activePlanIds, dateStr) => {
   const dData = history?.[dateStr] || {};
   const historical = Array.isArray(dData.workouts) ? dData.workouts : [];

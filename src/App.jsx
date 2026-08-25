@@ -60,7 +60,7 @@ import { rapikanNamaProgram, rapikanNamaSesi, pertahankanNamaSesi } from './util
 import useDialog from './hooks/useDialog';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import UpdaterAlert from './components/UpdaterAlert';
-import { getLocalYMD, resolveProjectedProgramId, isLomealOwned, resolveLoggedExercise, splitSessionLogs, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos, getDayWorkouts, countMissedScheduledDays } from './data/constants';
+import { getLocalYMD, resolveProjectedProgramId, isLomealOwned, resolveLoggedExercise, splitSessionLogs, buildLogymSyncPayload, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos, getDayWorkouts, countMissedScheduledDays } from './data/constants';
 import { serializeDay, dayFingerprint, migrateBaseline, reconcileHistory, workoutsToMap, workoutIdsFromBaseline, diffFields, cleanFirestoreData, stableStringify, mergeBackupIntoHistory, sessionsPendingSave } from './utils/historySync';
 import { useBleManager } from './hooks/useBleManager';
 import { bolehSync, gabungAntrean } from './utils/hcSchedule';
@@ -2236,6 +2236,31 @@ export default function App() {
       return () => { clearTimeout(timer); if (retryTimer) clearTimeout(retryTimer); pendingHistorySaveRef.current = null; };
     }
   }, [history, user, isDataLoaded]);
+
+  // Sinkronisasi ringkasan aktivitas hari ini ke Lomeal via dokumen root `logym_users/{uid}`
+  const lastLogymSyncRef = useRef('');
+  useEffect(() => {
+    if (!user?.uid || !isDataLoaded) return;
+    try {
+      const syncPayload = buildLogymSyncPayload(history, userProfile?.weight);
+      const syncStr = JSON.stringify(syncPayload);
+      if (lastLogymSyncRef.current === syncStr) return;
+
+      const timer = setTimeout(() => {
+        lastLogymSyncRef.current = syncStr;
+        const safePayload = cleanFirestoreData(syncPayload);
+        setDoc(doc(db, 'logym_users', user.uid), safePayload, { merge: true })
+          .then(() => {
+            console.log('[LogymSync] Terkirim ke Lomeal:', syncPayload.logymSync.today);
+          })
+          .catch(err => console.warn('[LogymSync] Gagal auto-sync ke Lomeal:', err));
+      }, 1000);
+
+      return () => clearTimeout(timer);
+    } catch (e) {
+      console.warn('[LogymSync] Error build payload:', e);
+    }
+  }, [history, user?.uid, isDataLoaded, userProfile?.weight]);
 
   useEffect(() => {
     const flush = () => {
