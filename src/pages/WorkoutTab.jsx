@@ -744,6 +744,19 @@ const WorkoutTab = ({
     const doStart = () => {
       playSoundEffect('success', soundEnabled);
       setSessionToRun(progId);
+
+      // Temukan latihan pertama yang belum selesai agar saat resume langsung ke latihan tersebut
+      const currentProg = activeProgramsList.find(p => p.workoutId === progId || p.id === progId);
+      const exList = progId === 'extra' ? extraExercises : (currentProg?.exercises || []);
+      const firstIncomplete = exList.find(ex => {
+        if (skippedExercises[ex.id]) return false;
+        const logs = getSetLogs(ex);
+        return !logs || logs.length === 0 || logs.some(s => !s.done && !s.skipped);
+      });
+      if (firstIncomplete) {
+        setActiveExerciseId(firstIncomplete.id);
+      }
+
       setIsImmersiveMode(true);
       setIsWorkoutActive(true);
       if (!workoutStartTime || sessionToRun !== progId) {
@@ -1267,33 +1280,37 @@ const WorkoutTab = ({
         const allSkipped = hasExercises && activeExercises.length === 0;
 
         let isAllSetsDone = false;
+        let hasSomeSetsDone = false;
         if (hasExercises && !allSkipped) {
           isAllSetsDone = activeExercises.every(ex => {
             const logs = getSetLogs(ex);
-            return logs.length > 0 && logs.every(s => s.done && !s.skipped);
+            return logs.length > 0 && logs.every(s => s.done || s.skipped);
+          });
+          hasSomeSetsDone = activeExercises.some(ex => {
+            const logs = getSetLogs(ex);
+            return logs.some(s => s.done || s.skipped);
           });
         }
-
-        const isCompleted = isAllSetsDone;
 
         // Cek history hari ini
         const todayData = history[selectedDate];
         const wInHistory = todayData?.workouts?.find(w => w.programId === sessionData.workoutId || w.id === sessionData.workoutId || (sessionData.workoutId === 'extra' && w.programId === 'adhoc'));
         const hasHistoryDuration = wInHistory && wInHistory.duration;
+        const isSessionFinished = isAllSetsDone || wInHistory?.status === 'completed';
 
-        const isDisabled = !hasExercises || allSkipped;
+        const isDisabled = !hasExercises || allSkipped || isSessionFinished;
 
         let btnText = isExtra ? "MULAI EKSTRA" : "MULAI LATIHAN";
         let btnIcon = <Play size={24} className="ml-1" />;
         let btnClass = `${t.bgAccent} shadow-[0_8px_30px_rgb(0,0,0,0.15)] disabled:opacity-50 text-white`;
 
-        if (hasHistoryDuration || isCurrentlyCompleted) {
-          btnText = "LANJUTKAN LATIHAN";
-          btnIcon = <Play size={24} className="ml-1" />;
-        } else if (isCompleted) {
+        if (isSessionFinished) {
           btnText = "SESI SELESAI";
           btnIcon = <CheckCircle size={24} />;
-          btnClass = `${t.bgAccent} text-white shadow-lg opacity-80`;
+          btnClass = "bg-emerald-600/80 text-white shadow-none cursor-default";
+        } else if (hasHistoryDuration || hasSomeSetsDone || isCurrentlyCompleted) {
+          btnText = "LANJUTKAN LATIHAN";
+          btnIcon = <Play size={24} className="ml-1" />;
         } else if (!hasExercises) {
           btnText = "SESI KOSONG";
           btnIcon = <X size={24} />;

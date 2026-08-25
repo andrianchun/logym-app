@@ -171,19 +171,50 @@ const ImmersiveWorkout = ({
     return [...baseExercises, ...extraExercises].filter(ex => !skippedExercises[ex.id]);
   }, [activeProgramsList, activeProgramId, programs, extraExercises, skippedExercises]);
 
+  // Helper tunggal untuk membaca log latihan dengan dukungan format compound key, originalId, dan fallback template
+  const getLogsForEx = (exItem) => {
+    if (!exItem) return [];
+    if (exerciseLogs[exItem.id]) return exerciseLogs[exItem.id];
+    if (exItem.originalId && exerciseLogs[exItem.originalId]) return exerciseLogs[exItem.originalId];
+    if (exItem.workoutId) {
+      const key = `${exItem.originalId || exItem.id}-${exItem.workoutId}`;
+      if (exerciseLogs[key]) return exerciseLogs[key];
+    }
+    const libMatch = exerciseLibrary?.find(e => e.id === exItem.originalId || e.id === exItem.id || e.name?.toLowerCase() === exItem.name?.toLowerCase());
+    const step = gymStepFor(gymProfiles, activeGymId, exItem.equipment, units?.weight === 'lbs');
+    let suggestedWeight = defaultSetWeight(libMatch, exItem, step);
+    const eqConf = getEquipmentConfig(gymProfiles, activeGymId, exItem, userProfile);
+    const total_w = calculateActualWeight(suggestedWeight, eqConf);
+    return Array.from({length: exItem.sets || 3}).map(() => ({
+      w: suggestedWeight,
+      input_w: suggestedWeight,
+      base_w: eqConf.baseWeight,
+      ratio: eqConf.ratio,
+      total_w: total_w,
+      r: exItem.reps || 10,
+      d: exItem.duration || 10,
+      done: false
+    }));
+  };
+
+  const isExerciseFullyDone = (eItem) => {
+    if (!eItem) return false;
+    if (skippedExercises[eItem.id] || (eItem.originalId && skippedExercises[eItem.originalId])) return true;
+    const logs = getLogsForEx(eItem);
+    return logs.length > 0 && logs.every(s => s.done || s.skipped);
+  };
+
   // Dihitung sekali saat mode immersive dibuka: mulai dari latihan yang SEDANG dikerjakan
-  // (set terakhir yang dicentang user), bukan dari latihan pertama.
+  // atau latihan PERTAMA yang BELUM selesai (tidak pernah melompat ke latihan yang sudah selesai).
   const [currentIndex, setCurrentIndex] = useState(() => {
     if (activeExerciseId) {
-       const idx = validExercises.findIndex(ex => ex.id === activeExerciseId);
-       if (idx !== -1) return idx;
+       const idx = validExercises.findIndex(ex => ex.id === activeExerciseId || ex.originalId === activeExerciseId);
+       if (idx !== -1) {
+         if (!isExerciseFullyDone(validExercises[idx])) return idx;
+       }
     }
-    for (let i = 0; i < validExercises.length; i++) {
-      const eItem = validExercises[i];
-      const logs = exerciseLogs[eItem.id];
-      const isGroupIncomplete = !logs || logs.some(set => !set.done);
-      if (isGroupIncomplete) return i;
-    }
+    const firstIncompleteIdx = validExercises.findIndex(ex => !isExerciseFullyDone(ex));
+    if (firstIncompleteIdx !== -1) return firstIncompleteIdx;
     return validExercises.length > 0 ? validExercises.length - 1 : 0;
   });
   
@@ -267,25 +298,6 @@ const ImmersiveWorkout = ({
   }, [localRestTimer]);
 
   // 3. Current Set Logic
-  const getLogsForEx = (exItem) => {
-    if (exerciseLogs[exItem.id]) return exerciseLogs[exItem.id];
-    const libMatch = exerciseLibrary?.find(e => e.id === exItem.originalId || e.id === exItem.id || e.name?.toLowerCase() === exItem.name?.toLowerCase());
-    const step = gymStepFor(gymProfiles, activeGymId, exItem.equipment, units?.weight === 'lbs');
-    let suggestedWeight = defaultSetWeight(libMatch, exItem, step);
-    const eqConf = getEquipmentConfig(gymProfiles, activeGymId, exItem, userProfile);
-    const total_w = calculateActualWeight(suggestedWeight, eqConf);
-    return Array.from({length: exItem.sets || 3}).map(() => ({
-      w: suggestedWeight,
-      input_w: suggestedWeight,
-      base_w: eqConf.baseWeight,
-      ratio: eqConf.ratio,
-      total_w: total_w,
-      r: exItem.reps || 10,
-      d: exItem.duration || 10,
-      done: false
-    }));
-  };
-
   const logs = ex ? getLogsForEx(ex) : [];
 
   let activeSetIdx = 0;

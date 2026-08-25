@@ -168,6 +168,12 @@ Setiap perubahan pada struktur latihan atau timer wajib lolos verifikasi di 5 la
   2. Gambar thumbnail sebelumnya berupa file PNG 2.3 MB yang hanya diganti ekstensi `.webp`. Server mengirim header `image/webp` yang bentrok dengan payload PNG. Semua thumbnail wajib di-encode ke True WebP (~80 KB).
   3. `ExerciseDetailModal` dan `WorkoutTab` perlu menyinkronkan pemutaran HTML5 video saat swipe serta memelihara `videoUrl` saat enrichment.
 
+### Insiden 6: Tombol "Lanjutkan Latihan" Mulai dari Awal & Risiko Rewrite Sesi Settle (25 Agustus 2026)
+* **Gejala**: Saat membuka tab Latihan untuk sesi yang sudah selesai atau sedang berjalan separuh, tombol floating menampilkan "Lanjutkan Latihan" namun saat ditekan malah memulai latihan dari exercise index 0 (bukan latihan yang belum selesai), dan berisiko menimpa sesi yang sudah tersimpan di Firestore/kalender.
+* **Pelajaran**:
+  1. Sesi yang semua setnya selesai (`isAllSetsDone`) atau berstatus `completed` di histori hari ini **WAJIB** menampilkan status `"SESI SELESAI"` (hijau, *disabled/non-clickable*) sehingga data yang sudah aman tidak dapat tertimpa secara tidak sengaja.
+  2. Saat sesi yang belum selesai dilanjutkan (*resume*), `proceedStartWorkout` dan `ImmersiveWorkout` **WAJIB** mendeteksi latihan pertama yang belum selesai (`firstIncompleteIndex`) menggunakan pembacaan log komposit (`ex.id`, `originalId`, `compoundKey`) dan langsung melompat ke posisi tersebut, tidak pernah mereset ke index 0.
+
 ---
 
 ## 5. Checklist Wajib Sebelum Rilis / Selesai Debugging
@@ -176,6 +182,7 @@ Setiap perubahan pada struktur latihan atau timer wajib lolos verifikasi di 5 la
 - [ ] 2. Apakah build produksi sukses tanpa error? (`npm run build`)
 - [ ] 3. Apakah data yang dikirim ke Firestore sudah melewati `cleanFirestoreData`?
 - [ ] 4. Apakah Floating Bar, Immersive Mode, dan Kalender menampilkan angka kalori/durasi yang konsisten?
-- [ ] 5. Apakah modal baru memiliki proteksi scroll lock (`overscroll-contain touch-none`) dan `data-close-modal="true"`?
+- [ ] 5. Apakah modal baru memiliki proteksi scroll lock (`overscroll-contain touch-none`) and `data-close-modal="true"`?
 - [ ] 6. Apakah semua video MP4 berformat H.264 (avc1) dan thumbnail berformat True WebP?
-- [ ] 7. Apakah ukuran bundle OTA sudah diverifikasi di bawah batas wajar?
+- [ ] 7. Apakah sesi yang sudah selesai berstatus "SESI SELESAI" dan sesi yang di-resume melompat langsung ke latihan yang belum selesai?
+- [ ] 8. Apakah ukuran bundle OTA sudah diverifikasi di bawah batas wajar?
