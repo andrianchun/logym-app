@@ -286,14 +286,14 @@ export const defaultMasterExercises = [
   },
   {
     "id": 120,
-    "name": "SM Romanian Deadlift (RDL)",
+    "name": "Smith Machine Romanian Deadlift",
     "target": ["Hams", "Glutes"],
     "type": "weight",
     "defaultWeight": 20,
     "equipment": "Smith Machine",
     "level": "beginner",
     "ytVideo": "https://youtu.be/xWnlfJaQZ3k?si=z0FRk3rh4UO7JdUC",
-    "videoUrl": "/exercise-assets/youtube-backup/edb-Smith_Machine_Romanian_Deadlift.mp4",
+    "videoUrl": "/exercise-assets/edb-Smith_Machine_Stiff-Legged_Deadlift.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Romanian_Deadlift.mp4",
     "thumbnailUrl": "/exercise-assets/edb-Smith_Machine_Stiff-Legged_Deadlift.webp",
     "gifUrl": "/exercise-assets/edb-Smith_Machine_Stiff-Legged_Deadlift.webp"
   },
@@ -352,7 +352,7 @@ export const defaultMasterExercises = [
   },
   {
     "id": 126,
-    "name": "Treadmill Running",
+    "name": "Treadmill",
     "target": ["Cardio"],
     "type": "cardio",
     "defaultWeight": 0,
@@ -550,6 +550,39 @@ export const defaultMasterExercises = [
     "videoUrl": "",
     "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Pull_Through/0.jpg",
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Pull_Through/0.jpg"
+  },
+  {
+    "id": 141,
+    "name": "Trail Running",
+    "target": [
+      "Cardio",
+      "Quads",
+      "Glutes",
+      "Calves"
+    ],
+    "type": "cardio",
+    "defaultWeight": 0,
+    "duration": 30,
+    "equipment": "Body Weight",
+    "level": "intermediate",
+    "ytVideo": ""
+  },
+  {
+    "id": 142,
+    "name": "Barbell Incline Bench Press - Medium Grip",
+    "target": [
+      "Chest",
+      "Shoulders",
+      "Triceps"
+    ],
+    "type": "weight",
+    "defaultWeight": 20,
+    "equipment": "Barbell",
+    "level": "intermediate",
+    "ytVideo": "",
+    "videoUrl": "",
+    "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Incline_Bench_Press_-_Medium_Grip/0.jpg",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Incline_Bench_Press_-_Medium_Grip/0.jpg"
   }
 ];
 
@@ -560,6 +593,8 @@ export const cleanExerciseNameForMatching = (name) => {
     .replace(/[^\w\s]/g, ' ')
     .replace(/\brumanian\b/g, 'romanian')
     .replace(/\brdl\b/g, 'romanian deadlift')
+    .replace(/\b(romanian deadlift)(\s+romanian deadlift)+\b/g, 'romanian deadlift')
+    .replace(/\bsm\b/g, 'smith machine')
     .replace(/\bdumbell\b/g, 'dumbbell')
     .replace(/\bdumbel\b/g, 'dumbbell')
     .replace(/\bpull\s+thru\b/g, 'pull through')
@@ -605,9 +640,53 @@ export const findMatchingMasterExercise = (targetEx, masterList = defaultMasterE
   const byExact = masterList.find(m => cleanExerciseNameForMatching(m.name) === rawName);
   if (byExact) return byExact;
 
+  const hasModifierMismatch = (str1, str2) => {
+    // 1. Equipment mismatch (Cable vs Dumbbell vs Barbell vs Smith vs Body Weight)
+    const EQUIPMENT_MODIFIERS = ['cable', 'dumbbell', 'barbell', 'smith', 'kettlebell', 'band', 'body weight', 'pool', 'bicycle', 'treadmill'];
+    for (const eq1 of EQUIPMENT_MODIFIERS) {
+      for (const eq2 of EQUIPMENT_MODIFIERS) {
+        if (eq1 !== eq2 && str1.includes(eq1) && str2.includes(eq2)) {
+          return true;
+        }
+      }
+    }
+
+    // 2. Deficit is strictly isolated
+    if (str1.includes('deficit') !== str2.includes('deficit')) return true;
+
+    // 3. Overhead vs Pushdown vs Extension vs Kickback
+    if (str1.includes('overhead') !== str2.includes('overhead')) return true;
+    if (str1.includes('pushdown') !== str2.includes('pushdown')) return true;
+    if (str1.includes('kickback') !== str2.includes('kickback')) return true;
+
+    // 4. Incline vs Decline vs Flat
+    if (str1.includes('incline') && str2.includes('decline')) return true;
+    if (str1.includes('decline') && str2.includes('incline')) return true;
+    if ((str1.includes('incline') || str1.includes('decline')) !== (str2.includes('incline') || str2.includes('decline'))) {
+      if (str1.includes('press') || str2.includes('press') || str1.includes('bench') || str2.includes('bench')) return true;
+    }
+
+    // 5. Seated vs Standing (only conflict if opposing)
+    if (str1.includes('seated') && str2.includes('standing')) return true;
+    if (str1.includes('standing') && str2.includes('seated')) return true;
+
+    // 6. Grip styles (Close vs Wide vs Reverse)
+    if (str1.includes('close grip') && str2.includes('wide grip')) return true;
+    if (str1.includes('wide grip') && str2.includes('close grip')) return true;
+    if (str1.includes('reverse grip') !== str2.includes('reverse grip')) return true;
+
+    // 7. Curl variations (Hammer vs Preacher vs Concentration vs Alternate)
+    if (str1.includes('hammer') !== str2.includes('hammer')) return true;
+    if (str1.includes('preacher') !== str2.includes('preacher')) return true;
+    if (str1.includes('concentration') !== str2.includes('concentration')) return true;
+
+    return false;
+  };
+
   // 3. Substring (satu nama mengandung nama lainnya)
   const bySub = masterList.find(m => {
     const mName = cleanExerciseNameForMatching(m.name);
+    if (hasModifierMismatch(rawName, mName)) return false;
     return mName.includes(rawName) || rawName.includes(mName);
   });
   if (bySub) return bySub;
@@ -618,7 +697,9 @@ export const findMatchingMasterExercise = (targetEx, masterList = defaultMasterE
   if (targetWords.length > 0) {
     const targetCore = targetWords.join(' ');
     const byCore = masterList.find(m => {
-      const mWords = cleanExerciseNameForMatching(m.name).split(/[\s-]+/).filter(w => !IGNORE_WORDS.has(w));
+      const mName = cleanExerciseNameForMatching(m.name);
+      if (hasModifierMismatch(rawName, mName)) return false;
+      const mWords = mName.split(/[\s-]+/).filter(w => !IGNORE_WORDS.has(w));
       const mCore = mWords.join(' ');
       return mCore === targetCore || mCore.includes(targetCore) || targetCore.includes(mCore);
     });
@@ -630,15 +711,15 @@ export const findMatchingMasterExercise = (targetEx, masterList = defaultMasterE
 
 /**
  * Menormalkan objek latihan ke nama dan atribut kanonikal master resmi.
- * Menjamin sinkronisasi nama:
+ * Menjamin sinkronisasi nama tanpa menimpa variasi spesifik (seperti Deficit, Incline, Rope, Cable Curl, dll.):
  *  - "Lat Pulldown" -> "Wide-Grip Lat Pulldown"
  *  - "Cross Cable Rear Delt" -> "Cable Rear Delt Fly"
- *  - "Dumbbell Biceps Curl" / "Biceps Curl" -> "Dumbbell Alternate Bicep Curl"
- *  - "Rumanian Deadlift" / "RDL" -> "Romanian Deadlift"
- *  - "Flat Dumbbell Bench Press" -> "Dumbbell Bench Press"
- *  - "Cable Lateral Raises" -> "Cable Seated Lateral Raise"
+ *  - "Dumbbell Biceps Curl" / "Biceps Curl" -> "Dumbbell Alternate Bicep Curl" (bukan Cable Curl / Barbell Curl)
+ *  - "Rumanian Deadlift" / "RDL" -> "Romanian Deadlift" (bukan Deficit RDL / Smith RDL)
+ *  - "Flat Dumbbell Bench Press" -> "Dumbbell Bench Press" (bukan Incline DB Press)
+ *  - "Cable Lateral Raises" -> "Cable Seated Lateral Raise" (bukan Dumbbell Lateral Raise)
  *  - "Cable Pull Through" -> "Pull Through"
- *  - "Cable Triceps Pushdown" -> "Triceps Pushdown"
+ *  - "Cable Triceps Pushdown" -> "Triceps Pushdown" (bukan Rope Overhead Extension)
  */
 export const canonicalizeExercise = (ex) => {
   if (!ex) return ex;
@@ -646,23 +727,34 @@ export const canonicalizeExercise = (ex) => {
   let name = ex.name || '';
   const locName = cleanExerciseNameForMatching(name);
 
-  if (locName.includes('lat pulldown') || locName === 'wide grip lat pulldown') {
+  // Exact alias mapping: HANYA ubah jika nama persis alias resminya
+  if (locName === 'lat pulldown' || locName === 'wide grip lat pulldown' || locName === 'wide grip lat pull down') {
     name = 'Wide-Grip Lat Pulldown';
-  } else if (locName.includes('rear delt') || locName.includes('cross cable rear delt')) {
+  } else if (locName === 'cable rear delt fly' || locName === 'cross cable rear delt' || locName === 'cross cable rear delt fly' || locName === 'cable rear delt flyes') {
     name = 'Cable Rear Delt Fly';
-  } else if (locName.includes('romanian deadlift') || locName.includes('rumanian deadlift')) {
+  } else if (locName === 'romanian deadlift from deficit' || locName === 'rdl from deficit' || locName === 'deficit rdl') {
+    name = 'Romanian Deadlift from Deficit';
+  } else if (locName === 'sm romanian deadlift' || locName === 'smith machine romanian deadlift' || locName === 'smith rdl' || locName === 'sm rdl' || locName === 'smith machine rdl' || locName === 'sm romanian deadlift rdl') {
+    name = 'Smith Machine Romanian Deadlift';
+  } else if (locName === 'romanian deadlift' || locName === 'rumanian deadlift' || locName === 'rdl' || locName === 'barbell rdl' || locName === 'barbell romanian deadlift') {
     name = 'Romanian Deadlift';
-  } else if (locName.includes('dumbbell bench press') || locName === 'flat dumbbell bench press') {
+  } else if (locName === 'flat dumbbell bench press' || locName === 'dumbbell flat bench press' || locName === 'db bench press') {
     name = 'Dumbbell Bench Press';
-  } else if (locName.includes('hip abduction') || locName.includes('cable abduction') || locName === 'standing cable hip abduction') {
+  } else if (locName === 'standing cable hip abduction' || locName === 'cable hip abduction' || locName === 'cable hip abductions') {
     name = 'Cable Hip Abduction';
-  } else if (locName.includes('pull through')) {
+  } else if (locName === 'cable pull through' || locName === 'cable pull thru' || locName === 'pull through') {
     name = 'Pull Through';
-  } else if (locName.includes('lateral raise')) {
+  } else if (locName === 'cable lateral raise' || locName === 'cable lateral raises' || locName === 'cable seated lateral raise' || locName === 'seated cable lateral raise') {
     name = 'Cable Seated Lateral Raise';
-  } else if (locName.includes('triceps pushdown') || locName.includes('tricep pushdown')) {
+  } else if (locName === 'treadmill running' || locName === 'running on treadmill' || locName === 'treadmill') {
+    name = 'Treadmill';
+  } else if (locName === 'trail running' || locName === 'trail run') {
+    name = 'Trail Running';
+  } else if (locName === 'jogging' || locName === 'running' || locName === 'jogging running' || locName === 'jogging / running') {
+    name = 'Jogging / Running';
+  } else if (locName === 'cable triceps pushdown' || locName === 'triceps pushdown' || locName === 'tricep pushdown') {
     name = 'Triceps Pushdown';
-  } else if (locName.includes('bicep curl') && !locName.includes('high cable')) {
+  } else if (locName === 'dumbbell biceps curl' || locName === 'dumbbell bicep curl' || locName === 'biceps curl' || locName === 'bicep curl' || locName === 'dumbbell alternate bicep curl' || locName === 'dumbbell alternating bicep curl') {
     name = 'Dumbbell Alternate Bicep Curl';
   } else if (masterMatch && masterMatch.name && masterMatch.id === (ex.originalId || ex.id)) {
     name = masterMatch.name;
@@ -1039,7 +1131,7 @@ export const defaultPrograms = [
       },
       {
         "id": 120,
-        "name": "SM Romanian Deadlift (RDL)",
+        "name": "Smith Machine Romanian Deadlift",
         "sets": 4,
         "reps": 12,
         "target": [
@@ -1050,7 +1142,7 @@ export const defaultPrograms = [
         "defaultWeight": 20,
         "equipment": "Smith Machine",
         "ytVideo": "https://youtu.be/xWnlfJaQZ3k?si=z0FRk3rh4UO7JdUC",
-        "videoUrl": "/exercise-assets/youtube-backup/edb-Smith_Machine_Romanian_Deadlift.mp4"
+        "videoUrl": "/exercise-assets/edb-Smith_Machine_Stiff-Legged_Deadlift.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Romanian_Deadlift.mp4"
       },
       {
         "id": 121,
@@ -1259,7 +1351,7 @@ export const exerciseAliasMap = {
   '123': 'edb-Plank',
   '124': 'edb-Dumbbell_Shrug',
   '125': 'edb-Palms-Up_Dumbbell_Wrist_Curl_Over_A_Bench',
-  '126': 'edb-126',
+  '126': 'edb-Treadmill',
   '127': 'edb-127',
   '128': 'edb-128',
   '129': 'edb-129',
@@ -1270,10 +1362,12 @@ export const exerciseAliasMap = {
   '134': 'edb-Goblet_Squat',
   '135': 'edb-Barbell_Bench_Press_-_Medium_Grip',
   '136': 'edb-136',
-  '137': 'edb-137',
+  '137': 'edb-Jogging_Running',
   '138': 'edb-138',
   '139': 'edb-139',
-  '140': 'edb-Pull_Through'
+  '140': 'edb-Pull_Through',
+  '141': 'edb-Trail_Running',
+  '142': 'edb-Barbell_Incline_Bench_Press_-_Medium_Grip'
 };
 
 export const resolveLoggedExercise = (logKey, exLookup) => {

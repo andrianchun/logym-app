@@ -18,27 +18,16 @@ export const isSameExerciseEntity = (e1, e2) => {
   const m2 = findMatchingMasterExercise(e2, defaultMasterExercises);
   if (m1 && m2 && m1.id === m2.id) return true;
 
+  const c1 = canonicalizeExercise(e1);
+  const c2 = canonicalizeExercise(e2);
+  if (c1?.name && c2?.name && cleanExerciseNameForMatching(c1.name) === cleanExerciseNameForMatching(c2.name)) {
+    return true;
+  }
+
   const n1 = cleanExerciseNameForMatching(e1.name);
   const n2 = cleanExerciseNameForMatching(e2.name);
   if (!n1 || !n2) return false;
-  if (n1 === n2) return true;
-  // Lat Pulldown <-> Wide-Grip Lat Pulldown merger
-  if (n1.includes('lat pulldown') && n2.includes('lat pulldown')) return true;
-  // Romanian / Rumanian Deadlift merger
-  if (n1.includes('romanian deadlift') && n2.includes('romanian deadlift')) return true;
-  // Rear Delt Fly merger
-  if (n1.includes('rear delt') && n2.includes('rear delt')) return true;
-  // Dumbbell Bicep Curl merger
-  if (n1.includes('bicep curl') && n2.includes('bicep curl') && !n1.includes('high cable') && !n2.includes('high cable')) return true;
-  // Dumbbell Bench Press <-> Flat Dumbbell Bench Press merger
-  if (n1.includes('dumbbell bench press') && n2.includes('dumbbell bench press')) return true;
-  // Pull Through <-> Cable Pull Through merger
-  if (n1.includes('pull through') && n2.includes('pull through')) return true;
-  // Lateral Raise <-> Cable Lateral Raise merger
-  if (n1.includes('lateral raise') && n2.includes('lateral raise')) return true;
-  // Triceps Pushdown <-> Cable Triceps Pushdown merger
-  if (n1.includes('triceps pushdown') && n2.includes('triceps pushdown')) return true;
-  return false;
+  return n1 === n2;
 };
 
 const ExerciseDetailModal = ({ 

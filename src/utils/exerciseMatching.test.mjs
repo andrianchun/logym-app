@@ -74,4 +74,45 @@ assert.equal(matchRearDelt.name, 'Cable Rear Delt Fly');
 assert.ok(matchRearDelt.thumbnailUrl.includes('Cable_Rear_Delt_Fly.webp'));
 assert.ok(matchRearDelt.videoUrl.includes('Cable_Rear_Delt_Fly_1.mp4'));
 
+// 9. Romanian Deadlift from Deficit TIDAK boleh tertukar dengan Romanian Deadlift biasa
+const matchDeficit = findMatchingMasterExercise({ name: 'Romanian Deadlift from Deficit' }, defaultMasterExercises);
+assert.equal(matchDeficit, null, 'Romanian Deadlift from Deficit tidak boleh tertukar dengan RDL biasa di master');
+assert.equal(canonicalizeExercise({ name: 'Romanian Deadlift from Deficit' }).name, 'Romanian Deadlift from Deficit');
+
+// 10. Treadmill & Trail Running
+assert.equal(canonicalizeExercise({ name: 'Treadmill Running' }).name, 'Treadmill');
+assert.equal(canonicalizeExercise({ name: 'Trail Running' }).name, 'Trail Running');
+const matchTreadmill = findMatchingMasterExercise({ name: 'Treadmill Running' }, defaultMasterExercises);
+assert.equal(matchTreadmill.name, 'Treadmill');
+assert.equal(matchTreadmill.id, 126);
+
+const matchTrail = findMatchingMasterExercise({ name: 'Trail Running' }, defaultMasterExercises);
+assert.equal(matchTrail.name, 'Trail Running');
+assert.equal(matchTrail.id, 141);
+
+// 11. Proteksi Alat & Variasi: Cable Bicep Curl TIDAK boleh tertukar ke Dumbbell Bicep Curl
+assert.equal(canonicalizeExercise({ name: 'Cable Bicep Curl' }).name, 'Cable Bicep Curl');
+assert.equal(findMatchingMasterExercise({ name: 'Cable Bicep Curl' }, defaultMasterExercises), null);
+
+// 12. Proteksi Triceps: Cable Rope Overhead Triceps Extension (ID 117) TIDAK boleh tertukar ke Triceps Pushdown (ID 105)
+const matchOverhead = findMatchingMasterExercise({ name: 'Cable Rope Overhead Triceps Extension' }, defaultMasterExercises);
+assert.equal(matchOverhead.id, 117);
+assert.equal(matchOverhead.name, 'Cable Rope Overhead Triceps Extension');
+
+// 13. Dumbbell Lateral Raise TIDAK boleh tertukar ke Cable Seated Lateral Raise
+assert.equal(canonicalizeExercise({ name: 'Dumbbell Lateral Raise' }).name, 'Dumbbell Lateral Raise');
+
+// 14. Smith Machine Romanian Deadlift (ID 120) nama lengkap resmi
+assert.equal(canonicalizeExercise({ name: 'SM Romanian Deadlift (RDL)' }).name, 'Smith Machine Romanian Deadlift');
+assert.equal(canonicalizeExercise({ name: 'Smith Machine Romanian Deadlift' }).name, 'Smith Machine Romanian Deadlift');
+const matchSmRdl = findMatchingMasterExercise({ name: 'SM Romanian Deadlift (RDL)' }, defaultMasterExercises);
+assert.equal(matchSmRdl.id, 120);
+assert.equal(matchSmRdl.name, 'Smith Machine Romanian Deadlift');
+
+// 15. Barbell Incline Bench Press vs Barbell Bench Press
+const matchBarbellIncline = findMatchingMasterExercise({ name: 'Barbell Incline Bench Press' }, defaultMasterExercises);
+assert.ok(matchBarbellIncline, 'Harus menemukan Barbell Incline Bench Press ID 142');
+assert.equal(matchBarbellIncline.id, 142);
+assert.notEqual(matchBarbellIncline.id, 135, 'Barbell Incline TIDAK boleh tertukar dengan Flat Barbell Bench Press (ID 135)');
+
 console.log('exerciseMatching OK');
