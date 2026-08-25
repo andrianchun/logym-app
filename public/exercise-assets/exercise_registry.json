@@ -5533,13 +5533,13 @@
       "Initiate the movement by moving your arms back and outward, keeping your arms straight as you execute the movement.",
       "Pause at the end of the motion before returning the handles to the start position."
     ],
-    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Rear_Delt_Fly/0.jpg",
+    "gifUrl": "/exercise-assets/edb-Cable_Rear_Delt_Fly.webp",
     "ytVideo": "",
     "status": "pending",
     "isFavorite": true,
     "popularityRank": 16,
-    "thumbnailUrl": "",
-    "videoUrl": "",
+    "thumbnailUrl": "/exercise-assets/edb-Cable_Rear_Delt_Fly.webp",
+    "videoUrl": "/exercise-assets/edb-Cable_Rear_Delt_Fly_1.mp4 /exercise-assets/edb-Cable_Rear_Delt_Fly_2.mp4 /exercise-assets/youtube-backup/edb-Cable_Rear_Delt_Fly_1.mp4",
     "prompt_id": "",
     "approvedAt": null,
     "instructions": [

@@ -4579,14 +4579,15 @@
       "Gerakkan kedua lengan ke arah belakang dan luar, jaga lengan tetap lurus selama gerakan.",
       "Tahan sejenak di titik akhir gerakan sebelum kembali ke posisi awal."
     ],
-    "videoUrl": "https://youtu.be/cGXBVOc5xIk?si=ve9zzcNdiyNqYF5I https://youtu.be/IeOqdw9WI90?si=J4oHxFNn7257r3ak",
+    "videoUrl": "/exercise-assets/edb-Cable_Rear_Delt_Fly_1.mp4 /exercise-assets/edb-Cable_Rear_Delt_Fly_2.mp4 /exercise-assets/youtube-backup/edb-Cable_Rear_Delt_Fly_1.mp4",
     "ytVideo": "https://youtu.be/cGXBVOc5xIk?si=ve9zzcNdiyNqYF5I https://youtu.be/IeOqdw9WI90?si=J4oHxFNn7257r3ak",
     "defaultWeight": 5,
     "level": "advanced",
     "type": "weight",
     "aliases": [
       "Cross Cable Rear Delt"
-    ]
+    ],
+    "thumbnailUrl": "/exercise-assets/edb-Cable_Rear_Delt_Fly.webp"
   },
   {
     "exerciseId": "Cable_Reverse_Crunch",

@@ -400,16 +400,21 @@ const ImmersiveWorkout = ({
     let items = [];
     if (exercise.videoUrl) {
       const urls = exercise.videoUrl.split(/(?:,|\s)+/).filter(v => v.trim());
-      urls.forEach(u => items.push({ type: u.match(/\.(mp4|webm)$/i) ? 'video' : (u.includes('youtu') ? 'youtube' : 'video'), url: u }));
+      urls.forEach(u => {
+        if (u.match(/\.(mp4|webm)$/i)) {
+          items.push({ type: 'video', url: u });
+        }
+      });
     }
     if (exercise.gifUrl) {
       const urls = exercise.gifUrl.split(/(?:,|\s)+/).filter(v => v.trim());
-      urls.forEach(u => items.push({ type: u.match(/\.(mp4|webm)$/i) ? 'video' : 'image', url: u }));
-    }
-    // HANYA jika TIDAK ADA video sama sekali, gunakan ytVideo YouTube
-    if (items.length === 0 && exercise.ytVideo) {
-      const urls = exercise.ytVideo.split(/(?:,|\s)+/).filter(v => v.trim());
-      urls.forEach(u => items.push({ type: 'youtube', url: u }));
+      urls.forEach(u => {
+        if (u.match(/\.(mp4|webm)$/i)) {
+          if (!items.some(it => it.url === u)) items.push({ type: 'video', url: u });
+        } else {
+          items.push({ type: 'image', url: u });
+        }
+      });
     }
     return items;
   };
@@ -779,36 +784,23 @@ const ImmersiveWorkout = ({
             </div>
           ) : (
             mediaItems.map((media, idx) => (
-              <div key={idx} className="h-full flex items-center justify-center shrink-0 relative overflow-hidden" style={{ width: `${100 / mediaItems.length}%` }}>
-                {(() => {
-                  if (media.type === 'youtube') {
-                    const match = media.url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})/);
-                    const videoId = match ? match[1] : null;
-                    if (videoId) {
-                      return (
-                        <React.Fragment key={`yt-imm-${videoId}-${idx}`}>
-                          {!ytLoaded && idx === activeMediaIndex && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-[#05070d] z-10">
-                              <Clock className="animate-spin text-white/50" size={32} />
-                            </div>
-                          )}
-                          <iframe 
-                            src={`https://www.youtube.com/embed/${videoId}?enablejsapi=1&mute=1&controls=0&modestbranding=1&playsinline=1&rel=0&disablekb=1&iv_load_policy=3`}
-                            title="YouTube video player" 
-                            frameBorder="0" 
-                            onLoad={handleIframeLoad}
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; compute-pressure" 
-                            className={`immersive-video-iframe w-[160%] h-[160%] max-w-none pointer-events-none scale-[1.4] sm:scale-[1.3] transition-opacity duration-700 ${ytLoaded || idx !== activeMediaIndex ? 'opacity-100' : 'opacity-0'}`}
-                          ></iframe>
-                        </React.Fragment>
-                      );
-                    }
-                  }
-                  if (media.type === 'video') {
-                    return <video src={media.url} poster={resolvedEx?.thumbnailUrl || resolvedEx?.gifUrl || ''} autoPlay={idx === activeMediaIndex && !isPaused} loop muted playsInline preload="auto" disablePictureInPicture controlsList="nodownload nofullscreen noremoteplayback" className="immersive-video-html5 w-full h-full object-cover opacity-80 pointer-events-none scale-[1.10] bg-black" />;
-                  }
-                  return <img src={media.url} alt={ex.name} className="w-full h-full object-cover opacity-80 pointer-events-none scale-[1.10]" />;
-                })()}
+              <div key={idx} className="h-full flex items-center justify-center shrink-0 relative overflow-hidden bg-black" style={{ width: `${100 / mediaItems.length}%` }}>
+                {media.type === 'video' ? (
+                  <video 
+                    src={media.url} 
+                    poster={resolvedEx?.thumbnailUrl || resolvedEx?.gifUrl || ''} 
+                    autoPlay={idx === activeMediaIndex && !isPaused} 
+                    loop 
+                    muted 
+                    playsInline 
+                    preload="auto" 
+                    disablePictureInPicture 
+                    controlsList="nodownload nofullscreen noremoteplayback" 
+                    className="immersive-video-html5 w-full h-full object-cover opacity-90 pointer-events-none scale-[1.10] bg-black" 
+                  />
+                ) : (
+                  <img src={media.url} alt={ex.name} className="w-full h-full object-cover opacity-90 pointer-events-none scale-[1.10]" />
+                )}
               </div>
             ))
           )}

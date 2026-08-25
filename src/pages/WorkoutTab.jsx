@@ -1257,76 +1257,112 @@ const WorkoutTab = ({
         )}
       </div>
 
-      {/* FLOATING START WORKOUT BUTTON */}
+      {/* FLOATING START / RESUME WORKOUT BUTTON */}
       {(() => {
-        const activeExpandedId = Object.keys(expandedSessions || {}).find(k => (expandedSessions || {})[k]);
-        if (!activeExpandedId || isImmersiveMode || isWorkoutActive) return null;
-        
-        let sessionData = null;
-        let isExtra = false;
-        if (activeExpandedId === 'extra') {
-           sessionData = { exercises: extraExercises, workoutId: 'extra' };
-           isExtra = true;
-        } else {
-           sessionData = activeProgramsList.find(p => p.workoutId === activeExpandedId);
-        }
+        if (isImmersiveMode || isWorkoutActive) return null;
 
-        if (!sessionData) return null;
+        // 1. Kumpulkan seluruh sesi latihan hari ini (Program + Ekstra)
+        const allSessionsList = [
+          ...activeProgramsList.map(p => ({
+            ...p,
+            workoutId: p.workoutId,
+            isExtra: false,
+            exercises: p.exercises || []
+          })),
+          ...(extraExercises.length > 0 ? [{
+            workoutId: 'extra',
+            name: 'Ekstra',
+            isExtra: true,
+            exercises: extraExercises
+          }] : [])
+        ];
 
-        const hasExercises = sessionData.exercises && sessionData.exercises.length > 0;
-        if (!hasExercises) return null;
-        
-        const activeExercises = hasExercises ? sessionData.exercises.filter(ex => !skippedExercises[ex.id]) : [];
-        const allSkipped = hasExercises && activeExercises.length === 0;
+        if (allSessionsList.length === 0) return null;
 
-        let isAllSetsDone = false;
-        let hasSomeSetsDone = false;
-        if (hasExercises && !allSkipped) {
-          isAllSetsDone = activeExercises.every(ex => {
+        // 2. Evaluasi status tiap sesi
+        const todayData = history[selectedDate];
+        const evaluatedSessions = allSessionsList.map(session => {
+          const exercises = session.exercises || [];
+          const hasExercises = exercises.length > 0;
+          const activeExercises = exercises.filter(ex => !skippedExercises[ex.id]);
+          const allSkipped = hasExercises && activeExercises.length === 0;
+          
+          const wInHistory = todayData?.workouts?.find(w => 
+            w.programId === session.workoutId || 
+            w.id === session.workoutId || 
+            (session.workoutId === 'extra' && w.programId === 'adhoc')
+          );
+          
+          const isAllSetsDone = hasExercises && !allSkipped && activeExercises.every(ex => {
             const logs = getSetLogs(ex);
             return logs.length > 0 && logs.every(s => s.done || s.skipped);
           });
-          hasSomeSetsDone = activeExercises.some(ex => {
+          
+          const hasSomeSetsDone = hasExercises && activeExercises.some(ex => {
             const logs = getSetLogs(ex);
             return logs.some(s => s.done || s.skipped);
           });
+
+          const isFinished = hasExercises && (isAllSetsDone || wInHistory?.status === 'completed');
+          const hasHistoryDuration = !!(wInHistory && wInHistory.duration);
+
+          return {
+            ...session,
+            hasExercises,
+            allSkipped,
+            isFinished,
+            hasSomeSetsDone,
+            hasHistoryDuration
+          };
+        });
+
+        // 3. Tentukan sesi target yang akan dijalankan
+        const activeExpandedId = Object.keys(expandedSessions || {}).find(k => (expandedSessions || {})[k]);
+        const expandedSession = evaluatedSessions.find(s => s.workoutId === activeExpandedId);
+        
+        // Cari sesi pertama yang BELUM selesai
+        const firstUnfinished = evaluatedSessions.find(s => !s.isFinished && s.hasExercises && !s.allSkipped);
+
+        // Jika sesi yang sedang dibuka belum selesai, utamakan itu. Jika sudah selesai, lanjutkan ke sesi berikutnya yang belum selesai!
+        let targetSession = null;
+        if (expandedSession && !expandedSession.isFinished && expandedSession.hasExercises && !expandedSession.allSkipped) {
+          targetSession = expandedSession;
+        } else if (firstUnfinished) {
+          targetSession = firstUnfinished;
         }
 
-        // Cek history hari ini
-        const todayData = history[selectedDate];
-        const wInHistory = todayData?.workouts?.find(w => w.programId === sessionData.workoutId || w.id === sessionData.workoutId || (sessionData.workoutId === 'extra' && w.programId === 'adhoc'));
-        const hasHistoryDuration = wInHistory && wInHistory.duration;
-        const isSessionFinished = isAllSetsDone || wInHistory?.status === 'completed';
+        const areAllSessionsFinished = evaluatedSessions.length > 0 && evaluatedSessions.every(s => s.isFinished || !s.hasExercises || s.allSkipped);
 
-        const isDisabled = !hasExercises || allSkipped || isSessionFinished;
-
-        let btnText = isExtra ? "MULAI EKSTRA" : "MULAI LATIHAN";
-        let btnIcon = <Play size={24} className="ml-1" />;
-        let btnClass = `${t.bgAccent} shadow-[0_8px_30px_rgb(0,0,0,0.15)] disabled:opacity-50 text-white`;
-
-        if (isSessionFinished) {
-          btnText = "SESI SELESAI";
-          btnIcon = <CheckCircle size={24} />;
-          btnClass = "bg-emerald-600/80 text-white shadow-none cursor-default";
-        } else if (hasHistoryDuration || hasSomeSetsDone || isCurrentlyCompleted) {
-          btnText = "LANJUTKAN LATIHAN";
-          btnIcon = <Play size={24} className="ml-1" />;
-        } else if (!hasExercises) {
-          btnText = "SESI KOSONG";
-          btnIcon = <X size={24} />;
-          btnClass = "bg-zinc-800 text-white shadow-none";
-        } else if (allSkipped) {
-          btnText = "SEMUA DISKIP";
-          btnIcon = <X size={24} />;
-          btnClass = "bg-zinc-800 text-white shadow-none";
+        if (areAllSessionsFinished) {
+          return createPortal(
+            <div className="fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 pointer-events-none flex justify-center animate-in fade-in duration-200">
+              <button 
+                disabled={true}
+                className={`pointer-events-auto w-full max-w-2xl mx-auto py-5 rounded-full text-xl font-black flex items-center justify-center gap-3 transition-all ${t.bgAccent} text-white shadow-lg opacity-85 cursor-default`}
+              >
+                <CheckCircle size={24} /> SESI SELESAI
+              </button>
+            </div>,
+            document.body
+          );
         }
+
+        if (!targetSession) return null;
+
+        const isResume = targetSession.hasSomeSetsDone || targetSession.hasHistoryDuration || isCurrentlyCompleted;
+        const btnText = isResume ? "LANJUTKAN LATIHAN" : (targetSession.isExtra ? "MULAI EKSTRA" : "MULAI LATIHAN");
+        const btnIcon = <Play size={24} className="ml-1" />;
 
         return createPortal(
-          <div className="fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 pointer-events-none flex justify-center">
+          <div className="fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 pointer-events-none flex justify-center animate-in fade-in duration-200">
             <button 
-              onClick={() => handleStartWorkout(sessionData.workoutId)}
-              disabled={isDisabled}
-              className={`pointer-events-auto w-full max-w-2xl mx-auto py-5 rounded-full text-xl font-black flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-95 disabled:hover:scale-100 ${btnClass}`}
+              onClick={() => {
+                if (setExpandedSessions && targetSession.workoutId !== activeExpandedId) {
+                  setExpandedSessions({ [targetSession.workoutId]: true });
+                }
+                handleStartWorkout(targetSession.workoutId);
+              }}
+              className={`pointer-events-auto w-full max-w-2xl mx-auto py-5 rounded-full text-xl font-black flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-95 ${t.bgAccent} shadow-[0_8px_30px_rgb(0,0,0,0.25)] text-white`}
             >
               {btnIcon} {btnText}
             </button>

@@ -250,17 +250,20 @@ const ExerciseDetailModal = ({
     if (!exercise) return items;
     if (exercise.videoUrl) {
       const urls = exercise.videoUrl.split(/(?:,|\s)+/).filter(v => v.trim());
-      urls.forEach(u => items.push({ type: u.match(/\.(mp4|webm)$/i) ? 'video' : (u.includes('youtu') ? 'youtube' : 'video'), url: u }));
+      urls.forEach(u => {
+        if (u.match(/\.(mp4|webm)$/i)) {
+          items.push({ type: 'video', url: u });
+        }
+      });
     }
     if (exercise.gifUrl) {
       const urls = exercise.gifUrl.split(/(?:,|\s)+/).filter(v => v.trim());
-      urls.forEach(u => items.push({ type: u.match(/\.(mp4|webm)$/i) ? 'video' : 'image', url: u }));
-    }
-    // HANYA jika TIDAK ADA video sama sekali di videoUrl, gunakan ytVideo YouTube sebagai fallback
-    if (items.length === 0 && exercise.ytVideo && typeof exercise.ytVideo === 'string') {
-      const urls = exercise.ytVideo.split(/(?:,|\s)+/).filter(v => v.trim());
       urls.forEach(u => {
-        items.push({ type: 'youtube', url: u });
+        if (u.match(/\.(mp4|webm)$/i)) {
+          if (!items.some(it => it.url === u)) items.push({ type: 'video', url: u });
+        } else {
+          items.push({ type: 'image', url: u });
+        }
       });
     }
     return items;
@@ -488,68 +491,24 @@ const ExerciseDetailModal = ({
                 </div>
               ) : (
                 mediaItems.map((media, idx) => (
-                  <div key={idx} className="relative h-full flex items-center justify-center shrink-0 overflow-hidden" style={{ width: `${100 / mediaItems.length}%` }}>
-                    {(() => {
-                      if (media.type === 'youtube') {
-                        const match = media.url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})/);
-                        const videoId = match ? match[1] : null;
-                        if (videoId) {
-                          return (
-                            <React.Fragment key={`yt-${videoId}-${idx}`}>
-                              <iframe 
-                                src={`https://www.youtube.com/embed/${videoId}?enablejsapi=1&mute=1&controls=0&modestbranding=1&playsinline=1&rel=0&disablekb=1&iv_load_policy=3`}
-                                title="YouTube video player" 
-                                frameBorder="0" 
-                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; compute-pressure"
-                                onLoad={(e) => handleIframeLoad(e, idx)}
-                                className={`exercise-video-iframe absolute w-[150%] h-[150%] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 max-w-none pointer-events-none transition-opacity duration-700 ${isVideoReady || idx !== activeMediaIndex ? 'opacity-100' : 'opacity-0'}`}
-                              ></iframe>
-                              {!isVideoReady && idx === activeMediaIndex && (
-                                <div className="absolute inset-0 flex items-center justify-center bg-black z-10">
-                                  <Loader2 className="w-8 h-8 text-white/50 animate-spin" />
-                                </div>
-                              )}
-                            </React.Fragment>
-                          );
-                        }
-                      }
-                      if (media.type === 'video') {
-                        return <video src={media.url} poster={ex?.thumbnailUrl || ex?.gifUrl || ''} autoPlay={idx === activeMediaIndex} loop muted playsInline preload="auto" className="exercise-video-html5 w-full h-full object-cover opacity-100 shadow-xl transition-all duration-300 bg-black" />;
-                      }
-                      
-                      // Animated Image Component for ExerciseDB frames
-                      const AnimatedImage = () => {
-                        const [frame, setFrame] = React.useState(0);
-                        React.useEffect(() => {
-                           if (!media.url.includes('yuhonas/free-exercise-db') || idx !== activeMediaIndex) return;
-                           const interval = setInterval(() => {
-                               setFrame(f => f === 0 ? 1 : 0);
-                           }, 800);
-                           return () => clearInterval(interval);
-                        }, [media.url, idx, activeMediaIndex]);
-                        
-                        const currentUrl = (media.url.includes('yuhonas/free-exercise-db') && media.url.endsWith('0.jpg'))
-                            ? media.url.replace('0.jpg', `${frame}.jpg`)
-                            : media.url;
-                            
-                        // Preload second frame
-                        React.useEffect(() => {
-                            if (media.url.includes('yuhonas/free-exercise-db') && media.url.endsWith('0.jpg')) {
-                                const img = new Image();
-                                img.src = media.url.replace('0.jpg', '1.jpg');
-                            }
-                        }, [media.url]);
-
-                        return (
-                          <div className="relative w-full h-full flex items-center justify-center">
-                            <img src={currentUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30 blur-2xl scale-125 pointer-events-none" />
-                            <img src={currentUrl} alt={ex.name} className="relative z-10 w-full h-full object-contain pb-6 pointer-events-none drop-shadow-2xl" />
-                          </div>
-                        );
-                      };
-                      
-                      return <AnimatedImage />;
-                    })()}
+                  <div key={idx} className="relative h-full flex items-center justify-center shrink-0 overflow-hidden bg-black" style={{ width: `${100 / mediaItems.length}%` }}>
+                    {media.type === 'video' ? (
+                      <video 
+                        src={media.url} 
+                        poster={ex?.thumbnailUrl || ex?.gifUrl || ''} 
+                        autoPlay={idx === activeMediaIndex} 
+                        loop 
+                        muted 
+                        playsInline 
+                        preload="auto" 
+                        className="exercise-video-html5 w-full h-full object-cover opacity-100 shadow-xl transition-all duration-300 bg-black" 
+                      />
+                    ) : (
+                      <div className="relative w-full h-full flex items-center justify-center">
+                        <img src={media.url} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30 blur-2xl scale-125 pointer-events-none" />
+                        <img src={media.url} alt={ex.name} className="relative z-10 w-full h-full object-contain pb-6 pointer-events-none drop-shadow-2xl" />
+                      </div>
+                    )}
                   </div>
                 ))
               )}

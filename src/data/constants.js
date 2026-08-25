@@ -257,8 +257,10 @@ export const defaultMasterExercises = [
     "defaultWeight": 5,
     "equipment": "Cable",
     "level": "advanced",
-    "ytVideo": "https://youtu.be/cGXBVOc5xIk?si=ve9zzcNdiyNqYF5I https://youtu.be/IeOqdw9WI90?si=J4oHxFNn7257r3ak",
-    "videoUrl": "https://youtu.be/cGXBVOc5xIk?si=ve9zzcNdiyNqYF5I https://youtu.be/IeOqdw9WI90?si=J4oHxFNn7257r3ak"
+    "ytVideo": "https://youtu.be/cGXBVOc5xIk?si=ve9zzcNdiyNqYF5I",
+    "videoUrl": "/exercise-assets/edb-Cable_Rear_Delt_Fly_1.mp4 /exercise-assets/edb-Cable_Rear_Delt_Fly_2.mp4 /exercise-assets/youtube-backup/edb-Cable_Rear_Delt_Fly_1.mp4",
+    "thumbnailUrl": "/exercise-assets/edb-Cable_Rear_Delt_Fly.webp",
+    "gifUrl": "/exercise-assets/edb-Cable_Rear_Delt_Fly.webp"
   },
   {
     "id": 117,
