@@ -1,33 +1,50 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { DownloadCloud, X, Loader2 } from 'lucide-react';
 
-// Bar progres unduhan. Bundle OTA puluhan MB, diinterpolasi halus agar tidak melompat-lompat,
-// dan memberi status transparan saat fase ekstraksi/pemasangan ke disk berlangsung.
+// Bar progres unduhan. Bundle OTA puluhan MB, diinterpolasi halus 60fps dengan active crawler
+// agar progres selalu bergerak dinamis (tidak mandek di 0%), dan memberi status transparan
+// saat fase ekstraksi/pemasangan ke disk berlangsung.
 function DownloadProgress({ progress, t }) {
-  const [smoothProgress, setSmoothProgress] = useState(typeof progress === 'number' ? progress : 0);
-  const targetRef = useRef(typeof progress === 'number' ? progress : 0);
+  const [displayProgress, setDisplayProgress] = useState(0);
+  const targetRef = useRef(0);
+  const isDoneRef = useRef(false);
 
   useEffect(() => {
     if (typeof progress === 'number') {
-      targetRef.current = progress;
+      targetRef.current = Math.max(targetRef.current, progress);
+      if (progress >= 100) {
+        isDoneRef.current = true;
+      }
     }
   }, [progress]);
 
   useEffect(() => {
     if (typeof progress !== 'number') return;
-    const interval = setInterval(() => {
-      setSmoothProgress(prev => {
-        const target = targetRef.current;
-        if (prev === target) return prev;
-        if (prev < target) {
-          const step = Math.max(1, Math.ceil((target - prev) / 3));
-          return Math.min(target, prev + step);
-        }
-        return target;
+
+    // Timer 1: Active progress crawler saat native progress belum terdistribusi / terbendung.
+    // Berjalan mulus dari 1% naik ke ~92% secara asimtotik agar layar selalu hidup.
+    const crawlerInterval = setInterval(() => {
+      if (isDoneRef.current) return;
+      targetRef.current = Math.min(92, targetRef.current + (targetRef.current < 25 ? 1.8 : targetRef.current < 60 ? 1.0 : 0.4));
+    }, 200);
+
+    // Timer 2: Render frame 30ms (60fps fluid) untuk transisi angka dan lebar bar yang sangat mulus
+    const renderInterval = setInterval(() => {
+      setDisplayProgress(prev => {
+        const target = isDoneRef.current ? 100 : targetRef.current;
+        if (prev >= target) return prev;
+        const diff = target - prev;
+        const step = diff > 20 ? 1.8 : diff > 5 ? 0.9 : 0.35;
+        const next = prev + step;
+        return next >= target ? target : next;
       });
-    }, 40);
-    return () => clearInterval(interval);
-  }, [progress]);
+    }, 30);
+
+    return () => {
+      clearInterval(crawlerInterval);
+      clearInterval(renderInterval);
+    };
+  }, [progress !== null]);
 
   if (progress === 'apk') {
     return (
@@ -41,7 +58,8 @@ function DownloadProgress({ progress, t }) {
     );
   }
 
-  const isExtracting = smoothProgress >= 100;
+  const rounded = Math.round(displayProgress);
+  const isExtracting = rounded >= 100;
 
   return (
     <div className="w-full text-left">
@@ -50,13 +68,13 @@ function DownloadProgress({ progress, t }) {
           {isExtracting ? 'Mengekstrak & memasang…' : 'Mengunduh pembaruan…'}
         </span>
         <span className={`text-xs font-bold ${t.textMain} tabular-nums`}>
-          {smoothProgress}%
+          {rounded}%
         </span>
       </div>
       <div className="w-full h-2.5 rounded-full bg-black/20 overflow-hidden relative">
         <div
-          className={`${t.bgAccent} h-full rounded-full transition-all duration-150 ease-out`}
-          style={{ width: `${Math.min(100, Math.max(smoothProgress, 3))}%` }}
+          className={`${t.bgAccent} h-full rounded-full transition-all duration-75 ease-out`}
+          style={{ width: `${Math.min(100, Math.max(rounded, 3))}%` }}
         />
         {isExtracting && (
           <div className="absolute inset-0 bg-white/30 animate-pulse rounded-full" />

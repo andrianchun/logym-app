@@ -301,13 +301,19 @@ export default function App() {
       setDownloadProgress(0);
       const reg = await navigator.serviceWorker?.getRegistration();
       if (reg?.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-      window.location.reload();
+      setDownloadProgress(100);
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
       return;
     }
 
     try {
       setDownloadProgress(0);
       const bundle = await CapacitorUpdater.download({ url: otaState.url, version: otaState.version });
+      setDownloadProgress(100);
+      // Jeda 600ms agar user melihat bar 100% dan status ekstraksi sebelum app me-reload bundle baru
+      await new Promise(resolve => setTimeout(resolve, 600));
       await CapacitorUpdater.set(bundle); 
     } catch (err) {
       console.error('OTA Update failed:', err);
