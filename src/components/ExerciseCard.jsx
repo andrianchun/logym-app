@@ -577,11 +577,11 @@ const ExerciseCard = ({
                                 {showWeightInfo && (
                                   <>
                                     <div 
-                                      className="fixed inset-0 z-40 bg-transparent" 
+                                      className="fixed inset-0 z-20 bg-transparent" 
                                       onClick={(e) => { e.stopPropagation(); setShowWeightInfo(false); }} 
                                     />
                                     <div 
-                                      className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-max max-w-[240px] px-3.5 py-2 rounded-2xl bg-[#0c1427]/85 border border-white/15 backdrop-blur-2xl text-left shadow-2xl shadow-black/80 z-50 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto normal-case tracking-normal font-normal"
+                                      className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-max max-w-[240px] px-3.5 py-2 rounded-2xl bg-[#0c1427]/90 border border-white/15 backdrop-blur-2xl text-left shadow-2xl shadow-black/80 z-30 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto normal-case tracking-normal font-normal"
                                       onClick={(e) => e.stopPropagation()}
                                     >
                                       <div className="font-bold text-xs text-sky-400 whitespace-nowrap">

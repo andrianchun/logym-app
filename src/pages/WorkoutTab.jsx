@@ -309,7 +309,19 @@ const WorkoutTab = ({
       setScrolledTargets(prev => ({ ...prev, [focusWorkoutId]: true }));
       hasAutoExpanded.current = true;
     } else if (activeProgramsList.length > 0 && Object.keys(expandedSessions || {}).length === 0 && !hasAutoExpanded.current) {
-      setExpandedSessions({ [activeProgramsList[0].workoutId]: true });
+      const todayData = history[selectedDate];
+      const firstUnfinishedProg = activeProgramsList.find(prog => {
+        const activeExs = (prog.exercises || []).filter(ex => !skippedExercises[ex.id]);
+        if (activeExs.length === 0) return false;
+        const isDone = activeExs.every(ex => {
+          const logs = getSetLogs(ex);
+          return Array.isArray(logs) && logs.length > 0 && logs.every(s => s.done || s.skipped);
+        });
+        const wEntry = (todayData?.workouts || []).find(w => w.id === prog.workoutId);
+        return !(isDone || (wEntry?.status === 'completed' && isDone));
+      }) || activeProgramsList[0];
+
+      setExpandedSessions({ [firstUnfinishedProg.workoutId]: true });
       hasAutoExpanded.current = true;
     }
   }, [activeProgramsList, expandedSessions, focusWorkoutId, scrolledTargets, exerciseLogs, extraExercises, skippedExercises]);
@@ -461,16 +473,40 @@ const WorkoutTab = ({
   const getSetLogs = (ex) => {
     // 1. Check live in-memory session logs first
     if (exerciseLogs[ex.id]) return exerciseLogs[ex.id];
+    const liveKey = Object.keys(exerciseLogs).find(k => 
+      k === String(ex.id) || k.startsWith(`${ex.id}-`) || (ex.originalId && (k === String(ex.originalId) || k.startsWith(`${ex.originalId}-`)))
+    );
+    if (liveKey && exerciseLogs[liveKey]) return exerciseLogs[liveKey];
 
     // 2. For completed workouts, fall back to the saved log in history
-    if (ex.workoutId) {
-      const dayData = history[selectedDate];
-      if (dayData?.workouts) {
-        const workoutEntry = dayData.workouts.find(w => w.id === ex.workoutId);
-        if (workoutEntry?.log) {
-          // Saved log can be keyed by composite ID or original ID
-          const savedLog = workoutEntry.log[ex.id] || workoutEntry.log[ex.originalId];
-          if (savedLog) return savedLog;
+    const dayData = history[selectedDate];
+    if (dayData && dayData.workouts) {
+      const targetWorkouts = ex?.workoutId
+        ? dayData.workouts.filter(w => w.id === ex.workoutId)
+        : dayData.workouts;
+
+      for (const workoutEntry of targetWorkouts) {
+        if (workoutEntry && workoutEntry.log) {
+          const candidateKeys = [
+            ex?.id,
+            ex?.originalId,
+            ex?.workoutId ? `${ex.id}-${ex.workoutId}` : null,
+            ex?.originalId && ex?.workoutId ? `${ex.originalId}-${ex.workoutId}` : null,
+            workoutEntry.id ? `${ex.id}-${workoutEntry.id}` : null,
+            ex?.originalId && workoutEntry.id ? `${ex.originalId}-${workoutEntry.id}` : null,
+          ].filter(Boolean).map(String);
+
+          for (const k of candidateKeys) {
+            if (workoutEntry.log[k]) return workoutEntry.log[k];
+          }
+
+          const rawId = ex?.id;
+          if (rawId) {
+            const prefixMatch = Object.entries(workoutEntry.log).find(([k]) => 
+              k === String(rawId) || k.startsWith(`${rawId}-`) || (ex?.originalId && (k === String(ex.originalId) || k.startsWith(`${ex.originalId}-`)))
+            );
+            if (prefixMatch) return prefixMatch[1];
+          }
         }
       }
     }
@@ -662,48 +698,9 @@ const WorkoutTab = ({
       }
     };
 
+  // Rekor 10RM baru ditampilkan secara elegan lewat Coach Praise di kartu/immersive tanpa popup badge yang mengganggu.
   React.useEffect(() => {
      if (!isWorkoutActive) return;
-     const sessionExs = sessionExercises.length > 0 ? sessionExercises : Object.keys(exerciseLogs).map(id => exerciseLibrary.find(e => e.id === id)).filter(Boolean);
-     
-     sessionExs.forEach(ex => {
-        if (!ex) return;
-        const hint = getOverloadHint(ex);
-        if (hint && hint.isNewRecord) {
-           const cacheKey = `${selectedDate}_${ex.id}`;
-           
-           // Gunakan localStorage agar tidak me-reset saat aplikasi ditutup (force close)
-           let notifiedIds = [];
-           try {
-             notifiedIds = JSON.parse(localStorage.getItem(`lyfit_notified_10rm_${selectedDate}`) || '[]');
-           } catch(e) {}
-
-           if (!notifiedIds.includes(cacheKey)) {
-              notifiedIds.push(cacheKey);
-              try {
-                 localStorage.setItem(`lyfit_notified_10rm_${selectedDate}`, JSON.stringify(notifiedIds));
-              } catch(e) {}
-              
-              const recordTitle = `REKOR 10RM BARU!`;
-              let cleanDesc = hint.text;
-              if (cleanDesc.includes('Mantap! Kamu baru saja buat rekor 10RM baru:')) {
-                  cleanDesc = cleanDesc.replace('Mantap! Kamu baru saja buat rekor 10RM baru:', 'Rekor baru:');
-              }
-              
-              window.dispatchEvent(new CustomEvent('show-achievement', {
-                 detail: {
-                    id: `10rm_${cacheKey}_${Date.now()}`,
-                    title: recordTitle,
-                    description: cleanDesc,
-                    color: 'text-amber-500', 
-                    bg: 'bg-amber-500/10', 
-                    borderColor: 'border-amber-500/30',
-                    imageUrl: '/badges/badge_volume.webp',
-                 }
-              }));
-           }
-        }
-     });
   }, [exerciseLogs, sessionExercises, isWorkoutActive, selectedDate]);
 
   const handleStartWorkout = (progId) => {
@@ -1064,11 +1061,11 @@ const WorkoutTab = ({
                       </div>
                     </div>
                     
-                    {/* no-swipe di bawah: pada lebar tablet daftar latihan ini men-scroll
-                        horizontal, dan tanpa kelas itu gerakan yang sama juga dibaca App.jsx
-                        sebagai perintah pindah tab (lihat handleGlobalTouchStart). */}
+                    {/* sm:no-swipe: pada lebar tablet daftar latihan men-scroll horizontal sehingga
+                        swipe pindah tab dikunci khusus tablet. Di HP (tampilan vertikal), swipe kanan-kiri
+                        tetap aktif untuk pindah tab. */}
                     {isExpanded && (
-                      <div className="no-swipe pb-4 sm:p-6 sm:pt-0 space-y-4 sm:space-y-0 sm:flex sm:flex-row sm:overflow-x-auto sm:snap-x sm:gap-6 hide-scrollbar animate-in slide-in-from-top-2 fade-in duration-200">
+                      <div className="sm:no-swipe pb-4 sm:p-6 sm:pt-0 space-y-4 sm:space-y-0 sm:flex sm:flex-row sm:overflow-x-auto sm:snap-x sm:gap-6 hide-scrollbar animate-in slide-in-from-top-2 fade-in duration-200">
                         {groupExercises(prog.exercises).map((group, gIdx) => {
                           return (
                           <div key={`${prog.id}-group-${gIdx}`} className={`sm:w-[340px] sm:shrink-0 sm:snap-center sm:bg-black/5 sm:dark:bg-white/5 sm:rounded-3xl sm:border sm:border-black/5 sm:dark:border-white/5 sm:overflow-hidden relative flex flex-col mb-4 sm:mb-0 last:mb-0 ${group.isSuperset ? 'pr-0' : ''}`}>
@@ -1164,7 +1161,7 @@ const WorkoutTab = ({
                   </button>
                   
                   {(expandedSessions || {})['extra'] && (
-                    <div className="no-swipe p-2 sm:p-6 pt-0 space-y-4 sm:space-y-0 sm:flex sm:flex-row sm:overflow-x-auto sm:snap-x sm:gap-6 hide-scrollbar animate-in slide-in-from-top-2 fade-in duration-200">
+                    <div className="sm:no-swipe p-2 sm:p-6 pt-0 space-y-4 sm:space-y-0 sm:flex sm:flex-row sm:overflow-x-auto sm:snap-x sm:gap-6 hide-scrollbar animate-in slide-in-from-top-2 fade-in duration-200">
                         {groupExercises(extraExercises).map((group, gIdx) => {
                           return (
                           <div key={`extra-group-${gIdx}`} className={`sm:w-[340px] sm:shrink-0 sm:snap-center sm:bg-black/5 sm:dark:bg-white/5 sm:rounded-3xl sm:border sm:border-black/5 sm:dark:border-white/5 sm:overflow-hidden relative flex flex-col mb-4 sm:mb-0 last:mb-0 ${group.isSuperset ? 'pr-3' : ''}`}>
@@ -1287,23 +1284,24 @@ const WorkoutTab = ({
           const activeExercises = exercises.filter(ex => !skippedExercises[ex.id]);
           const allSkipped = hasExercises && activeExercises.length === 0;
           
-          const wInHistory = todayData?.workouts?.find(w => 
-            w.programId === session.workoutId || 
+          const wInHistory = (todayData?.workouts || []).find(w => 
             w.id === session.workoutId || 
             (session.workoutId === 'extra' && w.programId === 'adhoc')
           );
           
+          // Sesi dianggap selesai JIKA dan HANYA JIKA:
+          // Seluruh set dari seluruh latihan yang tidak diskip di sesi ini sudah dicentang (done/skipped)
           const isAllSetsDone = hasExercises && !allSkipped && activeExercises.every(ex => {
             const logs = getSetLogs(ex);
-            return logs.length > 0 && logs.every(s => s.done || s.skipped);
+            return Array.isArray(logs) && logs.length > 0 && logs.every(s => s.done || s.skipped);
           });
           
           const hasSomeSetsDone = hasExercises && activeExercises.some(ex => {
             const logs = getSetLogs(ex);
-            return logs.some(s => s.done || s.skipped);
+            return Array.isArray(logs) && logs.some(s => s.done || s.skipped);
           });
 
-          const isFinished = hasExercises && (isAllSetsDone || wInHistory?.status === 'completed');
+          const isFinished = hasExercises && (isAllSetsDone || (wInHistory?.status === 'completed' && isAllSetsDone));
           const hasHistoryDuration = !!(wInHistory && wInHistory.duration);
 
           return {
@@ -1320,15 +1318,15 @@ const WorkoutTab = ({
         const activeExpandedId = Object.keys(expandedSessions || {}).find(k => (expandedSessions || {})[k]);
         const expandedSession = evaluatedSessions.find(s => s.workoutId === activeExpandedId);
         
-        // Cari sesi pertama yang BELUM selesai
-        const firstUnfinished = evaluatedSessions.find(s => !s.isFinished && s.hasExercises && !s.allSkipped);
+        // Cari semua sesi yang BELUM selesai
+        const unfinishedSessions = evaluatedSessions.filter(s => !s.isFinished && s.hasExercises && !s.allSkipped);
 
-        // Jika sesi yang sedang dibuka belum selesai, utamakan itu. Jika sudah selesai, lanjutkan ke sesi berikutnya yang belum selesai!
+        // Jika sesi yang sedang dibuka belum selesai, utamakan itu. Jika sudah selesai, lanjutkan ke sesi pertama yang belum selesai!
         let targetSession = null;
         if (expandedSession && !expandedSession.isFinished && expandedSession.hasExercises && !expandedSession.allSkipped) {
           targetSession = expandedSession;
-        } else if (firstUnfinished) {
-          targetSession = firstUnfinished;
+        } else if (unfinishedSessions.length > 0) {
+          targetSession = unfinishedSessions[0];
         }
 
         const areAllSessionsFinished = evaluatedSessions.length > 0 && evaluatedSessions.every(s => s.isFinished || !s.hasExercises || s.allSkipped);
@@ -1349,7 +1347,7 @@ const WorkoutTab = ({
 
         if (!targetSession) return null;
 
-        const isResume = targetSession.hasSomeSetsDone || targetSession.hasHistoryDuration || isCurrentlyCompleted;
+        const isResume = targetSession.hasSomeSetsDone || targetSession.hasHistoryDuration;
         const btnText = isResume ? "LANJUTKAN LATIHAN" : (targetSession.isExtra ? "MULAI EKSTRA" : "MULAI LATIHAN");
         const btnIcon = <Play size={24} className="ml-1" />;
 
@@ -1357,9 +1355,14 @@ const WorkoutTab = ({
           <div className="fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 pointer-events-none flex justify-center animate-in fade-in duration-200">
             <button 
               onClick={() => {
-                if (setExpandedSessions && targetSession.workoutId !== activeExpandedId) {
-                  setExpandedSessions({ [targetSession.workoutId]: true });
-                }
+                // Otomatis buka kartu latihan sesi target yang bersangkutan dan scroll ke kartu tersebut
+                setExpandedSessions({ [targetSession.workoutId]: true });
+                setTimeout(() => {
+                  const targetEl = document.getElementById(targetSession.workoutId === 'extra' ? 'session-extra' : `session-${targetSession.workoutId}`);
+                  if (targetEl && typeof smartScrollTo === 'function') {
+                    smartScrollTo(targetEl, 80);
+                  }
+                }, 100);
                 handleStartWorkout(targetSession.workoutId);
               }}
               className={`pointer-events-auto w-full max-w-2xl mx-auto py-5 rounded-full text-xl font-black flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-95 ${t.bgAccent} shadow-[0_8px_30px_rgb(0,0,0,0.25)] text-white`}

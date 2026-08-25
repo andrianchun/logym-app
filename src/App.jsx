@@ -3068,17 +3068,39 @@ export default function App() {
     if (exerciseLogs[idToCheck]) return exerciseLogs[idToCheck];
     
     const matchingKey = Object.keys(exerciseLogs).find(key => 
-      idToCheck && typeof idToCheck === 'string' && idToCheck.startsWith(key + '-')
+      idToCheck && typeof idToCheck === 'string' && (idToCheck === key || idToCheck.startsWith(key + '-') || key.startsWith(idToCheck + '-'))
     );
     if (matchingKey) return exerciseLogs[matchingKey];
     
-    if (ex?.workoutId) {
-      const dayData = history[selectedDate];
-      if (dayData && dayData.workouts) {
-        const workoutEntry = dayData.workouts.find(w => w.id === ex.workoutId);
+    // Cari di riwayat tersimpan (history) hari ini
+    const dayData = history[selectedDate];
+    if (dayData && dayData.workouts) {
+      const targetWorkouts = ex?.workoutId
+        ? dayData.workouts.filter(w => w.id === ex.workoutId)
+        : dayData.workouts;
+
+      for (const workoutEntry of targetWorkouts) {
         if (workoutEntry && workoutEntry.log) {
-          const savedLog = workoutEntry.log[ex.id] || workoutEntry.log[ex.originalId];
-          if (savedLog) return savedLog;
+          const candidateKeys = [
+            idToCheck,
+            ex?.id,
+            ex?.originalId,
+            idToCheck && workoutEntry.id ? `${idToCheck}-${workoutEntry.id}` : null,
+            ex?.id && workoutEntry.id ? `${ex.id}-${workoutEntry.id}` : null,
+            ex?.originalId && workoutEntry.id ? `${ex.originalId}-${workoutEntry.id}` : null,
+          ].filter(Boolean).map(String);
+
+          for (const k of candidateKeys) {
+            if (workoutEntry.log[k]) return workoutEntry.log[k];
+          }
+
+          const rawId = ex?.id || idToCheck;
+          if (rawId) {
+            const prefixMatch = Object.entries(workoutEntry.log).find(([k]) => 
+              k === String(rawId) || k.startsWith(`${rawId}-`) || (ex?.originalId && (k === String(ex.originalId) || k.startsWith(`${ex.originalId}-`)))
+            );
+            if (prefixMatch) return prefixMatch[1];
+          }
         }
       }
     }
@@ -3430,7 +3452,13 @@ export default function App() {
             // dibiarkan seperti sekarang. extras cuma ikut dipulihkan kalau yang dibatalkan
             // memang sesi Ekstra.
             const batalEkstra = progId === 'extra';
-            const opsiBelah = { progId, workoutId: focusWorkoutId, extraExercises };
+            const targetProgExs = progId === 'extra'
+              ? (extraExercises || [])
+              : (programs.find(p => p.id === progId || p.id === focusWorkoutId)?.exercises
+                 || (history[targetDateStr]?.workouts?.find(w => w.id === focusWorkoutId || w.programId === progId)?.overriddenExercises)
+                 || sessionExercises
+                 || []);
+            const opsiBelah = { progId, workoutId: focusWorkoutId, extraExercises, sessionExercises: targetProgExs };
             const sisaLogsBatal = splitSessionLogs(exerciseLogs, opsiBelah).sisa;
             const sisaSkipBatal = splitSessionLogs(skippedExercises, opsiBelah).sisa;
 
@@ -3657,10 +3685,17 @@ Ini tidak bisa dibatalkan otomatis.`,
 
     // HANYA log milik sesi ini yang disimpan & dibuang dari state. Versi lama mengosongkan
     // exerciseLogs/skippedExercises/extraExercises tanpa syarat dan menulis SELURUH log hari itu
-    // ke sesi yang kebetulan disimpan duluan — treadmill di sesi Ekstra yang belum disimpan ikut
-    // masuk ke sesi beban, lalu kartu Ekstranya lenyap bersama datanya.
-    const belah = splitSessionLogs(exerciseLogs, { progId, workoutId: fokusSesi, extraExercises });
-    const belahSkip = splitSessionLogs(skippedExercises, { progId, workoutId: fokusSesi, extraExercises });
+    // ke sesi yang kebetulan disimpan duluan.
+    const targetDateStr = activeWorkoutDate || selectedDate;
+    const targetSessionExercises = progId === 'extra'
+      ? (extraExercises || [])
+      : (programs.find(p => p.id === progId || p.id === fokusSesi)?.exercises
+         || (history[targetDateStr]?.workouts?.find(w => w.id === fokusSesi || w.programId === progId)?.overriddenExercises)
+         || sessionExercises
+         || []);
+
+    const belah = splitSessionLogs(exerciseLogs, { progId, workoutId: fokusSesi, extraExercises, sessionExercises: targetSessionExercises });
+    const belahSkip = splitSessionLogs(skippedExercises, { progId, workoutId: fokusSesi, extraExercises, sessionExercises: targetSessionExercises });
     // extras cuma dibersihkan kalau yang disimpan memang sesi Ekstra — invarian lama yang sempat
     // hilang (lihat memori extra-exercises-are-adhoc-only).
     const isSesiEkstra = progId === 'extra';
@@ -3689,8 +3724,6 @@ Ini tidak bisa dibatalkan otomatis.`,
     setSkippedExercises(belahSkip.sisa);
     if (isSesiEkstra) setExtraExercises([]);
     setSessionSnapshot(null);
-
-    const targetDateStr = activeWorkoutDate || selectedDate;
 
     let cleanLogs = {};
     let cleanSkipped = {};
@@ -3795,10 +3828,13 @@ Ini tidak bisa dibatalkan otomatis.`,
               exerciseLibrary.forEach(ex => { lookup[ex.id] = ex; });
               (w.overriddenExercises || []).forEach(ex => { lookup[ex.id] = ex; });
               Object.keys(cleanLogs).forEach(k => {
-                const ex = resolveLoggedExercise(k, lookup);
-                if (ex && !known.has(String(ex.id))) {
-                  known.add(String(ex.id));
-                  frozenExercises = [...frozenExercises, JSON.parse(JSON.stringify(ex))];
+                const isExplicitlyForSession = (fokusSesi && k.endsWith(`-${fokusSesi}`)) || (progId && k.endsWith(`-${progId}`));
+                if (isExplicitlyForSession) {
+                  const ex = resolveLoggedExercise(k, lookup);
+                  if (ex && !known.has(String(ex.id))) {
+                    known.add(String(ex.id));
+                    frozenExercises = [...frozenExercises, JSON.parse(JSON.stringify(ex))];
+                  }
                 }
               });
             }
@@ -4099,6 +4135,8 @@ Ini tidak bisa dibatalkan otomatis.`,
   const diLuarAreaSwipe = (e) => {
     const el = e.target;
     if (swipeAreaRef.current && el instanceof Node && !swipeAreaRef.current.contains(el)) return true;
+    const isTablet = typeof window !== 'undefined' && window.innerWidth >= 640;
+    if (isTablet && el.closest?.('.sm\\:no-swipe')) return true;
     return !!(el.closest?.('input[type="range"]') || el.closest?.('[role="dialog"]') || el.closest?.('.no-swipe'));
   };
 

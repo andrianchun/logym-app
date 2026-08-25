@@ -57,6 +57,20 @@ assert.ok(Math.abs(liveCompoundKcal - liftKcal) <= 5, `live dengan compound key 
 // 7. Riwayat lama tanpa logs tetap pakai fallback timer (tidak regresi)
 assert.equal(calculateSmartWorkoutCalories(KG, { duration: 60 }, {}), calculateWorkoutCalories(KG, 60));
 
+// 7b. Sesi dengan daftar latihan tapi 0 set selesai (tidak dikerjakan / skip semua) WAJIB 0 kcal
+const zeroSetKcal = calculateSmartWorkoutCalories(KG, {
+  id: 'w3', duration: '07:00', exercises: [{ id: 1, type: 'weight', name: 'Bench Press' }, { id: 2, type: 'weight', name: 'Squat' }],
+}, {
+  1: [{ done: false, skipped: true }],
+  2: [{ done: false, skipped: false }],
+});
+assert.equal(zeroSetKcal, 0, `sesi 0 set selesai harus 0 kcal, bukan dapat ${zeroSetKcal}`);
+
+const zeroLiveKcal = calculateLiveWorkoutCalories(KG, [benchEx], {
+  '1-prog-1': [{ done: false, r: 10, w: 40 }]
+}, 420);
+assert.equal(zeroLiveKcal, 0, `live 0 set selesai harus 0 kcal, bukan dapat ${zeroLiveKcal}`);
+
 // --- recomputeStrengthRecords --------------------------------------------
 // Rekor 10RM + beban terakhir yang tampil di kartu latihan.
 

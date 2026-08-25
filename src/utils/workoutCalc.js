@@ -543,24 +543,18 @@ export const calculateSmartWorkoutCalories = (weightKg, workout, logs, globalRes
     }
   }
 
-  // 2. Fallback: Jika tidak ada logs sama sekali (riwayat lama banget), pakai blind timer lawas
+  const weight = Number(weightKg) || 70;
+  const durMins = parseWorkoutDurationMinutes(workout.duration);
+  const exercises = workout.overriddenExercises || workout.exercises || [];
+
+  // 2. Fallback: Jika tidak ada logs sama sekali (riwayat lama banget tanpa rincian set), pakai blind timer lawas
   if (!logs || Object.keys(logs).length === 0) {
-    const durMins = parseWorkoutDurationMinutes(workout.duration);
     return calculateWorkoutCalories(weightKg, durMins);
   }
 
-  const weight = Number(weightKg) || 70;
-  const durMins = parseWorkoutDurationMinutes(workout.duration);
-  
-  // Baseline kalori selama di gym (MET 2.5: aktivitas ringan, berdiri, berjalan pelan)
-  // Memastikan durasi keseluruhan (termasuk pause/istirahat tak tercatat) ikut menyumbang kalori.
-  const baselineCalories = weight * 2.5 * (durMins / 60);
-
   let extraCalories = 0;
+  let totalDoneSets = 0;
   let matchedAnyExercise = false;
-
-  // Ambil daftar latihan (bisa dari Override atau Adhoc)
-  const exercises = workout.overriddenExercises || workout.exercises || [];
 
   exercises.forEach(ex => {
     const exLogs = setsForExercise(logs, ex, workout);
@@ -571,14 +565,23 @@ export const calculateSmartWorkoutCalories = (weightKg, workout, logs, globalRes
     // setelah bolak-balik lewat penyimpanan. Dulu bentuk itu ditolak diam-diam dan seluruh
     // latihannya dianggap tidak ada — hasilnya kalori NOL padahal setnya lengkap.
     Object.values(exLogs).forEach(set => {
-      // HANYA hitung kalori jika set benar-benar dicentang selesai
-      if (set?.done) extraCalories += setExtraCalories(weight, ex, set);
+      // HANYA hitung kalori jika set benar-benar dicentang selesai (bukan di-skip)
+      if (set?.done && !set?.skipped) {
+        totalDoneSets++;
+        extraCalories += setExtraCalories(weight, ex, set);
+      }
     });
   });
 
+  // Jika sesi memiliki daftar latihan dan TIDAK ADA SATUPUN set yang selesai (semua skip / tidak dikerjakan),
+  // kalori yang terbakar WAJIB 0 kcal. Mencegah bug "7 menit ga ngapa-ngapain dapat 72 kcal".
+  if (exercises.length > 0 && totalDoneSets === 0) {
+    return 0;
+  }
+
   // Log beneran ada isinya, tapi gak ada satupun exercise yang id-nya cocok sama log.
   // Fallback ke estimasi timer biasa (durasi × MET) alih-alih 0.
-  if (baselineCalories === 0 && extraCalories === 0 && !matchedAnyExercise) {
+  if (extraCalories === 0 && !matchedAnyExercise && exercises.length === 0) {
     return calculateWorkoutCalories(weight, durMins);
   }
 
@@ -587,6 +590,9 @@ export const calculateSmartWorkoutCalories = (weightKg, workout, logs, globalRes
   if (durMins === 0 && extraCalories > 0) {
       return Math.round(extraCalories * (6.0 / 3.5)); 
   }
+
+  // Baseline kalori selama di gym (MET 2.5: aktivitas ringan, berdiri, berjalan pelan)
+  const baselineCalories = weight * 2.5 * (durMins / 60);
 
   return Math.round(baselineCalories + extraCalories);
 };
@@ -1073,23 +1079,31 @@ export const dailyBurnCalories = (bioData, workouts, fallbackWeightKg, dayExerci
  */
 export const calculateLiveWorkoutCalories = (weightKg, exercises, logs, currentDurationSecs) => {
   const weight = Number(weightKg) || 70;
-  // Baseline kalori selama di gym (MET 2.5: aktivitas ringan, berdiri, berjalan pelan)
-  const baselineCalories = weight * 2.5 * (currentDurationSecs / 3600);
-  
   let extraCalories = 0;
+  let totalDoneSets = 0;
   
   if (exercises && logs) {
     exercises.forEach(ex => {
       if (!ex) return;
       const exLogs = logs[ex.id]
         || Object.entries(logs).find(([k]) => String(k) === String(ex.id) || String(k).startsWith(`${ex.id}-`))?.[1];
-      if (!exLogs || !Array.isArray(exLogs)) return;
+      if (!exLogs) return;
 
-      exLogs.forEach(set => {
-        if (set?.done) extraCalories += setExtraCalories(weight, ex, set);
+      const setList = Array.isArray(exLogs) ? exLogs : Object.values(exLogs);
+      setList.forEach(set => {
+        if (set?.done && !set?.skipped) {
+          totalDoneSets++;
+          extraCalories += setExtraCalories(weight, ex, set);
+        }
       });
     });
   }
+
+  // Jika belum ada satupun set yang diselesaikan, kalori live tetap 0 kcal
+  if (totalDoneSets === 0) return 0;
+
+  // Baseline kalori selama di gym (MET 2.5: aktivitas ringan, berdiri, berjalan pelan)
+  const baselineCalories = weight * 2.5 * (currentDurationSecs / 3600);
 
   return Math.round(baselineCalories + extraCalories);
 };

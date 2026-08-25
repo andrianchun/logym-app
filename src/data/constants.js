@@ -1195,9 +1195,12 @@ export const resolveLoggedExercise = (logKey, exLookup) => {
  * Lihat juga resolveLoggedExercise di atas soal lima bentuk kunci — jangan pernah
  * `key.split('-')[0]`.
  */
-export const splitSessionLogs = (exerciseLogs, { progId, workoutId, extraExercises } = {}) => {
+export const splitSessionLogs = (exerciseLogs, { progId, workoutId, extraExercises, sessionExercises } = {}) => {
   const semua = exerciseLogs || {};
   const idEkstra = new Set((extraExercises || []).map(ex => String(ex?.id)));
+  const idSession = sessionExercises && sessionExercises.length > 0
+    ? new Set(sessionExercises.map(ex => String(ex?.id)))
+    : null;
   const kunci = Object.keys(semua);
 
   let milik;
@@ -1209,7 +1212,17 @@ export const splitSessionLogs = (exerciseLogs, { progId, workoutId, extraExercis
     const cocok = sufiks.length > 0
       ? nonEkstra.filter(k => sufiks.some(s => String(k).endsWith(s)))
       : [];
-    milik = new Set(cocok.length > 0 ? cocok : nonEkstra);
+
+    if (cocok.length > 0) {
+      milik = new Set(cocok);
+    } else if (idSession && idSession.size > 0) {
+      milik = new Set(nonEkstra.filter(k => {
+        const rawId = String(k).includes('-') ? String(k).slice(0, String(k).lastIndexOf('-')) : String(k);
+        return idSession.has(String(k)) || idSession.has(rawId);
+      }));
+    } else {
+      milik = new Set(nonEkstra);
+    }
   }
 
   const milikSesi = {};

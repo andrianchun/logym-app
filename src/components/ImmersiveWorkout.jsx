@@ -493,25 +493,43 @@ const ImmersiveWorkout = ({
     });
   }, [isPaused, activeMediaIndex, currentIndex]);
 
-  // Swipe Logic
-  const [touchStart, setTouchStart] = React.useState(null);
-  const [touchEnd, setTouchEnd] = React.useState(null);
+  // Swipe Logic on Center Visual (Video & Image)
+  const [touchStartX, setTouchStartX] = React.useState(null);
+  const [touchStartY, setTouchStartY] = React.useState(null);
+  const [touchEndX, setTouchEndX] = React.useState(null);
+  const [touchEndY, setTouchEndY] = React.useState(null);
 
   const minSwipeDistance = 50;
 
   const onTouchStart = (e) => {
     if (diLuarImmersive(e)) return;
-    setTouchEnd(null);
-    setTouchStart(e.targetTouches[0].clientX);
+    setTouchEndX(null);
+    setTouchEndY(null);
+    setTouchStartX(e.targetTouches[0].clientX);
+    setTouchStartY(e.targetTouches[0].clientY);
   };
 
-  const onTouchMove = (e) => setTouchEnd(e.targetTouches[0].clientX);
+  const onTouchMove = (e) => {
+    if (diLuarImmersive(e)) return;
+    setTouchEndX(e.targetTouches[0].clientX);
+    setTouchEndY(e.targetTouches[0].clientY);
+  };
 
   const onTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
-    const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > minSwipeDistance;
-    const isRightSwipe = distance < -minSwipeDistance;
+    if (touchStartX === null || touchEndX === null || touchStartY === null || touchEndY === null) return;
+    const deltaX = touchStartX - touchEndX;
+    const deltaY = touchEndY - touchStartY; // positive = swipe down
+
+    // 1. Swipe Down -> MINIMIZE LANGSUNG DARI AREA VIDEO!
+    if (deltaY > 50 && deltaY > Math.abs(deltaX) * 1.1) {
+      playSoundEffect('click', soundEnabled);
+      handleMinimize();
+      return;
+    }
+
+    // 2. Swipe Horizontal -> Ganti Media Carousel
+    const isLeftSwipe = deltaX > minSwipeDistance;
+    const isRightSwipe = deltaX < -minSwipeDistance;
     if (isLeftSwipe || isRightSwipe) {
       if (mediaItems.length > 1) {
         playSoundEffect('click', soundEnabled);
@@ -524,15 +542,13 @@ const ImmersiveWorkout = ({
     }
   };
 
-  // Root swipe logic for minimizing (swipe down)
+  // Root swipe logic for minimizing (swipe down anywhere on screen)
   const rootRef = React.useRef(null);
-  const [rootTouchStart, setRootTouchStart] = React.useState(null);
-  const [rootTouchEnd, setRootTouchEnd] = React.useState(null);
+  const [rootTouchStartX, setRootTouchStartX] = React.useState(null);
+  const [rootTouchStartY, setRootTouchStartY] = React.useState(null);
+  const [rootTouchEndX, setRootTouchEndX] = React.useState(null);
+  const [rootTouchEndY, setRootTouchEndY] = React.useState(null);
 
-  // Dialog dirender lewat createPortal ke document.body, tapi React mengalirkan event lewat pohon
-  // KOMPONEN — jadi sentuhan di dalam Detail Latihan, hint, atau panel detail set tetap sampai ke
-  // handler swipe di sini. Menandai tiap dialog satu per satu selalu ketinggalan satu; memeriksa
-  // apakah sentuhannya benar-benar berada DI DALAM layar immersive menutup semuanya sekaligus.
   const diLuarImmersive = (e) => {
     const el = e.target;
     if (!(el instanceof Node)) return false;
@@ -542,22 +558,27 @@ const ImmersiveWorkout = ({
   const onRootTouchStart = (e) => {
     if (activeSetDetail !== null || showFinishConfirm) return;
     if (diLuarImmersive(e)) return;
-    // Zona picker beban/reps memang dikecualikan: itu kontrol geser, menariknya tidak boleh
-    // menutup layar. Sisa layar — media, header, area kosong — tetap bisa dipakai.
-    if (e.target.closest('.no-swipe-minimize')) return;
-    setRootTouchEnd(null);
-    setRootTouchStart(e.targetTouches[0].clientY);
+    // Hanya kecualikan jika menyentuh wheel angka atau input form langsung
+    if (e.target.closest('.scroll-picker-wheel') || e.target.closest('input')) return;
+    setRootTouchEndX(null);
+    setRootTouchEndY(null);
+    setRootTouchStartX(e.targetTouches[0].clientX);
+    setRootTouchStartY(e.targetTouches[0].clientY);
   };
+
   const onRootTouchMove = (e) => {
     if (activeSetDetail !== null || showFinishConfirm) return;
-    setRootTouchEnd(e.targetTouches[0].clientY);
-  }
+    setRootTouchEndX(e.targetTouches[0].clientX);
+    setRootTouchEndY(e.targetTouches[0].clientY);
+  };
+
   const onRootTouchEnd = () => {
-    if (activeSetDetail !== null || showFinishConfirm || !rootTouchStart || !rootTouchEnd) return;
-    const distance = rootTouchStart - rootTouchEnd;
-    // Ambang 60px, bukan 100. Swipe ganti latihan di layar yang sama sudah pakai 50, jadi gestur
-    // minimize dulu dua kali lebih berat daripada tetangganya — itu yang terasa "susah banget".
-    if (distance < -60) { // Swipe down
+    if (activeSetDetail !== null || showFinishConfirm || rootTouchStartY === null || rootTouchEndY === null) return;
+    const deltaY = rootTouchEndY - rootTouchStartY; // positive = swipe down
+    const deltaX = (rootTouchEndX !== null && rootTouchStartX !== null) ? rootTouchEndX - rootTouchStartX : 0;
+    
+    // Tarik ke bawah > 50px dan arah dominan ke bawah -> Langsung Minimize!
+    if (deltaY > 50 && deltaY > Math.abs(deltaX) * 1.1) {
       playSoundEffect('click', soundEnabled);
       handleMinimize();
     }
@@ -720,8 +741,17 @@ const ImmersiveWorkout = ({
       onTouchEnd={onRootTouchEnd}
     >
       
+      {/* TOP PULL-DOWN DRAG HANDLE */}
+      <div 
+        className="w-full flex justify-center pt-2 pb-1 cursor-pointer z-30 shrink-0 select-none touch-pan-y" 
+        onClick={() => { playSoundEffect('click', soundEnabled); handleMinimize(); }}
+        title="Tarik ke bawah untuk minimize"
+      >
+        <div className="w-12 h-1.5 rounded-full bg-white/30 hover:bg-white/50 transition-colors" />
+      </div>
+
       {/* HEADER (UNIFIED BAR) */}
-      <div className={`flex items-center justify-between px-4 pb-2 w-full z-20 shrink-0`} style={{ paddingTop: 'max(1.25rem, env(safe-area-inset-top, 24px))' }}>
+      <div className={`flex items-center justify-between px-4 pb-2 w-full z-50 shrink-0`} style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top, 12px))' }}>
         
         {/* Durasi Group */}
         <div className="flex items-center gap-4">
@@ -971,11 +1001,11 @@ const ImmersiveWorkout = ({
                                {showWeightInfo && (
                                  <>
                                    <div 
-                                     className="fixed inset-0 z-40 bg-transparent" 
+                                     className="fixed inset-0 z-30 bg-transparent" 
                                      onClick={(e) => { e.stopPropagation(); setShowWeightInfo(false); }} 
                                    />
                                    <div 
-                                     className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-max max-w-[240px] px-3.5 py-2 rounded-2xl bg-[#0c1427]/85 border border-white/15 backdrop-blur-2xl text-left shadow-2xl shadow-black/80 z-50 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto"
+                                     className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-max max-w-[240px] px-3.5 py-2 rounded-2xl bg-[#0c1427]/90 border border-white/15 backdrop-blur-2xl text-left shadow-2xl shadow-black/80 z-40 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto"
                                      onClick={(e) => e.stopPropagation()}
                                    >
                                      <div className="font-bold text-xs text-sky-400 whitespace-nowrap">

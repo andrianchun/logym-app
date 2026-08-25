@@ -69,7 +69,23 @@ const extras = [{ id: '900-1786258529614', name: 'Treadmill' }];
   assert.deepEqual(Object.keys(milikSesi), [`${uuid}-w1`]);
 }
 
-// 6. Masukan kosong tidak melempar.
+// 7. Dua sesi tanpa sufiks di hari yang sama dipisahkan dengan benar berdasarkan sessionExercises
+{
+  const logs = {
+    '1': [{ done: false }],
+    '2': [{ done: false }],
+    '8': [{ done: false }],
+    '9': [{ done: false }],
+  };
+  const session1Exs = [{ id: 1, name: 'Bench' }, { id: 2, name: 'Row' }];
+  const { milikSesi, sisa } = splitSessionLogs(logs, {
+    progId: 'sesi_1', workoutId: 'sesi_1', sessionExercises: session1Exs
+  });
+  assert.deepEqual(Object.keys(milikSesi).sort(), ['1', '2']);
+  assert.deepEqual(Object.keys(sisa).sort(), ['8', '9'], 'latihan sesi 2 harus selamat sebagai sisa');
+}
+
+// 8. Masukan kosong tidak melempar.
 assert.deepEqual(splitSessionLogs(null, {}), { milikSesi: {}, sisa: {} });
 assert.deepEqual(splitSessionLogs({}, undefined), { milikSesi: {}, sisa: {} });
 

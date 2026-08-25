@@ -173,27 +173,27 @@ const FloatingTimer = ({
         </span>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 pr-1.5">
         {showTimer ? (
-          <div className={`flex items-center rounded-full shadow-inner px-4 py-1.5 min-w-[90px] justify-center gap-2 transition-colors ${
+          <div className={`flex items-center rounded-full shadow-inner px-3.5 py-1.5 min-w-[85px] justify-center gap-1.5 transition-colors ${
             localRestTimer < -30 ? 'bg-rose-600 animate-pulse text-white' :
             localRestTimer <= 0 ? 'bg-amber-500 text-white' :
             'bg-black/20 text-white'
           }`}>
-            <span className="text-[10px] font-black uppercase text-white/80 tracking-widest mr-1">
+            <span className="text-[10px] font-black uppercase text-white/80 tracking-widest mr-0.5">
                REST
             </span>
-            <Clock size={16} className={`animate-pulse ${localRestTimer < -30 ? 'text-white' : localRestTimer <= 0 ? 'text-white' : 'text-white'}`} />
+            <Clock size={15} className={`animate-pulse ${localRestTimer < -30 ? 'text-white' : localRestTimer <= 0 ? 'text-white' : 'text-white'}`} />
             <span className="font-mono font-black h2 text-white">
               {formatTime(localRestTimer)}
             </span>
           </div>
         ) : activeSetTimerInfo && activeSetTimerInfo.currentSeconds !== undefined ? (
-          <div className="flex items-center rounded-full shadow-inner px-4 py-1.5 min-w-[90px] justify-center gap-2 bg-rose-500 text-white animate-pulse">
-            <span className="text-[10px] font-black uppercase text-white/90 tracking-widest mr-1">
+          <div className="flex items-center rounded-full shadow-inner px-3.5 py-1.5 min-w-[85px] justify-center gap-1.5 bg-rose-500 text-white animate-pulse">
+            <span className="text-[10px] font-black uppercase text-white/90 tracking-widest mr-0.5">
                SET
             </span>
-            <Clock size={16} className="text-white" />
+            <Clock size={15} className="text-white" />
             <span className="font-mono font-black h2 text-white">
               {formatTime(activeSetTimerInfo.currentSeconds)}
             </span>

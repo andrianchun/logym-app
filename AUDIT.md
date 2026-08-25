@@ -171,8 +171,29 @@ Setiap perubahan pada struktur latihan atau timer wajib lolos verifikasi di 5 la
 ### Insiden 6: Tombol "Lanjutkan Latihan" Mulai dari Awal & Risiko Rewrite Sesi Settle (25 Agustus 2026)
 * **Gejala**: Saat membuka tab Latihan untuk sesi yang sudah selesai atau sedang berjalan separuh, tombol floating menampilkan "Lanjutkan Latihan" namun saat ditekan malah memulai latihan dari exercise index 0 (bukan latihan yang belum selesai), dan berisiko menimpa sesi yang sudah tersimpan di Firestore/kalender.
 * **Pelajaran**:
-  1. Sesi yang semua setnya selesai (`isAllSetsDone`) atau berstatus `completed` di histori hari ini **WAJIB** menampilkan status `"SESI SELESAI"` (hijau, *disabled/non-clickable*) sehingga data yang sudah aman tidak dapat tertimpa secara tidak sengaja.
+  1. Sesi yang semua setnya selesai (`isAllSetsDone`) atau berstatus `completed` di histori hari ini **WAJIB** menampilkan status `"SESI SELESAI"` (Biru LOGYM, *disabled/non-clickable*) jika SEMUA sesi hari itu sudah tuntas.
   2. Saat sesi yang belum selesai dilanjutkan (*resume*), `proceedStartWorkout` dan `ImmersiveWorkout` **WAJIB** mendeteksi latihan pertama yang belum selesai (`firstIncompleteIndex`) menggunakan pembacaan log komposit (`ex.id`, `originalId`, `compoundKey`) dan langsung melompat ke posisi tersebut, tidak pernah mereset ke index 0.
+
+### Insiden 7: Multi-Sesi False-Finish & Auto-Focus Target Sesi (25 Agustus 2026)
+* **Gejala**: Hari latihan dengan lebih dari 1 sesi (misal Sesi 1 Push selesai, Sesi 2 Legs belum dilakukan) salah membaca status hari sebagai "SESI SELESAI" karena evaluasi `wInHistory` mencocokkan `programId` global alih-alih `workoutId` spesifik tiap sesi. Sesi 2 yang belum disentuh tidak otomatis terbuka dan tidak bisa dilanjutkan dari tombol utama.
+* **Pelajaran**:
+  1. **Isolasi Status Per Sesi**: Sesi dianggap selesai **HANYA JIKA** seluruh set dari latihan aktif di sesi tersebut sudah 100% `done || skipped`. Status hari tidak boleh mematikan tombol utama jika masih ada sesi lain yang belum tuntas.
+  2. **Smart Session Routing**: Jika Sesi 1 selesai dan Sesi 2 belum selesai, tombol floating **WAJIB** tetap aktif (`"LANJUTKAN LATIHAN"` / `"MULAI LATIHAN"` bertema Biru LOGYM). Ketika diklik, aplikasi **WAJIB** meng-expand kartu Sesi 2, mengarahkan scroll ke kartu tersebut, dan langsung membuka Immersive Mode pada latihan pertama yang belum selesai di Sesi 2.
+  3. **Auto-Expand Invariant**: Saat membuka tab Latihan, sistem secara otomatis mengekspansi sesi pertama yang belum selesai (`firstUnfinishedSession`), bukan selalu Sesi 1 yang sudah beres.
+
+### Insiden 8: Ghost Calories pada 0-Done Sets & Penggabungan Latihan Antar Sesi (25 Agustus 2026)
+* **Gejala**: 
+  1. Latihan yang timer-nya berjalan 7 menit namun tidak ada satupun set yang dikerjakan (0 set selesai, semua skip/tidak dikerjakan) malah mendapat estimasi ~72 kcal.
+  2. Saat menyimpan Sesi 1 (Upper Body Focus, 7 latihan), latihan dari Sesi 2 (Legs/Core, latihan 8-10) ikut digabung ke dalam daftar latihan Sesi 1 sehingga Sesi 1 tampak memiliki 10 latihan.
+* **Pelajaran**:
+  1. **Zero-Work Zero-Calorie Invariant**: Jika sebuah sesi memiliki daftar latihan dan jumlah set yang dicentang selesai adalah 0 (`totalDoneSets === 0`), `calculateSmartWorkoutCalories` dan `calculateLiveWorkoutCalories` **WAJIB** mengembalikan `0 kcal`. Tidak boleh ada pembagian kalori baseline untuk sesi kosong tanpa usaha.
+  2. **Isolasi Latihan Antar Sesi (`splitSessionLogs`)**: `splitSessionLogs` **WAJIB** menerima `sessionExercises` dari sesi yang bersangkutan agar dapat memfilter kunci latihan secara tepat. Log dan daftar latihan milik Sesi 2 tidak boleh tertelan atau disalin ke `overriddenExercises` Sesi 1 saat disimpan.
+
+### Insiden 9: Toggle Set pada Sesi Selesai Mengakibatkan Set Lain Undone (25 Agustus 2026)
+* **Gejala**: Pada sesi yang sudah selesai dan tersimpan (seluruh set tercentang *done*), saat pengguna menekan tombol centang pada Set 1, Set 1 tetap *done* namun Set 2 dan Set 3 mendadak berubah menjadi *undone*.
+* **Pelajaran**:
+  1. **Unified History Fallback di `getSetLogs`**: `getSetLogs(ex, idToCheck)` di `App.jsx` sebelumnya mensyaratkan `ex?.workoutId`, padahal objek latihan dari `getBaseEx` tidak membawa `workoutId`. Hal ini menyebabkan `getSetLogs` gagal menarik log tersimpan dari `history[selectedDate]` dan malah menginstansiasi array template kosong `[done: false, done: false, done: false]`.
+  2. **Resolusi Kunci Majemuk Lengkap**: `getSetLogs` **WAJIB** menyisir seluruh workout di `history[selectedDate]` dengan kandidat kunci: `idToCheck`, `ex.id`, `ex.originalId`, compound key `${id}-${workout.id}`, dan pencocokan prefiks. Dengan begitu, toggle set pada sesi yang telah selesai bekerja secara presisi (Set 1 menjadi *undone*, Set 2 & 3 tetap *done*).
 
 ---
 
@@ -184,5 +205,8 @@ Setiap perubahan pada struktur latihan atau timer wajib lolos verifikasi di 5 la
 - [ ] 4. Apakah Floating Bar, Immersive Mode, dan Kalender menampilkan angka kalori/durasi yang konsisten?
 - [ ] 5. Apakah modal baru memiliki proteksi scroll lock (`overscroll-contain touch-none`) and `data-close-modal="true"`?
 - [ ] 6. Apakah semua video MP4 berformat H.264 (avc1) dan thumbnail berformat True WebP?
-- [ ] 7. Apakah sesi yang sudah selesai berstatus "SESI SELESAI" dan sesi yang di-resume melompat langsung ke latihan yang belum selesai?
+- [ ] 7. Apakah multi-sesi mendeteksi sesi yang belum selesai dengan akurat, membuka kartu sesi target, dan tombol "SESI SELESAI" berwarna Biru LOGYM hanya jika SELURUH sesi hari itu tuntas?
 - [ ] 8. Apakah ukuran bundle OTA sudah diverifikasi di bawah batas wajar?
+- [ ] 9. Apakah sesi dengan 0 set selesai mengembalikan 0 kcal dan pemisahan log per-sesi tidak mencemari daftar latihan sesi lain?
+- [ ] 10. Apakah toggle set pada sesi selesai menarik set tersimpan dari riwayat secara akurat tanpa mereset set lain menjadi undone?
+
