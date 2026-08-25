@@ -31,6 +31,15 @@ export default function TwoFrameMotionLoop({ exerciseId, gifUrl, name, className
     return null;
   }, [exerciseId, gifUrl]);
 
+  // Preload both images immediately to prevent decode lag
+  useEffect(() => {
+    if (!frames || frames.length < 2) return;
+    const img0 = new Image();
+    img0.src = frames[0];
+    const img1 = new Image();
+    img1.src = frames[1];
+  }, [frames]);
+
   useEffect(() => {
     if (!frames || frames.length < 2) return;
     const timer = setInterval(() => {
@@ -42,36 +51,30 @@ export default function TwoFrameMotionLoop({ exerciseId, gifUrl, name, className
   if (!frames || hasError) return null;
 
   return (
-    <div className={`relative w-full h-full overflow-hidden bg-black flex items-center justify-center select-none ${className}`}>
-      {/* Background glow / ambient backdrop */}
+    <div className={`relative w-full h-full overflow-hidden bg-[#0a0f1d] flex items-center justify-center select-none ${className}`}>
+      {/* Background glow / ambient backdrop (steady, no flashing) */}
       <img
-        src={frames[frame]}
+        src={frames[0]}
         alt=""
         aria-hidden="true"
-        className="absolute inset-0 w-full h-full object-cover opacity-25 blur-2xl scale-125 pointer-events-none transition-opacity duration-300"
+        className="absolute inset-0 w-full h-full object-cover opacity-20 blur-2xl scale-125 pointer-events-none"
       />
 
-      {/* Frame 0 & Frame 1 with crossfade */}
+      {/* Frame 0 always rendered solid underneath */}
       <img
         src={frames[0]}
         alt={name || 'Exercise Form A'}
-        loading="lazy"
         onError={() => setHasError(true)}
-        className={`absolute inset-0 w-full h-full object-contain pointer-events-none drop-shadow-2xl transition-opacity duration-150 ${frame === 0 ? 'opacity-100' : 'opacity-0'}`}
+        className="absolute inset-0 w-full h-full object-contain pointer-events-none drop-shadow-2xl z-0"
       />
+
+      {/* Frame 1 rendered directly on top, instantly toggled (zero black flickering) */}
       <img
         src={frames[1]}
         alt={name || 'Exercise Form B'}
-        loading="lazy"
         onError={() => setHasError(true)}
-        className={`absolute inset-0 w-full h-full object-contain pointer-events-none drop-shadow-2xl transition-opacity duration-150 ${frame === 1 ? 'opacity-100' : 'opacity-0'}`}
+        className={`absolute inset-0 w-full h-full object-contain pointer-events-none drop-shadow-2xl z-10 ${frame === 1 ? 'visible opacity-100' : 'invisible opacity-0'}`}
       />
-
-      {/* Frame indicator badge */}
-      <div className="absolute bottom-3 right-3 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-[9px] font-black uppercase tracking-wider text-white/80 z-20 pointer-events-none flex items-center gap-1.5">
-        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-        <span>Loop {frame === 0 ? 'Posisi A' : 'Posisi B'}</span>
-      </div>
     </div>
   );
 }

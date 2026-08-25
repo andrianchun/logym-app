@@ -7,7 +7,6 @@ import { formatTarget, exerciseTypeLabels, getVideoId, defaultMasterExercises, f
 import { playSoundEffect } from '../utils/audio';
 import { resolveExerciseKind, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from '../utils/workoutCalc';
 import { getCachedExercises } from '../utils/exerciseDbApi';
-import TwoFrameMotionLoop from './TwoFrameMotionLoop';
 
 const ExerciseCard = ({
   ex, idx, isExtra = false,
