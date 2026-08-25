@@ -8,7 +8,7 @@ import { Capacitor } from '@capacitor/core';
 import SwipeInput from '../components/SwipeInput';
 import { getLocalYMD, resolveProjectedProgramId, getDayWorkouts as sharedGetDayWorkouts, deletedProjectedMap, hasDeletedProjected, weekStripDates } from '../data/constants';
 import { formatNumber } from '../utils/numberFormat';
-import { parseWorkoutDurationMinutes, calculateWorkoutCalories, calculateSmartWorkoutCalories, resolveExerciseKind, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from '../utils/workoutCalc';
+import { parseWorkoutDurationMinutes, calculateWorkoutCalories, calculateSmartWorkoutCalories, calculateLiveWorkoutCalories, resolveExerciseKind, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from '../utils/workoutCalc';
 import PanoramicSlider from '../components/PanoramicSlider';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { getLogyNotification } from '../utils/aiAgent';
@@ -1669,7 +1669,26 @@ const CalendarTab = ({
                                        // dan tombol "Lanjutkan Latihan" di panel yang terbuka.
                                        const isRunningSession = isWorkoutActive && (sessionToRun === w.id || sessionToRun === w.programId || (sessionToRun === 'extra' && w.programId === 'adhoc'));
                                        const actualMins = parseWorkoutDurationMinutes(w.duration);
-                                       const calBurned = isCompleted ? calculateSmartWorkoutCalories(userProfile?.weight, w, logsToUse) : calculateWorkoutCalories(userProfile?.weight, estDuration);
+                                       const liveSecs = (isRunningSession && workoutStartTime) ? Math.max(0, Math.floor((Date.now() - workoutStartTime) / 1000)) : 0;
+                                       const liveDurStr = liveSecs >= 3600
+                                         ? `${Math.floor(liveSecs / 3600)}:${Math.floor((liveSecs % 3600) / 60).toString().padStart(2, '0')}:${(liveSecs % 60).toString().padStart(2, '0')}`
+                                         : `${Math.floor(liveSecs / 60).toString().padStart(2, '0')}:${(liveSecs % 60).toString().padStart(2, '0')}`;
+                                       const liveDurHuman = formatDurationHuman(liveDurStr);
+                                       const liveCal = isRunningSession
+                                         ? calculateLiveWorkoutCalories(userProfile?.weight || 70, (w.overriddenExercises || prog?.exercises || []), logsToUse, liveSecs)
+                                         : 0;
+
+                                       const calBurned = isRunningSession
+                                         ? liveCal
+                                         : isCompleted
+                                           ? calculateSmartWorkoutCalories(userProfile?.weight, w, logsToUse)
+                                           : calculateWorkoutCalories(userProfile?.weight, estDuration);
+
+                                       const displayDuration = isRunningSession
+                                         ? liveDurHuman
+                                         : isCompleted
+                                           ? formatDurationHuman(w.duration || '00:00')
+                                           : `${estDuration} Menit`;
 
                                        // Kartu "Selesai" pakai warna aksen biru penuh; "Terjadwal" (belum selesai)
                                        // dibikin lebih pudar supaya kelihatan beda statusnya sekilas.
@@ -1727,7 +1746,7 @@ const CalendarTab = ({
                                               
                                               <div className="flex justify-between items-end mt-auto">
                                                 <div className={`text-xs font-semibold opacity-70 flex items-center gap-1.5 ${c.text}`}>
-                                                  <span>{isCompleted ? formatDurationHuman(w.duration || '00:00') : `${estDuration} Menit`}</span>
+                                                  <span>{displayDuration}</span>
                                                   <span className="opacity-50">·</span>
                                                   <span>{`~${calBurned} kcal`}</span>
                                                 </div>

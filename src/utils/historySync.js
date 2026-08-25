@@ -137,6 +137,29 @@ export const workoutIdsFromBaseline = (entry) => {
 };
 
 /**
+ * Membersihkan data secara rekursif dari nilai `undefined` sebelum dikirim ke Firestore.
+ * Firestore melempar error fatal jika ada properti bersarang bernilai `undefined`.
+ * FieldValue spesial (seperti deleteField()) tetap dipertahankan.
+ */
+export const cleanFirestoreData = (obj) => {
+  if (obj === undefined) return null;
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (obj._methodName || (obj.constructor && obj.constructor.name === 'FieldValue')) return obj;
+  if (Array.isArray(obj)) {
+    return obj
+      .filter(item => item !== undefined)
+      .map(item => cleanFirestoreData(item));
+  }
+  const cleaned = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      cleaned[key] = cleanFirestoreData(value);
+    }
+  }
+  return cleaned;
+};
+
+/**
  * Diff per-field untuk dokumen utama (programs, exerciseLibrary, settings.*, userAchievements).
  *
  * Dokumen utama dulu ditulis UTUH setiap kali menyimpan: seluruh isi `settings` versi device
@@ -158,9 +181,10 @@ export const diffFields = (local, baseline) => {
 
   Object.keys(local || {}).forEach(k => {
     if (local[k] === undefined) return; // Firestore menolak undefined — jangan pernah kirim
-    const json = stableStringify(local[k]);
+    const cleanedVal = cleanFirestoreData(local[k]);
+    const json = stableStringify(cleanedVal);
     if (base[k] === json) return;
-    changed[k] = local[k];
+    changed[k] = cleanedVal;
     changedKeys.push(k);
     nextBaseline[k] = json;
   });

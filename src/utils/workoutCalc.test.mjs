@@ -47,6 +47,13 @@ const liftKcal = calculateSmartWorkoutCalories(KG, {
 }, { 1: Array.from({ length: 3 }, () => ({ done: true, r: 10, w: 40 })) });
 assert.ok(liftKcal > 150 && liftKcal < 220, `sesi beban 1 jam harus wajar, dapat ${liftKcal}`);
 
+// 6b. Live timer untuk sesi beban dengan kunci gabungan `${ex.id}-${workoutId}`
+const benchEx = { id: 1, type: 'weight', name: 'Bench Press' };
+const liveCompoundKcal = calculateLiveWorkoutCalories(KG, [benchEx], {
+  '1-prog-1': Array.from({ length: 3 }, () => ({ done: true, r: 10, w: 40 }))
+}, 3600);
+assert.ok(Math.abs(liveCompoundKcal - liftKcal) <= 5, `live dengan compound key ${liveCompoundKcal} harus sinkron dengan riwayat ${liftKcal}`);
+
 // 7. Riwayat lama tanpa logs tetap pakai fallback timer (tidak regresi)
 assert.equal(calculateSmartWorkoutCalories(KG, { duration: 60 }, {}), calculateWorkoutCalories(KG, 60));
 

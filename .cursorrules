@@ -1,0 +1,13 @@
+# LOGYM System Rules & Audit Protocol
+
+Setiap kali pengguna meminta untuk "audit", "debug", atau memodifikasi fitur Logym:
+1. BACA `AUDIT.md` dan `RELEASE_PROTOCOL.md` terlebih dahulu sebagai kompas arsitektur dan pedoman DOs & DON'Ts.
+2. Terapkan Zero-Trust Gateway: seluruh payload Firestore (`setDoc`/`updateDoc`) wajib melalui `cleanFirestoreData()`.
+3. Terapkan SSOT Key Resolution: dukung format kunci log majemuk `${ex.id}-${workoutId}` di seluruh komponen live dan riwayat.
+4. Terapkan Duration Protection: durasi sesi selesai tidak boleh menjadi 00:00 (gunakan `calcFallbackDurationSecs`).
+5. Jalankan unit test sebelum selesai:
+   - `node src/utils/workoutCalc.test.mjs`
+   - `node src/utils/historySync.test.mjs`
+   - `node src/utils/dashboardCalc.test.mjs`
+   - `node src/utils/aiAgentContext.test.mjs`
+   - `node scripts/otaManifest.test.mjs`

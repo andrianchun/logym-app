@@ -1,7 +1,7 @@
 // Cek rekonsiliasi history. Jalankan: node src/utils/historySync.test.mjs
 // Ini jalur yang kalau salah, sesi latihan hilang permanen antar device.
 import assert from 'node:assert/strict';
-import { reconcileHistory, serializeDay, dayFingerprint, migrateBaseline, workoutsToArray, workoutsToMap, workoutIdsFromBaseline, diffFields } from './historySync.js';
+import { reconcileHistory, serializeDay, dayFingerprint, migrateBaseline, workoutsToArray, workoutsToMap, workoutIdsFromBaseline, diffFields, cleanFirestoreData } from './historySync.js';
 
 const day = (...names) => ({ workouts: names.map(n => ({ id: n, status: 'completed' })) });
 
@@ -135,6 +135,14 @@ assert.deepEqual(workoutIdsFromBaseline('{bukan json'), []);
   const { changed, changedKeys } = diffFields({ theme: 'dark', userProfile: undefined }, null);
   assert.deepEqual(changedKeys, ['theme']);
   assert.ok(!('userProfile' in changed));
+
+  // Nested undefined di dalam array dan objek juga wajib bersih
+  const dirtyProgram = [{ id: 'p1', exercises: [{ id: 1, name: 'Bench', videoUrl: undefined }] }];
+  const cleaned = cleanFirestoreData(dirtyProgram);
+  assert.ok(!('videoUrl' in cleaned[0].exercises[0]), 'nested undefined harus terbuang');
+
+  const { changed: ch2 } = diffFields({ programs: dirtyProgram }, null);
+  assert.ok(!('videoUrl' in ch2.programs[0].exercises[0]), 'diffFields wajib membersihkan nested undefined');
 }
 
 // 17. Urutan key di dalam objek tidak boleh dianggap perubahan.

@@ -1080,11 +1080,13 @@ export const calculateLiveWorkoutCalories = (weightKg, exercises, logs, currentD
   
   if (exercises && logs) {
     exercises.forEach(ex => {
-      const exLogs = logs[ex.id];
+      if (!ex) return;
+      const exLogs = logs[ex.id]
+        || Object.entries(logs).find(([k]) => String(k) === String(ex.id) || String(k).startsWith(`${ex.id}-`))?.[1];
       if (!exLogs || !Array.isArray(exLogs)) return;
 
       exLogs.forEach(set => {
-        if (set.done) extraCalories += setExtraCalories(weight, ex, set);
+        if (set?.done) extraCalories += setExtraCalories(weight, ex, set);
       });
     });
   }

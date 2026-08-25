@@ -61,7 +61,7 @@ import useDialog from './hooks/useDialog';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import UpdaterAlert from './components/UpdaterAlert';
 import { getLocalYMD, resolveProjectedProgramId, isLomealOwned, resolveLoggedExercise, splitSessionLogs, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos, getDayWorkouts, countMissedScheduledDays } from './data/constants';
-import { serializeDay, dayFingerprint, migrateBaseline, reconcileHistory, workoutsToMap, workoutIdsFromBaseline, diffFields, stableStringify, mergeBackupIntoHistory, sessionsPendingSave } from './utils/historySync';
+import { serializeDay, dayFingerprint, migrateBaseline, reconcileHistory, workoutsToMap, workoutIdsFromBaseline, diffFields, cleanFirestoreData, stableStringify, mergeBackupIntoHistory, sessionsPendingSave } from './utils/historySync';
 import { useBleManager } from './hooks/useBleManager';
 import { bolehSync, gabungAntrean } from './utils/hcSchedule';
 import { Loader2, Download, X } from 'lucide-react';
@@ -2027,8 +2027,9 @@ export default function App() {
         const peringatanTertunda = setTimeout(() => setSyncStatus('error'), 15000);
         const prevBaseline = mainBaselineRef.current;
         setMainBaseline(nextBaseline);
+        const safePayload = cleanFirestoreData(payload);
         try {
-          return setDoc(mainDocRef, payload, { merge: true })
+          return setDoc(mainDocRef, safePayload, { merge: true })
             .then(() => {
               clearTimeout(peringatanTertunda);
               setCloudSaveError(null);
@@ -2166,7 +2167,8 @@ export default function App() {
               setCloudSaveError(err?.message || String(err));
            };
            try {
-              return setDoc(yearRef, dirtyByYear[year], { merge: true })
+              const safeYearData = cleanFirestoreData(dirtyByYear[year]);
+              return setDoc(yearRef, safeYearData, { merge: true })
                  .then(() => {
                     clearTimeout(pendingWarn);
                     commitBaselineFor(year); 
@@ -3636,6 +3638,12 @@ Ini tidak bisa dibatalkan otomatis.`,
       return h > 0 ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}` : `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
+    const calcFallbackDurationSecs = (logs, defaultSecs) => {
+      if (defaultSecs > 0) return defaultSecs;
+      const totalDoneSets = Object.values(logs || {}).reduce((n, sets) => n + Object.values(sets || {}).filter(s => s?.done).length, 0);
+      return totalDoneSets > 0 ? Math.max(60, totalDoneSets * 90) : 0;
+    };
+
     setIsWorkoutActive(false);
     setWorkoutStartTime(null);
     setRestTargetTime(null);
@@ -3702,6 +3710,7 @@ Ini tidak bisa dibatalkan otomatis.`,
         const adhocIdx = workouts.findIndex(w => w.programId === 'adhoc' && w.status !== 'completed');
         if (adhocIdx >= 0) {
           const existingW = workouts[adhocIdx];
+          const finalSecs = calcFallbackDurationSecs(cleanLogs, durationSecs);
           workouts[adhocIdx] = {
             ...existingW,
             status: 'completed',
@@ -3709,8 +3718,8 @@ Ini tidak bisa dibatalkan otomatis.`,
             skipped: cleanSkipped,
             exercises: cleanExtra,
             timestamp: endStamp,
-            startedAt: startedAtFor(durationSecs),
-            duration: formatDur(durationSecs)
+            startedAt: startedAtFor(finalSecs),
+            duration: formatDur(finalSecs)
           };
         } else {
           const isSameAdhoc = (w) => w.programId === 'adhoc' && (w.id === fokusSesi || fokusSesi === 'extra');
@@ -3726,7 +3735,7 @@ Ini tidak bisa dibatalkan otomatis.`,
                   else if (parts.length === 2) existingSecs = (parts[0] || 0) * 60 + (parts[1] || 0);
                 }
               }
-              const finalSecs = Math.max(durationSecs, existingSecs);
+              const finalSecs = calcFallbackDurationSecs(cleanLogs, Math.max(durationSecs, existingSecs));
               workouts[completedAdhocIdx] = {
                 ...existingW,
                 status: 'completed',
@@ -3738,6 +3747,7 @@ Ini tidak bisa dibatalkan otomatis.`,
                 duration: formatDur(finalSecs)
               };
           } else {
+              const finalSecs = calcFallbackDurationSecs(cleanLogs, durationSecs);
               workouts.push({
                 id: `adhoc_${Date.now()}`,
                 programId: 'adhoc',
@@ -3747,8 +3757,8 @@ Ini tidak bisa dibatalkan otomatis.`,
                 skipped: cleanSkipped,
                 exercises: cleanExtra,
                 timestamp: endStamp,
-                startedAt: startedAtFor(durationSecs),
-                duration: formatDur(durationSecs)
+                startedAt: startedAtFor(finalSecs),
+                duration: formatDur(finalSecs)
               });
           }
         }
@@ -3800,7 +3810,7 @@ Ini tidak bisa dibatalkan otomatis.`,
                 }
               }
             }
-            const finalSecs = Math.max(durationSecs, existingSecs);
+            const finalSecs = calcFallbackDurationSecs(cleanLogs, Math.max(durationSecs, existingSecs));
 
             return {
               ...w,
@@ -3847,7 +3857,7 @@ Ini tidak bisa dibatalkan otomatis.`,
                   else if (parts.length === 2) existingSecs = (parts[0]||0)*60+(parts[1]||0);
                 }
               }
-              const finalSecs = Math.max(durationSecs, existingSecs);
+              const finalSecs = calcFallbackDurationSecs(cleanLogs, Math.max(durationSecs, existingSecs));
               workouts[secondPassIdx] = {
                 ...existingW,
                 programId: realProgramId,
@@ -3867,6 +3877,7 @@ Ini tidak bisa dibatalkan otomatis.`,
                  pName = p.name;
                  pId = p.id;
               }
+              const finalSecs = calcFallbackDurationSecs(cleanLogs, durationSecs);
               workouts.push({
                  id: focusWorkoutId || progId || `completed_${Date.now()}`,
                  programId: pId,
@@ -3875,8 +3886,8 @@ Ini tidak bisa dibatalkan otomatis.`,
                  log: cleanLogs,
                  skipped: cleanSkipped,
                  timestamp: endStamp,
-                 startedAt: startedAtFor(durationSecs),
-                 duration: durationSecs > 0 ? formatDur(durationSecs) : '00:00',
+                 startedAt: startedAtFor(finalSecs),
+                 duration: formatDur(finalSecs),
                  ...(p?.exercises?.length > 0 ? { overriddenExercises: JSON.parse(JSON.stringify(p.exercises)) } : {})
               });
             }
