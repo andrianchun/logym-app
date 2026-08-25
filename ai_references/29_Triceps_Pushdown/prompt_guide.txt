@@ -1,0 +1,19 @@
+=== EXERCISE: Triceps Pushdown ===
+ID: Triceps_Pushdown
+Target: lateral and long head of triceps
+Equipment: high cable pulley with straight bar or V-bar
+
+================================================================================
+1. PROMPT IMAGE (1:1 SINGLE HERO - PINPOINT CYAN HIGHLIGHT)
+Upload to ChatGPT: 00_coach_reference.jpg, 1_end_pose.jpg
+================================================================================
+Single 1:1 hero shot. The identical shredded muscular Asian male fitness coach from Image 1, shirtless in black compression shorts, calm focused face with closed mouth. Performing "Triceps Pushdown" with high cable pulley with straight bar or V-bar in a dark modern gym, captured at peak muscle contraction matching Image 3. Delicate glowing neon cyan wireframe highlight strictly isolated ONLY on the lateral and long head of triceps (no glow on face, neck, abs, legs, or background). Cinematic rim lighting, 8k resolution, photorealistic.
+
+================================================================================
+2. PROMPT VIDEO (STEADY TRIPOD + CLOSED MOUTH + PINPOINT PULSE)
+Upload to Kling AI / Runway / Luma (Upload Single Hero Image as First Frame)
+================================================================================
+Fixed steady tripod shot (stationary side-profile 45-degree angle). Strictly NO 360 rotation, NO camera orbit, NO panning. The identical shredded Asian fitness coach from Image 1 executes 1 perfect rep of "Triceps Pushdown" using high cable pulley with straight bar or V-bar. 
+Stoic focus, mouth strictly closed (zero talking/moving mouth).
+Movement: 1. Attach a straight or angled bar to a high pulley and grab with an overhand grip (palms facing down) at shoulder width. 2. Standing upright with the torso straight and a very small inclination forward, bring the upper arms close to your body and perpendicular to the floor. The forearms should be pointing up towards the pulley as they hold the bar. This is your starting position. 3. Using the triceps, bring the bar down until it touches the front of your thighs and the arms are fully extended perpendicular to the floor. The upper arms should always remain stationary next to your torso and only the forearms should move. Exhale as you perform this movement. 4. After a second hold at the contracted position, bring the bar slowly up to the starting point. Breathe in as you perform this step.
+VFX: Delicate glowing cyan wireframe highlight strictly confined to lateral and long head of triceps, pulsing softly at peak contraction. Rest of body 100% natural non-glowing human skin. 60fps, seamless loop, 8k.

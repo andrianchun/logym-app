@@ -102,17 +102,17 @@ const AddExerciseModal = ({
         <>
             <div className={`p-4 border-b ${t.border} shrink-0 space-y-3`}>
               <div className="flex gap-2 items-center">
-                <div className={`flex-1 flex items-center gap-2 px-3 py-3 rounded-xl ${t.inputBg}`}>
-                  <Search size={16} className={t.textMuted} />
+                <div className={`flex-1 min-w-0 flex items-center gap-2 px-3 py-3 rounded-xl ${t.inputBg}`}>
+                  <Search size={16} className={`shrink-0 ${t.textMuted}`} />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Cari latihan..."
-                    className={`flex-1 bg-transparent body-lg ${t.textMain} outline-none placeholder:${t.textMuted}`}
+                    className={`w-full min-w-0 bg-transparent body-lg ${t.textMain} outline-none placeholder:${t.textMuted}`}
                   />
                   {searchQuery && (
-                    <button onClick={() => setSearchQuery('')} className={`${t.textMuted} hover:opacity-70`}>
+                    <button onClick={() => setSearchQuery('')} className={`shrink-0 ${t.textMuted} hover:opacity-70`}>
                       <X size={14} />
                     </button>
                   )}
@@ -120,11 +120,12 @@ const AddExerciseModal = ({
                 
                 <button
                   onClick={() => setShowFilters(!showFilters)}
-                  className={`p-3 rounded-xl transition-all ${
+                  className={`shrink-0 p-3 rounded-xl transition-all ${
                     showFilters || muscleFilter.length > 0 || equipFilter.length > 0
                       ? `${t.bgAccent} text-white shadow-sm`
                       : `${t.inputBg} ${t.textMuted}`
                   }`}
+                  title="Filter"
                 >
                   <Filter size={18} />
                 </button>

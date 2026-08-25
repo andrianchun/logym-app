@@ -186,20 +186,20 @@ const AlternativeExerciseModal = ({
         {/* Search & Filter */}
         <div className={`p-4 border-b ${t.border} bg-black/5`}>
           <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Search size={16} className={`absolute left-3 top-1/2 -translate-y-1/2 ${t.textMuted}`} />
+            <div className="relative flex-1 min-w-0">
+              <Search size={16} className={`absolute left-3 top-1/2 -translate-y-1/2 shrink-0 ${t.textMuted}`} />
               <input 
                 type="text"
                 placeholder="Cari alternatif..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className={`w-full pl-9 pr-4 py-3 rounded-xl ${t.inputBg} ${t.textMain} body-md font-bold outline-none focus:ring-2 ${t.ringAccent} transition-all`}
+                className={`w-full min-w-0 pl-9 pr-4 py-3 rounded-xl ${t.inputBg} ${t.textMain} body-md font-bold outline-none focus:ring-2 ${t.ringAccent} transition-all`}
               />
             </div>
             
             <button
               onClick={() => { setShowFavoritesOnly(!showFavoritesOnly); playSoundEffect('click', soundEnabled); }}
-              className={`p-3 rounded-xl transition-all ${
+              className={`shrink-0 p-3 rounded-xl transition-all ${
                 showFavoritesOnly 
                   ? 'bg-rose-500 text-white shadow-sm' 
                   : `${t.inputBg} ${t.textMuted}`
@@ -210,7 +210,7 @@ const AlternativeExerciseModal = ({
 
             <button
               onClick={() => { playSoundEffect('click', soundEnabled); setShowFilters(!showFilters); }}
-              className={`p-3 rounded-xl transition-all flex items-center justify-center ${
+              className={`shrink-0 p-3 rounded-xl transition-all flex items-center justify-center ${
                 showFilters || muscleFilter.length > 0 || equipFilter.length > 0 || sortOrder !== 'recommendation'
                   ? `${t.bgAccent} text-white shadow-sm`
                   : `${t.inputBg} ${t.textMuted}`

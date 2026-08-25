@@ -1,0 +1,19 @@
+=== EXERCISE: Seated Cable Rows ===
+ID: Seated_Cable_Rows
+Target: rhomboids, latissimus dorsi, middle traps, biceps
+Equipment: low cable row machine with V-bar close grip handle
+
+================================================================================
+1. PROMPT IMAGE (1:1 SINGLE HERO - PINPOINT CYAN HIGHLIGHT)
+Upload to ChatGPT: 00_coach_reference.jpg, 1_end_pose.jpg
+================================================================================
+Single 1:1 hero shot. The identical shredded muscular Asian male fitness coach from Image 1, shirtless in black compression shorts, calm focused face with closed mouth. Performing "Seated Cable Rows" with low cable row machine with V-bar close grip handle in a dark modern gym, captured at peak muscle contraction matching Image 3. Delicate glowing neon cyan wireframe highlight strictly isolated ONLY on the rhomboids, latissimus dorsi, middle traps, biceps (no glow on face, neck, abs, legs, or background). Cinematic rim lighting, 8k resolution, photorealistic.
+
+================================================================================
+2. PROMPT VIDEO (STEADY TRIPOD + CLOSED MOUTH + PINPOINT PULSE)
+Upload to Kling AI / Runway / Luma (Upload Single Hero Image as First Frame)
+================================================================================
+Fixed steady tripod shot (stationary side-profile 45-degree angle). Strictly NO 360 rotation, NO camera orbit, NO panning. The identical shredded Asian fitness coach from Image 1 executes 1 perfect rep of "Seated Cable Rows" using low cable row machine with V-bar close grip handle. 
+Stoic focus, mouth strictly closed (zero talking/moving mouth).
+Movement: 1. For this exercise you will need access to a low pulley row machine with a V-bar. Note: The V-bar will enable you to have a neutral grip where the palms of your hands face each other. To get into the starting position, first sit down on the machine and place your feet on the front platform or crossbar provided making sure that your knees are slightly bent and not locked. 2. Lean over as you keep the natural alignment of your back and grab the V-bar handles. 3. With your arms extended pull back until your torso is at a 90-degree angle from your legs. Your back should be slightly arched and your chest should be sticking out. You should be feeling a nice stretch on your lats as you hold the bar in front of you. This is the starting position of the exercise. 4. Keeping the torso stationary, pull the handles back towards your torso while keeping the arms close to it until you touch the abdominals. Breathe out as you perform that movement. At that point you should be squeezing your back muscles hard. Hold that contraction for a second and slowly go back to the original position while breathing in.
+VFX: Delicate glowing cyan wireframe highlight strictly confined to rhomboids, latissimus dorsi, middle traps, biceps, pulsing softly at peak contraction. Rest of body 100% natural non-glowing human skin. 60fps, seamless loop, 8k.

@@ -1,0 +1,19 @@
+=== EXERCISE: Cable Rope Overhead Triceps Extension ===
+ID: Cable_Rope_Overhead_Triceps_Extension
+Target: triceps long head
+Equipment: low-to-mid cable pulley with rope attachment facing away overhead
+
+================================================================================
+1. PROMPT IMAGE (1:1 SINGLE HERO - PINPOINT CYAN HIGHLIGHT)
+Upload to ChatGPT: 00_coach_reference.jpg, 1_end_pose.jpg
+================================================================================
+Single 1:1 hero shot. The identical shredded muscular Asian male fitness coach from Image 1, shirtless in black compression shorts, calm focused face with closed mouth. Performing "Cable Rope Overhead Triceps Extension" with low-to-mid cable pulley with rope attachment facing away overhead in a dark modern gym, captured at peak muscle contraction matching Image 3. Delicate glowing neon cyan wireframe highlight strictly isolated ONLY on the triceps long head (no glow on face, neck, abs, legs, or background). Cinematic rim lighting, 8k resolution, photorealistic.
+
+================================================================================
+2. PROMPT VIDEO (STEADY TRIPOD + CLOSED MOUTH + PINPOINT PULSE)
+Upload to Kling AI / Runway / Luma (Upload Single Hero Image as First Frame)
+================================================================================
+Fixed steady tripod shot (stationary side 45-degree angle). Strictly NO 360 rotation, NO camera orbit, NO panning. The identical shredded Asian fitness coach from Image 1 executes 1 perfect rep of "Cable Rope Overhead Triceps Extension" using low-to-mid cable pulley with rope attachment facing away overhead. 
+Stoic focus, mouth strictly closed (zero talking/moving mouth).
+Movement: 1. Attach a rope to the bottom pulley of the pulley machine. 2. Grasping the rope with both hands, extend your arms with your hands directly above your head using a neutral grip (palms facing each other). Your elbows should be in close to your head and the arms should be perpendicular to the floor with the knuckles aimed at the ceiling. This will be your starting position. 3. Slowly lower the rope behind your head as you hold the upper arms stationary. Inhale as you perform this movement and pause when your triceps are fully stretched. 4. Return to the starting position by flexing your triceps as you breathe out.
+VFX: Delicate glowing cyan wireframe highlight strictly confined to triceps long head, pulsing softly at peak contraction. Rest of body 100% natural non-glowing human skin. 60fps, seamless loop, 8k.

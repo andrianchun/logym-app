@@ -1521,7 +1521,7 @@
   {
     "exerciseId": "Barbell_Bench_Press_-_Medium_Grip",
     "name": "Barbell Bench Press - Medium Grip",
-    "gifUrl": "/exercise-assets/thumbnails/edb-Barbell_Bench_Press_-_Medium_Grip.webp",
+    "gifUrl": "/exercise-assets/edb-Barbell_Bench_Press_-_Medium_Grip.webp",
     "bodyParts": [
       "strength"
     ],
@@ -1557,7 +1557,7 @@
       "Setelah selesai, kembalikan barbel ke rak."
     ],
     "thumbnailUrl": "/exercise-assets/thumbnails/edb-Barbell_Bench_Press_-_Medium_Grip.webp",
-    "videoUrl": "/exercise-assets/videos/edb-Barbell_Bench_Press_-_Medium_Grip.mp4",
+    "videoUrl": "/exercise-assets/edb-Barbell_Bench_Press_-_Medium_Grip.mp4 /exercise-assets/youtube-backup/edb-Barbell_Bench_Press_-_Medium_Grip.mp4",
     "ytVideo": "https://youtu.be/rT7DgCr-3pg",
     "defaultWeight": 20,
     "level": "intermediate",
@@ -2279,7 +2279,7 @@
   {
     "exerciseId": "Barbell_Squat",
     "name": "Barbell Squat",
-    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Squat/0.jpg",
+    "gifUrl": "/exercise-assets/edb-Barbell_Squat.webp",
     "bodyParts": [
       "strength"
     ],
@@ -2318,7 +2318,8 @@
       "Turunkan tubuh perlahan dengan menekuk lutut dan pinggul. Pastikan punggung tetap lurus dan kepala tetap tegak. Turun hingga sudut paha dan betis kurang dari 90 derajat sambil menarik napas. Tips: Pastikan lutut tidak melewati garis ujung jari kaki untuk menghindari cedera.",
       "Kembali ke posisi awal dengan mendorong tumit ke lantai sambil meluruskan kaki. Buang napas saat naik.",
       "Ulangi gerakan sesuai jumlah repetisi yang dianjurkan."
-    ]
+    ],
+    "videoUrl": "/exercise-assets/edb-Barbell_Squat.mp4"
   },
   {
     "exerciseId": "Barbell_Squat_To_A_Bench",
@@ -2442,7 +2443,7 @@
       "Dorong tubuh ke atas menggunakan tumit kaki depan dan luruskan kedua kaki untuk kembali ke posisi berdiri.",
       "Melangkahlah ke depan dengan kaki belakang, lalu ulangi gerakan lunge dengan kaki yang lain."
     ],
-    "videoUrl": "https://youtu.be/mJilHWIBWO8?si=2NCYOofB0EUrY22X",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Barbell_Walking_Lunge.mp4",
     "ytVideo": "https://youtu.be/mJilHWIBWO8?si=2NCYOofB0EUrY22X",
     "defaultWeight": 5,
     "level": "intermediate",
@@ -4047,7 +4048,7 @@
   {
     "exerciseId": "Cable_Crossover",
     "name": "Cable Crossover",
-    "gifUrl": "/exercise-assets/thumbnails/edb-Cable_Crossover.webp",
+    "gifUrl": "/exercise-assets/edb-Cable_Crossover.webp",
     "bodyParts": [
       "strength"
     ],
@@ -4082,7 +4083,7 @@
       "Tahan selama satu detik di posisi awal, lalu ulangi gerakan sesuai jumlah repetisi yang ditentukan."
     ],
     "thumbnailUrl": "/exercise-assets/thumbnails/edb-Cable_Crossover.webp",
-    "videoUrl": "/exercise-assets/videos/edb-Cable_Crossover.mp4"
+    "videoUrl": "/exercise-assets/edb-Cable_Crossover.mp4"
   },
   {
     "exerciseId": "Cable_Crunch",
@@ -4122,7 +4123,7 @@
       "Kembali ke posisi awal secara perlahan sambil menarik napas. Tips: Pastikan otot perut Anda tetap tegang sepanjang gerakan. Selain itu, jangan memilih beban yang terlalu berat agar punggung bawah tidak menanggung beban utama.",
       "Ulangi sesuai jumlah repetisi yang direkomendasikan."
     ],
-    "videoUrl": "https://youtu.be/K2m0jj6RfYg?si=CZMLt6PF0Yxvgb6V",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Cable_Crunch.mp4",
     "ytVideo": "https://youtu.be/K2m0jj6RfYg?si=CZMLt6PF0Yxvgb6V",
     "defaultWeight": 40,
     "level": "intermediate",
@@ -4549,7 +4550,7 @@
   {
     "exerciseId": "Cable_Rear_Delt_Fly",
     "name": "Cable Rear Delt Fly",
-    "gifUrl": "/exercise-assets/thumbnails/edb-Cable_Rear_Delt_Fly.webp",
+    "gifUrl": "/exercise-assets/edb-Cable_Rear_Delt_Fly.webp",
     "bodyParts": [
       "strength"
     ],
@@ -4629,7 +4630,7 @@
   {
     "exerciseId": "Cable_Rope_Overhead_Triceps_Extension",
     "name": "Cable Rope Overhead Triceps Extension",
-    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Rope_Overhead_Triceps_Extension/0.jpg",
+    "gifUrl": "/exercise-assets/edb-Cable_Rope_Overhead_Triceps_Extension.webp",
     "bodyParts": [
       "strength"
     ],
@@ -4661,7 +4662,7 @@
       "Kembali ke posisi awal dengan mengontraksikan otot trisep sambil mengembuskan napas.",
       "Ulangi gerakan ini sesuai jumlah repetisi yang dianjurkan."
     ],
-    "videoUrl": "https://youtu.be/9Ark9S11uXw?si=pEAe5tf66v5yUToU https://youtu.be/NTk0Igxqcsk?si=zX7dHQL0VyHURoC_",
+    "videoUrl": "/exercise-assets/edb-Cable_Rope_Overhead_Triceps_Extension.mp4 /exercise-assets/youtube-backup/edb-Cable_Rope_Overhead_Triceps_Extension.mp4",
     "ytVideo": "https://youtu.be/9Ark9S11uXw?si=pEAe5tf66v5yUToU https://youtu.be/NTk0Igxqcsk?si=zX7dHQL0VyHURoC_",
     "defaultWeight": 40,
     "level": "intermediate",
@@ -4834,7 +4835,7 @@
       "Turunkan kembali lengan secara perlahan ke posisi awal sambil menarik napas.",
       "Ulangi gerakan ini sesuai jumlah repetisi yang dianjurkan. Tips: Jaga agar lengan atas tetap tegak lurus dengan torso dan pertahankan sudut siku yang konstan (sudut 10 hingga 30 derajat) sepanjang latihan."
     ],
-    "videoUrl": "https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Cable_Seated_Lateral_Raise.mp4",
     "ytVideo": "https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA",
     "defaultWeight": 20,
     "level": "beginner",
@@ -8156,7 +8157,7 @@
   {
     "exerciseId": "Dumbbell_Alternate_Bicep_Curl",
     "name": "Dumbbell Alternate Bicep Curl",
-    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Alternate_Bicep_Curl/0.jpg",
+    "gifUrl": "/exercise-assets/edb-Dumbbell_Alternate_Bicep_Curl.webp",
     "bodyParts": [
       "strength"
     ],
@@ -8190,7 +8191,7 @@
       "Ulangi gerakan yang sama untuk tangan kiri. Ini dihitung satu repetisi.",
       "Lanjutkan gerakan bergantian ini sesuai jumlah repetisi yang ditentukan."
     ],
-    "videoUrl": "https://youtu.be/MKWBV29S6c0?si=JV1BM77vAR6VuQYG https://youtu.be/_aoad2yuP5w?si=PRXDFoozz45AB_VO",
+    "videoUrl": "/exercise-assets/edb-Dumbbell_Alternate_Bicep_Curl.mp4 /exercise-assets/youtube-backup/edb-Dumbbell_Alternate_Bicep_Curl.mp4",
     "ytVideo": "https://youtu.be/MKWBV29S6c0?si=JV1BM77vAR6VuQYG https://youtu.be/_aoad2yuP5w?si=PRXDFoozz45AB_VO",
     "defaultWeight": 20,
     "level": "beginner",
@@ -8202,7 +8203,7 @@
   {
     "exerciseId": "Dumbbell_Bench_Press",
     "name": "Dumbbell Bench Press",
-    "gifUrl": "/exercise-assets/thumbnails/edb-Dumbbell_Bench_Press.webp",
+    "gifUrl": "/exercise-assets/edb-Dumbbell_Bench_Press.webp",
     "bodyParts": [
       "strength"
     ],
@@ -8238,7 +8239,7 @@
       "Ulangi gerakan sesuai dengan jumlah repetisi yang ditentukan dalam program latihan Anda."
     ],
     "thumbnailUrl": "/exercise-assets/thumbnails/edb-Dumbbell_Bench_Press.webp",
-    "videoUrl": "/exercise-assets/videos/edb-Dumbbell_Bench_Press.mp4",
+    "videoUrl": "/exercise-assets/edb-Dumbbell_Bench_Press.mp4 /exercise-assets/youtube-backup/edb-Dumbbell_Bench_Press.mp4",
     "ytVideo": "https://youtu.be/WbCEvFA0NJs?si=n6uJrVnL8SbZLnii",
     "defaultWeight": 10,
     "level": "beginner",
@@ -9037,7 +9038,7 @@
   {
     "exerciseId": "Dumbbell_Shoulder_Press",
     "name": "Dumbbell Shoulder Press",
-    "gifUrl": "/exercise-assets/thumbnails/edb-Dumbbell_Shoulder_Press.webp",
+    "gifUrl": "/exercise-assets/edb-Dumbbell_Shoulder_Press.webp",
     "bodyParts": [
       "strength"
     ],
@@ -9074,7 +9075,7 @@
       "Tahan sejenak, lalu tarik napas sambil menurunkan dumbbell secara perlahan ke posisi awal.",
       "Ulangi sesuai repetisi yang ditentukan."
     ],
-    "videoUrl": "/exercise-assets/videos/edb-Dumbbell_Shoulder_Press.mp4",
+    "videoUrl": "/exercise-assets/edb-Dumbbell_Shoulder_Press.mp4 /exercise-assets/youtube-backup/edb-Dumbbell_Shoulder_Press.mp4",
     "ytVideo": "https://youtu.be/k6tzKisR3NY?si=g67rT52vc6oWjiFC https://youtu.be/E7ngsffMPR0?si=FJGsgUxb7aoAZ_ub",
     "defaultWeight": 5,
     "level": "intermediate",
@@ -9112,7 +9113,7 @@
       "Turunkan kembali dumbbell ke posisi semula.",
       "Ulangi sesuai repetisi yang ditentukan."
     ],
-    "videoUrl": "https://youtu.be/rFsSeClGnNA?si=EfUCHpJdjSbWFObO https://youtu.be/2BrmhGze7sk?si=PSt1tUQjaI2liYby",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Dumbbell_Shrug.mp4",
     "ytVideo": "https://youtu.be/rFsSeClGnNA?si=EfUCHpJdjSbWFObO https://youtu.be/2BrmhGze7sk?si=PSt1tUQjaI2liYby",
     "defaultWeight": 15,
     "level": "beginner",
@@ -11144,7 +11145,7 @@
       "Jongkok di antara kedua kaki hingga hamstring menyentuh betis. Pastikan dada dan kepala tetap tegak serta punggung lurus.",
       "Tahan posisi di bawah sejenak dan gunakan siku untuk mendorong lutut ke arah luar. Kembali ke posisi awal, ulangi 10-20 repetisi."
     ],
-    "videoUrl": "https://youtu.be/MeIiIdhgPgl",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Goblet_Squat.mp4",
     "ytVideo": "https://youtu.be/MeIiIdhgPgl",
     "defaultWeight": 10,
     "level": "beginner",
@@ -11366,7 +11367,7 @@
   {
     "exerciseId": "Hammer_Curls",
     "name": "Hammer Curls",
-    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Hammer_Curls/0.jpg",
+    "gifUrl": "/exercise-assets/edb-Hammer_Curls.webp",
     "bodyParts": [
       "strength"
     ],
@@ -11397,7 +11398,8 @@
       "Sambil menjaga lengan atas tetap diam, embuskan napas dan tekuk siku untuk mengangkat dumbbell ke depan sambil mengencangkan otot bisep. Angkat hingga dumbbell berada di setinggi bahu. Tahan posisi kontraksi ini sejenak sambil meremas otot bisep. Tips: Fokuslah untuk menjaga siku tetap diam dan hanya menggerakkan lengan bawah.",
       "Setelah jeda singkat, tarik napas dan turunkan dumbbell secara perlahan kembali ke posisi awal.",
       "Ulangi gerakan ini sesuai jumlah repetisi yang direkomendasikan."
-    ]
+    ],
+    "videoUrl": "/exercise-assets/edb-Hammer_Curls.mp4"
   },
   {
     "exerciseId": "Hammer_Grip_Incline_DB_Bench_Press",
@@ -11914,7 +11916,7 @@
       "Kembalikan lengan secara perlahan ke posisi awal.",
       "Ulangi sesuai dengan jumlah repetisi yang direkomendasikan."
     ],
-    "videoUrl": "https://youtu.be/CrbTqNOlFgE?si=xKanrhppuvUAudTj",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-High_Cable_Curls.mp4",
     "ytVideo": "https://youtu.be/CrbTqNOlFgE?si=xKanrhppuvUAudTj",
     "defaultWeight": 30,
     "level": "beginner",
@@ -12660,7 +12662,7 @@
   {
     "exerciseId": "Incline_Dumbbell_Press",
     "name": "Incline Dumbbell Press",
-    "gifUrl": "/exercise-assets/thumbnails/edb-Incline_Dumbbell_Press.webp",
+    "gifUrl": "/exercise-assets/edb-Incline_Dumbbell_Press.webp",
     "bodyParts": [
       "strength"
     ],
@@ -12702,7 +12704,7 @@
       "Setelah selesai, letakkan kembali dumbbell ke paha lalu ke lantai. Ini adalah cara paling aman untuk melepaskan dumbbell."
     ],
     "thumbnailUrl": "/exercise-assets/thumbnails/edb-Incline_Dumbbell_Press.webp",
-    "videoUrl": "/exercise-assets/videos/edb-Incline_Dumbbell_Press.mp4"
+    "videoUrl": "/exercise-assets/edb-Incline_Dumbbell_Press.mp4"
   },
   {
     "exerciseId": "Incline_Hammer_Curls",
@@ -19454,7 +19456,7 @@
       "Pastikan lengan bawah tetap diam dan hanya pergelangan tangan yang bergerak.",
       "Ulangi sebanyak repetisi yang dianjurkan."
     ],
-    "videoUrl": "https://youtu.be/0-c4s051u6E?si=K-4Z9iKq2d8r0N1M",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Palms-Up_Dumbbell_Wrist_Curl_Over_A_Bench.mp4",
     "ytVideo": "https://youtu.be/0-c4s051u6E?si=K-4Z9iKq2d8r0N1M",
     "defaultWeight": 5,
     "level": "beginner",
@@ -19713,7 +19715,7 @@
       "Ambil posisi telungkup di lantai, topang berat badan dengan jari kaki dan lengan bawah. Siku ditekuk tepat di bawah bahu.",
       "Jaga tubuh tetap lurus setiap saat dan tahan posisi ini selama mungkin. Untuk meningkatkan kesulitan, angkat satu tangan atau kaki."
     ],
-    "videoUrl": "https://youtu.be/xe2MXatLTUw?si=U5L4UwgiNv19R7lh",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Plank.mp4",
     "ytVideo": "https://youtu.be/xe2MXatLTUw?si=U5L4UwgiNv19R7lh",
     "defaultWeight": 0,
     "level": "beginner",
@@ -20524,7 +20526,7 @@
       "Mulai gerakan dengan mendorong pinggul ke belakang dan menjangkaukan tangan melalui celah kaki sejauh mungkin dengan lutut sedikit ditekuk.",
       "Jaga lengan tetap lurus, lalu dorong pinggul ke depan hingga posisi berdiri tegak. Hindari menarik beban dengan bahu; seluruh tenaga harus berasal dari dorongan pinggul."
     ],
-    "videoUrl": "https://youtu.be/sFQtAuiVwyo?si=GQLiGcITyE4Yzp3G",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Pull_Through.mp4",
     "ytVideo": "https://youtu.be/sFQtAuiVwyo?si=GQLiGcITyE4Yzp3G",
     "defaultWeight": 20,
     "level": "intermediate",
@@ -22083,7 +22085,7 @@
       "Tahan selama satu detik lalu turunkan kembali sambil menarik napas.",
       "Ulangi gerakan sesuai jumlah repetisi yang dianjurkan."
     ],
-    "videoUrl": "https://youtu.be/wdOkFomQNp8?si=PWlxiKYPBMlfLoek",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Rocking_Standing_Calf_Raise.mp4",
     "ytVideo": "https://youtu.be/wdOkFomQNp8?si=PWlxiKYPBMlfLoek",
     "defaultWeight": 10,
     "level": "beginner",
@@ -22138,7 +22140,7 @@
   {
     "exerciseId": "Romanian_Deadlift",
     "name": "Romanian Deadlift",
-    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Romanian_Deadlift/0.jpg",
+    "gifUrl": "/exercise-assets/edb-Romanian_Deadlift.webp",
     "bodyParts": [
       "strength"
     ],
@@ -22174,7 +22176,7 @@
       "Saat posisi tegak, turunkan barbel dengan mendorong pinggul ke belakang. Tekuk lutut hanya sedikit, berbeda dengan gerakan squat. Jaga dada tetap membusung dan napas terkontrol.",
       "Ulangi gerakan sesuai jumlah repetisi yang dianjurkan."
     ],
-    "videoUrl": "https://youtu.be/xY8BywOKkLQ?si=B1A9ulZ-Cz67GNw6",
+    "videoUrl": "/exercise-assets/edb-Romanian_Deadlift.mp4 /exercise-assets/youtube-backup/edb-Romanian_Deadlift.mp4",
     "ytVideo": "https://youtu.be/xY8BywOKkLQ?si=B1A9ulZ-Cz67GNw6",
     "defaultWeight": 5,
     "level": "intermediate",
@@ -22939,7 +22941,7 @@
   {
     "exerciseId": "Seated_Cable_Rows",
     "name": "Seated Cable Rows",
-    "gifUrl": "/exercise-assets/thumbnails/edb-Seated_Cable_Rows.webp",
+    "gifUrl": "/exercise-assets/edb-Seated_Cable_Rows.webp",
     "bodyParts": [
       "strength"
     ],
@@ -22976,7 +22978,7 @@
       "Ulangi gerakan tersebut sesuai jumlah repetisi yang dianjurkan."
     ],
     "thumbnailUrl": "/exercise-assets/thumbnails/edb-Seated_Cable_Rows.webp",
-    "videoUrl": "/exercise-assets/videos/edb-Seated_Cable_Rows.mp4",
+    "videoUrl": "/exercise-assets/edb-Seated_Cable_Rows.mp4 /exercise-assets/youtube-backup/edb-Seated_Cable_Rows.mp4",
     "ytVideo": "https://youtu.be/qD1WZ5pSuvk?si=JbbritEwFpnqjPHz",
     "defaultWeight": 10,
     "level": "beginner",
@@ -23058,7 +23060,7 @@
       "Angkat tumit setinggi mungkin dengan meluruskan pergelangan kaki sembari mengontraksikan betis dan mengembuskan napas. Tahan kontraksi di posisi atas selama satu detik.",
       "Ulangi gerakan sesuai jumlah repetisi yang dianjurkan."
     ],
-    "videoUrl": "https://youtu.be/ar8nav0jGoE?si=owieb0xbPHFg7zMA",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Seated_Calf_Raise.mp4",
     "ytVideo": "https://youtu.be/ar8nav0jGoE?si=owieb0xbPHFg7zMA",
     "defaultWeight": 30,
     "level": "beginner",
@@ -25484,7 +25486,7 @@
   {
     "exerciseId": "Smith_Machine_Bench_Press",
     "name": "Smith Machine Bench Press",
-    "gifUrl": "/exercise-assets/thumbnails/edb-Smith_Machine_Bench_Press.png",
+    "gifUrl": "/exercise-assets/edb-Smith_Machine_Bench_Press.png",
     "bodyParts": [
       "strength"
     ],
@@ -25519,7 +25521,7 @@
       "Ulangi gerakan sesuai target repetisi.",
       "Kunci kembali palang pada rak setelah selesai."
     ],
-    "videoUrl": "/exercise-assets/videos/edb-Smith_Machine_Bench_Press.mp4",
+    "videoUrl": "/exercise-assets/edb-Smith_Machine_Bench_Press.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Bench_Press.mp4",
     "ytVideo": "https://youtu.be/gQ3afio08V8?si=DfCKjmSAhUMXjMl_",
     "defaultWeight": 7.5,
     "level": "beginner",
@@ -25766,7 +25768,7 @@
   {
     "exerciseId": "Smith_Machine_Incline_Bench_Press",
     "name": "Smith Machine Incline Bench Press",
-    "gifUrl": "/exercise-assets/thumbnails/edb-Smith_Machine_Incline_Bench_Press.png",
+    "gifUrl": "/exercise-assets/edb-Smith_Machine_Incline_Bench_Press.png",
     "bodyParts": [
       "strength"
     ],
@@ -25802,7 +25804,7 @@
       "Setelah selesai, kunci kembali bar ke rak dengan aman."
     ],
     "thumbnailUrl": "/exercise-assets/thumbnails/edb-Smith_Machine_Incline_Bench_Press.webp",
-    "videoUrl": "/exercise-assets/videos/edb-Smith_Machine_Incline_Bench_Press.mp4",
+    "videoUrl": "/exercise-assets/edb-Smith_Machine_Incline_Bench_Press.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Incline_Bench_Press.mp4",
     "ytVideo": "https://youtu.be/VXaBbUYMfIs?si=pOB-MkazqZiMP_KX",
     "defaultWeight": 10,
     "level": "intermediate",
@@ -26001,7 +26003,7 @@
   {
     "exerciseId": "Smith_Machine_Squat",
     "name": "Smith Machine Squat",
-    "gifUrl": "/exercise-assets/thumbnails/edb-Smith_Machine_Squat.webp",
+    "gifUrl": "/exercise-assets/edb-Smith_Machine_Squat.webp",
     "bodyParts": [
       "strength"
     ],
@@ -26041,7 +26043,7 @@
       "Buang napas sambil mendorong lantai dengan tumit untuk kembali ke posisi berdiri tegak.",
       "Ulangi gerakan sesuai repetisi yang dianjurkan."
     ],
-    "videoUrl": "/exercise-assets/videos/edb-Smith_Machine_Squat.mp4",
+    "videoUrl": "/exercise-assets/edb-Smith_Machine_Squat.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Squat.mp4",
     "ytVideo": "https://youtu.be/iKCJCydYYrE?si=ICtqLU9ov9eFaHfL https://youtu.be/LwsG-1xgP2E?si=Ptr7dUVcsJFKMLYC",
     "defaultWeight": 0,
     "level": "intermediate",
@@ -26050,7 +26052,7 @@
   {
     "exerciseId": "Smith_Machine_Stiff-Legged_Deadlift",
     "name": "Smith Machine Stiff-Legged Deadlift",
-    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Smith_Machine_Stiff-Legged_Deadlift/0.jpg",
+    "gifUrl": "/exercise-assets/edb-Smith_Machine_Stiff-Legged_Deadlift.webp",
     "bodyParts": [
       "strength"
     ],
@@ -26085,7 +26087,7 @@
       "Tarik napas, segera kembali ke posisi tegak dengan mendorong pinggul dan pinggang ke depan.",
       "Ulangi gerakan sesuai repetisi yang dianjurkan."
     ],
-    "videoUrl": "/exercise-assets/videos/edb-Smith_Machine_Stiff-Legged_Deadlift.mp4"
+    "videoUrl": "/exercise-assets/edb-Smith_Machine_Stiff-Legged_Deadlift.mp4"
   },
   {
     "exerciseId": "Smith_Machine_Upright_Row",
@@ -26857,7 +26859,7 @@
   {
     "exerciseId": "Split_Squat_with_Dumbbells",
     "name": "Split Squat with Dumbbells",
-    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Split_Squat_with_Dumbbells/0.jpg",
+    "gifUrl": "/exercise-assets/edb-Split_Squat_with_Dumbbells.webp",
     "bodyParts": [
       "strength"
     ],
@@ -26889,7 +26891,7 @@
       "Turunkan tubuh dengan menekuk lutut dan pinggul depan. Jaga postur tetap tegak dan pastikan lutut depan tetap sejajar dengan kaki.",
       "Dorong melalui tumit kaki depan untuk meluruskan lutut dan pinggul hingga kembali ke posisi berdiri."
     ],
-    "videoUrl": "https://youtu.be/or1frhkjBDc?si=FR7v-hKp_QP4-Rpn",
+    "videoUrl": "/exercise-assets/edb-Split_Squat_with_Dumbbells.mp4 /exercise-assets/youtube-backup/edb-Split_Squat_with_Dumbbells.mp4",
     "ytVideo": "https://youtu.be/or1frhkjBDc?si=FR7v-hKp_QP4-Rpn",
     "defaultWeight": 30,
     "level": "advanced",
@@ -30224,7 +30226,7 @@
   {
     "exerciseId": "Triceps_Pushdown",
     "name": "Triceps Pushdown",
-    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Triceps_Pushdown/0.jpg",
+    "gifUrl": "/exercise-assets/edb-Triceps_Pushdown.webp",
     "bodyParts": [
       "strength"
     ],
@@ -30256,7 +30258,7 @@
       "Tahan selama satu detik di posisi kontraksi, lalu kembalikan bar secara perlahan ke posisi awal sambil menarik napas.",
       "Ulangi gerakan ini sesuai jumlah repetisi yang dianjurkan."
     ],
-    "videoUrl": "https://youtu.be/1FjkhpZsaxc?si=UF5-0LJTCd_pEhy3 https://youtu.be/u36jNfqh8_U?si=AEMeWXqnBvpOWNOj https://youtu.be/9qupVR7pKtk?si=FtLIHZmKuqXcK0ne",
+    "videoUrl": "/exercise-assets/edb-Triceps_Pushdown.mp4 /exercise-assets/youtube-backup/edb-Triceps_Pushdown.mp4",
     "ytVideo": "https://youtu.be/1FjkhpZsaxc?si=UF5-0LJTCd_pEhy3 https://youtu.be/u36jNfqh8_U?si=AEMeWXqnBvpOWNOj https://youtu.be/9qupVR7pKtk?si=FtLIHZmKuqXcK0ne",
     "defaultWeight": 20,
     "level": "beginner",
@@ -31400,7 +31402,7 @@
   {
     "exerciseId": "Wide-Grip_Lat_Pulldown",
     "name": "Wide-Grip Lat Pulldown",
-    "gifUrl": "/exercise-assets/thumbnails/edb-Wide-Grip_Lat_Pulldown.png",
+    "gifUrl": "/exercise-assets/edb-Wide-Grip_Lat_Pulldown.png",
     "bodyParts": [
       "strength"
     ],
@@ -31439,7 +31441,7 @@
       "Setelah menahan selama satu detik pada posisi kontraksi dengan merapatkan belikat, perlahan angkat kembali bar ke posisi awal hingga lengan lurus penuh dan otot latissimus merenggang maksimal. Tarik napas selama fase ini.",
       "Ulangi gerakan ini sesuai jumlah repetisi yang ditentukan."
     ],
-    "videoUrl": "/exercise-assets/videos/edb-Wide-Grip_Lat_Pulldown.mp4",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Wide-Grip_Lat_Pulldown.mp4",
     "ytVideo": "https://youtu.be/bNmvKpJSWKM?si=E7zZ3a3qeG4Ij7bb https://youtu.be/7Cjc_aXoQ_I?si=ZqhPV5iSMoTOLSIf",
     "defaultWeight": 40,
     "level": "beginner",
@@ -32065,7 +32067,7 @@
     "instructions_en": [
       "Perform the movement with proper form and comfortable intensity."
     ],
-    "videoUrl": "https://youtu.be/xWnlfJaQZ3k?si=z0FRk3rh4UO7JdUC",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Smith_Machine_Romanian_Deadlift.mp4",
     "ytVideo": "https://youtu.be/xWnlfJaQZ3k?si=z0FRk3rh4UO7JdUC",
     "gifUrl": "",
     "thumbnailUrl": "",

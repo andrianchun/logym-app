@@ -1,0 +1,19 @@
+=== EXERCISE: Bent Over Two-Dumbbell Row ===
+ID: Bent_Over_Two-Dumbbell_Row
+Target: latissimus dorsi, rhomboids, rear delts
+Equipment: pair of dumbbells in bent-over hip-hinged torso stance
+
+================================================================================
+1. PROMPT IMAGE (1:1 SINGLE HERO - PINPOINT CYAN HIGHLIGHT)
+Upload to ChatGPT: 00_coach_reference.jpg, 1_end_pose.jpg
+================================================================================
+Single 1:1 hero shot. The identical shredded muscular Asian male fitness coach from Image 1, shirtless in black compression shorts, calm focused face with closed mouth. Performing "Bent Over Two-Dumbbell Row" with pair of dumbbells in bent-over hip-hinged torso stance in a dark modern gym, captured at peak muscle contraction matching Image 3. Delicate glowing neon cyan wireframe highlight strictly isolated ONLY on the latissimus dorsi, rhomboids, rear delts (no glow on face, neck, abs, legs, or background). Cinematic rim lighting, 8k resolution, photorealistic.
+
+================================================================================
+2. PROMPT VIDEO (STEADY TRIPOD + CLOSED MOUTH + PINPOINT PULSE)
+Upload to Kling AI / Runway / Luma (Upload Single Hero Image as First Frame)
+================================================================================
+Fixed steady tripod shot (stationary side-profile 45-degree angle). Strictly NO 360 rotation, NO camera orbit, NO panning. The identical shredded Asian fitness coach from Image 1 executes 1 perfect rep of "Bent Over Two-Dumbbell Row" using pair of dumbbells in bent-over hip-hinged torso stance. 
+Stoic focus, mouth strictly closed (zero talking/moving mouth).
+Movement: 1. With a dumbbell in each hand (palms facing your torso), bend your knees slightly and bring your torso forward by bending at the waist; as you bend make sure to keep your back straight until it is almost parallel to the floor. Tip: Make sure that you keep the head up. The weights should hang directly in front of you as your arms hang perpendicular to the floor and your torso. This is your starting position. 2. While keeping the torso stationary, lift the dumbbells to your side (as you breathe out), keeping the elbows close to the body (do not exert any force with the forearm other than holding the weights). On the top contracted position, squeeze the back muscles and hold for a second. 3. Slowly lower the weight again to the starting position as you inhale. 4. Repeat for the recommended amount of repetitions.
+VFX: Delicate glowing cyan wireframe highlight strictly confined to latissimus dorsi, rhomboids, rear delts, pulsing softly at peak contraction. Rest of body 100% natural non-glowing human skin. 60fps, seamless loop, 8k.

@@ -1,0 +1,19 @@
+=== EXERCISE: Barbell Walking Lunge ===
+ID: Barbell_Walking_Lunge
+Target: quadriceps, glutes, calves, core
+Equipment: barbell across upper back walking forward
+
+================================================================================
+1. PROMPT IMAGE (1:1 SINGLE HERO - PINPOINT CYAN HIGHLIGHT)
+Upload to ChatGPT: 00_coach_reference.jpg, 1_end_pose.jpg
+================================================================================
+Single 1:1 hero shot. The identical shredded muscular Asian male fitness coach from Image 1, shirtless in black compression shorts, calm focused face with closed mouth. Performing "Barbell Walking Lunge" with barbell across upper back walking forward in a dark modern gym, captured at peak muscle contraction matching Image 3. Delicate glowing neon cyan wireframe highlight strictly isolated ONLY on the quadriceps, glutes, calves, core (no glow on face, neck, abs, legs, or background). Cinematic rim lighting, 8k resolution, photorealistic.
+
+================================================================================
+2. PROMPT VIDEO (STEADY TRIPOD + CLOSED MOUTH + PINPOINT PULSE)
+Upload to Kling AI / Runway / Luma (Upload Single Hero Image as First Frame)
+================================================================================
+Fixed steady tripod shot (stationary front-facing track angle). Strictly NO 360 rotation, NO camera orbit, NO panning. The identical shredded Asian fitness coach from Image 1 executes 1 perfect rep of "Barbell Walking Lunge" using barbell across upper back walking forward. 
+Stoic focus, mouth strictly closed (zero talking/moving mouth).
+Movement: 1. Begin standing with your feet shoulder width apart and a barbell across your upper back. 2. Step forward with one leg, flexing the knees to drop your hips. Descend until your rear knee nearly touches the ground. Your posture should remain upright, and your front knee should stay above the front foot. 3. Drive through the heel of your lead foot and extend both knees to raise yourself back up. 4. Step forward with your rear foot, repeating the lunge on the opposite leg.
+VFX: Delicate glowing cyan wireframe highlight strictly confined to quadriceps, glutes, calves, core, pulsing softly at peak contraction. Rest of body 100% natural non-glowing human skin. 60fps, seamless loop, 8k.

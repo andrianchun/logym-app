@@ -1,48 +1,19 @@
 === EXERCISE: Pushups ===
 ID: Pushups
-Target Muscles: chest, triceps, anterior deltoids, core
+Target: chest, triceps, anterior delts, core
 Equipment: bodyweight on gym floor mat
-Layout: 1:1 Square Asymmetric Multi-Angle 3D (Top Hero)
 
-[CARA MELAKUKAN (ID)]:
-Berbaring telungkup di lantai dan letakkan tangan Anda terpisah sekitar 90 cm, sangga tubuh Anda dengan lengan lurus.
-Selanjutnya, turunkan tubuh Anda ke bawah hingga dada hampir menyentuh lantai sambil menarik napas.
-Hembuskan napas dan dorong tubuh Anda kembali ke posisi awal sambil mengontraksikan otot dada.
-Setelah jeda singkat pada posisi kontraksi di atas, turunkan kembali tubuh Anda untuk repetisi berikutnya sesuai kebutuhan.
+================================================================================
+1. PROMPT IMAGE (1:1 SINGLE HERO - PINPOINT CYAN HIGHLIGHT)
+Upload to ChatGPT: 00_coach_reference.jpg, 1_end_pose.jpg
+================================================================================
+Single 1:1 hero shot. The identical shredded muscular Asian male fitness coach from Image 1, shirtless in black compression shorts, calm focused face with closed mouth. Performing "Pushups" with bodyweight on gym floor mat in a dark modern gym, captured at peak muscle contraction matching Image 3. Delicate glowing neon cyan wireframe highlight strictly isolated ONLY on the chest, triceps, anterior delts, core (no glow on face, neck, abs, legs, or background). Cinematic rim lighting, 8k resolution, photorealistic.
 
-[INSTRUCTIONS (EN)]:
-Lie on the floor face down and place your hands about 36 inches apart while holding your torso up at arms length.
-Next, lower yourself downward until your chest almost touches the floor as you inhale.
-Now breathe out and press your upper body back up to the starting position while squeezing your chest.
-After a brief pause at the top contracted position, you can begin to lower yourself downward again for as many repetitions as needed.
-
-==================================================
-1. PROMPT IMAGE (THUMBNAIL 1:1 KOLASE 3-PANEL)
-(Upload: 00_coach_reference.jpg, 0_start_pose.jpg, 1_end_pose.jpg)
-==================================================
-Generate a high-end visual exercise guide in 1:1 square aspect ratio, featuring the identical shredded muscular Asian male fitness coach character from Image 1 in a moody dark luxury gym.
-
-Composition (Strict Multi-Angle 3D Rules):
-1:1 square canvas with an asymmetric 3-panel multi-angle 3D layout (MANDATORY: Every panel MUST show a completely different camera perspective):
-- Top Half (Dominant Wide Hero Panel): Front 3/4 isometric perspective capturing the full exercise movement at peak contraction matching Image 3 with illuminated 3D depth and glowing cyan anatomical muscle highlights
-- Bottom-Left Panel (Setup View): True 90-degree lateral side-profile view capturing precise joint angles, bench setup, and starting position matching Image 2
-- Bottom-Right Panel (Macro Anatomy): Low-angle cinematic macro close-up perspective focusing sharply on the striations and 3D volume of the working muscle fibers
-
-The coach is performing "Pushups" with bodyweight on gym floor mat, strictly adhering to the biomechanics in Image 2 (start position) and Image 3 (end position).
-
-Include hyper-detailed glowing cyan / neon electric blue anatomical muscle fiber highlight overlays specifically emphasizing active engagement on the chest, triceps, anterior deltoids, core. Ensure deep 3D spatial depth between foreground and background, moody gym environment, dramatic cinematic rim lighting accentuating muscle striations, 8k resolution, ultra-photorealistic, 1:1 square aspect ratio.
-
-==================================================
-2. PROMPT VIDEO (1 FRAME FULL DINAMIS / MOVING CAMERA)
-(Kling AI / Runway Gen-3 / Luma Dream Machine / Haiper)
-==================================================
-A cinematic single-camera full-scene gym video featuring the identical shredded muscular Asian male fitness coach from Image 1 executing "Pushups" with perfect biomechanics using bodyweight on gym floor mat.
-
-Camera Movement:
-Low ground-level cinematic tracking pan from front-side to side profile, capturing full body control and sharp muscle striations in continuous fluid motion.
-
-Action & Biomechanics:
-Lowering body with a straight plank posture until chest hovers just above the floor, then pressing up firmly with core braced. Target muscles engaged: chest, triceps, anterior deltoids, core.
-
-Visual Aesthetics:
-Moody dark luxury fitness gym, dramatic volumetric rim lighting, deep 3D shadow depth, hyper-realistic sweat and vascularity, authentic gym acoustics, 8k resolution, 60fps, seamless looping repetition, masterpiece.
+================================================================================
+2. PROMPT VIDEO (STEADY TRIPOD + CLOSED MOUTH + PINPOINT PULSE)
+Upload to Kling AI / Runway / Luma (Upload Single Hero Image as First Frame)
+================================================================================
+Fixed steady tripod shot (stationary side 45-degree angle). Strictly NO 360 rotation, NO camera orbit, NO panning. The identical shredded Asian fitness coach from Image 1 executes 1 perfect rep of "Pushups" using bodyweight on gym floor mat. 
+Stoic focus, mouth strictly closed (zero talking/moving mouth).
+Movement: 1. Lie on the floor face down and place your hands about 36 inches apart while holding your torso up at arms length. 2. Next, lower yourself downward until your chest almost touches the floor as you inhale. 3. Now breathe out and press your upper body back up to the starting position while squeezing your chest. 4. After a brief pause at the top contracted position, you can begin to lower yourself downward again for as many repetitions as needed.
+VFX: Delicate glowing cyan wireframe highlight strictly confined to chest, triceps, anterior delts, core, pulsing softly at peak contraction. Rest of body 100% natural non-glowing human skin. 60fps, seamless loop, 8k.

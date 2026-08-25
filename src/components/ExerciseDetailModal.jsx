@@ -233,21 +233,34 @@ const ExerciseDetailModal = ({
     let items = [];
     if (!exercise) return items; // dipanggil sebelum penjaga `!ex`, jadi harus tahan nilai kosong
     if (exercise.videoUrl) {
-      items.push({ type: 'video', url: exercise.videoUrl });
-    }
-    if (exercise.ytVideo && typeof exercise.ytVideo === 'string') {
-      const urls = exercise.ytVideo.split(/(?:,|\s)+/).filter(v => v.trim());
-      urls.forEach(u => items.push({ type: 'youtube', url: u }));
+      const urls = exercise.videoUrl.split(/(?:,|\s)+/).filter(v => v.trim());
+      urls.forEach(u => items.push({ type: u.match(/\.(mp4|webm)$/i) ? 'video' : (u.includes('youtu') ? 'youtube' : 'video'), url: u }));
     }
     if (exercise.gifUrl) {
       const urls = exercise.gifUrl.split(/(?:,|\s)+/).filter(v => v.trim());
       urls.forEach(u => items.push({ type: u.match(/\.(mp4|webm)$/i) ? 'video' : 'image', url: u }));
+    }
+    if (exercise.ytVideo && typeof exercise.ytVideo === 'string' && items.length === 0) {
+      const urls = exercise.ytVideo.split(/(?:,|\s)+/).filter(v => v.trim());
+      urls.forEach(u => items.push({ type: 'youtube', url: u }));
     }
     return items;
   };
   const mediaItems = React.useMemo(() => parseMedia(ex), [ex]);
   const [activeMediaIndex, setActiveMediaIndex] = React.useState(0);
   const activeMedia = mediaItems[activeMediaIndex];
+
+  // Kunci scroll background (atas-bawah) saat modal detail aktif
+  React.useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    const originalTouchAction = document.body.style.touchAction;
+    document.body.style.overflow = 'hidden';
+    document.body.style.touchAction = 'none';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.touchAction = originalTouchAction;
+    };
+  }, []);
 
   // Swipe logic for media carousel
   const [touchStart, setTouchStart] = useState(null);
@@ -256,6 +269,24 @@ const ExerciseDetailModal = ({
 
   React.useEffect(() => {
     setIsVideoReady(false);
+  }, [activeMediaIndex]);
+
+  // Sinkronisasi pemutaran video YouTube via postMessage tanpa memanipulasi `iframe.src`,
+  // sehingga browser history TIDAK tercemar saat user menggeser/swipe ke video lain.
+  React.useEffect(() => {
+    const iframes = document.querySelectorAll('.exercise-video-iframe');
+    iframes.forEach((iframe, idx) => {
+      try {
+        if (iframe && iframe.contentWindow) {
+          if (idx === activeMediaIndex) {
+            iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
+          } else {
+            iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
+            iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'seekTo', args: [0, true] }), '*');
+          }
+        }
+      } catch (err) {}
+    });
   }, [activeMediaIndex]);
 
   // Custom YouTube Looping Logic reliably using e.source
@@ -280,8 +311,15 @@ const ExerciseDetailModal = ({
     return () => window.removeEventListener("message", handleMessage);
   }, []);
 
-  const handleIframeLoad = (e) => {
-    e.target.contentWindow.postMessage(JSON.stringify({event: "listening"}), "*");
+  const handleIframeLoad = (e, idx) => {
+    try {
+      e.target.contentWindow.postMessage(JSON.stringify({ event: "listening" }), "*");
+      if (idx === activeMediaIndex) {
+        e.target.contentWindow.postMessage(JSON.stringify({ event: "command", func: "playVideo", args: [] }), "*");
+      } else {
+        e.target.contentWindow.postMessage(JSON.stringify({ event: "command", func: "pauseVideo", args: [] }), "*");
+      }
+    } catch (err) {}
   };
 
   const minSwipeDistance = 40;
@@ -396,8 +434,8 @@ const ExerciseDetailModal = ({
   };
 
   return createPortal(
-    <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in no-swipe`} onClick={onClose}>
-      <div className={`w-full max-w-md sm:max-w-4xl mx-auto ${t.bgCard} rounded-[2.5rem] overflow-hidden flex flex-col sm:flex-row h-[85vh] sm:h-[80vh] animate-in zoom-in-95 duration-200 shadow-2xl`} onClick={e => e.stopPropagation()}>
+    <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in no-swipe overscroll-contain`} onClick={onClose}>
+      <div className={`w-full max-w-md sm:max-w-4xl mx-auto ${t.bgCard} rounded-[2.5rem] overflow-hidden flex flex-col sm:flex-row h-[85vh] sm:h-[80vh] animate-in zoom-in-95 duration-200 shadow-2xl overscroll-contain`} onClick={e => e.stopPropagation()}>
         
         {/* Kolom Kiri: Header with Video/Image */}
         <div className="w-full sm:w-[45%] flex flex-col relative shrink-0 bg-black h-[50%] sm:h-auto rounded-b-[2.5rem] sm:rounded-none z-10 shadow-[0_8px_30px_rgb(0,0,0,0.15)] overflow-hidden">
@@ -427,13 +465,13 @@ const ExerciseDetailModal = ({
                         const videoId = match ? match[1] : null;
                         if (videoId) {
                           return (
-                            <>
+                            <React.Fragment key={`yt-${videoId}-${idx}`}>
                               <iframe 
-                                src={`https://www.youtube.com/embed/${videoId}?enablejsapi=1&autoplay=${idx === activeMediaIndex ? '1' : '0'}&mute=1&controls=0&modestbranding=1&playsinline=1&rel=0&disablekb=1&iv_load_policy=3`}
+                                src={`https://www.youtube.com/embed/${videoId}?enablejsapi=1&mute=1&controls=0&modestbranding=1&playsinline=1&rel=0&disablekb=1&iv_load_policy=3`}
                                 title="YouTube video player" 
                                 frameBorder="0" 
                                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; compute-pressure"
-                                onLoad={handleIframeLoad}
+                                onLoad={(e) => handleIframeLoad(e, idx)}
                                 className={`exercise-video-iframe absolute w-[150%] h-[150%] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 max-w-none pointer-events-none transition-opacity duration-700 ${isVideoReady || idx !== activeMediaIndex ? 'opacity-100' : 'opacity-0'}`}
                               ></iframe>
                               {!isVideoReady && idx === activeMediaIndex && (
@@ -441,7 +479,7 @@ const ExerciseDetailModal = ({
                                   <Loader2 className="w-8 h-8 text-white/50 animate-spin" />
                                 </div>
                               )}
-                            </>
+                            </React.Fragment>
                           );
                         }
                       }
@@ -514,7 +552,7 @@ const ExerciseDetailModal = ({
             {/* Top gradient for obscuring iframe remnants and better button visibility */}
             <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-black/80 via-black/40 to-transparent z-10 pointer-events-none"></div>
 
-            <button onClick={onClose} className="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 backdrop-blur-sm transition-all sm:hidden z-20">
+            <button data-close-modal="true" onClick={onClose} aria-label="Tutup" className="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 backdrop-blur-sm transition-all sm:hidden z-20">
               <X size={20} />
             </button>
             
@@ -545,7 +583,7 @@ const ExerciseDetailModal = ({
         {/* Kolom Kanan: Action Tabs & Tab Content */}
         <div className="w-full sm:w-[55%] flex flex-col bg-transparent overflow-hidden h-full relative">
           {/* Desktop Close Button */}
-          <button onClick={onClose} className="hidden sm:flex absolute top-3 right-3 bg-black/5 hover:bg-rose-500 hover:text-white dark:bg-white/5 dark:hover:bg-rose-500 text-slate-500 dark:text-slate-300 p-2 rounded-full transition-all z-20">
+          <button data-close-modal="true" onClick={onClose} aria-label="Tutup" className="hidden sm:flex absolute top-3 right-3 bg-black/5 hover:bg-rose-500 hover:text-white dark:bg-white/5 dark:hover:bg-rose-500 text-slate-500 dark:text-slate-300 p-2 rounded-full transition-all z-20">
             <X size={20} />
           </button>
 
@@ -564,7 +602,7 @@ const ExerciseDetailModal = ({
                 onTouchEnd={onTabTouchEnd}
               >
                 {/* Tab 1: Instruksi */}
-                <div className="w-1/3 h-full p-6 pb-24 overflow-y-auto hide-scrollbar">
+                <div className="w-1/3 h-full p-6 pb-24 overflow-y-auto hide-scrollbar overscroll-contain touch-pan-y">
                   <div className="space-y-4">
                     {!ex.ytVideo && (
                       <div className={`p-4 rounded-2xl border ${t.border} bg-rose-500/5`}>
@@ -596,7 +634,7 @@ const ExerciseDetailModal = ({
                 </div>
 
                 {/* Tab 2: Riwayat */}
-                <div className="w-1/3 h-full p-4 pb-24 overflow-y-auto hide-scrollbar">
+                <div className="w-1/3 h-full p-4 pb-24 overflow-y-auto hide-scrollbar overscroll-contain touch-pan-y">
                   <div className="space-y-0">
                      {(!historyData || historyData.length === 0) ? (
                        <div className={`text-center py-8 ${t.textMuted}`}>
@@ -720,7 +758,7 @@ const ExerciseDetailModal = ({
                 </div>
 
                  {/* Tab 3: 1RM Calc / Pace Calc */}
-                 <div className="w-1/3 h-full p-5 pb-24 overflow-y-auto hide-scrollbar relative">
+                 <div className="w-1/3 h-full p-5 pb-24 overflow-y-auto hide-scrollbar relative overscroll-contain touch-pan-y">
                      {initialExType === 'cardio' ? (
                        <div className="space-y-4 text-center pb-5">
                           <div className="flex items-center justify-center gap-2">

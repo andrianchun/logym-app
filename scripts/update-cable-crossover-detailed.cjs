@@ -1,0 +1,73 @@
+const fs = require('fs');
+const path = require('path');
+
+const targetDir = path.resolve('ai_references/07_Cable_Crossover');
+
+const fullGuide = `=== EXERCISE: Cable Crossover ===
+ID: Cable_Crossover
+Target Muscles: Lower and Inner Pectoralis Major (Lower/Mid Chest), Anterior Deltoids, Sternal Head
+Equipment: Dual Cable Crossover Station with High Pulleys & Single D-Handles / Stirrups
+
+[REFERENSI GAMBAR YANG DI-UPLOAD KE CHATGPT]:
+- Image 1: 00_coach_reference.jpg (Wajah & Karakter Coach)
+- Image 2: ref_1_high_angle_stretch.jpg (Sudut Rentang Tangan & Siku Tampak Atas/Depan)
+- Image 3: ref_2_shoulder_depression.png (Bahu Terkunci Turun & Sudut Dada Samping)
+- Image 4: ref_3_front_contraction.png (Titik Temu Tangan & Kontraksi Dada Depan)
+- Image 5: 0_start_pose.jpg (Pose Awal Full-Body Split Stance - Dada Teregang)
+- Image 6: 1_end_pose.jpg (Pose Akhir Full-Body Split Stance - Puncak Kontraksi)
+
+================================================================================
+1. PROMPT IMAGE (1:1 MULTI-PANEL ASYMMETRIC COLLAGE - ULTRA DETAILED)
+Upload 6 gambar di atas ke ChatGPT (GPT-4o)
+================================================================================
+Generate an ultra-photorealistic, high-end visual fitness exercise guide in 1:1 square aspect ratio, featuring the identical shredded muscular Asian male fitness coach character from Image 1 in a moody dark luxury fitness gym.
+
+Character Specifications:
+- Exact same handsome Asian facial features, short dark textured hairstyle, clean-shaven, and shredded athletic physique as in Image 1.
+- Shirtless, wearing black compression workout shorts, white gym socks, and athletic shoes. Calm, stoic gym focus with closed mouth.
+
+Composition (Asymmetric 1:1 Multi-Panel Multi-Angle Collage):
+The 1:1 canvas is divided into a clean multi-panel composition capturing the exercise from multiple distinct perspectives:
+- Left Half (Tall Dominant Hero Panel): Full-body 3/4 isometric perspective in a stable split-stance forward lunge, capturing the athlete at peak contraction matching Image 6, bringing the cable handles smoothly together in front of the lower sternum.
+- Top-Right Panel (Stretch & Joint Angles): High front perspective matching Image 2 and Image 5, demonstrating the wide chest stretch at start position with elbows slightly bent at fixed 135-degree angle without over-extending behind the torso plane.
+- Middle-Right Panel (Biomechanical Alignment & Shoulder Depression): Side-angle close-up matching Image 3, illustrating proper scapular depression (shoulders packed down and back, chest puffed out, torso tilted forward 15 degrees).
+- Bottom-Right Panel (Macro Peak Squeeze): Front macro close-up matching Image 4, focusing sharply on the converged hands/handles touching at waist/lower-chest level with intense striations across the inner sternal chest fibers.
+
+Anatomical Highlight (Strict Pinpoint Glowing Cyan Wireframe):
+- Overlay a delicate, semi-transparent glowing electric cyan / neon blue wireframe anatomical mesh STRICTLY CONFINED to the inner and lower pectoralis major (sternal chest) and front deltoids.
+- CRITICAL RESTRICTION: Zero glow on the face, neck, abs, legs, hands, or background. All other areas must remain 100% natural human skin with realistic sweat glisten and vascularity.
+
+Aesthetics & Studio Lighting:
+- Moody dark luxury gym environment with subtle ambient teal/cyan neon lighting.
+- Dramatic cinematic volumetric rim lighting carving muscle contours, 8k resolution, hyper-detailed textures, flawless photorealism, 1:1 square canvas.
+
+================================================================================
+2. PROMPT VIDEO (STEADY TRIPOD SHOT - ULTRA DETAILED HOW-TO & ISOLATED PULSE)
+Upload hasil gambar Single Hero / First Frame ke Kling AI / Runway / Luma
+================================================================================
+[CAMERA & CINEMATOGRAPHY]: FIXED STEADY TRIPOD SHOT. STATIC ROCK-SOLID CAMERA FRAMING at a stationary front 3/4 angle slightly elevated. STRICTLY NO 360 ROTATION, NO CAMERA ORBIT, NO PANNING, NO SHAKY CAM. The camera remains completely still, keeping the athlete, cable cables, and machine centered in frame.
+
+Subject & Expression:
+The identical shredded muscular Asian male fitness coach from the reference image, performing "Cable Crossover" on a dual cable crossover station with high pulleys.
+CRITICAL FACIAL DIRECTIVE: STOIC FOCUSED WORKOUT EXPRESSION, MOUTH STRICTLY CLOSED. ZERO TALKING, ZERO MOUTH MOVEMENT, NO MUTTERING, NO TALKING ARTIFACTS.
+
+Biomechanical Execution (Step-by-Step How-To):
+1. Setup in a solid split stance with one foot forward for balance, torso leaning forward roughly 15 degrees from the hips with a proud arched chest and shoulders pulled down away from ears.
+2. Starting from a wide arm stretch with elbows slightly bent (fixed angle) at shoulder level, feeling a deep stretch across the pectoralis major.
+3. Exhale and sweep both hands forward and downward in a smooth hugging arc, converging the handles together directly in front of the lower chest/navel.
+4. Hold and forcefully squeeze the inner and lower chest at peak contraction for 1 full second without rounding the upper back.
+5. Inhale and control the eccentric return along the identical wide arc back to the starting stretch for 2 seconds.
+
+[STRICT PINPOINT MUSCLE HIGHLIGHT VFX]:
+A delicate, semi-transparent glowing cyan / neon electric blue wireframe muscle fiber overlay is strictly and exclusively confined to the inner and lower pectoralis major and anterior deltoids.
+CRITICAL RULE: The face, neck, abdomen, legs, and all non-working muscles MUST REMAIN 100% NATURAL REALISTIC HUMAN SKIN WITH ZERO GLOW. No full-body glowing aura. The subtle cyan highlight pulses gently only inside the boundaries of the lower/inner chest as they contract at the peak, then softens during eccentric stretch.
+
+Tempo & Dynamics:
+Controlled repetition tempo: 2 seconds slow lowering with deep muscle stretch, 1 second explosive lifting into peak contraction, holding top squeeze for 1 second. Clean seamless looping motion.
+
+Visuals & Lighting:
+Moody atmospheric gym, dramatic volumetric rim lighting highlighting muscle striations, sweat glistens under studio lighting, 8k resolution, 60fps, crisp masterclass fitness production.
+`;
+
+fs.writeFileSync(path.join(targetDir, 'prompt_guide.txt'), fullGuide, 'utf8');
+console.log('Updated Cable Crossover prompt_guide.txt with ultra-detailed multi-panel prompt!');

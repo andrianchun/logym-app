@@ -3,11 +3,14 @@ const path = require('path');
 
 const edbPath = path.resolve('public/exercisedb.json');
 const csvPath = path.resolve('src/data/exercise_catalog.csv');
-const videosDir = path.resolve('public/exercise-assets/videos');
-const thumbsDir = path.resolve('public/exercise-assets/thumbnails');
+const assetsDir = path.resolve('public/exercise-assets');
+const ytBackupDir = path.resolve('public/exercise-assets/youtube-backup');
 
-const videos = fs.existsSync(videosDir) ? fs.readdirSync(videosDir) : [];
-const thumbs = fs.existsSync(thumbsDir) ? fs.readdirSync(thumbsDir) : [];
+const aiFiles = fs.existsSync(assetsDir) ? fs.readdirSync(assetsDir).filter(f => !fs.statSync(path.join(assetsDir, f)).isDirectory()) : [];
+const aiVideos = aiFiles.filter(f => f.endsWith('.mp4') || f.endsWith('.webm'));
+const thumbs = aiFiles.filter(f => f.endsWith('.webp') || f.endsWith('.png') || f.endsWith('.jpg') || f.endsWith('.jpeg'));
+
+const ytBackupFiles = fs.existsSync(ytBackupDir) ? fs.readdirSync(ytBackupDir).filter(f => f.endsWith('.mp4') || f.endsWith('.webm')) : [];
 
 const edb = JSON.parse(fs.readFileSync(edbPath, 'utf8'));
 
@@ -23,17 +26,50 @@ const findExactAsset = (ex, list) => {
   });
 };
 
-console.log('=== STRICT SYNCING EXERCISE DATABASE ===\n');
+console.log('=== SYNCING EXERCISE DATABASE (AI FIRST + YT BACKUP SECOND) ===\n');
 
+let updated = 0;
 edb.forEach(ex => {
-  const matchedVid = findExactAsset(ex, videos);
+  const matchedAiVid = findExactAsset(ex, aiVideos);
+  let matchedYtVid = findExactAsset(ex, ytBackupFiles);
+
+  // Manual fallback aliases if needed
+  if (!matchedYtVid && ex.name === 'SM Romanian Deadlift (RDL)') {
+    matchedYtVid = 'edb-Smith_Machine_Romanian_Deadlift.mp4';
+  }
+
   const matchedThumb = findExactAsset(ex, thumbs);
 
-  if (matchedVid) {
-    ex.videoUrl = `/exercise-assets/videos/${matchedVid}`;
+  const videoUrls = [];
+  if (matchedAiVid) {
+    videoUrls.push(`/exercise-assets/${matchedAiVid}`);
   }
+  if (matchedYtVid) {
+    videoUrls.push(`/exercise-assets/youtube-backup/${matchedYtVid}`);
+  }
+
+  let changed = false;
+  if (videoUrls.length > 0) {
+    const combinedVideoUrl = videoUrls.join(' ');
+    if (ex.videoUrl !== combinedVideoUrl) {
+      ex.videoUrl = combinedVideoUrl;
+      changed = true;
+    }
+  }
+
   if (matchedThumb) {
-    ex.gifUrl = `/exercise-assets/thumbnails/${matchedThumb}`;
+    const tUrl = `/exercise-assets/${matchedThumb}`;
+    if (ex.gifUrl !== tUrl) {
+      ex.gifUrl = tUrl;
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    updated++;
+    const aiTag = matchedAiVid ? '🤖 AI' : '❌ No AI';
+    const ytTag = matchedYtVid ? '🎬 YT Backup' : '❌ No YT';
+    console.log(`✅ [SYNCED] ${ex.name} -> [${aiTag}] [${ytTag}] (${ex.videoUrl})`);
   }
 });
 
@@ -76,4 +112,4 @@ if (fs.existsSync(androidPublicDir)) {
   fs.copyFileSync(edbPath, path.join(androidPublicDir, 'exercisedb.json'));
 }
 
-console.log('Strict sync complete!');
+console.log(`\nSync complete! (${updated} exercises updated)`);

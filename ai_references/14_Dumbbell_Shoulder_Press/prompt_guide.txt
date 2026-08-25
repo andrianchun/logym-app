@@ -1,0 +1,19 @@
+=== EXERCISE: Dumbbell Shoulder Press ===
+ID: Dumbbell_Shoulder_Press
+Target: anterior and lateral delts, triceps
+Equipment: pair of dumbbells on 90-degree upright bench
+
+================================================================================
+1. PROMPT IMAGE (1:1 SINGLE HERO - PINPOINT CYAN HIGHLIGHT)
+Upload to ChatGPT: 00_coach_reference.jpg, 1_end_pose.jpg
+================================================================================
+Single 1:1 hero shot. The identical shredded muscular Asian male fitness coach from Image 1, shirtless in black compression shorts, calm focused face with closed mouth. Performing "Dumbbell Shoulder Press" with pair of dumbbells on 90-degree upright bench in a dark modern gym, captured at peak muscle contraction matching Image 3. Delicate glowing neon cyan wireframe highlight strictly isolated ONLY on the anterior and lateral delts, triceps (no glow on face, neck, abs, legs, or background). Cinematic rim lighting, 8k resolution, photorealistic.
+
+================================================================================
+2. PROMPT VIDEO (STEADY TRIPOD + CLOSED MOUTH + PINPOINT PULSE)
+Upload to Kling AI / Runway / Luma (Upload Single Hero Image as First Frame)
+================================================================================
+Fixed steady tripod shot (stationary front 3/4 eye-level angle). Strictly NO 360 rotation, NO camera orbit, NO panning. The identical shredded Asian fitness coach from Image 1 executes 1 perfect rep of "Dumbbell Shoulder Press" using pair of dumbbells on 90-degree upright bench. 
+Stoic focus, mouth strictly closed (zero talking/moving mouth).
+Movement: 1. While holding a dumbbell in each hand, sit on a military press bench or utility bench that has back support. Place the dumbbells upright on top of your thighs. 2. Now raise the dumbbells to shoulder height one at a time using your thighs to help propel them up into position. 3. Make sure to rotate your wrists so that the palms of your hands are facing forward. This is your starting position. 4. Now, exhale and push the dumbbells upward until they touch at the top.
+VFX: Delicate glowing cyan wireframe highlight strictly confined to anterior and lateral delts, triceps, pulsing softly at peak contraction. Rest of body 100% natural non-glowing human skin. 60fps, seamless loop, 8k.

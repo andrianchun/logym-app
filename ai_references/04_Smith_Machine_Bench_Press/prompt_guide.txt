@@ -1,0 +1,19 @@
+=== EXERCISE: Smith Machine Bench Press ===
+ID: Smith_Machine_Bench_Press
+Target: mid chest, triceps, anterior delts
+Equipment: Smith machine flat bench with vertical guide rails
+
+================================================================================
+1. PROMPT IMAGE (1:1 SINGLE HERO - PINPOINT CYAN HIGHLIGHT)
+Upload to ChatGPT: 00_coach_reference.jpg, 1_end_pose.jpg
+================================================================================
+Single 1:1 hero shot. The identical shredded muscular Asian male fitness coach from Image 1, shirtless in black compression shorts, calm focused face with closed mouth. Performing "Smith Machine Bench Press" with Smith machine flat bench with vertical guide rails in a dark modern gym, captured at peak muscle contraction matching Image 3. Delicate glowing neon cyan wireframe highlight strictly isolated ONLY on the mid chest, triceps, anterior delts (no glow on face, neck, abs, legs, or background). Cinematic rim lighting, 8k resolution, photorealistic.
+
+================================================================================
+2. PROMPT VIDEO (STEADY TRIPOD + CLOSED MOUTH + PINPOINT PULSE)
+Upload to Kling AI / Runway / Luma (Upload Single Hero Image as First Frame)
+================================================================================
+Fixed steady tripod shot (stationary 45-degree front-side angle). Strictly NO 360 rotation, NO camera orbit, NO panning. The identical shredded Asian fitness coach from Image 1 executes 1 perfect rep of "Smith Machine Bench Press" using Smith machine flat bench with vertical guide rails. 
+Stoic focus, mouth strictly closed (zero talking/moving mouth).
+Movement: 1. Place a flat bench underneath the smith machine. Now place the barbell at a height that you can reach when lying down and your arms are almost fully extended. Once the weight you need is selected, lie down on the flat bench. Using a pronated grip that is wider than shoulder width, unlock the bar from the rack and hold it straight over you with your arms locked. This will be your starting position. 2. As you breathe in, come down slowly until you feel the bar on your middle chest. 3. After a second pause, bring the bar back to the starting position as you breathe out and push the bar using your chest muscles. Lock your arms in the contracted position, hold for a second and then start coming down slowly again. Tip: It should take at least twice as long to go down than to come up. 4. Repeat the movement for the prescribed amount of repetitions.
+VFX: Delicate glowing cyan wireframe highlight strictly confined to mid chest, triceps, anterior delts, pulsing softly at peak contraction. Rest of body 100% natural non-glowing human skin. 60fps, seamless loop, 8k.

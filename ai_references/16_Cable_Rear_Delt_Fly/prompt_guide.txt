@@ -1,0 +1,19 @@
+=== EXERCISE: Cable Rear Delt Fly ===
+ID: Cable_Rear_Delt_Fly
+Target: posterior deltoids (rear delts), upper back
+Equipment: dual high-to-mid cable crossover pulleys crossing arms with cable stoppers (no handles)
+
+================================================================================
+1. PROMPT IMAGE (1:1 SINGLE HERO - PINPOINT CYAN HIGHLIGHT)
+Upload to ChatGPT: 00_coach_reference.jpg, 1_end_pose.jpg
+================================================================================
+Single 1:1 hero shot. The identical shredded muscular Asian male fitness coach from Image 1, shirtless in black compression shorts, calm focused face with closed mouth. Performing "Cable Rear Delt Fly" with dual high-to-mid cable crossover pulleys crossing arms with cable stoppers (no handles) in a dark modern gym, captured at peak muscle contraction matching Image 3. Delicate glowing neon cyan wireframe highlight strictly isolated ONLY on the posterior deltoids (rear delts), upper back (no glow on face, neck, abs, legs, or background). Cinematic rim lighting, 8k resolution, photorealistic.
+
+================================================================================
+2. PROMPT VIDEO (STEADY TRIPOD + CLOSED MOUTH + PINPOINT PULSE)
+Upload to Kling AI / Runway / Luma (Upload Single Hero Image as First Frame)
+================================================================================
+Fixed steady tripod shot (stationary rear view from behind athlete capturing posterior deltoid squeeze). Strictly NO 360 rotation, NO camera orbit, NO panning. The identical shredded Asian fitness coach from Image 1 executes 1 perfect rep of "Cable Rear Delt Fly" using dual high-to-mid cable crossover pulleys crossing arms with cable stoppers (no handles). 
+Stoic focus, mouth strictly closed (zero talking/moving mouth).
+Movement: 1. Stand tall between dual high pulleys holding cable stoppers with arms crossed at shoulder height. 2. Pull arms horizontally outward and backward in a wide reverse arc, keeping elbows slightly bent. 3. Squeeze rear delts hard at peak expansion without shrugging traps. 4. Slowly return under control to starting cross position.
+VFX: Delicate glowing cyan wireframe highlight strictly confined to posterior deltoids (rear delts), upper back, pulsing softly at peak contraction. Rest of body 100% natural non-glowing human skin. 60fps, seamless loop, 8k.

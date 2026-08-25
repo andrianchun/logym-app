@@ -1,0 +1,19 @@
+=== EXERCISE: Cable Seated Lateral Raise ===
+ID: Cable_Seated_Lateral_Raise
+Target: lateral delts (side shoulders)
+Equipment: low cable pulley with single-hand cuff seated on flat bench
+
+================================================================================
+1. PROMPT IMAGE (1:1 SINGLE HERO - PINPOINT CYAN HIGHLIGHT)
+Upload to ChatGPT: 00_coach_reference.jpg, 1_end_pose.jpg
+================================================================================
+Single 1:1 hero shot. The identical shredded muscular Asian male fitness coach from Image 1, shirtless in black compression shorts, calm focused face with closed mouth. Performing "Cable Seated Lateral Raise" with low cable pulley with single-hand cuff seated on flat bench in a dark modern gym, captured at peak muscle contraction matching Image 3. Delicate glowing neon cyan wireframe highlight strictly isolated ONLY on the lateral delts (side shoulders) (no glow on face, neck, abs, legs, or background). Cinematic rim lighting, 8k resolution, photorealistic.
+
+================================================================================
+2. PROMPT VIDEO (STEADY TRIPOD + CLOSED MOUTH + PINPOINT PULSE)
+Upload to Kling AI / Runway / Luma (Upload Single Hero Image as First Frame)
+================================================================================
+Fixed steady tripod shot (stationary front 3/4 angle). Strictly NO 360 rotation, NO camera orbit, NO panning. The identical shredded Asian fitness coach from Image 1 executes 1 perfect rep of "Cable Seated Lateral Raise" using low cable pulley with single-hand cuff seated on flat bench. 
+Stoic focus, mouth strictly closed (zero talking/moving mouth).
+Movement: 1. Stand in the middle of two low pulleys that are opposite to each other and place a flat bench right behind you (in perpendicular fashion to you; the narrow edge of the bench should be the one behind you). Select the weight to be used on each pulley. 2. Now sit at the edge of the flat bench behind you with your feet placed in front of your knees. 3. Bend forward while keeping your back flat and rest your torso on the thighs. 4. Have someone give you the single handles attached to the pulleys. Grasp the left pulley with the right hand and the right pulley with the left after you select your weight. The pulleys should run under your knees and your arms will be extended with palms facing each other and a slight bend at the elbows. This will be the starting position.
+VFX: Delicate glowing cyan wireframe highlight strictly confined to lateral delts (side shoulders), pulsing softly at peak contraction. Rest of body 100% natural non-glowing human skin. 60fps, seamless loop, 8k.

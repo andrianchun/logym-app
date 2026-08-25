@@ -1,0 +1,19 @@
+=== EXERCISE: Dumbbell Alternate Bicep Curl ===
+ID: Dumbbell_Alternate_Bicep_Curl
+Target: biceps brachii, brachialis, forearms
+Equipment: pair of dumbbells alternating arms with supination
+
+================================================================================
+1. PROMPT IMAGE (1:1 SINGLE HERO - PINPOINT CYAN HIGHLIGHT)
+Upload to ChatGPT: 00_coach_reference.jpg, 1_end_pose.jpg
+================================================================================
+Single 1:1 hero shot. The identical shredded muscular Asian male fitness coach from Image 1, shirtless in black compression shorts, calm focused face with closed mouth. Performing "Dumbbell Alternate Bicep Curl" with pair of dumbbells alternating arms with supination in a dark modern gym, captured at peak muscle contraction matching Image 3. Delicate glowing neon cyan wireframe highlight strictly isolated ONLY on the biceps brachii, brachialis, forearms (no glow on face, neck, abs, legs, or background). Cinematic rim lighting, 8k resolution, photorealistic.
+
+================================================================================
+2. PROMPT VIDEO (STEADY TRIPOD + CLOSED MOUTH + PINPOINT PULSE)
+Upload to Kling AI / Runway / Luma (Upload Single Hero Image as First Frame)
+================================================================================
+Fixed steady tripod shot (stationary front 3/4 eye-level angle). Strictly NO 360 rotation, NO camera orbit, NO panning. The identical shredded Asian fitness coach from Image 1 executes 1 perfect rep of "Dumbbell Alternate Bicep Curl" using pair of dumbbells alternating arms with supination. 
+Stoic focus, mouth strictly closed (zero talking/moving mouth).
+Movement: 1. Stand (torso upright) with a dumbbell in each hand held at arms length. The elbows should be close to the torso and the palms of your hand should be facing your thighs. 2. While holding the upper arm stationary, curl the right weight as you rotate the palm of the hands until they are facing forward. At this point continue contracting the biceps as you breathe out until your biceps is fully contracted and the dumbbells are at shoulder level. Hold the contracted position for a second as you squeeze the biceps. Tip: Only the forearms should move. 3. Slowly begin to bring the dumbbell back to the starting position as your breathe in. Tip: Remember to twist the palms back to the starting position (facing your thighs) as you come down. 4. Repeat the movement with the left hand. This equals one repetition.
+VFX: Delicate glowing cyan wireframe highlight strictly confined to biceps brachii, brachialis, forearms, pulsing softly at peak contraction. Rest of body 100% natural non-glowing human skin. 60fps, seamless loop, 8k.

@@ -749,7 +749,7 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
             kotak biru tua memanjang dari pemilih gym sampai kolom cari.
             Blur-nya dipertahankan: itu yang menjaga teks tetap terbaca saat daftar latihan
             menggulung di bawahnya, dan blur tidak punya tepi berwarna yang bisa jadi kotak. */}
-        <div className={`sticky top-0 z-30 backdrop-blur-md pt-3 pb-3 -mx-4 px-4 space-y-3`}>
+        <div className="pt-3 pb-3 -mx-4 px-4 space-y-3">
         
         {/* ── Gym Selector ───────────────────────────────────────── */}
         <div className="flex items-center gap-2">
@@ -758,11 +758,11 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
               onClick={() => setShowGymSelector(!showGymSelector)}
               className={`w-full flex items-center bg-transparent border ${t.border} rounded-2xl px-3 py-2.5 cursor-pointer`}
             >
-              <Dumbbell className={`${t.textAccent} mr-2`} size={18} />
+              <Dumbbell className={`${t.textAccent} mr-2 shrink-0`} size={18} />
               <div className={`flex-1 ${t.text} body-sm font-semibold truncate`}>
                 {gymProfiles.find(g => g.id === activeGymId)?.name || 'Pilih Gym'}
               </div>
-              <ChevronDown className={`${t.textMuted} transition-transform ${showGymSelector ? 'rotate-180' : ''}`} size={16} />
+              <ChevronDown className={`${t.textMuted} shrink-0 transition-transform ${showGymSelector ? 'rotate-180' : ''}`} size={16} />
             </div>
 
             {/* Dropdown Menu */}
@@ -790,7 +790,7 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
           </div>
           <button 
             onClick={() => setShowGymManager(true)}
-            className={`p-2.5 rounded-2xl border ${t.border} ${t.btnBg} hover:opacity-80 transition-opacity`}
+            className={`shrink-0 p-2.5 rounded-2xl border ${t.border} ${t.btnBg} hover:opacity-80 transition-opacity`}
           >
             <Edit2 size={18} className={t.textAccent} />
           </button>
@@ -831,17 +831,17 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
         <div className="space-y-3">
           {/* Unified Search Bar */}
           <div className="flex gap-2 items-center">
-            <div className={`flex-1 flex items-center gap-2 px-3 py-3 rounded-xl ${t.inputBg}`}>
-              <Search size={16} className={t.textMuted} />
+            <div className={`flex-1 min-w-0 flex items-center gap-2 px-3 py-3 rounded-xl ${t.inputBg}`}>
+              <Search size={16} className={`shrink-0 ${t.textMuted}`} />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Cari latihan..."
-                className={`flex-1 bg-transparent body-lg ${t.textMain} outline-none placeholder:${t.textMuted}`}
+                className={`w-full min-w-0 bg-transparent body-lg ${t.textMain} outline-none placeholder:${t.textMuted}`}
               />
               {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className={`${t.textMuted} hover:opacity-70`}>
+                <button onClick={() => setSearchQuery('')} className={`shrink-0 ${t.textMuted} hover:opacity-70`}>
                   <X size={14} />
                 </button>
               )}
@@ -849,7 +849,7 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
             
             <button
               onClick={() => { setShowFavoritesOnly(!showFavoritesOnly); playSoundEffect('click', soundEnabled); }}
-              className={`p-3 rounded-xl transition-all ${
+              className={`shrink-0 p-3 rounded-xl transition-all ${
                 showFavoritesOnly
                   ? `bg-rose-500 text-white shadow-sm`
                   : `${t.inputBg} ${t.textMuted}`
@@ -861,17 +861,18 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
 
             <button
               onClick={() => { setShowFilters(!showFilters); playSoundEffect('click', soundEnabled); }}
-              className={`p-3 rounded-xl transition-all ${
+              className={`shrink-0 p-3 rounded-xl transition-all ${
                 showFilters || muscleFilter.length > 0 || equipFilter.length > 0 || levelFilter.length > 0
                   ? `${t.bgAccent} text-white shadow-sm`
                   : `${t.inputBg} ${t.textMuted}`
               }`}
+              title="Filter Latihan"
             >
               <Filter size={18} />
             </button>
           </div>
 
-          {/* Filter Panel (Compact 3-Row Layout) */}
+          {/* Filter Panel */}
           {showFilters && (
             <div className={`p-3 rounded-2xl border ${t.border} ${theme === 'dark' ? 'bg-slate-900/90' : 'bg-white/95'} backdrop-blur-xl space-y-2 animate-in fade-in duration-200 shadow-md`}>
               {/* Baris 1: Otot */}
@@ -891,19 +892,19 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
                 selected={equipFilter}
                 onToggle={(v) => toggleFilter(equipFilter, setEquipFilter, v)}
               />
-              {/* Baris 3: Level + Sort + Reset */}
-              <div className={`flex items-center gap-2 w-full pt-1.5 border-t ${t.border}`}>
-                <div className="flex-1 min-w-0">
-                  <FilterChips
-                    t={t}
-                    label="Level"
-                    options={levelOptions}
-                    selected={levelFilter}
-                    onToggle={(v) => toggleFilter(levelFilter, setLevelFilter, v)}
-                    formatOption={(opt) => levelLabels[opt] || opt.charAt(0).toUpperCase() + opt.slice(1)}
-                  />
-                </div>
-                <div className={`flex items-center gap-1.5 shrink-0 pl-2 border-l ${t.border}`}>
+              {/* Baris 3: Level */}
+              <FilterChips
+                t={t}
+                label="Level"
+                options={levelOptions}
+                selected={levelFilter}
+                onToggle={(v) => toggleFilter(levelFilter, setLevelFilter, v)}
+                formatOption={(opt) => levelLabels[opt] || opt.charAt(0).toUpperCase() + opt.slice(1)}
+              />
+              {/* Baris 4: Sort + Reset */}
+              <div className={`flex items-center justify-between gap-2 w-full pt-1.5 border-t ${t.border}`}>
+                <div className="flex items-center gap-2">
+                  <span className={`text-[10px] font-black uppercase tracking-wider ${t.textMuted}`}>Urutkan</span>
                   <div className="relative">
                     <select 
                       value={sortOrder}
@@ -917,15 +918,15 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
                     </select>
                     <ChevronDown size={11} className={`absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none ${t.textMuted}`} />
                   </div>
-                  {(muscleFilter.length > 0 || equipFilter.length > 0 || levelFilter.length > 0) && (
-                    <button
-                      onClick={() => { setMuscleFilter([]); setEquipFilter([]); setLevelFilter([]); }}
-                      className="px-2 py-1 rounded-lg text-[10px] font-black text-rose-500 hover:bg-rose-500/10 transition-colors shrink-0"
-                    >
-                      Reset
-                    </button>
-                  )}
                 </div>
+                {(muscleFilter.length > 0 || equipFilter.length > 0 || levelFilter.length > 0) && (
+                  <button
+                    onClick={() => { setMuscleFilter([]); setEquipFilter([]); setLevelFilter([]); }}
+                    className="px-2.5 py-1 rounded-lg text-[10px] font-black text-rose-500 hover:bg-rose-500/10 transition-colors shrink-0"
+                  >
+                    Reset Filter
+                  </button>
+                )}
               </div>
             </div>
           )}

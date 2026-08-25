@@ -42,7 +42,7 @@ id,name,target,equipment,level,type,defaultWeight,ytVideo,videoUrl,gifUrl
 ,Band Skull Crusher,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Band_Skull_Crusher/0.jpg
 ,Barbell Ab Rollout,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Ab_Rollout/0.jpg
 ,Barbell Ab Rollout - On Knees,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Ab_Rollout_-_On_Knees/0.jpg
-,Barbell Bench Press - Medium Grip,,,intermediate,weight,20,https://youtu.be/rT7DgCr-3pg,/exercise-assets/videos/edb-Barbell_Bench_Press_-_Medium_Grip.mp4,/exercise-assets/thumbnails/edb-Barbell_Bench_Press_-_Medium_Grip.webp
+,Barbell Bench Press - Medium Grip,,,intermediate,weight,20,https://youtu.be/rT7DgCr-3pg,/exercise-assets/edb-Barbell_Bench_Press_-_Medium_Grip.mp4 /exercise-assets/youtube-backup/edb-Barbell_Bench_Press_-_Medium_Grip.mp4,/exercise-assets/edb-Barbell_Bench_Press_-_Medium_Grip.webp
 ,Barbell Curl,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Curl/0.jpg
 ,Barbell Curls Lying Against An Incline,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Curls_Lying_Against_An_Incline/0.jpg
 ,Barbell Deadlift,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Deadlift/0.jpg
@@ -62,10 +62,10 @@ id,name,target,equipment,level,type,defaultWeight,ytVideo,videoUrl,gifUrl
 ,Barbell Shrug Behind The Back,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Shrug_Behind_The_Back/0.jpg
 ,Barbell Side Bend,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Side_Bend/0.jpg
 ,Barbell Side Split Squat,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Side_Split_Squat/0.jpg
-,Barbell Squat,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Squat/0.jpg
+,Barbell Squat,,,,,,,/exercise-assets/edb-Barbell_Squat.mp4,/exercise-assets/edb-Barbell_Squat.webp
 ,Barbell Squat To A Bench,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Squat_To_A_Bench/0.jpg
 ,Barbell Step Ups,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Step_Ups/0.jpg
-,Barbell Walking Lunge,,,intermediate,weight,5,https://youtu.be/mJilHWIBWO8?si=2NCYOofB0EUrY22X,https://youtu.be/mJilHWIBWO8?si=2NCYOofB0EUrY22X,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Walking_Lunge/0.jpg
+,Barbell Walking Lunge,,,intermediate,weight,5,https://youtu.be/mJilHWIBWO8?si=2NCYOofB0EUrY22X,/exercise-assets/youtube-backup/edb-Barbell_Walking_Lunge.mp4,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Walking_Lunge/0.jpg
 ,Battling Ropes,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Battling_Ropes/0.jpg
 ,Bear Crawl Sled Drags,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Bear_Crawl_Sled_Drags/0.jpg
 ,Behind Head Chest Stretch,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Behind_Head_Chest_Stretch/0.jpg
@@ -109,8 +109,8 @@ id,name,target,equipment,level,type,defaultWeight,ytVideo,videoUrl,gifUrl
 ,Butt Lift (Bridge),,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Butt_Lift_Bridge/0.jpg
 ,Butterfly,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Butterfly/0.jpg
 ,Cable Chest Press,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Chest_Press/0.jpg
-,Cable Crossover,,,,,,,/exercise-assets/videos/edb-Cable_Crossover.mp4,/exercise-assets/thumbnails/edb-Cable_Crossover.webp
-,Cable Crunch,,,intermediate,weight,40,https://youtu.be/K2m0jj6RfYg?si=CZMLt6PF0Yxvgb6V,https://youtu.be/K2m0jj6RfYg?si=CZMLt6PF0Yxvgb6V,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Crunch/0.jpg
+,Cable Crossover,,,,,,,/exercise-assets/edb-Cable_Crossover.mp4,/exercise-assets/edb-Cable_Crossover.webp
+,Cable Crunch,,,intermediate,weight,40,https://youtu.be/K2m0jj6RfYg?si=CZMLt6PF0Yxvgb6V,/exercise-assets/youtube-backup/edb-Cable_Crunch.mp4,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Crunch/0.jpg
 ,Cable Deadlifts,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Deadlifts/0.jpg
 ,Cable Hammer Curls - Rope Attachment,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Hammer_Curls_-_Rope_Attachment/0.jpg
 ,Cable Hip Adduction,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Hip_Adduction/0.jpg
@@ -122,13 +122,13 @@ id,name,target,equipment,level,type,defaultWeight,ytVideo,videoUrl,gifUrl
 ,Cable Lying Triceps Extension,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Lying_Triceps_Extension/0.jpg
 ,Cable One Arm Tricep Extension,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_One_Arm_Tricep_Extension/0.jpg
 ,Cable Preacher Curl,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Preacher_Curl/0.jpg
-,Cable Rear Delt Fly,,,advanced,weight,5,https://youtu.be/cGXBVOc5xIk?si=ve9zzcNdiyNqYF5I https://youtu.be/IeOqdw9WI90?si=J4oHxFNn7257r3ak,https://youtu.be/cGXBVOc5xIk?si=ve9zzcNdiyNqYF5I https://youtu.be/IeOqdw9WI90?si=J4oHxFNn7257r3ak,/exercise-assets/thumbnails/edb-Cable_Rear_Delt_Fly.webp
+,Cable Rear Delt Fly,,,advanced,weight,5,https://youtu.be/cGXBVOc5xIk?si=ve9zzcNdiyNqYF5I https://youtu.be/IeOqdw9WI90?si=J4oHxFNn7257r3ak,https://youtu.be/cGXBVOc5xIk?si=ve9zzcNdiyNqYF5I https://youtu.be/IeOqdw9WI90?si=J4oHxFNn7257r3ak,/exercise-assets/edb-Cable_Rear_Delt_Fly.webp
 ,Cable Reverse Crunch,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Reverse_Crunch/0.jpg
-,Cable Rope Overhead Triceps Extension,,,intermediate,weight,40,https://youtu.be/9Ark9S11uXw?si=pEAe5tf66v5yUToU https://youtu.be/NTk0Igxqcsk?si=zX7dHQL0VyHURoC_,https://youtu.be/9Ark9S11uXw?si=pEAe5tf66v5yUToU https://youtu.be/NTk0Igxqcsk?si=zX7dHQL0VyHURoC_,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Rope_Overhead_Triceps_Extension/0.jpg
+,Cable Rope Overhead Triceps Extension,,,intermediate,weight,40,https://youtu.be/9Ark9S11uXw?si=pEAe5tf66v5yUToU https://youtu.be/NTk0Igxqcsk?si=zX7dHQL0VyHURoC_,/exercise-assets/edb-Cable_Rope_Overhead_Triceps_Extension.mp4 /exercise-assets/youtube-backup/edb-Cable_Rope_Overhead_Triceps_Extension.mp4,/exercise-assets/edb-Cable_Rope_Overhead_Triceps_Extension.webp
 ,Cable Rope Rear-Delt Rows,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Rope_Rear-Delt_Rows/0.jpg
 ,Cable Russian Twists,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Russian_Twists/0.jpg
 ,Cable Seated Crunch,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Seated_Crunch/0.jpg
-,Cable Seated Lateral Raise,,,beginner,weight,20,https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA,https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Seated_Lateral_Raise/0.jpg
+,Cable Seated Lateral Raise,,,beginner,weight,20,https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA,/exercise-assets/youtube-backup/edb-Cable_Seated_Lateral_Raise.mp4,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Seated_Lateral_Raise/0.jpg
 ,Cable Shoulder Press,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Shoulder_Press/0.jpg
 ,Cable Shrugs,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Shrugs/0.jpg
 ,Cable Wrist Curl,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Wrist_Curl/0.jpg
@@ -219,8 +219,8 @@ id,name,target,equipment,level,type,defaultWeight,ytVideo,videoUrl,gifUrl
 ,Downward Facing Balance,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Downward_Facing_Balance/0.jpg
 ,Drag Curl,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Drag_Curl/0.jpg
 ,Drop Push,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Drop_Push/0.jpg
-,Dumbbell Alternate Bicep Curl,,,beginner,weight,20,https://youtu.be/MKWBV29S6c0?si=JV1BM77vAR6VuQYG https://youtu.be/_aoad2yuP5w?si=PRXDFoozz45AB_VO,https://youtu.be/MKWBV29S6c0?si=JV1BM77vAR6VuQYG https://youtu.be/_aoad2yuP5w?si=PRXDFoozz45AB_VO,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Alternate_Bicep_Curl/0.jpg
-,Dumbbell Bench Press,,,beginner,weight,10,https://youtu.be/WbCEvFA0NJs?si=n6uJrVnL8SbZLnii,/exercise-assets/videos/edb-Dumbbell_Bench_Press.mp4,/exercise-assets/thumbnails/edb-Dumbbell_Bench_Press.webp
+,Dumbbell Alternate Bicep Curl,,,beginner,weight,20,https://youtu.be/MKWBV29S6c0?si=JV1BM77vAR6VuQYG https://youtu.be/_aoad2yuP5w?si=PRXDFoozz45AB_VO,/exercise-assets/edb-Dumbbell_Alternate_Bicep_Curl.mp4 /exercise-assets/youtube-backup/edb-Dumbbell_Alternate_Bicep_Curl.mp4,/exercise-assets/edb-Dumbbell_Alternate_Bicep_Curl.webp
+,Dumbbell Bench Press,,,beginner,weight,10,https://youtu.be/WbCEvFA0NJs?si=n6uJrVnL8SbZLnii,/exercise-assets/edb-Dumbbell_Bench_Press.mp4 /exercise-assets/youtube-backup/edb-Dumbbell_Bench_Press.mp4,/exercise-assets/edb-Dumbbell_Bench_Press.webp
 ,Dumbbell Bench Press with Neutral Grip,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Bench_Press_with_Neutral_Grip/0.jpg
 ,Dumbbell Bicep Curl,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Bicep_Curl/0.jpg
 ,Dumbbell Clean,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Clean/0.jpg
@@ -242,8 +242,8 @@ id,name,target,equipment,level,type,defaultWeight,ytVideo,videoUrl,gifUrl
 ,Dumbbell Scaption,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Scaption/0.jpg
 ,Dumbbell Seated Box Jump,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Seated_Box_Jump/0.jpg
 ,Dumbbell Seated One-Leg Calf Raise,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Seated_One-Leg_Calf_Raise/0.jpg
-,Dumbbell Shoulder Press,,,intermediate,weight,5,https://youtu.be/k6tzKisR3NY?si=g67rT52vc6oWjiFC https://youtu.be/E7ngsffMPR0?si=FJGsgUxb7aoAZ_ub,/exercise-assets/videos/edb-Dumbbell_Shoulder_Press.mp4,/exercise-assets/thumbnails/edb-Dumbbell_Shoulder_Press.webp
-,Dumbbell Shrug,,,beginner,weight,15,https://youtu.be/rFsSeClGnNA?si=EfUCHpJdjSbWFObO https://youtu.be/2BrmhGze7sk?si=PSt1tUQjaI2liYby,https://youtu.be/rFsSeClGnNA?si=EfUCHpJdjSbWFObO https://youtu.be/2BrmhGze7sk?si=PSt1tUQjaI2liYby,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Shrug/0.jpg
+,Dumbbell Shoulder Press,,,intermediate,weight,5,https://youtu.be/k6tzKisR3NY?si=g67rT52vc6oWjiFC https://youtu.be/E7ngsffMPR0?si=FJGsgUxb7aoAZ_ub,/exercise-assets/edb-Dumbbell_Shoulder_Press.mp4 /exercise-assets/youtube-backup/edb-Dumbbell_Shoulder_Press.mp4,/exercise-assets/edb-Dumbbell_Shoulder_Press.webp
+,Dumbbell Shrug,,,beginner,weight,15,https://youtu.be/rFsSeClGnNA?si=EfUCHpJdjSbWFObO https://youtu.be/2BrmhGze7sk?si=PSt1tUQjaI2liYby,/exercise-assets/youtube-backup/edb-Dumbbell_Shrug.mp4,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Shrug/0.jpg
 ,Dumbbell Side Bend,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Side_Bend/0.jpg
 ,Dumbbell Squat,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Squat/0.jpg
 ,Dumbbell Squat To A Bench,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Squat_To_A_Bench/0.jpg
@@ -300,14 +300,14 @@ id,name,target,equipment,level,type,defaultWeight,ytVideo,videoUrl,gifUrl
 ,Gironda Sternum Chins,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Gironda_Sternum_Chins/0.jpg
 ,Glute Ham Raise,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Glute_Ham_Raise/0.jpg
 ,Glute Kickback,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Glute_Kickback/0.jpg
-,Goblet Squat,,,beginner,weight,10,https://youtu.be/MeIiIdhgPgl,https://youtu.be/MeIiIdhgPgl,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Goblet_Squat/0.jpg
+,Goblet Squat,,,beginner,weight,10,https://youtu.be/MeIiIdhgPgl,/exercise-assets/youtube-backup/edb-Goblet_Squat.mp4,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Goblet_Squat/0.jpg
 ,Good Morning,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Good_Morning/0.jpg
 ,Good Morning off Pins,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Good_Morning_off_Pins/0.jpg
 ,Gorilla Chin/Crunch,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Gorilla_Chin_Crunch/0.jpg
 ,Groin and Back Stretch,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Groin_and_Back_Stretch/0.jpg
 ,Groiners,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Groiners/0.jpg
 ,Hack Squat,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Hack_Squat/0.jpg
-,Hammer Curls,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Hammer_Curls/0.jpg
+,Hammer Curls,,,,,,,/exercise-assets/edb-Hammer_Curls.mp4,/exercise-assets/edb-Hammer_Curls.webp
 ,Hammer Grip Incline DB Bench Press,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Hammer_Grip_Incline_DB_Bench_Press/0.jpg
 ,Hamstring-SMR,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Hamstring-SMR/0.jpg
 ,Hamstring Stretch,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Hamstring_Stretch/0.jpg
@@ -321,7 +321,7 @@ id,name,target,equipment,level,type,defaultWeight,ytVideo,videoUrl,gifUrl
 ,Hanging Pike,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Hanging_Pike/0.jpg
 ,Heaving Snatch Balance,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Heaving_Snatch_Balance/0.jpg
 ,Heavy Bag Thrust,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Heavy_Bag_Thrust/0.jpg
-,High Cable Curls,,,beginner,weight,30,https://youtu.be/CrbTqNOlFgE?si=xKanrhppuvUAudTj,https://youtu.be/CrbTqNOlFgE?si=xKanrhppuvUAudTj,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/High_Cable_Curls/0.jpg
+,High Cable Curls,,,beginner,weight,30,https://youtu.be/CrbTqNOlFgE?si=xKanrhppuvUAudTj,/exercise-assets/youtube-backup/edb-High_Cable_Curls.mp4,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/High_Cable_Curls/0.jpg
 ,Hip Circles (prone),,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Hip_Circles_prone/0.jpg
 ,Hip Extension with Bands,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Hip_Extension_with_Bands/0.jpg
 ,Hip Flexion with Band,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Hip_Flexion_with_Band/0.jpg
@@ -342,7 +342,7 @@ id,name,target,equipment,level,type,defaultWeight,ytVideo,videoUrl,gifUrl
 ,Incline Dumbbell Curl,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Incline_Dumbbell_Curl/0.jpg
 ,Incline Dumbbell Flyes,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Incline_Dumbbell_Flyes/0.jpg
 ,Incline Dumbbell Flyes - With A Twist,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Incline_Dumbbell_Flyes_-_With_A_Twist/0.jpg
-,Incline Dumbbell Press,,,,,,,/exercise-assets/videos/edb-Incline_Dumbbell_Press.mp4,/exercise-assets/thumbnails/edb-Incline_Dumbbell_Press.webp
+,Incline Dumbbell Press,,,,,,,/exercise-assets/edb-Incline_Dumbbell_Press.mp4,/exercise-assets/edb-Incline_Dumbbell_Press.webp
 ,Incline Hammer Curls,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Incline_Hammer_Curls/0.jpg
 ,Incline Inner Biceps Curl,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Incline_Inner_Biceps_Curl/0.jpg
 ,Incline Push-Up,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Incline_Push-Up/0.jpg
@@ -529,7 +529,7 @@ id,name,target,equipment,level,type,defaultWeight,ytVideo,videoUrl,gifUrl
 ,Palms-Down Dumbbell Wrist Curl Over A Bench,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Palms-Down_Dumbbell_Wrist_Curl_Over_A_Bench/0.jpg
 ,Palms-Down Wrist Curl Over A Bench,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Palms-Down_Wrist_Curl_Over_A_Bench/0.jpg
 ,Palms-Up Barbell Wrist Curl Over A Bench,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Palms-Up_Barbell_Wrist_Curl_Over_A_Bench/0.jpg
-,Palms-Up Dumbbell Wrist Curl Over A Bench,,,beginner,weight,5,https://youtu.be/0-c4s051u6E?si=K-4Z9iKq2d8r0N1M,https://youtu.be/0-c4s051u6E?si=K-4Z9iKq2d8r0N1M,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Palms-Up_Dumbbell_Wrist_Curl_Over_A_Bench/0.jpg
+,Palms-Up Dumbbell Wrist Curl Over A Bench,,,beginner,weight,5,https://youtu.be/0-c4s051u6E?si=K-4Z9iKq2d8r0N1M,/exercise-assets/youtube-backup/edb-Palms-Up_Dumbbell_Wrist_Curl_Over_A_Bench.mp4,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Palms-Up_Dumbbell_Wrist_Curl_Over_A_Bench/0.jpg
 ,Parallel Bar Dip,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Parallel_Bar_Dip/0.jpg
 ,Pelvic Tilt Into Bridge,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Pelvic_Tilt_Into_Bridge/0.jpg
 ,Peroneals-SMR,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Peroneals-SMR/0.jpg
@@ -537,7 +537,7 @@ id,name,target,equipment,level,type,defaultWeight,ytVideo,videoUrl,gifUrl
 ,Physioball Hip Bridge,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Physioball_Hip_Bridge/0.jpg
 ,Pin Presses,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Pin_Presses/0.jpg
 ,Piriformis-SMR,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Piriformis-SMR/0.jpg
-,Plank,,,beginner,time,0,https://youtu.be/xe2MXatLTUw?si=U5L4UwgiNv19R7lh,https://youtu.be/xe2MXatLTUw?si=U5L4UwgiNv19R7lh,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Plank/0.jpg
+,Plank,,,beginner,time,0,https://youtu.be/xe2MXatLTUw?si=U5L4UwgiNv19R7lh,/exercise-assets/youtube-backup/edb-Plank.mp4,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Plank/0.jpg
 ,Plate Pinch,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Plate_Pinch/0.jpg
 ,Plate Twist,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Plate_Twist/0.jpg
 ,Platform Hamstring Slides,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Platform_Hamstring_Slides/0.jpg
@@ -557,7 +557,7 @@ id,name,target,equipment,level,type,defaultWeight,ytVideo,videoUrl,gifUrl
 ,Press Sit-Up,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Press_Sit-Up/0.jpg
 ,Prone Manual Hamstring,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Prone_Manual_Hamstring/0.jpg
 ,Prowler Sprint,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Prowler_Sprint/0.jpg
-,Pull Through,,,intermediate,weight,20,https://youtu.be/sFQtAuiVwyo?si=GQLiGcITyE4Yzp3G,https://youtu.be/sFQtAuiVwyo?si=GQLiGcITyE4Yzp3G,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Pull_Through/0.jpg
+,Pull Through,,,intermediate,weight,20,https://youtu.be/sFQtAuiVwyo?si=GQLiGcITyE4Yzp3G,/exercise-assets/youtube-backup/edb-Pull_Through.mp4,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Pull_Through/0.jpg
 ,Pullups,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Pullups/0.jpg
 ,Push-Up Wide,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Push-Up_Wide/0.jpg
 ,Push-Ups - Close Triceps Position,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Push-Ups_-_Close_Triceps_Position/0.jpg
@@ -600,9 +600,9 @@ id,name,target,equipment,level,type,defaultWeight,ytVideo,videoUrl,gifUrl
 ,Rickshaw Deadlift,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Rickshaw_Deadlift/0.jpg
 ,Ring Dips,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Ring_Dips/0.jpg
 ,Rocket Jump,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Rocket_Jump/0.jpg
-,Rocking Standing Calf Raise,,,beginner,weight,10,https://youtu.be/wdOkFomQNp8?si=PWlxiKYPBMlfLoek,https://youtu.be/wdOkFomQNp8?si=PWlxiKYPBMlfLoek,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Rocking_Standing_Calf_Raise/0.jpg
+,Rocking Standing Calf Raise,,,beginner,weight,10,https://youtu.be/wdOkFomQNp8?si=PWlxiKYPBMlfLoek,/exercise-assets/youtube-backup/edb-Rocking_Standing_Calf_Raise.mp4,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Rocking_Standing_Calf_Raise/0.jpg
 ,Rocky Pull-Ups/Pulldowns,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Rocky_Pull-Ups_Pulldowns/0.jpg
-,Romanian Deadlift,,,intermediate,weight,5,https://youtu.be/xY8BywOKkLQ?si=B1A9ulZ-Cz67GNw6,https://youtu.be/xY8BywOKkLQ?si=B1A9ulZ-Cz67GNw6,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Romanian_Deadlift/0.jpg
+,Romanian Deadlift,,,intermediate,weight,5,https://youtu.be/xY8BywOKkLQ?si=B1A9ulZ-Cz67GNw6,/exercise-assets/edb-Romanian_Deadlift.mp4 /exercise-assets/youtube-backup/edb-Romanian_Deadlift.mp4,/exercise-assets/edb-Romanian_Deadlift.webp
 ,Romanian Deadlift from Deficit,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Romanian_Deadlift_from_Deficit/0.jpg
 ,Rope Climb,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Rope_Climb/0.jpg
 ,Rope Crunch,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Rope_Crunch/0.jpg
@@ -624,9 +624,9 @@ id,name,target,equipment,level,type,defaultWeight,ytVideo,videoUrl,gifUrl
 ,Seated Bent-Over Rear Delt Raise,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Seated_Bent-Over_Rear_Delt_Raise/0.jpg
 ,Seated Bent-Over Two-Arm Dumbbell Triceps Extension,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Seated_Bent-Over_Two-Arm_Dumbbell_Triceps_Extension/0.jpg
 ,Seated Biceps,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Seated_Biceps/0.jpg
-,Seated Cable Rows,,,beginner,weight,10,https://youtu.be/qD1WZ5pSuvk?si=JbbritEwFpnqjPHz,/exercise-assets/videos/edb-Seated_Cable_Rows.mp4,/exercise-assets/thumbnails/edb-Seated_Cable_Rows.webp
+,Seated Cable Rows,,,beginner,weight,10,https://youtu.be/qD1WZ5pSuvk?si=JbbritEwFpnqjPHz,/exercise-assets/edb-Seated_Cable_Rows.mp4 /exercise-assets/youtube-backup/edb-Seated_Cable_Rows.mp4,/exercise-assets/edb-Seated_Cable_Rows.webp
 ,Seated Cable Shoulder Press,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Seated_Cable_Shoulder_Press/0.jpg
-,Seated Calf Raise,,,beginner,weight,30,https://youtu.be/ar8nav0jGoE?si=owieb0xbPHFg7zMA,https://youtu.be/ar8nav0jGoE?si=owieb0xbPHFg7zMA,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Seated_Calf_Raise/0.jpg
+,Seated Calf Raise,,,beginner,weight,30,https://youtu.be/ar8nav0jGoE?si=owieb0xbPHFg7zMA,/exercise-assets/youtube-backup/edb-Seated_Calf_Raise.mp4,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Seated_Calf_Raise/0.jpg
 ,Seated Calf Stretch,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Seated_Calf_Stretch/0.jpg
 ,Seated Close-Grip Concentration Barbell Curl,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Seated_Close-Grip_Concentration_Barbell_Curl/0.jpg
 ,Seated Dumbbell Curl,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Seated_Dumbbell_Curl/0.jpg
@@ -697,21 +697,21 @@ id,name,target,equipment,level,type,defaultWeight,ytVideo,videoUrl,gifUrl
 ,Sledgehammer Swings,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Sledgehammer_Swings/0.jpg
 ,Smith Incline Shoulder Raise,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Smith_Incline_Shoulder_Raise/0.jpg
 ,Smith Machine Behind the Back Shrug,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Smith_Machine_Behind_the_Back_Shrug/0.jpg
-,Smith Machine Bench Press,,,beginner,weight,7.5,https://youtu.be/gQ3afio08V8?si=DfCKjmSAhUMXjMl_,/exercise-assets/videos/edb-Smith_Machine_Bench_Press.mp4,/exercise-assets/thumbnails/edb-Smith_Machine_Bench_Press.png
+,Smith Machine Bench Press,,,beginner,weight,7.5,https://youtu.be/gQ3afio08V8?si=DfCKjmSAhUMXjMl_,/exercise-assets/edb-Smith_Machine_Bench_Press.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Bench_Press.mp4,/exercise-assets/edb-Smith_Machine_Bench_Press.png
 ,Smith Machine Bent Over Row,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Smith_Machine_Bent_Over_Row/0.jpg
 ,Smith Machine Calf Raise,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Smith_Machine_Calf_Raise/0.jpg
 ,Smith Machine Close-Grip Bench Press,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Smith_Machine_Close-Grip_Bench_Press/0.jpg
 ,Smith Machine Decline Press,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Smith_Machine_Decline_Press/0.jpg
 ,Smith Machine Hang Power Clean,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Smith_Machine_Hang_Power_Clean/0.jpg
 ,Smith Machine Hip Raise,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Smith_Machine_Hip_Raise/0.jpg
-,Smith Machine Incline Bench Press,,,intermediate,weight,10,https://youtu.be/VXaBbUYMfIs?si=pOB-MkazqZiMP_KX,/exercise-assets/videos/edb-Smith_Machine_Incline_Bench_Press.mp4,/exercise-assets/thumbnails/edb-Smith_Machine_Incline_Bench_Press.png
+,Smith Machine Incline Bench Press,,,intermediate,weight,10,https://youtu.be/VXaBbUYMfIs?si=pOB-MkazqZiMP_KX,/exercise-assets/edb-Smith_Machine_Incline_Bench_Press.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Incline_Bench_Press.mp4,/exercise-assets/edb-Smith_Machine_Incline_Bench_Press.png
 ,Smith Machine Leg Press,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Smith_Machine_Leg_Press/0.jpg
 ,Smith Machine One-Arm Upright Row,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Smith_Machine_One-Arm_Upright_Row/0.jpg
 ,Smith Machine Overhead Shoulder Press,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Smith_Machine_Overhead_Shoulder_Press/0.jpg
 ,Smith Machine Pistol Squat,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Smith_Machine_Pistol_Squat/0.jpg
 ,Smith Machine Reverse Calf Raises,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Smith_Machine_Reverse_Calf_Raises/0.jpg
-,Smith Machine Squat,,,intermediate,weight,0,https://youtu.be/iKCJCydYYrE?si=ICtqLU9ov9eFaHfL https://youtu.be/LwsG-1xgP2E?si=Ptr7dUVcsJFKMLYC,/exercise-assets/videos/edb-Smith_Machine_Squat.mp4,/exercise-assets/thumbnails/edb-Smith_Machine_Squat.webp
-,Smith Machine Stiff-Legged Deadlift,,,,,,,/exercise-assets/videos/edb-Smith_Machine_Stiff-Legged_Deadlift.mp4,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Smith_Machine_Stiff-Legged_Deadlift/0.jpg
+,Smith Machine Squat,,,intermediate,weight,0,https://youtu.be/iKCJCydYYrE?si=ICtqLU9ov9eFaHfL https://youtu.be/LwsG-1xgP2E?si=Ptr7dUVcsJFKMLYC,/exercise-assets/edb-Smith_Machine_Squat.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Squat.mp4,/exercise-assets/edb-Smith_Machine_Squat.webp
+,Smith Machine Stiff-Legged Deadlift,,,,,,,/exercise-assets/edb-Smith_Machine_Stiff-Legged_Deadlift.mp4,/exercise-assets/edb-Smith_Machine_Stiff-Legged_Deadlift.webp
 ,Smith Machine Upright Row,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Smith_Machine_Upright_Row/0.jpg
 ,Smith Single-Leg Split Squat,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Smith_Single-Leg_Split_Squat/0.jpg
 ,Snatch,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Snatch/0.jpg
@@ -731,7 +731,7 @@ id,name,target,equipment,level,type,defaultWeight,ytVideo,videoUrl,gifUrl
 ,Split Jerk,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Split_Jerk/0.jpg
 ,Split Jump,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Split_Jump/0.jpg
 ,Split Snatch,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Split_Snatch/0.jpg
-,Split Squat with Dumbbells,,,advanced,weight,30,https://youtu.be/or1frhkjBDc?si=FR7v-hKp_QP4-Rpn,https://youtu.be/or1frhkjBDc?si=FR7v-hKp_QP4-Rpn,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Split_Squat_with_Dumbbells/0.jpg
+,Split Squat with Dumbbells,,,advanced,weight,30,https://youtu.be/or1frhkjBDc?si=FR7v-hKp_QP4-Rpn,/exercise-assets/edb-Split_Squat_with_Dumbbells.mp4 /exercise-assets/youtube-backup/edb-Split_Squat_with_Dumbbells.mp4,/exercise-assets/edb-Split_Squat_with_Dumbbells.webp
 ,Split Squats,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Split_Squats/0.jpg
 ,Squat Jerk,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Squat_Jerk/0.jpg
 ,Squat with Bands,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Squat_with_Bands/0.jpg
@@ -823,7 +823,7 @@ id,name,target,equipment,level,type,defaultWeight,ytVideo,videoUrl,gifUrl
 ,Tricep Dumbbell Kickback,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Tricep_Dumbbell_Kickback/0.jpg
 ,Tricep Side Stretch,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Tricep_Side_Stretch/0.jpg
 ,Triceps Overhead Extension with Rope,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Triceps_Overhead_Extension_with_Rope/0.jpg
-,Triceps Pushdown,,,beginner,weight,20,https://youtu.be/1FjkhpZsaxc?si=UF5-0LJTCd_pEhy3 https://youtu.be/u36jNfqh8_U?si=AEMeWXqnBvpOWNOj https://youtu.be/9qupVR7pKtk?si=FtLIHZmKuqXcK0ne,https://youtu.be/1FjkhpZsaxc?si=UF5-0LJTCd_pEhy3 https://youtu.be/u36jNfqh8_U?si=AEMeWXqnBvpOWNOj https://youtu.be/9qupVR7pKtk?si=FtLIHZmKuqXcK0ne,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Triceps_Pushdown/0.jpg
+,Triceps Pushdown,,,beginner,weight,20,https://youtu.be/1FjkhpZsaxc?si=UF5-0LJTCd_pEhy3 https://youtu.be/u36jNfqh8_U?si=AEMeWXqnBvpOWNOj https://youtu.be/9qupVR7pKtk?si=FtLIHZmKuqXcK0ne,/exercise-assets/edb-Triceps_Pushdown.mp4 /exercise-assets/youtube-backup/edb-Triceps_Pushdown.mp4,/exercise-assets/edb-Triceps_Pushdown.webp
 ,Triceps Pushdown - Rope Attachment,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Triceps_Pushdown_-_Rope_Attachment/0.jpg
 ,Triceps Pushdown - V-Bar Attachment,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Triceps_Pushdown_-_V-Bar_Attachment/0.jpg
 ,Triceps Stretch,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Triceps_Stretch/0.jpg
@@ -856,7 +856,7 @@ id,name,target,equipment,level,type,defaultWeight,ytVideo,videoUrl,gifUrl
 ,Wide-Grip Barbell Bench Press,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Wide-Grip_Barbell_Bench_Press/0.jpg
 ,Wide-Grip Decline Barbell Bench Press,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Wide-Grip_Decline_Barbell_Bench_Press/0.jpg
 ,Wide-Grip Decline Barbell Pullover,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Wide-Grip_Decline_Barbell_Pullover/0.jpg
-,Wide-Grip Lat Pulldown,,,beginner,weight,40,https://youtu.be/bNmvKpJSWKM?si=E7zZ3a3qeG4Ij7bb https://youtu.be/7Cjc_aXoQ_I?si=ZqhPV5iSMoTOLSIf,/exercise-assets/videos/edb-Wide-Grip_Lat_Pulldown.mp4,/exercise-assets/thumbnails/edb-Wide-Grip_Lat_Pulldown.png
+,Wide-Grip Lat Pulldown,,,beginner,weight,40,https://youtu.be/bNmvKpJSWKM?si=E7zZ3a3qeG4Ij7bb https://youtu.be/7Cjc_aXoQ_I?si=ZqhPV5iSMoTOLSIf,/exercise-assets/youtube-backup/edb-Wide-Grip_Lat_Pulldown.mp4,/exercise-assets/edb-Wide-Grip_Lat_Pulldown.png
 ,Wide-Grip Pulldown Behind The Neck,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Wide-Grip_Pulldown_Behind_The_Neck/0.jpg
 ,Wide-Grip Rear Pull-Up,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Wide-Grip_Rear_Pull-Up/0.jpg
 ,Wide-Grip Standing Barbell Curl,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Wide-Grip_Standing_Barbell_Curl/0.jpg
@@ -873,7 +873,7 @@ id,name,target,equipment,level,type,defaultWeight,ytVideo,videoUrl,gifUrl
 ,Zottman Curl,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Zottman_Curl/0.jpg
 ,Zottman Preacher Curl,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Zottman_Preacher_Curl/0.jpg
 ,Cardio,,,beginner,cardio,0,,,
-,SM Romanian Deadlift (RDL),,,beginner,weight,20,https://youtu.be/xWnlfJaQZ3k?si=z0FRk3rh4UO7JdUC,https://youtu.be/xWnlfJaQZ3k?si=z0FRk3rh4UO7JdUC,
+,SM Romanian Deadlift (RDL),,,beginner,weight,20,https://youtu.be/xWnlfJaQZ3k?si=z0FRk3rh4UO7JdUC,/exercise-assets/youtube-backup/edb-Smith_Machine_Romanian_Deadlift.mp4,
 ,Treadmill Running,,,beginner,cardio,0,,,
 ,Stationary Bike,,,beginner,cardio,0,,,
 ,Aerobic,,,beginner,cardio,0,,,

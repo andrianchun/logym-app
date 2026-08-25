@@ -26,52 +26,955 @@ export const exerciseTypeLabels = {
 };
 
 export const defaultMasterExercises = [
-  { id: 101, name: 'Smith Machine Incline Bench Press', target: ['Dada Atas', 'Deltoid Depan', 'Triceps'], type: 'weight', defaultWeight: 10, equipment: 'Smith Machine', level: 'intermediate', ytVideo: 'https://youtu.be/VXaBbUYMfIs?si=pOB-MkazqZiMP_KX' },
-  { id: 102, name: 'Seated Cable Rows', target: ['Punggung Atas', 'Biceps'], type: 'weight', defaultWeight: 10, equipment: 'Cable', level: 'beginner', ytVideo: 'https://youtu.be/qD1WZ5pSuvk?si=JbbritEwFpnqjPHz' },
-  { id: 103, name: 'Dumbbell Bench Press', target: ['Dada Tengah', 'Triceps'], type: 'weight', defaultWeight: 10, equipment: 'Dumbbell', level: 'beginner', ytVideo: 'https://youtu.be/WbCEvFA0NJs?si=n6uJrVnL8SbZLnii' },
-  { id: 104, name: 'Cable Seated Lateral Raise', target: ['Deltoid Samping'], type: 'weight', defaultWeight: 20, equipment: 'Cable', level: 'beginner', ytVideo: 'https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA' },
-  { id: 105, name: 'Triceps Pushdown', target: ['Triceps'], type: 'weight', defaultWeight: 20, equipment: 'Cable', level: 'beginner', ytVideo: 'https://youtu.be/1FjkhpZsaxc?si=UF5-0LJTCd_pEhy3 https://youtu.be/u36jNfqh8_U?si=AEMeWXqnBvpOWNOj https://youtu.be/9qupVR7pKtk?si=FtLIHZmKuqXcK0ne' },
-  { id: 106, name: 'Dumbbell Alternate Bicep Curl', target: ['Biceps'], type: 'weight', defaultWeight: 20, equipment: 'Dumbbell', level: 'beginner', ytVideo: 'https://youtu.be/MKWBV29S6c0?si=JV1BM77vAR6VuQYG https://youtu.be/_aoad2yuP5w?si=PRXDFoozz45AB_VO' },
-  { id: 107, name: 'Cardio', target: ['Cardio'], type: 'cardio', defaultWeight: 0, duration: 15, equipment: 'Stationary Bike', level: 'beginner', ytVideo: '' },
-  { id: 108, name: 'Smith Machine Squat', target: ['Quads', 'Hams', 'Glutes'], type: 'weight', defaultWeight: 0, equipment: 'Smith Machine', level: 'intermediate', ytVideo: 'https://youtu.be/iKCJCydYYrE?si=ICtqLU9ov9eFaHfL https://youtu.be/LwsG-1xgP2E?si=Ptr7dUVcsJFKMLYC' },
-  { id: 109, name: 'Romanian Deadlift', target: ['Hams', 'Glutes'], type: 'weight', defaultWeight: 5, equipment: 'Barbell', level: 'intermediate', ytVideo: 'https://youtu.be/xY8BywOKkLQ?si=B1A9ulZ-Cz67GNw6' },
-  { id: 110, name: 'Barbell Walking Lunge', target: ['Quads', 'Hams', 'Glutes'], type: 'weight', defaultWeight: 5, equipment: 'Dumbbell', level: 'intermediate', ytVideo: 'https://youtu.be/mJilHWIBWO8?si=2NCYOofB0EUrY22X' },
-  { id: 111, name: 'Rocking Standing Calf Raise', target: ['Calves'], type: 'weight', defaultWeight: 10, equipment: 'Machine', level: 'beginner', ytVideo: 'https://youtu.be/wdOkFomQNp8?si=PWlxiKYPBMlfLoek' },
-  { id: 112, name: 'Cable Crunch', target: ['Core'], type: 'weight', defaultWeight: 40, equipment: 'Cable', level: 'intermediate', ytVideo: 'https://youtu.be/K2m0jj6RfYg?si=CZMLt6PF0Yxvgb6V' },
-  { id: 113, name: 'Wide-Grip Lat Pulldown', target: ['Lats', 'Biceps'], type: 'weight', defaultWeight: 40, equipment: 'Machine', level: 'beginner', ytVideo: 'https://youtu.be/bNmvKpJSWKM?si=E7zZ3a3qeG4Ij7bb https://youtu.be/7Cjc_aXoQ_I?si=ZqhPV5iSMoTOLSIf' },
-  { id: 114, name: 'Dumbbell Shoulder Press', target: ['Deltoid Depan', 'Triceps'], type: 'weight', defaultWeight: 5, equipment: 'Dumbbell', level: 'intermediate', ytVideo: 'https://youtu.be/k6tzKisR3NY?si=g67rT52vc6oWjiFC https://youtu.be/E7ngsffMPR0?si=FJGsgUxb7aoAZ_ub' },
-  { id: 124, name: 'Dumbbell Shrug', target: ['Traps', 'Leher'], type: 'weight', defaultWeight: 15, equipment: 'Dumbbell', level: 'beginner', ytVideo: 'https://youtu.be/rFsSeClGnNA?si=EfUCHpJdjSbWFObO https://youtu.be/2BrmhGze7sk?si=PSt1tUQjaI2liYby' },
-  { id: 115, name: 'Smith Machine Bench Press', target: ['Dada Tengah', 'Triceps'], type: 'weight', defaultWeight: 7.5, equipment: 'Smith Machine', level: 'beginner', ytVideo: 'https://youtu.be/gQ3afio08V8?si=DfCKjmSAhUMXjMl_' },
-  { id: 116, name: 'Cable Rear Delt Fly', target: ['Deltoid Belakang'], type: 'weight', defaultWeight: 5, equipment: 'Cable', level: 'advanced', ytVideo: 'https://youtu.be/cGXBVOc5xIk?si=ve9zzcNdiyNqYF5I https://youtu.be/IeOqdw9WI90?si=J4oHxFNn7257r3ak' },
-  { id: 117, name: 'Cable Rope Overhead Triceps Extension', target: ['Triceps'], type: 'weight', defaultWeight: 40, equipment: 'Cable', level: 'intermediate', ytVideo: 'https://youtu.be/9Ark9S11uXw?si=pEAe5tf66v5yUToU https://youtu.be/NTk0Igxqcsk?si=zX7dHQL0VyHURoC_' },
-  { id: 118, name: 'High Cable Curls', target: ['Biceps'], type: 'weight', defaultWeight: 30, equipment: 'Cable', level: 'beginner', ytVideo: 'https://youtu.be/CrbTqNOlFgE?si=xKanrhppuvUAudTj' },
-  { id: 119, name: 'Split Squat with Dumbbells', target: ['Quads', 'Hams', 'Glutes'], type: 'weight', defaultWeight: 30, equipment: 'Dumbbell', level: 'advanced', ytVideo: 'https://youtu.be/or1frhkjBDc?si=FR7v-hKp_QP4-Rpn' },
-  { id: 120, name: 'SM Romanian Deadlift (RDL)', target: ['Hams', 'Glutes'], type: 'weight', defaultWeight: 20, equipment: 'Smith Machine', level: 'beginner', ytVideo: 'https://youtu.be/xWnlfJaQZ3k?si=z0FRk3rh4UO7JdUC' },
-  { id: 121, name: 'Pull Through', target: ['Hams', 'Glutes'], type: 'weight', defaultWeight: 20, equipment: 'Cable', level: 'intermediate', ytVideo: 'https://youtu.be/sFQtAuiVwyo?si=GQLiGcITyE4Yzp3G' },
-  { id: 122, name: 'Seated Calf Raise', target: ['Calves'], type: 'weight', defaultWeight: 30, equipment: 'Dumbbell', level: 'beginner', ytVideo: 'https://youtu.be/ar8nav0jGoE?si=owieb0xbPHFg7zMA' },
-  { id: 123, name: 'Plank', target: ['Core'], type: 'time', defaultWeight: 0, duration: 30, equipment: 'Body Weight', level: 'beginner', ytVideo: 'https://youtu.be/xe2MXatLTUw?si=U5L4UwgiNv19R7lh' },
-  { id: 125, name: 'Palms-Up Dumbbell Wrist Curl Over A Bench', target: ['Forearm'], type: 'weight', defaultWeight: 5, equipment: 'Dumbbell', level: 'beginner', ytVideo: 'https://youtu.be/0-c4s051u6E?si=K-4Z9iKq2d8r0N1M' },
-  { id: 126, name: 'Treadmill Running', target: ['Cardio'], type: 'cardio', defaultWeight: 0, duration: 15, equipment: 'Treadmill', level: 'beginner', ytVideo: '' },
-  { id: 127, name: 'Stationary Bike', target: ['Cardio'], type: 'cardio', defaultWeight: 0, duration: 15, equipment: 'Stationary Bike', level: 'beginner', ytVideo: '' },
-  { id: 128, name: 'Aerobic', target: ['Cardio'], type: 'cardio', defaultWeight: 0, duration: 20, equipment: 'Body Weight', level: 'beginner', ytVideo: '' },
-  { id: 129, name: 'HIIT', target: ['Cardio', 'Core'], type: 'cardio', defaultWeight: 0, duration: 15, equipment: 'Body Weight', level: 'advanced', ytVideo: '' },
-  { id: 130, name: 'Pilates', target: ['Core'], type: 'time', defaultWeight: 0, duration: 1200, equipment: 'Body Weight', level: 'intermediate', ytVideo: '' },
-  { id: 131, name: 'Yoga / Relaksasi', target: ['Core'], type: 'time', defaultWeight: 0, duration: 600, equipment: 'Body Weight', level: 'beginner', ytVideo: '' },
-  { id: 132, name: 'Elliptical Trainer', target: ['Cardio'], type: 'cardio', defaultWeight: 0, duration: 15, equipment: 'Elliptical Machine', level: 'beginner', ytVideo: '' },
-  { id: 133, name: 'Jump Rope', target: ['Cardio'], type: 'cardio', defaultWeight: 0, duration: 5, equipment: 'Rope', level: 'intermediate', ytVideo: '' },
-  { id: 134, name: 'Goblet Squat', target: ['Quads', 'Glutes'], type: 'weight', defaultWeight: 10, equipment: 'Dumbbell', level: 'beginner', ytVideo: 'https://youtu.be/MeIiIdhgPgl' },
-  { id: 135, name: 'Barbell Bench Press - Medium Grip', target: ['Dada Tengah', 'Triceps', 'Deltoid Depan'], type: 'weight', defaultWeight: 20, equipment: 'Barbell', level: 'intermediate', ytVideo: 'https://youtu.be/rT7DgCr-3pg' },
-  { id: 136, name: 'Swimming (Renang)', target: ['Cardio', 'Core', 'Lats'], type: 'cardio', defaultWeight: 0, duration: 30, equipment: 'Pool', level: 'intermediate', ytVideo: '' },
-  { id: 137, name: 'Jogging / Running', target: ['Cardio', 'Quads', 'Calves'], type: 'cardio', defaultWeight: 0, duration: 20, equipment: 'Body Weight', level: 'beginner', ytVideo: '' },
-  { id: 138, name: 'Walking / Jalan Kaki', target: ['Cardio'], type: 'cardio', defaultWeight: 0, duration: 30, equipment: 'Body Weight', level: 'beginner', ytVideo: '' },
-  { id: 139, name: 'Cycling / Sepeda', target: ['Cardio', 'Quads'], type: 'cardio', defaultWeight: 0, duration: 30, equipment: 'Bicycle', level: 'beginner', ytVideo: '' }
+  {
+    "id": 101,
+    "name": "Smith Machine Incline Bench Press",
+    "target": [
+      "Dada Atas",
+      "Deltoid Depan",
+      "Triceps"
+    ],
+    "type": "weight",
+    "defaultWeight": 10,
+    "equipment": "Smith Machine",
+    "level": "intermediate",
+    "ytVideo": "https://youtu.be/VXaBbUYMfIs?si=pOB-MkazqZiMP_KX",
+    "videoUrl": "/exercise-assets/edb-Smith_Machine_Incline_Bench_Press.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Incline_Bench_Press.mp4"
+  },
+  {
+    "id": 102,
+    "name": "Seated Cable Rows",
+    "target": [
+      "Punggung Atas",
+      "Biceps"
+    ],
+    "type": "weight",
+    "defaultWeight": 10,
+    "equipment": "Cable",
+    "level": "beginner",
+    "ytVideo": "https://youtu.be/qD1WZ5pSuvk?si=JbbritEwFpnqjPHz",
+    "videoUrl": "/exercise-assets/edb-Seated_Cable_Rows.mp4 /exercise-assets/youtube-backup/edb-Seated_Cable_Rows.mp4"
+  },
+  {
+    "id": 103,
+    "name": "Dumbbell Bench Press",
+    "target": [
+      "Dada Tengah",
+      "Triceps"
+    ],
+    "type": "weight",
+    "defaultWeight": 10,
+    "equipment": "Dumbbell",
+    "level": "beginner",
+    "ytVideo": "https://youtu.be/WbCEvFA0NJs?si=n6uJrVnL8SbZLnii",
+    "videoUrl": "/exercise-assets/edb-Dumbbell_Bench_Press.mp4 /exercise-assets/youtube-backup/edb-Dumbbell_Bench_Press.mp4"
+  },
+  {
+    "id": 104,
+    "name": "Cable Seated Lateral Raise",
+    "target": [
+      "Deltoid Samping"
+    ],
+    "type": "weight",
+    "defaultWeight": 20,
+    "equipment": "Cable",
+    "level": "beginner",
+    "ytVideo": "https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Cable_Seated_Lateral_Raise.mp4"
+  },
+  {
+    "id": 105,
+    "name": "Triceps Pushdown",
+    "target": [
+      "Triceps"
+    ],
+    "type": "weight",
+    "defaultWeight": 20,
+    "equipment": "Cable",
+    "level": "beginner",
+    "ytVideo": "https://youtu.be/1FjkhpZsaxc?si=UF5-0LJTCd_pEhy3 https://youtu.be/u36jNfqh8_U?si=AEMeWXqnBvpOWNOj https://youtu.be/9qupVR7pKtk?si=FtLIHZmKuqXcK0ne",
+    "videoUrl": "/exercise-assets/edb-Triceps_Pushdown.mp4 /exercise-assets/youtube-backup/edb-Triceps_Pushdown.mp4"
+  },
+  {
+    "id": 106,
+    "name": "Dumbbell Alternate Bicep Curl",
+    "target": [
+      "Biceps"
+    ],
+    "type": "weight",
+    "defaultWeight": 20,
+    "equipment": "Dumbbell",
+    "level": "beginner",
+    "ytVideo": "https://youtu.be/MKWBV29S6c0?si=JV1BM77vAR6VuQYG https://youtu.be/_aoad2yuP5w?si=PRXDFoozz45AB_VO",
+    "videoUrl": "/exercise-assets/edb-Dumbbell_Alternate_Bicep_Curl.mp4 /exercise-assets/youtube-backup/edb-Dumbbell_Alternate_Bicep_Curl.mp4"
+  },
+  {
+    "id": 107,
+    "name": "Cardio",
+    "target": [
+      "Cardio"
+    ],
+    "type": "cardio",
+    "defaultWeight": 0,
+    "duration": 15,
+    "equipment": "Stationary Bike",
+    "level": "beginner",
+    "ytVideo": ""
+  },
+  {
+    "id": 108,
+    "name": "Smith Machine Squat",
+    "target": [
+      "Quads",
+      "Hams",
+      "Glutes"
+    ],
+    "type": "weight",
+    "defaultWeight": 0,
+    "equipment": "Smith Machine",
+    "level": "intermediate",
+    "ytVideo": "https://youtu.be/iKCJCydYYrE?si=ICtqLU9ov9eFaHfL https://youtu.be/LwsG-1xgP2E?si=Ptr7dUVcsJFKMLYC",
+    "videoUrl": "/exercise-assets/edb-Smith_Machine_Squat.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Squat.mp4"
+  },
+  {
+    "id": 109,
+    "name": "Romanian Deadlift",
+    "target": [
+      "Hams",
+      "Glutes"
+    ],
+    "type": "weight",
+    "defaultWeight": 5,
+    "equipment": "Barbell",
+    "level": "intermediate",
+    "ytVideo": "https://youtu.be/xY8BywOKkLQ?si=B1A9ulZ-Cz67GNw6",
+    "videoUrl": "/exercise-assets/edb-Romanian_Deadlift.mp4 /exercise-assets/youtube-backup/edb-Romanian_Deadlift.mp4"
+  },
+  {
+    "id": 110,
+    "name": "Barbell Walking Lunge",
+    "target": [
+      "Quads",
+      "Hams",
+      "Glutes"
+    ],
+    "type": "weight",
+    "defaultWeight": 5,
+    "equipment": "Dumbbell",
+    "level": "intermediate",
+    "ytVideo": "https://youtu.be/mJilHWIBWO8?si=2NCYOofB0EUrY22X",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Barbell_Walking_Lunge.mp4"
+  },
+  {
+    "id": 111,
+    "name": "Rocking Standing Calf Raise",
+    "target": [
+      "Calves"
+    ],
+    "type": "weight",
+    "defaultWeight": 10,
+    "equipment": "Machine",
+    "level": "beginner",
+    "ytVideo": "https://youtu.be/wdOkFomQNp8?si=PWlxiKYPBMlfLoek",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Rocking_Standing_Calf_Raise.mp4"
+  },
+  {
+    "id": 112,
+    "name": "Cable Crunch",
+    "target": [
+      "Core"
+    ],
+    "type": "weight",
+    "defaultWeight": 40,
+    "equipment": "Cable",
+    "level": "intermediate",
+    "ytVideo": "https://youtu.be/K2m0jj6RfYg?si=CZMLt6PF0Yxvgb6V",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Cable_Crunch.mp4"
+  },
+  {
+    "id": 113,
+    "name": "Wide-Grip Lat Pulldown",
+    "target": [
+      "Lats",
+      "Biceps"
+    ],
+    "type": "weight",
+    "defaultWeight": 40,
+    "equipment": "Machine",
+    "level": "beginner",
+    "ytVideo": "https://youtu.be/bNmvKpJSWKM?si=E7zZ3a3qeG4Ij7bb https://youtu.be/7Cjc_aXoQ_I?si=ZqhPV5iSMoTOLSIf",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Wide-Grip_Lat_Pulldown.mp4"
+  },
+  {
+    "id": 114,
+    "name": "Dumbbell Shoulder Press",
+    "target": [
+      "Deltoid Depan",
+      "Triceps"
+    ],
+    "type": "weight",
+    "defaultWeight": 5,
+    "equipment": "Dumbbell",
+    "level": "intermediate",
+    "ytVideo": "https://youtu.be/k6tzKisR3NY?si=g67rT52vc6oWjiFC https://youtu.be/E7ngsffMPR0?si=FJGsgUxb7aoAZ_ub",
+    "videoUrl": "/exercise-assets/edb-Dumbbell_Shoulder_Press.mp4 /exercise-assets/youtube-backup/edb-Dumbbell_Shoulder_Press.mp4"
+  },
+  {
+    "id": 124,
+    "name": "Dumbbell Shrug",
+    "target": [
+      "Traps",
+      "Leher"
+    ],
+    "type": "weight",
+    "defaultWeight": 15,
+    "equipment": "Dumbbell",
+    "level": "beginner",
+    "ytVideo": "https://youtu.be/rFsSeClGnNA?si=EfUCHpJdjSbWFObO https://youtu.be/2BrmhGze7sk?si=PSt1tUQjaI2liYby",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Dumbbell_Shrug.mp4"
+  },
+  {
+    "id": 115,
+    "name": "Smith Machine Bench Press",
+    "target": [
+      "Dada Tengah",
+      "Triceps"
+    ],
+    "type": "weight",
+    "defaultWeight": 7.5,
+    "equipment": "Smith Machine",
+    "level": "beginner",
+    "ytVideo": "https://youtu.be/gQ3afio08V8?si=DfCKjmSAhUMXjMl_",
+    "videoUrl": "/exercise-assets/edb-Smith_Machine_Bench_Press.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Bench_Press.mp4"
+  },
+  {
+    "id": 116,
+    "name": "Cable Rear Delt Fly",
+    "target": [
+      "Deltoid Belakang"
+    ],
+    "type": "weight",
+    "defaultWeight": 5,
+    "equipment": "Cable",
+    "level": "advanced",
+    "ytVideo": "https://youtu.be/cGXBVOc5xIk?si=ve9zzcNdiyNqYF5I https://youtu.be/IeOqdw9WI90?si=J4oHxFNn7257r3ak",
+    "videoUrl": "https://youtu.be/cGXBVOc5xIk?si=ve9zzcNdiyNqYF5I https://youtu.be/IeOqdw9WI90?si=J4oHxFNn7257r3ak"
+  },
+  {
+    "id": 117,
+    "name": "Cable Rope Overhead Triceps Extension",
+    "target": [
+      "Triceps"
+    ],
+    "type": "weight",
+    "defaultWeight": 40,
+    "equipment": "Cable",
+    "level": "intermediate",
+    "ytVideo": "https://youtu.be/9Ark9S11uXw?si=pEAe5tf66v5yUToU https://youtu.be/NTk0Igxqcsk?si=zX7dHQL0VyHURoC_",
+    "videoUrl": "/exercise-assets/edb-Cable_Rope_Overhead_Triceps_Extension.mp4 /exercise-assets/youtube-backup/edb-Cable_Rope_Overhead_Triceps_Extension.mp4"
+  },
+  {
+    "id": 118,
+    "name": "High Cable Curls",
+    "target": [
+      "Biceps"
+    ],
+    "type": "weight",
+    "defaultWeight": 30,
+    "equipment": "Cable",
+    "level": "beginner",
+    "ytVideo": "https://youtu.be/CrbTqNOlFgE?si=xKanrhppuvUAudTj",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-High_Cable_Curls.mp4"
+  },
+  {
+    "id": 119,
+    "name": "Split Squat with Dumbbells",
+    "target": [
+      "Quads",
+      "Hams",
+      "Glutes"
+    ],
+    "type": "weight",
+    "defaultWeight": 30,
+    "equipment": "Dumbbell",
+    "level": "advanced",
+    "ytVideo": "https://youtu.be/or1frhkjBDc?si=FR7v-hKp_QP4-Rpn",
+    "videoUrl": "/exercise-assets/edb-Split_Squat_with_Dumbbells.mp4 /exercise-assets/youtube-backup/edb-Split_Squat_with_Dumbbells.mp4"
+  },
+  {
+    "id": 120,
+    "name": "SM Romanian Deadlift (RDL)",
+    "target": [
+      "Hams",
+      "Glutes"
+    ],
+    "type": "weight",
+    "defaultWeight": 20,
+    "equipment": "Smith Machine",
+    "level": "beginner",
+    "ytVideo": "https://youtu.be/xWnlfJaQZ3k?si=z0FRk3rh4UO7JdUC",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Smith_Machine_Romanian_Deadlift.mp4"
+  },
+  {
+    "id": 121,
+    "name": "Pull Through",
+    "target": [
+      "Hams",
+      "Glutes"
+    ],
+    "type": "weight",
+    "defaultWeight": 20,
+    "equipment": "Cable",
+    "level": "intermediate",
+    "ytVideo": "https://youtu.be/sFQtAuiVwyo?si=GQLiGcITyE4Yzp3G",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Pull_Through.mp4"
+  },
+  {
+    "id": 122,
+    "name": "Seated Calf Raise",
+    "target": [
+      "Calves"
+    ],
+    "type": "weight",
+    "defaultWeight": 30,
+    "equipment": "Dumbbell",
+    "level": "beginner",
+    "ytVideo": "https://youtu.be/ar8nav0jGoE?si=owieb0xbPHFg7zMA",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Seated_Calf_Raise.mp4"
+  },
+  {
+    "id": 123,
+    "name": "Plank",
+    "target": [
+      "Core"
+    ],
+    "type": "time",
+    "defaultWeight": 0,
+    "duration": 30,
+    "equipment": "Body Weight",
+    "level": "beginner",
+    "ytVideo": "https://youtu.be/xe2MXatLTUw?si=U5L4UwgiNv19R7lh",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Plank.mp4"
+  },
+  {
+    "id": 125,
+    "name": "Palms-Up Dumbbell Wrist Curl Over A Bench",
+    "target": [
+      "Forearm"
+    ],
+    "type": "weight",
+    "defaultWeight": 5,
+    "equipment": "Dumbbell",
+    "level": "beginner",
+    "ytVideo": "https://youtu.be/0-c4s051u6E?si=K-4Z9iKq2d8r0N1M",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Palms-Up_Dumbbell_Wrist_Curl_Over_A_Bench.mp4"
+  },
+  {
+    "id": 126,
+    "name": "Treadmill Running",
+    "target": [
+      "Cardio"
+    ],
+    "type": "cardio",
+    "defaultWeight": 0,
+    "duration": 15,
+    "equipment": "Treadmill",
+    "level": "beginner",
+    "ytVideo": ""
+  },
+  {
+    "id": 127,
+    "name": "Stationary Bike",
+    "target": [
+      "Cardio"
+    ],
+    "type": "cardio",
+    "defaultWeight": 0,
+    "duration": 15,
+    "equipment": "Stationary Bike",
+    "level": "beginner",
+    "ytVideo": ""
+  },
+  {
+    "id": 128,
+    "name": "Aerobic",
+    "target": [
+      "Cardio"
+    ],
+    "type": "cardio",
+    "defaultWeight": 0,
+    "duration": 20,
+    "equipment": "Body Weight",
+    "level": "beginner",
+    "ytVideo": ""
+  },
+  {
+    "id": 129,
+    "name": "HIIT",
+    "target": [
+      "Cardio",
+      "Core"
+    ],
+    "type": "cardio",
+    "defaultWeight": 0,
+    "duration": 15,
+    "equipment": "Body Weight",
+    "level": "advanced",
+    "ytVideo": ""
+  },
+  {
+    "id": 130,
+    "name": "Pilates",
+    "target": [
+      "Core"
+    ],
+    "type": "time",
+    "defaultWeight": 0,
+    "duration": 1200,
+    "equipment": "Body Weight",
+    "level": "intermediate",
+    "ytVideo": ""
+  },
+  {
+    "id": 131,
+    "name": "Yoga / Relaksasi",
+    "target": [
+      "Core"
+    ],
+    "type": "time",
+    "defaultWeight": 0,
+    "duration": 600,
+    "equipment": "Body Weight",
+    "level": "beginner",
+    "ytVideo": ""
+  },
+  {
+    "id": 132,
+    "name": "Elliptical Trainer",
+    "target": [
+      "Cardio"
+    ],
+    "type": "cardio",
+    "defaultWeight": 0,
+    "duration": 15,
+    "equipment": "Elliptical Machine",
+    "level": "beginner",
+    "ytVideo": ""
+  },
+  {
+    "id": 133,
+    "name": "Jump Rope",
+    "target": [
+      "Cardio"
+    ],
+    "type": "cardio",
+    "defaultWeight": 0,
+    "duration": 5,
+    "equipment": "Rope",
+    "level": "intermediate",
+    "ytVideo": ""
+  },
+  {
+    "id": 134,
+    "name": "Goblet Squat",
+    "target": [
+      "Quads",
+      "Glutes"
+    ],
+    "type": "weight",
+    "defaultWeight": 10,
+    "equipment": "Dumbbell",
+    "level": "beginner",
+    "ytVideo": "https://youtu.be/MeIiIdhgPgl",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Goblet_Squat.mp4"
+  },
+  {
+    "id": 135,
+    "name": "Barbell Bench Press - Medium Grip",
+    "target": [
+      "Dada Tengah",
+      "Triceps",
+      "Deltoid Depan"
+    ],
+    "type": "weight",
+    "defaultWeight": 20,
+    "equipment": "Barbell",
+    "level": "intermediate",
+    "ytVideo": "https://youtu.be/rT7DgCr-3pg",
+    "videoUrl": "/exercise-assets/edb-Barbell_Bench_Press_-_Medium_Grip.mp4 /exercise-assets/youtube-backup/edb-Barbell_Bench_Press_-_Medium_Grip.mp4"
+  },
+  {
+    "id": 136,
+    "name": "Swimming (Renang)",
+    "target": [
+      "Cardio",
+      "Core",
+      "Lats"
+    ],
+    "type": "cardio",
+    "defaultWeight": 0,
+    "duration": 30,
+    "equipment": "Pool",
+    "level": "intermediate",
+    "ytVideo": ""
+  },
+  {
+    "id": 137,
+    "name": "Jogging / Running",
+    "target": [
+      "Cardio",
+      "Quads",
+      "Calves"
+    ],
+    "type": "cardio",
+    "defaultWeight": 0,
+    "duration": 20,
+    "equipment": "Body Weight",
+    "level": "beginner",
+    "ytVideo": ""
+  },
+  {
+    "id": 138,
+    "name": "Walking / Jalan Kaki",
+    "target": [
+      "Cardio"
+    ],
+    "type": "cardio",
+    "defaultWeight": 0,
+    "duration": 30,
+    "equipment": "Body Weight",
+    "level": "beginner",
+    "ytVideo": ""
+  },
+  {
+    "id": 139,
+    "name": "Cycling / Sepeda",
+    "target": [
+      "Cardio",
+      "Quads"
+    ],
+    "type": "cardio",
+    "defaultWeight": 0,
+    "duration": 30,
+    "equipment": "Bicycle",
+    "level": "beginner",
+    "ytVideo": ""
+  }
 ];
 
 export const defaultPrograms = [
-  { id: 'prog-1', planId: 'custom', planName: 'Program Default', assignedDays: ['Sel'], name: 'Upper 1', exercises: [ { id: 101, name: 'Smith Machine Incline Bench Press', sets: 4, reps: 12, target: ['Dada Atas', 'Deltoid Depan', 'Triceps'], type: 'weight', defaultWeight: 10, equipment: 'Smith Machine', ytVideo: 'https://youtu.be/VXaBbUYMfIs?si=pOB-MkazqZiMP_KX' }, { id: 102, name: 'Seated Cable Rows', sets: 4, reps: 12, target: ['Punggung Atas', 'Biceps'], type: 'weight', defaultWeight: 10, equipment: 'Cable', ytVideo: 'https://youtu.be/qD1WZ5pSuvk?si=JbbritEwFpnqjPHz' }, { id: 103, name: 'Dumbbell Bench Press', sets: 3, reps: 12, target: ['Dada Tengah', 'Triceps'], type: 'weight', defaultWeight: 10, equipment: 'Dumbbell', ytVideo: 'https://youtu.be/WbCEvFA0NJs?si=n6uJrVnL8SbZLnii' }, { id: 104, name: 'Cable Seated Lateral Raise', sets: 3, reps: 12, target: ['Deltoid Samping'], type: 'weight', defaultWeight: 20, equipment: 'Cable', ytVideo: 'https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA' }, { id: 105, name: 'Triceps Pushdown', sets: 3, reps: 10, target: ['Triceps'], type: 'weight', defaultWeight: 20, equipment: 'Cable', ytVideo: 'https://youtu.be/1FjkhpZsaxc?si=UF5-0LJTCd_pEhy3 https://youtu.be/u36jNfqh8_U?si=AEMeWXqnBvpOWNOj https://youtu.be/9qupVR7pKtk?si=FtLIHZmKuqXcK0ne' }, { id: 106, name: 'Dumbbell Alternate Bicep Curl', sets: 3, reps: 10, target: ['Biceps'], type: 'weight', defaultWeight: 20, equipment: 'Dumbbell', ytVideo: 'https://youtu.be/MKWBV29S6c0?si=JV1BM77vAR6VuQYG https://youtu.be/_aoad2yuP5w?si=PRXDFoozz45AB_VO' }, { id: 107, name: 'Cardio', sets: 1, reps: 0, duration: 15, target: ['Cardio'], type: 'cardio', defaultWeight: 0, equipment: 'Stationary Bike', ytVideo: '' }, ] },
-  { id: 'prog-2', planId: 'custom', planName: 'Program Default', assignedDays: ['Rab'], name: 'Lower 1', exercises: [ { id: 108, name: 'Smith Machine Squat', sets: 3, reps: 10, target: ['Quads', 'Hams', 'Glutes'], type: 'weight', defaultWeight: 0, equipment: 'Smith Machine', ytVideo: 'https://youtu.be/iKCJCydYYrE?si=ICtqLU9ov9eFaHfL https://youtu.be/LwsG-1xgP2E?si=Ptr7dUVcsJFKMLYC' }, { id: 109, name: 'Romanian Deadlift', sets: 4, reps: 12, target: ['Hams', 'Glutes'], type: 'weight', defaultWeight: 5, equipment: 'Barbell', ytVideo: 'https://youtu.be/xY8BywOKkLQ?si=B1A9ulZ-Cz67GNw6' }, { id: 110, name: 'Barbell Walking Lunge', sets: 3, reps: 12, target: ['Quads', 'Hams', 'Glutes'], type: 'weight', defaultWeight: 5, equipment: 'Dumbbell', ytVideo: 'https://youtu.be/mJilHWIBWO8?si=2NCYOofB0EUrY22X' }, { id: 111, name: 'Rocking Standing Calf Raise', sets: 4, reps: 12, target: ['Calves'], type: 'weight', defaultWeight: 10, equipment: 'Machine', ytVideo: 'https://youtu.be/wdOkFomQNp8?si=PWlxiKYPBMlfLoek' }, { id: 112, name: 'Cable Crunch', sets: 4, reps: 20, target: ['Core'], type: 'weight', defaultWeight: 40, equipment: 'Cable', ytVideo: 'https://youtu.be/K2m0jj6RfYg?si=CZMLt6PF0Yxvgb6V' }, ] },
-  { id: 'prog-3', planId: 'custom', planName: 'Program Default', assignedDays: ['Jum'], name: 'Upper 2', exercises: [ { id: 113, name: 'Wide-Grip Lat Pulldown', sets: 4, reps: 12, target: ['Lats', 'Biceps'], type: 'weight', defaultWeight: 40, equipment: 'Machine', ytVideo: 'https://youtu.be/bNmvKpJSWKM?si=E7zZ3a3qeG4Ij7bb https://youtu.be/7Cjc_aXoQ_I?si=ZqhPV5iSMoTOLSIf' }, { id: 114, name: 'Dumbbell Shoulder Press', sets: 4, reps: 12, target: ['Deltoid Depan', 'Triceps'], type: 'weight', defaultWeight: 5, equipment: 'Dumbbell', ytVideo: 'https://youtu.be/k6tzKisR3NY?si=g67rT52vc6oWjiFC https://youtu.be/E7ngsffMPR0?si=FJGsgUxb7aoAZ_ub' }, { id: 124, name: 'Dumbbell Shrug', sets: 4, reps: 12, target: ['Traps', 'Leher'], type: 'weight', defaultWeight: 15, equipment: 'Dumbbell', ytVideo: 'https://youtu.be/rFsSeClGnNA?si=EfUCHpJdjSbWFObO https://youtu.be/2BrmhGze7sk?si=PSt1tUQjaI2liYby' }, { id: 115, name: 'Smith Machine Bench Press', sets: 3, reps: 12, target: ['Dada Tengah', 'Triceps'], type: 'weight', defaultWeight: 7.5, equipment: 'Smith Machine', ytVideo: 'https://youtu.be/gQ3afio08V8?si=DfCKjmSAhUMXjMl_' }, { id: 116, name: 'Cable Rear Delt Fly', sets: 4, reps: 12, target: ['Deltoid Belakang'], type: 'weight', defaultWeight: 5, equipment: 'Cable', ytVideo: 'https://youtu.be/cGXBVOc5xIk?si=ve9zzcNdiyNqYF5I https://youtu.be/IeOqdw9WI90?si=J4oHxFNn7257r3ak' }, { id: 117, name: 'Cable Rope Overhead Triceps Extension', sets: 3, reps: 12, target: ['Triceps'], type: 'weight', defaultWeight: 40, equipment: 'Cable', ytVideo: 'https://youtu.be/9Ark9S11uXw?si=pEAe5tf66v5yToU https://youtu.be/NTk0Igxqcsk?si=zX7dHQL0VyHURoC_' }, { id: 118, name: 'High Cable Curls', sets: 3, reps: 12, target: ['Biceps'], type: 'weight', defaultWeight: 30, equipment: 'Cable', ytVideo: 'https://youtu.be/CrbTqNOlFgE?si=xKanrhppuvUAudTj' }, { id: 125, name: 'Palms-Up Dumbbell Wrist Curl Over A Bench', sets: 3, reps: 15, target: ['Forearm'], type: 'weight', defaultWeight: 5, equipment: 'Dumbbell', ytVideo: 'https://youtu.be/0-c4s051u6E?si=K-4Z9iKq2d8r0N1M' }, ] },
-  { id: 'prog-4', planId: 'custom', planName: 'Program Default', assignedDays: ['Min'], name: 'Lower 2', exercises: [ { id: 119, name: 'Split Squat with Dumbbells', sets: 3, reps: 10, target: ['Quads', 'Hams', 'Glutes'], type: 'weight', defaultWeight: 30, equipment: 'Dumbbell', ytVideo: 'https://youtu.be/or1frhkjBDc?si=FR7v-hKp_QP4-Rpn' }, { id: 120, name: 'SM Romanian Deadlift (RDL)', sets: 4, reps: 12, target: ['Hams', 'Glutes'], type: 'weight', defaultWeight: 20, equipment: 'Smith Machine', ytVideo: 'https://youtu.be/xWnlfJaQZ3k?si=z0FRk3rh4UO7JdUC' }, { id: 121, name: 'Pull Through', sets: 3, reps: 12, target: ['Hams', 'Glutes'], type: 'weight', defaultWeight: 20, equipment: 'Cable', ytVideo: 'https://youtu.be/sFQtAuiVwyo?si=GQLiGcITyE4Yzp3G' }, { id: 122, name: 'Seated Calf Raise', sets: 4, reps: 20, target: ['Calves'], type: 'weight', defaultWeight: 30, equipment: 'Dumbbell', ytVideo: 'https://youtu.be/ar8nav0jGoE?si=owieb0xbPHFg7zMA' }, { id: 123, name: 'Plank', sets: 3, duration: 30, reps: 0, target: ['Core'], type: 'time', defaultWeight: 0, equipment: 'Body Weight', ytVideo: 'https://youtu.be/xe2MXatLTUw?si=U5L4UwgiNv19R7lh' }, ] }
+  {
+    "id": "prog-1",
+    "planId": "custom",
+    "planName": "Program Default",
+    "assignedDays": [
+      "Sel"
+    ],
+    "name": "Upper 1",
+    "exercises": [
+      {
+        "id": 101,
+        "name": "Smith Machine Incline Bench Press",
+        "sets": 4,
+        "reps": 12,
+        "target": [
+          "Dada Atas",
+          "Deltoid Depan",
+          "Triceps"
+        ],
+        "type": "weight",
+        "defaultWeight": 10,
+        "equipment": "Smith Machine",
+        "ytVideo": "https://youtu.be/VXaBbUYMfIs?si=pOB-MkazqZiMP_KX",
+        "videoUrl": "/exercise-assets/edb-Smith_Machine_Incline_Bench_Press.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Incline_Bench_Press.mp4"
+      },
+      {
+        "id": 102,
+        "name": "Seated Cable Rows",
+        "sets": 4,
+        "reps": 12,
+        "target": [
+          "Punggung Atas",
+          "Biceps"
+        ],
+        "type": "weight",
+        "defaultWeight": 10,
+        "equipment": "Cable",
+        "ytVideo": "https://youtu.be/qD1WZ5pSuvk?si=JbbritEwFpnqjPHz",
+        "videoUrl": "/exercise-assets/edb-Seated_Cable_Rows.mp4 /exercise-assets/youtube-backup/edb-Seated_Cable_Rows.mp4"
+      },
+      {
+        "id": 103,
+        "name": "Dumbbell Bench Press",
+        "sets": 3,
+        "reps": 12,
+        "target": [
+          "Dada Tengah",
+          "Triceps"
+        ],
+        "type": "weight",
+        "defaultWeight": 10,
+        "equipment": "Dumbbell",
+        "ytVideo": "https://youtu.be/WbCEvFA0NJs?si=n6uJrVnL8SbZLnii",
+        "videoUrl": "/exercise-assets/edb-Dumbbell_Bench_Press.mp4 /exercise-assets/youtube-backup/edb-Dumbbell_Bench_Press.mp4"
+      },
+      {
+        "id": 104,
+        "name": "Cable Seated Lateral Raise",
+        "sets": 3,
+        "reps": 12,
+        "target": [
+          "Deltoid Samping"
+        ],
+        "type": "weight",
+        "defaultWeight": 20,
+        "equipment": "Cable",
+        "ytVideo": "https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA",
+        "videoUrl": "/exercise-assets/youtube-backup/edb-Cable_Seated_Lateral_Raise.mp4"
+      },
+      {
+        "id": 105,
+        "name": "Triceps Pushdown",
+        "sets": 3,
+        "reps": 10,
+        "target": [
+          "Triceps"
+        ],
+        "type": "weight",
+        "defaultWeight": 20,
+        "equipment": "Cable",
+        "ytVideo": "https://youtu.be/1FjkhpZsaxc?si=UF5-0LJTCd_pEhy3 https://youtu.be/u36jNfqh8_U?si=AEMeWXqnBvpOWNOj https://youtu.be/9qupVR7pKtk?si=FtLIHZmKuqXcK0ne",
+        "videoUrl": "/exercise-assets/edb-Triceps_Pushdown.mp4 /exercise-assets/youtube-backup/edb-Triceps_Pushdown.mp4"
+      },
+      {
+        "id": 106,
+        "name": "Dumbbell Alternate Bicep Curl",
+        "sets": 3,
+        "reps": 10,
+        "target": [
+          "Biceps"
+        ],
+        "type": "weight",
+        "defaultWeight": 20,
+        "equipment": "Dumbbell",
+        "ytVideo": "https://youtu.be/MKWBV29S6c0?si=JV1BM77vAR6VuQYG https://youtu.be/_aoad2yuP5w?si=PRXDFoozz45AB_VO",
+        "videoUrl": "/exercise-assets/edb-Dumbbell_Alternate_Bicep_Curl.mp4 /exercise-assets/youtube-backup/edb-Dumbbell_Alternate_Bicep_Curl.mp4"
+      },
+      {
+        "id": 107,
+        "name": "Cardio",
+        "sets": 1,
+        "reps": 0,
+        "duration": 15,
+        "target": [
+          "Cardio"
+        ],
+        "type": "cardio",
+        "defaultWeight": 0,
+        "equipment": "Stationary Bike",
+        "ytVideo": ""
+      }
+    ]
+  },
+  {
+    "id": "prog-2",
+    "planId": "custom",
+    "planName": "Program Default",
+    "assignedDays": [
+      "Rab"
+    ],
+    "name": "Lower 1",
+    "exercises": [
+      {
+        "id": 108,
+        "name": "Smith Machine Squat",
+        "sets": 3,
+        "reps": 10,
+        "target": [
+          "Quads",
+          "Hams",
+          "Glutes"
+        ],
+        "type": "weight",
+        "defaultWeight": 0,
+        "equipment": "Smith Machine",
+        "ytVideo": "https://youtu.be/iKCJCydYYrE?si=ICtqLU9ov9eFaHfL https://youtu.be/LwsG-1xgP2E?si=Ptr7dUVcsJFKMLYC",
+        "videoUrl": "/exercise-assets/edb-Smith_Machine_Squat.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Squat.mp4"
+      },
+      {
+        "id": 109,
+        "name": "Romanian Deadlift",
+        "sets": 4,
+        "reps": 12,
+        "target": [
+          "Hams",
+          "Glutes"
+        ],
+        "type": "weight",
+        "defaultWeight": 5,
+        "equipment": "Barbell",
+        "ytVideo": "https://youtu.be/xY8BywOKkLQ?si=B1A9ulZ-Cz67GNw6",
+        "videoUrl": "/exercise-assets/edb-Romanian_Deadlift.mp4 /exercise-assets/youtube-backup/edb-Romanian_Deadlift.mp4"
+      },
+      {
+        "id": 110,
+        "name": "Barbell Walking Lunge",
+        "sets": 3,
+        "reps": 12,
+        "target": [
+          "Quads",
+          "Hams",
+          "Glutes"
+        ],
+        "type": "weight",
+        "defaultWeight": 5,
+        "equipment": "Dumbbell",
+        "ytVideo": "https://youtu.be/mJilHWIBWO8?si=2NCYOofB0EUrY22X",
+        "videoUrl": "/exercise-assets/youtube-backup/edb-Barbell_Walking_Lunge.mp4"
+      },
+      {
+        "id": 111,
+        "name": "Rocking Standing Calf Raise",
+        "sets": 4,
+        "reps": 12,
+        "target": [
+          "Calves"
+        ],
+        "type": "weight",
+        "defaultWeight": 10,
+        "equipment": "Machine",
+        "ytVideo": "https://youtu.be/wdOkFomQNp8?si=PWlxiKYPBMlfLoek",
+        "videoUrl": "/exercise-assets/youtube-backup/edb-Rocking_Standing_Calf_Raise.mp4"
+      },
+      {
+        "id": 112,
+        "name": "Cable Crunch",
+        "sets": 4,
+        "reps": 20,
+        "target": [
+          "Core"
+        ],
+        "type": "weight",
+        "defaultWeight": 40,
+        "equipment": "Cable",
+        "ytVideo": "https://youtu.be/K2m0jj6RfYg?si=CZMLt6PF0Yxvgb6V",
+        "videoUrl": "/exercise-assets/youtube-backup/edb-Cable_Crunch.mp4"
+      }
+    ]
+  },
+  {
+    "id": "prog-3",
+    "planId": "custom",
+    "planName": "Program Default",
+    "assignedDays": [
+      "Jum"
+    ],
+    "name": "Upper 2",
+    "exercises": [
+      {
+        "id": 113,
+        "name": "Wide-Grip Lat Pulldown",
+        "sets": 4,
+        "reps": 12,
+        "target": [
+          "Lats",
+          "Biceps"
+        ],
+        "type": "weight",
+        "defaultWeight": 40,
+        "equipment": "Machine",
+        "ytVideo": "https://youtu.be/bNmvKpJSWKM?si=E7zZ3a3qeG4Ij7bb https://youtu.be/7Cjc_aXoQ_I?si=ZqhPV5iSMoTOLSIf",
+        "videoUrl": "/exercise-assets/youtube-backup/edb-Wide-Grip_Lat_Pulldown.mp4"
+      },
+      {
+        "id": 114,
+        "name": "Dumbbell Shoulder Press",
+        "sets": 4,
+        "reps": 12,
+        "target": [
+          "Deltoid Depan",
+          "Triceps"
+        ],
+        "type": "weight",
+        "defaultWeight": 5,
+        "equipment": "Dumbbell",
+        "ytVideo": "https://youtu.be/k6tzKisR3NY?si=g67rT52vc6oWjiFC https://youtu.be/E7ngsffMPR0?si=FJGsgUxb7aoAZ_ub",
+        "videoUrl": "/exercise-assets/edb-Dumbbell_Shoulder_Press.mp4 /exercise-assets/youtube-backup/edb-Dumbbell_Shoulder_Press.mp4"
+      },
+      {
+        "id": 124,
+        "name": "Dumbbell Shrug",
+        "sets": 4,
+        "reps": 12,
+        "target": [
+          "Traps",
+          "Leher"
+        ],
+        "type": "weight",
+        "defaultWeight": 15,
+        "equipment": "Dumbbell",
+        "ytVideo": "https://youtu.be/rFsSeClGnNA?si=EfUCHpJdjSbWFObO https://youtu.be/2BrmhGze7sk?si=PSt1tUQjaI2liYby",
+        "videoUrl": "/exercise-assets/youtube-backup/edb-Dumbbell_Shrug.mp4"
+      },
+      {
+        "id": 115,
+        "name": "Smith Machine Bench Press",
+        "sets": 3,
+        "reps": 12,
+        "target": [
+          "Dada Tengah",
+          "Triceps"
+        ],
+        "type": "weight",
+        "defaultWeight": 7.5,
+        "equipment": "Smith Machine",
+        "ytVideo": "https://youtu.be/gQ3afio08V8?si=DfCKjmSAhUMXjMl_",
+        "videoUrl": "/exercise-assets/edb-Smith_Machine_Bench_Press.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Bench_Press.mp4"
+      },
+      {
+        "id": 116,
+        "name": "Cable Rear Delt Fly",
+        "sets": 4,
+        "reps": 12,
+        "target": [
+          "Deltoid Belakang"
+        ],
+        "type": "weight",
+        "defaultWeight": 5,
+        "equipment": "Cable",
+        "ytVideo": "https://youtu.be/cGXBVOc5xIk?si=ve9zzcNdiyNqYF5I https://youtu.be/IeOqdw9WI90?si=J4oHxFNn7257r3ak",
+        "videoUrl": "https://youtu.be/cGXBVOc5xIk?si=ve9zzcNdiyNqYF5I https://youtu.be/IeOqdw9WI90?si=J4oHxFNn7257r3ak"
+      },
+      {
+        "id": 117,
+        "name": "Cable Rope Overhead Triceps Extension",
+        "sets": 3,
+        "reps": 12,
+        "target": [
+          "Triceps"
+        ],
+        "type": "weight",
+        "defaultWeight": 40,
+        "equipment": "Cable",
+        "ytVideo": "https://youtu.be/9Ark9S11uXw?si=pEAe5tf66v5yToU https://youtu.be/NTk0Igxqcsk?si=zX7dHQL0VyHURoC_",
+        "videoUrl": "/exercise-assets/edb-Cable_Rope_Overhead_Triceps_Extension.mp4 /exercise-assets/youtube-backup/edb-Cable_Rope_Overhead_Triceps_Extension.mp4"
+      },
+      {
+        "id": 118,
+        "name": "High Cable Curls",
+        "sets": 3,
+        "reps": 12,
+        "target": [
+          "Biceps"
+        ],
+        "type": "weight",
+        "defaultWeight": 30,
+        "equipment": "Cable",
+        "ytVideo": "https://youtu.be/CrbTqNOlFgE?si=xKanrhppuvUAudTj",
+        "videoUrl": "/exercise-assets/youtube-backup/edb-High_Cable_Curls.mp4"
+      },
+      {
+        "id": 125,
+        "name": "Palms-Up Dumbbell Wrist Curl Over A Bench",
+        "sets": 3,
+        "reps": 15,
+        "target": [
+          "Forearm"
+        ],
+        "type": "weight",
+        "defaultWeight": 5,
+        "equipment": "Dumbbell",
+        "ytVideo": "https://youtu.be/0-c4s051u6E?si=K-4Z9iKq2d8r0N1M",
+        "videoUrl": "/exercise-assets/youtube-backup/edb-Palms-Up_Dumbbell_Wrist_Curl_Over_A_Bench.mp4"
+      }
+    ]
+  },
+  {
+    "id": "prog-4",
+    "planId": "custom",
+    "planName": "Program Default",
+    "assignedDays": [
+      "Min"
+    ],
+    "name": "Lower 2",
+    "exercises": [
+      {
+        "id": 119,
+        "name": "Split Squat with Dumbbells",
+        "sets": 3,
+        "reps": 10,
+        "target": [
+          "Quads",
+          "Hams",
+          "Glutes"
+        ],
+        "type": "weight",
+        "defaultWeight": 30,
+        "equipment": "Dumbbell",
+        "ytVideo": "https://youtu.be/or1frhkjBDc?si=FR7v-hKp_QP4-Rpn",
+        "videoUrl": "/exercise-assets/edb-Split_Squat_with_Dumbbells.mp4 /exercise-assets/youtube-backup/edb-Split_Squat_with_Dumbbells.mp4"
+      },
+      {
+        "id": 120,
+        "name": "SM Romanian Deadlift (RDL)",
+        "sets": 4,
+        "reps": 12,
+        "target": [
+          "Hams",
+          "Glutes"
+        ],
+        "type": "weight",
+        "defaultWeight": 20,
+        "equipment": "Smith Machine",
+        "ytVideo": "https://youtu.be/xWnlfJaQZ3k?si=z0FRk3rh4UO7JdUC",
+        "videoUrl": "/exercise-assets/youtube-backup/edb-Smith_Machine_Romanian_Deadlift.mp4"
+      },
+      {
+        "id": 121,
+        "name": "Pull Through",
+        "sets": 3,
+        "reps": 12,
+        "target": [
+          "Hams",
+          "Glutes"
+        ],
+        "type": "weight",
+        "defaultWeight": 20,
+        "equipment": "Cable",
+        "ytVideo": "https://youtu.be/sFQtAuiVwyo?si=GQLiGcITyE4Yzp3G",
+        "videoUrl": "/exercise-assets/youtube-backup/edb-Pull_Through.mp4"
+      },
+      {
+        "id": 122,
+        "name": "Seated Calf Raise",
+        "sets": 4,
+        "reps": 20,
+        "target": [
+          "Calves"
+        ],
+        "type": "weight",
+        "defaultWeight": 30,
+        "equipment": "Dumbbell",
+        "ytVideo": "https://youtu.be/ar8nav0jGoE?si=owieb0xbPHFg7zMA",
+        "videoUrl": "/exercise-assets/youtube-backup/edb-Seated_Calf_Raise.mp4"
+      },
+      {
+        "id": 123,
+        "name": "Plank",
+        "sets": 3,
+        "duration": 30,
+        "reps": 0,
+        "target": [
+          "Core"
+        ],
+        "type": "time",
+        "defaultWeight": 0,
+        "equipment": "Body Weight",
+        "ytVideo": "https://youtu.be/xe2MXatLTUw?si=U5L4UwgiNv19R7lh",
+        "videoUrl": "/exercise-assets/youtube-backup/edb-Plank.mp4"
+      }
+    ]
+  }
 ];
 
 export const defaultWarmupVideos = "https://youtu.be/_6-k5-w1bZw https://youtu.be/khOmp34A_tA https://youtu.be/9UYVecB2_08";

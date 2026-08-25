@@ -368,13 +368,17 @@ const ImmersiveWorkout = ({
   const parseMedia = (exercise) => {
     if (!exercise) return [];
     let items = [];
-    if (exercise.ytVideo) {
-      const urls = exercise.ytVideo.split(' ').filter(v => v.trim());
-      urls.forEach(u => items.push({ type: 'youtube', url: u }));
+    if (exercise.videoUrl) {
+      const urls = exercise.videoUrl.split(/(?:,|\s)+/).filter(v => v.trim());
+      urls.forEach(u => items.push({ type: u.match(/\.(mp4|webm)$/i) ? 'video' : (u.includes('youtu') ? 'youtube' : 'video'), url: u }));
     }
     if (exercise.gifUrl) {
-      const urls = exercise.gifUrl.split(' ').filter(v => v.trim());
+      const urls = exercise.gifUrl.split(/(?:,|\s)+/).filter(v => v.trim());
       urls.forEach(u => items.push({ type: u.match(/\.(mp4|webm)$/i) ? 'video' : 'image', url: u }));
+    }
+    if (exercise.ytVideo && items.length === 0) {
+      const urls = exercise.ytVideo.split(/(?:,|\s)+/).filter(v => v.trim());
+      urls.forEach(u => items.push({ type: 'youtube', url: u }));
     }
     return items;
   };
@@ -751,21 +755,21 @@ const ImmersiveWorkout = ({
                     const videoId = match ? match[1] : null;
                     if (videoId) {
                       return (
-                        <>
+                        <React.Fragment key={`yt-imm-${videoId}-${idx}`}>
                           {!ytLoaded && idx === activeMediaIndex && (
                             <div className="absolute inset-0 flex items-center justify-center bg-[#05070d] z-10">
                               <Clock className="animate-spin text-white/50" size={32} />
                             </div>
                           )}
                           <iframe 
-                            src={`https://www.youtube.com/embed/${videoId}?enablejsapi=1&autoplay=${idx === activeMediaIndex && !isPaused ? '1' : '0'}&mute=1&controls=0&modestbranding=1&playsinline=1&rel=0&disablekb=1&iv_load_policy=3`}
+                            src={`https://www.youtube.com/embed/${videoId}?enablejsapi=1&mute=1&controls=0&modestbranding=1&playsinline=1&rel=0&disablekb=1&iv_load_policy=3`}
                             title="YouTube video player" 
                             frameBorder="0" 
                             onLoad={handleIframeLoad}
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; compute-pressure" 
                             className={`immersive-video-iframe w-[160%] h-[160%] max-w-none pointer-events-none scale-[1.4] sm:scale-[1.3] transition-opacity duration-700 ${ytLoaded || idx !== activeMediaIndex ? 'opacity-100' : 'opacity-0'}`}
                           ></iframe>
-                        </>
+                        </React.Fragment>
                       );
                     }
                   }
