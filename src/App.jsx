@@ -428,7 +428,12 @@ export default function App() {
 
   const [exerciseLibrary, _setExerciseLibrary] = useState(() => {
     const raw = __previewUser ? defaultMasterExercises : readCache('__CACHED_EXERCISE_LIBRARY', defaultMasterExercises);
-    return (raw || []).map(canonicalizeExercise);
+    return (raw || []).map(ex => {
+      if (ex.id === 121 && (ex.name === 'Pull Through' || ex.name === 'Cable Pull Through')) {
+        return canonicalizeExercise({ ...ex, name: 'Cable Hip Abduction', target: ['Glutes'] });
+      }
+      return canonicalizeExercise(ex);
+    });
   });
   useEffect(() => {
     writeCache('__CACHED_EXERCISE_LIBRARY', exerciseLibrary);
@@ -438,7 +443,12 @@ export default function App() {
     const raw = __previewUser ? defaultPrograms : readCache('__CACHED_PROGRAMS', defaultPrograms);
     return (raw || []).map(p => ({
       ...p,
-      exercises: (p.exercises || []).map(canonicalizeExercise)
+      exercises: (p.exercises || []).map(ex => {
+        if (ex.id === 121 && (ex.name === 'Pull Through' || ex.name === 'Cable Pull Through')) {
+          return canonicalizeExercise({ ...ex, name: 'Cable Hip Abduction', target: ['Glutes'] });
+        }
+        return canonicalizeExercise(ex);
+      })
     }));
   });
   useEffect(() => {
@@ -1811,17 +1821,27 @@ export default function App() {
                 planId: p.planId ?? (DEFAULT_DAYS[p.id] ? 'custom' : null),
                 planName: p.planName ?? (DEFAULT_DAYS[p.id] ? 'Program Default' : null),
                 assignedDays: p.assignedDays ?? DEFAULT_DAYS[p.id] ?? [],
-                exercises: p.exercises ? p.exercises.map(canonicalizeExercise) : []
+                exercises: p.exercises ? p.exercises.map(ex => {
+                  if (ex.id === 121 && (ex.name === 'Pull Through' || ex.name === 'Cable Pull Through')) {
+                    return canonicalizeExercise({ ...ex, name: 'Cable Hip Abduction', target: ['Glutes'] });
+                  }
+                  return canonicalizeExercise(ex);
+                }) : []
               }));
               setPrograms(prev => (!takeServer('programs', prev) || JSON.stringify(prev) === JSON.stringify(migratedPrograms)) ? prev : migratedPrograms);
             }
             if (data.exerciseLibrary) {
               const parsedLib = typeof data.exerciseLibrary === 'string' ? JSON.parse(data.exerciseLibrary) : data.exerciseLibrary;
-              const migratedLib = parsedLib.map(canonicalizeExercise);
+              const migratedLib = parsedLib.map(ex => {
+                if (ex.id === 121 && (ex.name === 'Pull Through' || ex.name === 'Cable Pull Through')) {
+                  return canonicalizeExercise({ ...ex, name: 'Cable Hip Abduction', target: ['Glutes'] });
+                }
+                return canonicalizeExercise(ex);
+              });
               
               const existingIds = new Set(migratedLib.map(ex => ex.id));
               defaultMasterExercises.forEach(defaultEx => {
-                  if (defaultEx.id >= 126 && defaultEx.id <= 133 && !existingIds.has(defaultEx.id)) {
+                  if (!existingIds.has(defaultEx.id)) {
                       migratedLib.push(defaultEx);
                   }
               });

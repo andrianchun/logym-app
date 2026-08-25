@@ -11,6 +11,8 @@ assert.equal(canonicalizeExercise({ name: 'Biceps Curl' }).name, 'Dumbbell Alter
 assert.equal(canonicalizeExercise({ name: 'Rumanian Deadlift' }).name, 'Romanian Deadlift');
 assert.equal(canonicalizeExercise({ name: 'Flat Dumbbell Bench Press' }).name, 'Dumbbell Bench Press');
 assert.equal(canonicalizeExercise({ name: 'Cable Lateral Raises' }).name, 'Cable Seated Lateral Raise');
+assert.equal(canonicalizeExercise({ name: 'Cable Hip Abduction' }).name, 'Cable Hip Abduction');
+assert.equal(canonicalizeExercise({ name: 'Standing Cable Hip Abduction' }).name, 'Cable Hip Abduction');
 assert.equal(canonicalizeExercise({ name: 'Cable Pull Through' }).name, 'Pull Through');
 assert.equal(canonicalizeExercise({ name: 'Cable Triceps Pushdown' }).name, 'Triceps Pushdown');
 
@@ -25,7 +27,14 @@ assert.ok(matchLatPulldown.thumbnailUrl.includes('Wide-Grip_Lat_Pulldown.webp'),
 const matchPullThrough = findMatchingMasterExercise({ name: 'Cable Pull Through' }, defaultMasterExercises);
 assert.ok(matchPullThrough, 'Cable Pull Through harus menemukan master exercise');
 assert.equal(matchPullThrough.name, 'Pull Through');
-assert.ok(matchPullThrough.videoUrl.includes('Pull_Through.mp4'));
+assert.equal(matchPullThrough.id, 140);
+
+// 3. Cable Hip Abduction (ID 121)
+const matchAbduction = findMatchingMasterExercise({ name: 'Cable Hip Abduction' }, defaultMasterExercises);
+assert.ok(matchAbduction, 'Cable Hip Abduction harus menemukan master ID 121');
+assert.equal(matchAbduction.id, 121);
+assert.equal(matchAbduction.name, 'Cable Hip Abduction');
+assert.ok(matchAbduction.ytVideo.includes('sFQtAuiVwyo'));
 
 // 3. Flat Dumbbell Bench Press -> Dumbbell Bench Press
 const matchBench = findMatchingMasterExercise({ name: 'Flat Dumbbell Bench Press' }, defaultMasterExercises);

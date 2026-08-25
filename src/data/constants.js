@@ -299,16 +299,16 @@ export const defaultMasterExercises = [
   },
   {
     "id": 121,
-    "name": "Pull Through",
-    "target": ["Hams", "Glutes"],
+    "name": "Cable Hip Abduction",
+    "target": ["Glutes"],
     "type": "weight",
-    "defaultWeight": 20,
+    "defaultWeight": 15,
     "equipment": "Cable",
     "level": "intermediate",
     "ytVideo": "https://youtu.be/sFQtAuiVwyo?si=GQLiGcITyE4Yzp3G",
     "videoUrl": "/exercise-assets/youtube-backup/edb-Pull_Through.mp4",
-    "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Pull_Through/0.jpg",
-    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Pull_Through/0.jpg"
+    "thumbnailUrl": "https://img.youtube.com/vi/sFQtAuiVwyo/hqdefault.jpg",
+    "gifUrl": ""
   },
   {
     "id": 122,
@@ -534,6 +534,22 @@ export const defaultMasterExercises = [
     "equipment": "Bicycle",
     "level": "beginner",
     "ytVideo": ""
+  },
+  {
+    "id": 140,
+    "name": "Pull Through",
+    "target": [
+      "Hams",
+      "Glutes"
+    ],
+    "type": "weight",
+    "defaultWeight": 20,
+    "equipment": "Cable",
+    "level": "intermediate",
+    "ytVideo": "https://youtu.be/03XwN3vR_2E",
+    "videoUrl": "",
+    "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Pull_Through/0.jpg",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Pull_Through/0.jpg"
   }
 ];
 
@@ -638,6 +654,8 @@ export const canonicalizeExercise = (ex) => {
     name = 'Romanian Deadlift';
   } else if (locName.includes('dumbbell bench press') || locName === 'flat dumbbell bench press') {
     name = 'Dumbbell Bench Press';
+  } else if (locName.includes('hip abduction') || locName.includes('cable abduction') || locName === 'standing cable hip abduction') {
+    name = 'Cable Hip Abduction';
   } else if (locName.includes('pull through')) {
     name = 'Pull Through';
   } else if (locName.includes('lateral raise')) {
@@ -1036,15 +1054,14 @@ export const defaultPrograms = [
       },
       {
         "id": 121,
-        "name": "Pull Through",
+        "name": "Cable Hip Abduction",
         "sets": 3,
-        "reps": 12,
+        "reps": 15,
         "target": [
-          "Hams",
           "Glutes"
         ],
         "type": "weight",
-        "defaultWeight": 20,
+        "defaultWeight": 15,
         "equipment": "Cable",
         "ytVideo": "https://youtu.be/sFQtAuiVwyo?si=GQLiGcITyE4Yzp3G",
         "videoUrl": "/exercise-assets/youtube-backup/edb-Pull_Through.mp4"
@@ -1237,7 +1254,7 @@ export const exerciseAliasMap = {
   '118': 'edb-High_Cable_Curls',
   '119': 'edb-Split_Squat_with_Dumbbells',
   '120': 'edb-120',
-  '121': 'edb-Pull_Through',
+  '121': 'edb-Cable_Hip_Abduction',
   '122': 'edb-Seated_Calf_Raise',
   '123': 'edb-Plank',
   '124': 'edb-Dumbbell_Shrug',
@@ -1255,7 +1272,8 @@ export const exerciseAliasMap = {
   '136': 'edb-136',
   '137': 'edb-137',
   '138': 'edb-138',
-  '139': 'edb-139'
+  '139': 'edb-139',
+  '140': 'edb-Pull_Through'
 };
 
 export const resolveLoggedExercise = (logKey, exLookup) => {

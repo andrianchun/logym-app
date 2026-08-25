@@ -20497,6 +20497,54 @@
     ]
   },
   {
+    "exerciseId": "Cable_Hip_Abduction",
+    "name": "Cable Hip Abduction",
+    "gifUrl": "",
+    "bodyParts": [
+      "strength"
+    ],
+    "equipments": [
+      "cable"
+    ],
+    "targetMuscles": [
+      "glutes"
+    ],
+    "secondaryMuscles": [
+      "abductors"
+    ],
+    "instructions": [
+      "Pasang ankle strap pada katrol kabel bawah (low cable pulley), lalu kaitkan pada pergelangan kaki luar Anda.",
+      "Berdiri menyamping dari mesin kabel dengan jarak sekitar satu langkah, pegang tiang mesin dengan satu tangan untuk keseimbangan tubuh.",
+      "Jaga tubuh tetap tegak dan kaki tumpuan sedikit ditekuk. Angkat dan ayunkan kaki yang aktif ke arah samping luar menjauhi tubuh sejauh yang Anda rasa nyaman.",
+      "Tahan dan kontraksikan otot bokong samping (glute medius) selama satu detik di puncak gerakan, lalu turunkan kembali kaki secara perlahan ke posisi awal.",
+      "Ulangi sesuai jumlah repetisi yang ditentukan, kemudian ganti ke kaki sisi lainnya."
+    ],
+    "instructions_en": [
+      "Attach an ankle cuff to a low cable pulley and fasten it around your outside ankle.",
+      "Stand sideways to the cable machine, holding onto the frame for stability.",
+      "Keep your torso upright and your supporting leg slightly bent. Abduct your active leg out to the side away from your body as high as comfortably possible.",
+      "Pause and squeeze your glutes at the top for a second, then slowly return to the starting position.",
+      "Repeat for the recommended repetitions, then switch legs."
+    ],
+    "instructions_id": [
+      "Pasang ankle strap pada katrol kabel bawah (low cable pulley), lalu kaitkan pada pergelangan kaki luar Anda.",
+      "Berdiri menyamping dari mesin kabel dengan jarak sekitar satu langkah, pegang tiang mesin dengan satu tangan untuk keseimbangan tubuh.",
+      "Jaga tubuh tetap tegak dan kaki tumpuan sedikit ditekuk. Angkat dan ayunkan kaki yang aktif ke arah samping luar menjauhi tubuh sejauh yang Anda rasa nyaman.",
+      "Tahan dan kontraksikan otot bokong samping (glute medius) selama satu detik di puncak gerakan, lalu turunkan kembali kaki secara perlahan ke posisi awal.",
+      "Ulangi sesuai jumlah repetisi yang ditentukan, kemudian ganti ke kaki sisi lainnya."
+    ],
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Pull_Through.mp4",
+    "ytVideo": "https://youtu.be/sFQtAuiVwyo?si=GQLiGcITyE4Yzp3G",
+    "defaultWeight": 15,
+    "level": "intermediate",
+    "type": "weight",
+    "aliases": [
+      "Standing Cable Hip Abduction",
+      "Cable Hip Abductions",
+      "Hip Abduction Cable"
+    ]
+  },
+  {
     "exerciseId": "Pull_Through",
     "name": "Pull Through",
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Pull_Through/0.jpg",
@@ -20527,8 +20575,8 @@
       "Mulai gerakan dengan mendorong pinggul ke belakang dan menjangkaukan tangan melalui celah kaki sejauh mungkin dengan lutut sedikit ditekuk.",
       "Jaga lengan tetap lurus, lalu dorong pinggul ke depan hingga posisi berdiri tegak. Hindari menarik beban dengan bahu; seluruh tenaga harus berasal dari dorongan pinggul."
     ],
-    "videoUrl": "/exercise-assets/youtube-backup/edb-Pull_Through.mp4",
-    "ytVideo": "https://youtu.be/sFQtAuiVwyo?si=GQLiGcITyE4Yzp3G",
+    "videoUrl": "",
+    "ytVideo": "https://youtu.be/03XwN3vR_2E",
     "defaultWeight": 20,
     "level": "intermediate",
     "type": "weight",
