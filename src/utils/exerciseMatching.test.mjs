@@ -122,12 +122,19 @@ assert.equal(matchOverhead.name, 'Cable Rope Overhead Triceps Extension');
 // 13. Dumbbell Lateral Raise TIDAK boleh tertukar ke Standing Cable Lateral Raise (harus Side Lateral Raise)
 assert.equal(canonicalizeExercise({ name: 'Dumbbell Lateral Raise' }).name, 'Side Lateral Raise');
 
-// 14. Smith Machine Romanian Deadlift (ID 120) nama lengkap resmi
+// 14. Smith Machine Romanian Deadlift (ID 120) nama lengkap resmi & merger Stiff Leg RDL
 assert.equal(canonicalizeExercise({ name: 'SM Romanian Deadlift (RDL)' }).name, 'Smith Machine Romanian Deadlift');
 assert.equal(canonicalizeExercise({ name: 'Smith Machine Romanian Deadlift' }).name, 'Smith Machine Romanian Deadlift');
+assert.equal(canonicalizeExercise({ name: 'Smith Machine Stiff Leg RDL' }).name, 'Smith Machine Romanian Deadlift');
+assert.equal(canonicalizeExercise({ name: 'Smith Machine Stiff-Legged Deadlift' }).name, 'Smith Machine Romanian Deadlift');
+assert.equal(canonicalizeExercise({ name: 'SM Stiff Leg Deadlift' }).name, 'Smith Machine Romanian Deadlift');
 const matchSmRdl = findMatchingMasterExercise({ name: 'SM Romanian Deadlift (RDL)' }, defaultMasterExercises);
 assert.equal(matchSmRdl.id, 120);
 assert.equal(matchSmRdl.name, 'Smith Machine Romanian Deadlift');
+
+const matchSmStiff = findMatchingMasterExercise({ name: 'Smith Machine Stiff Leg RDL' }, defaultMasterExercises);
+assert.equal(matchSmStiff.id, 120);
+assert.equal(matchSmStiff.name, 'Smith Machine Romanian Deadlift');
 
 // 15. Barbell Incline Bench Press vs Barbell Bench Press
 const matchBarbellIncline = findMatchingMasterExercise({ name: 'Barbell Incline Bench Press' }, defaultMasterExercises);

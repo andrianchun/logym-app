@@ -26182,7 +26182,7 @@
   },
   {
     "exerciseId": "Smith_Machine_Stiff-Legged_Deadlift",
-    "name": "Smith Machine Stiff-Legged Deadlift",
+    "name": "Smith Machine Romanian Deadlift",
     "gifUrl": "/exercise-assets/edb-Smith_Machine_Stiff-Legged_Deadlift.webp",
     "bodyParts": [
       "strength"
@@ -26218,7 +26218,19 @@
       "Tarik napas, segera kembali ke posisi tegak dengan mendorong pinggul dan pinggang ke depan.",
       "Ulangi gerakan sesuai repetisi yang dianjurkan."
     ],
-    "videoUrl": "/exercise-assets/edb-Smith_Machine_Stiff-Legged_Deadlift.mp4"
+    "videoUrl": "/exercise-assets/edb-Smith_Machine_Stiff-Legged_Deadlift.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Romanian_Deadlift.mp4",
+    "aliases": [
+      "Smith Machine Stiff-Legged Deadlift",
+      "Smith Machine Stiff Leg RDL",
+      "SM Romanian Deadlift",
+      "SM Stiff Leg Deadlift",
+      "SM Stiff Leg RDL",
+      "Smith RDL",
+      "SM RDL",
+      "Smith Machine RDL"
+    ],
+    "ytVideo": "https://youtu.be/xWnlfJaQZ3k?si=z0FRk3rh4UO7JdUC",
+    "thumbnailUrl": "/exercise-assets/edb-Smith_Machine_Stiff-Legged_Deadlift.webp"
   },
   {
     "exerciseId": "Smith_Machine_Upright_Row",

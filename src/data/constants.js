@@ -678,6 +678,16 @@ export const findMatchingMasterExercise = (targetEx, masterList = defaultMasterE
     'barbell rdl': 'Romanian Deadlift',
     'barbell romanian deadlift': 'Romanian Deadlift',
     'smith machine romanian deadlift': 'Smith Machine Romanian Deadlift',
+    'smith machine stiff-legged deadlift': 'Smith Machine Romanian Deadlift',
+    'smith machine stiff legged deadlift': 'Smith Machine Romanian Deadlift',
+    'smith machine stiff leg deadlift': 'Smith Machine Romanian Deadlift',
+    'smith machine stiff leg rdl': 'Smith Machine Romanian Deadlift',
+    'smith machine stiff-legged rdl': 'Smith Machine Romanian Deadlift',
+    'smith machine stiff leg romanian deadlift': 'Smith Machine Romanian Deadlift',
+    'smith machine stiff legged romanian deadlift': 'Smith Machine Romanian Deadlift',
+    'sm stiff leg deadlift': 'Smith Machine Romanian Deadlift',
+    'sm stiff leg rdl': 'Smith Machine Romanian Deadlift',
+    'sm stiff-legged deadlift': 'Smith Machine Romanian Deadlift',
     'smith rdl': 'Smith Machine Romanian Deadlift',
     'sm rdl': 'Smith Machine Romanian Deadlift',
     'sm romanian deadlift': 'Smith Machine Romanian Deadlift',
@@ -763,7 +773,24 @@ export const canonicalizeExercise = (ex) => {
     name = 'Cable Rear Delt Fly';
   } else if (locName === 'romanian deadlift from deficit' || locName === 'rdl from deficit' || locName === 'deficit rdl') {
     name = 'Romanian Deadlift from Deficit';
-  } else if (locName === 'sm romanian deadlift' || locName === 'smith machine romanian deadlift' || locName === 'smith rdl' || locName === 'sm rdl' || locName === 'smith machine rdl' || locName === 'sm romanian deadlift rdl') {
+  } else if (
+    locName === 'sm romanian deadlift' ||
+    locName === 'smith machine romanian deadlift' ||
+    locName === 'smith rdl' ||
+    locName === 'sm rdl' ||
+    locName === 'smith machine rdl' ||
+    locName === 'sm romanian deadlift rdl' ||
+    locName === 'smith machine stiff-legged deadlift' ||
+    locName === 'smith machine stiff legged deadlift' ||
+    locName === 'smith machine stiff leg deadlift' ||
+    locName === 'smith machine stiff leg rdl' ||
+    locName === 'smith machine stiff-legged rdl' ||
+    locName === 'sm stiff leg deadlift' ||
+    locName === 'sm stiff leg rdl' ||
+    locName === 'sm stiff-legged deadlift' ||
+    locName === 'smith machine stiff leg romanian deadlift' ||
+    locName === 'smith machine stiff legged romanian deadlift'
+  ) {
     name = 'Smith Machine Romanian Deadlift';
   } else if (locName === 'romanian deadlift' || locName === 'rumanian deadlift' || locName === 'rdl' || locName === 'barbell rdl' || locName === 'barbell romanian deadlift') {
     name = 'Romanian Deadlift';
