@@ -39,6 +39,31 @@ const levelLabels = {
   advanced: 'Mahir',
 };
 
+const MUSCLE_ANATOMICAL_ORDER = {
+  'chest_upper': 10,
+  'chest_mid': 11,
+  'chest_lower': 12,
+  'back_upper': 20,
+  'lats': 21,
+  'trapezius': 22,
+  'deltoid_front': 30,
+  'deltoid_lateral': 31,
+  'deltoid_rear': 32,
+  'biceps': 40,
+  'triceps': 41,
+  'forearm': 42,
+  'quadriceps': 50,
+  'hamstring': 51,
+  'glutes': 52,
+  'calves': 53,
+  'adductors': 54,
+  'abductors': 55,
+  'core': 60,
+  'cardio': 70,
+  'full_body': 80,
+  'neck': 90
+};
+
 // ─── Sub-component: ExerciseForm ───────────────────────────────────
 const ExerciseForm = ({ t, lang, formData, setFormData, originalData, onSave, onCancel, isEditing }) => {
   const [openDropdown, setOpenDropdown] = useState(null);
@@ -504,6 +529,23 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
     return scores;
   }, [history]);
 
+  // Hitung frekuensi latihan per kelompok otot dari riwayat user
+  const musclePopularityScores = useMemo(() => {
+    const mScores = {};
+    Object.values(history || {}).forEach(day => {
+      (day.workouts || []).forEach(w => {
+        (w.overriddenExercises || w.exercises || []).forEach(ex => {
+          const targets = Array.isArray(ex?.target) ? ex.target : [ex?.target || ''];
+          targets.forEach(t => {
+            const mKey = normalizeMuscleKey(t);
+            mScores[mKey] = (mScores[mKey] || 0) + 1;
+          });
+        });
+      });
+    });
+    return mScores;
+  }, [history]);
+
   // Gabungan: pemakaian sendiri dikalikan supaya kebiasaan user tetap menang atas tren global —
   // daftar ini dipakai buat memilih latihan berikutnya, jadi yang sering dia pakai harus di depan.
   // Bonus +1000 untuk 22 latihan master yang dulu di-hardcode sudah dibuang: itu mengunci urutan
@@ -574,6 +616,24 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
         const scoreA = popularityScores[exerciseSlug(a.name)] || 0;
         const scoreB = popularityScores[exerciseSlug(b.name)] || 0;
         if (scoreB !== scoreA) return scoreB - scoreA;
+
+        // Fallback jika sudah habis / sama-sama belum pernah dilatih (score === 0):
+        // 1. Urutkan berdasarkan kelompok otot yang paling sering dilatih user
+        const targetA = Array.isArray(a.target) && a.target.length > 0 ? a.target[0] : (a.target || '');
+        const targetB = Array.isArray(b.target) && b.target.length > 0 ? b.target[0] : (b.target || '');
+        const mKeyA = normalizeMuscleKey(targetA);
+        const mKeyB = normalizeMuscleKey(targetB);
+
+        const mUsageA = musclePopularityScores[mKeyA] || 0;
+        const mUsageB = musclePopularityScores[mKeyB] || 0;
+        if (mUsageB !== mUsageA) return mUsageB - mUsageA;
+
+        // 2. Urutkan berdasarkan kelompok hierarki anatomis otot (Dada -> Punggung -> Bahu -> Lengan -> Kaki -> Core -> Kardio)
+        const anatA = MUSCLE_ANATOMICAL_ORDER[mKeyA] ?? 99;
+        const anatB = MUSCLE_ANATOMICAL_ORDER[mKeyB] ?? 99;
+        if (anatA !== anatB) return anatA - anatB;
+
+        // 3. Di dalam kelompok otot yang sama, urutkan A-Z
         return a.name.localeCompare(b.name);
       }
       if (sortOrder === 'az') return a.name.localeCompare(b.name);
@@ -603,7 +663,7 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
     });
 
     return list;
-  }, [gymFilteredLibrary, viewMode, showFavoritesOnly, searchQuery, muscleFilter, equipFilter, levelFilter, sortOrder, popularityScores]);
+  }, [gymFilteredLibrary, viewMode, showFavoritesOnly, searchQuery, muscleFilter, equipFilter, levelFilter, sortOrder, popularityScores, musclePopularityScores]);
 
   // Pagination for performance (Render top 30 initially, load more on demand)
   const [displayCount, setDisplayCount] = useState(30);

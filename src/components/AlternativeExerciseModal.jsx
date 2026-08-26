@@ -7,6 +7,31 @@ import { fetchExercisesFromApi } from '../utils/exerciseDbApi';
 import EquipmentIcon from './EquipmentIcon';
 import FilterChips from './FilterChips';
 
+const MUSCLE_ANATOMICAL_ORDER = {
+  'chest_upper': 10,
+  'chest_mid': 11,
+  'chest_lower': 12,
+  'back_upper': 20,
+  'lats': 21,
+  'trapezius': 22,
+  'deltoid_front': 30,
+  'deltoid_lateral': 31,
+  'deltoid_rear': 32,
+  'biceps': 40,
+  'triceps': 41,
+  'forearm': 42,
+  'quadriceps': 50,
+  'hamstring': 51,
+  'glutes': 52,
+  'calves': 53,
+  'adductors': 54,
+  'abductors': 55,
+  'core': 60,
+  'cardio': 70,
+  'full_body': 80,
+  'neck': 90
+};
+
 const AlternativeExerciseModal = ({ 
   isOpen, 
   onClose, 
@@ -148,6 +173,13 @@ const AlternativeExerciseModal = ({
     if (sortOrder === 'recommendation') {
       filtered.sort((a, b) => {
         if (a.score !== b.score) return b.score - a.score;
+        const targetA = Array.isArray(a.target) && a.target.length > 0 ? a.target[0] : (a.target || '');
+        const targetB = Array.isArray(b.target) && b.target.length > 0 ? b.target[0] : (b.target || '');
+        const mKeyA = normalizeMuscleKey(targetA);
+        const mKeyB = normalizeMuscleKey(targetB);
+        const anatA = MUSCLE_ANATOMICAL_ORDER[mKeyA] ?? 99;
+        const anatB = MUSCLE_ANATOMICAL_ORDER[mKeyB] ?? 99;
+        if (anatA !== anatB) return anatA - anatB;
         return a.name.localeCompare(b.name);
       });
     } else if (sortOrder === 'az') {
