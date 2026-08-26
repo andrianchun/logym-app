@@ -7,12 +7,21 @@ const AchievementPopup = ({ achievements, onClose, soundEnabled, playSoundEffect
 
   useEffect(() => {
     if (achievements && achievements.length > 0) {
+      const origBody = document.body.style.overflow;
+      const origHtml = document.documentElement.style.overflow;
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+
       playSoundEffect('success', soundEnabled);
       setCanClose(false);
       const timer = setTimeout(() => {
         setCanClose(true);
       }, 2000);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+        document.body.style.overflow = origBody;
+        document.documentElement.style.overflow = origHtml;
+      };
     }
   }, [achievements]);
 
@@ -48,8 +57,8 @@ const AchievementPopup = ({ achievements, onClose, soundEnabled, playSoundEffect
   const btnShadow = t?.bgAccent ? '' : 'shadow-[#3b82f6]/30';
 
   return (
-    <div className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm flex flex-col justify-center p-4 animate-in fade-in slide-in-from-bottom-8 duration-500" onClick={handleClose}>
-      <div className={`w-full max-w-sm mx-auto relative rounded-3xl overflow-hidden ${isDark ? 'bg-slate-900 border border-white/10' : 'bg-white border border-black/10'} shadow-2xl`} onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm flex flex-col justify-center p-4 animate-in fade-in overscroll-contain touch-none no-swipe" onClick={handleClose}>
+      <div className={`w-full max-w-sm mx-auto relative rounded-3xl overflow-hidden ${isDark ? 'bg-slate-900 border border-white/10' : 'bg-white border border-black/10'} shadow-2xl animate-in zoom-in-95 duration-200`} onClick={e => e.stopPropagation()}>
         
         {/* Glow Background */}
         <div className={`absolute top-0 left-0 right-0 h-40 ${ach.bg} opacity-50 blur-3xl rounded-full translate-y-[-50%] pointer-events-none`} />
@@ -57,6 +66,7 @@ const AchievementPopup = ({ achievements, onClose, soundEnabled, playSoundEffect
         {canClose && (
           <button
             onClick={handleClose}
+            data-close-modal="true"
             className="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-black/20 text-white hover:bg-black/40 transition-colors animate-in fade-in zoom-in-95"
           >
             <X size={18} />

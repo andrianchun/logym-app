@@ -179,7 +179,12 @@ export default function SharedProfileView({
             decoding="async"
             loading="lazy"
             className="absolute inset-0 w-full h-full object-cover"
-            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+              if (e.currentTarget.nextElementSibling) {
+                e.currentTarget.nextElementSibling.classList.remove('hidden');
+              }
+            }}
           />
         ) : null}
         <div className={`absolute inset-0 w-full h-full bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center ${profileUserPhoto ? 'hidden' : ''}`}>
@@ -431,11 +436,15 @@ export default function SharedProfileView({
                           decoding="async"
                           loading="lazy"
                           className="w-full h-full object-cover rounded-2xl"
-                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            if (e.currentTarget.nextElementSibling) {
+                              e.currentTarget.nextElementSibling.style.display = 'block';
+                            }
+                          }}
                         />
-                      ) : (
-                        <ClipboardList size={20} className={isDark ? 'text-white/50' : 'text-slate-400'} />
-                      )}
+                      ) : null}
+                      <ClipboardList size={20} className={`${isDark ? 'text-white/50' : 'text-slate-400'} ${images.length > 0 ? 'hidden' : ''}`} />
                     </div>
                     
                     {/* Post Content */}

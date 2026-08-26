@@ -103,9 +103,9 @@ export default function ImageModal({ images = [], initialIndex = 0, onClose }) {
       
       {/* Pagination indicators - Bottom */}
       {images.length > 1 && (
-        <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1.5 z-20 pointer-events-none">
+        <div className="absolute bottom-5 left-0 right-0 flex items-center justify-center gap-2 z-20 pointer-events-none">
           {images.map((_, idx) => (
-            <div key={idx} className={`h-1.5 rounded-full transition-all duration-300 shadow-sm ${idx === currentIndex ? 'w-6 bg-white' : 'w-1.5 bg-white/40'}`} />
+            <div key={idx} className={`h-2.5 rounded-full transition-all duration-300 shadow-md ${idx === currentIndex ? 'w-8 bg-white' : 'w-2.5 bg-white/50'}`} />
           ))}
         </div>
       )}

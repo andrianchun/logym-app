@@ -319,10 +319,38 @@ export const mergeBackupIntoHistory = (history, backupData) => {
     const idSekarang = new Set(sekarang.map((w) => String(w?.id)));
     const tambahan = (Array.isArray(bersih.workouts) ? bersih.workouts : [])
       .filter((w) => w?.id !== undefined && w?.id !== null && !idSekarang.has(String(w.id)));
-    if (tambahan.length === 0) return;
 
-    next[d] = { ...next[d], workouts: [...sekarang, ...tambahan] };
-    sesiDitambal += tambahan.length;
+    let ditambalDiSesiLama = 0;
+    const updatedWorkouts = sekarang.map(wCur => {
+      const wBackup = (Array.isArray(bersih.workouts) ? bersih.workouts : []).find(w => String(w?.id) === String(wCur?.id));
+      if (!wBackup) return wCur;
+
+      const curKeys = new Set(Object.keys(wCur.log || {}));
+      const backupKeys = Object.keys(wBackup.log || {});
+      const hasMissingLogKeys = backupKeys.some(k => !curKeys.has(k));
+
+      const curExIds = new Set((wCur.exercises || wCur.overriddenExercises || []).map(e => String(e.id)));
+      const backupExs = wBackup.exercises || wBackup.overriddenExercises || [];
+      const missingExs = backupExs.filter(e => !curExIds.has(String(e.id)));
+
+      if (hasMissingLogKeys || missingExs.length > 0) {
+        ditambalDiSesiLama++;
+        const mergedLog = { ...(wBackup.log || {}), ...(wCur.log || {}) };
+        const mergedExercises = [...(wCur.exercises || wCur.overriddenExercises || []), ...missingExs];
+        return {
+          ...wCur,
+          log: mergedLog,
+          ...(wCur.exercises ? { exercises: mergedExercises } : {}),
+          ...(wCur.overriddenExercises ? { overriddenExercises: mergedExercises } : {})
+        };
+      }
+      return wCur;
+    });
+
+    if (tambahan.length > 0 || ditambalDiSesiLama > 0) {
+      next[d] = { ...next[d], workouts: [...updatedWorkouts, ...tambahan] };
+      sesiDitambal += (tambahan.length + ditambalDiSesiLama);
+    }
   });
 
   return { next, tanggalBaru, sesiDitambal };

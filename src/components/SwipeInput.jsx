@@ -66,12 +66,15 @@ const SwipeInput = ({ value, onChange, disabled, step = 1, className, min = 0, m
         }
     };
 
-    const onTouchEnd = () => {
+    const onTouchEnd = (e) => {
         if (dragRef.current.isDragging) {
+            const wasMoved = dragRef.current.lastCalculatedValue !== undefined;
             dragRef.current.isDragging = false;
-            // Baru lempar ke parent (re-render berat) SAAT JARI DIANGKAT (dan jika ada perubahan dari drag)
-            if (dragRef.current.lastCalculatedValue !== undefined && dragRef.current.lastCalculatedValue !== Number(value)) {
-                onChange(dragRef.current.lastCalculatedValue);
+            if (wasMoved) {
+                if (e && e.cancelable) e.preventDefault();
+                if (dragRef.current.lastCalculatedValue !== Number(value)) {
+                    onChange(dragRef.current.lastCalculatedValue);
+                }
             }
         }
     };

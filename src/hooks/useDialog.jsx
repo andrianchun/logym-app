@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertCircle, CheckCircle2, Info } from 'lucide-react';
 
@@ -16,6 +16,18 @@ import { AlertCircle, CheckCircle2, Info } from 'lucide-react';
 export default function useDialog(isDark = false, customBgClass = null) {
   const [state, setState] = useState(null);
   const resolveRef = useRef(null);
+
+  useEffect(() => {
+    if (!state) return;
+    const origBody = document.body.style.overflow;
+    const origHtml = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = origBody;
+      document.documentElement.style.overflow = origHtml;
+    };
+  }, [state]);
 
   const close = useCallback((value) => {
     setState(null);
@@ -47,12 +59,12 @@ export default function useDialog(isDark = false, customBgClass = null) {
 
   const dialog = state ? createPortal(
     <div
-      className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center px-6 animate-in fade-in duration-150"
+      className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center px-6 animate-in fade-in duration-150 overscroll-contain touch-none no-swipe"
       onClick={() => state.mode === 'alert' && close()}
     >
       <div
         className={`w-full max-w-xs rounded-3xl p-5 shadow-2xl border animate-in zoom-in-95 duration-200 ${
-          isDark ? `${customBgClass || 'bg-slate-900/80 backdrop-blur-xl'} border-white/10` : 'bg-white/80 backdrop-blur-xl border-black/8'
+          isDark ? `${customBgClass || 'bg-slate-900/90 backdrop-blur-xl'} border-white/10` : 'bg-white/90 backdrop-blur-xl border-black/8'
         }`}
         onClick={e => e.stopPropagation()}
       >

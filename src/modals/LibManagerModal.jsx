@@ -18,6 +18,17 @@ const LibManagerModal = ({ showLibManager, setShowLibManager, t, exerciseLibrary
   const dropdownRef = React.useRef(null);
   
   React.useEffect(() => {
+    const origBody = document.body.style.overflow;
+    const origHtml = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = origBody;
+      document.documentElement.style.overflow = origHtml;
+    };
+  }, []);
+
+  React.useEffect(() => {
       const handleClickOutside = (e) => {
           if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
               setOpenDropdown(null);
@@ -78,12 +89,12 @@ const LibManagerModal = ({ showLibManager, setShowLibManager, t, exerciseLibrary
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-      <div className={`w-full max-w-md mx-auto ${t.bgCard} rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 border ${t.border}`}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in overscroll-contain touch-none no-swipe" onClick={() => setShowLibManager(false)}>
+      <div className={`w-full max-w-md mx-auto ${t.bgCard} rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 border ${t.border}`} onClick={e => e.stopPropagation()}>
          
-         <div className={`p-5 border-b ${t.border} flex justify-between items-center bg-black/5`}>
-            <h3 className="font-black h2">{viewMode === 'list' ? 'Kelola Database Latihan' : (editForm.id ? 'Edit Latihan Master' : 'Tambah Master Baru')}</h3>
-            <button onClick={() => { if(viewMode==='form') setViewMode('list'); else setShowLibManager(false); }} className={`p-2 rounded-full ${t.btnBg} hover:text-rose-500`}><X size={20}/></button>
+         <div className={`p-4 border-b ${t.border} flex justify-between items-center shrink-0`}>
+            <h3 className={`font-black text-lg ${t.textMain}`}>{viewMode === 'list' ? 'Kelola Database Latihan' : (editForm.id ? 'Edit Latihan Master' : 'Tambah Master Baru')}</h3>
+            <button onClick={() => { if(viewMode==='form') setViewMode('list'); else setShowLibManager(false); }} className={`p-1.5 rounded-full ${t.btnBg} hover:opacity-80 transition-all`} data-close-modal="true"><X size={18} className={t.textMain}/></button>
          </div>
          
          {viewMode === 'list' ? (

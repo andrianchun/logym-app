@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { X, Camera, Loader2, Send, Image as ImageIcon } from 'lucide-react';
 import { uploadImageToFirebase } from '../utils/storage';
 import { db } from '../firebase';
@@ -13,6 +13,15 @@ export default function BugReportModal({ showModal, setShowModal, user }) {
     
     const fileInputRef = useRef(null);
     const { showAlert } = useDialog();
+
+    useEffect(() => {
+        if (!showModal) return;
+        const orig = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = orig;
+        };
+    }, [showModal]);
 
     if (!showModal) return null;
 
@@ -74,12 +83,15 @@ export default function BugReportModal({ showModal, setShowModal, user }) {
     };
 
     return (
-        <div className="fixed inset-0 z-[1000] flex flex-col bg-black/90 sm:bg-black/60 sm:items-center sm:justify-center animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[1000] flex flex-col bg-black/90 sm:bg-black/60 sm:items-center sm:justify-center animate-in fade-in duration-200 overscroll-contain">
             <div className="w-full h-full sm:h-auto sm:max-h-[85vh] sm:max-w-md bg-neutral-900 sm:rounded-3xl shadow-2xl flex flex-col relative overflow-hidden">
-                {/* Header */}
-                <div className="p-4 border-b border-white/10 flex items-center justify-between shrink-0 bg-black/40 backdrop-blur-md relative z-10">
+                {/* Header with Safe Area Top Padding */}
+                <div 
+                    className="p-4 border-b border-white/10 flex items-center justify-between shrink-0 bg-black/40 backdrop-blur-md relative z-10"
+                    style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 24px))' }}
+                >
                     <h2 className="text-xl font-black text-white tracking-tight">Laporkan Bug</h2>
-                    <button onClick={() => setShowModal(false)} className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-neutral-300 transition-colors">
+                    <button onClick={() => setShowModal(false)} className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-neutral-300 transition-colors" data-close-modal="true">
                         <X size={20} />
                     </button>
                 </div>

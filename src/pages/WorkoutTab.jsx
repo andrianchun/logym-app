@@ -476,12 +476,10 @@ const WorkoutTab = ({
     );
     if (liveKey && exerciseLogs[liveKey]) return exerciseLogs[liveKey];
 
-    // 2. For completed workouts, fall back to the saved log in history
+    // 2. For completed workouts, fall back to the saved log in history HANYA jika workoutId spesifik cocok
     const dayData = history[selectedDate];
-    if (dayData && dayData.workouts) {
-      const targetWorkouts = ex?.workoutId
-        ? dayData.workouts.filter(w => w.id === ex.workoutId)
-        : dayData.workouts;
+    if (dayData && dayData.workouts && ex?.workoutId) {
+      const targetWorkouts = dayData.workouts.filter(w => w.id === ex.workoutId);
 
       for (const workoutEntry of targetWorkouts) {
         if (workoutEntry && workoutEntry.log) {
@@ -592,12 +590,19 @@ const WorkoutTab = ({
       // `s.w` mentah sementara rekornya dari total_w, barbel 80 kg + bar 20 kg selalu kalah dari
       // rekornya sendiri dan badge REKOR BARU tidak pernah muncul untuk alat berbasis bar.
       let currentMax10RM = 0;
+      let currentMaxWeight = 0;
+      let currentMaxReps = 0;
       const eqConfNow = getEquipmentConfig(gymProfiles, activeGymId, exItem, userProfile);
-      const currentLogs = exerciseLogs[exItem.id] || getSetLogs(exItem);
+      const currentLogs = getSetLogs(exItem) || exerciseLogs[exItem.id] || [];
       currentLogs.forEach(s => {
         if (s.done && !s.skipped && (Number(s.w) > 0 || Number(s.total_w) > 0) && s.r > 0) {
-          const c10RM = estimate10RM(getSetActualWeight(s, eqConfNow), s.r);
-          if (c10RM > currentMax10RM) currentMax10RM = c10RM;
+          const actW = getSetActualWeight(s, eqConfNow);
+          const c10RM = estimate10RM(actW, s.r);
+          if (c10RM > currentMax10RM) {
+            currentMax10RM = c10RM;
+            currentMaxWeight = actW;
+            currentMaxReps = Number(s.r);
+          }
         }
       });
 
@@ -616,21 +621,32 @@ const WorkoutTab = ({
       // jadi begitu ia ikut dibandingkan, rekornya selalu terlihat "sudah pernah dicapai" dan
       // badge REKOR BARU tidak pernah muncul.
       const record10RM = Math.max(best10RM, Number(libEx?.rm10Best) || 0);
-      const true10RM = last10RM > 0 ? last10RM : stored10RM;
+      const true10RM = last10RM > 0 ? last10RM : (stored10RM > 0 ? stored10RM : currentMax10RM);
       const isNewRecord = currentMax10RM > record10RM && record10RM > 0;
-      
+      const isFirstRecord = currentMax10RM > 0 && record10RM === 0;
+
+      const isImp = units?.weight === 'lbs';
+      const uStr = isImp ? 'lbs' : 'kg';
+
       if (isNewRecord) {
         return {
           title: "REKOR BARU DIPECAHKAN!",
-          text: `Mantap! Kamu baru saja buat rekor 10RM baru: ${currentMax10RM} ${units?.weight === 'lbs' ? 'lbs' : 'kg'}!\n\nLanjutkan kerja kerasnya!`,
+          text: `Mantap! Kamu baru saja buat rekor 10RM baru: ${currentMax10RM} ${uStr} (${currentMaxWeight} ${uStr} x ${currentMaxReps} Reps)!\n\nLanjutkan kerja kerasnya!`,
+          mode: 'praise',
+          isNewRecord: true
+        };
+      }
+
+      if (isFirstRecord) {
+        return {
+          title: "🎯 10RM PERTAMA TERCATAT!",
+          text: `Keren! 10RM acuan pertamamu berhasil tercatat: ${currentMax10RM} ${uStr} (${currentMaxWeight} ${uStr} x ${currentMaxReps} Reps).\n\nAngka ini otomatis menjadi target acuan progresifmu untuk sesi latihan berikutnya!`,
           mode: 'praise',
           isNewRecord: true
         };
       }
       
       const hasLastSession = lastSessionWeight > 0;
-      const isImp = units?.weight === 'lbs';
-      const uStr = isImp ? 'lbs' : 'kg';
       const isDeload = history?.[selectedDate]?.wellness === 'deload' || history?.[selectedDate]?.isDeloadWeek;
 
       if (isDeload && hasLastSession) {
@@ -684,13 +700,19 @@ const WorkoutTab = ({
         
         return {
           title: "TARGET HARI INI",
-          text: `${missionText}\n\n10RM terakhir: ${true10RM} ${uStr}`,
+          text: `${missionText}\n\n10RM acuan: ${true10RM} ${uStr}`,
+          mode: 'push'
+        };
+      } else if (currentMax10RM > 0) {
+        return {
+          title: "TARGET HARI INI",
+          text: `Beban terbaik sesi ini:\n${currentMaxWeight} ${uStr} x ${currentMaxReps} Reps\n\n10RM acuan saat ini: ${currentMax10RM} ${uStr}.\nFokus tuntaskan sisa set dengan form dan kontrol yang rapi!`,
           mode: 'push'
         };
       } else {
         return {
           title: "TARGET HARI INI",
-          text: `Atur beban yang cukup menantang untuk diangkat 10 repetisi dengan form benar.\n\n10RM terakhir: ${true10RM > 0 ? true10RM + ' ' + uStr : '-'}`,
+          text: `Atur beban yang cukup menantang untuk diangkat 10 repetisi dengan form benar (RPE 8).\n\n10RM acuan: ${true10RM > 0 ? true10RM + ' ' + uStr : '-'}`,
           mode: 'push'
         };
       }
@@ -760,7 +782,7 @@ const WorkoutTab = ({
           // Coba cari durasi sebelumnya dari history hari ini (berjaga-jaga jika resumeDurationSecs ter-reset atau user buka tab manual)
           const todayData = history[selectedDate];
           if (todayData && todayData.workouts) {
-             const wInHistory = todayData.workouts.find(w => w.programId === progId || w.id === progId || (progId === 'extra' && w.programId === 'adhoc'));
+             const wInHistory = todayData.workouts.find(w => w.programId === progId || w.id === progId || (progId === 'extra' && w.programId === 'adhoc' && w.status !== 'completed'));
              if (wInHistory && wInHistory.duration) {
                 if (typeof wInHistory.duration === 'number') prevSecsToUse = wInHistory.duration * 60;
                 else if (typeof wInHistory.duration === 'string') {
@@ -1284,7 +1306,7 @@ const WorkoutTab = ({
           
           const wInHistory = (todayData?.workouts || []).find(w => 
             w.id === session.workoutId || 
-            (session.workoutId === 'extra' && w.programId === 'adhoc')
+            (session.workoutId === 'extra' && w.programId === 'adhoc' && w.status !== 'completed')
           );
           
           // Sesi dianggap selesai JIKA dan HANYA JIKA:
@@ -1375,7 +1397,7 @@ const WorkoutTab = ({
       {/* CELEBRATION MODAL */}
       {/* CELEBRATION MODAL */}
       {showCelebration && createPortal(
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 overscroll-contain touch-none no-swipe">
            <div className="absolute inset-0 bg-black/80 backdrop-blur-md animate-in fade-in duration-300"></div>
            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200vw] h-[200vw] bg-[radial-gradient(ellipse_at_center,rgba(59,130,246,0.2)_0%,transparent_50%)] animate-spin-slow pointer-events-none"></div>
            <div className="relative z-10 flex flex-col items-center animate-in zoom-in-95 fade-in slide-in-from-bottom-10 duration-500">

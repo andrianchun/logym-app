@@ -47,9 +47,17 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
     duration: null,
     consents: userProfile?.consents || { tos: false, data: false, ai: false }
   });
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [recommendedPlan, setRecommendedPlan] = useState(null);
-  const [showGymManager, setShowGymManager] = useState(false);
+  useEffect(() => {
+    if (!isOpen) return;
+    const origBody = document.body.style.overflow;
+    const origHtml = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = origBody;
+      document.documentElement.style.overflow = origHtml;
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     // Broadcast for Lomeal mock sync via localhost cookies
@@ -502,9 +510,9 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
   };
 
   return (
-    <div className={`fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md animate-in fade-in no-swipe`} role="dialog" onClick={onClose}>
+    <div className={`fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md animate-in fade-in no-swipe overscroll-contain touch-none`} role="dialog" onClick={onClose}>
       <div 
-        className={`w-full h-full ${t.bgCard} overflow-hidden flex flex-col animate-in slide-in-from-bottom-10 fade-in duration-300 relative`} 
+        className={`w-full h-full ${t.bgCard} overflow-hidden flex flex-col animate-in slide-in-from-bottom-10 fade-in duration-300 relative overscroll-contain`} 
         onClick={e => e.stopPropagation()}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -534,13 +542,13 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
             </p>
           </div>
 
-          <button onClick={handleCloseClick} className={`p-2 rounded-full ${t.inputBg} hover:text-rose-500 transition-colors`}>
+          <button onClick={handleCloseClick} className={`p-2 rounded-full ${t.inputBg} hover:text-rose-500 transition-colors`} data-close-modal="true">
             <X size={20}/>
           </button>
         </div>
 
         {/* CONTENT */}
-        <div className="flex-1 flex flex-col justify-end pb-8 sm:pb-12 overflow-y-auto p-6 pt-0 hide-scrollbar relative z-10">
+        <div className="flex-1 flex flex-col justify-end pb-8 sm:pb-12 overflow-y-auto p-6 pt-0 hide-scrollbar overscroll-contain touch-pan-y relative z-10">
           
           
 

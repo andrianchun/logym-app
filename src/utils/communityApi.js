@@ -4,6 +4,7 @@ import {
   serverTimestamp, doc, setDoc, updateDoc, deleteDoc,
   increment, where, writeBatch, arrayUnion, arrayRemove
 } from 'firebase/firestore';
+import { cleanFirestoreData } from './historySync';
 
 // ─── Community User Registration ────────────────────────────────────────────
 export const registerToCommunity = async (userId, userProfile) => {
@@ -164,10 +165,14 @@ export const createCommunityPost = async (userId, userName, userPhoto, postData)
 };
 
 // ─── Update Post ──────────────────────────────────────────────────────────────
-export const updatePost = async (postId, { text, imageUrls }) => {
+export const updatePost = async (postId, updateData) => {
   try {
     const ref = doc(db, 'logym_community_posts', postId);
-    await updateDoc(ref, { text, imageUrls });
+    const safeData = cleanFirestoreData({
+      ...updateData,
+      editedAt: serverTimestamp()
+    });
+    await updateDoc(ref, safeData);
   } catch (err) {
     console.error("Gagal update post:", err);
     throw err;

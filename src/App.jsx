@@ -60,6 +60,7 @@ import { rapikanNamaProgram, rapikanNamaSesi, pertahankanNamaSesi } from './util
 import useDialog from './hooks/useDialog';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import UpdaterAlert from './components/UpdaterAlert';
+import PwaInstallPrompt from './components/PwaInstallPrompt';
 import { getLocalYMD, resolveProjectedProgramId, isLomealOwned, resolveLoggedExercise, splitSessionLogs, buildLogymSyncPayload, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos, getDayWorkouts, countMissedScheduledDays, canonicalizeExercise } from './data/constants';
 import { serializeDay, dayFingerprint, migrateBaseline, reconcileHistory, workoutsToMap, workoutIdsFromBaseline, diffFields, cleanFirestoreData, stableStringify, mergeBackupIntoHistory, sessionsPendingSave } from './utils/historySync';
 import { useBleManager } from './hooks/useBleManager';
@@ -119,11 +120,12 @@ export default function App() {
   const [isAuthChecking, setIsAuthChecking] = useState(!__previewUser);
   const [isDataLoaded, setIsDataLoaded] = useState(!!__previewUser || !!__cachedUser);
   const [isHistoryLoaded, setIsHistoryLoaded] = useState(!!__previewUser || !!__cachedUser);
+  const [isInitialSplash, setIsInitialSplash] = useState(true);
   useEffect(() => {
-    const slowTimer = setTimeout(() => {
-      setIsSlowLoading(true);
-    }, 4000);
-    return () => { clearTimeout(slowTimer); };
+    const splashTimer = setTimeout(() => {
+      setIsInitialSplash(false);
+    }, 800);
+    return () => clearTimeout(splashTimer);
   }, []);
   const [isSlowLoading, setIsSlowLoading] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -138,33 +140,6 @@ export default function App() {
     });
     return unsub;
   }, [user?.uid]);
-
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
-
-  useEffect(() => {
-    const handleBeforeInstallPrompt = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      const hasDismissed = localStorage.getItem('__PWA_PROMPT_DISMISSED');
-      if (!hasDismissed) {
-        setShowInstallPrompt(true);
-      }
-    };
-
-    const handleAppInstalled = () => {
-      setShowInstallPrompt(false);
-      setDeferredPrompt(null);
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    window.addEventListener('appinstalled', handleAppInstalled);
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', handleAppInstalled);
-    };
-  }, []);
 
   const [otaState, setOtaState] = useState({ open: false, force: false, url: '', version: '', notes: '' });
   const [currentVer, setCurrentVer] = useState(__APP_VERSION__);
@@ -1619,7 +1594,14 @@ export default function App() {
     const showNotification = async () => {
       try {
         if (Capacitor.getPlatform() === 'android') {
-           await WorkoutTimerPlugin.startTimer({ startTime: workoutStartTime || Date.now(), workoutName: runningWorkoutName });
+           const activeEx = (sessionExercises || []).find(e => String(e.id) === String(activeExerciseId));
+           await WorkoutTimerPlugin.startTimer({ 
+             startTime: workoutStartTime || Date.now(), 
+             workoutName: runningWorkoutName,
+             exerciseName: activeEx?.name || '',
+             isResting: !!restTargetTime,
+             targetTime: restTargetTime || 0
+           });
         }
       } catch (err) {
         console.warn('Notification error:', err);
@@ -2217,28 +2199,30 @@ export default function App() {
            clearTimeout(pendingWarn);
 
            try {
-             const todayStr = getLocalYMD(new Date());
-             const sesiSelesai = Object.values(history)
-               .reduce((n, d) => n + (d?.workouts || []).filter(w => w?.status === 'completed').length, 0);
-             const backupKey = `${todayStr}:${sesiSelesai}`;
-             const memoKey = `lyfit_last_backup_key_${user.uid}`;
-             if (localStorage.getItem(memoKey) !== backupKey && Object.keys(history).length > 0) {
-               const backupRef = doc(db, 'logym_users', user.uid, 'history_backups', `${todayStr}_${sesiSelesai}`);
-               setDoc(backupRef, {
-                 payload: JSON.stringify(history),
-                 timestamp: Date.now(),
-                 sessions: sesiSelesai,
-                 expireAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-               })
-                 .then(() => {
-                   localStorage.setItem(memoKey, backupKey);
-                   console.log(`[Auto-Backup] Tersimpan: ${todayStr} (${sesiSelesai} sesi), kedaluwarsa 30 hari.`);
-                 })
-                 .catch(err => console.error('[Auto-Backup] Gagal menyimpan backup:', err));
-             }
-           } catch (e) {
-             console.error('[Auto-Backup] Error:', e);
-           }
+              const todayStr = getLocalYMD(new Date());
+              const sesiSelesai = Object.values(history)
+                .reduce((n, d) => n + (d?.workouts || []).filter(w => w?.status === 'completed').length, 0);
+              const todayFingerprint = dayFingerprint(history[todayStr]);
+              const backupKey = `${todayStr}:${sesiSelesai}:${todayFingerprint}`;
+              const memoKey = `lyfit_last_backup_key_${user.uid}`;
+              if (localStorage.getItem(memoKey) !== backupKey && Object.keys(history).length > 0 && sesiSelesai > 0) {
+                const backupDocId = `${todayStr}_${Date.now()}`;
+                const backupRef = doc(db, 'logym_users', user.uid, 'history_backups', backupDocId);
+                setDoc(backupRef, {
+                  payload: JSON.stringify(history),
+                  timestamp: Date.now(),
+                  sessions: sesiSelesai,
+                  expireAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                })
+                  .then(() => {
+                    localStorage.setItem(memoKey, backupKey);
+                    console.log(`[Auto-Backup] Tersimpan: ${backupDocId} (${sesiSelesai} sesi), kedaluwarsa 7 hari.`);
+                  })
+                  .catch(err => console.error('[Auto-Backup] Gagal menyimpan backup:', err));
+              }
+            } catch (e) {
+              console.error('[Auto-Backup] Error:', e);
+            }
 
            const sent = deletedDates.filter(d => !failedYears.has(d.substring(0, 4)));
            if (sent.length === 0) return;
@@ -3103,6 +3087,11 @@ export default function App() {
              (eOrigIdStr && (exIdStr === eOrigIdStr || exIdStr.startsWith(eOrigIdStr + '-')));
     };
     
+    // 1. Prioritaskan latihan dari program aktif dan extraExercises saat ini
+    const activeMatch = [...programs.map(p => p.exercises || []).flat(), ...extraExercises].find(isMatch);
+    if (activeMatch) return activeMatch;
+
+    // 2. Fallback ke riwayat sesi yang tersimpan pada tanggal ini
     const todayData = history[selectedDate];
     if (todayData && todayData.workouts) {
        for (const w of todayData.workouts) {
@@ -3111,7 +3100,7 @@ export default function App() {
        }
     }
 
-    return [...programs.map(p => p.exercises || []).flat(), ...extraExercises].find(isMatch);
+    return null;
   };
 
   const getSetLogs = (ex, idToCheck) => {
@@ -3122,12 +3111,10 @@ export default function App() {
     );
     if (matchingKey) return exerciseLogs[matchingKey];
     
-    // Cari di riwayat tersimpan (history) hari ini
+    // Cari di riwayat tersimpan (history) hari ini HANYA jika workoutId spesifik cocok
     const dayData = history[selectedDate];
-    if (dayData && dayData.workouts) {
-      const targetWorkouts = ex?.workoutId
-        ? dayData.workouts.filter(w => w.id === ex.workoutId)
-        : dayData.workouts;
+    if (dayData && dayData.workouts && ex?.workoutId) {
+      const targetWorkouts = dayData.workouts.filter(w => w.id === ex.workoutId);
 
       for (const workoutEntry of targetWorkouts) {
         if (workoutEntry && workoutEntry.log) {
@@ -3289,9 +3276,14 @@ export default function App() {
            // "beban terakhir yang diketik", wajar naik-turun seketika.
            setExerciseLibrary(lib => {
               const existingIdx = lib.findIndex(e => e.name?.toLowerCase() === ex.name?.toLowerCase() || e.id === ex.id);
-              if (existingIdx >= 0 && lib[existingIdx].lastWeight !== weight) {
+              if (existingIdx >= 0) {
+                  const cur = lib[existingIdx];
+                  const updatedLastWeight = weight > 0 ? weight : cur.lastWeight;
+                  const updatedRm10 = cur.rm10 ? cur.rm10 : c10RM;
+                  const updatedRm10Best = Math.max(Number(cur.rm10Best) || 0, c10RM);
+                  if (cur.lastWeight === updatedLastWeight && cur.rm10 === updatedRm10 && (cur.rm10Best || 0) === updatedRm10Best) return lib;
                   const newLib = [...lib];
-                  newLib[existingIdx] = { ...newLib[existingIdx], lastWeight: weight };
+                  newLib[existingIdx] = { ...cur, lastWeight: updatedLastWeight, rm10: updatedRm10, rm10Best: updatedRm10Best };
                   return newLib;
               }
               return lib;
@@ -3304,7 +3296,7 @@ export default function App() {
               const todayData = history[selectedDate];
               if (todayData && todayData.workouts) {
                  const progId = sessionToRun || activeProgramId;
-                 const wInHistory = todayData.workouts.find(w => w.programId === progId || w.id === progId || (progId === 'extra' && w.programId === 'adhoc'));
+                 const wInHistory = todayData.workouts.find(w => w.programId === progId || w.id === progId || (progId === 'extra' && w.programId === 'adhoc' && w.status !== 'completed'));
                  if (wInHistory && wInHistory.duration) {
                     if (typeof wInHistory.duration === 'number') prevSecsToUse = wInHistory.duration * 60;
                     else if (typeof wInHistory.duration === 'string') {
@@ -3321,17 +3313,14 @@ export default function App() {
            setResumeDurationSecs(0);
         };
 
+        if (!isWorkoutActive) {
+          activateWorkoutFromCard();
+        }
         if (!isSuperset || isSupersetComplete) {
           setRestTargetTime(Date.now() + (programRestTime * 1000));
-          if (!isWorkoutActive) {
-            activateWorkoutFromCard();
-          }
         } else if (isSuperset) {
           setShowSupersetToast(true);
           setTimeout(() => setShowSupersetToast(false), 3000);
-          if (!isWorkoutActive) {
-            activateWorkoutFromCard();
-          }
         }
       }
       return { ...prev, [exId]: currentLogs };
@@ -3593,46 +3582,6 @@ export default function App() {
 
   // Hitung ulang beban aktual seluruh riwayat setelah beban dasar alat diisi di Kelola Gym.
   //
-  // Selalu PRATINJAU dulu, tidak pernah langsung menulis: ini menyentuh setiap set di seluruh
-  // riwayat, dan riwayat tidak menyimpan di gym mana sesi dikerjakan. Kalau user punya lebih dari
-  // satu gym, dia yang harus memutuskan apakah gym aktif memang tempat sesi-sesi itu dikerjakan —
-  // bukan aku yang menebak.
-  const perbaikiBebanRiwayat = () => {
-    const lookup = buildExLookupByName(history, exerciseLibrary, extraExercises,
-      ...programs.map(p => p.exercises));
-    const eqConfOf = (ex) => getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile);
-    const { next, diubah, contoh } = repairActualWeights(history, lookup, eqConfOf);
-
-    if (diubah === 0) {
-      showOtaAlert('Tidak ada yang perlu dihitung ulang. Semua set sudah memakai beban dasar yang tercatat, atau alatnya memang berbeban dasar nol.');
-      return;
-    }
-
-    const namaGym = gymProfiles.find(g => g.id === activeGymId)?.name || 'gym aktif';
-    const daftar = contoh.map(c => `• ${c.tanggal} — ${c.latihan}: ${c.dari} → ${c.ke} kg`).join('\n');
-    const banyakGym = (gymProfiles || []).length > 1;
-
-    setConfirmModal({
-      isOpen: true,
-      title: 'Hitung Ulang Beban Aktual',
-      message: `${diubah} set akan dihitung ulang memakai beban dasar alat dari "${namaGym}".
-
-${daftar}${diubah > contoh.length ? `
-…dan ${diubah - contoh.length} set lainnya` : ''}
-
-Beban yang kamu ketik TIDAK berubah — yang dihitung ulang cuma beban aktualnya. Hanya set yang beban dasarnya tercatat nol yang disentuh.${banyakGym ? `
-
-PERHATIAN: kamu punya ${gymProfiles.length} profil gym, dan riwayat tidak mencatat sesi dikerjakan di gym mana. Semua set akan memakai konfigurasi "${namaGym}".` : ''}
-
-Ini tidak bisa dibatalkan otomatis.`,
-      confirmText: 'Ya, Hitung Ulang',
-      onConfirm: () => {
-        setHistory(next);
-        showOtaAlert(`${diubah} set dihitung ulang memakai beban dasar "${namaGym}".`);
-      },
-    });
-  };
-
   const pendingRmLogKeys = useRef(null);
   useEffect(() => {
     const keys = pendingRmLogKeys.current;
@@ -3650,7 +3599,7 @@ Ini tidak bisa dibatalkan otomatis.`,
     setExerciseLibrary(lib => {
       let changed = false;
       const next = lib.map(e => {
-        const r = records[canonicalExId(e.name)];
+        const r = records[canonicalExId(e.name)] || records[String(e.id)] || (e.originalId ? records[String(e.originalId)] : null);
         if (!r) return e;
         // Versi lama menimpa rm10 TANPA SYARAT dengan nilai turunan riwayat setiap kali latihan
         // disimpan — 10RM yang disimpan manual hilang di sesi berikutnya, dan rekor yang sesi
@@ -3797,10 +3746,22 @@ Ini tidak bisa dibatalkan otomatis.`,
       
       if (progId === 'extra') {
         const adhocIdx = workouts.findIndex(w => w.programId === 'adhoc' && w.status !== 'completed');
-        if (adhocIdx >= 0) {
-          const existingW = workouts[adhocIdx];
-          const finalSecs = calcFallbackDurationSecs(cleanLogs, durationSecs);
-          workouts[adhocIdx] = {
+        const targetAdhocIdx = (fokusSesi && fokusSesi !== 'extra') ? workouts.findIndex(w => w.id === fokusSesi) : -1;
+        const matchedIdx = adhocIdx >= 0 ? adhocIdx : targetAdhocIdx;
+
+        if (matchedIdx >= 0) {
+          const existingW = workouts[matchedIdx];
+          let existingSecs = 0;
+          if (existingW.duration) {
+            if (typeof existingW.duration === 'number') existingSecs = existingW.duration * 60;
+            else if (typeof existingW.duration === 'string') {
+              const parts = existingW.duration.split(':').map(Number);
+              if (parts.length === 3) existingSecs = (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
+              else if (parts.length === 2) existingSecs = (parts[0] || 0) * 60 + (parts[1] || 0);
+            }
+          }
+          const finalSecs = calcFallbackDurationSecs(cleanLogs, Math.max(durationSecs, existingSecs));
+          workouts[matchedIdx] = {
             ...existingW,
             status: 'completed',
             log: cleanLogs,
@@ -3811,52 +3772,26 @@ Ini tidak bisa dibatalkan otomatis.`,
             duration: formatDur(finalSecs)
           };
         } else {
-          const isSameAdhoc = (w) => w.programId === 'adhoc' && (w.id === fokusSesi || fokusSesi === 'extra');
-          const completedAdhocIdx = workouts.map((w, i) => (isSameAdhoc(w) ? i : -1)).filter(i => i >= 0).pop() ?? -1;
-          if (completedAdhocIdx >= 0) {
-              const existingW = workouts[completedAdhocIdx];
-              let existingSecs = 0;
-              if (existingW.duration) {
-                if (typeof existingW.duration === 'number') existingSecs = existingW.duration * 60;
-                else if (typeof existingW.duration === 'string') {
-                  const parts = existingW.duration.split(':').map(Number);
-                  if (parts.length === 3) existingSecs = (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
-                  else if (parts.length === 2) existingSecs = (parts[0] || 0) * 60 + (parts[1] || 0);
-                }
-              }
-              const finalSecs = calcFallbackDurationSecs(cleanLogs, Math.max(durationSecs, existingSecs));
-              workouts[completedAdhocIdx] = {
-                ...existingW,
-                status: 'completed',
-                log: cleanLogs,
-                skipped: cleanSkipped,
-                exercises: cleanExtra,
-                timestamp: endStamp,
-                startedAt: startedAtFor(finalSecs),
-                duration: formatDur(finalSecs)
-              };
-          } else {
-              const finalSecs = calcFallbackDurationSecs(cleanLogs, durationSecs);
-              workouts.push({
-                id: `adhoc_${Date.now()}`,
-                programId: 'adhoc',
-                programName: 'Ekstra',
-                status: 'completed',
-                log: cleanLogs,
-                skipped: cleanSkipped,
-                exercises: cleanExtra,
-                timestamp: endStamp,
-                startedAt: startedAtFor(finalSecs),
-                duration: formatDur(finalSecs)
-              });
-          }
+          const finalSecs = calcFallbackDurationSecs(cleanLogs, durationSecs);
+          workouts.push({
+            id: (fokusSesi && fokusSesi !== 'extra') ? fokusSesi : `adhoc_${Date.now()}`,
+            programId: 'adhoc',
+            programName: 'Ekstra',
+            status: 'completed',
+            log: cleanLogs,
+            skipped: cleanSkipped,
+            exercises: cleanExtra,
+            timestamp: endStamp,
+            startedAt: startedAtFor(finalSecs),
+            duration: formatDur(finalSecs)
+          });
         }
       } else {
         let isTargetFound = false;
         workouts = workouts.map(w => {
           const isTargetWorkout = fokusSesi 
-            ? (w.id === fokusSesi || w.programId === fokusSesi)
-            : (progId ? (w.id === progId || w.programId === progId) : w.status === 'planned');
+            ? (w.id === fokusSesi || (w.programId === fokusSesi && w.status !== 'completed'))
+            : (progId ? (w.id === progId || (w.programId === progId && w.status !== 'completed')) : w.status === 'planned');
             
           if (isTargetWorkout) {
             isTargetFound = true;
@@ -4035,8 +3970,8 @@ Ini tidak bisa dibatalkan otomatis.`,
       playSoundEffect('click', soundEnabled);
       setSelectedDate(dateStr);
       setActiveProgramId(w.programId);
-      setFocusWorkoutId(w.programId === 'adhoc' ? 'extra' : w.id);
-      setSessionToRun(w.programId === 'adhoc' ? 'extra' : w.id);
+      setFocusWorkoutId(w.id);
+      setSessionToRun(w.id);
 
       let prevSecs = 0;
       if (w.duration) {
@@ -4075,9 +4010,7 @@ Ini tidak bisa dibatalkan otomatis.`,
         }
       }
       
-      if (w.programId === 'adhoc' && w.exercises && w.exercises.length > 0) {
-        extraToLoad = w.exercises;
-      } else if (dayData && dayData._activeSession && dayData._activeSession.extraExercises) {
+      if (w.programId !== 'adhoc' && dayData && dayData._activeSession && dayData._activeSession.extraExercises) {
         extraToLoad = dayData._activeSession.extraExercises;
       }
 
@@ -4234,16 +4167,16 @@ Ini tidak bisa dibatalkan otomatis.`,
   const __cachedUidRender = localStorage.getItem('__CACHED_UID');
   const isWaitingForAuth = isAuthChecking && !__cachedUidRender;
   
-  if (isWaitingForAuth || (user && (!isDataLoaded || !isHistoryLoaded))) {
+  if (isInitialSplash || isWaitingForAuth || (user && (!isDataLoaded || !isHistoryLoaded))) {
     return (
-      <div className={`fixed inset-0 z-50 flex flex-col items-center justify-center p-4 transition-colors duration-300 ${theme === 'dark' ? 'bg-[#0f1115]' : 'bg-white'}`}>
-         <img src={theme === 'dark' ? '/logo-dark.webp' : '/logo-light.webp'} alt="Logym Logo" className="w-40 h-40 object-contain animate-pulse drop-shadow-2xl" />
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 bg-[#05070d] select-none touch-none overscroll-none overflow-hidden">
+         <img src="/logo-dark.webp" alt="Logym Logo" className="w-40 h-40 object-contain animate-pulse drop-shadow-2xl" />
          
          {isSlowLoading && user && (!isDataLoaded || !isHistoryLoaded) && (
            <div className="absolute bottom-12 left-0 right-0 px-8 flex flex-col items-center justify-center text-center animate-in fade-in slide-in-from-bottom-4 duration-700">
-             <Loader2 className={`w-5 h-5 animate-spin mb-3 ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`} />
-             <p className={`text-sm font-medium ${theme === 'dark' ? 'text-zinc-400' : 'text-zinc-500'}`}>Mengambil data dari server...</p>
-             <p className={`text-[10px] mt-1.5 leading-relaxed max-w-[250px] mx-auto ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>Koneksi mungkin sedang lambat, mohon tunggu sebentar agar data tersinkronisasi.</p>
+             <Loader2 className="w-5 h-5 animate-spin mb-3 text-zinc-500" />
+             <p className="text-sm font-medium text-zinc-400">Mengambil data dari server...</p>
+             <p className="text-[10px] mt-1.5 leading-relaxed max-w-[250px] mx-auto text-zinc-500">Koneksi mungkin sedang lambat, mohon tunggu sebentar agar data tersinkronisasi.</p>
            </div>
          )}
       </div>
@@ -4406,7 +4339,6 @@ Ini tidak bisa dibatalkan otomatis.`,
          healthAvailable={healthAvailable} onHcBackfill={handleHcBackfill}
          setHistory={setHistory}
          backupList={backupList} isRestoring={isRestoring} onLoadBackups={loadBackupList} onRestoreBackup={restoreFromBackup}
-         onRepairActualWeights={perbaikiBebanRiwayat}
       />
 
       <Header
@@ -4659,41 +4591,7 @@ Ini tidak bisa dibatalkan otomatis.`,
       />
 
       {/* PWA Install Prompt */}
-      {showInstallPrompt && (
-        <div className="fixed inset-0 z-[200] flex items-end justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className={`w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col items-center text-center animate-in slide-in-from-bottom-8 duration-300 ${t.bgCard} ${t.border} border`}>
-             <img src="/icon-192.png" className="w-20 h-20 rounded-2xl mb-4 shadow-xl border border-white/10" alt="Logym Logo" />
-             <h3 className={`text-xl font-black ${t.textMain} mb-2`}>Install Logym App</h3>
-             <p className={`text-sm ${t.textMuted} mb-6`}>Install aplikasi Logym di perangkatmu untuk akses lebih cepat, latihan offline, dan pengalaman yang lebih mulus.</p>
-             <div className="flex flex-col w-full gap-3">
-                <button 
-                  className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 text-white ${t.bgAccent} shadow-md`}
-                  onClick={async () => {
-                    if (deferredPrompt) {
-                      deferredPrompt.prompt();
-                      const { outcome } = await deferredPrompt.userChoice;
-                      if (outcome === 'accepted') {
-                        setDeferredPrompt(null);
-                        setShowInstallPrompt(false);
-                      }
-                    }
-                  }}
-                >
-                  <Download size={18} /> Instal Sekarang
-                </button>
-                <button 
-                  className={`w-full py-3.5 rounded-xl font-bold ${t.textMuted} hover:${t.textMain} bg-transparent border border-transparent transition-colors`}
-                  onClick={() => {
-                    localStorage.setItem('__PWA_PROMPT_DISMISSED', 'true');
-                    setShowInstallPrompt(false);
-                  }}
-                >
-                  Nanti Saja
-                </button>
-             </div>
-          </div>
-        </div>
-      )}
+      <PwaInstallPrompt />
 
       <BottomNav t={t} lang={lang} activeTab={activeTab} setActiveTab={setActiveTab} setIsEditingMode={setIsEditingMode} />
     </div>

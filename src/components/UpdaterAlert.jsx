@@ -100,11 +100,14 @@ export default function UpdaterAlert({
     if (!open || !force) return;
     const originalOverflow = document.body.style.overflow;
     const originalTouchAction = document.body.style.touchAction;
+    const originalHtmlOverflow = document.documentElement.style.overflow;
     document.body.style.overflow = 'hidden';
     document.body.style.touchAction = 'none';
+    document.documentElement.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = originalOverflow;
       document.body.style.touchAction = originalTouchAction;
+      document.documentElement.style.overflow = originalHtmlOverflow;
     };
   }, [open, force]);
 
@@ -119,7 +122,7 @@ export default function UpdaterAlert({
     // Scrim sengaja TIDAK ikut di-fade: elemen ber-backdrop-filter yang animasi opacity-nya
     // sendiri bikin blur baru menyala setelah animasi selesai (kedipan layer).
     return (
-      <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center p-6 bg-black/80 backdrop-blur-md overscroll-contain touch-none select-none">
+      <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center p-6 bg-black/80 backdrop-blur-md overscroll-contain touch-none select-none no-swipe">
         <div className={`w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl ${t.bgCardSolid} border ${t.border} ${t.textMain} flex flex-col items-center text-center animate-in zoom-in-95 duration-500 overscroll-contain`}>
           <div className="pt-8 pb-4">
             <img src="/icon-512.webp" alt="LOGYM Logo" className="w-24 h-24 mx-auto rounded-2xl shadow-lg mb-4 bg-white/5 border border-white/10 p-2" />

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Trophy, Heart, MessageCircle, Flame, Loader2, Award, Plus, Bell,
-  MoreHorizontal, Trash2, Edit3, Send, RefreshCw, Share2, X, Check, ClipboardList, Search
+  MoreHorizontal, Trash2, Edit3, Send, RefreshCw, Share2, X, Check, ClipboardList, Search,
+  ImagePlus, Clock
 } from 'lucide-react';
 import { toJpeg } from 'html-to-image';
 import {
@@ -10,6 +11,7 @@ import {
   getWeeklyLeaderboard, updateLeaderboardScore, getCurrentWeekId, searchUsers,
   getFollowingFeed
 } from '../utils/communityApi';
+import { uploadImageToFirebase } from '../utils/storage';
 import { getFollowingIds, getFollowerList, getBlockedList, blockUser } from '../utils/followApi';
 import { containsBadWords, reportPost, reportUser, getLocalHiddenPosts, getLocalBlockedUsers } from '../utils/moderationApi';
 import { formatNumber } from '../utils/numberFormat';
@@ -45,13 +47,26 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
   const [commentInput, setCommentInput] = useState({});
   const [loadingComments, setLoadingComments] = useState({});
   const [menuOpen, setMenuOpen] = useState(null); // postId
-  const [editingPost, setEditingPost] = useState(null); // {id, text, imageUrls}
+  const [editingPost, setEditingPost] = useState(null); // {id, text, imageUrls, newFiles, type, programData}
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const editFileInputRef = useRef(null);
   const [createPostOverrides, setCreatePostOverrides] = useState({});
 
   const isDark = theme === 'dark';
   const { dialog, showAlert, showConfirm } = useDialog(isDark);
   const postRefs = useRef({});
   const [flashingPostId, setFlashingPostId] = useState(null);
+
+  // Modal Scroll Lock Protocol
+  useEffect(() => {
+    if (editingPost || viewingProfile || selectedImages || isCreatingPost) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [editingPost, viewingProfile, selectedImages, isCreatingPost]);
 
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -257,11 +272,54 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
 
   const handleEditSave = async () => {
     if (!editingPost) return;
+
+    if (containsBadWords(editingPost.text || '')) {
+      await showAlert('Pesan mengandung kata-kata yang tidak pantas atau melanggar standar komunitas.', { type: 'error', title: 'Peringatan' });
+      return;
+    }
+
+    setIsSavingEdit(true);
     try {
-      await updatePost(editingPost.id, { text: editingPost.text, imageUrls: editingPost.imageUrls });
-      setFeed(prev => prev.map(p => p.id === editingPost.id ? { ...p, text: editingPost.text, imageUrls: editingPost.imageUrls } : p));
+      let finalImageUrls = [...(editingPost.imageUrls || [])];
+      
+      // Upload any new files selected during edit
+      if (editingPost.newFiles && editingPost.newFiles.length > 0) {
+        for (let i = 0; i < editingPost.newFiles.length; i++) {
+          const file = editingPost.newFiles[i];
+          const url = await uploadImageToFirebase(file, `community_posts/${user?.uid || 'guest'}/edit_${editingPost.id}_${Date.now()}_${i}`);
+          if (url) finalImageUrls.push(url);
+        }
+      }
+
+      const isStillTemplate = editingPost.type === 'template' && !!editingPost.programData;
+      const updatePayload = {
+        text: editingPost.text || '',
+        imageUrls: finalImageUrls,
+        type: isStillTemplate ? 'template' : (editingPost.type === 'template' ? 'user_post' : editingPost.type || 'user_post'),
+        programData: isStillTemplate ? editingPost.programData : null,
+        programName: isStillTemplate ? (editingPost.programName || editingPost.programData?.name || null) : null,
+        exercises: isStillTemplate ? (editingPost.exercises || editingPost.programData?.exercises || null) : null,
+        routines: isStillTemplate ? (editingPost.routines || editingPost.programData?.routines || null) : null,
+        planName: isStillTemplate ? (editingPost.planName || editingPost.programData?.planName || null) : null,
+        restTime: isStillTemplate ? (editingPost.restTime || editingPost.programData?.restTime || null) : null,
+      };
+
+      await updatePost(editingPost.id, updatePayload);
+
+      setFeed(prev => prev.map(p => p.id === editingPost.id ? {
+        ...p,
+        ...updatePayload,
+        editedAt: new Date()
+      } : p));
+
       setEditingPost(null);
-    } catch (e) { await showAlert('Gagal menyimpan perubahan.', { type: 'error', title: 'Error' }); }
+      await showAlert('Postingan berhasil diperbarui!', { type: 'success', title: 'Berhasil' });
+    } catch (e) {
+      console.error(e);
+      await showAlert('Gagal menyimpan perubahan. Silakan coba lagi.', { type: 'error', title: 'Error' });
+    } finally {
+      setIsSavingEdit(false);
+    }
   };
 
   const handleExpandComments = async (postId) => {
@@ -372,6 +430,9 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
               className={`w-full h-full rounded-full object-cover ${!isTopTen ? `ring-2 ${t.ringAccent} ring-opacity-20 hover:ring-opacity-50` : ''} transition-all`}
               onError={(e) => {
                 e.currentTarget.style.display = 'none';
+                if (e.currentTarget.nextElementSibling) {
+                  e.currentTarget.nextElementSibling.classList.remove('hidden');
+                }
               }}
             />
           ) : null}
@@ -389,7 +450,14 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
     const liked = likedPosts[post.id] || false;
     const commentsOpen = expandedComments[post.id] || false;
     const postComments = comments[post.id] || [];
-    const isEditingThis = editingPost?.id === post.id;
+
+    // Edit time window check: max 30 minutes from creation
+    const EDIT_WINDOW_MS = 30 * 60 * 1000;
+    const postDate = post.timestamp?.toDate ? post.timestamp.toDate() : (post.timestamp ? new Date(post.timestamp) : null);
+    const postAgeMs = postDate ? (Date.now() - postDate.getTime()) : 0;
+    const isEditExpired = postAgeMs > EDIT_WINDOW_MS;
+    const canEdit = isOwn && (!isEditExpired || isAdmin);
+
     const postImages = Array.isArray(post.imageUrls) && post.imageUrls.length > 0
       ? post.imageUrls.filter(Boolean)
       : (post.imageUrl ? [post.imageUrl] : (post.mealPhoto ? [post.mealPhoto] : (post.photoUrl ? [post.photoUrl] : (post.dishPhoto ? [post.dishPhoto] : (post.photo ? [post.photo] : [])))));
@@ -428,6 +496,9 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
             </div>
             <div className={`flex items-center gap-1.5 text-[11px] font-medium ${t.textMuted}`}>
               <span>{formatTimeAgo(post.timestamp)}</span>
+              {post.editedAt && (
+                <span className="text-[10px] text-zinc-400 font-medium italic">(Diedit)</span>
+              )}
               {post.type === 'repost' && (
                 <>
                   <span>•</span>
@@ -454,12 +525,42 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
               >
                 {isOwn ? (
                   <>
-                    <button
-                      onClick={() => { setEditingPost({ id: post.id, text: post.text || '', imageUrls: post.imageUrls || [] }); setMenuOpen(null); }}
-                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold whitespace-nowrap ${isDark ? 'text-white hover:bg-white/5' : 'text-black hover:bg-black/5'} transition-colors`}
-                    >
-                      <Edit3 size={16} /> Edit
-                    </button>
+                    {canEdit ? (
+                      <button
+                        onClick={() => {
+                          const existingPhotos = Array.isArray(post.imageUrls) && post.imageUrls.length > 0
+                            ? [...post.imageUrls]
+                            : (post.imageUrl ? [post.imageUrl] : (post.mealPhoto ? [post.mealPhoto] : (post.photoUrl ? [post.photoUrl] : (post.dishPhoto ? [post.dishPhoto] : (post.photo ? [post.photo] : [])))));
+                          
+                          setEditingPost({
+                            id: post.id,
+                            text: post.text || '',
+                            imageUrls: existingPhotos,
+                            newFiles: [],
+                            type: post.type || 'user_post',
+                            programData: post.programData || (post.type === 'template' ? {
+                              name: post.programName,
+                              routines: post.routines,
+                              exercises: post.exercises,
+                              restTime: post.restTime
+                            } : null),
+                            programName: post.programName || post.programData?.name || null,
+                            exercises: post.exercises || post.programData?.exercises || null,
+                            routines: post.routines || post.programData?.routines || null,
+                            planName: post.planName || post.programData?.planName || null,
+                            restTime: post.restTime || post.programData?.restTime || null,
+                          });
+                          setMenuOpen(null);
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold whitespace-nowrap ${isDark ? 'text-white hover:bg-white/5' : 'text-black hover:bg-black/5'} transition-colors`}
+                      >
+                        <Edit3 size={16} /> Edit
+                      </button>
+                    ) : (
+                      <div className="px-4 py-2 text-[11px] font-medium text-zinc-500 border-b border-white/5 flex items-center gap-1.5">
+                        <Clock size={12} /> Batas edit (30 mnt) lewat
+                      </div>
+                    )}
                     <button
                       onClick={() => handleDelete(post.id)}
                       className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold whitespace-nowrap text-rose-500 hover:bg-rose-500/10 transition-colors"
@@ -496,28 +597,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
           </div>
         </div>
 
-        {/* Edit mode */}
-        {isEditingThis ? (
-          <div className="mb-3 flex flex-col gap-2">
-            <div className="relative">
-              <textarea
-                value={editingPost.text}
-                maxLength={500}
-                onChange={e => setEditingPost(prev => ({ ...prev, text: e.target.value }))}
-                className={`w-full p-3 pb-6 rounded-2xl resize-none outline-none text-sm border ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-black/5 border-black/10 text-black'}`}
-                rows={3}
-                placeholder="Tulis caption postingan..."
-              />
-              <span className={`absolute right-3 bottom-2 text-[10px] font-bold ${t.textMuted}`}>
-                {(editingPost.text || '').length}/500
-              </span>
-            </div>
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setEditingPost(null)} className={`px-3 py-1.5 rounded-xl text-xs font-bold ${isDark ? 'bg-white/10 text-white' : 'bg-black/10 text-black'}`}>Batal</button>
-              <button onClick={handleEditSave} className={`px-3 py-1.5 rounded-xl text-xs font-bold ${t.bgAccent} flex items-center gap-1`}><Check size={12}/> Simpan</button>
-            </div>
-          </div>
-        ) : (
+        {/* Post Content */}
           <>
             {/* Repost: original content preview */}
             {post.type === 'repost' && (
@@ -626,7 +706,9 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
                       loading="lazy"
                       className="w-full h-full object-cover object-center block"
                       onError={(e) => {
-                        e.currentTarget.style.display = 'none';
+                        if (e.currentTarget.parentElement) {
+                          e.currentTarget.parentElement.style.display = 'none';
+                        }
                       }}
                     />
                   </div>
@@ -732,7 +814,12 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
               return (
                 <div className="mb-3 flex flex-col gap-2">
                   {post.text && <p className={`text-xs ${t.textMain} whitespace-pre-wrap leading-relaxed`}>{post.text}</p>}
-                  <ProgramCard post={post} isDark={isDark} t={t} />
+                  <ProgramCard 
+                    post={post} 
+                    isDark={isDark} 
+                    t={t} 
+                    onOpenProfile={({ userId, userName, userPhoto }) => setViewingProfile({ userId, userName, userPhoto })}
+                  />
                   <button onClick={handleImportProgram} className={`w-full py-2 rounded-xl text-xs font-black shadow-sm hover:opacity-80 active:scale-95 transition-all ${t.bgAccent}`}>
                     Simpan Program
                   </button>
@@ -757,7 +844,6 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
               </div>
             )}
           </>
-        )}
 
         {/* Action bar */}
         <div className={`flex items-center gap-1 pt-2 border-t ${t.borderDashed} border-dashed`}>
@@ -815,7 +901,12 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
                     decoding="async"
                     loading="lazy"
                     className="w-6 h-6 rounded-full object-cover shrink-0 mt-0.5"
-                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      if (e.currentTarget.nextElementSibling) {
+                        e.currentTarget.nextElementSibling.classList.remove('hidden');
+                      }
+                    }}
                   />
                 ) : null}
                 <div className={`w-6 h-6 rounded-full shrink-0 mt-0.5 flex items-center justify-center text-[9px] font-black ${isDark ? 'bg-white/10 text-white/60' : 'bg-black/8 text-black/50'} ${c.userPhoto ? 'hidden' : ''}`}>
@@ -841,7 +932,12 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
                   decoding="async"
                   loading="lazy"
                   className="w-6 h-6 rounded-full object-cover shrink-0"
-                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    if (e.currentTarget.nextElementSibling) {
+                      e.currentTarget.nextElementSibling.classList.remove('hidden');
+                    }
+                  }}
                 />
               ) : null}
               <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black ${t.bgAccentSoft} ${t.textAccent} ${user?.photoURL ? 'hidden' : ''}`}>
@@ -874,7 +970,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
   return (
     <div className="w-full max-w-full overflow-x-hidden min-h-screen pb-32">
         {/* Search Bar */}
-        <div className="p-4 relative z-20">
+        <div className="p-4 relative z-20" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 24px))' }}>
           <div className={`flex items-center gap-2 px-4 py-3 rounded-2xl ${t.inputBg} border ${t.border}`}>
             <Search size={18} className={t.textMuted} />
             <input
@@ -912,7 +1008,21 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
                     className={`flex items-center gap-3 p-2 rounded-xl hover:${t.bgAccentSoft} cursor-pointer transition-colors`}
                   >
                     {u.photoUrl ? (
-                      <img src={u.photoUrl} alt="" referrerPolicy="no-referrer" crossOrigin="anonymous" decoding="async" loading="lazy" className="w-8 h-8 rounded-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                      <img
+                        src={u.photoUrl}
+                        alt=""
+                        referrerPolicy="no-referrer"
+                        crossOrigin="anonymous"
+                        decoding="async"
+                        loading="lazy"
+                        className="w-8 h-8 rounded-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          if (e.currentTarget.nextElementSibling) {
+                            e.currentTarget.nextElementSibling.classList.remove('hidden');
+                          }
+                        }}
+                      />
                     ) : null}
                     <div className={`w-8 h-8 rounded-full ${t.bgAccentSoft} ${t.textAccent} flex items-center justify-center font-bold text-xs ${u.photoUrl ? 'hidden' : ''}`}>
                       {(u.name || '?').charAt(0).toUpperCase()}
@@ -938,7 +1048,13 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
               </div>
               <span className={`text-[10px] font-bold ${t.textMuted}`}>Reset Senin</span>
             </div>
-            <div className="flex items-center gap-3 overflow-x-auto hide-scrollbar pt-2 pb-1">
+            <div 
+              className="flex items-center gap-3 overflow-x-auto hide-scrollbar pt-2 pb-1 no-swipe"
+              onTouchStart={e => e.stopPropagation()}
+              onTouchMove={e => e.stopPropagation()}
+              onTouchEnd={e => e.stopPropagation()}
+              style={{ touchAction: 'pan-x pan-y' }}
+            >
               {leaderboard.length === 0 ? (
                 <div className={`text-xs font-bold ${t.textMuted} py-4 text-center w-full`}>Memuat papan peringkat...</div>
               ) : (
@@ -958,7 +1074,12 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
                           decoding="async"
                           loading="lazy"
                           className={`w-[72px] h-[72px] rounded-[24px] object-cover border-[3px] ${idx === 0 ? 'border-yellow-400' : idx === 1 ? 'border-slate-300' : idx === 2 ? 'border-amber-600' : 'border-blue-400'} shadow-md`}
-                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            if (e.currentTarget.nextElementSibling) {
+                              e.currentTarget.nextElementSibling.classList.remove('hidden');
+                            }
+                          }}
                         />
                       ) : null}
                       <div className={`w-[72px] h-[72px] rounded-[24px] bg-blue-50 text-blue-500 flex items-center justify-center font-black text-3xl border-[3px] ${idx === 0 ? 'border-yellow-400' : idx === 1 ? 'border-slate-300' : idx === 2 ? 'border-amber-600' : 'border-blue-400'} shadow-md ${lbUser.photoUrl ? 'hidden' : ''}`}>
@@ -1010,6 +1131,168 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
 
       {selectedImages && selectedImages.urls && (
         <ImageModal images={selectedImages.urls} initialIndex={selectedImages.index} onClose={() => setSelectedImages(null)} />
+      )}
+
+      {/* Edit Post Modal */}
+      {editingPost && (
+        <div className="fixed inset-0 z-[999] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-300 touch-none overscroll-contain">
+          <div className={`w-full sm:max-w-xl ${isDark ? 'bg-slate-900/90 backdrop-blur-2xl border border-white/10' : 'bg-white/95 backdrop-blur-2xl border border-black/10'} rounded-t-[2.5rem] sm:rounded-[2.5rem] flex flex-col max-h-[85vh] shadow-2xl animate-in slide-in-from-bottom-10 overscroll-contain`}>
+            
+            {/* Header */}
+            <div className="p-5 flex items-center justify-between shrink-0 border-b border-white/5">
+              <button 
+                type="button"
+                data-close-modal="true"
+                onClick={() => { if (!isSavingEdit) setEditingPost(null); }} 
+                className={`p-2.5 rounded-full ${isDark ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-black/5 hover:bg-black/10 text-black'} transition-colors`}
+              >
+                <X size={22} />
+              </button>
+              <h3 className={`font-black text-xl ${isDark ? 'text-white' : 'text-black'}`}>
+                Edit Postingan
+              </h3>
+              <button 
+                onClick={handleEditSave}
+                disabled={isSavingEdit}
+                className={`px-5 py-2.5 rounded-2xl font-black text-sm ${t?.bgAccent || 'bg-blue-500 text-white'} shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all active:translate-y-0 disabled:opacity-50 disabled:hover:translate-y-0 flex items-center gap-1.5`}
+              >
+                {isSavingEdit ? <Loader2 size={16} className="animate-spin" /> : <><Check size={16} /> Simpan</>}
+              </button>
+            </div>
+
+            {/* Scrollable Body */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 flex flex-col gap-4 overscroll-contain">
+
+              {/* Attached Program Preview Card with Red X to Remove */}
+              {editingPost.type === 'template' && editingPost.programData && (
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs font-bold text-sky-400">Lampiran Program</span>
+                  <ProgramCard 
+                    post={editingPost} 
+                    isDark={isDark} 
+                    t={t || {}} 
+                    onRemove={() => {
+                      setEditingPost(prev => ({
+                        ...prev,
+                        type: 'user_post',
+                        programData: null,
+                        programName: null,
+                        exercises: null,
+                        routines: null,
+                        planName: null,
+                        restTime: null
+                      }));
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Text Area */}
+              <div className="relative">
+                <textarea
+                  value={editingPost.text || ''}
+                  onChange={(e) => {
+                    if (e.target.value.length <= 500) {
+                      setEditingPost(prev => ({ ...prev, text: e.target.value }));
+                    }
+                  }}
+                  placeholder="Tulis caption atau cerita postinganmu..."
+                  className={`w-full min-h-[120px] p-3 rounded-2xl resize-none outline-none text-base border ${isDark ? 'bg-white/5 border-white/10 text-white placeholder-white/40' : 'bg-black/5 border-black/10 text-black placeholder-black/40'}`}
+                />
+                <div className={`text-right text-[11px] font-bold mt-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>
+                  {(editingPost.text || '').length}/500
+                </div>
+              </div>
+
+              {/* Photos Grid & Add Photos */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className={`text-xs font-bold ${isDark ? 'text-white/80' : 'text-black/80'}`}>
+                    Foto ({(editingPost.imageUrls?.length || 0) + (editingPost.newFiles?.length || 0)}/10)
+                  </span>
+                  {((editingPost.imageUrls?.length || 0) + (editingPost.newFiles?.length || 0)) < 10 && (
+                    <button
+                      type="button"
+                      onClick={() => editFileInputRef.current?.click()}
+                      className={`text-xs font-bold px-3 py-1.5 rounded-xl border flex items-center gap-1.5 transition-all ${
+                        isDark ? 'bg-white/10 border-white/15 text-sky-400 hover:bg-white/15' : 'bg-black/5 border-black/10 text-sky-600 hover:bg-black/10'
+                      }`}
+                    >
+                      <ImagePlus size={14} /> Tambah Foto
+                    </button>
+                  )}
+                </div>
+
+                <input
+                  type="file"
+                  ref={editFileInputRef}
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    const validFiles = files.filter(f => f.type.startsWith('image/'));
+                    const currentTotal = (editingPost.imageUrls?.length || 0) + (editingPost.newFiles?.length || 0);
+                    const toAdd = validFiles.slice(0, 10 - currentTotal);
+                    setEditingPost(prev => ({
+                      ...prev,
+                      newFiles: [...(prev.newFiles || []), ...toAdd]
+                    }));
+                    e.target.value = '';
+                  }}
+                  multiple
+                  accept="image/*"
+                  className="hidden"
+                />
+
+                {/* Photos list */}
+                {((editingPost.imageUrls?.length || 0) + (editingPost.newFiles?.length || 0)) > 0 && (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {/* Existing URLs */}
+                    {(editingPost.imageUrls || []).map((url, i) => (
+                      <div key={`url-${i}`} className="relative aspect-square rounded-2xl overflow-hidden border border-white/10 group">
+                        <img src={url} alt={`photo-${i}`} className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setEditingPost(prev => ({
+                            ...prev,
+                            imageUrls: prev.imageUrls.filter((_, idx) => idx !== i)
+                          }))}
+                          className="absolute top-1.5 right-1.5 p-1 rounded-full bg-rose-500 hover:bg-rose-600 text-white shadow-md transition-all active:scale-90"
+                          title="Hapus Foto"
+                        >
+                          <X size={12} strokeWidth={2.5} />
+                        </button>
+                      </div>
+                    ))}
+
+                    {/* Newly added File previews */}
+                    {(editingPost.newFiles || []).map((file, i) => {
+                      const previewUrl = URL.createObjectURL(file);
+                      return (
+                        <div key={`file-${i}`} className="relative aspect-square rounded-2xl overflow-hidden border border-sky-500/40 group">
+                          <img src={previewUrl} alt={`new-${i}`} className="w-full h-full object-cover" />
+                          <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-sky-500/80 text-[8px] font-black text-white uppercase">
+                            Baru
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setEditingPost(prev => ({
+                              ...prev,
+                              newFiles: prev.newFiles.filter((_, idx) => idx !== i)
+                            }))}
+                            className="absolute top-1.5 right-1.5 p-1 rounded-full bg-rose-500 hover:bg-rose-600 text-white shadow-md transition-all active:scale-90"
+                            title="Hapus Foto"
+                          >
+                            <X size={12} strokeWidth={2.5} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+            </div>
+          </div>
+        </div>
       )}
 
       {isCreatingPost && (

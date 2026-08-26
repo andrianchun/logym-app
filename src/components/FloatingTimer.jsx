@@ -15,7 +15,9 @@ const FloatingTimer = ({
   
   const [workoutSeconds, setWorkoutSeconds] = React.useState(0);
 
-  const [localRestTimer, setLocalRestTimer] = React.useState(0);
+  const [localRestTimer, setLocalRestTimer] = React.useState(() => {
+    return restTargetTime !== null ? Math.ceil((restTargetTime - Date.now()) / 1000) : 0;
+  });
   const prevRestRef = React.useRef(0);
 
   useEffect(() => {
@@ -27,6 +29,10 @@ const FloatingTimer = ({
   useEffect(() => {
     let interval;
     if (restTargetTime !== null) {
+      const initialRemaining = Math.ceil((restTargetTime - Date.now()) / 1000);
+      setLocalRestTimer(initialRemaining);
+      prevRestRef.current = initialRemaining;
+
       // Bunyi dibandingkan lewat ref, BUKAN di dalam updater setLocalRestTimer. Fungsi updater
       // dipanggil React di fase render dan boleh dipanggil lebih dari sekali untuk satu perubahan
       // (mode Strict memang selalu dua kali) — hitung mundur 3-2-1 jadi terdengar dobel.
@@ -174,21 +180,25 @@ const FloatingTimer = ({
       </div>
 
       <div className="flex items-center gap-2 pr-1.5">
-        {showTimer ? (
-          <div className={`flex items-center rounded-full shadow-inner px-3.5 py-1.5 min-w-[85px] justify-center gap-1.5 transition-colors ${
-            localRestTimer < -30 ? 'bg-rose-600 animate-pulse text-white' :
-            localRestTimer <= 0 ? 'bg-amber-500 text-white' :
-            'bg-black/20 text-white'
-          }`}>
-            <span className="text-[10px] font-black uppercase text-white/80 tracking-widest mr-0.5">
-               REST
-            </span>
-            <Clock size={15} className={`animate-pulse ${localRestTimer < -30 ? 'text-white' : localRestTimer <= 0 ? 'text-white' : 'text-white'}`} />
-            <span className="font-mono font-black h2 text-white">
-              {formatTime(localRestTimer)}
-            </span>
-          </div>
-        ) : activeSetTimerInfo && activeSetTimerInfo.currentSeconds !== undefined ? (
+        {showTimer ? (() => {
+          const currentRemaining = restTargetTime !== null ? Math.ceil((restTargetTime - Date.now()) / 1000) : 0;
+          const displayRest = (localRestTimer !== 0 || currentRemaining <= 0) ? localRestTimer : currentRemaining;
+          return (
+            <div className={`flex items-center rounded-full shadow-inner px-3.5 py-1.5 min-w-[85px] justify-center gap-1.5 transition-colors ${
+              displayRest < -30 ? 'bg-rose-600 animate-pulse text-white' :
+              displayRest <= 0 ? 'bg-amber-500 text-white' :
+              'bg-black/20 text-white'
+            }`}>
+              <span className="text-[10px] font-black uppercase text-white/80 tracking-widest mr-0.5">
+                 REST
+              </span>
+              <Clock size={15} className="animate-pulse text-white" />
+              <span className="font-mono font-black h2 text-white">
+                {formatTime(displayRest)}
+              </span>
+            </div>
+          );
+        })() : activeSetTimerInfo && activeSetTimerInfo.currentSeconds !== undefined ? (
           <div className="flex items-center rounded-full shadow-inner px-3.5 py-1.5 min-w-[85px] justify-center gap-1.5 bg-rose-500 text-white animate-pulse">
             <span className="text-[10px] font-black uppercase text-white/90 tracking-widest mr-0.5">
                SET

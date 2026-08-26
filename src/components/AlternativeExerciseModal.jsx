@@ -34,6 +34,18 @@ const AlternativeExerciseModal = ({
     return () => { mounted = false; };
   }, []);
 
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const origBody = document.body.style.overflow;
+    const origHtml = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = origBody;
+      document.documentElement.style.overflow = origHtml;
+    };
+  }, [isOpen]);
+
   const combinedLibrary = useMemo(() => {
     const onlineMap = new Map();
     onlineExercises.forEach(ex => {
@@ -161,40 +173,38 @@ const AlternativeExerciseModal = ({
   // yang sama, jadi dengan z-[60] dia tetap dirender tapi ADA DI BELAKANG editor: tombol "ganti
   // latihan alternatif" di editor terasa tidak melakukan apa-apa sama sekali.
   // `no-swipe` + role="dialog": App.jsx memasang penangkap sentuh global untuk geser-pindah-tab
-  // dan handleGlobalTouchStart/TouchEnd MELEWATI elemen yang punya salah satu penanda itu. Dialog
-  // ini satu-satunya modal yang belum menandai dirinya (bandingkan ExerciseDetailModal), jadi
-  // sentuhan di dalamnya ikut dimakan penangkap global — terasa seperti dialog yang tidak bisa
-  // dipencet atau di-scroll.
-  //
-  // Dirender lewat portal ke <body> supaya tidak pernah lagi terjebak di dalam tumpukan overlay
-  // pemanggilnya, apa pun z-index mereka.
   return createPortal(
-    <div role="dialog" aria-modal="true" className={`fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in no-swipe`} onClick={onClose}>
+    <div role="dialog" aria-modal="true" className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in overscroll-contain touch-none no-swipe" onClick={onClose}>
       <div className={`w-full max-w-md mx-auto ${t.bgCard} rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 border ${t.border}`} onClick={e => e.stopPropagation()}>
         
         {/* Header */}
-        <div className={`p-4 border-b ${t.border} flex justify-between items-center`}>
+        <div className={`p-4 border-b ${t.border} flex justify-between items-center shrink-0`}>
           <div>
-            <h3 className={`font-black h2 ${t.textMain}`}>Alternatif Latihan</h3>
-            <p className={`body-md ${t.textMuted}`}>Pengganti untuk {originalEx.name}</p>
+            <h3 className={`font-black text-lg ${t.textMain}`}>Alternatif Latihan</h3>
+            <p className={`text-xs ${t.textMuted}`}>Pengganti untuk {originalEx.name}</p>
           </div>
-          <button onClick={onClose} className={`p-2 rounded-full bg-black/5 hover:bg-black/10 transition-colors ${t.textMain}`}>
-            <X size={20} />
+          <button onClick={onClose} className={`p-1.5 rounded-full ${t.btnBg} hover:opacity-80 transition-all`} data-close-modal="true">
+            <X size={18} className={t.textMain} />
           </button>
         </div>
 
         {/* Search & Filter */}
-        <div className={`p-4 border-b ${t.border} bg-black/5`}>
+        <div className={`p-4 border-b ${t.border} shrink-0 space-y-3`}>
           <div className="flex gap-2">
-            <div className="relative flex-1 min-w-0">
-              <Search size={16} className={`absolute left-3 top-1/2 -translate-y-1/2 shrink-0 ${t.textMuted}`} />
+            <div className={`flex-1 min-w-0 flex items-center gap-2 px-3 py-2.5 rounded-xl ${t.inputBg}`}>
+              <Search size={16} className={`shrink-0 ${t.textMuted}`} />
               <input 
-                type="text"
-                placeholder="Cari alternatif..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className={`w-full min-w-0 pl-9 pr-4 py-3 rounded-xl ${t.inputBg} ${t.textMain} body-md font-bold outline-none focus:ring-2 ${t.ringAccent} transition-all`}
+                type="text" 
+                placeholder="Cari alternatif..." 
+                value={searchTerm} 
+                onChange={(e) => setSearchTerm(e.target.value)} 
+                className={`w-full bg-transparent text-sm font-semibold ${t.textMain} outline-none placeholder:${t.textMuted}`}
               />
+              {searchTerm && (
+                <button onClick={() => setSearchTerm('')} className={`shrink-0 ${t.textMuted} hover:opacity-70`}>
+                  <X size={14} />
+                </button>
+              )}
             </div>
             
             <button

@@ -8,7 +8,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
   const [chartType, setChartType] = useState(() => {
       try {
           const saved = localStorage.getItem('lyfit_prog_chart_type');
-          if (saved) return saved;
+          if (saved && saved !== 'rm10') return saved;
       } catch(e) {}
       return 'exercise';
   });
@@ -38,10 +38,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
   // ==========================================
   const chartDataObj = useMemo(() => {
     const isMusc = chartType === 'muscle';
-    // Mode 10RM: beban mentah per sesi tidak bisa dibandingkan langsung (5x5 @80 kg vs 3x12 @60 kg
-    // mana yang lebih kuat?). 10RM menormalkan beban+reps jadi satu angka, jadi garis yang naik
-    // benar-benar berarti lebih kuat — inilah indikator progressive overload yang sebenarnya.
-    const isRm10 = chartType === 'rm10';
+    // Mode Per Latihan: menggunakan 10RM terstandarisasi untuk menormalkan beban + reps jadi satu angka kekuatan progresif
     const itemsSet = new Set();
     const itemFreq = {};
     const dataPoints = []; // Menggunakan Array datar agar titiknya berurutan sesuai set
@@ -134,14 +131,10 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                       } else {
                           let val = 0;
                           if (exType === 'weight') {
-                              // Di mode 10RM hanya latihan berbeban yang punya arti — latihan
-                              // reps/waktu dilewati, bukan digambar dengan angka yang salah makna.
-                              val = isRm10
-                                ? estimate10RM(actW, Number(s.r)) * (isImp ? 2.20462 : 1)
-                                : actW * (isImp ? 2.20462 : 1);
+                              val = estimate10RM(actW, Number(s.r)) * (isImp ? 2.20462 : 1);
                           }
-                          else if (!isRm10 && exType === 'reps') val = Number(s.r);
-                          else if (!isRm10 && exType === 'time') val = Number(s.d);
+                          else if (exType === 'reps') val = Number(s.r);
+                          else if (exType === 'time') val = Number(s.d);
 
                           if (val > 0) {
                               itemsSet.add(exName);
@@ -512,17 +505,11 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
         {!isSubCard && (
         <div className={`mb-5 border-b border-dashed ${t.border} pb-5 no-swipe`} onTouchStart={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
            <div className={`relative flex w-full p-1 rounded-full ${t.btnBg}`}>
-               <div className={`absolute top-1 bottom-1 w-[calc(33.333%-4px)] rounded-full transition-transform duration-300 ease-out ${t.bgAccent} shadow-sm`} style={{ transform: chartType === 'exercise' ? 'translateX(0)' : chartType === 'muscle' ? 'translateX(100%)' : 'translateX(200%)', left: '4px' }}></div>
+               <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full transition-transform duration-300 ease-out ${t.bgAccent} shadow-sm`} style={{ transform: chartType === 'exercise' ? 'translateX(0)' : 'translateX(100%)', left: '4px' }}></div>
 
                <button onClick={() => { playSoundEffect('click', soundEnabled); setChartType('exercise');}} className={`flex-1 py-2 rounded-full body-md font-bold relative z-10 transition-colors duration-300 ${chartType === 'exercise' ? 'text-white' : t.textMuted}`}>{lang?.progExercise || 'Per Latihan'}</button>
                <button onClick={() => { playSoundEffect('click', soundEnabled); setChartType('muscle');}} className={`flex-1 py-2 rounded-full body-md font-bold relative z-10 transition-colors duration-300 ${chartType === 'muscle' ? 'text-white' : t.textMuted}`}>{lang?.progMuscle || 'Per Otot'}</button>
-               <button onClick={() => { playSoundEffect('click', soundEnabled); setChartType('rm10');}} className={`flex-1 py-2 rounded-full body-md font-bold relative z-10 transition-colors duration-300 ${chartType === 'rm10' ? 'text-white' : t.textMuted}`}>10RM</button>
            </div>
-           {chartType === 'rm10' && (
-             <p className={`mt-2.5 caption font-medium normal-case leading-snug ${t.textMuted}`}>
-               Estimasi 10RM per sesi — beban dan reps dinormalkan jadi satu angka, jadi garis naik = benar-benar makin kuat. Hanya latihan berbeban.
-             </p>
-           )}
         </div>
         )}
         
@@ -572,9 +559,9 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                              if (foundEx) {
                                  if (foundEx.type === 'time') unit = ' s';
                                  else if (foundEx.type === 'reps') unit = ' reps';
-                                 else unit = isImp ? ' lbs' : ' kg';
+                                 else unit = isImp ? ' lbs (10RM)' : ' kg (10RM)';
                              } else {
-                                 unit = isImp ? ' lbs' : ' kg';
+                                 unit = isImp ? ' lbs (10RM)' : ' kg (10RM)';
                              }
                          }
                          return [`${value}${unit}`, name];
@@ -632,6 +619,13 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                  )
               })}
             </div>
+            
+            {/* Keterangan miring di bawah toggle2 */}
+            <p className={`mt-2 text-[10.5px] italic font-medium ${t.textMuted}`}>
+              {chartType === 'exercise' 
+                ? '* Berdasarkan estimasi 10RM dan repetisi.' 
+                : '* Berdasarkan total volume beban (kg × reps).'}
+            </p>
             </div>
         )}
         

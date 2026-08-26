@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Plus, Edit2, Trash2, Check, ArrowLeft, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { equipmentOptions } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
@@ -8,6 +8,17 @@ const generateId = () => `gym_${Date.now()}`;
 
 const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGymId, onClose, t, soundEnabled, setConfirmModal, language }) => {
   const [editingGym, setEditingGym] = useState(null); // null means list view, non-null means editing
+
+  useEffect(() => {
+    const origBody = document.body.style.overflow;
+    const origHtml = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = origBody;
+      document.documentElement.style.overflow = origHtml;
+    };
+  }, []);
 
   const handleCreateGym = () => {
     playSoundEffect('click', soundEnabled);
@@ -70,16 +81,16 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
   // ─── LIST VIEW ──────────────────────────────────────────────────
   if (!editingGym) {
     return (
-      <div className={`fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in`} onClick={onClose}>
-        <div className={`w-full max-w-md mx-auto ${t.bgCard} rounded-3xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden border ${t.border}`} onClick={e => e.stopPropagation()}>
-          <div className={`p-4 border-b ${t.border} flex justify-between items-center`}>
-            <h3 className={`text-xl font-bold ${t.textAccent}`}>Kelola Profil Gym</h3>
-            <button onClick={onClose} className={`p-2 rounded-full ${t.btnBg} hover:opacity-80`}><X size={20} className={t.textMain} /></button>
+      <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in overscroll-contain touch-none no-swipe" onClick={onClose}>
+        <div className={`w-full max-w-md mx-auto ${t.bgCard} rounded-3xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden border ${t.border} animate-in zoom-in-95 duration-200`} onClick={e => e.stopPropagation()}>
+          <div className={`p-4 border-b ${t.border} flex justify-between items-center shrink-0`}>
+            <h3 className={`text-lg font-black ${t.textMain}`}>Kelola Profil Gym</h3>
+            <button onClick={onClose} className={`p-1.5 rounded-full ${t.btnBg} hover:opacity-80 transition-all`} data-close-modal="true"><X size={18} className={t.textMain} /></button>
           </div>
           
-          <div className="p-4 overflow-y-auto flex-1 space-y-3">
+          <div className="p-4 overflow-y-auto flex-1 space-y-3 overscroll-contain touch-pan-y hide-scrollbar">
             {gymProfiles.map(gym => (
-              <div key={gym.id} className={`p-4 rounded-2xl border ${activeGymId === gym.id ? 'border-primary shadow-lg shadow-primary/20' : t.border} ${t.bg} flex items-center justify-between`}>
+              <div key={gym.id} className={`p-4 rounded-2xl border ${activeGymId === gym.id ? `${t.borderAccent || 'border-sky-500'} shadow-lg shadow-sky-500/10` : t.border} ${t.bgCard} flex items-center justify-between`}>
                 <div 
                   className="flex-1 cursor-pointer"
                   onClick={() => {
@@ -88,28 +99,28 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
                   }}
                 >
                   <div className="flex items-center gap-2">
-                    <span className={`font-bold ${activeGymId === gym.id ? t.textAccent : t.textMain}`}>{gym.name}</span>
+                    <span className={`font-bold text-sm ${activeGymId === gym.id ? t.textAccent : t.textMain}`}>{gym.name}</span>
                     {activeGymId === gym.id && <Check size={16} className={t.textAccent} />}
                   </div>
-                  <p className={`text-xs ${t.textMuted} mt-1`}>
+                  <p className={`text-xs ${t.textMuted} mt-0.5`}>
                     {gym.equipment === 'all' || gym.equipment?.length === equipmentOptions.length ? 'Semua Alat Tersedia' : `${gym.equipment?.length || 0} Alat Tersedia`}
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-1.5">
                   {gym.id !== 'default' && (
-                    <button onClick={() => handleEditGym(gym)} className={`p-2 rounded-xl ${t.btnBg} hover:opacity-80`}><Edit2 size={16} className={t.textMain} /></button>
+                    <button onClick={() => handleEditGym(gym)} className={`p-2 rounded-xl ${t.btnBg} hover:opacity-80 text-sm`} title="Edit"><Edit2 size={15} className={t.textMain} /></button>
                   )}
                   {gym.id !== 'default' && gymProfiles.length > 1 && (
-                    <button onClick={() => handleDeleteGym(gym)} className="p-2 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20"><X size={16} /></button>
+                    <button onClick={() => handleDeleteGym(gym)} className="p-2 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 text-sm" title="Hapus"><Trash2 size={15} /></button>
                   )}
                 </div>
               </div>
             ))}
           </div>
 
-          <div className={`p-4 border-t ${t.border}`}>
-            <button onClick={handleCreateGym} className={`w-full py-3.5 rounded-2xl bg-primary text-white font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform`}>
-              <Plus size={20} /> Tambah Profil Gym
+          <div className={`p-4 border-t ${t.border} shrink-0`}>
+            <button onClick={handleCreateGym} className={`w-full py-3 rounded-2xl ${t.bgAccent} text-white font-black text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-transform shadow-lg`}>
+              <Plus size={18} /> Tambah Profil Gym
             </button>
           </div>
         </div>
@@ -216,15 +227,18 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
   };
 
   return (
-    <div className={`fixed inset-0 z-[75] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in`} onClick={() => setEditingGym(null)}>
-      <div className={`w-full max-w-md mx-auto ${t.bgCard} rounded-3xl shadow-2xl flex flex-col h-[90vh] overflow-hidden border ${t.border}`} onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[75] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in overscroll-contain touch-none no-swipe" onClick={() => setEditingGym(null)}>
+      <div className={`w-full max-w-md mx-auto ${t.bgCard} rounded-3xl shadow-2xl flex flex-col h-[90vh] overflow-hidden border ${t.border} animate-in zoom-in-95 duration-200`} onClick={e => e.stopPropagation()}>
         
         {/* Header */}
-        <div className="flex justify-between items-center p-5 pb-4 shrink-0 border-b border-dashed border-slate-500/30">
-          <h3 className={`text-2xl font-black ${t.textAccent}`}>Edit Gym</h3>
+        <div className={`flex justify-between items-center p-4 shrink-0 border-b ${t.border}`}>
+          <h3 className={`text-lg font-black ${t.textMain}`}>Edit Profil Gym</h3>
+          <button onClick={() => setEditingGym(null)} className={`p-1.5 rounded-full ${t.btnBg} hover:opacity-80 transition-all`} data-close-modal="true">
+            <X size={18} className={t.textMain} />
+          </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 space-y-6">
+        <div className="flex-1 overflow-y-auto p-4 space-y-5 overscroll-contain touch-pan-y hide-scrollbar">
           {/* Gym Name */}
           <div>
             <label className={`text-xs font-bold uppercase tracking-wider ${t.textMuted} mb-2 block`}>Nama Profil Gym</label>
@@ -232,7 +246,7 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
               type="text" 
               value={editingGym.name}
               onChange={e => setEditingGym({...editingGym, name: e.target.value})}
-              className={`w-full bg-transparent border-b-2 ${t.border} focus:${t.borderAccent} pb-2 outline-none text-xl font-bold ${t.textMain}`}
+              className={`w-full bg-transparent border-b-2 ${t.border} focus:${t.borderAccent || 'border-sky-500'} pb-2 outline-none text-lg font-bold ${t.textMain}`}
               placeholder="Misal: Fitness First, Home Gym..."
               autoFocus
             />
@@ -240,37 +254,37 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
 
           {/* Equipment Toggles */}
           <div>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3">
               <label className={`text-xs font-bold uppercase tracking-wider ${t.textMuted}`}>Ketersediaan Alat</label>
               <div className="flex gap-2">
                 <button 
                   onClick={() => setEditingGym({...editingGym, equipment: [...equipmentOptions]})}
-                  className="px-2.5 py-1.5 bg-primary/10 text-primary rounded-lg text-[10px] uppercase font-bold hover:bg-primary/20 transition-colors"
+                  className={`px-2.5 py-1 ${t.bgAccentSoft || 'bg-sky-500/10'} ${t.textAccent || 'text-sky-500'} rounded-lg text-[10px] uppercase font-black hover:opacity-80 transition-all`}
                 >
                   Pilih Semua
                 </button>
                 <button 
                   onClick={() => setEditingGym({...editingGym, equipment: []})}
-                  className="px-2.5 py-1.5 bg-rose-500/10 text-rose-500 rounded-lg text-[10px] uppercase font-bold hover:bg-rose-500/20 transition-colors"
+                  className="px-2.5 py-1 bg-rose-500/10 text-rose-500 rounded-lg text-[10px] uppercase font-black hover:bg-rose-500/20 transition-all"
                 >
                   Hapus Semua
                 </button>
               </div>
             </div>
             
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {equipmentOptions.map(eq => {
                 const isActive = editingGym.equipment.includes(eq);
                 return (
-                  <div key={eq} className={`border ${isActive ? t.borderAccentSoft : t.border} rounded-2xl p-3 ${t.bgCard}`}>
+                  <div key={eq} className={`border ${isActive ? `${t.borderAccent || 'border-sky-500/40'} ${t.bgAccentSoft || 'bg-sky-500/5'}` : t.border} rounded-2xl p-3 ${t.bgCard} transition-all`}>
                     <div 
                       className="flex items-center gap-3 cursor-pointer"
                       onClick={() => toggleEquipment(eq)}
                     >
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center border transition-colors ${isActive ? t.bgAccent : `border-slate-500/30 ${t.bgCard}`}`}>
-                        {isActive && <Check size={14} className="text-white" />}
+                      <div className={`w-5 h-5 rounded-full flex items-center justify-center border transition-colors ${isActive ? `${t.bgAccent} border-transparent` : `border-slate-500/30 ${t.bgCard}`}`}>
+                        {isActive && <Check size={12} className="text-white" />}
                       </div>
-                      <span className={`font-semibold ${isActive ? t.textMain : t.textMuted}`}>{eq}</span>
+                      <span className={`font-bold text-sm ${isActive ? t.textMain : t.textMuted}`}>{eq}</span>
                     </div>
                     {isActive && renderConfigFields(eq)}
                   </div>
@@ -281,10 +295,10 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
         </div>
 
         {/* Footer */}
-        <div className="px-5 pb-6 pt-4 mt-auto shrink-0 border-t border-dashed border-slate-500/30 bg-gradient-to-t from-black/5 to-transparent">
+        <div className={`p-4 shrink-0 border-t ${t.border}`}>
           <div className="flex gap-3">
-            <button onClick={() => setEditingGym(null)} className={`w-1/3 py-3 rounded-xl font-bold text-sm sm:text-base ${t.textMuted} ${t.btnBg} active:scale-[0.98] transition-all`}>Batal</button>
-            <button onClick={handleSaveEdit} disabled={!editingGym.name.trim()} className={`flex-1 py-3 rounded-xl font-black text-sm sm:text-base text-white ${t.bgAccent} shadow-lg shadow-black/20 disabled:opacity-50 active:scale-[0.98] transition-all`}>Simpan</button>
+            <button onClick={() => setEditingGym(null)} className={`w-1/3 py-3 rounded-2xl font-bold text-sm ${t.textMuted} ${t.btnBg} active:scale-[0.98] transition-all`} data-close-modal="true">Batal</button>
+            <button onClick={handleSaveEdit} disabled={!editingGym.name.trim()} className={`flex-1 py-3 rounded-2xl font-black text-sm text-white ${t.bgAccent} shadow-lg shadow-black/20 disabled:opacity-50 active:scale-[0.98] transition-all`}>Simpan</button>
           </div>
         </div>
       </div>

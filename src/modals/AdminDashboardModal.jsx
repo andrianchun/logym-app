@@ -19,6 +19,18 @@ export default function AdminDashboardModal({ showModal, setShowModal, user }) {
     const isAdmin = user?.email === 'untheryan@gmail.com';
 
     useEffect(() => {
+        if (!showModal) return;
+        const origBody = document.body.style.overflow;
+        const origHtml = document.documentElement.style.overflow;
+        document.body.style.overflow = 'hidden';
+        document.documentElement.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = origBody;
+            document.documentElement.style.overflow = origHtml;
+        };
+    }, [showModal]);
+
+    useEffect(() => {
         if (showModal && isAdmin) {
             fetchData(activeTab);
         }
@@ -48,26 +60,34 @@ export default function AdminDashboardModal({ showModal, setShowModal, user }) {
     };
 
     const handleUnban = async (userId) => {
-        const confirm = await showConfirm(
-            "Lepaskan ban untuk pengguna ini?",
-            { title: "Unban User", confirmText: "Unban", cancelText: "Batal" }
-        );
-        if (!confirm) return;
+        const ok = await showConfirm("Buka blokir user ini?", { title: 'Unban User' });
+        if (!ok) return;
+        try {
+            await unbanUserGlobal(userId);
+            setBannedUsers(prev => prev.filter(u => u.id !== userId));
+            showAlert("User berhasil di-unban!", { type: 'success' });
+        } catch (e) {
+            showAlert("Gagal unban user.", { type: 'error' });
+        }
+    };
 
-        const success = await unbanUserGlobal(userId);
-        if (success) {
-            showAlert("Ban berhasil dilepaskan.", { type: 'success' });
-            fetchData('banned');
-        } else {
-            showAlert("Gagal melepaskan ban.", { type: 'error' });
+    const handleMarkProcessed = async (id, currentStatus) => {
+        try {
+            await updateDoc(doc(db, 'logym_ai_inbox', id), {
+                processed: !currentStatus
+            });
+            setInboxItems(prev => prev.map(item => item.id === id ? { ...item, processed: !currentStatus } : item));
+        } catch (e) {
+            showAlert("Gagal update status.", { type: 'error' });
         }
     };
 
     const handleDeleteInbox = async (id) => {
-        if (!window.confirm("Hapus pertanyaan ini dari inbox?")) return;
+        const ok = await showConfirm("Hapus feedback ini?", { title: 'Hapus Pesan', danger: true });
+        if (!ok) return;
         try {
             await deleteDoc(doc(db, 'logym_ai_inbox', id));
-            setInboxItems(prev => prev.filter(i => i.id !== id));
+            setInboxItems(prev => prev.filter(item => item.id !== id));
         } catch (e) {
             showAlert("Gagal menghapus.", { type: 'error' });
         }
@@ -84,7 +104,8 @@ export default function AdminDashboardModal({ showModal, setShowModal, user }) {
     };
 
     const handleDeleteBug = async (id) => {
-        if (!window.confirm("Hapus laporan bug ini?")) return;
+        const ok = await showConfirm("Hapus laporan bug ini?", { title: 'Hapus Laporan', danger: true });
+        if (!ok) return;
         try {
             await deleteDoc(doc(db, 'logym_bug_reports', id));
             setBugReports(prev => prev.filter(b => b.id !== id));
@@ -96,9 +117,9 @@ export default function AdminDashboardModal({ showModal, setShowModal, user }) {
     if (!showModal || !isAdmin) return null;
 
     return (
-        <div className="fixed inset-0 z-[9999] bg-neutral-950 flex flex-col animate-in slide-in-from-bottom-full duration-300">
+        <div className="fixed inset-0 z-[9999] bg-neutral-950 flex flex-col overscroll-contain touch-none no-swipe animate-in slide-in-from-bottom-full duration-300">
             {/* Header */}
-            <div className="px-4 pt-4 pb-4 border-b border-white/10 shrink-0 bg-neutral-900 flex items-center justify-between">
+            <div className="px-4 pt-4 pb-4 border-b border-white/10 shrink-0 bg-neutral-900 flex items-center justify-between" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 24px))' }}>
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-red-500/20 rounded-xl text-red-500">
                         <ShieldAlert size={24} />
@@ -108,13 +129,13 @@ export default function AdminDashboardModal({ showModal, setShowModal, user }) {
                         <p className="text-xs text-red-400 font-mono">Top Secret Area • Authorized Only</p>
                     </div>
                 </div>
-                <button onClick={() => setShowModal(false)} className="p-2 bg-white/5 hover:bg-white/10 rounded-full text-neutral-300 transition-colors">
+                <button onClick={() => setShowModal(false)} className="p-2 bg-white/5 hover:bg-white/10 rounded-full text-neutral-300 transition-colors" data-close-modal="true">
                     <X size={20} />
                 </button>
             </div>
 
             {/* Tabs */}
-            <div className="flex px-4 pt-4 bg-neutral-900 border-b border-white/10 shrink-0 overflow-x-auto hide-scrollbar gap-4">
+            <div className="flex px-4 pt-4 bg-neutral-900 border-b border-white/10 shrink-0 overflow-x-auto hide-scrollbar gap-4 no-swipe">
                 <button 
                     onClick={() => setActiveTab('ai_inbox')}
                     className={`pb-3 font-bold text-sm whitespace-nowrap transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'ai_inbox' ? 'border-red-500 text-red-500' : 'border-transparent text-neutral-500 hover:text-white'}`}
@@ -135,8 +156,8 @@ export default function AdminDashboardModal({ showModal, setShowModal, user }) {
                 </button>
             </div>
 
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto p-4 bg-neutral-950">
+            {/* Content List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 overscroll-contain touch-pan-y hide-scrollbar bg-neutral-950">
                 {isLoading ? (
                     <div className="flex flex-col items-center justify-center h-40 text-neutral-500">
                         <Loader2 size={32} className="animate-spin mb-4" />

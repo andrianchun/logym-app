@@ -19,7 +19,6 @@ export default function SettingsModal({
   setShowLibManager, setShowHelp,
   exportData, handleImportFile,
   backupList, isRestoring, onLoadBackups, onRestoreBackup,
-  onRepairActualWeights,
   user, handleLogout, handleDeleteAccount,
   setConfirmModal,
   biometricStandard, setBiometricStandard,
@@ -41,6 +40,47 @@ export default function SettingsModal({
   const [prevShowSettings, setPrevShowSettings] = useState(showSettings);
   const [showBugReport, setShowBugReport] = useState(false);
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
+
+  const TABS = ['preferensi', 'faq', 'lanjutan'];
+  const touchStartX = React.useRef(null);
+  const touchStartY = React.useRef(null);
+
+  const handleTouchStart = (e) => {
+    if (e.target.closest('.no-swipe') || e.target.closest('input') || e.target.closest('textarea') || e.target.closest('button') || e.target.closest('a')) return;
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e) => {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const diffX = e.changedTouches[0].clientX - touchStartX.current;
+    const diffY = e.changedTouches[0].clientY - touchStartY.current;
+    touchStartX.current = null;
+    touchStartY.current = null;
+
+    if (Math.abs(diffX) > 60 && Math.abs(diffX) > Math.abs(diffY) * 2.0) {
+      const currentIndex = TABS.indexOf(activeTab);
+      if (diffX < 0 && currentIndex < TABS.length - 1) {
+        // Swipe left -> Next tab
+        setActiveTab(TABS[currentIndex + 1]);
+      } else if (diffX > 0 && currentIndex > 0) {
+        // Swipe right -> Prev tab
+        setActiveTab(TABS[currentIndex - 1]);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!showSettings) return;
+    const origOverflow = document.body.style.overflow;
+    const origHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = origOverflow;
+      document.documentElement.style.overflow = origHtmlOverflow;
+    };
+  }, [showSettings]);
 
   if (showSettings !== prevShowSettings) {
       setPrevShowSettings(showSettings);
@@ -65,29 +105,32 @@ export default function SettingsModal({
   if (!showSettings) return null;
 
   return (
-    <div className={`fixed inset-0 z-[999] ${t.bgApp} flex flex-col animate-in slide-in-from-bottom-full duration-300`}>
-      {/* HEADER MODAL */}
-      <div className={`relative px-4 pb-4 border-b ${t.border} shrink-0`} style={{ paddingTop: 'max(1.25rem, env(safe-area-inset-top, 24px))' }}>
+    <div 
+      className={`fixed inset-0 z-[1000] ${t.bgApp} flex flex-col overscroll-contain touch-none no-swipe`}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* HEADER MODAL DENGAN TAB INTEGRATED (TIDAK DOUBLE NAV BAR) */}
+      <div className={`relative px-4 pt-3 pb-3 border-b ${t.border} shrink-0`} style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 24px))' }}>
         <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: `url('/banner-${theme}.webp')`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
-        <div className="absolute right-4 z-20 flex items-center space-x-2" style={{ top: 'max(1.25rem, env(safe-area-inset-top, 24px))' }}>
-            <button onClick={() => setShowSettings(false)} className={`p-2 rounded-full ${t.btnBg} transition-colors`}>
-                <X size={20} className={t.textMain} />
-            </button>
+        
+        <div className="relative z-10 flex items-center justify-between gap-3 mb-2.5">
+          <h1 className={`text-xl font-black ${t.textMain} tracking-tight`}>{lang.settings || 'Pengaturan'}</h1>
+          <button onClick={() => setShowSettings(false)} className={`p-1.5 rounded-full ${t.btnBg} hover:opacity-80 transition-all`} data-close-modal="true">
+            <X size={18} className={t.textMain} />
+          </button>
         </div>
-        <div className="relative z-10">
-            <h1 className={`text-2xl font-black ${t.textMain} tracking-tight`}>{lang.settings || 'Pengaturan'}</h1>
-        </div>
-      </div>
 
-      {/* Tabs */}
-      <div className={`flex border-b ${t.border} px-2 shrink-0 overflow-x-auto no-scrollbar`}>
-          <button onClick={() => setActiveTab('preferensi')} className={`flex-1 py-3 text-sm font-bold border-b-2 whitespace-nowrap px-4 transition-colors ${activeTab === 'preferensi' ? `border-[#3b82f6] ${t.textMain}` : `border-transparent ${t.textMuted}`}`}>Preferensi</button>
-          <button onClick={() => setActiveTab('faq')} className={`flex-1 py-3 text-sm font-bold border-b-2 whitespace-nowrap px-4 transition-colors ${activeTab === 'faq' ? `border-[#3b82f6] ${t.textMain}` : `border-transparent ${t.textMuted}`}`}>FAQ</button>
-          <button onClick={() => setActiveTab('lanjutan')} className={`flex-1 py-3 text-sm font-bold border-b-2 whitespace-nowrap px-4 transition-colors ${activeTab === 'lanjutan' ? `border-[#3b82f6] ${t.textMain}` : `border-transparent ${t.textMuted}`}`}>Lanjutan</button>
+        {/* Integrated Segmented Pill Tabs */}
+        <div className={`relative z-10 flex p-1 rounded-2xl ${theme === 'dark' ? 'bg-white/5 border border-white/10' : 'bg-black/5 border border-black/5'} gap-1 no-swipe`}>
+          <button onClick={() => setActiveTab('preferensi')} className={`flex-1 py-1.5 text-xs font-black rounded-xl transition-all ${activeTab === 'preferensi' ? `${t.bgAccent} text-white shadow-sm` : `${t.textMuted} hover:${t.textMain}`}`}>Preferensi</button>
+          <button onClick={() => setActiveTab('faq')} className={`flex-1 py-1.5 text-xs font-black rounded-xl transition-all ${activeTab === 'faq' ? `${t.bgAccent} text-white shadow-sm` : `${t.textMuted} hover:${t.textMain}`}`}>FAQ</button>
+          <button onClick={() => setActiveTab('lanjutan')} className={`flex-1 py-1.5 text-xs font-black rounded-xl transition-all ${activeTab === 'lanjutan' ? `${t.bgAccent} text-white shadow-sm` : `${t.textMuted} hover:${t.textMain}`}`}>Lanjutan</button>
+        </div>
       </div>
 
       {/* BODY MODAL */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 space-y-6 overscroll-contain touch-pan-y hide-scrollbar">
 
         {/* TAB 1: PREFERENSI */}
         {activeTab === 'preferensi' && (
@@ -144,13 +187,47 @@ export default function SettingsModal({
                 </div>
                 <div className={`relative flex w-32 p-1 rounded-full ${t.btnBg} shrink-0`}>
                     <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full transition-transform duration-300 ease-out ${t.bgAccent} shadow-sm`} style={{ transform: weekStartDay === 0 ? 'translateX(100%)' : 'translateX(0)', left: '4px' }}></div>
-                    <button onClick={() => setWeekStartDay(1)} className={`flex flex-1 justify-center items-center py-1.5 rounded-full relative z-10 transition-colors duration-300 ${weekStartDay === 1 ? 'text-white' : t.textMuted} text-xs font-bold`}>Senin</button>
-                    <button onClick={() => setWeekStartDay(0)} className={`flex flex-1 justify-center items-center py-1.5 rounded-full relative z-10 transition-colors duration-300 ${weekStartDay === 0 ? 'text-white' : t.textMuted} text-xs font-bold`}>Minggu</button>
+                    <button onClick={() => setWeekStartDay(1)} className={`flex flex-1 justify-center items-center py-1.5 rounded-full relative z-10 transition-colors duration-300 ${weekStartDay === 1 ? 'text-white' : t.textMuted} text-xs font-bold`}>{language === 'ID' ? 'Sen' : 'Mon'}</button>
+                    <button onClick={() => setWeekStartDay(0)} className={`flex flex-1 justify-center items-center py-1.5 rounded-full relative z-10 transition-colors duration-300 ${weekStartDay === 0 ? 'text-white' : t.textMuted} text-xs font-bold`}>{language === 'ID' ? 'Min' : 'Sun'}</button>
                 </div>
                 </div>
             </div>
 
-            {/* Separator — Satuan & Unit digabung ke tab yang sama, dipisah judul & spacing */}
+            {/* Rutinitas Latihan (Pengingat & Jam) */}
+            <p className={`body-md ${t.textMuted} uppercase tracking-wider pt-2`}>
+                Rutinitas Latihan
+            </p>
+            <div className={`p-4 rounded-2xl border ${t.border} ${t.bgCard} space-y-2`}>
+                {/* Waktu Latihan */}
+                <div className="flex justify-between items-center py-2">
+                <div className={`flex items-center space-x-3 ${t.textMain} shrink-0`}>
+                    <Clock size={20} className={t.textAccent}/> 
+                    <span className="font-bold">Jam Default</span>
+                </div>
+                <input
+                    type="time"
+                    lang="en-GB"
+                    value={defaultReminderTime}
+                    onChange={(e) => setDefaultReminderTime(e.target.value)}
+                    className={`w-32 text-center font-bold px-2 py-1.5 rounded-xl outline-none border ${t.border} focus:ring-2 ${t.ringAccent} ${t.inputBg} ${t.textMain}`}
+                />
+                </div>
+
+                {/* Notifikasi Toggle */}
+                <div className="flex justify-between items-center py-2 border-t border-black/5 dark:border-white/5">
+                <div className={`flex items-center space-x-3 ${t.textMain} shrink-0`}>
+                    {reminderEnabled ? <Bell size={20} className={t.textAccent}/> : <BellOff size={20} className={t.textMuted}/>}
+                    <span className="font-bold">Pengingat</span>
+                </div>
+                <div className={`relative flex w-32 p-1 rounded-full ${t.btnBg} shrink-0`}>
+                    <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full transition-transform duration-300 ease-out ${t.bgAccent} shadow-sm`} style={{ transform: reminderEnabled ? 'translateX(100%)' : 'translateX(0)', left: '4px' }}></div>
+                    <button onClick={() => setReminderEnabled(false)} className={`flex flex-1 justify-center items-center py-1.5 rounded-full relative z-10 transition-colors duration-300 ${!reminderEnabled ? 'text-white' : t.textMuted}`}><BellOff size={16} /></button>
+                    <button onClick={() => setReminderEnabled(true)} className={`flex flex-1 justify-center items-center py-1.5 rounded-full relative z-10 transition-colors duration-300 ${reminderEnabled ? 'text-white' : t.textMuted}`}><Bell size={16} /></button>
+                </div>
+                </div>
+            </div>
+
+            {/* Separator — Satuan & Unit */}
             <p id="satuan-unit-settings" className={`body-md ${t.textMuted} uppercase tracking-wider pt-2`}>
                 Satuan & Unit
             </p>
@@ -217,7 +294,7 @@ export default function SettingsModal({
                 <div className={`relative flex w-32 p-1 rounded-full ${t.btnBg} shrink-0`}>
                     <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full transition-transform duration-300 ease-out ${t.bgAccent} shadow-sm`} style={{ transform: biometricStandard === 'western' ? 'translateX(100%)' : 'translateX(0)', left: '4px' }}></div>
                     <button onClick={() => setBiometricStandard('asia')} className={`flex flex-1 justify-center items-center py-1.5 rounded-full relative z-10 transition-colors duration-300 ${biometricStandard === 'asia' ? 'text-white' : t.textMuted} text-xs font-bold`}>Asia</button>
-                    <button onClick={() => setBiometricStandard('western')} className={`flex flex-1 justify-center items-center py-1.5 rounded-full relative z-10 transition-colors duration-300 ${biometricStandard === 'western' ? 'text-white' : t.textMuted} text-xs font-bold`}>Western</button>
+                    <button onClick={() => setBiometricStandard('western')} className={`flex flex-1 justify-center items-center py-1.5 rounded-full relative z-10 transition-colors duration-300 ${biometricStandard === 'western' ? 'text-white' : t.textMuted} text-xs font-bold`}>West</button>
                 </div>
                 </div>
 
@@ -467,37 +544,6 @@ export default function SettingsModal({
                 )}
             </div>
 
-            <div className={`p-4 rounded-2xl border ${t.border} ${t.bgCard} space-y-2`}>
-                <p className={`body-md ${t.textMuted} uppercase tracking-wider mb-2 flex items-center gap-2`}>Rutinitas Latihan</p>
-                {/* Waktu Latihan */}
-                <div className="flex justify-between items-center py-2">
-                <div className={`flex items-center space-x-3 ${t.textMain} shrink-0`}>
-                    <Clock size={20} className={t.textAccent}/> 
-                    <span className="font-bold">Jam Default</span>
-                </div>
-                <input
-                    type="time"
-                    lang="en-GB"
-                    value={defaultReminderTime}
-                    onChange={(e) => setDefaultReminderTime(e.target.value)}
-                    className={`w-32 text-center font-bold px-2 py-1.5 rounded-xl outline-none border ${t.border} focus:ring-2 ${t.ringAccent} ${t.inputBg} ${t.textMain}`}
-                />
-                </div>
-
-                {/* Notifikasi Toggle */}
-                <div className="flex justify-between items-center py-2 border-t border-black/5 dark:border-white/5">
-                <div className={`flex items-center space-x-3 ${t.textMain} shrink-0`}>
-                    {reminderEnabled ? <Bell size={20} className={t.textAccent}/> : <BellOff size={20} className={t.textMuted}/>}
-                    <span className="font-bold">Pengingat</span>
-                </div>
-                <div className={`relative flex w-32 p-1 rounded-full ${t.btnBg} shrink-0`}>
-                    <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full transition-transform duration-300 ease-out ${t.bgAccent} shadow-sm`} style={{ transform: reminderEnabled ? 'translateX(100%)' : 'translateX(0)', left: '4px' }}></div>
-                    <button onClick={() => setReminderEnabled(false)} className={`flex flex-1 justify-center items-center py-1.5 rounded-full relative z-10 transition-colors duration-300 ${!reminderEnabled ? 'text-white' : t.textMuted}`}><BellOff size={16} /></button>
-                    <button onClick={() => setReminderEnabled(true)} className={`flex flex-1 justify-center items-center py-1.5 rounded-full relative z-10 transition-colors duration-300 ${reminderEnabled ? 'text-white' : t.textMuted}`}><Bell size={16} /></button>
-                </div>
-                </div>
-            </div>
-
             {/* FITUR EXPORT / IMPORT JSON */}
             <div className={`p-4 rounded-2xl border ${t.border} ${t.bgCard} space-y-3`}>
                 <p className={`body-md ${t.textMuted} uppercase tracking-wider mb-2 flex items-center gap-2`}><Download size={16}/> Backup & Restore Data</p>
@@ -511,33 +557,10 @@ export default function SettingsModal({
                 </label>
                 </div>
 
-                {/* HITUNG ULANG BEBAN AKTUAL RIWAYAT.
-                    Kolom beban dasar untuk Cable/Machine/Dumbbell baru ada belakangan, jadi set
-                    lama menyimpan beban aktual yang dihitung seolah dasarnya nol. Ini membetulkan
-                    yang lama; yang baru sudah benar sejak dicatat. */}
+                {/* PULIHKAN DARI BACKUP OTOMATIS DI CLOUD */}
                 <div className={`pt-3 border-t ${t.border}`}>
-                    <p className={`body-sm ${t.textMuted} mb-2`}>
-                        Set lama dihitung sebelum beban dasar alat bisa diisi, jadi beban aktualnya
-                        menganggap dasarnya nol. Ini menghitung ulang set-set itu memakai setelan
-                        gym aktif. <span className="font-bold">Beban yang kamu ketik tidak berubah</span>,
-                        dan kamu akan melihat pratinjaunya dulu sebelum apa pun disimpan.
-                    </p>
-                    <button
-                        onClick={onRepairActualWeights}
-                        className={`w-full flex items-center justify-center space-x-2 py-3 rounded-xl font-bold ${t.btnBg} ${t.textMain} body-lg border ${t.border} active:scale-95 transition-all`}
-                    >
-                        <RefreshCw size={16} />
-                        <span>Hitung Ulang Beban Aktual</span>
-                    </button>
-                </div>
-
-                {/* PULIHKAN DARI BACKUP OTOMATIS DI CLOUD.
-                    Backup dibuat sendiri tiap selesai latihan, tapi sampai sekarang tidak ada satu
-                    pun cara membacanya dari dalam app — harus buka konsol Firebase. Ini gagangnya. */}
-                <div className={`pt-3 border-t ${t.border}`}>
-                    <p className={`body-sm ${t.textMuted} mb-2`}>
-                        Backup otomatis tersimpan di cloud tiap selesai latihan, disimpan 30 hari.
-                        Memulihkan <span className="font-bold">hanya menambahkan tanggal yang hilang</span> — data yang ada di HP ini tidak akan diubah.
+                    <p className={`text-xs ${t.textMuted} mb-2`}>
+                        Backup otomatis 7 hari terakhir. Memulihkan hanya menambal tanggal/sesi yang hilang.
                     </p>
                     <button
                         onClick={onLoadBackups}

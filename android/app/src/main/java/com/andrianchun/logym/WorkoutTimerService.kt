@@ -93,12 +93,17 @@ class WorkoutTimerService : Service() {
             currentWorkoutName = intent.getStringExtra("workoutName") ?: "Sesi Latihan Aktif"
             currentExerciseName = intent.getStringExtra("exerciseName") ?: ""
             currentCalories = intent.getStringExtra("calories") ?: "0"
-            isResting = false
-            restTargetTime = 0L
-            previousRestLeft = 1L
+            isResting = intent.getBooleanExtra("isResting", false)
+            restTargetTime = intent.getLongExtra("targetTime", 0L)
+            previousRestLeft = if (isResting && restTargetTime > 0) {
+                kotlin.math.ceil((restTargetTime - System.currentTimeMillis()) / 1000.0).toLong()
+            } else {
+                1L
+            }
             
             startForeground(9999, buildNotification())
             startTicker()
+            updateFloatingWidgetVisibility()
         } else if (action == "UPDATE") {
             if (intent.hasExtra("isResting")) isResting = intent.getBooleanExtra("isResting", false)
             if (intent.hasExtra("targetTime")) {
@@ -113,7 +118,7 @@ class WorkoutTimerService : Service() {
             intent.getStringExtra("calories")?.let { currentCalories = it }
             
             updateNotification()
-            updateFloatingWidgetData()
+            updateFloatingWidgetVisibility()
         } else if (action == "APP_STATE_CHANGE") {
             isAppActive = intent.getBooleanExtra("isActive", true)
             updateFloatingWidgetVisibility()

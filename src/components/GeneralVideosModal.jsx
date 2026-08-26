@@ -33,6 +33,18 @@ const GeneralVideosModal = ({
   const [hasSaved, setHasSaved] = useState(false);
 
   useEffect(() => {
+    if (!isOpen) return;
+    const origBody = document.body.style.overflow;
+    const origHtml = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = origBody;
+      document.documentElement.style.overflow = origHtml;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
     if (isOpen) {
       const wList = parseVideoList(warmupVideos);
       const cList = parseVideoList(cooldownVideos);
@@ -100,11 +112,9 @@ const GeneralVideosModal = ({
   };
 
   const handleSave = () => {
-    playSoundEffect('done', soundEnabled);
-    const cleanWarmup = warmupList.map(s => s.trim()).filter(Boolean).join(' ');
-    const cleanCooldown = cooldownList.map(s => s.trim()).filter(Boolean).join(' ');
-    setWarmupVideos(cleanWarmup);
-    setCooldownVideos(cleanCooldown);
+    playSoundEffect('click', soundEnabled);
+    setWarmupVideos(warmupList.filter(Boolean).join('\n'));
+    setCooldownVideos(cooldownList.filter(Boolean).join('\n'));
     setHasSaved(true);
     setTimeout(() => {
       onClose();
@@ -115,7 +125,7 @@ const GeneralVideosModal = ({
 
   return (
     <div 
-      className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200 overscroll-contain touch-none no-swipe"
       onClick={onClose}
     >
       <div 
@@ -123,13 +133,14 @@ const GeneralVideosModal = ({
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className={`p-5 sm:p-6 border-b ${t.border} flex items-center justify-between`}>
-          <h2 className={`text-lg sm:text-xl font-black ${t.textMain}`}>Video Instruksi Umum</h2>
+        <div className={`p-4 sm:p-5 border-b ${t.border} flex items-center justify-between shrink-0`}>
+          <h2 className={`text-lg font-black ${t.textMain}`}>Video Instruksi Umum</h2>
           <button 
             onClick={onClose}
-            className={`w-9 h-9 rounded-full flex items-center justify-center bg-black/5 dark:bg-white/5 ${t.textMuted} hover:${t.textMain} transition-all`}
+            className={`p-1.5 rounded-full ${t.btnBg} hover:opacity-80 transition-all`}
+            data-close-modal="true"
           >
-            <X size={18} />
+            <X size={18} className={t.textMain} />
           </button>
         </div>
 

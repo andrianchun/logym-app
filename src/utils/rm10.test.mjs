@@ -218,9 +218,36 @@ console.log('rm10 OK', { r100x10: estimate10RM(100, 10), bulat42_5step5: roundDo
 
 // ---- Saran beban ikut turun setelah koreksi (gejala yang dilaporkan user) ----
 {
-  const { defaultSetWeight } = await import('./workoutCalc.js');
+  const { defaultSetWeight, estimate10RM, canonicalExId, buildExLookupByName, recomputeStrengthRecords } = await import('./workoutCalc.js');
   const ex = { reps: 10 };
   assert.equal(defaultSetWeight({ rm10: estimate10RM(100, 10) }, ex, 2.5), 100, 'sebelum dikoreksi');
   assert.equal(defaultSetWeight({ rm10: estimate10RM(10, 10) }, ex, 2.5), 10, 'sesudah dikoreksi');
   console.log('saran beban OK');
+
+  // Latihan baru pertama kali (misal Close Grip Front Lat Pulldown)
+  const NEW_EX = 'Close Grip Front Lat Pulldown';
+  const exItem = { id: 'uuid-cgflp', name: NEW_EX };
+  const histFirst = {
+    '2026-08-26': {
+      workouts: [{
+        id: 'w-adhoc',
+        status: 'completed',
+        exercises: [exItem],
+        log: {
+          'uuid-cgflp-w-adhoc': [
+            { w: 50, r: 10, done: true },
+            { w: 55, r: 10, done: true }
+          ]
+        }
+      }]
+    }
+  };
+  const lookupNew = buildExLookupByName(histFirst, [exItem]);
+  const recNew = recomputeStrengthRecords(histFirst, ['uuid-cgflp-w-adhoc'], lookupNew);
+  const canonKey = canonicalExId(NEW_EX);
+  const rResult = recNew[canonKey] || recNew['uuid-cgflp'];
+  assert.ok(rResult, 'rekor latihan baru harus ditemukan');
+  assert.equal(rResult.rm10, estimate10RM(55, 10), '10RM harus dari set terberat 55 kg');
+  assert.equal(rResult.rm10Best, estimate10RM(55, 10), 'rm10Best pertama kali harus sama dengan 10RM');
+  console.log('10RM pertama latihan baru OK');
 }

@@ -19,6 +19,14 @@ export default function NotificationPanel({ user, isDark, t, onClose, onNotifCli
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    const orig = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = orig;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!user?.uid) return;
     const load = async () => {
       setIsLoading(true);
@@ -42,7 +50,7 @@ export default function NotificationPanel({ user, isDark, t, onClose, onNotifCli
   };
 
   const modalContent = (
-    <div className="fixed inset-0 z-[1000] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300" onClick={onClose}>
+    <div className="fixed inset-0 z-[1000] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300 overscroll-contain" onClick={onClose}>
       <div
         className={`w-full max-w-sm glass-card ${isDark ? 'bg-[#0d1f2d]/70' : 'bg-white/70'} rounded-3xl flex flex-col max-h-[85vh] shadow-2xl animate-in zoom-in-95 border ${isDark ? 'border-white/10' : 'border-black/8'}`}
         onClick={e => e.stopPropagation()}
@@ -53,7 +61,7 @@ export default function NotificationPanel({ user, isDark, t, onClose, onNotifCli
             <Bell size={18} className={accent} />
             <h3 className={`font-black text-base ${isDark ? 'text-white' : 'text-slate-900'}`}>Notifikasi</h3>
           </div>
-          <button onClick={onClose} className={`p-1.5 rounded-full ${isDark ? 'bg-white/5 text-white/70' : 'bg-black/5 text-black/60'}`}>
+          <button onClick={onClose} className={`p-1.5 rounded-full ${isDark ? 'bg-white/5 text-white/70' : 'bg-black/5 text-black/60'}`} data-close-modal="true">
             <X size={16} />
           </button>
         </div>

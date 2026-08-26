@@ -204,6 +204,13 @@ Setiap perubahan pada struktur latihan atau timer wajib lolos verifikasi di 5 la
   2. **Smart Alias Normalization (`cleanExerciseNameForMatching` & `findMatchingMasterExercise`)**: Seluruh pencarian latihan di `ImmersiveWorkout.jsx`, `ExerciseDetailModal.jsx`, `ExerciseCard.jsx`, dan `exerciseDbApi.js` **WAJIB** memakai fungsi normalisasi cerdas yang menangani typo fonetik (e.g. *rumanian* -> *romanian*), variasi alat/posisi (*cable*, *flat*, *wide-grip*), bentuk jamak (*raises* -> *raise*), dan singkatan (*rdl* -> *romanian deadlift*).
   3. **History Entity Merger (`isSameExerciseEntity`)**: Tab detail latihan **WAJIB** menggabungkan riwayat sesi untuk entitas yang sama (misal *Lat Pulldown* dan *Wide-Grip Lat Pulldown*) sehingga grafik progres dan 1RM selalu lengkap.
 
+### Insiden 11: Penimpaan Sesi Ekstra & Pewarisan Durasi pada Multi-Sesi Adhoc (26 Agustus 2026)
+* **Gejala**: Menyimpan sesi ekstra ke-2 di hari yang sama menimpa latihan dan log sesi ekstra ke-1 di histori, serta timer sesi baru mewarisi durasi sesi lama.
+* **Pelajaran**:
+  1. **Isolasi Simpan Sesi Adhoc**: Saat menyimpan sesi ekstra (`progId === 'extra'`), jika `fokusSesi === 'extra'` (atau sesi baru), sistem **WAJIB selalu membuat entri baru** (`workouts.push(...)`) dengan ID unik (`adhoc_${Date.now()}`). Penimpaan hanya boleh terjadi jika ada sesi adhoc belum selesai (`w.status !== 'completed'`) atau user secara spesifik menargetkan `w.id === fokusSesi`.
+  2. **Isolasi Durasi & Timer**: Pembacaan durasi awal di `proceedStartWorkout` dan `activateWorkoutFromCard` untuk sesi `extra` **WAJIB mengabaikan** sesi adhoc yang sudah berstatus `completed`.
+  3. **Identitas Sesi pada Edit**: Saat mengedit sesi adhoc di `handleEditPastWorkout`, `focusWorkoutId` dan `sessionToRun` **WAJIB disetel ke `w.id`** asli (bukan `'extra'`) agar operasi simpan mengenali sesi target secara presisi.
+
 ---
 
 ## 5. Checklist Wajib Sebelum Rilis / Selesai Debugging
@@ -219,4 +226,6 @@ Setiap perubahan pada struktur latihan atau timer wajib lolos verifikasi di 5 la
 - [ ] 9. Apakah sesi dengan 0 set selesai mengembalikan 0 kcal dan pemisahan log per-sesi tidak mencemari daftar latihan sesi lain?
 - [ ] 10. Apakah toggle set pada sesi selesai menarik set tersimpan dari riwayat secara akurat tanpa mereset set lain menjadi undone?
 - [ ] 11. Apakah gesture swipe-down di Immersive Mode memicu minimize seketika dan pencocokan media/riwayat latihan mendukung normalisasi alias?
+- [ ] 12. Apakah multi-sesi ekstra (adhoc) tersimpan sebagai entri terpisah tanpa saling menimpa latihan atau durasi?
+
 

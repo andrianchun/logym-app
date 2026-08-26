@@ -1,8 +1,20 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Zap, Activity, ShieldAlert, X } from 'lucide-react';
 import { playSoundEffect } from '../utils/audio';
 
 const WellnessCheckModal = ({ isOpen, onSelect, onClose, t, soundEnabled }) => {
+  useEffect(() => {
+    if (!isOpen) return;
+    const origBody = document.body.style.overflow;
+    const origHtml = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = origBody;
+      document.documentElement.style.overflow = origHtml;
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handleChoose = (option) => {
@@ -12,25 +24,26 @@ const WellnessCheckModal = ({ isOpen, onSelect, onClose, t, soundEnabled }) => {
 
   return (
     <div 
-      className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in"
+      className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in overscroll-contain touch-none no-swipe"
       onClick={onClose}
     >
       <div 
-        className={`w-full max-w-md mx-auto ${t.bgCard} rounded-3xl shadow-2xl flex flex-col overflow-hidden border ${t.border} p-6 relative`}
+        className={`w-full max-w-md mx-auto ${t.bgCard} rounded-3xl shadow-2xl flex flex-col overflow-hidden border ${t.border} p-6 relative animate-in zoom-in-95 duration-200`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
         <button 
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 rounded-full bg-black/5 dark:bg-white/5 text-zinc-400 hover:text-white transition"
+          className={`absolute top-4 right-4 p-1.5 rounded-full ${t.btnBg} hover:opacity-80 transition-all`}
+          data-close-modal="true"
           title="Tutup"
         >
-          <X size={18} />
+          <X size={18} className={t.textMain} />
         </button>
 
         {/* Header */}
         <div className="text-center mb-5 pt-1">
-          <h3 className={`h2 font-bold ${t.textMain}`}>Kondisi Tubuh Hari Ini</h3>
+          <h3 className={`text-lg font-black ${t.textMain}`}>Kondisi Tubuh Hari Ini</h3>
           <p className={`text-xs ${t.textMuted} mt-1`}>
             Sesuaikan intensitas dan target beban latihanmu.
           </p>

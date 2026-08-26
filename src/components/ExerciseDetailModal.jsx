@@ -324,11 +324,14 @@ const ExerciseDetailModal = ({
   React.useEffect(() => {
     const originalOverflow = document.body.style.overflow;
     const originalTouchAction = document.body.style.touchAction;
+    const originalHtmlOverflow = document.documentElement.style.overflow;
     document.body.style.overflow = 'hidden';
     document.body.style.touchAction = 'none';
+    document.documentElement.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = originalOverflow;
       document.body.style.touchAction = originalTouchAction;
+      document.documentElement.style.overflow = originalHtmlOverflow;
     };
   }, []);
 
@@ -515,7 +518,7 @@ const ExerciseDetailModal = ({
   };
 
   return createPortal(
-    <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in no-swipe overscroll-contain`} onClick={onClose}>
+    <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in no-swipe overscroll-contain touch-none`} onClick={onClose}>
       <div className={`w-full max-w-md sm:max-w-4xl mx-auto ${t.bgCard} rounded-[2.5rem] overflow-hidden flex flex-col sm:flex-row h-[85vh] sm:h-[80vh] animate-in zoom-in-95 duration-200 shadow-2xl overscroll-contain`} onClick={e => e.stopPropagation()}>
         
         {/* Kolom Kiri: Header with Video/Image */}
@@ -613,9 +616,22 @@ const ExerciseDetailModal = ({
 
               {/* Media Indicators */}
               {mediaItems.length > 1 && (
-                <div className="flex justify-center gap-1.5 mt-1">
+                <div className="flex items-center justify-center gap-2 mt-2.5 py-1">
                   {mediaItems.map((_, idx) => (
-                    <div key={idx} className={`h-1.5 rounded-full transition-all duration-300 shadow-sm ${idx === activeMediaIndex ? `w-5 ${t.bgAccent}` : 'w-1.5 bg-white/40'}`} />
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveMediaIndex(idx);
+                      }}
+                      aria-label={`Media ${idx + 1}`}
+                      className={`h-2.5 rounded-full transition-all duration-300 cursor-pointer ${
+                        idx === activeMediaIndex 
+                          ? `w-8 ${t.bgAccent} shadow-md` 
+                          : 'w-2.5 bg-white/50 hover:bg-white/80'
+                      }`}
+                    />
                   ))}
                 </div>
               )}
@@ -648,17 +664,14 @@ const ExerciseDetailModal = ({
                 <div className="w-1/3 h-full p-6 pb-24 overflow-y-auto hide-scrollbar overscroll-contain touch-pan-y">
                   <div className="space-y-4">
                     {!ex.ytVideo && (
-                      <div className={`p-4 rounded-2xl border ${t.border} bg-rose-500/5`}>
-                        <p className={`body-md ${t.textMuted} mb-3`}>Belum ada video tutorial untuk latihan ini.</p>
-                        <a 
-                          href={`https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name + ' shorts tutorial @DeltaBolic @fitnessonlineapp @officialdemic')}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-rose-500 text-white font-bold body-lg hover:bg-rose-600 active:scale-95 transition-all"
-                        >
-                          <Video size={16} /> Cari Video Shorts di YouTube
-                        </a>
-                      </div>
+                      <a 
+                        href={`https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name + ' shorts tutorial @DeltaBolic @fitnessonlineapp @officialdemic')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-2 w-full py-2.5 rounded-2xl bg-rose-500 text-white font-bold text-sm hover:bg-rose-600 active:scale-[0.98] transition-all shadow-md shadow-rose-500/20"
+                      >
+                        <Video size={16} /> Cari Online
+                      </a>
                     )}
                     
                     <div>

@@ -11,6 +11,7 @@ import CreatePostModal from '../components/CreatePostModal';
 import useDialog from '../hooks/useDialog';
 import { getPlanBgConfig } from '../utils/planBg';
 import { defaultSetWeight, gymStepFor } from '../utils/workoutCalc';
+import UserProfileModal from '../components/UserProfileModal';
 import GymAIChat from '../components/GymAIChat';
 
 const PlanNameInput = ({ initialValue, onSave, className, placeholder }) => {
@@ -156,9 +157,23 @@ const ProgramTab = ({
   // yang lain otomatis menutup yang sekarang, kalau tidak kartunya jadi panjang sekali.
   const [openRoutineId, setOpenRoutineId] = useState(null);
   const [editingPlanId, setEditingPlanId] = useState(null);
+  const [viewingProfile, setViewingProfile] = useState(null);
   const [programsSnapshot, setProgramsSnapshot] = useState(null); // snapshot for Batal/cancel
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
+
+  useEffect(() => {
+    if (editingPlanId || viewingProfile) {
+      const originalOverflow = document.body.style.overflow;
+      const originalHtmlOverflow = document.documentElement.style.overflow;
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+        document.documentElement.style.overflow = originalHtmlOverflow;
+      };
+    }
+  }, [editingPlanId, viewingProfile]);
 
   useEffect(() => {
     if (focusRoutineId) {
@@ -780,31 +795,51 @@ const ProgramTab = ({
                     </div>
                   )}
 
-                  {/* Origin Badge (Semua satu style biru aksen Logym, program bawaan polos tanpa badge) */}
+                  {/* Origin Badge */}
                   {(() => {
                     const isAiPlan = group.isAI || group.routines?.some(r => r.source === 'ai' || r.isAI) || planId.startsWith('plan_ai_') || planId.startsWith('ai-');
                     const isCommunityPlan = group.routines?.some(r => r.source === 'community' || r.isCommunity || r.sharedBy);
                     const isCustomPlan = planId.startsWith('custom') || group.routines?.some(r => r.source === 'custom' || r.isCustom);
 
-                    let badgeText = null;
                     if (isAiPlan) {
-                      badgeText = 'Coach Logy';
+                      return (
+                        <span className="px-2 py-0.5 text-[9px] font-black uppercase rounded-md bg-blue-500/30 text-blue-100 backdrop-blur-md border border-blue-400/40 shadow-sm shadow-blue-500/20">
+                          Coach Logy
+                        </span>
+                      );
                     } else if (isCommunityPlan) {
-                      const rawUser = group.routines?.find(r => r.sharedBy || r.authorName || r.authorUsername)?.sharedBy ||
-                                      group.routines?.find(r => r.authorName)?.authorName ||
-                                      'komunitas';
-                      badgeText = rawUser.startsWith('@') ? rawUser : `@${rawUser}`;
+                      const matchedRoutine = group.routines?.find(r => r.sharedBy || r.authorName || r.authorUsername);
+                      const rawUser = matchedRoutine?.sharedBy || matchedRoutine?.authorName || 'komunitas';
+                      const cleanUser = rawUser.startsWith('@') ? rawUser.slice(1) : rawUser;
+                      const authorUserId = matchedRoutine?.authorId || matchedRoutine?.userId || null;
+                      const authorUserPhoto = matchedRoutine?.authorPhoto || matchedRoutine?.userPhoto || null;
+
+                      return (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setViewingProfile({
+                              userId: authorUserId,
+                              userName: cleanUser,
+                              userPhoto: authorUserPhoto
+                            });
+                          }}
+                          className="px-2.5 py-0.5 text-[10px] font-bold rounded-lg bg-sky-500/20 text-sky-300 border border-sky-400/30 backdrop-blur-md hover:bg-sky-500/30 hover:scale-105 active:scale-95 transition-all cursor-pointer inline-flex items-center gap-1 shadow-sm"
+                          title={`Lihat profil @${cleanUser.toLowerCase()}`}
+                        >
+                          @{cleanUser.toLowerCase()}
+                        </button>
+                      );
                     } else if (isCustomPlan) {
-                      badgeText = 'Custom';
+                      return (
+                        <span className="px-2 py-0.5 text-[9px] font-black uppercase rounded-md bg-white/10 text-white/70 backdrop-blur-md border border-white/15">
+                          Custom
+                        </span>
+                      );
                     }
 
-                    if (!badgeText) return null; // Program bawaan polos tanpa badge
-
-                    return (
-                      <span className="px-2 py-0.5 text-[9px] font-black uppercase rounded-md bg-blue-500/30 text-blue-100 backdrop-blur-md border border-blue-400/40 shadow-sm shadow-blue-500/20">
-                        {badgeText}
-                      </span>
-                    );
+                    return null; // Program bawaan polos tanpa badge
                   })()}
                 </div>
               </div>
@@ -920,7 +955,7 @@ const ProgramTab = ({
   return (
     <div className="flex flex-col animate-in fade-in duration-300 pb-6 max-w-4xl mx-auto w-full space-y-3 sm:space-y-4">
       {editingPlanId && groupedPrograms[editingPlanId] && (
-        <div className="fixed inset-0 z-[100] bg-neutral-950 overflow-y-auto overflow-x-hidden flex flex-col animate-in slide-in-from-bottom-10 fade-in duration-300 w-full h-full pb-20">
+        <div className="fixed inset-0 z-[100] bg-neutral-950 overflow-y-auto overflow-x-hidden flex flex-col animate-in slide-in-from-bottom-10 fade-in duration-300 w-full h-full pb-20 no-swipe overscroll-contain touch-pan-y">
             {/* DEDICATED VIEW HEADER */}
             <div className="sticky top-0 bg-neutral-950/90 backdrop-blur-xl z-[60] border-b border-white/5 shadow-2xl">
                 <div className="flex items-center justify-center p-4 max-w-4xl mx-auto w-full">
@@ -1202,6 +1237,22 @@ const ProgramTab = ({
 
       {/* GymAIChat is now rendered globally in App.jsx; onAcceptProgram is passed down via prop */}
       
+      {viewingProfile && (
+        <UserProfileModal
+          profileUserId={viewingProfile.userId}
+          profileUserName={viewingProfile.userName}
+          profileUserPhoto={viewingProfile.userPhoto}
+          currentUser={user}
+          isDark={isDark}
+          t={t}
+          onClose={() => setViewingProfile(null)}
+          onNavigateToPost={(postId) => {
+            setViewingProfile(null);
+            if (setHighlightPostId) setHighlightPostId(postId);
+          }}
+        />
+      )}
+
       {dialog}
       </div>
     </div>

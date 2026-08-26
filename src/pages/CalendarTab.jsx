@@ -808,7 +808,7 @@ const CalendarTab = ({
                       console.error('Error during log cleanup:', err);
                   }
                   
-                  if (workoutToRemove.programId) {
+                  if (workoutToRemove.programId && workoutToRemove.programId !== 'adhoc') {
                       newDeletedProjected[String(workoutToRemove.programId)] = true;
                   }
                   
@@ -850,7 +850,7 @@ const CalendarTab = ({
   const getSelectedWorkoutsForDate = (dateStr) => {
     let wks = [...getDayWorkouts(dateStr)];
     const dData = history[dateStr] || {};
-    if (dData._activeSession?.extraExercises?.length > 0 && !wks.some(w => w.programId === 'adhoc')) {
+    if (dData._activeSession?.extraExercises?.length > 0 && !wks.some(w => w.programId === 'adhoc' && w.status !== 'completed' && w.id !== 'virtual_adhoc')) {
       wks.push({
         id: 'virtual_adhoc',
         programId: 'adhoc',
@@ -1667,7 +1667,11 @@ const CalendarTab = ({
                                        
                                        // Sesi yang timernya sedang berjalan. Dipakai dua kali: badge status di bawah
                                        // dan tombol "Lanjutkan Latihan" di panel yang terbuka.
-                                       const isRunningSession = isWorkoutActive && (sessionToRun === w.id || sessionToRun === w.programId || (sessionToRun === 'extra' && w.programId === 'adhoc'));
+                                       const isRunningSession = isWorkoutActive && (
+                                         sessionToRun === w.id || 
+                                         (sessionToRun === w.programId && w.status !== 'completed') || 
+                                         (sessionToRun === 'extra' && w.programId === 'adhoc' && (w.status !== 'completed' || w.id === 'virtual_adhoc'))
+                                       );
                                        const actualMins = parseWorkoutDurationMinutes(w.duration);
                                        const liveSecs = (isRunningSession && workoutStartTime) ? Math.max(0, Math.floor((Date.now() - workoutStartTime) / 1000)) : 0;
                                        const liveDurStr = liveSecs >= 3600
@@ -1921,26 +1925,21 @@ const CalendarTab = ({
 
       {/* JADWALKAN SESI DIALOG */}
       {showProgramSelect && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center px-6" onClick={() => setShowProgramSelect(false)}>
-          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm animate-in fade-in duration-300 ease-out" />
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center px-6 bg-black/70 backdrop-blur-sm animate-in fade-in overscroll-contain touch-none no-swipe" onClick={() => setShowProgramSelect(false)}>
           <div 
-            className={`relative w-full max-w-xs rounded-3xl p-5 shadow-2xl border ${t.border} animate-in zoom-in-95 fade-in duration-300 ease-out ${theme === 'dark' ? 'bg-black/70' : 'bg-white/70'}`}
-            style={{ 
-              backdropFilter: 'blur(40px) saturate(180%)',
-              WebkitBackdropFilter: 'blur(40px) saturate(180%)'
-            }}
+            className={`relative w-full max-w-xs rounded-3xl p-5 shadow-2xl border ${t.border} animate-in zoom-in-95 duration-200 ${theme === 'dark' ? 'bg-slate-900/90' : 'bg-white/90'} backdrop-blur-xl`}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between mb-4 mt-2">
-              <h3 className={`font-black text-xl ${t.textMain}`}>Tambah Sesi Ekstra</h3>
-              <button onClick={() => setShowProgramSelect(false)} className={`p-2 rounded-full hover:bg-black/10 dark:hover:bg-white/10 ${t.textMuted}`}>
-                <X size={18} />
+            <div className="flex items-center justify-between mb-3 mt-1">
+              <h3 className={`font-black text-lg ${t.textMain}`}>Tambah Sesi Ekstra</h3>
+              <button onClick={() => setShowProgramSelect(false)} className={`p-1.5 rounded-full ${t.btnBg} hover:opacity-80 transition-all`} data-close-modal="true">
+                <X size={18} className={t.textMain} />
               </button>
             </div>
 
-            <div className={`h-px mb-4 ${theme === 'dark' ? 'bg-white/10' : 'bg-black/10'}`} />
+            <div className={`h-px mb-3 ${theme === 'dark' ? 'bg-white/10' : 'bg-black/10'}`} />
 
-            <div className="space-y-4 max-h-64 overflow-y-auto pr-1">
+            <div className="space-y-3 max-h-64 overflow-y-auto pr-1 overscroll-contain touch-pan-y hide-scrollbar">
               {(() => {
                 const filtered = programs.filter(p => activePlanIds.includes(p.planId || 'custom'));
                 const grouped = filtered.reduce((acc, p) => {
@@ -1951,16 +1950,16 @@ const CalendarTab = ({
                 }, {});
                 return Object.entries(grouped).map(([gName, progs]) => (
                   <div key={gName}>
-                    <p className={`text-[10px] font-black uppercase tracking-wider ${t.textMuted} mb-2 px-1`}>{gName}</p>
+                    <p className={`text-[10px] font-black uppercase tracking-wider ${t.textMuted} mb-1.5 px-1`}>{gName}</p>
                     <div className="space-y-1.5">
                       {progs.map(p => (
                         <button 
                           key={p.id} 
                           onClick={() => addWorkoutToDate(p)}
-                          className={`w-full p-4 rounded-2xl text-left body-lg font-bold transition-all flex justify-between items-center ${t.textMain} ${theme === 'dark' ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-black/5 border-black/10 hover:bg-black/10'} border shadow-sm backdrop-blur-md`}
+                          className={`w-full p-3 rounded-2xl text-left text-sm font-bold transition-all flex justify-between items-center ${t.textMain} ${theme === 'dark' ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-black/5 border-black/10 hover:bg-black/10'} border shadow-sm`}
                         >
                           {p.name}
-                          <Plus size={18} className="opacity-40" />
+                          <Plus size={16} className="opacity-40" />
                         </button>
                       ))}
                     </div>
@@ -1969,7 +1968,7 @@ const CalendarTab = ({
               })()}
             </div>
 
-            <div className="pb-2"></div>
+            <div className="pb-1"></div>
           </div>
         </div>
       )}
@@ -1991,18 +1990,18 @@ const CalendarTab = ({
 
       {/* Long Press Action Modal */}
       {longPressDate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setLongPressDate(null)}>
-          <div className={`${t.bgCard} w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-200`} onClick={e => e.stopPropagation()}>
-            <h3 className="text-xl font-black mb-4 text-center">Opsi Jadwal</h3>
-            <div className="flex flex-col gap-3">
-              <button onClick={() => { setClipboardSourceDate(longPressDate); setClipboardAction('copy'); setLongPressDate(null); }} className={`w-full py-4 rounded-2xl font-bold body-lg transition-all ${t.bgAccent} text-white shadow-lg ${t.shadowAccent}`}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in overscroll-contain touch-none no-swipe" onClick={() => setLongPressDate(null)}>
+          <div className={`${t.bgCard} w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-200 border ${t.border}`} onClick={e => e.stopPropagation()}>
+            <h3 className={`text-lg font-black mb-4 text-center ${t.textMain}`}>Opsi Jadwal</h3>
+            <div className="flex flex-col gap-2.5">
+              <button onClick={() => { setClipboardSourceDate(longPressDate); setClipboardAction('copy'); setLongPressDate(null); }} className={`w-full py-3 rounded-2xl font-black text-sm transition-all ${t.bgAccent} text-white shadow-lg ${t.shadowAccent}`}>
                 Salin Jadwal
               </button>
-              <button onClick={() => { setClipboardSourceDate(longPressDate); setClipboardAction('move'); setLongPressDate(null); }} className={`w-full py-4 rounded-2xl font-bold body-lg transition-all border-2 ${t.borderAccentSoft} ${t.textAccent}`}>
+              <button onClick={() => { setClipboardSourceDate(longPressDate); setClipboardAction('move'); setLongPressDate(null); }} className={`w-full py-3 rounded-2xl font-bold text-sm transition-all border-2 ${t.borderAccentSoft} ${t.textAccent}`}>
                 Pindah Jadwal
               </button>
             </div>
-            <button onClick={() => setLongPressDate(null)} className={`mt-4 w-full py-3 rounded-2xl font-bold border ${t.border} opacity-70`}>Batal</button>
+            <button onClick={() => setLongPressDate(null)} className={`mt-3 w-full py-2.5 rounded-2xl font-bold text-sm border ${t.border} ${t.textMuted} ${t.btnBg} transition-all`} data-close-modal="true">Batal</button>
           </div>
         </div>
       )}
@@ -2028,6 +2027,17 @@ const CalendarTab = ({
 const NotificationModal = ({ t, target, defaultReminderTime, soundEnabled, reminderEnabled, lang, onSave, onNativeSync, onClose }) => {
   const [enabled, setEnabled] = React.useState(target.currentEnabled !== undefined ? target.currentEnabled : reminderEnabled);
   
+  React.useEffect(() => {
+    const origBody = document.body.style.overflow;
+    const origHtml = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = origBody;
+      document.documentElement.style.overflow = origHtml;
+    };
+  }, []);
+
   const parseInit = () => {
     const src = target.currentTime || defaultReminderTime || '15:00';
     const p = src.split(':');
@@ -2039,29 +2049,14 @@ const NotificationModal = ({ t, target, defaultReminderTime, soundEnabled, remin
 
   const isDark = t.bgCard?.includes('0d1526') || t.bgCard?.includes('05070d');
 
-  const clamp = (val, max) => {
-    const n = parseInt(val) || 0;
-    return String(Math.min(max, Math.max(0, n))).padStart(2, '0');
-  };
-
   const handleSave = () => {
     onSave(enabled, parseInt(hh) || 0, parseInt(mm) || 0);
   };
 
-  const inputCls = `w-16 h-14 text-center font-black text-2xl rounded-2xl outline-none border-2 ${t.border} focus:ring-2 ${t.ringAccent} ${t.textMain}`;
-
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center px-6" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm animate-in fade-in duration-300 ease-out" />
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center px-6 bg-black/70 backdrop-blur-sm animate-in fade-in overscroll-contain touch-none no-swipe" onClick={onClose}>
       <div 
-        className={`relative w-full max-w-xs rounded-3xl p-5 shadow-2xl border ${t.border} animate-in zoom-in-95 fade-in duration-300 ease-out`}
-        style={{ 
-          background: isDark 
-            ? 'rgba(15, 40, 60, 0.65)' 
-            : 'rgba(255, 255, 255, 0.65)', 
-          backdropFilter: 'blur(40px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(40px) saturate(180%)'
-        }}
+        className={`relative w-full max-w-xs rounded-3xl p-5 shadow-2xl border ${t.border} animate-in zoom-in-95 duration-200 ${isDark ? 'bg-slate-900/90' : 'bg-white/90'} backdrop-blur-xl`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Title */}
@@ -2070,7 +2065,7 @@ const NotificationModal = ({ t, target, defaultReminderTime, soundEnabled, remin
             {enabled ? <Bell size={20} className={t.textAccent} /> : <BellOff size={20} className="opacity-40" />}
           </div>
           <div className="min-w-0">
-            <h3 className="font-black body-lg">Pengingat</h3>
+            <h3 className="font-black text-base">Pengingat</h3>
             <p className="caption opacity-50 truncate">{target.programName}</p>
           </div>
         </div>
@@ -2081,22 +2076,22 @@ const NotificationModal = ({ t, target, defaultReminderTime, soundEnabled, remin
         {/* Toggle */}
         <div className="flex flex-col py-1">
           <div className="flex items-center justify-between">
-            <span className="font-bold body-lg">Notifikasi</span>
+            <span className="font-bold text-sm">Notifikasi</span>
             <button 
               onClick={() => setEnabled(!enabled)}
-              className={`relative w-14 h-8 rounded-full transition-colors duration-300 ${enabled ? t.bgAccent : isDark ? 'bg-white/15' : 'bg-black/15'} ${!reminderEnabled ? 'opacity-80' : ''}`}
+              className={`relative w-12 h-7 rounded-full transition-colors duration-300 ${enabled ? t.bgAccent : isDark ? 'bg-white/15' : 'bg-black/15'} ${!reminderEnabled ? 'opacity-80' : ''}`}
             >
-              <div className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-md transition-transform duration-300 ${enabled ? 'translate-x-7' : 'translate-x-1'}`} />
+              <div className={`absolute top-0.5 w-6 h-6 rounded-full bg-white shadow-md transition-transform duration-300 ${enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
             </button>
           </div>
           {!reminderEnabled && (
-            <span className="text-xs text-rose-500 mt-1">Notifikasi global dimatikan, tapi jadwal ini tetap bisa menyala.</span>
+            <span className="text-[11px] text-rose-500 mt-1">Notifikasi global dimatikan, tapi jadwal ini tetap bisa menyala.</span>
           )}
         </div>
         
         {/* Time Picker */}
-        <div className="py-3 mb-2">
-          <p className="caption opacity-50 mb-2">Jam Rencana Latihan</p>
+        <div className="py-2 mb-2">
+          <p className="caption opacity-50 mb-1.5 text-xs">Jam Rencana Latihan</p>
           <input
             type="time"
             value={`${hh}:${mm}`}
@@ -2105,28 +2100,28 @@ const NotificationModal = ({ t, target, defaultReminderTime, soundEnabled, remin
               setHh(h || '00');
               setMm(m || '00');
             }}
-            className={`w-full p-3 rounded-2xl font-black text-2xl text-center ${isDark ? 'bg-white/10 text-white' : 'bg-black/5 text-black'} border-0 outline-none`}
+            className={`w-full p-2.5 rounded-2xl font-black text-xl text-center ${isDark ? 'bg-white/10 text-white' : 'bg-black/5 text-black'} border-0 outline-none`}
             style={{ colorScheme: isDark ? 'dark' : 'light' }}
           />
         </div>
 
         {/* Calendar Sync */}
-        <div className="mt-4 mb-2">
+        <div className="mt-2 mb-2">
           <button 
             onClick={onNativeSync}
-            className={`w-full py-3 rounded-2xl font-bold flex items-center justify-center gap-2 border-2 ${target.gcalSynced ? 'border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10' : t.border + ' hover:bg-black/5 dark:hover:bg-white/5'} transition-colors`}
+            className={`w-full py-2.5 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 border-2 ${target.gcalSynced ? 'border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10' : t.border + ' hover:bg-black/5 dark:hover:bg-white/5'} transition-colors`}
           >
-            {target.gcalSynced ? <CalendarCheck size={18} /> : <CalendarPlus size={18} className={t.textAccent} />}
+            {target.gcalSynced ? <CalendarCheck size={16} /> : <CalendarPlus size={16} className={t.textAccent} />}
             {target.gcalSynced ? "Tersinkron di Notifikasi Kalender" : "Notifikasi Kalender"}
           </button>
         </div>
 
         {/* Actions */}
-        <div className="flex gap-3 mt-4">
-          <button onClick={onClose} className={`flex-1 py-3 rounded-2xl border ${t.border} font-bold body-lg active:scale-95 transition-all`}>
+        <div className="flex gap-2.5 mt-3">
+          <button onClick={onClose} className={`flex-1 py-2.5 rounded-2xl border ${t.border} font-bold text-sm active:scale-95 transition-all`} data-close-modal="true">
             Batal
           </button>
-          <button onClick={handleSave} className={`flex-[2] py-3 rounded-2xl ${t.bgAccent} text-white font-black body-lg shadow-lg active:scale-95 transition-all`}>
+          <button onClick={handleSave} className={`flex-[2] py-2.5 rounded-2xl ${t.bgAccent} text-white font-black text-sm shadow-lg active:scale-95 transition-all`}>
             Simpan
           </button>
         </div>

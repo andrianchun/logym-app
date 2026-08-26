@@ -77,6 +77,18 @@ const AddExerciseModal = ({
   // limit to 100 to prevent lag
   filteredLib = filteredLib.slice(0, 100);
 
+  React.useEffect(() => {
+    if (!activeAddModalTarget) return;
+    const origBody = document.body.style.overflow;
+    const origHtml = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = origBody;
+      document.documentElement.style.overflow = origHtml;
+    };
+  }, [activeAddModalTarget]);
+
   const allEquipOptions = React.useMemo(() => {
     const set = new Set(combinedLibrary.map(ex => ex.equipment).filter(Boolean));
     return [...set].sort();
@@ -86,30 +98,30 @@ const AddExerciseModal = ({
 
   return (
     <div 
-      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col justify-center p-4 animate-in fade-in"
+      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex flex-col justify-center p-4 animate-in fade-in overscroll-contain touch-none no-swipe"
       onClick={() => setActiveAddModalTarget(null)}
     >
       <div 
-        className={`w-full max-w-md mx-auto ${t.bgCard} rounded-2xl overflow-hidden border ${t.border} flex flex-col h-[85vh] max-h-[800px] shadow-2xl`}
+        className={`w-full max-w-md mx-auto ${t.bgCard} rounded-3xl overflow-hidden border ${t.border} flex flex-col h-[85vh] max-h-[800px] shadow-2xl animate-in zoom-in-95 duration-200`}
         onClick={(e) => e.stopPropagation()}
       >
         
-        <div className={`p-5 border-b ${t.border} flex justify-between items-center bg-black/5`}>
-            <h3 className="font-black h2">{lang.searchLib || 'Cari di Library...'}</h3>
-            <button onClick={() => setActiveAddModalTarget(null)} className={`p-2 rounded-full ${t.btnBg} hover:text-rose-500`}><X size={20}/></button>
+        <div className={`p-4 border-b ${t.border} flex justify-between items-center shrink-0`}>
+            <h3 className={`font-black text-lg ${t.textMain}`}>{lang?.searchLib || 'Cari di Library...'}</h3>
+            <button onClick={() => setActiveAddModalTarget(null)} className={`p-1.5 rounded-full ${t.btnBg} hover:opacity-80 transition-all`} data-close-modal="true"><X size={18} className={t.textMain}/></button>
         </div>
 
         <>
             <div className={`p-4 border-b ${t.border} shrink-0 space-y-3`}>
               <div className="flex gap-2 items-center">
-                <div className={`flex-1 min-w-0 flex items-center gap-2 px-3 py-3 rounded-xl ${t.inputBg}`}>
+                <div className={`flex-1 min-w-0 flex items-center gap-2 px-3 py-2.5 rounded-xl ${t.inputBg}`}>
                   <Search size={16} className={`shrink-0 ${t.textMuted}`} />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Cari latihan..."
-                    className={`w-full min-w-0 bg-transparent body-lg ${t.textMain} outline-none placeholder:${t.textMuted}`}
+                    className={`w-full min-w-0 bg-transparent text-sm font-semibold ${t.textMain} outline-none placeholder:${t.textMuted}`}
                   />
                   {searchQuery && (
                     <button onClick={() => setSearchQuery('')} className={`shrink-0 ${t.textMuted} hover:opacity-70`}>

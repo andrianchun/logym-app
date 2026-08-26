@@ -385,7 +385,34 @@ console.log('historySync OK');
   // Sesi tanpa id tidak bisa dibandingkan — jangan ditambahkan, nanti menggandakan tiap klik.
   const g = mergeBackupIntoHistory({ '2026-08-05': { workouts: [] } },
     { '2026-08-05': { workouts: [{ status: 'completed' }] } });
-  assert.equal(g.sesiDitambal, 0, 'sesi tanpa id dilewati, bukan digandakan tiap Pulihkan');
+  // 6. Sesi dengan id yang sama tapi log-nya sempat tertimpa/hilang berhasil ditambal log-nya dari backup.
+  const hCorrupted = {
+    '2026-08-26': {
+      workouts: [{
+        id: 'w-same',
+        status: 'completed',
+        exercises: [{ id: 102, name: 'Lateral Raise' }],
+        log: { 102: [{ w: 10, r: 12, done: true }] }
+      }]
+    }
+  };
+  const hBackup = {
+    '2026-08-26': {
+      workouts: [{
+        id: 'w-same',
+        status: 'completed',
+        exercises: [{ id: 101, name: 'Incline Bench' }, { id: 102, name: 'Lateral Raise' }],
+        log: {
+          101: [{ w: 20, r: 10, done: true }],
+          102: [{ w: 10, r: 12, done: true }]
+        }
+      }]
+    }
+  };
+  const hRestored = mergeBackupIntoHistory(hCorrupted, hBackup);
+  assert.equal(hRestored.sesiDitambal, 1, 'sesi yang kehilangan log harus ditambal');
+  assert.ok(hRestored.next['2026-08-26'].workouts[0].log[101], 'log 101 yang hilang berhasil dipulihkan');
+  assert.equal(hRestored.next['2026-08-26'].workouts[0].exercises.length, 2, 'latihan yang hilang berhasil dipulihkan');
 
   console.log('mergeBackupIntoHistory OK');
 }

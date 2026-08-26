@@ -268,12 +268,18 @@ const ImmersiveWorkout = ({
 
 
   const [showWeightInfo, setShowWeightInfo] = useState(false);
-  const [localRestTimer, setLocalRestTimer] = useState(0);
+  const [localRestTimer, setLocalRestTimer] = useState(() => {
+    return restTargetTime !== null ? Math.ceil((restTargetTime - Date.now()) / 1000) : 0;
+  });
   const prevLocalRestRef = React.useRef(null);
 
   useEffect(() => {
     let interval;
     if (restTargetTime !== null) {
+      const initialRemaining = Math.ceil((restTargetTime - Date.now()) / 1000);
+      setLocalRestTimer(initialRemaining);
+      prevLocalRestRef.current = initialRemaining;
+
       const updateTimer = () => {
         const remaining = Math.ceil((restTargetTime - Date.now()) / 1000);
         if (prevLocalRestRef.current !== remaining) {
@@ -579,12 +585,12 @@ const ImmersiveWorkout = ({
     }
   };
 
-  // Root swipe logic for minimizing (swipe down anywhere on screen)
+  // Top bar swipe logic for minimizing (swipe down from header/drag handle area)
   const rootRef = React.useRef(null);
-  const [rootTouchStartX, setRootTouchStartX] = React.useState(null);
-  const [rootTouchStartY, setRootTouchStartY] = React.useState(null);
-  const [rootTouchEndX, setRootTouchEndX] = React.useState(null);
-  const [rootTouchEndY, setRootTouchEndY] = React.useState(null);
+  const [topTouchStartX, setTopTouchStartX] = React.useState(null);
+  const [topTouchStartY, setTopTouchStartY] = React.useState(null);
+  const [topTouchEndX, setTopTouchEndX] = React.useState(null);
+  const [topTouchEndY, setTopTouchEndY] = React.useState(null);
 
   const diLuarImmersive = (e) => {
     const el = e.target;
@@ -592,37 +598,36 @@ const ImmersiveWorkout = ({
     return !!(rootRef.current && !rootRef.current.contains(el));
   };
 
-  const onRootTouchStart = (e) => {
+  const onTopBarTouchStart = (e) => {
     if (activeSetDetail !== null || showFinishConfirm) return;
     if (diLuarImmersive(e)) return;
-    // Hanya kecualikan jika menyentuh wheel angka atau input form langsung
-    if (e.target.closest('.scroll-picker-wheel') || e.target.closest('input')) return;
-    setRootTouchEndX(null);
-    setRootTouchEndY(null);
-    setRootTouchStartX(e.targetTouches[0].clientX);
-    setRootTouchStartY(e.targetTouches[0].clientY);
+    if (e.target.closest('button') || e.target.closest('input')) return;
+    setTopTouchEndX(null);
+    setTopTouchEndY(null);
+    setTopTouchStartX(e.targetTouches[0].clientX);
+    setTopTouchStartY(e.targetTouches[0].clientY);
   };
 
-  const onRootTouchMove = (e) => {
+  const onTopBarTouchMove = (e) => {
     if (activeSetDetail !== null || showFinishConfirm) return;
     const curX = e.targetTouches[0].clientX;
     const curY = e.targetTouches[0].clientY;
-    setRootTouchEndX(curX);
-    setRootTouchEndY(curY);
+    setTopTouchEndX(curX);
+    setTopTouchEndY(curY);
 
-    // Langsung minimize seketika dari area header/root saat ditarik ke bawah > 40px!
-    if (rootTouchStartY !== null && (curY - rootTouchStartY) > 40 && (curY - rootTouchStartY) > Math.abs(curX - (rootTouchStartX || curX)) * 1.1) {
-      setRootTouchStartY(null);
-      setRootTouchStartX(null);
+    // Langsung minimize seketika dari area header saat ditarik ke bawah > 40px!
+    if (topTouchStartY !== null && (curY - topTouchStartY) > 40 && (curY - topTouchStartY) > Math.abs(curX - (topTouchStartX || curX)) * 1.1) {
+      setTopTouchStartY(null);
+      setTopTouchStartX(null);
       playSoundEffect('click', soundEnabled);
       handleMinimize();
     }
   };
 
-  const onRootTouchEnd = () => {
-    if (activeSetDetail !== null || showFinishConfirm || rootTouchStartY === null || rootTouchEndY === null) return;
-    const deltaY = rootTouchEndY - rootTouchStartY; // positive = swipe down
-    const deltaX = (rootTouchEndX !== null && rootTouchStartX !== null) ? rootTouchEndX - rootTouchStartX : 0;
+  const onTopBarTouchEnd = () => {
+    if (activeSetDetail !== null || showFinishConfirm || topTouchStartY === null || topTouchEndY === null) return;
+    const deltaY = topTouchEndY - topTouchStartY; // positive = swipe down
+    const deltaX = (topTouchEndX !== null && topTouchStartX !== null) ? topTouchEndX - topTouchStartX : 0;
     
     // Tarik ke bawah > 40px dan arah dominan ke bawah -> Langsung Minimize!
     if (deltaY > 40 && deltaY > Math.abs(deltaX) * 1.1) {
@@ -631,44 +636,28 @@ const ImmersiveWorkout = ({
     }
   };
 
-  // Listen to YouTube player state to hide initial loading UI and handle seamless looping
-  React.useEffect(() => {
-    const handleMessage = (e) => {
-      if (e.origin !== "https://www.youtube.com") return;
-      try {
-        const data = JSON.parse(e.data);
-        if (data.event === "infoDelivery" && data.info) {
-          if (data.info.playerState === 1) { // 1 = Playing
-            if (!ytLoaded) setYtLoaded(true);
-          }
-          
-          // Loop before it ends using seekTo(0.1) to avoid triggering the native loading/pause spinner
-          if (data.info.duration && data.info.currentTime) {
-            if (data.info.duration - data.info.currentTime < 0.5) {
-              if (e.source) {
-                e.source.postMessage(JSON.stringify({event: "command", func: "seekTo", args: [0.1, true]}), "*");
-                e.source.postMessage(JSON.stringify({event: "command", func: "playVideo", args: []}), "*");
-              }
-            }
-          }
-          // Fallback if it somehow hits ended state (0)
-          if (data.info.playerState === 0) {
-            if (e.source) {
-              e.source.postMessage(JSON.stringify({event: "command", func: "seekTo", args: [0.1, true]}), "*");
-              e.source.postMessage(JSON.stringify({event: "command", func: "playVideo", args: []}), "*");
-            }
-          }
-        }
-      } catch (err) {}
-    };
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, [ytLoaded]);
+  // Helper untuk mencari latihan berikutnya yang BELUM selesai (melompati latihan yang sudah tuntas)
+  const getNextIncompleteExIndex = (fromIdx) => {
+    if (!validExercises || validExercises.length === 0) return -1;
+    // 1. Cari maju dari latihan berikutnya sampai akhir daftar
+    for (let i = fromIdx + 1; i < validExercises.length; i++) {
+      if (!isExerciseFullyDone(validExercises[i])) return i;
+    }
+    // 2. Wrap-around: cari dari awal daftar sampai sebelum indeks saat ini
+    for (let i = 0; i < fromIdx; i++) {
+      if (!isExerciseFullyDone(validExercises[i])) return i;
+    }
+    // 3. Semua latihan dalam sesi sudah selesai
+    return -1;
+  };
+
+  const isAllWorkoutDone = validExercises.length > 0 && validExercises.every(eItem => isExerciseFullyDone(eItem));
 
   const handleNextEx = () => {
     playSoundEffect('click', soundEnabled);
-    if (currentIndex < validExercises.length - 1) {
-      setCurrentIndex(currentIndex + 1);
+    const nextIncompleteIdx = getNextIncompleteExIndex(currentIndex);
+    if (nextIncompleteIdx !== -1) {
+      setCurrentIndex(nextIncompleteIdx);
     } else {
       setShowFinishConfirm(true);
     }
@@ -783,50 +772,55 @@ const ImmersiveWorkout = ({
     <div 
       ref={rootRef}
       className={`fixed inset-0 z-[100] flex flex-col ${t.bgApp} ${t.textMain} overflow-hidden duration-300 ${isClosing ? 'animate-out slide-out-to-bottom-full' : 'animate-in slide-in-from-bottom-full'} no-swipe`}
-      onTouchStart={onRootTouchStart}
-      onTouchMove={onRootTouchMove}
-      onTouchEnd={onRootTouchEnd}
     >
       
-      {/* TOP PULL-DOWN DRAG HANDLE */}
+      {/* TOP HEADER SECTION (WITH SWIPE-DOWN MINIMIZE PROTECTION) */}
       <div 
-        className="w-full flex justify-center pt-2 pb-1 cursor-pointer z-30 shrink-0 select-none touch-pan-y" 
-        onClick={() => { playSoundEffect('click', soundEnabled); handleMinimize(); }}
-        title="Tarik ke bawah untuk minimize"
+        className="w-full shrink-0 select-none touch-pan-y"
+        onTouchStart={onTopBarTouchStart}
+        onTouchMove={onTopBarTouchMove}
+        onTouchEnd={onTopBarTouchEnd}
       >
-        <div className="w-12 h-1.5 rounded-full bg-white/30 hover:bg-white/50 transition-colors" />
-      </div>
-
-      {/* HEADER (UNIFIED BAR) */}
-      <div className={`flex items-center justify-between px-4 pb-2 w-full z-50 shrink-0`} style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top, 12px))' }}>
-        
-        {/* Durasi Group */}
-        <div className="flex items-center gap-4">
-          <LiveWorkoutStats 
-            workoutStartTime={workoutStartTime} 
-            isPaused={isPaused} 
-            userProfile={userProfile} 
-            validExercises={validExercises} 
-            exerciseLogs={exerciseLogs} 
-            t={t} 
-            formatTime={formatTime} 
-          />
+        {/* TOP PULL-DOWN DRAG HANDLE */}
+        <div 
+          className="w-full flex justify-center pt-2 pb-1 cursor-pointer z-30 shrink-0 select-none touch-pan-y" 
+          onClick={() => { playSoundEffect('click', soundEnabled); handleMinimize(); }}
+          title="Tarik ke bawah untuk minimize"
+        >
+          <div className="w-12 h-1.5 rounded-full bg-white/30 hover:bg-white/50 transition-colors" />
         </div>
 
-        {/* Controls */}
-        <div className="flex items-center gap-2">
-          <button onClick={() => { playSoundEffect('click', soundEnabled); setIsPaused(!isPaused); }} className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-white/5 hover:bg-white/10' : 'bg-black/5 hover:bg-black/10'} flex items-center justify-center transition shadow-sm`} title="Play/Pause">
-            {isPaused ? <Play size={18} className={`${t.textAccent}`} /> : <Pause size={18} />}
-          </button>
-          <button data-close-modal="true" onClick={() => { playSoundEffect('click', soundEnabled); handleMinimize(); }} className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-white/5 hover:bg-white/10' : 'bg-black/5 hover:bg-black/10'} flex items-center justify-center transition shadow-sm`} title="Minimize">
-            <Minimize2 size={18} />
-          </button>
-          <button onClick={() => { playSoundEffect('click', soundEnabled); onCancelWorkout(); }} className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400' : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-500'} flex items-center justify-center transition shadow-sm`} title="Batalkan Workout">
-            <X size={18} strokeWidth={2.5} />
-          </button>
-          <button onClick={() => { playSoundEffect('click', soundEnabled); setShowFinishConfirm(true); }} className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-white/5 hover:bg-white/10 text-emerald-400' : 'bg-black/5 hover:bg-black/10 text-[#3b82f6]'} flex items-center justify-center transition shadow-sm`} title="Selesai Workout">
-            <Check size={20} strokeWidth={3} />
-          </button>
+        {/* HEADER (UNIFIED BAR) */}
+        <div className={`flex items-center justify-between px-4 pb-2 w-full z-50 shrink-0`} style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top, 12px))' }}>
+          
+          {/* Durasi Group */}
+          <div className="flex items-center gap-4">
+            <LiveWorkoutStats 
+              workoutStartTime={workoutStartTime} 
+              isPaused={isPaused} 
+              userProfile={userProfile} 
+              validExercises={validExercises} 
+              exerciseLogs={exerciseLogs} 
+              t={t} 
+              formatTime={formatTime} 
+            />
+          </div>
+
+          {/* Controls */}
+          <div className="flex items-center gap-2">
+            <button onClick={() => { playSoundEffect('click', soundEnabled); setIsPaused(!isPaused); }} className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-white/5 hover:bg-white/10' : 'bg-black/5 hover:bg-black/10'} flex items-center justify-center transition shadow-sm`} title="Play/Pause">
+              {isPaused ? <Play size={18} className={`${t.textAccent}`} /> : <Pause size={18} />}
+            </button>
+            <button data-close-modal="true" onClick={() => { playSoundEffect('click', soundEnabled); handleMinimize(); }} className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-white/5 hover:bg-white/10' : 'bg-black/5 hover:bg-black/10'} flex items-center justify-center transition shadow-sm`} title="Minimize">
+              <Minimize2 size={18} />
+            </button>
+            <button onClick={() => { playSoundEffect('click', soundEnabled); onCancelWorkout(); }} className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400' : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-500'} flex items-center justify-center transition shadow-sm`} title="Batalkan Workout">
+              <X size={18} strokeWidth={2.5} />
+            </button>
+            <button onClick={() => { playSoundEffect('click', soundEnabled); setShowFinishConfirm(true); }} className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-white/5 hover:bg-white/10 text-emerald-400' : 'bg-black/5 hover:bg-black/10 text-[#3b82f6]'} flex items-center justify-center transition shadow-sm`} title="Selesai Workout">
+              <Check size={20} strokeWidth={3} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -910,9 +904,22 @@ const ImmersiveWorkout = ({
         
         {/* Media Indicators */}
         {mediaItems.length > 1 && (
-          <div className="absolute top-4 left-0 right-0 flex justify-center gap-1.5 z-10">
+          <div className="absolute top-4 left-0 right-0 flex items-center justify-center gap-2 z-20">
             {mediaItems.map((_, idx) => (
-              <div key={idx} className={`h-1.5 rounded-full transition-all duration-300 shadow-sm ${idx === activeMediaIndex ? 'w-6 bg-white' : 'w-2 bg-white/40'}`} />
+              <button
+                key={idx}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveMediaIndex(idx);
+                }}
+                aria-label={`Media ${idx + 1}`}
+                className={`h-2.5 rounded-full transition-all duration-300 cursor-pointer ${
+                  idx === activeMediaIndex 
+                    ? `w-8 ${t.bgAccent} shadow-md` 
+                    : 'w-2.5 bg-white/50 hover:bg-white/80'
+                }`}
+              />
             ))}
           </div>
         )}
@@ -963,45 +970,50 @@ const ImmersiveWorkout = ({
                     onClick={e => e.stopPropagation()}
                   >
                     {/* Glassmorphism Card */}
-                    <div className="relative w-full rounded-[32px] bg-[#0c1427]/90 border border-white/15 backdrop-blur-2xl shadow-2xl shadow-black/90 overflow-visible text-center">
-                      
-                      {/* Coach Popout Avatar (Atas keluar kotak, Bawah terpotong pas di rounded bottom kotak) */}
-                      <div className="absolute -top-44 inset-x-0 bottom-0 pointer-events-none z-10 overflow-hidden rounded-b-[32px] flex items-start justify-center">
-                        <img 
-                          src={getOverloadHint && getOverloadHint(ex)?.mode === 'praise' ? '/coach-praise.webp' : '/coach-push.webp'} 
-                          alt="Coach"
-                          className="w-[230%] max-w-none h-auto -translate-y-6 drop-shadow-[0_16px_32px_rgba(0,0,0,0.95)] opacity-85"
-                          style={{
-                            maskImage: 'linear-gradient(to bottom, black 40%, rgba(0,0,0,0.7) 65%, transparent 95%)',
-                            WebkitMaskImage: 'linear-gradient(to bottom, black 40%, rgba(0,0,0,0.7) 65%, transparent 95%)'
-                          }}
-                        />
-                      </div>
+                    {(() => {
+                      const hint = getOverloadHint ? getOverloadHint(ex) : null;
+                      return (
+                        <div className={`relative w-full rounded-[32px] ${hint?.isNewRecord ? 'bg-[#0c1427]/90 border border-sky-400/40 shadow-[0_0_30px_rgba(56,189,248,0.25)]' : 'bg-[#0c1427]/90 border border-white/15'} backdrop-blur-2xl shadow-2xl shadow-black/90 overflow-visible text-center`}>
+                          
+                          {/* Coach Popout Avatar (Atas keluar kotak, Bawah terpotong pas di rounded bottom kotak) */}
+                          <div className="absolute -top-44 inset-x-0 bottom-0 pointer-events-none z-10 overflow-hidden rounded-b-[32px] flex items-start justify-center">
+                            <img 
+                              src={hint?.mode === 'praise' ? '/coach-praise.webp' : '/coach-push.webp'} 
+                              alt="Coach"
+                              className="w-[230%] max-w-none h-auto -translate-y-6 drop-shadow-[0_16px_32px_rgba(0,0,0,0.95)] opacity-85"
+                              style={{
+                                maskImage: 'linear-gradient(to bottom, black 40%, rgba(0,0,0,0.7) 65%, transparent 95%)',
+                                WebkitMaskImage: 'linear-gradient(to bottom, black 40%, rgba(0,0,0,0.7) 65%, transparent 95%)'
+                              }}
+                            />
+                          </div>
 
-                      {/* Content Container (Z-Index di DEPAN Coach, tanpa kotak di dalam kotak) */}
-                      <div className="relative z-20 w-full pt-32 pb-6 px-6 flex flex-col items-center">
-                        {getOverloadHint && getOverloadHint(ex) ? (
-                          <>
-                            <h3 className="font-black text-lg text-white tracking-wider uppercase mb-3 drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]">
-                              {getOverloadHint(ex).title}
-                            </h3>
-                            <p className="text-zinc-100 text-sm font-semibold whitespace-pre-wrap leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
-                              {getOverloadHint(ex).text}
-                            </p>
-                          </>
-                        ) : (
-                          <>
-                            <h3 className="font-black text-lg text-white tracking-wider uppercase mb-3 drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]">
-                              TARGET HARI INI
-                            </h3>
-                            <p className="text-zinc-100 text-sm font-semibold whitespace-pre-wrap leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
-                              Belum ada rekor 10RM.{"\n\n"}Gunakan beban yang menantang tapi sanggup diangkat 10x dengan benar (RPE 8).
-                            </p>
-                          </>
-                        )}
-                      </div>
+                          {/* Content Container (Z-Index di DEPAN Coach, tanpa kotak di dalam kotak) */}
+                          <div className="relative z-20 w-full pt-32 pb-6 px-6 flex flex-col items-center">
+                            {hint ? (
+                              <>
+                                <h3 className={`font-black ${hint.isNewRecord ? 'text-xl text-sky-400 drop-shadow-[0_0_12px_rgba(56,189,248,0.8)] animate-pulse' : 'text-lg text-white'} tracking-wider uppercase mb-3 drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]`}>
+                                  {hint.title}
+                                </h3>
+                                <p className="text-zinc-100 text-sm font-semibold whitespace-pre-wrap leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
+                                  {hint.text}
+                                </p>
+                              </>
+                            ) : (
+                              <>
+                                <h3 className="font-black text-lg text-white tracking-wider uppercase mb-3 drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]">
+                                  TARGET HARI INI
+                                </h3>
+                                <p className="text-zinc-100 text-sm font-semibold whitespace-pre-wrap leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
+                                  Belum ada rekor 10RM.{"\n\n"}Gunakan beban yang menantang tapi sanggup diangkat 10x dengan benar (RPE 8).
+                                </p>
+                              </>
+                            )}
+                          </div>
 
-                    </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>,
                 document.body
@@ -1317,7 +1329,7 @@ const ImmersiveWorkout = ({
               onClick={handleNextEx}
               className={`w-full py-4 rounded-2xl ${t.bgAccent} font-black h2 flex items-center justify-center gap-2 shadow-xl hover:opacity-90 active:opacity-80 transition-opacity`}
             >
-              {currentIndex === validExercises.length - 1 ? 'FINISH WORKOUT' : 'LATIHAN BERIKUTNYA'}
+              {isAllWorkoutDone ? 'SELESAI LATIHAN' : 'LATIHAN BERIKUTNYA'}
             </button>
           )}
         </div>

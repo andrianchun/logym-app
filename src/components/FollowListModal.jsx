@@ -21,6 +21,14 @@ export default function FollowListModal({ currentUser, type, isDark, t, onClose,
   const title = type === 'followers' ? 'Followers' : 'Following';
 
   useEffect(() => {
+    const orig = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = orig;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!currentUser?.uid) return;
     const load = async () => {
       setIsLoading(true);
@@ -137,7 +145,12 @@ export default function FollowListModal({ currentUser, type, isDark, t, onClose,
               decoding="async"
               loading="lazy"
               className="w-10 h-10 rounded-full object-cover shrink-0 group-hover:opacity-80 transition-opacity"
-              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                if (e.currentTarget.nextElementSibling) {
+                  e.currentTarget.nextElementSibling.classList.remove('hidden');
+                }
+              }}
             />
           ) : null}
           <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-sm shrink-0 group-hover:opacity-80 transition-opacity ${t?.bgAccentSoft || 'bg-[#3b82f6]/10'} ${t?.textAccent || 'text-[#3b82f6]'} ${u.photo ? 'hidden' : ''}`}>
@@ -191,7 +204,7 @@ export default function FollowListModal({ currentUser, type, isDark, t, onClose,
 
   const modal = (
     <div
-      className="fixed inset-0 z-[2000] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300"
+      className="fixed inset-0 z-[2000] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300 overscroll-contain touch-none"
       onClick={onClose}
     >
       <div
@@ -201,7 +214,7 @@ export default function FollowListModal({ currentUser, type, isDark, t, onClose,
         {/* Header */}
         <div className={`px-4 py-3.5 flex items-center justify-between border-b ${isDark ? 'border-white/10' : 'border-black/8'} shrink-0`}>
           <h3 className={`font-black text-base ${isDark ? 'text-white' : 'text-black'}`}>{title}</h3>
-          <button onClick={onClose} className={`p-1.5 rounded-full ${isDark ? 'bg-white/5 text-white/60' : 'bg-black/5 text-black/50'}`}>
+          <button onClick={onClose} className={`p-1.5 rounded-full ${isDark ? 'bg-white/5 text-white/60' : 'bg-black/5 text-black/50'}`} data-close-modal="true">
             <X size={16} />
           </button>
         </div>

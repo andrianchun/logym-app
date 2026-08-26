@@ -114,6 +114,16 @@ export default function ProfileModal({
         setShowEditPersonal(true);
     };
 
+    // Lock body scroll when ProfileModal is open
+    useEffect(() => {
+        if (!showProfileModal) return;
+        const orig = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = orig;
+        };
+    }, [showProfileModal]);
+
     // If a forceTab is specified (e.g., navigate to beranda after share), switch to it
     useEffect(() => {
         if (forceTab && showProfileModal) {
@@ -328,7 +338,7 @@ export default function ProfileModal({
 
     return (<>
         <div 
-            className={`fixed inset-0 z-[100] flex flex-col bg-black/80 backdrop-blur-md animate-in fade-in no-swipe`}
+            className={`fixed inset-0 z-[100] flex flex-col bg-black/80 backdrop-blur-md animate-in fade-in no-swipe overscroll-contain touch-none`}
             onTouchStart={handleLocalTouchStart}
             onTouchEnd={handleLocalTouchEnd}
         >
@@ -568,8 +578,8 @@ export default function ProfileModal({
 
         {/* Edit Personal Details Modal */}
         {showEditPersonal && (
-            <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 overflow-y-auto">
-                <div className={`w-full max-w-sm p-6 rounded-3xl ${t.bgCard} border ${t.border} shadow-2xl animate-in zoom-in-95 my-auto max-h-[90vh] overflow-y-auto hide-scrollbar`}>
+            <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 overflow-y-auto overscroll-contain touch-none" onClick={() => setShowEditPersonal(false)}>
+                <div className={`w-full max-w-sm p-6 rounded-3xl ${t.bgCard} border ${t.border} shadow-2xl animate-in zoom-in-95 my-auto max-h-[90vh] overflow-y-auto hide-scrollbar`} onClick={e => e.stopPropagation()}>
                     <h3 className={`text-xl font-black ${t.textMain} mb-4`}>Data Personal</h3>
                     
                     <div className="space-y-5 mb-6">
@@ -588,7 +598,12 @@ export default function ProfileModal({
                                         decoding="async"
                                         loading="lazy"
                                         className="w-full h-full object-cover group-hover:opacity-75 transition-opacity"
-                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                        onError={(e) => {
+                                            e.currentTarget.style.display = 'none';
+                                            if (e.currentTarget.nextElementSibling) {
+                                                e.currentTarget.nextElementSibling.classList.remove('hidden');
+                                            }
+                                        }}
                                     />
                                 ) : null}
                                 <div className={`w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-700 to-slate-900 group-hover:opacity-75 transition-opacity ${user?.photoURL ? 'hidden' : ''}`}>
@@ -771,10 +786,10 @@ export default function ProfileModal({
 
         {/* Achievement Details Modal */}
         {selectedAchievement && (
-            <div className="fixed inset-0 z-[120] bg-black/60 flex items-end sm:items-center justify-center sm:p-4 pb-16 animate-in fade-in duration-200">
-                <div className={`w-full max-w-sm rounded-t-3xl sm:rounded-3xl p-6 ${isDark ? 'bg-slate-900 border border-white/10' : 'bg-white'} shadow-2xl animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-0 sm:zoom-in-95`}>
+            <div className="fixed inset-0 z-[120] bg-black/60 flex items-end sm:items-center justify-center sm:p-4 pb-16 animate-in fade-in duration-200 overscroll-contain" onClick={() => setSelectedAchievement(null)}>
+                <div className={`w-full max-w-sm rounded-t-3xl sm:rounded-3xl p-6 ${isDark ? 'bg-slate-900 border border-white/10' : 'bg-white'} shadow-2xl animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-0 sm:zoom-in-95`} onClick={e => e.stopPropagation()}>
                     <div className="flex justify-end mb-2">
-                        <button onClick={() => setSelectedAchievement(null)} className={`p-1.5 rounded-full ${isDark ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-black/5 hover:bg-black/10 text-black'} transition-colors`}>
+                        <button onClick={() => setSelectedAchievement(null)} className={`p-1.5 rounded-full ${isDark ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-black/5 hover:bg-black/10 text-black'} transition-colors`} data-close-modal="true">
                             <X size={18}/>
                         </button>
                     </div>
