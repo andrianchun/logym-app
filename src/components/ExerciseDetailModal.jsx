@@ -675,7 +675,6 @@ const ExerciseDetailModal = ({
                     )}
                     
                     <div>
-                      <h3 className={`body-lg font-bold ${t.textMuted} mb-3`}>{lang?.id === 'EN' ? 'Instructions' : 'Instruksi Gerakan'}</h3>
                       {activeInstructions && activeInstructions.length > 0 ? (
                         <ol className="list-decimal pl-5 space-y-3">
                           {activeInstructions.map((step, i) => (

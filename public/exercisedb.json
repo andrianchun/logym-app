@@ -4836,13 +4836,11 @@
       "Turunkan kembali lengan secara perlahan ke posisi awal sambil menarik napas.",
       "Ulangi gerakan ini sesuai jumlah repetisi yang dianjurkan. Tips: Jaga agar lengan atas tetap tegak lurus dengan torso dan pertahankan sudut siku yang konstan (sudut 10 hingga 30 derajat) sepanjang latihan."
     ],
-    "videoUrl": "/exercise-assets/youtube-backup/edb-Cable_Seated_Lateral_Raise.mp4",
-    "ytVideo": "https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA",
     "defaultWeight": 20,
     "level": "beginner",
     "type": "weight",
     "aliases": [
-      "Cable Lateral Raise"
+      "Seated Cable Lateral Raise"
     ]
   },
   {
@@ -13186,9 +13184,24 @@
       "quadriceps",
       "traps"
     ],
-    "instructions": [],
-    "instructions_en": [],
-    "instructions_id": []
+    "instructions": [
+      "Pegang sepasang dumbbell ringan dan berdiri tegak dengan kaki selebar bahu.",
+      "Rentangkan kedua lengan lurus ke samping setinggi bahu sehingga tubuh membentuk formasi salib ('T' shape).",
+      "Tahan posisi ini selama durasi yang ditentukan sambil menjaga kontraksi otot bahu dan core tetap aktif.",
+      "Turunkan beban perlahan ke samping paha setelah selesai."
+    ],
+    "instructions_en": [
+      "Hold a pair of light dumbbells and stand tall with feet shoulder-width apart.",
+      "Extend both arms straight out to the sides at shoulder height, forming a 'T' shape with your body.",
+      "Hold this static position for the prescribed duration while maintaining tension in your shoulders and core.",
+      "Slowly lower the weights back to your sides upon completion."
+    ],
+    "instructions_id": [
+      "Pegang sepasang dumbbell ringan dan berdiri tegak dengan kaki selebar bahu.",
+      "Rentangkan kedua lengan lurus ke samping setinggi bahu sehingga tubuh membentuk formasi salib ('T' shape).",
+      "Tahan posisi ini selama durasi yang ditentukan sambil menjaga kontraksi otot bahu dan core tetap aktif.",
+      "Turunkan beban perlahan ke samping paha setelah selesai."
+    ]
   },
   {
     "exerciseId": "Iron_Crosses_stretch",
@@ -18164,9 +18177,24 @@
       "lower back",
       "shoulders"
     ],
-    "instructions": [],
-    "instructions_en": [],
-    "instructions_id": []
+    "instructions": [
+      "Berdiri dengan kaki dibuka sedikit lebih lebar dari bahu dan letakkan kettlebell di lantai di depan Anda.",
+      "Bungkukkan pinggul ke belakang (hip hinge), raih handle kettlebell dengan satu tangan sambil menjaga punggung tetap lurus dan dada terbuka.",
+      "Ayunkan kettlebell ke belakang di antara kedua paha, lalu dorong pinggul ke depan secara eksplosif untuk mengayunkan kettlebell ke atas hingga setinggi dada.",
+      "Biarkan kettlebell berayun turun mengikuti gravitasi ke antara paha, lalu ulangi gerakan tanpa jeda sebelum berganti tangan."
+    ],
+    "instructions_en": [
+      "Stand with feet slightly wider than shoulder-width apart, kettlebell placed on the floor in front of you.",
+      "Hinge at your hips and grip the kettlebell handle with one hand, keeping a neutral spine and flat back.",
+      "Swing the kettlebell back between your legs, then explosively drive your hips forward to swing it up to chest height.",
+      "Allow the kettlebell to swing back between your legs and repeat rhythmically before switching hands."
+    ],
+    "instructions_id": [
+      "Berdiri dengan kaki dibuka sedikit lebih lebar dari bahu dan letakkan kettlebell di lantai di depan Anda.",
+      "Bungkukkan pinggul ke belakang (hip hinge), raih handle kettlebell dengan satu tangan sambil menjaga punggung tetap lurus dan dada terbuka.",
+      "Ayunkan kettlebell ke belakang di antara kedua paha, lalu dorong pinggul ke depan secara eksplosif untuk mengayunkan kettlebell ke atas hingga setinggi dada.",
+      "Biarkan kettlebell berayun turun mengikuti gravitasi ke antara paha, lalu ulangi gerakan tanpa jeda sebelum berganti tangan."
+    ]
   },
   {
     "exerciseId": "One-Arm_Long_Bar_Row",
@@ -20791,9 +20819,24 @@
       "quadriceps",
       "triceps"
     ],
-    "instructions": [],
-    "instructions_en": [],
-    "instructions_id": []
+    "instructions": [
+      "Pegang barbell di depan bahu (posisi front rack) dengan telapak tangan menghadap ke atas/depan dan siku sedikit ke depan.",
+      "Lakukan tekukan dangkal pada lutut dan pinggul (quarter squat) untuk mengumpulkan tenaga dorongan (dip).",
+      "Dorong lantai secara eksplosif dengan kaki sambil mendorong barbell lurus ke atas kepala (drive and press) hingga lengan mengunci sempurna.",
+      "Tahan sejenak di puncak gerakan, lalu turunkan kembali barbell ke bahu secara terkontrol dan bersiap untuk repetisi berikutnya."
+    ],
+    "instructions_en": [
+      "Rest the barbell across your front shoulders in a front rack position, elbows pointing forward.",
+      "Dip your knees and hips slightly into a shallow quarter-squat to generate power.",
+      "Explosively extend your legs and drive the barbell overhead until your arms are fully locked out.",
+      "Pause briefly at the top, then lower the bar back to the shoulders with control to prepare for the next rep."
+    ],
+    "instructions_id": [
+      "Pegang barbell di depan bahu (posisi front rack) dengan telapak tangan menghadap ke atas/depan dan siku sedikit ke depan.",
+      "Lakukan tekukan dangkal pada lutut dan pinggul (quarter squat) untuk mengumpulkan tenaga dorongan (dip).",
+      "Dorong lantai secara eksplosif dengan kaki sambil mendorong barbell lurus ke atas kepala (drive and press) hingga lengan mengunci sempurna.",
+      "Tahan sejenak di puncak gerakan, lalu turunkan kembali barbell ke bahu secara terkontrol dan bersiap untuk repetisi berikutnya."
+    ]
   },
   {
     "exerciseId": "Push_Press_-_Behind_the_Neck",
@@ -23977,6 +24020,10 @@
       "Jaga torso tetap stabil (tanpa mengayun), angkat dumbbell ke samping dengan sedikit menekuk siku dan tangan sedikit miring ke depan (seperti menuang air). Lanjutkan hingga lengan sejajar dengan lantai. Buang napas saat melakukannya dan tahan sedetik di atas.",
       "Turunkan kembali dumbbell secara perlahan ke posisi awal sambil menarik napas.",
       "Ulangi sebanyak repetisi yang ditentukan."
+    ],
+    "aliases": [
+      "Seated Dumbbell Lateral Raise",
+      "Seated Lateral Raise"
     ]
   },
   {
@@ -24289,9 +24336,24 @@
     "secondaryMuscles": [
       "shoulders"
     ],
-    "instructions": [],
-    "instructions_en": [],
-    "instructions_id": []
+    "instructions": [
+      "Berbaring miring pada salah satu sisi tubuh dengan kaki lurus bertumpuk satu sama lain.",
+      "Tempatkan siku tepat di bawah bahu dan lengan bawah menempel rata di lantai.",
+      "Angkat pinggul dari lantai hingga tubuh Anda membentuk garis lurus diagonal dari kepala hingga pergelangan kaki.",
+      "Tahan posisi ini selama durasi yang ditentukan sambil mengencangkan otot oblique dan core, lalu ganti sisi."
+    ],
+    "instructions_en": [
+      "Lie on your side with legs straight and feet stacked on top of each other.",
+      "Place your forearm directly beneath your shoulder on the floor.",
+      "Lift your hips off the ground until your body forms a straight diagonal line from head to heels.",
+      "Hold the position for the prescribed duration engaging your core and obliques, then switch sides."
+    ],
+    "instructions_id": [
+      "Berbaring miring pada salah satu sisi tubuh dengan kaki lurus bertumpuk satu sama lain.",
+      "Tempatkan siku tepat di bawah bahu dan lengan bawah menempel rata di lantai.",
+      "Angkat pinggul dari lantai hingga tubuh Anda membentuk garis lurus diagonal dari kepala hingga pergelangan kaki.",
+      "Tahan posisi ini selama durasi yang ditentukan sambil mengencangkan otot oblique dan core, lalu ganti sisi."
+    ]
   },
   {
     "exerciseId": "Side_Hop-Sprint",
@@ -24342,9 +24404,24 @@
       "abdominals"
     ],
     "secondaryMuscles": [],
-    "instructions": [],
-    "instructions_en": [],
-    "instructions_id": []
+    "instructions": [
+      "Berbaring miring di lantai dengan kaki bertumpuk dan tangan bawah diletakkan lurus di lantai untuk keseimbangan.",
+      "Letakkan tangan atas di belakang kepala dengan siku mengarah ke atas.",
+      "Angkat kedua kaki bersamaan dengan mengangkat torso bagian atas ke samping, mendekatkan siku ke pinggul/paha untuk mengontraksikan oblique.",
+      "Turunkan tubuh kembali secara perlahan ke posisi awal dan ulangi sebelum berganti sisi."
+    ],
+    "instructions_en": [
+      "Lie on your side with feet stacked and lower arm extended along the floor for stability.",
+      "Place your upper hand behind your head with your elbow pointed up.",
+      "Simultaneously lift your legs and upper torso sideways, bringing your elbow toward your hips to crunch the obliques.",
+      "Slowly lower back down and repeat for the desired reps before switching sides."
+    ],
+    "instructions_id": [
+      "Berbaring miring di lantai dengan kaki bertumpuk dan tangan bawah diletakkan lurus di lantai untuk keseimbangan.",
+      "Letakkan tangan atas di belakang kepala dengan siku mengarah ke atas.",
+      "Angkat kedua kaki bersamaan dengan mengangkat torso bagian atas ke samping, mendekatkan siku ke pinggul/paha untuk mengontraksikan oblique.",
+      "Turunkan tubuh kembali secara perlahan ke posisi awal dan ulangi sebelum berganti sisi."
+    ]
   },
   {
     "exerciseId": "Side_Lateral_Raise",
@@ -24377,6 +24454,11 @@
       "Jaga tubuh tetap stabil (tanpa mengayun), angkat dumbbell ke samping dengan sedikit menekuk siku dan posisi tangan sedikit miring ke depan seperti sedang menuang air ke dalam gelas. Lanjutkan hingga lengan sejajar dengan lantai. Buang napas saat melakukan gerakan ini dan tahan selama satu detik di atas.",
       "Turunkan kembali dumbbell secara perlahan ke posisi awal sambil menarik napas.",
       "Ulangi untuk jumlah repetisi yang dianjurkan."
+    ],
+    "aliases": [
+      "Dumbbell Lateral Raise",
+      "Lateral Raise",
+      "Standing Dumbbell Lateral Raise"
     ]
   },
   {
@@ -32483,5 +32565,55 @@
     "defaultWeight": 0,
     "duration": 30,
     "source": "logym_master"
+  },
+  {
+    "exerciseId": "Standing_Cable_Lateral_Raise",
+    "name": "Standing Cable Lateral Raise",
+    "gifUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.webp",
+    "thumbnailUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.webp",
+    "bodyParts": [
+      "strength"
+    ],
+    "equipments": [
+      "cable"
+    ],
+    "targetMuscles": [
+      "shoulders"
+    ],
+    "secondaryMuscles": [
+      "traps"
+    ],
+    "instructions": [
+      "Pasang single handle (d-handle) pada katrol kabel di posisi paling bawah (low pulley). Berdirilah tegak di samping mesin katrol.",
+      "Pegang handle dengan tangan yang berada di sisi luar (menyilang di depan badan atau dari samping). Jaga tubuh tetap tegak, dada membusung, dan siku sedikit ditekuk.",
+      "Angkat lengan ke samping hingga setinggi bahu atau sejajar dengan lantai. Buang napas saat mengangkat dan rasakan kontraksi penuh pada deltoid samping.",
+      "Turunkan kabel secara perlahan dan terkontrol kembali ke posisi awal sambil menarik napas.",
+      "Ulangi sebanyak repetisi yang ditentukan, lalu lakukan hal yang sama pada sisi lengan lainnya."
+    ],
+    "instructions_en": [
+      "Attach a single handle to the low pulley of a cable machine. Stand upright beside the pulley.",
+      "Grasp the handle with the far arm across your body. Keep your torso steady and your elbow slightly bent.",
+      "Raise your arm out to the side until it is parallel to the floor and at shoulder level. Exhale and hold the contraction at the top.",
+      "Slowly lower the cable back down to the starting position under control as you inhale.",
+      "Repeat for the recommended amount of reps, then switch to the other arm."
+    ],
+    "instructions_id": [
+      "Pasang single handle (d-handle) pada katrol kabel di posisi paling bawah (low pulley). Berdirilah tegak di samping mesin katrol.",
+      "Pegang handle dengan tangan yang berada di sisi luar (menyilang di depan badan atau dari samping). Jaga tubuh tetap tegak, dada membusung, dan siku sedikit ditekuk.",
+      "Angkat lengan ke samping hingga setinggi bahu atau sejajar dengan lantai. Buang napas saat mengangkat dan rasakan kontraksi penuh pada deltoid samping.",
+      "Turunkan kabel secara perlahan dan terkontrol kembali ke posisi awal sambil menarik napas.",
+      "Ulangi sebanyak repetisi yang ditentukan, lalu lakukan hal yang sama pada sisi lengan lainnya."
+    ],
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.mp4 /exercise-assets/youtube-backup/edb-Cable_Seated_Lateral_Raise.mp4",
+    "ytVideo": "https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA",
+    "defaultWeight": 10,
+    "level": "beginner",
+    "type": "weight",
+    "aliases": [
+      "Cable Lateral Raise",
+      "Cable Lateral Raises",
+      "Standing Cable Lateral Raises",
+      "Cable Side Lateral Raise"
+    ]
   }
 ]

@@ -10,7 +10,12 @@ assert.equal(canonicalizeExercise({ name: 'Dumbbell Biceps Curl' }).name, 'Dumbb
 assert.equal(canonicalizeExercise({ name: 'Biceps Curl' }).name, 'Dumbbell Alternate Bicep Curl');
 assert.equal(canonicalizeExercise({ name: 'Rumanian Deadlift' }).name, 'Romanian Deadlift');
 assert.equal(canonicalizeExercise({ name: 'Flat Dumbbell Bench Press' }).name, 'Dumbbell Bench Press');
-assert.equal(canonicalizeExercise({ name: 'Cable Lateral Raises' }).name, 'Cable Seated Lateral Raise');
+assert.equal(canonicalizeExercise({ name: 'Cable Lateral Raises' }).name, 'Standing Cable Lateral Raise');
+assert.equal(canonicalizeExercise({ name: 'Standing Cable Lateral Raise' }).name, 'Standing Cable Lateral Raise');
+assert.equal(canonicalizeExercise({ name: 'Cable Seated Lateral Raise' }).name, 'Cable Seated Lateral Raise');
+assert.equal(canonicalizeExercise({ name: 'Seated Side Lateral Raise' }).name, 'Seated Side Lateral Raise');
+assert.equal(canonicalizeExercise({ name: 'Side Lateral Raise' }).name, 'Side Lateral Raise');
+assert.equal(canonicalizeExercise({ name: 'Dumbbell Lateral Raise' }).name, 'Side Lateral Raise');
 assert.equal(canonicalizeExercise({ name: 'Cable Hip Abduction' }).name, 'Cable Hip Abduction');
 assert.equal(canonicalizeExercise({ name: 'Standing Cable Hip Abduction' }).name, 'Cable Hip Abduction');
 assert.equal(canonicalizeExercise({ name: 'Cable Pull Through' }).name, 'Pull Through');
@@ -42,10 +47,25 @@ assert.ok(matchBench, 'Flat Dumbbell Bench Press harus menemukan Dumbbell Bench 
 assert.equal(matchBench.name, 'Dumbbell Bench Press');
 assert.ok(matchBench.thumbnailUrl.includes('Dumbbell_Bench_Press.webp'));
 
-// 4. Cable Lateral Raises -> Cable Seated Lateral Raise
+// 4. Cable Lateral Raises -> Standing Cable Lateral Raise (ID 104)
 const matchLatRaise = findMatchingMasterExercise({ name: 'Cable Lateral Raises' }, defaultMasterExercises);
-assert.ok(matchLatRaise, 'Cable Lateral Raises harus menemukan Cable Seated Lateral Raise');
-assert.equal(matchLatRaise.name, 'Cable Seated Lateral Raise');
+assert.ok(matchLatRaise, 'Cable Lateral Raises harus menemukan Standing Cable Lateral Raise');
+assert.equal(matchLatRaise.name, 'Standing Cable Lateral Raise');
+assert.equal(matchLatRaise.id, 104);
+
+// 4b. Side Lateral Raise (Dumbbell) -> Side Lateral Raise (ID 143)
+const matchSideLat = findMatchingMasterExercise({ name: 'Side Lateral Raise', equipment: 'Dumbbell' }, defaultMasterExercises);
+assert.ok(matchSideLat, 'Side Lateral Raise harus menemukan ID 143');
+assert.equal(matchSideLat.name, 'Side Lateral Raise');
+assert.equal(matchSideLat.id, 143);
+
+// 4c. Seated Side Lateral Raise (Dumbbell) TIDAK boleh mencocokkan Standing Cable Lateral Raise (ID 104)
+const matchSeatedDumbbell = findMatchingMasterExercise({ name: 'Seated Side Lateral Raise', equipment: 'Dumbbell' }, defaultMasterExercises);
+assert.notEqual(matchSeatedDumbbell?.id, 104, 'Seated Dumbbell Lateral Raise tidak boleh mencocokkan ID 104 Cable');
+
+// 4d. Cable Seated Lateral Raise TIDAK boleh mencocokkan Standing Cable Lateral Raise (ID 104)
+const matchCableSeated = findMatchingMasterExercise({ name: 'Cable Seated Lateral Raise', equipment: 'Cable' }, defaultMasterExercises);
+assert.notEqual(matchCableSeated?.id, 104, 'Cable Seated Lateral Raise tidak boleh mencocokkan Standing Cable ID 104');
 
 // 5. Cable Triceps Pushdown -> Triceps Pushdown
 const matchTriceps = findMatchingMasterExercise({ name: 'Cable Triceps Pushdown' }, defaultMasterExercises);
@@ -99,8 +119,8 @@ const matchOverhead = findMatchingMasterExercise({ name: 'Cable Rope Overhead Tr
 assert.equal(matchOverhead.id, 117);
 assert.equal(matchOverhead.name, 'Cable Rope Overhead Triceps Extension');
 
-// 13. Dumbbell Lateral Raise TIDAK boleh tertukar ke Cable Seated Lateral Raise
-assert.equal(canonicalizeExercise({ name: 'Dumbbell Lateral Raise' }).name, 'Dumbbell Lateral Raise');
+// 13. Dumbbell Lateral Raise TIDAK boleh tertukar ke Standing Cable Lateral Raise (harus Side Lateral Raise)
+assert.equal(canonicalizeExercise({ name: 'Dumbbell Lateral Raise' }).name, 'Side Lateral Raise');
 
 // 14. Smith Machine Romanian Deadlift (ID 120) nama lengkap resmi
 assert.equal(canonicalizeExercise({ name: 'SM Romanian Deadlift (RDL)' }).name, 'Smith Machine Romanian Deadlift');

@@ -67,16 +67,16 @@ export const defaultMasterExercises = [
   },
   {
     "id": 104,
-    "name": "Cable Seated Lateral Raise",
+    "name": "Standing Cable Lateral Raise",
     "target": ["Deltoid Samping"],
     "type": "weight",
-    "defaultWeight": 20,
+    "defaultWeight": 10,
     "equipment": "Cable",
     "level": "beginner",
     "ytVideo": "https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA",
-    "videoUrl": "/exercise-assets/youtube-backup/edb-Cable_Seated_Lateral_Raise.mp4",
-    "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Seated_Lateral_Raise/0.jpg",
-    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Seated_Lateral_Raise/0.jpg"
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.mp4 /exercise-assets/youtube-backup/edb-Cable_Seated_Lateral_Raise.mp4",
+    "thumbnailUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.webp",
+    "gifUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.webp"
   },
   {
     "id": 105,
@@ -583,6 +583,19 @@ export const defaultMasterExercises = [
     "videoUrl": "",
     "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Incline_Bench_Press_-_Medium_Grip/0.jpg",
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Incline_Bench_Press_-_Medium_Grip/0.jpg"
+  },
+  {
+    "id": 143,
+    "name": "Side Lateral Raise",
+    "target": ["Deltoid Samping"],
+    "type": "weight",
+    "defaultWeight": 5,
+    "equipment": "Dumbbell",
+    "level": "beginner",
+    "ytVideo": "",
+    "videoUrl": "",
+    "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Side_Lateral_Raise/0.jpg",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Side_Lateral_Raise/0.jpg"
   }
 ];
 
@@ -640,70 +653,86 @@ export const findMatchingMasterExercise = (targetEx, masterList = defaultMasterE
   const byExact = masterList.find(m => cleanExerciseNameForMatching(m.name) === rawName);
   if (byExact) return byExact;
 
-  const hasModifierMismatch = (str1, str2) => {
-    // 1. Equipment mismatch (Cable vs Dumbbell vs Barbell vs Smith vs Body Weight)
-    const EQUIPMENT_MODIFIERS = ['cable', 'dumbbell', 'barbell', 'smith', 'kettlebell', 'band', 'body weight', 'pool', 'bicycle', 'treadmill'];
-    for (const eq1 of EQUIPMENT_MODIFIERS) {
-      for (const eq2 of EQUIPMENT_MODIFIERS) {
-        if (eq1 !== eq2 && str1.includes(eq1) && str2.includes(eq2)) {
-          return true;
-        }
-      }
-    }
+  // 3. Cocokkan ALIAS KANONIKAL RESMI SAJA (tanpa mencaplok variasi berbeda!)
+  const canonicalAliases = {
+    // Lat Pulldown
+    'lat pulldown': 'Wide-Grip Lat Pulldown',
+    'wide grip lat pulldown': 'Wide-Grip Lat Pulldown',
+    'wide grip lat pull down': 'Wide-Grip Lat Pulldown',
+    
+    // Bench Press
+    'flat dumbbell bench press': 'Dumbbell Bench Press',
+    'dumbbell flat bench press': 'Dumbbell Bench Press',
+    'db bench press': 'Dumbbell Bench Press',
+    'barbell bench press': 'Barbell Bench Press - Medium Grip',
+    'flat barbell bench press': 'Barbell Bench Press - Medium Grip',
+    'barbell flat bench press': 'Barbell Bench Press - Medium Grip',
+    'barbell incline bench press': 'Barbell Incline Bench Press - Medium Grip',
+    'incline barbell bench press': 'Barbell Incline Bench Press - Medium Grip',
+    'barbell incline bench press medium grip': 'Barbell Incline Bench Press - Medium Grip',
 
-    // 2. Deficit is strictly isolated
-    if (str1.includes('deficit') !== str2.includes('deficit')) return true;
+    // Deadlift
+    'romanian deadlift': 'Romanian Deadlift',
+    'rumanian deadlift': 'Romanian Deadlift',
+    'rdl': 'Romanian Deadlift',
+    'barbell rdl': 'Romanian Deadlift',
+    'barbell romanian deadlift': 'Romanian Deadlift',
+    'smith machine romanian deadlift': 'Smith Machine Romanian Deadlift',
+    'smith rdl': 'Smith Machine Romanian Deadlift',
+    'sm rdl': 'Smith Machine Romanian Deadlift',
+    'sm romanian deadlift': 'Smith Machine Romanian Deadlift',
 
-    // 3. Overhead vs Pushdown vs Extension vs Kickback
-    if (str1.includes('overhead') !== str2.includes('overhead')) return true;
-    if (str1.includes('pushdown') !== str2.includes('pushdown')) return true;
-    if (str1.includes('kickback') !== str2.includes('kickback')) return true;
+    // Lateral Raise
+    'standing cable lateral raise': 'Standing Cable Lateral Raise',
+    'standing cable lateral raises': 'Standing Cable Lateral Raise',
+    'cable lateral raise': 'Standing Cable Lateral Raise',
+    'cable lateral raises': 'Standing Cable Lateral Raise',
+    'cable side lateral raise': 'Standing Cable Lateral Raise',
+    'cable side lateral raises': 'Standing Cable Lateral Raise',
+    'side lateral raise': 'Side Lateral Raise',
+    'side lateral raises': 'Side Lateral Raise',
+    'dumbbell lateral raise': 'Side Lateral Raise',
+    'dumbbell lateral raises': 'Side Lateral Raise',
+    'dumbbell side lateral raise': 'Side Lateral Raise',
+    'lateral raise': 'Side Lateral Raise',
+    'lateral raises': 'Side Lateral Raise',
 
-    // 4. Incline vs Decline vs Flat
-    if (str1.includes('incline') && str2.includes('decline')) return true;
-    if (str1.includes('decline') && str2.includes('incline')) return true;
-    if ((str1.includes('incline') || str1.includes('decline')) !== (str2.includes('incline') || str2.includes('decline'))) {
-      if (str1.includes('press') || str2.includes('press') || str1.includes('bench') || str2.includes('bench')) return true;
-    }
+    // Delts / Rows / Pushdown / Pulls
+    'cable rear delt fly': 'Cable Rear Delt Fly',
+    'cross cable rear delt': 'Cable Rear Delt Fly',
+    'cross cable rear delt fly': 'Cable Rear Delt Fly',
+    'cable rear delt flyes': 'Cable Rear Delt Fly',
+    'pull through': 'Pull Through',
+    'cable pull through': 'Pull Through',
+    'cable pull thru': 'Pull Through',
+    'cable hip abduction': 'Cable Hip Abduction',
+    'standing cable hip abduction': 'Cable Hip Abduction',
+    'triceps pushdown': 'Triceps Pushdown',
+    'cable triceps pushdown': 'Triceps Pushdown',
+    'tricep pushdown': 'Triceps Pushdown',
+    'dumbbell alternate bicep curl': 'Dumbbell Alternate Bicep Curl',
+    'dumbbell alternating bicep curl': 'Dumbbell Alternate Bicep Curl',
+    'dumbbell bicep curl': 'Dumbbell Alternate Bicep Curl',
+    'dumbbell biceps curl': 'Dumbbell Alternate Bicep Curl',
+    'bicep curl': 'Dumbbell Alternate Bicep Curl',
+    'biceps curl': 'Dumbbell Alternate Bicep Curl',
 
-    // 5. Seated vs Standing (only conflict if opposing)
-    if (str1.includes('seated') && str2.includes('standing')) return true;
-    if (str1.includes('standing') && str2.includes('seated')) return true;
-
-    // 6. Grip styles (Close vs Wide vs Reverse)
-    if (str1.includes('close grip') && str2.includes('wide grip')) return true;
-    if (str1.includes('wide grip') && str2.includes('close grip')) return true;
-    if (str1.includes('reverse grip') !== str2.includes('reverse grip')) return true;
-
-    // 7. Curl variations (Hammer vs Preacher vs Concentration vs Alternate)
-    if (str1.includes('hammer') !== str2.includes('hammer')) return true;
-    if (str1.includes('preacher') !== str2.includes('preacher')) return true;
-    if (str1.includes('concentration') !== str2.includes('concentration')) return true;
-
-    return false;
+    // Cardio
+    'treadmill': 'Treadmill',
+    'treadmill running': 'Treadmill',
+    'running on treadmill': 'Treadmill',
+    'trail running': 'Trail Running',
+    'trail run': 'Trail Running',
+    'jogging': 'Jogging / Running',
+    'running': 'Jogging / Running',
+    'jogging running': 'Jogging / Running',
+    'jogging / running': 'Jogging / Running',
   };
 
-  // 3. Substring (satu nama mengandung nama lainnya)
-  const bySub = masterList.find(m => {
-    const mName = cleanExerciseNameForMatching(m.name);
-    if (hasModifierMismatch(rawName, mName)) return false;
-    return mName.includes(rawName) || rawName.includes(mName);
-  });
-  if (bySub) return bySub;
-
-  // 4. Token inti (mengabaikan awalan alat/posisi seperti cable, dumbbell, smith, flat, wide-grip, alternate, dll)
-  const IGNORE_WORDS = new Set(['cable', 'machine', 'dumbbell', 'barbell', 'smith', 'seated', 'standing', 'lying', 'flat', 'incline', 'decline', 'wide', 'grip', 'close', 'sm', 'alternate', 'alternating', 'with']);
-  const targetWords = rawName.split(/[\s-]+/).filter(w => !IGNORE_WORDS.has(w));
-  if (targetWords.length > 0) {
-    const targetCore = targetWords.join(' ');
-    const byCore = masterList.find(m => {
-      const mName = cleanExerciseNameForMatching(m.name);
-      if (hasModifierMismatch(rawName, mName)) return false;
-      const mWords = mName.split(/[\s-]+/).filter(w => !IGNORE_WORDS.has(w));
-      const mCore = mWords.join(' ');
-      return mCore === targetCore || mCore.includes(targetCore) || targetCore.includes(mCore);
-    });
-    if (byCore) return byCore;
+  const canonicalName = canonicalAliases[rawName];
+  if (canonicalName) {
+    const byCanonical = masterList.find(m => cleanExerciseNameForMatching(m.name) === cleanExerciseNameForMatching(canonicalName));
+    if (byCanonical) return byCanonical;
   }
 
   return null;
@@ -717,7 +746,7 @@ export const findMatchingMasterExercise = (targetEx, masterList = defaultMasterE
  *  - "Dumbbell Biceps Curl" / "Biceps Curl" -> "Dumbbell Alternate Bicep Curl" (bukan Cable Curl / Barbell Curl)
  *  - "Rumanian Deadlift" / "RDL" -> "Romanian Deadlift" (bukan Deficit RDL / Smith RDL)
  *  - "Flat Dumbbell Bench Press" -> "Dumbbell Bench Press" (bukan Incline DB Press)
- *  - "Cable Lateral Raises" -> "Cable Seated Lateral Raise" (bukan Dumbbell Lateral Raise)
+ *  - "Cable Lateral Raises" -> "Standing Cable Lateral Raise" (bukan Dumbbell Lateral Raise / Seated Cable Raise)
  *  - "Cable Pull Through" -> "Pull Through"
  *  - "Cable Triceps Pushdown" -> "Triceps Pushdown" (bukan Rope Overhead Extension)
  */
@@ -744,8 +773,14 @@ export const canonicalizeExercise = (ex) => {
     name = 'Cable Hip Abduction';
   } else if (locName === 'cable pull through' || locName === 'cable pull thru' || locName === 'pull through') {
     name = 'Pull Through';
-  } else if (locName === 'cable lateral raise' || locName === 'cable lateral raises' || locName === 'cable seated lateral raise' || locName === 'seated cable lateral raise') {
+  } else if (locName === 'standing cable lateral raise' || locName === 'standing cable lateral raises' || locName === 'cable lateral raise' || locName === 'cable lateral raises' || locName === 'cable side lateral raise' || locName === 'cable side lateral raises') {
+    name = 'Standing Cable Lateral Raise';
+  } else if (locName === 'cable seated lateral raise' || locName === 'seated cable lateral raise' || locName === 'seated cable lateral raises') {
     name = 'Cable Seated Lateral Raise';
+  } else if (locName === 'seated side lateral raise' || locName === 'seated dumbbell lateral raise' || locName === 'seated dumbbell lateral raises' || locName === 'seated lateral raise' || locName === 'seated lateral raises') {
+    name = 'Seated Side Lateral Raise';
+  } else if (locName === 'side lateral raise' || locName === 'side lateral raises' || locName === 'dumbbell lateral raise' || locName === 'dumbbell lateral raises' || locName === 'dumbbell side lateral raise' || locName === 'dumbbell side lateral raises' || locName === 'lateral raise' || locName === 'lateral raises') {
+    name = 'Side Lateral Raise';
   } else if (locName === 'treadmill running' || locName === 'running on treadmill' || locName === 'treadmill') {
     name = 'Treadmill';
   } else if (locName === 'trail running' || locName === 'trail run') {
@@ -833,17 +868,17 @@ export const defaultPrograms = [
       },
       {
         "id": 104,
-        "name": "Cable Seated Lateral Raise",
+        "name": "Standing Cable Lateral Raise",
         "sets": 3,
         "reps": 12,
         "target": [
           "Deltoid Samping"
         ],
         "type": "weight",
-        "defaultWeight": 20,
+        "defaultWeight": 10,
         "equipment": "Cable",
         "ytVideo": "https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA",
-        "videoUrl": "/exercise-assets/youtube-backup/edb-Cable_Seated_Lateral_Raise.mp4"
+        "videoUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.mp4 /exercise-assets/youtube-backup/edb-Cable_Seated_Lateral_Raise.mp4"
       },
       {
         "id": 105,

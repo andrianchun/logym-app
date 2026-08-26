@@ -15,7 +15,7 @@ const ytVideoMap = {
   'seated cable rows': 'https://youtu.be/qD1WZ5pSuvk?si=JbbritEwFpnqjPHz',
   'dumbbell bench press': 'https://youtu.be/WbCEvFA0NJs?si=n6uJrVnL8SbZLnii',
   'flat dumbbell bench press': 'https://youtu.be/WbCEvFA0NJs?si=n6uJrVnL8SbZLnii',
-  'cable seated lateral raise': 'https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA',
+  'standing cable lateral raise': 'https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA',
   'cable lateral raise': 'https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA',
   'cable lateral raises': 'https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA',
   'triceps pushdown': 'https://youtu.be/1FjkhpZsaxc?si=UF5-0LJTCd_pEhy3 https://youtu.be/u36jNfqh8_U?si=AEMeWXqnBvpOWNOj https://youtu.be/9qupVR7pKtk?si=FtLIHZmKuqXcK0ne',
