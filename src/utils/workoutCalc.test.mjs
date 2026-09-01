@@ -353,4 +353,30 @@ console.log('workoutCalc OK', { cardioKcal, plankKcal, liftKcal });
   console.log('calculatePersonalRecords OK', { big3Total: pr.big3.total, streak: pr.longestWeeklyStreak, lifetimeVol: pr.lifetimeVolumeKg, analogy: getTonaseAnalogy(13900) });
 }
 
+// --- dailyBurnCalories with TEF (Thermic Effect of Food) -----------------
+{
+  const { dailyBurnCalories } = await import('./workoutCalc.js');
+  
+  // 1. With logged nutrition: TEF = 10% of nutritionCalories (2000 kcal -> 200 kcal)
+  const bioWithFood = { weight: 70, steps: 5000, nutritionCalories: 2000 };
+  const burnFood = dailyBurnCalories(bioWithFood, [], 70, {}, { weight: 70, height: 175, age: 25, gender: 'male' });
+  assert.equal(burnFood.tef, 200, `TEF dari makanan 2000 kcal harus 200 kcal, dapat ${burnFood.tef}`);
+  assert.equal(burnFood.steps, 200, `5000 langkah x 0.04 = 200 kcal, dapat ${burnFood.steps}`);
+  assert.equal(burnFood.total, burnFood.bmr + burnFood.steps + burnFood.tef + burnFood.workout);
 
+  // 2. Without logged nutrition: Fallback TEF = 10% of BMR
+  const bioEmpty = { weight: 70, steps: 0 };
+  const burnEmpty = dailyBurnCalories(bioEmpty, [], 70, {}, { weight: 70, height: 175, age: 25, gender: 'male' });
+  assert.equal(burnEmpty.tef, Math.round(burnEmpty.bmr * 0.1), `Fallback TEF harus 10% BMR, dapat ${burnEmpty.tef}`);
+  assert.equal(burnEmpty.total, burnEmpty.bmr + burnEmpty.tef);
+
+  // 3. With explicit macronutrients (Protein 150g, Carbs 200g, Fat 50g)
+  // TEF = (150*4*0.25) + (200*4*0.075) + (50*9*0.02) = 150 + 60 + 9 = 219 kcal
+  const bioWithMacros = { weight: 70, steps: 0, protein: 150, carbs: 200, fat: 50 };
+  const burnMacros = dailyBurnCalories(bioWithMacros, [], 70, {}, { weight: 70, height: 175, age: 25, gender: 'male' });
+  assert.equal(burnMacros.tef, 219, `TEF dari makro P:150 C:200 F:50 harus 219 kcal, dapat ${burnMacros.tef}`);
+  assert.equal(burnMacros.hasMacros, true);
+  assert.equal(burnMacros.macros.protein, 150);
+
+  console.log('dailyBurnCalories with TEF OK', { bmr: burnFood.bmr, steps: burnFood.steps, tef: burnFood.tef, tefMacros: burnMacros.tef, total: burnFood.total });
+}

@@ -121,14 +121,15 @@ assert.deepEqual(splitWorkoutCalories(BERAT, null, {}), { kardio: 0, beban: 0 })
 const hariKosong = { bmr: 2000, steps: 0 };
 const sesiSelesai = { id: 'w1', status: 'completed', exercises: [beban], duration: '45:00', log: { 1: logSet(4, { r: 10, w: 40 }) } };
 
-// 12. Dasar: BMR + langkah + latihan. Langkah ~0,04 kkal/langkah.
+// 12. Dasar: BMR + langkah + latihan + TEF. Langkah ~0,04 kkal/langkah, TEF ~10%.
 {
   const b = dailyBurnCalories({ bmr: 2000, steps: 5000 }, [], BERAT);
   assert.equal(b.bmr, 2000);
   assert.equal(b.steps, 200);
   assert.equal(b.workout, 0);
-  assert.equal(b.total, 2200);
-  assert.equal(b.floor, 2200);
+  assert.equal(b.tef, 200); // 10% BMR
+  assert.equal(b.total, 2400); // 2000 + 200 + 0 + 200
+  assert.equal(b.floor, 2400);
 }
 
 // 13. Hanya sesi 'completed'/adhoc yang dihitung — sesi terjadwal yang belum dikerjakan tidak
@@ -143,7 +144,7 @@ const sesiSelesai = { id: 'w1', status: 'completed', exercises: [beban], duratio
 {
   const b = dailyBurnCalories(hariKosong, [sesiSelesai], BERAT);
   assert.equal(b.kardio + b.beban, b.workout);
-  assert.equal(b.total, b.bmr + b.steps + b.workout);
+  assert.equal(b.total, b.bmr + b.steps + b.workout + b.tef);
 }
 
 // 15. Berat badan hari itu menang atas fallback — riwayat lama harus dihitung dengan berat
@@ -154,7 +155,7 @@ const sesiSelesai = { id: 'w1', status: 'completed', exercises: [beban], duratio
   assert.ok(berat > ringan, 'berat badan hari itu tidak dipakai');
 }
 
-// 16. Manual menggantikan BASIS (BMR+langkah), TAPI latihan tetap ditambahkan di atasnya —
+// 16. Manual menggantikan BASIS (BMR+langkah+TEF), TAPI latihan tetap ditambahkan di atasnya —
 //     manual dimaksudkan menimpa sinkronisasi alat lain, bukan pencatatan latihan sendiri.
 {
   const bio = { bmr: 2000, steps: 5000, _manualFlags: { activityCalories: 3000 } };
@@ -162,8 +163,8 @@ const sesiSelesai = { id: 'w1', status: 'completed', exercises: [beban], duratio
   assert.equal(b.isManual, true);
   assert.equal(b.manualBase, 3000);
   assert.equal(b.total, 3000 + b.workout, 'langkah tidak boleh ikut ditambah di cabang manual');
-  // `floor` tetap lantai mentah tanpa manual — Lomeal memakainya sebagai basis koreksi.
-  assert.equal(b.floor, 2000 + 200 + b.workout);
+  // `floor` tetap lantai mentah tanpa manual — Lomeal memakainya sebagai basis koreksi (BMR + steps + TEF + workout).
+  assert.equal(b.floor, 2000 + 200 + 200 + b.workout);
 }
 
 // 17. REGRESI: Lomeal menandai override dengan boolean `true` (angkanya di bioData), bukan angka.
@@ -174,10 +175,10 @@ const sesiSelesai = { id: 'w1', status: 'completed', exercises: [beban], duratio
   assert.equal(dailyBurnCalories(bio, [], BERAT).total, 2800);
 }
 
-// 18. Manual di BAWAH BMR tidak boleh menurunkan angka di bawah lantai fisiologisnya.
+// 18. Manual di BAWAH BMR+TEF tidak boleh menurunkan angka di bawah lantai fisiologisnya.
 {
   const bio = { bmr: 2000, _manualFlags: { activityCalories: 500 } };
-  assert.equal(dailyBurnCalories(bio, [], BERAT).total, 2000);
+  assert.equal(dailyBurnCalories(bio, [], BERAT).total, 2200); // 2000 BMR + 200 TEF
 }
 
 // 19. REGRESI PING-PONG: `bioData.activityCalories` TIDAK BOLEH jadi masukan. Field itu keluaran
@@ -201,8 +202,8 @@ const sesiSelesai = { id: 'w1', status: 'completed', exercises: [beban], duratio
 
 // 21. Masukan kosong/kotor tidak boleh melahirkan NaN — satu NaN merusak seluruh kartu.
 {
-  assert.equal(dailyBurnCalories(null, null, null).total, 1600); // fallback BMR ala Lomeal
-  assert.equal(dailyBurnCalories({ bmr: 'x', steps: 'y' }, undefined, undefined).total, 1600);
+  assert.equal(dailyBurnCalories(null, null, null).total, 1760); // 1600 BMR + 160 TEF
+  assert.equal(dailyBurnCalories({ bmr: 'x', steps: 'y' }, undefined, undefined).total, 1760);
   assert.ok(Number.isFinite(dailyBurnCalories({ steps: null }, [], NaN).total));
 }
 

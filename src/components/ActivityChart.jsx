@@ -7,43 +7,31 @@ import { dailyBurnCalories, dailyActiveMinutes } from '../utils/workoutCalc';
 import { dayBmr } from '../utils/bmr';
 
 const CustomStackedBarShape = (props) => {
-  const { x, y, width, height, fill, payload, dataKey, chartId = 'default' } = props;
-  if (!height || height <= 0) return null;
+  const { x, y, width, height, fill, payload, dataKey } = props;
+  if (!height || height <= 0 || !width || width <= 0) return null;
 
-  const isTop = payload.topBurnKey === dataKey || payload.topSleepKey === dataKey || payload.topActKey === dataKey;
-  const r = isTop ? width / 2 : 0;
-  
-  let stackGroup = 'other';
-  if (dataKey.startsWith('cal')) stackGroup = 'burn';
-  else if (dataKey.startsWith('act') || dataKey === 'activeMinutes') stackGroup = 'act';
-  else if (dataKey.startsWith('sleep')) stackGroup = 'sleep';
+  const clampedY = Math.max(5, y);
+  const clampedHeight = Math.max(1, height - (clampedY - y));
+  const safeWidth = Math.max(1, width);
 
-  const clipId = `clip-${chartId}-${payload.dateFull}-${stackGroup}`;
-  const clipUrl = `url(#${clipId})`;
+  const isTop = payload?.topBurnKey === dataKey || payload?.topSleepKey === dataKey || payload?.topActKey === dataKey;
+  const r = isTop ? Math.min(safeWidth / 2, clampedHeight, 14) : 0;
 
   if (r > 0) {
-    // Segmen teratas mendefinisikan clipPath melengkung (seperti kapsul atas) yang menjuntai sampai bawah (y=2000).
-    // Ini akan memotong/clip SEMUA segmen di bawahnya dengan rapi, menghindari ada sudut siku-siku yang menonjol
-    // keluar jika segmen-segmen terlalu pendek.
-    const pathClip = `M${x},2000 L${x},${y + r} A${r},${r} 0 0,1 ${x + width},${y + r} L${x + width},2000 Z`;
-    
-    return (
-      <g clipPath={clipUrl}>
-        <defs>
-          <clipPath id={clipId}>
-            <path d={pathClip} />
-          </clipPath>
-        </defs>
-        <rect x={x} y={y} width={width} height={height} fill={fill} />
-      </g>
-    );
+    // Kapsul mulus dengan bagian bawah RATA (flat bottom) agar menyatu rapat tanpa celah
+    const d = `M ${x},${clampedY + clampedHeight} L ${x},${clampedY + r} A ${r},${r} 0 0,1 ${x + r},${clampedY} L ${x + safeWidth - r},${clampedY} A ${r},${r} 0 0,1 ${x + safeWidth},${clampedY + r} L ${x + safeWidth},${clampedY + clampedHeight} Z`;
+    return <path d={d} fill={fill} />;
   }
 
-  // Segmen bawah/tengah otomatis terpotong mengikuti clipPath dari segmen teratas
+  // Segmen bawah/tengah berbentuk balok persegi rata sempurna
   return (
-    <g clipPath={clipUrl}>
-      <rect x={x} y={y} width={width} height={height} fill={fill} />
-    </g>
+    <rect
+      x={x}
+      y={clampedY}
+      width={safeWidth}
+      height={clampedHeight}
+      fill={fill}
+    />
   );
 };
 
@@ -148,7 +136,11 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
           const d = new Date(entry.dateStr);
           const histBio = entry.bioData;
 
-          const nutritionKcal = entry.dateStr === todayStr && lomealFresh ? lomealFresh.kcal : histBio?.nutritionCalories;
+          const isFreshToday = entry.dateStr === todayStr && lomealFresh;
+          const nutritionKcal = isFreshToday ? lomealFresh.kcal : histBio?.nutritionCalories;
+          const effectiveBio = isFreshToday
+            ? { ...histBio, nutritionCalories: lomealFresh.kcal, protein: lomealFresh.protein, carbs: lomealFresh.carbs, fat: lomealFresh.fat }
+            : histBio;
 
           // Rincian kalori dibakar — rumusnya BUKAN disalin dari kartu utama, tapi fungsi yang
           // sama persis (dailyBurnCalories). Salinan terpisah di sini pernah membuat grafik dan
@@ -157,7 +149,7 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
           // Totalnya juga DIHITUNG, tidak dibaca dari bioData.activityCalories: field itu dulu
           // ikut ditulis Health Connect dengan satuan berbeda (kalori aktif, tanpa BMR), jadi
           // batang hari yang tersinkron HC menyusut drastis tanpa sebab yang kelihatan.
-          const burn = dailyBurnCalories(histBio, history[entry.dateStr]?.workouts, dayWeight, history[entry.dateStr]?.exerciseLogs, userProfile);
+          const burn = dailyBurnCalories(effectiveBio, history[entry.dateStr]?.workouts, dayWeight, history[entry.dateStr]?.exerciseLogs, userProfile);
           // Log hari itu ikut dikirim: menit kardio/beban dipecah dari durasi SET, bukan dari
           // jenis sesi. Tanpa argumen ini, sesi campuran kembali digolongkan all-or-nothing.
           const act = dailyActiveMinutes(histBio, history[entry.dateStr]?.workouts, history[entry.dateStr]?.exerciseLogs);
@@ -243,7 +235,12 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
                   return r.status === 'unknown' ? null : r.score;
               })(),
               targetSteps: histBio?.targetSteps || targetSteps,
-              targetActiveMinutes: histBio?.targetActiveMinutes || targetActive,
+              targetActiveMinutes: (() => {
+                  const raw = Number(histBio?.targetActiveMinutes);
+                  if (raw > 0 && raw <= 120) return raw;
+                  if (raw > 120) return Math.round(raw / 5);
+                  return targetActive;
+              })(),
               targetSleep: histBio?.targetSleep || targetSleepH,
               targetCalories: histBio?.targetCalories || lomealTargets?.kcal || targetBurn || null,
               topBurnKey,
@@ -259,11 +256,77 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
 
   // Pinch-to-zoom logic
   const [pointWidth, setPointWidth] = useState(45);
+  const [visibleRange, setVisibleRange] = useState(() => ({
+      start: Math.max(0, (multiChartData?.length || 35) - 35),
+      end: Math.max(35, (multiChartData?.length || 35) - 1),
+  }));
   const touchState = useRef({ initialDist: 0, initialPointWidth: 45, pinchRatio: 0, scrollRelCenterX: 0 });
+
+  const updateVisibleRange = useCallback(() => {
+      const el = scrollRef.current;
+      if (!el || multiChartData.length === 0) return;
+      const sLeft = el.scrollLeft;
+      const cWidth = el.clientWidth || (window.innerWidth - 64);
+      const pWidth = pointWidthRef.current || 45;
+
+      const start = Math.max(0, Math.floor(sLeft / pWidth));
+      const end = Math.min(multiChartData.length - 1, Math.ceil((sLeft + cWidth) / pWidth));
+
+      setVisibleRange(prev => {
+          if (prev.start === start && prev.end === end) return prev;
+          return { start, end };
+      });
+  }, [multiChartData.length]);
+
+  const scrollTimeoutRef = useRef(null);
+
+  // Native scroll event listener dengan throttling + debounce agar scrolling 120fps ultra-fluid tanpa micro-stutter
+  useEffect(() => {
+      const el = scrollRef.current;
+      if (!el) return;
+      let lastCall = 0;
+      const onScrollNative = () => {
+          const now = performance.now();
+          if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+          
+          if (now - lastCall > 140) {
+              lastCall = now;
+              updateVisibleRange();
+          }
+          scrollTimeoutRef.current = setTimeout(() => {
+              updateVisibleRange();
+          }, 70);
+      };
+      el.addEventListener('scroll', onScrollNative, { passive: true });
+      return () => {
+          el.removeEventListener('scroll', onScrollNative);
+          if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+      };
+  }, [updateVisibleRange]);
+
+  const scrollToLatest = useCallback(() => {
+      const el = scrollRef.current;
+      if (!el) return;
+      const target = Math.max(0, el.scrollWidth - el.clientWidth);
+      el.scrollLeft = target;
+
+      requestAnimationFrame(() => {
+          if (el) el.scrollLeft = Math.max(0, el.scrollWidth - el.clientWidth);
+          updateVisibleRange();
+      });
+      setTimeout(() => {
+          if (el) el.scrollLeft = Math.max(0, el.scrollWidth - el.clientWidth);
+          updateVisibleRange();
+      }, 50);
+      setTimeout(() => {
+          if (el) el.scrollLeft = Math.max(0, el.scrollWidth - el.clientWidth);
+          updateVisibleRange();
+      }, 180);
+  }, [updateVisibleRange]);
 
   // Auto scroll ke data terbaru, default zoom 30 hari terakhir
   useEffect(() => {
-     if(scrollRef.current && multiChartData.length > 0) {
+     if (multiChartData.length > 0) {
         const data = multiChartData;
         const clientW = scrollRef.current?.clientWidth || (window.innerWidth - 64);
 
@@ -287,61 +350,113 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
         // Scroll ke ujung kanan data terbaru
         scrollTarget.current = (latestIdx + 1) * newPointWidth - clientW;
         if (scrollTarget.current < 0) scrollTarget.current = 0;
+        scrollToLatest();
      }
-  }, [multiChartData.length]);
+  }, [multiChartData.length, scrollToLatest]);
+
   const scrollTarget = useRef(null);
   const pointWidthRef = useRef(pointWidth);
   useEffect(() => { pointWidthRef.current = pointWidth; }, [pointWidth]);
   const rafRef = useRef(null);
+
+  useEffect(() => {
+     if (scrollTarget.current !== null && scrollRef.current) {
+         scrollRef.current.scrollLeft = scrollTarget.current;
+         scrollTarget.current = null;
+         updateVisibleRange();
+     } else {
+         scrollToLatest();
+     }
+  }, [pointWidth, scrollToLatest, updateVisibleRange]);
+
+  // Selalu tampilkan data terbaru saat user mengganti tab metrik
+  useEffect(() => {
+     scrollToLatest();
+  }, [activeMetric, scrollToLatest]);
 
   const yDomain = useMemo(() => {
       if (multiChartData.length === 0) return ['auto', 'auto'];
       const activeObj = chartMetricsList.find(m => m.key === activeMetric);
       if (!activeObj || activeObj.isExtra) return ['auto', 'auto'];
 
-      let min = Infinity;
-      let max = -Infinity;
+      if (activeMetric === 'energyScore') {
+          return [0, 100];
+      }
 
-      multiChartData.forEach(d => {
+      // Ambil HANYA data yang sedang terlihat di layar (viewport) saat digeser/scroll
+      const start = Math.max(0, visibleRange.start);
+      const end = Math.min(multiChartData.length - 1, visibleRange.end);
+      const visibleData = (start <= end && multiChartData.length > 0)
+          ? multiChartData.slice(start, end + 1)
+          : multiChartData.slice(-35);
+
+      let max = 0;
+      visibleData.forEach(d => {
           const consider = (val) => {
-              if (val === null || val === undefined) return;
-              if (val < min) min = val;
-              if (val > max) max = val;
+              const num = Number(val);
+              if (Number.isFinite(num) && num > max) max = num;
           };
           if (activeObj.type === 'single') {
               consider(d[activeMetric]);
           } else {
-              // Batang bertumpuk diukur dari JUMLAH satu tumpukan, bukan tiap potongnya —
-              // pakai nilai per potong, puncak grafiknya kepotong setinggi potongan terbesar.
               const stacks = {};
               activeObj.subMetrics.forEach(sub => {
-                  const val = d[sub.key];
-                  if (val === null || val === undefined) return;
-                  if (sub.stackId) stacks[sub.stackId] = (stacks[sub.stackId] || 0) + val;
-                  else consider(val);
+                  const val = Number(d[sub.key]);
+                  if (Number.isFinite(val) && val > 0) {
+                      if (sub.stackId) stacks[sub.stackId] = (stacks[sub.stackId] || 0) + val;
+                      else consider(val);
+                  }
               });
               Object.values(stacks).forEach(consider);
           }
-          // Garis target ikut diperhitungkan, kalau tidak ia bisa jatuh di luar layar persis
-          // saat paling berguna: waktu targetnya jauh di atas capaian.
-          if (activeObj.target) consider(d[activeObj.target]);
+          // Garis target diikutsertakan jika wajar
+          if (activeObj.target && d[activeObj.target]) {
+              const targetVal = Number(d[activeObj.target]);
+              if (Number.isFinite(targetVal) && targetVal > 0) {
+                  if (max === 0 || targetVal <= Math.max(max * 1.5, 30)) {
+                      consider(targetVal);
+                  }
+              }
+          }
       });
 
-      if (min !== Infinity && max !== -Infinity) {
-          const diff = max - min;
-          return [0, max + diff * 0.15 || max * 1.1];
-      } else {
-          return [0, 100];
+      if (max > 0) {
+          // Beri ruang atas ~25% agar batang tertinggi di viewport selalu mengisi ~75-85% tinggi chart
+          let ceiling = max * 1.25;
+          // Proteksi cerdas untuk durasi aktif harian
+          if (activeMetric === 'activeMinutes') {
+              if (max <= 50) ceiling = Math.min(ceiling, 60);
+              else if (max <= 90) ceiling = Math.min(ceiling, 115);
+              else if (max <= 120) ceiling = Math.min(ceiling, 140);
+          }
+          if (ceiling > 1000) return [0, Math.ceil(ceiling / 100) * 100];
+          if (ceiling > 100) return [0, Math.ceil(ceiling / 10) * 10];
+          if (ceiling > 10) return [0, Math.ceil(ceiling / 5) * 5];
+          return [0, Math.ceil(ceiling)];
       }
-  }, [multiChartData, activeMetric, chartMetricsList]);
+
+      const defaultCeilings = {
+          steps: 10000,
+          calories: 2500,
+          activeMinutes: 60,
+          sleep: 10,
+      };
+      return [0, defaultCeilings[activeMetric] || 100];
+  }, [multiChartData, visibleRange, activeMetric, chartMetricsList]);
+
+
 
   const handleScroll = () => {
       if (!rafRef.current) {
           rafRef.current = requestAnimationFrame(() => {
               rafRef.current = null;
+              updateVisibleRange();
           });
       }
   };
+
+  const pinchRafRef = useRef(null);
+  const lastCommittedWidthRef = useRef(pointWidth);
 
   const handleTouchStart = (e) => {
       if (e.touches.length === 2) {
@@ -349,22 +464,30 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
               e.touches[0].clientX - e.touches[1].clientX,
               e.touches[0].clientY - e.touches[1].clientY
           );
+          if (dist <= 0) return;
           
           const pinchCenterX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-          const rect = scrollRef.current.getBoundingClientRect();
+          const rect = scrollRef.current ? scrollRef.current.getBoundingClientRect() : { left: 0 };
           const scrollRelCenterX = pinchCenterX - rect.left;
           
-          const currentScrollLeft = scrollRef.current.scrollLeft;
-          const currentChartWidth = Math.max(multiChartData.length * pointWidth, window.innerWidth - 64);
+          const currentScrollLeft = scrollRef.current ? scrollRef.current.scrollLeft : 0;
+          const currentChartWidth = Math.max(multiChartData.length * pointWidthRef.current, window.innerWidth - 64);
           
           const pinchRatio = (scrollRelCenterX + currentScrollLeft) / currentChartWidth;
           
-          touchState.current = { initialDist: dist, initialPointWidth: pointWidth, pinchRatio, scrollRelCenterX };
+          touchState.current = {
+              initialDist: dist,
+              initialPointWidth: pointWidthRef.current,
+              pinchRatio,
+              scrollRelCenterX,
+          };
+          lastCommittedWidthRef.current = pointWidthRef.current;
       }
   };
 
   const handleTouchMove = (e) => {
-      if (e.touches.length === 2) {
+      if (e.touches.length === 2 && touchState.current.initialDist > 0) {
+          if (e.cancelable) e.preventDefault();
           const dist = Math.hypot(
               e.touches[0].clientX - e.touches[1].clientX,
               e.touches[0].clientY - e.touches[1].clientY
@@ -373,27 +496,32 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
           let newWidth = touchState.current.initialPointWidth * scale;
           if (newWidth < 25) newWidth = 25;
           if (newWidth > 200) newWidth = 200;
-          setPointWidth(newWidth);
-          
+
+          // Deadzone: lewati getaran mikro jari di bawah 1px untuk menghemat render cycles
+          if (Math.abs(newWidth - lastCommittedWidthRef.current) < 1.0) return;
+
           const nextChartWidth = Math.max(multiChartData.length * newWidth, window.innerWidth - 64);
           const newPinchAbsX = touchState.current.pinchRatio * nextChartWidth;
-          scrollTarget.current = newPinchAbsX - touchState.current.scrollRelCenterX;
+          scrollTarget.current = Math.max(0, newPinchAbsX - touchState.current.scrollRelCenterX);
+          lastCommittedWidthRef.current = newWidth;
+
+          if (!pinchRafRef.current) {
+              pinchRafRef.current = requestAnimationFrame(() => {
+                  pinchRafRef.current = null;
+                  setPointWidth(newWidth);
+              });
+          }
       }
   };
 
-  useEffect(() => {
-     if (scrollTarget.current !== null && scrollRef.current) {
-         scrollRef.current.scrollLeft = scrollTarget.current;
-         scrollTarget.current = null;
-     }
-  }, [pointWidth]);
-
-  useEffect(() => {
-     if (scrollRef.current) {
-         // Auto-scroll to the latest data (rightmost) by default
-         scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
-     }
-  }, [multiChartData.length]);
+  const handleTouchEnd = () => {
+      if (pinchRafRef.current) {
+          cancelAnimationFrame(pinchRafRef.current);
+          pinchRafRef.current = null;
+      }
+      touchState.current.initialDist = 0;
+      updateVisibleRange();
+  };
 
   const chartWidth = Math.max(multiChartData.length * pointWidth, window.innerWidth - 64);
   const activeObj = chartMetricsList.find(m => m.key === activeMetric);
@@ -405,8 +533,16 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
               onScroll={handleScroll}
               onTouchStartCapture={handleTouchStart}
               onTouchMoveCapture={handleTouchMove}
+              onTouchEndCapture={handleTouchEnd}
+              onTouchCancelCapture={handleTouchEnd}
               className="w-full overflow-x-auto scrollbar-hide mb-4 touch-pan-x pt-2 flex"
-              style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}>
+              style={{
+                  WebkitOverflowScrolling: 'touch',
+                  touchAction: 'pan-x pan-y',
+                  willChange: 'scroll-position',
+                  transform: 'translateZ(0)',
+                  contain: 'paint layout',
+              }}>
              <div style={{ width: `${chartWidth}px`, height: '224px', marginLeft: (multiChartData.length * pointWidth) < (window.innerWidth - 64) ? 'auto' : '0' }} className="cursor-crosshair relative shrink-0">
                  <svg className="absolute inset-0 w-full h-full pointer-events-none z-0" style={{ padding: '10px 0 30px 0' }}>
                      {[0, 25, 50, 75, 100].map((pct, i) => (
@@ -418,6 +554,8 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
                     width={chartWidth}
                     height={224}
                     data={multiChartData}
+                    barGap={2}
+                    barCategoryGap="8%"
                     style={{ outline: 'none' }}
                     onClick={(e) => {
                         if(e && e.activePayload && e.activePayload.length > 0) {
@@ -452,7 +590,7 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
                        labelStyle={{ color: theme === 'dark' ? '#a1a1aa' : '#71717a', marginBottom: '4px', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }} 
                     />
                     <XAxis dataKey="name" stroke={theme === 'dark' ? '#a1a1aa' : '#64748b'} fontSize={10} tickLine={false} axisLine={false} interval={Math.max(0, Math.ceil(50 / pointWidth) - 1)} />
-                    <YAxis domain={yDomain} hide={true} />
+                    <YAxis domain={yDomain} hide={true} allowDataOverflow={true} />
                     
                     {activeObj.type === 'single' ? (
                         <Bar
@@ -461,7 +599,7 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
                             fill={activeObj.color}
                             radius={[50, 50, 0, 0]}
                             isAnimationActive={false}
-                            maxBarSize={24}
+                            maxBarSize={28}
                         />
                     ) : (
                         activeObj.subMetrics.map(sub => {
@@ -488,7 +626,7 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
                                     fill={sub.color}
                                     shape={<CustomStackedBarShape chartId={chartId} />}
                                     isAnimationActive={false}
-                                    maxBarSize={24}
+                                    maxBarSize={28}
                                 />
                             );
                         })
@@ -505,6 +643,7 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
                             strokeWidth={2}
                             dot={false}
                             isAnimationActive={false}
+                            allowDataOverflow={true}
                             connectNulls
                         />
                     )}

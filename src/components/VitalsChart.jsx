@@ -62,37 +62,49 @@ const VitalsChart = ({ t, theme, history, language, activeMetric }) => {
     const byDay = {};
     hourlyPoints.forEach((p) => {
       const k = dayKeyOf(p.ts);
-      if (!byDay[k]) byDay[k] = { ts: [], value: [], dia: [], readings: [] };
+      if (!byDay[k]) byDay[k] = { ts: [], value: [], dia: [] };
       byDay[k].ts.push(p.ts);
       byDay[k].value.push(p.value);
       if (p.dia != null) byDay[k].dia.push(p.dia);
-      byDay[k].readings.push(p.dia != null ? `${Math.round(p.value)}/${Math.round(p.dia)}` : `${Math.round(p.value)}`);
     });
-    return Object.entries(byDay).map(([k, v]) => ({
-      ts: avg(v.ts),
-      value: Math.round(avg(v.value)),
-      dia: v.dia.length ? Math.round(avg(v.dia)) : undefined,
-      // Pengukuran asli hari itu, buat ditampilkan berdampingan di tooltip. Garisnya tetap
-      // memakai rata-rata (satu titik per hari tidak bisa punya dua nilai y), tapi angka yang
-      // DIBACA user adalah hasil ukur sungguhan, bukan rata-rata yang tidak pernah terjadi.
-      readings: v.readings,
-    })).sort((a, b) => a.ts - b.ts);
+    return Object.entries(byDay).map(([k, v]) => {
+      const minVal = Math.round(Math.min(...v.value));
+      const maxVal = Math.round(Math.max(...v.value));
+      const minDia = v.dia.length ? Math.round(Math.min(...v.dia)) : undefined;
+      const maxDia = v.dia.length ? Math.round(Math.max(...v.dia)) : undefined;
+      return {
+        ts: avg(v.ts),
+        value: Math.round(avg(v.value)),
+        minVal,
+        maxVal,
+        minDia,
+        maxDia,
+        count: v.value.length,
+        dia: v.dia.length ? Math.round(avg(v.dia)) : undefined,
+      };
+    }).sort((a, b) => a.ts - b.ts);
   }, [hourlyPoints]);
 
   const monthlyPoints = useMemo(() => {
     const byMonth = {};
     dailyPoints.forEach((p) => {
       const k = monthKeyOf(p.ts);
-      if (!byMonth[k]) byMonth[k] = { ts: [], value: [], dia: [] };
+      if (!byMonth[k]) byMonth[k] = { ts: [], value: [], dia: [], minVal: [], maxVal: [], minDia: [], maxDia: [] };
       byMonth[k].ts.push(p.ts);
       byMonth[k].value.push(p.value);
+      if (p.minVal != null) byMonth[k].minVal.push(p.minVal);
+      if (p.maxVal != null) byMonth[k].maxVal.push(p.maxVal);
+      if (p.minDia != null) byMonth[k].minDia.push(p.minDia);
+      if (p.maxDia != null) byMonth[k].maxDia.push(p.maxDia);
       if (p.dia != null) byMonth[k].dia.push(p.dia);
     });
-    // Bulanan & tahunan sengaja TIDAK membawa daftar pengukuran: sebulan bisa ratusan titik,
-    // rata-rata bulat justru yang berguna di zoom sejauh itu.
     return Object.entries(byMonth).map(([k, v]) => ({
       ts: avg(v.ts),
       value: Math.round(avg(v.value)),
+      minVal: v.minVal.length ? Math.min(...v.minVal) : Math.round(Math.min(...v.value)),
+      maxVal: v.maxVal.length ? Math.max(...v.maxVal) : Math.round(Math.max(...v.value)),
+      minDia: v.minDia.length ? Math.min(...v.minDia) : (v.dia.length ? Math.round(Math.min(...v.dia)) : undefined),
+      maxDia: v.maxDia.length ? Math.max(...v.maxDia) : (v.dia.length ? Math.round(Math.max(...v.dia)) : undefined),
       dia: v.dia.length ? Math.round(avg(v.dia)) : undefined,
     })).sort((a, b) => a.ts - b.ts);
   }, [dailyPoints]);
@@ -101,14 +113,22 @@ const VitalsChart = ({ t, theme, history, language, activeMetric }) => {
     const byYear = {};
     monthlyPoints.forEach((p) => {
       const k = new Date(p.ts).getFullYear();
-      if (!byYear[k]) byYear[k] = { ts: [], value: [], dia: [] };
+      if (!byYear[k]) byYear[k] = { ts: [], value: [], dia: [], minVal: [], maxVal: [], minDia: [], maxDia: [] };
       byYear[k].ts.push(p.ts);
       byYear[k].value.push(p.value);
+      if (p.minVal != null) byYear[k].minVal.push(p.minVal);
+      if (p.maxVal != null) byYear[k].maxVal.push(p.maxVal);
+      if (p.minDia != null) byYear[k].minDia.push(p.minDia);
+      if (p.maxDia != null) byYear[k].maxDia.push(p.maxDia);
       if (p.dia != null) byYear[k].dia.push(p.dia);
     });
     return Object.entries(byYear).map(([k, v]) => ({
       ts: avg(v.ts),
       value: Math.round(avg(v.value)),
+      minVal: v.minVal.length ? Math.min(...v.minVal) : Math.round(Math.min(...v.value)),
+      maxVal: v.maxVal.length ? Math.max(...v.maxVal) : Math.round(Math.max(...v.value)),
+      minDia: v.minDia.length ? Math.min(...v.minDia) : (v.dia.length ? Math.round(Math.min(...v.dia)) : undefined),
+      maxDia: v.maxDia.length ? Math.max(...v.maxDia) : (v.dia.length ? Math.round(Math.max(...v.dia)) : undefined),
       dia: v.dia.length ? Math.round(avg(v.dia)) : undefined,
     })).sort((a, b) => a.ts - b.ts);
   }, [monthlyPoints]);
@@ -164,31 +184,55 @@ const VitalsChart = ({ t, theme, history, language, activeMetric }) => {
     }
   };
 
+  const pinchRafRef = useRef(null);
+  const lastCommittedWidthRef = useRef(pointWidth);
+
   const handleTouchStart = (e) => {
     if (e.touches.length === 2) {
       const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      if (dist <= 0) return;
       const pinchCenterX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-      const rect = scrollRef.current.getBoundingClientRect();
+      const rect = scrollRef.current ? scrollRef.current.getBoundingClientRect() : { left: 0 };
       const scrollRelCenterX = pinchCenterX - rect.left;
-      const currentScrollLeft = scrollRef.current.scrollLeft;
-      const currentChartWidth = Math.max(chartData.length * pointWidth, window.innerWidth - 64);
+      const currentScrollLeft = scrollRef.current ? scrollRef.current.scrollLeft : 0;
+      const currentChartWidth = Math.max(chartData.length * pointWidthRef.current, window.innerWidth - 64);
       const pinchRatio = (scrollRelCenterX + currentScrollLeft) / currentChartWidth;
-      touchState.current = { initialDist: dist, initialPointWidth: pointWidth, pinchRatio, scrollRelCenterX };
+      touchState.current = { initialDist: dist, initialPointWidth: pointWidthRef.current, pinchRatio, scrollRelCenterX };
+      lastCommittedWidthRef.current = pointWidthRef.current;
     }
   };
 
   const handleTouchMove = (e) => {
-    if (e.touches.length === 2) {
+    if (e.touches.length === 2 && touchState.current.initialDist > 0) {
+      if (e.cancelable) e.preventDefault();
       const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
       const scale = dist / touchState.current.initialDist;
       let newWidth = touchState.current.initialPointWidth * scale;
       if (newWidth < 6) newWidth = 6;
       if (newWidth > 120) newWidth = 120;
-      setPointWidth(newWidth);
+      
+      if (Math.abs(newWidth - lastCommittedWidthRef.current) < 1.0) return;
+
       const nextChartWidth = Math.max(chartData.length * newWidth, window.innerWidth - 64);
       const newPinchAbsX = touchState.current.pinchRatio * nextChartWidth;
-      scrollTarget.current = newPinchAbsX - touchState.current.scrollRelCenterX;
+      scrollTarget.current = Math.max(0, newPinchAbsX - touchState.current.scrollRelCenterX);
+      lastCommittedWidthRef.current = newWidth;
+
+      if (!pinchRafRef.current) {
+        pinchRafRef.current = requestAnimationFrame(() => {
+          pinchRafRef.current = null;
+          setPointWidth(newWidth);
+        });
+      }
     }
+  };
+
+  const handleTouchEnd = () => {
+    if (pinchRafRef.current) {
+      cancelAnimationFrame(pinchRafRef.current);
+      pinchRafRef.current = null;
+    }
+    touchState.current.initialDist = 0;
   };
 
   useEffect(() => {
@@ -217,8 +261,16 @@ const VitalsChart = ({ t, theme, history, language, activeMetric }) => {
         onScroll={handleScroll}
         onTouchStartCapture={handleTouchStart}
         onTouchMoveCapture={handleTouchMove}
+        onTouchEndCapture={handleTouchEnd}
+        onTouchCancelCapture={handleTouchEnd}
         className="w-full overflow-x-auto scrollbar-hide mb-4 touch-pan-x pt-2 flex"
-        style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}
+        style={{
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-x pan-y',
+          willChange: 'scroll-position',
+          transform: 'translateZ(0)',
+          contain: 'paint layout',
+        }}
       >
         {chartData.length > 0 ? (
           <div style={{ width: `${chartWidth}px`, height: '224px', marginLeft: (chartData.length * pointWidth) < (window.innerWidth - 64) ? 'auto' : '0' }} className="cursor-crosshair relative shrink-0">
@@ -226,18 +278,20 @@ const VitalsChart = ({ t, theme, history, language, activeMetric }) => {
               <Tooltip
                 formatter={(value, name, props) => {
                   const p = props.payload || {};
-                  // Kalau satu hari punya beberapa pengukuran, tampilkan semuanya berdampingan.
-                  // Rata-rata desimal seperti "133,5/89,5" itu angka yang tidak pernah terjadi —
-                  // dan tensi/nadi memang bilangan bulat. Dibatasi 4 supaya tooltip tetap muat.
-                  const list = Array.isArray(p.readings) ? p.readings : null;
-                  if (list && list.length > 1) {
-                    const shown = list.slice(0, 4).join(' • ');
-                    const sisa = list.length > 4 ? ` +${list.length - 4}` : '';
-                    return [`${shown}${sisa} ${metric.unit}`, metric.label];
-                  }
+
+                  // Format Rentang Tensi (Min – Max) jika ada beberapa pengukuran
                   if (activeMetric === 'bloodPressureLog') {
+                    if (p.minVal != null && p.maxVal != null && (p.minVal !== p.maxVal || p.minDia !== p.maxDia)) {
+                      return [`${p.minVal}/${p.minDia ?? '-'} – ${p.maxVal}/${p.maxDia ?? '-'} ${metric.unit}`, metric.label];
+                    }
                     return [`${Math.round(p.value)}/${p.dia != null ? Math.round(p.dia) : '-'} ${metric.unit}`, metric.label];
                   }
+
+                  // Untuk Nadi & SpO2: tampilkan rentang jika ada variasi (mis. 55 – 78 bpm)
+                  if (p.minVal != null && p.maxVal != null && p.minVal !== p.maxVal) {
+                    return [`${p.minVal} – ${p.maxVal} ${metric.unit}`, metric.label];
+                  }
+
                   return [`${formatNumber(Math.round(value), language)} ${metric.unit}`, metric.label];
                 }}
                 cursor={{ stroke: theme === 'dark' ? '#52525b' : '#d4d4d8', strokeWidth: 1, strokeDasharray: '3 3' }}

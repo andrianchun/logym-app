@@ -1058,18 +1058,46 @@ export const dailyBurnCalories = (bioData, workouts, fallbackWeightKg, dayExerci
   // Fallback 1600 menyamakan konvensi Lomeal (nutrition.js: calcBMR(profile) || 1600).
   const bmr = dayBmr(bio, profile) || 1600;
   const steps = Math.round(Number(bio.steps) * 0.04) || 0;
-  const floor = bmr + steps + workout;
 
-  // Angka manual menggantikan BASIS (BMR + langkah) saja — latihan Logym hari itu SELALU
+  // TEF (Thermic Effect of Food) — pilar ke-4 metabolisme:
+  // 1. Jika rincian makronutrisi (Protein, Karbohidrat, Lemak) tersedia:
+  //    - Protein TEF ~25% (4 kcal/g x 25% = 1.0 kcal/g)
+  //    - Karbohidrat TEF ~7.5% (4 kcal/g x 7.5% = 0.3 kcal/g)
+  //    - Lemak TEF ~2% (9 kcal/g x 2% = 0.18 kcal/g)
+  // 2. Jika hanya ada total kalori makanan: 10% x kalori makanan (standar mixed diet).
+  // 3. Jika belum ada catatan makanan: 10% x BMR (basal fallback).
+  const proteinG = Number(bio.protein ?? bio.nutritionProtein) || 0;
+  const carbsG = Number(bio.carbs ?? bio.nutritionCarbs) || 0;
+  const fatG = Number(bio.fat ?? bio.nutritionFat) || 0;
+  const nutritionKcal = Number(bio.nutritionCalories) || 0;
+
+  let tef = 0;
+  const hasMacros = proteinG > 0 || carbsG > 0 || fatG > 0;
+  if (hasMacros) {
+    const tefP = proteinG * 4 * 0.25;   // 25% kalori protein
+    const tefC = carbsG * 4 * 0.075;   // 7.5% kalori karbohidrat
+    const tefF = fatG * 9 * 0.02;      // 2% kalori lemak
+    tef = Math.round(tefP + tefC + tefF);
+  } else if (nutritionKcal > 0) {
+    tef = Math.round(nutritionKcal * 0.10);
+  } else {
+    tef = Math.round(bmr * 0.10);
+  }
+
+  const floor = bmr + steps + workout + tef;
+
+  // Angka manual menggantikan BASIS (BMR + langkah + TEF) saja — latihan Logym hari itu SELALU
   // ditambahkan di atasnya. Manual dimaksudkan untuk menimpa sinkronisasi alat/app LAIN, bukan
   // pencatatan latihan sendiri.
   const isManual = !!bio._manualFlags?.activityCalories;
-  const manualBase = isManual ? Math.max(bmr, manualFieldValue(bio, 'activityCalories')) : 0;
+  const manualBase = isManual ? Math.max(bmr + tef, manualFieldValue(bio, 'activityCalories')) : 0;
 
   return {
     total: isManual ? manualBase + workout : floor,
     floor,   // lantai mentah TANPA manual — dipakai Lomeal sebagai basis koreksi
-    workout, kardio, beban, bmr, steps, sessions, isManual, manualBase,
+    workout, kardio, beban, bmr, steps, tef, hasMacros,
+    macros: { protein: proteinG, carbs: carbsG, fat: fatG },
+    sessions, isManual, manualBase,
   };
 };
 

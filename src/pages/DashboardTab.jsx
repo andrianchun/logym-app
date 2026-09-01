@@ -36,8 +36,11 @@ const MetricBox = ({ label, value, unit, icon, color, t, theme }) => (
 const PART_COLORS = {
     bmr:     { bar: 'bg-blue-500', dot: 'bg-blue-500' },
     manual:  { bar: 'bg-zinc-400 dark:bg-zinc-500', dot: 'bg-zinc-400 dark:bg-zinc-500' },
+    neat:    { bar: 'bg-indigo-400 dark:bg-indigo-400', dot: 'bg-indigo-400 dark:bg-indigo-400' },
     langkah: { bar: 'bg-indigo-400 dark:bg-indigo-400', dot: 'bg-indigo-400 dark:bg-indigo-400' },
+    eat:     { bar: 'bg-sky-400 dark:bg-sky-400', dot: 'bg-sky-400 dark:bg-sky-400' },
     latihan: { bar: 'bg-sky-400 dark:bg-sky-400', dot: 'bg-sky-400 dark:bg-sky-400' },
+    tef:     { bar: 'bg-emerald-400 dark:bg-emerald-400', dot: 'bg-emerald-400 dark:bg-emerald-400' },
     // Warna kardio/beban disamakan dengan grafik subcard (ActivityChart) supaya satu warna
     // berarti satu hal di seluruh dasbor.
     kardio:  { bar: 'bg-zinc-400 dark:bg-zinc-500', dot: 'bg-zinc-400 dark:bg-zinc-500' },
@@ -104,7 +107,18 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   // STATE KONEKSI & SINKRONISASI
   // ==========================================
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showCalorieModal, setShowCalorieModal] = useState(false);
   const [isLogyHidden, setIsLogyHidden] = useState(() => localStorage.getItem('lyfit_logy_hidden') === 'true');
+
+  useEffect(() => {
+    if (showCalorieModal) {
+      const origOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = origOverflow;
+      };
+    }
+  }, [showCalorieModal]);
 
   useEffect(() => {
       const handleToggle = (e) => {
@@ -613,23 +627,40 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   const dispMainWaist = units?.height === 'ft' && bioData.waist ? Number((bioData.waist * 0.393701).toFixed(1)) : bioData.waist || '-';
 
   // Smart Merge Deduplication (LyFit Internal + BioData/HealthConnect)
-  // mergedDailySessions/mergedWeeklyCardio/mergedWeeklyWeight sengaja tidak diambil: baris
-  // "Minggu ini: N Beban • N Kardio" dan "LOGYM • N latihan" digantikan rincian bar bertumpuk.
-  // Nilainya masih dihitung di useMemo, tinggal ditambahkan lagi di sini kalau mau dipakai.
-  const { mergedDailyActiveMinutes, mergedDurationParts, mergedCalorieParts, mergedDailyCalories, mergedDailyCaloriesFloor, mergedWeeklyActiveMinutes, mergedWeeklySessions, mergedWeeklyCalories } = useMemo(() => {
+  const { 
+    mergedDailyActiveMinutes, 
+    mergedDurationParts, 
+    mergedCalorieParts, 
+    mergedDailyCalories, 
+    mergedDailyCaloriesFloor, 
+    mergedWeeklyActiveMinutes, 
+    mergedWeeklySessions, 
+    mergedWeeklyCalories,
+    bmrCalories = 0,
+    stepsCalories = 0,
+    workoutCalories = 0,
+    tefCalories = 0,
+    tefDetail = null,
+  } = useMemo(() => {
      const currentWeight = Number(bioData.weight) || 70; // Asumsi 70kg jika tidak ada data
 
      const todayWks = history[activeDate]?.workouts || [];
      const todayCompletedWks = todayWks.filter(w => w.status === 'completed' || w.programId === 'adhoc');
 
+     // Ambil data nutrisi fresh dari Lomeal jika ada (termasuk Protein, Karbohidrat, Lemak)
+     const lomealFresh = lomealToday?.ymd === activeDate ? lomealToday : null;
+     const effectiveBio = {
+       ...bioData,
+       nutritionCalories: lomealFresh?.kcal ?? bioData.nutritionCalories,
+       protein: lomealFresh?.protein ?? bioData.protein,
+       carbs: lomealFresh?.carbs ?? bioData.carbs,
+       fat: lomealFresh?.fat ?? bioData.fat,
+     };
+
      // Kalori harian: SATU rumus, di workoutCalc.js. Salinannya dulu ada di sini, di
      // handleSaveWorkout, di ActivityChart, dan di ShareCardGenerator — dan ketiganya sempat
      // berbeda, jadi kartu, grafik, dan kartu bagikan menampilkan angka berbeda untuk hari sama.
-     // `activeDate`, bukan `targetDateStr` — variabel itu tidak pernah ada di scope ini, jadi
-     // fallback "pakai log tingkat-hari kalau sesi tidak punya log sendiri" selalu berujung
-     // `history[undefined]` alias tidak pernah jalan. Sesi lama yang lognya tersimpan di level
-     // hari karena itu dihitung 0 kalori.
-     const burn = dailyBurnCalories(bioData, todayWks, currentWeight, history[activeDate]?.exerciseLogs, userProfile);
+     const burn = dailyBurnCalories(effectiveBio, todayWks, currentWeight, history[activeDate]?.exerciseLogs, userProfile);
      const isDailyCalsManual = burn.isManual;
      const intTodayCardio = burn.kardio;
      const intTodayWeights = burn.beban;
@@ -655,12 +686,12 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          }
      });
      
-     // Kalori Dibakar = BMR + Langkah Kaki + Workout. Semua cabangnya (termasuk basis manual,
-     // yang WAJIB dibaca lewat manualFieldValue karena Lomeal menandai override-nya dengan
-     // boolean `true` dan `Number(true)` = 1) ada di dailyBurnCalories.
+     // Kalori Dibakar = BMR + NEAT (Langkah) + EAT (Workout) + TEF (Efek Cerna Makanan).
+     // Semua cabangnya ada di dailyBurnCalories.
      const bmrCalories = burn.bmr;
      const stepsCalories = burn.steps;
      const workoutCalories = burn.workout;
+     const tefCalories = burn.tef;
      const totalDailyCals = burn.floor;
      const dailyCals = burn.total;
 
@@ -689,18 +720,15 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
              else weeklyWeightSess++;
          });
 
-         // Rumus yang sama dengan kartu harian. Versi lama `Math.max(activeMinutes, durasiLatihan)`
-         // membuang menit jalan sepenuhnya: hari dengan 8.000 langkah dan tanpa latihan menyumbang
-         // 0 menit ke total mingguan, padahal kartu hariannya menampilkan ~80 menit.
          const dayAct = dailyActiveMinutes(dayData.bioData, wks, dayData.exerciseLogs);
          weeklyDur += dayAct.total;
          weeklyWorkoutDur += dayAct.workoutMinutes;
-         // Rumus yang SAMA PERSIS dengan kartu harian. Versi lama di sini
-         // `Math.max(bioData.activityCalories, kaloriLatihan)` — membaca field tersimpan yang
-         // bisa saja ditulis Health Connect dengan satuan lain (kalori aktif, tanpa BMR). Hari
-         // yang tersinkron HC ikut dihitung dengan satuan berbeda dari hari yang tidak, jadi
-         // totalnya tidak pernah bisa dijelaskan.
-         weeklyCals += dailyBurnCalories(dayData.bioData, wks, currentWeight, dayData.exerciseLogs, userProfile).total;
+         const dayBio = dayData.bioData || {};
+         const isDayFresh = dateStr === activeDate && lomealFresh;
+         const effectiveDayBio = isDayFresh
+           ? { ...dayBio, nutritionCalories: lomealFresh.kcal, protein: lomealFresh.protein, carbs: lomealFresh.carbs, fat: lomealFresh.fat }
+           : dayBio;
+         weeklyCals += dailyBurnCalories(effectiveDayBio, wks, currentWeight, dayData.exerciseLogs, userProfile).total;
      }
      
      // Override with manual weekly if user explicitly saved a modified value in the modal
@@ -732,17 +760,22 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          mergedCalorieParts: isDailyCalsManual
              ? [
                  { key: 'manual', label: 'Manual', value: burn.manualBase },
-                 { key: 'latihan', label: 'Latihan', value: workoutCalories },
+                 { key: 'eat', label: 'EAT', value: workoutCalories },
                ]
              : [
                  { key: 'bmr', label: 'BMR', value: bmrCalories },
-                 { key: 'langkah', label: 'Langkah', value: stepsCalories },
-                 // Latihan dipecah per LATIHAN, bukan per sesi — sesi beban yang ditutup treadmill
-                 // menyumbang ke dua-duanya. Jumlah keduanya = workoutCalories, dijamin
-                 // splitWorkoutCalories, jadi rinciannya tidak pernah meleset dari angka besarnya.
-                 { key: 'kardio', label: 'Kardio', value: intTodayCardio },
-                 { key: 'beban', label: 'Beban', value: intTodayWeights },
+                 { key: 'neat', label: 'NEAT', value: stepsCalories },
+                 { key: 'eat', label: 'EAT', value: workoutCalories },
+                 { key: 'tef', label: 'TEF', value: tefCalories },
                ],
+         bmrCalories,
+         stepsCalories,
+         workoutCalories,
+         tefCalories,
+         tefDetail: {
+           hasMacros: burn.hasMacros,
+           macros: burn.macros,
+         },
          mergedDailyCalories: dailyCals,
          mergedDailyCaloriesFloor: totalDailyCals,
          mergedDailySessions: intTodayExercises,
@@ -756,7 +789,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   // userProfile WAJIB ikut: umur & jenis kelamin datang async dari Firestore SETELAH render
   // pertama. Tanpa ini memo tidak pernah dihitung ulang saat profil tiba, dan sesi kardio
   // menempel di hitungan non-nadi sampai kebetulan ada hal lain yang berubah.
-  }, [history, activeDate, bioData, userProfile]);
+  }, [history, activeDate, bioData, userProfile, lomealToday]);
 
   // Tulis balik mergedDailyCalories (udah dilindungi Math.max lantai BMR+langkah+workout,
   // lihat useMemo di atas) ke bioData.activityCalories — biar Lomeal, yang baca field mentah
@@ -1119,8 +1152,15 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                  </div>
 
                  {/* Kalori Dibakar */}
-                 <div className="flex flex-col h-full text-right items-end">
-                     <div className="flex items-center justify-end space-x-1.5 mb-1"><span className={`caption ${t.textMuted} capitalize`}>Kalori Dibakar</span> <span className="w-5 h-5 rounded-full bg-blue-500/15 text-blue-500 flex items-center justify-center shrink-0"><Flame size={11}/></span></div>
+                 <div 
+                    onClick={() => { playSoundEffect('click', soundEnabled); setShowCalorieModal(true); }}
+                    className="flex flex-col h-full text-right items-end cursor-pointer group active:opacity-80 transition-opacity"
+                    title="Klik untuk melihat rincian BMR, NEAT, EAT, TEF"
+                 >
+                     <div className="flex items-center justify-end space-x-1.5 mb-1">
+                        <span className={`caption ${t.textMuted} capitalize group-hover:text-blue-400 transition-colors`}>Kalori Dibakar</span> 
+                        <span className="w-5 h-5 rounded-full bg-blue-500/15 text-blue-500 flex items-center justify-center shrink-0"><Flame size={11}/></span>
+                     </div>
                      <div className="flex flex-col flex-1 justify-end w-full">
                          <div className={`flex items-baseline justify-end ${NUM_ROW}`}>
                              <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{mergedDailyCalories > 0 ? formatNumber(mergedDailyCalories, language) : '-'}</span>
@@ -2039,6 +2079,131 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
       )}
 
 
+
+      {/* MODAL PENJELASAN METABOLISME (TDEE: BMR, NEAT, EAT, TEF) */}
+      {showCalorieModal && createPortal(
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/65 backdrop-blur-xl animate-in fade-in overscroll-contain touch-none"
+          onClick={() => setShowCalorieModal(false)}
+        >
+          <div 
+            className="w-full max-w-md bg-slate-900/60 dark:bg-black/60 backdrop-blur-2xl border border-white/20 text-white rounded-3xl p-6 shadow-[0_16px_40px_rgba(0,0,0,0.5)] ring-1 ring-white/10 animate-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="pb-4 border-b border-white/10">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="h2 text-white font-black">
+                    Metabolisme Harian (TDEE)
+                  </h3>
+                  <p className="caption text-slate-400 mt-1 leading-snug">
+                    Total seluruh energi yang dibakar tubuh dalam 24 jam.
+                  </p>
+                </div>
+                <button 
+                  data-close-modal="true" 
+                  onClick={() => setShowCalorieModal(false)} 
+                  className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-colors shrink-0 ml-3"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Total Banner */}
+              <div className="mt-4 pt-3 border-t border-dashed border-white/10 flex items-baseline justify-between">
+                <span className="caption text-slate-300 font-semibold uppercase tracking-wider">Total Kalori Dibakar</span>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-2xl font-black text-blue-400">
+                    {mergedDailyCalories > 0 ? formatNumber(mergedDailyCalories, language) : '0'}
+                  </span>
+                  <span className="caption text-slate-400 font-normal">kcal</span>
+                </div>
+              </div>
+            </div>
+
+            {/* List 4 Pilar (Tanpa Kotak dalam Kotak) */}
+            <div className="divide-y divide-white/10 py-1">
+              {/* 1. BMR */}
+              <div className="py-3 flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="body-md font-bold text-blue-400">
+                    BMR (Basal Metabolic Rate)
+                  </div>
+                  <p className="caption text-slate-300 mt-0.5 leading-snug">
+                    Energi dasar organ vital saat istirahat (rumus Mifflin-St Jeor).
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="body-lg font-black text-white whitespace-nowrap">
+                    {formatNumber(bmrCalories, language)} <span className="caption font-normal text-slate-400">kcal</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* 2. NEAT */}
+              <div className="py-3 flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="body-md font-bold text-indigo-400">
+                    NEAT (Aktivitas Spontan)
+                  </div>
+                  <p className="caption text-slate-300 mt-0.5 leading-snug">
+                    Gerak spontan harian ({formatNumber(bioData.steps || 0, language)} langkah) non-olahraga.
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="body-lg font-black text-white whitespace-nowrap">
+                    {formatNumber(stepsCalories, language)} <span className="caption font-normal text-slate-400">kcal</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* 3. EAT */}
+              <div className="py-3 flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="body-md font-bold text-sky-400">
+                    EAT (Olahraga & Latihan)
+                  </div>
+                  <p className="caption text-slate-300 mt-0.5 leading-snug">
+                    Latihan beban & kardio terencana di Logym.
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="body-lg font-black text-white whitespace-nowrap">
+                    {formatNumber(workoutCalories, language)} <span className="caption font-normal text-slate-400">kcal</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* 4. TEF */}
+              <div className="py-3 flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="body-md font-bold text-emerald-400">
+                    TEF (Efek Termik Makanan)
+                  </div>
+                  {tefDetail?.hasMacros ? (
+                    <div className="caption text-slate-300 mt-1 space-y-0.5 leading-snug">
+                      <div>• Protein ({formatNumber(tefDetail.macros.protein, language)}g ~25%)</div>
+                      <div>• Karbo ({formatNumber(tefDetail.macros.carbs, language)}g ~7.5%)</div>
+                      <div>• Lemak ({formatNumber(tefDetail.macros.fat, language)}g ~2%)</div>
+                    </div>
+                  ) : (
+                    <p className="caption text-slate-300 mt-0.5 leading-snug">
+                      Energi memproses & mencerna nutrisi makanan (~10%).
+                    </p>
+                  )}
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="body-lg font-black text-white whitespace-nowrap">
+                    {formatNumber(tefCalories, language)} <span className="caption font-normal text-slate-400">kcal</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
     </div>
   );
