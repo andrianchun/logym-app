@@ -54,12 +54,19 @@ const CalendarTab = ({
   }, [isWorkoutActive, workoutStartTime, exerciseLogs, userProfile?.weight, tickBerjalan]);
 
   const isImp = unitSystem === 'imperial';
-  const [calendarDate, setCalendarDate] = useState(() => {
-    if (selectedDate) {
-      const [y, m, d] = selectedDate.split('-');
-      return new Date(y, parseInt(m)-1, d);
+  const [calendarSelectedDate, setCalendarSelectedDate] = useState(() => selectedDate || getLocalYMD(new Date()));
+
+  // Ketika selectedDate dari luar berubah secara eksplisit (misal navigasi program atau login), sinkronkan kalender
+  useEffect(() => {
+    if (selectedDate && selectedDate !== calendarSelectedDate) {
+      setCalendarSelectedDate(selectedDate);
     }
-    return new Date();
+  }, [selectedDate]);
+
+  const [calendarDate, setCalendarDate] = useState(() => {
+    const dStr = selectedDate || getLocalYMD(new Date());
+    const [y, m, d] = dStr.split('-');
+    return new Date(y, parseInt(m)-1, d);
   });
   
   const [isTablet, setIsTablet] = useState(window.innerWidth >= 640);
@@ -187,7 +194,7 @@ const CalendarTab = ({
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollTop = 0;
     }
-  }, [selectedDate]);
+  }, [calendarSelectedDate]);
 
   // Tinggi maksimal "peek" sheet di mode bulanan = tinggi blok kalender mingguan yang
   // sebenarnya (top nav + label hari + 1 baris tanggal). Diukur dari fixedHeaderRef (selalu
@@ -363,10 +370,10 @@ const CalendarTab = ({
   
   const [detailSlideAnim, setDetailSlideAnim] = useState(null);
   const changeSelectedDateWithAnim = (newDateStr) => {
-    if (newDateStr === selectedDate) return;
-    const isNext = newDateStr > selectedDate;
+    if (newDateStr === calendarSelectedDate) return;
+    const isNext = newDateStr > calendarSelectedDate;
     setDetailSlideAnim(isNext ? 'left' : 'right');
-    setSelectedDate(newDateStr);
+    setCalendarSelectedDate(newDateStr);
     setTimeout(() => setDetailSlideAnim(null), 300);
   };
 
@@ -395,7 +402,7 @@ const CalendarTab = ({
     const isUpSwipe = distanceY > 85 && Math.abs(distanceY) > Math.abs(distanceX) * 1.4;
     const isDownSwipe = distanceY < -85 && Math.abs(distanceY) > Math.abs(distanceX) * 1.4;
 
-    if (isUpSwipe && calendarMode === 'monthly') { setCalendarDate(new Date(selectedDate)); setCalendarMode('weekly'); }
+    if (isUpSwipe && calendarMode === 'monthly') { setCalendarDate(new Date(calendarSelectedDate)); setCalendarMode('weekly'); }
     else if (isDownSwipe && calendarMode === 'weekly') { setCalendarMode('monthly'); }
     else if (isLeftSwipe) { 
         setSlideDirection('right');
@@ -437,7 +444,7 @@ const CalendarTab = ({
        return;
     }
 
-    const currentSelected = new Date(selectedDate);
+    const currentSelected = new Date(calendarSelectedDate);
     if (distanceX > 50 && Math.abs(distanceX) > Math.abs(distanceY)) { 
        currentSelected.setDate(currentSelected.getDate() + 1); 
        changeSelectedDateWithAnim(getLocalYMD(currentSelected)); 
@@ -449,10 +456,10 @@ const CalendarTab = ({
     }
   };
 
-  // Auto-sync: in weekly mode, ensure calendarDate always shows the week containing selectedDate
+  // Auto-sync: in weekly mode, ensure calendarDate always shows the week containing calendarSelectedDate
   useEffect(() => {
-    if (calendarMode === 'weekly' && selectedDate) {
-      const sel = new Date(selectedDate);
+    if (calendarMode === 'weekly' && calendarSelectedDate) {
+      const sel = new Date(calendarSelectedDate);
       const selDay = (sel.getDay() - weekStartDay + 7) % 7;
       const selWeekStart = new Date(sel);
       selWeekStart.setDate(sel.getDate() - selDay);
@@ -462,12 +469,12 @@ const CalendarTab = ({
       const calWeekStart = new Date(cal);
       calWeekStart.setDate(cal.getDate() - calDay);
       
-      // If selectedDate is not in the currently displayed week, snap calendarDate
+      // If calendarSelectedDate is not in the currently displayed week, snap calendarDate
       if (getLocalYMD(selWeekStart) !== getLocalYMD(calWeekStart)) {
         setCalendarDate(new Date(sel));
       }
     }
-  }, [selectedDate, calendarMode]);
+  }, [calendarSelectedDate, calendarMode]);
 
   const getDayWorkouts = (dateStr) => sharedGetDayWorkouts(history, programs, activePlanIds, dateStr);
 
@@ -649,7 +656,7 @@ const CalendarTab = ({
     if (!targetDateInput) return alert('Silakan pilih tanggal tujuan terlebih dahulu!');
     
     const h = { ...history };
-    const sourceWorkouts = getDayWorkouts(selectedDate);
+    const sourceWorkouts = getDayWorkouts(calendarSelectedDate);
     if (sourceWorkouts.length === 0) return;
     
     const targetD = h[targetDateInput] || { workouts: [] };
@@ -666,8 +673,8 @@ const CalendarTab = ({
     }
     
     if (actionType === 'move') {
-       const sourceD = h[selectedDate] || { workouts: [] };
-       h[selectedDate] = { ...sourceD, workouts: [] };
+       const sourceD = h[calendarSelectedDate] || { workouts: [] };
+       h[calendarSelectedDate] = { ...sourceD, workouts: [] };
     }
     
     setHistory(h);
@@ -676,11 +683,11 @@ const CalendarTab = ({
 
   const handleRepeat = () => {
     const h = { ...history };
-    const sourceWorkouts = getDayWorkouts(selectedDate);
+    const sourceWorkouts = getDayWorkouts(calendarSelectedDate);
     if (sourceWorkouts.length === 0) return;
 
     let copied = 0;
-    const baseDate = new Date(selectedDate);
+    const baseDate = new Date(calendarSelectedDate);
     
     for (let i = 1; i <= repeatCount; i++) {
         const targetDate = new Date(baseDate);
@@ -733,7 +740,7 @@ const CalendarTab = ({
 
     setHistory(prev => {
       const h = { ...prev };
-      const d = h[selectedDate] || { workouts: [] };
+      const d = h[calendarSelectedDate] || { workouts: [] };
       const existingWorkouts = Array.isArray(d.workouts) ? d.workouts : Object.values(d.workouts || {});
       
       const samePrograms = existingWorkouts.filter(w => w.programId === p.id);
@@ -742,7 +749,7 @@ const CalendarTab = ({
           newName = `${p.name} (${samePrograms.length + 1})`;
       }
 
-      h[selectedDate] = {
+      h[calendarSelectedDate] = {
         ...d,
         workouts: [
           ...existingWorkouts,
@@ -760,7 +767,7 @@ const CalendarTab = ({
     setShowProgramSelect(false);
   };
 
-  const removeWorkout = (workoutId, dateStr = selectedDate) => {
+  const removeWorkout = (workoutId, dateStr = calendarSelectedDate) => {
     setConfirmModal({
       isOpen: true,
       title: 'Hapus Jadwal?',
@@ -862,7 +869,7 @@ const CalendarTab = ({
     }
     return wks;
   };
-  const selectedWorkouts = getSelectedWorkoutsForDate(selectedDate);
+  const selectedWorkouts = getSelectedWorkoutsForDate(calendarSelectedDate);
   
   const getGridCellsForDate = (baseDate) => {
     const cells = [];
@@ -906,7 +913,7 @@ const CalendarTab = ({
   };
 
   const checkIsCompleted = (w, dateStr) => {
-    if (dateStr === selectedDate) {
+    if (dateStr === calendarSelectedDate) {
       const exercises = getExercisesForWorkout(w);
       if (exercises.length === 0) return false;
       
@@ -928,7 +935,7 @@ const CalendarTab = ({
   const checkIsCompletedStrict = (w, dateStr) => {
     if (w.status === 'completed') return true;
     
-    if (dateStr === selectedDate) {
+    if (dateStr === calendarSelectedDate) {
       const exercises = getExercisesForWorkout(w);
       if (exercises.length === 0) return false;
       const dData = history[dateStr] || {};
@@ -967,8 +974,8 @@ const CalendarTab = ({
     return dur;
   };
 
-  const hasPlanned = selectedWorkouts.some(w => !checkIsCompletedStrict(w, selectedDate));
-  const hasCompleted = selectedWorkouts.some(w => checkIsCompletedStrict(w, selectedDate));
+  const hasPlanned = selectedWorkouts.some(w => !checkIsCompletedStrict(w, calendarSelectedDate));
+  const hasCompleted = selectedWorkouts.some(w => checkIsCompletedStrict(w, calendarSelectedDate));
 
   // Satu panel bulan dengan tinggi natural (mengikuti isi, bukan dipaksa penuh 1 layar) —
   // supaya di list scroll vertikal, beberapa bulan sekaligus kelihatan alih-alih 1 bulan = 1 layar.
@@ -992,7 +999,7 @@ const CalendarTab = ({
             const day = dateObj.getDate();
             const workouts = getDayWorkouts(dateKey);
             const isToday = dateKey === todayStr;
-            const isSelected = dateKey === selectedDate;
+            const isSelected = dateKey === calendarSelectedDate;
 
             let cellStyle = `w-full h-full max-w-[44px] max-h-[44px] mx-auto relative flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer border border-transparent hover:bg-black/5 dark:hover:bg-white/5 text-zinc-500 dark:text-zinc-300`;
             if (isSelected) {
@@ -1133,7 +1140,7 @@ const CalendarTab = ({
             {/* Lebarnya disamakan dengan sisi kiri (w-[90px]). Selisih 15px itu yang membuat
                 judul tahun tidak pernah benar-benar di tengah. */}
             <div className="w-[90px] flex justify-end items-center">
-              {(selectedDate !== todayStr || calendarDate.getMonth() !== new Date().getMonth() || calendarDate.getFullYear() !== new Date().getFullYear()) && (
+              {(calendarSelectedDate !== todayStr || calendarDate.getMonth() !== new Date().getMonth() || calendarDate.getFullYear() !== new Date().getFullYear()) && (
                 <button
                   onClick={() => {
                     changeSelectedDateWithAnim(todayStr);
@@ -1212,7 +1219,7 @@ const CalendarTab = ({
                 setSlideDirection('right');
                 const newDate = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), calendarDate.getDate() + 7);
                 setCalendarDate(newDate);
-                const newSelected = new Date(selectedDate);
+                const newSelected = new Date(calendarSelectedDate);
                 newSelected.setDate(newSelected.getDate() + 7);
                 changeSelectedDateWithAnim(getLocalYMD(newSelected));
               }}
@@ -1220,7 +1227,7 @@ const CalendarTab = ({
                 setSlideDirection('left');
                 const newDate = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), calendarDate.getDate() - 7);
                 setCalendarDate(newDate);
-                const newSelected = new Date(selectedDate);
+                const newSelected = new Date(calendarSelectedDate);
                 newSelected.setDate(newSelected.getDate() - 7);
                 changeSelectedDateWithAnim(getLocalYMD(newSelected));
               }}
@@ -1240,7 +1247,7 @@ const CalendarTab = ({
                       const day = dateObj.getDate();
                       const workouts = getDayWorkouts(dateKey);
                       const isToday = dateKey === todayStr;
-                      const isSelected = dateKey === selectedDate;
+                      const isSelected = dateKey === calendarSelectedDate;
                       
                       // Ukuran & scale disamakan persis dengan sel mode bulanan (w/h-11 = 44px,
                       // scale-[1.1]) supaya "cursor" biru terasa konsisten saat mode berpindah.
@@ -1342,15 +1349,15 @@ const CalendarTab = ({
                className="flex-1 flex flex-col min-h-0"
                fillHeight={true}
                onSwipeLeft={() => {
-                   const d = new Date(selectedDate);
+                   const d = new Date(calendarSelectedDate);
                    d.setDate(d.getDate() + 1);
-                   setSelectedDate(getLocalYMD(d));
+                   setCalendarSelectedDate(getLocalYMD(d));
                    setCalendarDate(new Date(d));
                }}
                onSwipeRight={() => {
-                   const d = new Date(selectedDate);
+                   const d = new Date(calendarSelectedDate);
                    d.setDate(d.getDate() - 1);
-                   setSelectedDate(getLocalYMD(d));
+                   setCalendarSelectedDate(getLocalYMD(d));
                    setCalendarDate(new Date(d));
                }}
                onDownSwipe={() => {
@@ -1366,7 +1373,7 @@ const CalendarTab = ({
                    }
                }}
                renderPanel={(panelType) => {
-                   const d = new Date(selectedDate);
+                   const d = new Date(calendarSelectedDate);
                    if (panelType === 'prev') d.setDate(d.getDate() - 1);
                    else if (panelType === 'next') d.setDate(d.getDate() + 1);
                    const targetDateStr = getLocalYMD(d);
@@ -1379,7 +1386,7 @@ const CalendarTab = ({
                    const isCurr = panelType === 'curr';
                    return (
                      <div 
-                        key={isCurr ? selectedDate : panelType}
+                        key={isCurr ? calendarSelectedDate : panelType}
                         ref={isCurr ? scrollContainerRef : undefined}
                         className={`flex flex-col h-full overflow-y-auto hide-scrollbar ${isCurr && detailSlideAnim ? `anim-slide-${detailSlideAnim}` : ''}`}
                      >

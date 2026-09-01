@@ -311,3 +311,46 @@ console.log('workoutCalc OK', { cardioKcal, plankKcal, liftKcal });
 
   console.log('sessionSpanSeconds OK', { plank1dtk: kkal, jalurLama: lama });
 }
+
+// --- calculatePersonalRecords (PR Hall of Fame) --------------------------
+{
+  const { calculatePersonalRecords, getTonaseAnalogy } = await import('./workoutCalc.js');
+  const bench = { id: 101, name: 'Barbell Bench Press', type: 'weight' };
+  const squat = { id: 102, name: 'Barbell Squat', type: 'weight' };
+  const deadlift = { id: 103, name: 'Deadlift', type: 'weight' };
+  const lookup = { 101: bench, 102: squat, 103: deadlift };
+
+  const history = {
+    '2026-08-03': { // Week 1 (Monday)
+      workouts: [{
+        id: 'w1', status: 'completed', programName: 'Push Day',
+        log: { 101: [{ done: true, w: 80, r: 5 }] } // 1RM ~93.3 kg
+      }]
+    },
+    '2026-08-05': { // Week 1 (Wednesday)
+      workouts: [{
+        id: 'w2', status: 'completed', programName: 'Leg Day',
+        log: { 102: [{ done: true, w: 100, r: 5 }] } // 1RM ~116.7 kg
+      }]
+    },
+    '2026-08-10': { // Week 2 (Monday)
+      workouts: [{
+        id: 'w3', status: 'completed', programName: 'Pull Day',
+        log: { 103: [{ done: true, w: 120, r: 5 }] } // 1RM ~140.0 kg
+      }]
+    },
+  };
+
+  const pr = calculatePersonalRecords(history, lookup);
+  assert.equal(pr.totalWorkouts, 3);
+  assert.equal(pr.longestWeeklyStreak, 2); // 2 consecutive weeks
+  assert.ok(pr.big3.bench.weight1RM > 90);
+  assert.ok(pr.big3.squat.weight1RM > 115);
+  assert.ok(pr.big3.deadlift.weight1RM > 135);
+  assert.ok(pr.big3.total > 340);
+  assert.ok(pr.lifetimeVolumeKg > 1000);
+  assert.ok(getTonaseAnalogy(13900).includes('Gajah'));
+  console.log('calculatePersonalRecords OK', { big3Total: pr.big3.total, streak: pr.longestWeeklyStreak, lifetimeVol: pr.lifetimeVolumeKg, analogy: getTonaseAnalogy(13900) });
+}
+
+

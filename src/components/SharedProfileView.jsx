@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, MoreHorizontal, Share2, ClipboardList, AlertTriangle, LogOut, Camera, Edit2, UserPlus, UserCheck, ShieldAlert, Trophy, Check, Heart, MessageSquare } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
+import { ChevronLeft, MoreHorizontal, Share2, ClipboardList, AlertTriangle, LogOut, Camera, Edit2, UserPlus, UserCheck, ShieldAlert, Trophy, Check, Heart, MessageSquare, X } from 'lucide-react';
 import UnifiedBadge from './UnifiedBadge';
 import { ACHIEVEMENTS, getAchievementContext } from '../data/achievements';
 import { getUserPosts, getUserWeeklyScoreAndRank, shareAchievementToFeed } from '../utils/communityApi';
@@ -8,6 +9,7 @@ import { followUser, unfollowUser, isFollowing, getFollowerCount, getFollowingCo
 import { reportUser, getLocalBlockedUsers, banUserGlobal } from '../utils/moderationApi';
 import useDialog from '../hooks/useDialog';
 import DeveloperTools from './DeveloperTools';
+import { calculatePersonalRecords } from '../utils/workoutCalc';
 
 export default function SharedProfileView({
   profileUserId,
@@ -32,6 +34,8 @@ export default function SharedProfileView({
   onPostClick,
   history,
   setHistory,
+  exerciseLibrary = [],
+  programs = [],
   userAchievements = [],
   onAchievementShareComplete,
   onBadgeActionClick
@@ -48,7 +52,18 @@ export default function SharedProfileView({
   const [isLoading, setIsLoading] = useState(true);
   const [showAllBadges, setShowAllBadges] = useState(false);
   const [selectedBadgeInfo, setSelectedBadgeInfo] = useState(null);
+  const [activePrModal, setActivePrModal] = useState(null);
   const [isCapturing, setIsCapturing] = useState(false);
+
+  useEffect(() => {
+    if (activePrModal) {
+      const origOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = origOverflow;
+      };
+    }
+  }, [activePrModal]);
   
   const profileContainerRef = useRef(null);
 
@@ -165,6 +180,14 @@ export default function SharedProfileView({
     }
   });
   const regularPosts = posts.filter(p => p.type !== 'achievement');
+
+  const prData = useMemo(() => {
+    if (!history) return null;
+    const lookup = {};
+    (exerciseLibrary || []).forEach(e => { if (e?.id) lookup[e.id] = e; });
+    (programs || []).forEach(p => (p.exercises || []).forEach(e => { if (e?.id) lookup[e.id] = e; }));
+    return calculatePersonalRecords(history, lookup);
+  }, [history, exerciseLibrary, programs]);
 
   return (
     <div ref={profileContainerRef} className={`w-full h-full relative overflow-y-auto overflow-x-hidden hide-scrollbar bg-slate-100 dark:bg-slate-900`}>
@@ -319,6 +342,290 @@ export default function SharedProfileView({
             </div>
           </div>
         </div>
+
+        {/* REKOR PRIBADI / PERSONAL RECORDS (MINIMALIST) */}
+        {prData && (
+          <div className="px-6 mb-8 mt-2">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className={`text-xs font-black tracking-widest uppercase ${isDark ? 'text-white/60' : 'text-slate-500'}`}>
+                Rekor Latihan
+              </h3>
+              {prData.totalWorkouts > 0 && (
+                <span className={`text-[11px] font-bold ${isDark ? 'text-white/40' : 'text-slate-400'}`}>
+                  {prData.totalWorkouts} Sesi Selesai
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {/* BIG 3 TOTAL */}
+              <button
+                onClick={() => setActivePrModal('big3')}
+                className={`p-4 rounded-2xl flex flex-col justify-between text-left transition-all active:scale-95 ${isDark ? 'bg-white/5 border border-white/10 hover:border-blue-500/40' : 'bg-slate-50 border border-slate-200/80 hover:border-blue-500/40'}`}
+              >
+                <div className="w-full">
+                  <div className="flex items-center justify-between w-full">
+                    <span className={`text-[10px] font-black uppercase tracking-wider ${isDark ? 'text-white/40' : 'text-slate-400'}`}>
+                      Big 3 Total
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-baseline gap-1">
+                    <span className={`text-2xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                      {prData.big3.total > 0 ? prData.big3.total : '-'}
+                    </span>
+                    {prData.big3.total > 0 && <span className={`text-[10px] font-bold ${isDark ? 'text-white/50' : 'text-slate-400'}`}>kg</span>}
+                  </div>
+                </div>
+                <div className={`mt-2.5 pt-2 border-t text-[10px] font-semibold leading-tight w-full truncate ${isDark ? 'border-white/5 text-white/50' : 'border-slate-200 text-slate-500'}`}>
+                  Bench {prData.big3.bench.weight1RM || '-'} • Squat {prData.big3.squat.weight1RM || '-'} • Deadlift {prData.big3.deadlift.weight1RM || '-'}
+                </div>
+              </button>
+
+              {/* MAX SESI TONASE */}
+              <button
+                onClick={() => setActivePrModal('volume')}
+                className={`p-4 rounded-2xl flex flex-col justify-between text-left transition-all active:scale-95 ${isDark ? 'bg-white/5 border border-white/10 hover:border-amber-500/40' : 'bg-slate-50 border border-slate-200/80 hover:border-amber-500/40'}`}
+              >
+                <div className="w-full">
+                  <div className="flex items-center justify-between w-full">
+                    <span className={`text-[10px] font-black uppercase tracking-wider ${isDark ? 'text-white/40' : 'text-slate-400'}`}>
+                      Max Tonase Sesi
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-baseline gap-1">
+                    <span className={`text-2xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                      {prData.maxSessionVolume.volumeKg >= 1000 
+                        ? (prData.maxSessionVolume.volumeKg / 1000).toFixed(1) 
+                        : (prData.maxSessionVolume.volumeKg > 0 ? prData.maxSessionVolume.volumeKg : '-')}
+                    </span>
+                    {prData.maxSessionVolume.volumeKg > 0 && (
+                      <span className={`text-[10px] font-bold ${isDark ? 'text-white/50' : 'text-slate-400'}`}>
+                        {prData.maxSessionVolume.volumeKg >= 1000 ? 'Ton' : 'kg'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className={`mt-2.5 pt-2 border-t text-[10px] font-semibold truncate w-full ${isDark ? 'border-white/5 text-amber-300/80' : 'border-slate-200 text-amber-600'}`}>
+                  {prData.maxSessionVolume.volumeKg > 0 ? `~${prData.maxSessionVolume.analogy}` : 'Belum ada sesi'}
+                </div>
+              </button>
+
+              {/* KONSISTENSI TERBAIK */}
+              <button
+                onClick={() => setActivePrModal('streak')}
+                className={`p-4 rounded-2xl flex flex-col justify-between text-left transition-all active:scale-95 ${isDark ? 'bg-white/5 border border-white/10 hover:border-emerald-500/40' : 'bg-slate-50 border border-slate-200/80 hover:border-emerald-500/40'}`}
+              >
+                <div className="w-full">
+                  <div className="flex items-center justify-between w-full">
+                    <span className={`text-[10px] font-black uppercase tracking-wider ${isDark ? 'text-white/40' : 'text-slate-400'}`}>
+                      Konsistensi Terbaik
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-baseline gap-1">
+                    <span className={`text-2xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                      {prData.longestWeeklyStreak > 0 ? prData.longestWeeklyStreak : '-'}
+                    </span>
+                    {prData.longestWeeklyStreak > 0 && <span className={`text-[10px] font-bold ${isDark ? 'text-white/50' : 'text-slate-400'}`}>Minggu</span>}
+                  </div>
+                </div>
+                <div className={`mt-2.5 pt-2 border-t text-[10px] font-semibold w-full truncate ${isDark ? 'border-white/5 text-emerald-300/80' : 'border-slate-200 text-emerald-600'}`}>
+                  {prData.longestWeeklyStreak > 0 ? 'Disiplin mingguan' : 'Target program'}
+                </div>
+              </button>
+
+              {/* TOTAL TONASE */}
+              <button
+                onClick={() => setActivePrModal('lifetime')}
+                className={`p-4 rounded-2xl flex flex-col justify-between text-left transition-all active:scale-95 ${isDark ? 'bg-white/5 border border-white/10 hover:border-purple-500/40' : 'bg-slate-50 border border-slate-200/80 hover:border-purple-500/40'}`}
+              >
+                <div className="w-full">
+                  <div className="flex items-center justify-between w-full">
+                    <span className={`text-[10px] font-black uppercase tracking-wider ${isDark ? 'text-white/40' : 'text-slate-400'}`}>
+                      Total Tonase
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-baseline gap-1">
+                    <span className={`text-2xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                      {prData.lifetimeVolumeKg >= 1000 
+                        ? (prData.lifetimeVolumeKg / 1000).toFixed(1) 
+                        : (prData.lifetimeVolumeKg > 0 ? prData.lifetimeVolumeKg : '-')}
+                    </span>
+                    {prData.lifetimeVolumeKg > 0 && (
+                      <span className={`text-[10px] font-bold ${isDark ? 'text-white/50' : 'text-slate-400'}`}>
+                        {prData.lifetimeVolumeKg >= 1000 ? 'Ton' : 'kg'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className={`mt-2.5 pt-2 border-t text-[10px] font-semibold w-full truncate ${isDark ? 'border-white/5 text-purple-300/80' : 'border-slate-200 text-purple-600'}`}>
+                  {prData.lifetimeVolumeKg > 0 ? `~${prData.lifetimeAnalogy}` : 'Akumulasi beban'}
+                </div>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* PR Detail Modal for Profile */}
+        {activePrModal && createPortal(
+          <div 
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/65 backdrop-blur-xl animate-in fade-in overscroll-contain touch-none"
+            onClick={() => setActivePrModal(null)}
+          >
+            <div 
+              className="w-full max-w-md bg-slate-900/60 dark:bg-black/60 backdrop-blur-2xl border border-white/20 text-white rounded-3xl p-6 shadow-[0_16px_40px_rgba(0,0,0,0.5)] ring-1 ring-white/10 animate-in zoom-in-95 duration-200"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="pb-3 border-b border-white/10 mb-4">
+                <h4 className="text-base font-black text-white">
+                  {activePrModal === 'big3' && 'Rincian Big 3 (Estimasi 1RM)'}
+                  {activePrModal === 'volume' && 'Rekor Tonase 1 Sesi'}
+                  {activePrModal === 'streak' && 'Konsistensi Mingguan'}
+                  {activePrModal === 'lifetime' && 'Total Tonase Seumur Hidup'}
+                </h4>
+              </div>
+
+              {/* Content for Big 3 */}
+              {activePrModal === 'big3' && prData && (
+                <div className="space-y-3">
+                  <div className="p-4 rounded-2xl bg-blue-500/10 backdrop-blur-md border border-blue-400/25 flex items-baseline justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-blue-400">Total Big 3</span>
+                    <span className="text-3xl font-black text-blue-400">{prData.big3.total} kg</span>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="p-3.5 rounded-2xl bg-white/[0.05] backdrop-blur-md border border-white/10 flex items-center justify-between">
+                      <div className="min-w-0 flex-1 pr-2">
+                        <p className="text-xs font-bold text-white">Bench Press (Dada)</p>
+                        <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                          {prData.big3.bench.name || 'Flat Bench Press'}
+                          {prData.big3.bench.date && ` • ${new Date(prData.big3.bench.date + 'T12:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}`}
+                        </p>
+                      </div>
+                      <span className="text-base font-black text-blue-400 shrink-0 whitespace-nowrap">
+                        {prData.big3.bench.weight1RM > 0 ? `${prData.big3.bench.weight1RM} kg` : '-'}
+                      </span>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-white/[0.05] backdrop-blur-md border border-white/10 flex items-center justify-between">
+                      <div className="min-w-0 flex-1 pr-2">
+                        <p className="text-xs font-bold text-white">Squat (Paha & Kaki)</p>
+                        <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                          {prData.big3.squat.name || 'Barbell Squat'}
+                          {prData.big3.squat.date && ` • ${new Date(prData.big3.squat.date + 'T12:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}`}
+                        </p>
+                      </div>
+                      <span className="text-base font-black text-blue-400 shrink-0 whitespace-nowrap">
+                        {prData.big3.squat.weight1RM > 0 ? `${prData.big3.squat.weight1RM} kg` : '-'}
+                      </span>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-white/[0.05] backdrop-blur-md border border-white/10 flex items-center justify-between">
+                      <div className="min-w-0 flex-1 pr-2">
+                        <p className="text-xs font-bold text-white">Deadlift (Punggung Bawah & Posterior)</p>
+                        <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                          {prData.big3.deadlift.name || 'Deadlift'}
+                          {prData.big3.deadlift.date && ` • ${new Date(prData.big3.deadlift.date + 'T12:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}`}
+                        </p>
+                      </div>
+                      <span className="text-base font-black text-blue-400 shrink-0 whitespace-nowrap">
+                        {prData.big3.deadlift.weight1RM > 0 ? `${prData.big3.deadlift.weight1RM} kg` : '-'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] leading-relaxed text-slate-400 mt-3 pt-2 border-t border-white/10">
+                    * 1RM (One-Rep Max): Estimasi beban maksimal 1 repetisi berdasarkan set terberat Anda (rumus Epley).
+                  </p>
+                </div>
+              )}
+
+              {/* Content for Volume / Tonase */}
+              {activePrModal === 'volume' && prData && (
+                <div className="space-y-3">
+                  <div className="p-5 rounded-2xl bg-blue-500/10 backdrop-blur-md border border-blue-400/25 text-center">
+                    <div className="text-3xl font-black text-blue-400">
+                      {prData.maxSessionVolume.volumeKg >= 1000 
+                        ? `${(prData.maxSessionVolume.volumeKg / 1000).toFixed(1)} Ton` 
+                        : `${prData.maxSessionVolume.volumeKg} kg`}
+                    </div>
+                    {prData.maxSessionVolume.volumeKg > 0 && (
+                      <div className="inline-flex items-center justify-center gap-1 px-3 py-1 mt-2 rounded-full bg-blue-500/20 backdrop-blur-sm text-blue-300 text-xs font-bold whitespace-nowrap">
+                        Setara ~{prData.maxSessionVolume.analogy}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-white/[0.04] backdrop-blur-md border border-white/10 space-y-1.5 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Sesi Latihan:</span>
+                      <span className="font-bold text-white">{prData.maxSessionVolume.workoutName || 'Sesi Latihan'}</span>
+                    </div>
+                    {prData.maxSessionVolume.date && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Tanggal:</span>
+                        <span className="font-bold text-white">
+                          {new Date(prData.maxSessionVolume.date + 'T12:00:00').toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-white/[0.03] backdrop-blur-md border border-white/5 text-[11px] leading-relaxed text-slate-400">
+                    <p>
+                      <b className="text-slate-200">Tonase</b> adalah akumulasi total (beban × repetisi) dari seluruh set dalam 1 sesi untuk mengukur kapasitas kerja (<i className="text-slate-300">work capacity</i>) otot Anda.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Content for Streak */}
+              {activePrModal === 'streak' && prData && (
+                <div className="space-y-3">
+                  <div className="p-5 rounded-2xl bg-blue-500/10 backdrop-blur-md border border-blue-400/25 text-center">
+                    <div className="text-3xl font-black text-blue-400">
+                      {prData.longestWeeklyStreak} Minggu Beruntun
+                    </div>
+                    <p className="text-xs font-bold text-blue-300 mt-1">
+                      Disiplin target mingguan
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-white/[0.03] backdrop-blur-md border border-white/5 text-[11px] leading-relaxed text-slate-400">
+                    <p>
+                      <b className="text-slate-200">Konsistensi Mingguan</b> mengukur kepatuhan jadwal tanpa risiko <i>overtraining</i>. Hari istirahat (<i>Rest Day</i>) tetap menjaga rangkaian streak aktif.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Content for Lifetime */}
+              {activePrModal === 'lifetime' && prData && (
+                <div className="space-y-3">
+                  <div className="p-5 rounded-2xl bg-blue-500/10 backdrop-blur-md border border-blue-400/25 text-center">
+                    <div className="text-3xl font-black text-blue-400">
+                      {prData.lifetimeVolumeKg >= 1000 
+                        ? `${(prData.lifetimeVolumeKg / 1000).toFixed(1)} Ton` 
+                        : `${prData.lifetimeVolumeKg} kg`}
+                    </div>
+                    {prData.lifetimeVolumeKg > 0 && (
+                      <div className="inline-flex items-center justify-center gap-1 px-3 py-1 mt-2 rounded-full bg-blue-500/20 backdrop-blur-sm text-blue-300 text-xs font-bold whitespace-nowrap">
+                        Setara ~{prData.lifetimeAnalogy}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-white/[0.03] backdrop-blur-md border border-white/5 text-[11px] leading-relaxed text-slate-400">
+                    <p>
+                      <b className="text-slate-200">Total Tonase</b> adalah akumulasi seluruh beban yang pernah Anda angkat sejak hari pertama latihan di Logym.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>,
+          document.body
+        )}
 
         {/* Koleksi Pencapaian (Only for Own Profile) */}
         {isOwnProfile && (

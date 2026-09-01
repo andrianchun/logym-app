@@ -757,6 +757,51 @@ const WorkoutTab = ({
     }
   };
 
+  const requestSessionSwitch = (targetWorkoutId, onProceed) => {
+    if (isWorkoutActive && sessionToRun && sessionToRun !== targetWorkoutId) {
+      const currentProg = activeProgramsList.find(p => p.workoutId === sessionToRun || p.id === sessionToRun);
+      const currentSessionName = sessionToRun === 'extra' ? 'Sesi Ekstra' : (currentProg?.name ? `Sesi ${currentProg.name}` : 'sesi berjalan');
+      const targetProg = activeProgramsList.find(p => p.workoutId === targetWorkoutId || p.id === targetWorkoutId);
+      const targetSessionName = targetWorkoutId === 'extra' ? 'Sesi Ekstra' : (targetProg?.name ? `Sesi ${targetProg.name}` : 'sesi berikutnya');
+
+      if (setConfirmModal) {
+        setConfirmModal({
+          isOpen: true,
+          title: 'Pindah Sesi Latihan',
+          message: `Kamu sedang memiliki ${currentSessionName} yang aktif berjalan. Selesaikan dan simpan ${currentSessionName} terlebih dahulu sebelum melanjutkan ke ${targetSessionName}?`,
+          onConfirm: async () => {
+            playSoundEffect('click', soundEnabled);
+            if (sessionToRun && onSaveWorkout) {
+              await onSaveWorkout(sessionToRun);
+            }
+            setSessionToRun(targetWorkoutId);
+            setIsWorkoutActive(true);
+            setWorkoutStartTime(Date.now());
+            if (typeof onProceed === 'function') onProceed();
+          },
+          confirmText: 'Simpan & Lanjut',
+          onDiscard: () => {
+            playSoundEffect('click', soundEnabled);
+            setIsImmersiveMode(false);
+            setIsWorkoutActive(false);
+            setWorkoutStartTime(null);
+            if (setRestTargetTime) setRestTargetTime(null);
+
+            setTimeout(() => {
+              setSessionToRun(targetWorkoutId);
+              setIsWorkoutActive(true);
+              setWorkoutStartTime(Date.now());
+              if (typeof onProceed === 'function') onProceed();
+            }, 50);
+          },
+          discardText: 'Buang Sesi Sebelumnya'
+        });
+      }
+      return true;
+    }
+    return false;
+  };
+
   const proceedStartWorkout = (progId) => {
     const doStart = () => {
       playSoundEffect('success', soundEnabled);
@@ -803,48 +848,10 @@ const WorkoutTab = ({
       }
     };
 
-    if (isWorkoutActive && sessionToRun && sessionToRun !== progId) {
-      if (setConfirmModal) {
-        setConfirmModal({
-          isOpen: true,
-          title: 'Sesi Latihan Berjalan',
-          message: 'Kamu sedang memiliki sesi latihan yang aktif berjalan. Apakah kamu ingin menyimpan sesi yang berjalan saat ini, atau langsung membuangnya dan memulai latihan yang baru?',
-          onConfirm: async () => {
-             if (sessionToRun && onSaveWorkout) {
-               if (soundEnabled) {
-                 const audio = new Audio('/cheer.wav');
-                 audio.volume = 1.0;
-                 audio.play().catch(() => {});
-               }
-               setCelebrationSession(sessionToRun);
-               setShowCelebration(true);
-               await onSaveWorkout(sessionToRun);
-               setTimeout(() => {
-                 setShowCelebration(false);
-                 doStart();
-               }, 2000);
-             } else {
-               setTimeout(doStart, 100);
-             }
-          },
-          confirmText: 'Simpan Perubahan',
-          onDiscard: () => {
-             // Langsung buang tanpa memanggil onCancelWorkout yang men-trigger modal tambahan
-             setIsImmersiveMode(false);
-             setIsWorkoutActive(false);
-             setWorkoutStartTime(null);
-             if (setRestTargetTime) setRestTargetTime(null);
-
-             setTimeout(doStart, 100);
-          },
-          discardText: 'Buang Perubahan'
-        });
-      } else {
-        doStart();
-      }
-    } else {
-      doStart();
+    if (requestSessionSwitch(progId, doStart)) {
+      return;
     }
+    doStart();
   };
 
   const handleAddProgramToToday = (p) => {
@@ -1108,10 +1115,22 @@ const WorkoutTab = ({
                                 isWorkoutActive={isWorkoutActive}
                                 onStartWorkout={() => handleStartWorkout(prog.workoutId || prog.id)}
                                 onUpdateSet={(exId, setIdx, field, val) => {
+                                  if (requestSessionSwitch(prog.workoutId, () => {
+                                    onSetChange(exId, setIdx, field, val);
+                                  })) return;
                                   setSessionToRun(prog.workoutId);
                                   onSetChange(exId, setIdx, field, val);
                                 }} 
                                 onToggleSet={(exId, setIdx) => {
+                                  if (requestSessionSwitch(prog.workoutId, () => {
+                                    setActiveExerciseId(exId);
+                                    let siblingIds = null;
+                                    if (ex.supersetId) {
+                                      siblingIds = prog.exercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
+                                    }
+                                    onToggleSet(exId, setIdx, siblingIds);
+                                    advanceIfExerciseFinished(prog.workoutId, exId, setIdx);
+                                  })) return;
                                   setActiveExerciseId(exId);
                                   setSessionToRun(prog.workoutId);
                                   let siblingIds = null;
@@ -1128,6 +1147,14 @@ const WorkoutTab = ({
                                   advanceIfExerciseFinished(prog.workoutId, exId, setIdx);
                                 }}
                                 onAddSet={(exId) => {
+                                  if (requestSessionSwitch(prog.workoutId, () => {
+                                    if (ex.supersetId) {
+                                      const siblings = prog.exercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
+                                      onAddSet(siblings);
+                                    } else {
+                                      onAddSet(exId);
+                                    }
+                                  })) return;
                                   setSessionToRun(prog.workoutId);
                                   if (ex.supersetId) {
                                     const siblings = prog.exercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
@@ -1137,6 +1164,14 @@ const WorkoutTab = ({
                                   }
                                 }} 
                                 onAddWarmupSets={(exId) => {
+                                  if (requestSessionSwitch(prog.workoutId, () => {
+                                    if (ex.supersetId) {
+                                      const siblings = prog.exercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
+                                      onAddWarmupSets(siblings);
+                                    } else {
+                                      onAddWarmupSets(exId);
+                                    }
+                                  })) return;
                                   setSessionToRun(prog.workoutId);
                                   if (ex.supersetId) {
                                     const siblings = prog.exercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
@@ -1146,6 +1181,14 @@ const WorkoutTab = ({
                                   }
                                 }}
                                 onRemoveSet={(exId, setIdx) => {
+                                  if (requestSessionSwitch(prog.workoutId, () => {
+                                    if (ex.supersetId) {
+                                      const siblings = prog.exercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
+                                      onRemoveSet(siblings, setIdx);
+                                    } else {
+                                      onRemoveSet(exId, setIdx);
+                                    }
+                                  })) return;
                                   setSessionToRun(prog.workoutId);
                                   if (ex.supersetId) {
                                     const siblings = prog.exercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
@@ -1200,10 +1243,22 @@ const WorkoutTab = ({
                                 isWorkoutActive={isWorkoutActive}
                                 onStartWorkout={() => handleStartWorkout('extra')}
                                 onUpdateSet={(exId, setIdx, field, val) => {
+                                  if (requestSessionSwitch('extra', () => {
+                                    onSetChange(exId, setIdx, field, val);
+                                  })) return;
                                   setSessionToRun('extra');
                                   onSetChange(exId, setIdx, field, val);
                                 }} 
                                 onToggleSet={(exId, setIdx) => {
+                                  if (requestSessionSwitch('extra', () => {
+                                    setActiveExerciseId(exId);
+                                    let siblingIds = null;
+                                    if (ex.supersetId) {
+                                      siblingIds = extraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
+                                    }
+                                    onToggleSet(exId, setIdx, siblingIds);
+                                    advanceIfExerciseFinished('extra', exId, setIdx);
+                                  })) return;
                                   setActiveExerciseId(exId);
                                   setSessionToRun('extra');
                                   let siblingIds = null;
@@ -1214,6 +1269,14 @@ const WorkoutTab = ({
                                   advanceIfExerciseFinished('extra', exId, setIdx);
                                 }}
                               onAddSet={(exId) => {
+                                if (requestSessionSwitch('extra', () => {
+                                  if (ex.supersetId) {
+                                    const siblings = extraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
+                                    onAddSet(siblings);
+                                  } else {
+                                    onAddSet(exId);
+                                  }
+                                })) return;
                                 setSessionToRun('extra');
                                 if (ex.supersetId) {
                                   const siblings = extraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
@@ -1223,6 +1286,14 @@ const WorkoutTab = ({
                                 }
                               }} 
                               onAddWarmupSets={(exId) => {
+                                if (requestSessionSwitch('extra', () => {
+                                  if (ex.supersetId) {
+                                    const siblings = extraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
+                                    onAddWarmupSets(siblings);
+                                  } else {
+                                    onAddWarmupSets(exId);
+                                  }
+                                })) return;
                                 setSessionToRun('extra');
                                 if (ex.supersetId) {
                                   const siblings = extraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
@@ -1232,6 +1303,14 @@ const WorkoutTab = ({
                                 }
                               }}
                               onRemoveSet={(exId, setIdx) => {
+                                if (requestSessionSwitch('extra', () => {
+                                  if (ex.supersetId) {
+                                    const siblings = extraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
+                                    onRemoveSet(siblings, setIdx);
+                                  } else {
+                                    onRemoveSet(exId, setIdx);
+                                  }
+                                })) return;
                                 setSessionToRun('extra');
                                 if (ex.supersetId) {
                                   const siblings = extraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);

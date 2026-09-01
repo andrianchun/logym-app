@@ -1230,7 +1230,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                  maskImage: 'linear-gradient(to bottom, black 75%, transparent 100%)',
                  WebkitMaskImage: 'linear-gradient(to bottom, black 75%, transparent 100%)'
              }}>
-                 <img src="/bg-progress.webp" alt="" className="absolute -right-12 -top-8 w-[33rem] max-w-[120%] h-auto drop-shadow-xl transition-transform duration-500 ease-out" />
+                 <img src="/bg-progress.webp" alt="" className="absolute -right-12 -top-20 sm:-top-24 w-[33rem] max-w-[120%] h-auto drop-shadow-xl transition-transform duration-500 ease-out" />
              </div>
           </div>
 

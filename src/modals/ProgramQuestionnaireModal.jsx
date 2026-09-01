@@ -533,7 +533,10 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
         {/* ------------------------------ */}
 
         {/* HEADER */}
-        <div className="flex justify-between items-center p-5 pb-2 shrink-0 relative z-10 max-w-lg mx-auto w-full">
+        <div 
+          className="flex justify-between items-center px-5 pb-2 shrink-0 relative z-10 max-w-lg mx-auto w-full"
+          style={{ paddingTop: 'max(1.25rem, env(safe-area-inset-top, 24px))' }}
+        >
           <div className="w-10"></div>
           
           <div className="flex-1 text-center">

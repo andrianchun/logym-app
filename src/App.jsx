@@ -3016,18 +3016,18 @@ export default function App() {
     if (isWorkoutActive && !isTargetSameAsActive && !isJustSwitchingDate) {
        setConfirmModal({
           isOpen: true,
-          title: 'Sesi Latihan Berjalan',
-          message: 'Kamu sedang memiliki sesi latihan yang aktif berjalan. Apakah kamu ingin menyimpan sesi yang berjalan saat ini, atau langsung membuangnya dan berpindah ke sesi baru ini?',
+          title: 'Pindah Sesi Latihan',
+          message: 'Kamu sedang memiliki sesi latihan yang aktif berjalan. Selesaikan dan simpan sesi yang berjalan saat ini, atau langsung membuangnya dan berpindah ke sesi baru ini?',
           onConfirm: () => {
              if (sessionToRunRef.current) handleSaveWorkout(sessionToRunRef.current);
              setTimeout(doNav, 100);
           },
-          confirmText: 'Simpan Perubahan',
+          confirmText: 'Simpan & Lanjut',
           onDiscard: () => {
              handleCancelWorkout(sessionToRunRef.current);
              setTimeout(doNav, 100);
           },
-          discardText: 'Buang Perubahan'
+          discardText: 'Buang Sesi Sebelumnya'
        });
     } else {
        doNav();
@@ -3636,10 +3636,13 @@ export default function App() {
     // sessionSpanSeconds dipindah ke workoutCalc.js supaya ada tesnya: versi di sini dulu
     // menyerah pada sesi bersatu-set (`stamps.length < 2`) dan mengembalikan 0, yang berarti
     // "pakai timer global" — plank ekstra 1 detik jadi mewarisi 45 menit dan ~130 kkal.
+    const baseProgId = resolveProjectedProgramId(progId);
+    const baseFokusId = resolveProjectedProgramId(fokusSesi);
+
     const rentangSesiSecs = sessionSpanSeconds(
       progId === 'extra'
         ? (extraExercises || [])
-        : (programs.find(p => p.id === progId)?.exercises || sessionExercises || []),
+        : (programs.find(p => p.id === progId || p.id === baseProgId || p.id === fokusSesi || p.id === baseFokusId)?.exercises || sessionExercises || []),
       exerciseLogs
     );
 
@@ -3688,8 +3691,8 @@ export default function App() {
     const targetDateStr = activeWorkoutDate || selectedDate;
     const targetSessionExercises = progId === 'extra'
       ? (extraExercises || [])
-      : (programs.find(p => p.id === progId || p.id === fokusSesi)?.exercises
-         || (history[targetDateStr]?.workouts?.find(w => w.id === fokusSesi || w.programId === progId)?.overriddenExercises)
+      : (programs.find(p => p.id === progId || p.id === baseProgId || p.id === fokusSesi || p.id === baseFokusId)?.exercises
+         || (history[targetDateStr]?.workouts?.find(w => w.id === fokusSesi || w.id === progId || w.programId === progId || w.programId === baseProgId)?.overriddenExercises)
          || sessionExercises
          || []);
 
@@ -3709,10 +3712,10 @@ export default function App() {
     // Hanya yang SETNYA SUDAH PENUH yang ikut; yang masih separuh dibiarkan, karena user mungkin
     // masih mengerjakannya dan menutup sesi berjalan tidak bisa dibatalkan.
     if (!opts.auto) {
-      const hariIni = history[activeWorkoutDate || selectedDate]?.workouts || [];
+      const hariIni = getDayWorkouts(history, programs, activePlanIds, targetDateStr);
       const exerciseOf = (w) => (w.programId === 'adhoc'
         ? (w.exercises || [])
-        : (w.overriddenExercises || programs.find(pr => pr.id === w.programId)?.exercises || []));
+        : (w.overriddenExercises || programs.find(pr => pr.id === w.programId || pr.id === resolveProjectedProgramId(w.programId))?.exercises || []));
       autoSaveQueue.current = sessionsPendingSave(
         hariIni, exerciseOf, belah.sisa, belahSkip.sisa,
         [progId, fokusSesi, focusWorkoutId].filter(Boolean)
@@ -4036,13 +4039,13 @@ export default function App() {
     if (isWorkoutActive) {
        setConfirmModal({
           isOpen: true,
-          title: 'Sesi Latihan Berjalan',
-          message: 'Kamu sedang memiliki sesi latihan yang aktif berjalan. Apakah kamu ingin menyimpan sesi yang berjalan saat ini, atau langsung membuangnya dan berpindah untuk mengedit riwayat latihan ini?',
+          title: 'Pindah Sesi Latihan',
+          message: 'Kamu sedang memiliki sesi latihan yang aktif berjalan. Selesaikan dan simpan sesi yang berjalan saat ini, atau langsung membuangnya dan berpindah untuk mengedit riwayat latihan ini?',
           onConfirm: () => {
              if (sessionToRunRef.current) handleSaveWorkout(sessionToRunRef.current);
              setTimeout(doEdit, 100);
           },
-          confirmText: 'Simpan Perubahan',
+          confirmText: 'Simpan & Lanjut',
           onDiscard: () => {
              setIsImmersiveMode(false);
              setIsWorkoutActive(false);
@@ -4051,7 +4054,7 @@ export default function App() {
 
              setTimeout(doEdit, 100);
           },
-          discardText: 'Buang Perubahan'
+          discardText: 'Buang Sesi Sebelumnya'
        });
     } else {
        doEdit();

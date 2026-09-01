@@ -265,8 +265,11 @@ const ProgramTab = ({
       onConfirm: () => {
         const remaining = programs.filter(p => (p.planId || 'custom') !== planId);
         setPrograms(remaining);
+        setProgramsSnapshot(null);
+        setEditingPlanId(null);
+        setExpandedRoutineId(null);
         if (activePlanIds.includes(planId)) {
-          /* no fallback needed */
+          setActivePlanIds(activePlanIds.filter(id => id !== planId));
         }
       }
     });
@@ -722,7 +725,20 @@ const ProgramTab = ({
     const bgConfig = getPlanBgConfig(group.planName, planId);
 
     return (
-      <div id={`plan-${layout}-${planId}`} key={planId} className={`scroll-mt-24 rounded-[2rem] border ${isActive ? t.borderAccent : 'border-white/10'} shadow-[0_8px_30px_rgb(0,0,0,0.25)] overflow-hidden transition-all flex flex-col relative min-h-[350px] group/card bg-[#0c1427]/85 backdrop-blur-2xl`}>
+      <div 
+        id={`plan-${layout}-${planId}`} 
+        key={planId} 
+        onClick={() => {
+          playSoundEffect('click', soundEnabled);
+          setEditingPlanId(planId);
+          setProgramsSnapshot(JSON.parse(JSON.stringify(programs)));
+          setTimeout(() => {
+            const el = document.getElementById(`plan-${layout}-${planId}`);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 150);
+        }}
+        className={`scroll-mt-24 rounded-[2rem] border ${isActive ? t.borderAccent : 'border-white/10'} shadow-[0_8px_30px_rgb(0,0,0,0.25)] overflow-hidden transition-all flex flex-col relative min-h-[350px] group/card bg-[#0c1427]/85 backdrop-blur-2xl cursor-pointer hover:border-white/20 active:scale-[0.99]`}
+      >
               
         {/* Split Header (Left empty, Right glassmorphism) */}
         <div className="flex-none flex flex-row relative z-10 w-full min-h-[350px]">
@@ -774,7 +790,7 @@ const ProgramTab = ({
               <div className="flex-1 min-w-0 flex flex-col gap-1">
                 <div className="flex items-center gap-2 w-full">
                   {editingPlanId === planId ? (
-                    <div className={`relative group inline-block w-full flex-1`}>
+                    <div className={`relative group inline-block w-full flex-1`} onClick={(e) => e.stopPropagation()}>
                       <PlanNameInput
                         initialValue={group.planName}
                         onSave={(newName) => handleRenamePlan(planId, newName)}
@@ -867,7 +883,7 @@ const ProgramTab = ({
                                  <span className="text-[11px] font-bold text-white/90 drop-shadow-sm leading-tight line-clamp-2 flex-1">{r.name}</span>
                              </button>
                              {isOpen && (
-                                 <div className="pl-[18px] pt-1 pb-1.5 flex flex-col gap-1">
+                                 <div className="pl-[18px] pt-1 pb-1.5 flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
                                      {(r.exercises || []).length === 0 && (
                                          <span className="text-[9px] text-white/40 font-bold">Belum ada latihan</span>
                                      )}
@@ -896,7 +912,8 @@ const ProgramTab = ({
             {/* ACTION BUTTONS */}
             <div className="mt-auto flex items-center gap-2 relative z-10 w-full pt-1">
                 <button 
-                  onClick={() => { 
+                  onClick={(e) => { 
+                    e.stopPropagation();
                     playSoundEffect('success', soundEnabled); 
                     if (isActive) {
                       setActivePlanIds(activePlanIds.filter(id => id !== planId));
@@ -915,24 +932,10 @@ const ProgramTab = ({
                 >
                   {isActive ? 'Aktif' : 'Aktifkan'}
                 </button>
-                <button 
-                  onClick={() => { 
-                    playSoundEffect('click', soundEnabled);
-                    setEditingPlanId(planId);
-                    setProgramsSnapshot(JSON.parse(JSON.stringify(programs)));
-                    setTimeout(() => {
-                      const el = document.getElementById(`plan-${layout}-${planId}`);
-                      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }, 150);
-                  }}
-                  className="w-[38px] h-[38px] p-0 rounded-full transition-all flex items-center justify-center bg-white/10 hover:bg-white/20 border border-white/20 text-white shadow-sm shrink-0 active:scale-95"
-                  title="Edit Program"
-                >
-                  <Edit2 size={15} />
-                </button>
                 {true && (
                   <button 
-                    onClick={async () => {
+                    onClick={async (e) => {
+                      e.stopPropagation();
                       playSoundEffect('click', soundEnabled);
                       if (user) {
                         setPendingShareProgram(group);
@@ -957,16 +960,45 @@ const ProgramTab = ({
       {editingPlanId && groupedPrograms[editingPlanId] && (
         <div className="fixed inset-0 z-[100] bg-neutral-950 overflow-y-auto overflow-x-hidden flex flex-col animate-in slide-in-from-bottom-10 fade-in duration-300 w-full h-full pb-20 no-swipe overscroll-contain touch-pan-y">
             {/* DEDICATED VIEW HEADER */}
-            <div className="sticky top-0 bg-neutral-950/90 backdrop-blur-xl z-[60] border-b border-white/5 shadow-2xl">
-                <div className="flex items-center justify-center p-4 max-w-4xl mx-auto w-full">
-                    <input
-                        type="text"
-                        value={groupedPrograms[editingPlanId].planName}
-                        onChange={(e) => handleRenamePlan(editingPlanId, e.target.value)}
-                        maxLength={25}
-                        className="text-xl font-black text-white bg-transparent outline-none text-center border-b-2 border-white/20 focus:border-blue-500 transition-colors pb-0.5 w-full max-w-xs"
-                        placeholder="Nama Program..."
-                    />
+            <div 
+              className="sticky top-0 bg-neutral-950/90 backdrop-blur-xl z-[60] border-b border-white/5 shadow-2xl"
+              style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 24px))' }}
+            >
+                <div className="flex items-center justify-between px-4 py-3 max-w-4xl mx-auto w-full gap-3">
+                    <button 
+                      type="button"
+                      data-close-modal="true"
+                      onClick={() => {
+                        playSoundEffect('click', soundEnabled);
+                        if (programsSnapshot) {
+                          setPrograms(programsSnapshot);
+                          setProgramsSnapshot(null);
+                        }
+                        closeEditAndScrollToPlan(editingPlanId);
+                      }}
+                      className="p-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-neutral-300 hover:text-white transition-all active:scale-95 flex items-center justify-center shrink-0"
+                      title="Tutup / Batal"
+                    >
+                      <X size={20} />
+                    </button>
+                    <div className="flex-1 min-w-0 flex justify-center">
+                      <input
+                          type="text"
+                          value={groupedPrograms[editingPlanId].planName}
+                          onChange={(e) => handleRenamePlan(editingPlanId, e.target.value)}
+                          maxLength={25}
+                          className="text-xl font-black text-white bg-transparent outline-none text-center border-b-2 border-white/20 focus:border-blue-500 transition-colors pb-0.5 w-full max-w-xs"
+                          placeholder="Nama Program..."
+                      />
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={() => handleDeletePlan(editingPlanId, groupedPrograms[editingPlanId].planName)}
+                      className="p-2.5 rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 transition-all active:scale-95 flex items-center justify-center shrink-0"
+                      title="Hapus Seluruh Program"
+                    >
+                      <Trash2 size={20} />
+                    </button>
                 </div>
             </div>
 

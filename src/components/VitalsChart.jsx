@@ -22,7 +22,6 @@ export const VITALS_METRICS = (theme) => [
   { key: 'heartRateLog', dayKey: 'heartRate', label: 'Nadi', unit: 'bpm', color: theme === 'dark' ? '#06b6d4' : '#0891b2', field: 'value' },
   { key: 'bloodPressureLog', dayKey: 'bloodPressure', label: 'Tensi', unit: 'mmHg', color: theme === 'dark' ? '#a78bfa' : '#7c3aed', field: 'sys' },
   { key: 'oxygenSaturationLog', dayKey: 'oxygenSaturation', label: 'SpO2', unit: '%', color: theme === 'dark' ? '#93c5fd' : '#1e3a8a', field: 'value' },
-  { key: 'weightLog', dayKey: 'weight', label: 'Berat', unit: 'kg', color: theme === 'dark' ? '#38bdf8' : '#0284c7', field: 'value' },
 ];
 
 const VitalsChart = ({ t, theme, history, language, activeMetric }) => {

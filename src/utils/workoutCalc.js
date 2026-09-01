@@ -1186,3 +1186,197 @@ export const repairActualWeights = (history, exLookup, eqConfOf) => {
   if (diubah === 0) return { next: history || {}, diubah: 0, contoh: [] };
   return { next, diubah, contoh };
 };
+
+/**
+ * Hitung Rekor Pribadi (Personal Records / PR) dari seluruh riwayat latihan.
+ * Minimalis, presisi, performan tinggi, dan menghormati rest day (weekly consistency streak).
+ *
+ * @param {object} history seluruh riwayat
+ * @param {object} [exLookup] peta id -> latihan (opsional, untuk nama dan info alat)
+ * @returns {object}
+ */
+export const calculatePersonalRecords = (history, exLookup = {}) => {
+  let lifetimeVolumeKg = 0;
+  let maxSessionVolume = { volumeKg: 0, date: '', workoutName: '' };
+  let totalWorkouts = 0;
+
+  // Trackers for Big 3
+  const bestBench = { name: '', weight1RM: 0, date: '', isFlat: false };
+  const bestSquat = { name: '', weight1RM: 0, date: '' };
+  const bestDeadlift = { name: '', weight1RM: 0, date: '' };
+
+  const completedWeeks = new Set();
+
+  const isBenchName = (name) => {
+    const n = (name || '').toLowerCase();
+    return n.includes('bench press') || n.includes('chest press') || n.includes('dumbbell press');
+  };
+
+  const isSquatName = (name) => {
+    const n = (name || '').toLowerCase();
+    return n.includes('squat') || n.includes('leg press') || n.includes('hack squat');
+  };
+
+  const isDeadliftName = (name) => {
+    const n = (name || '').toLowerCase();
+    return n.includes('deadlift') || n.includes('rdl');
+  };
+
+  const sortedDates = Object.keys(history || {}).sort();
+
+  sortedDates.forEach((dateStr) => {
+    const day = history[dateStr];
+    if (!day || !Array.isArray(day.workouts)) return;
+
+    let hasCompletedInDay = false;
+
+    day.workouts.forEach((w) => {
+      if (!w || (w.status !== 'completed' && w.programId !== 'adhoc')) return;
+      const log = w.log || {};
+      const keys = Object.keys(log);
+      if (keys.length === 0) return;
+
+      hasCompletedInDay = true;
+      totalWorkouts++;
+
+      let sessionVol = 0;
+
+      keys.forEach((key) => {
+        const ex = resolveLoggedExercise(key, exLookup);
+        const exName = ex?.name || String(key);
+        const sets = log[key];
+        const setList = Array.isArray(sets) ? sets : Object.values(sets || {});
+
+        setList.forEach((set) => {
+          if (!set || set.skipped) return;
+          const wKg = Number(set.total_w !== undefined ? set.total_w : (set.w !== undefined ? set.w : set.input_w)) || 0;
+          const reps = Number(set.r) || 0;
+
+          if (reps > 0 && wKg > 0) {
+            sessionVol += wKg * reps;
+            const oneRM = estimate1RM(wKg, reps);
+
+            // Big 3: Bench
+            if (isBenchName(exName)) {
+              const isFlat = !exName.toLowerCase().includes('incline') && !exName.toLowerCase().includes('decline');
+              if (isFlat) {
+                if (!bestBench.isFlat || oneRM > bestBench.weight1RM) {
+                  bestBench.name = exName;
+                  bestBench.weight1RM = Math.round(oneRM * 10) / 10;
+                  bestBench.date = dateStr;
+                  bestBench.isFlat = true;
+                }
+              } else if (!bestBench.isFlat && oneRM > bestBench.weight1RM) {
+                bestBench.name = exName;
+                bestBench.weight1RM = Math.round(oneRM * 10) / 10;
+                bestBench.date = dateStr;
+                bestBench.isFlat = false;
+              }
+            }
+
+            // Big 3: Squat
+            if (isSquatName(exName)) {
+              if (oneRM > bestSquat.weight1RM) {
+                bestSquat.name = exName;
+                bestSquat.weight1RM = Math.round(oneRM * 10) / 10;
+                bestSquat.date = dateStr;
+              }
+            }
+
+            // Big 3: Deadlift
+            if (isDeadliftName(exName)) {
+              if (oneRM > bestDeadlift.weight1RM) {
+                bestDeadlift.name = exName;
+                bestDeadlift.weight1RM = Math.round(oneRM * 10) / 10;
+                bestDeadlift.date = dateStr;
+              }
+            }
+          }
+        });
+      });
+
+      lifetimeVolumeKg += sessionVol;
+
+      if (sessionVol > maxSessionVolume.volumeKg) {
+        maxSessionVolume = {
+          volumeKg: Math.round(sessionVol),
+          date: dateStr,
+          workoutName: w.programName || w.name || 'Sesi Latihan',
+        };
+      }
+    });
+
+    if (hasCompletedInDay) {
+      // Calculate Monday of week
+      const d = new Date(dateStr + 'T12:00:00');
+      const dayOfWeek = d.getDay(); // 0 is Sun, 1 is Mon
+      const diff = d.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+      const monday = new Date(d.setDate(diff));
+      const monStr = monday.toISOString().slice(0, 10);
+      completedWeeks.add(monStr);
+    }
+  });
+
+  // Calculate weekly consistency streak
+  const sortedMondays = Array.from(completedWeeks).sort();
+  let longestWeeklyStreak = 0;
+  let currentStreak = 0;
+  let prevMonTime = null;
+
+  sortedMondays.forEach((monStr) => {
+    const monTime = new Date(monStr + 'T12:00:00').getTime();
+    if (prevMonTime === null) {
+      currentStreak = 1;
+    } else {
+      const diffDays = Math.round((monTime - prevMonTime) / (86400 * 1000));
+      if (diffDays === 7) {
+        currentStreak++;
+      } else {
+        currentStreak = 1;
+      }
+    }
+    if (currentStreak > longestWeeklyStreak) {
+      longestWeeklyStreak = currentStreak;
+    }
+    prevMonTime = monTime;
+  });
+
+  const big3Total = Math.round(((bestBench.weight1RM || 0) + (bestSquat.weight1RM || 0) + (bestDeadlift.weight1RM || 0)) * 10) / 10;
+
+  return {
+    big3: {
+      total: big3Total,
+      bench: bestBench,
+      squat: bestSquat,
+      deadlift: bestDeadlift,
+    },
+    maxSessionVolume: {
+      ...maxSessionVolume,
+      analogy: getTonaseAnalogy(maxSessionVolume.volumeKg),
+    },
+    lifetimeVolumeKg: Math.round(lifetimeVolumeKg),
+    lifetimeAnalogy: getTonaseAnalogy(lifetimeVolumeKg),
+    longestWeeklyStreak,
+    totalWorkouts,
+  };
+};
+
+/**
+ * Analogi menyenangkan untuk menggambarkan total beban tonase latihan.
+ * @param {number} weightKg total beban dalam kg
+ * @returns {string} analogi singkat yang menarik
+ */
+export const getTonaseAnalogy = (weightKg) => {
+  const tons = (Number(weightKg) || 0) / 1000;
+  if (tons <= 0) return 'Belum ada beban';
+  if (tons < 0.5) return '1 Motor Sport 🏍️';
+  if (tons < 1.5) return '1 Mobil Mini Cooper 🚗';
+  if (tons < 3) return '1 Ekor Kuda Nil 🦛';
+  if (tons < 6) return '1 Gajah Asia Dewasa 🐘';
+  if (tons < 10) return '1 Ekor T-Rex 🦖';
+  if (tons < 16) return '2 Gajah Afrika 🐘🐘';
+  if (tons < 25) return '1 Truk Fuso 🚛';
+  if (tons < 50) return '1 Paus Bungkuk Dewasa 🐋';
+  return '1 Pesawat Boeing ✈️';
+};
+

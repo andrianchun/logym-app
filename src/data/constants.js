@@ -147,7 +147,7 @@ export const defaultMasterExercises = [
     "target": ["Quads", "Hams", "Glutes"],
     "type": "weight",
     "defaultWeight": 5,
-    "equipment": "Dumbbell",
+    "equipment": "Barbell",
     "level": "intermediate",
     "ytVideo": "https://youtu.be/mJilHWIBWO8?si=2NCYOofB0EUrY22X",
     "videoUrl": "/exercise-assets/youtube-backup/edb-Barbell_Walking_Lunge.mp4",

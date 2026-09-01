@@ -124,13 +124,35 @@ export const translateMuscle = (name) => {
 
 /**
  * Translate equipment name dari API ke format LyFit
- * Karena kita sudah mendukung semua alat API, cukup di-Title Case.
+ * Mendukung smart name override jika dataset open-source mengklasifikasikan secara generik.
  */
-export const translateEquipment = (name) => {
+export const translateEquipment = (name, exName = '') => {
+  const exNameLower = (exName || '').toLowerCase().trim();
+  const lower = (name || '').toLowerCase().trim();
+
+  // Smart override jika nama latihan secara spesifik menyebut alatnya
+  if (exNameLower.includes('smith machine') || exNameLower.includes('smith press') || exNameLower.includes('smith squat') || exNameLower.startsWith('smith ')) {
+    return 'Smith Machine';
+  }
+  if (exNameLower.includes('dumbbell') || exNameLower.includes('db ')) {
+    return 'Dumbbell';
+  }
+  if (exNameLower.includes('kettlebell') || exNameLower.includes('kb ')) {
+    return 'Kettlebell';
+  }
+  if (exNameLower.includes('cable') || exNameLower.includes('pulley') || exNameLower.includes('lat pulldown') || exNameLower.includes('cable row')) {
+    return 'Cable';
+  }
+  if (exNameLower.includes('barbell') || exNameLower.includes('bb ')) {
+    if (lower === 'e-z curl bar' || lower === 'ez barbell' || exNameLower.includes('ez')) return 'EZ Barbell';
+    return 'Barbell';
+  }
+
   if (!name) return 'Lainnya';
-  const lower = name.toLowerCase().trim();
-  if (lower === 'body weight') return 'Body Weight';
-  if (lower === 'ez barbell') return 'EZ Barbell';
+  if (lower === 'body weight' || lower === 'body only') return 'Body Weight';
+  if (lower === 'e-z curl bar' || lower === 'ez barbell') return 'EZ Barbell';
+  if (lower === 'smith machine') return 'Smith Machine';
+  if (lower === 'olympic barbell') return 'Olympic Barbell';
   return capitalizeWords(lower);
 };
 
@@ -178,9 +200,9 @@ export const mapToLyFitFormat = (apiEx) => {
       }
   }
 
-  // Tentukan equipment — ambil yang pertama
+  // Tentukan equipment — ambil yang pertama dengan name-aware override
   const rawEquipment = apiEx.equipments?.[0] || '';
-  const equipment = translateEquipment(rawEquipment);
+  const equipment = translateEquipment(rawEquipment, apiEx.name);
 
   // Tentukan tipe latihan
   const isCardio = translatedTargets.includes('Cardio') || 

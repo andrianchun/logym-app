@@ -372,11 +372,21 @@ export const mergeBackupIntoHistory = (history, backupData) => {
  */
 export const isSessionFullyLogged = (workout, exercises, exerciseLogs, skippedExercises) => {
   if (!workout || !Array.isArray(exercises) || exercises.length === 0) return false;
-  const aktif = exercises.filter((ex) =>
-    ex && !skippedExercises?.[`${ex.id}-${workout.id}`] && !skippedExercises?.[ex.id]);
+  const aktif = exercises.filter((ex) => {
+    if (!ex) return false;
+    const baseId = ex.originalId || ex.id;
+    return !skippedExercises?.[`${baseId}-${workout.id}`] &&
+           !skippedExercises?.[`${ex.id}-${workout.id}`] &&
+           !skippedExercises?.[ex.id] &&
+           !skippedExercises?.[baseId];
+  });
   if (aktif.length === 0) return false;
   return aktif.every((ex) => {
-    const logs = exerciseLogs?.[`${ex.id}-${workout.id}`] || exerciseLogs?.[ex.id] || [];
+    const baseId = ex.originalId || ex.id;
+    const logs = exerciseLogs?.[`${baseId}-${workout.id}`] ||
+                 exerciseLogs?.[`${ex.id}-${workout.id}`] ||
+                 exerciseLogs?.[ex.id] ||
+                 exerciseLogs?.[baseId] || [];
     const arr = Array.isArray(logs) ? logs : Object.values(logs || {});
     return arr.length > 0 && arr.every((s) => s?.done && !s?.skipped);
   });

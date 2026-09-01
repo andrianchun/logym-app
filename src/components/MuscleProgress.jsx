@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import Model from './react-body-highlighter/index.js';
 import { ChevronDown } from 'lucide-react';
-import { normalizeMuscleKey, resolveLoggedExercise } from '../data/constants';
+import { normalizeMuscleKey, resolveLoggedExercise, defaultMasterExercises } from '../data/constants';
 
 // Mapping from LyFit standard keys to react-body-highlighter muscle names
 const muscleMapping = {
@@ -160,9 +160,9 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
         
         // Build a lookup for exercise targets
         const exLookup = {};
-        [...programs.map(p=>p.exercises).flat(), ...exerciseLibrary].forEach(ex => {
-            exLookup[ex.id] = ex;
-        });
+        defaultMasterExercises.forEach(ex => { if (ex?.id) exLookup[ex.id] = ex; });
+        (exerciseLibrary || []).forEach(ex => { if (ex?.id) exLookup[ex.id] = ex; });
+        (programs || []).forEach(p => (p.exercises || []).forEach(ex => { if (ex?.id) exLookup[ex.id] = ex; }));
 
         for (const dayData of Object.values(filteredHistory)) {
             if (!dayData || !dayData.workouts) continue;
@@ -184,7 +184,13 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
                     const ex = resolveLoggedExercise(exIdStr, exLookup);
                     if (ex && sets) {
                         const exType = ex.type || 'weight';
-                        const exTargets = Array.isArray(ex.target) ? ex.target : [ex.target || 'Lainnya'];
+                        let exTargets = Array.isArray(ex.target) ? ex.target : (ex.target ? [ex.target] : ['Lainnya']);
+                        if (exTargets.length === 1 && exTargets[0] === 'Lainnya') {
+                           const libEx = exerciseLibrary?.find(e => e.id === ex.id || e.id === ex.originalId || e.name?.toLowerCase() === ex.name?.toLowerCase()) || defaultMasterExercises.find(e => e.id === ex.id || e.name?.toLowerCase() === ex.name?.toLowerCase());
+                           if (libEx?.target) {
+                              exTargets = Array.isArray(libEx.target) ? libEx.target : [libEx.target];
+                           }
+                        }
                         
                         let totalVolume = 0;
                         Object.values(sets).forEach(s => {

@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { TrendingUp } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { TrendingUp, X, Info } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
-import { getLocalYMD, formatTarget, normalizeMuscleKey, resolveLoggedExercise, resolveProjectedProgramId } from '../data/constants';
-import { estimate10RM, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from '../utils/workoutCalc';
+import { getLocalYMD, formatTarget, normalizeMuscleKey, resolveLoggedExercise, resolveProjectedProgramId, getDayWorkouts, defaultMasterExercises } from '../data/constants';
+import { estimate10RM, getEquipmentConfig, calculateActualWeight, getSetActualWeight, calculatePersonalRecords } from '../utils/workoutCalc';
 
 const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibrary, soundEnabled, playSoundEffect, selectedDate, units, activePlanIds, isSubCard = false, expandedSessions = {} }) => {
   const [chartType, setChartType] = useState(() => {
@@ -13,12 +14,12 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
       return 'exercise';
   });
   
-  const [activeChartLines, setActiveChartLines] = useState(() => {
+  const [customLinesByType, setCustomLinesByType] = useState(() => {
       try {
-          const saved = localStorage.getItem('lyfit_prog_chart_lines');
+          const saved = localStorage.getItem('lyfit_prog_custom_lines');
           if (saved) return JSON.parse(saved);
       } catch(e) {}
-      return [];
+      return { exercise: null, muscle: null };
   });
 
   useEffect(() => {
@@ -26,8 +27,19 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
   }, [chartType]);
   
   useEffect(() => {
-      localStorage.setItem('lyfit_prog_chart_lines', JSON.stringify(activeChartLines));
-  }, [activeChartLines]);
+      localStorage.setItem('lyfit_prog_custom_lines', JSON.stringify(customLinesByType));
+  }, [customLinesByType]);
+
+  const lastActiveExpandedRef = useRef(null);
+  const currentActiveExpandedId = expandedSessions ? Object.keys(expandedSessions).find(k => expandedSessions[k]) : null;
+
+  useEffect(() => {
+    if (currentActiveExpandedId !== lastActiveExpandedRef.current) {
+      lastActiveExpandedRef.current = currentActiveExpandedId;
+      // Saat user membuka chevron sesi lain di tab latihan, sesuaikan garis grafik ke sesi baru tersebut
+      setCustomLinesByType({ exercise: null, muscle: null });
+    }
+  }, [currentActiveExpandedId]);
 
   const chartColors = theme === 'dark' 
     ? ['#38bdf8', '#60a5fa', '#818cf8', '#2dd4bf', '#94a3b8', '#3b82f6', '#a78bfa', '#06b6d4', '#93c5fd']
@@ -44,18 +56,20 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
     const dataPoints = []; // Menggunakan Array datar agar titiknya berurutan sesuai set
 
     const exLookup = {};
-    programs.forEach(p => p.exercises.forEach(ex => exLookup[ex.id] = ex));
-    exerciseLibrary.forEach(ex => exLookup[ex.id] = ex); 
+    defaultMasterExercises.forEach(ex => { if (ex?.id) exLookup[ex.id] = ex; });
+    exerciseLibrary.forEach(ex => { if (ex?.id) exLookup[ex.id] = ex; }); 
     
     Object.values(history).forEach(d => {
       d?.workouts?.forEach(w => {
-         if (w.exercises) w.exercises.forEach(ex => exLookup[ex.id] = ex);
-         if (w.overriddenExercises) w.overriddenExercises.forEach(ex => exLookup[ex.id] = ex);
+         if (w.exercises) w.exercises.forEach(ex => { if (ex?.id) exLookup[ex.id] = ex; });
+         if (w.overriddenExercises) w.overriddenExercises.forEach(ex => { if (ex?.id) exLookup[ex.id] = ex; });
       });
       if (d?._activeSession?.extraExercises) {
-         d._activeSession.extraExercises.forEach(ex => exLookup[ex.id] = ex);
+         d._activeSession.extraExercises.forEach(ex => { if (ex?.id) exLookup[ex.id] = ex; });
       }
     });
+
+    programs.forEach(p => p.exercises?.forEach(ex => { if (ex?.id) exLookup[ex.id] = ex; }));
 
     const now = new Date();
     // Allow all data instead of limiting to 90 days
@@ -107,7 +121,13 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
           if (ex && sets) {
               const exName = ex.name;
               const exType = ex.type || 'weight';
-              const exTargets = Array.isArray(ex.target) ? ex.target : [ex.target || 'Lainnya'];
+              let exTargets = Array.isArray(ex.target) ? ex.target : (ex.target ? [ex.target] : ['Lainnya']);
+              if (exTargets.length === 1 && exTargets[0] === 'Lainnya') {
+                 const libEx = exerciseLibrary?.find(e => e.id === ex.id || e.id === ex.originalId || e.name?.toLowerCase() === ex.name?.toLowerCase()) || defaultMasterExercises.find(e => e.id === ex.id || e.name?.toLowerCase() === ex.name?.toLowerCase());
+                 if (libEx?.target) {
+                    exTargets = Array.isArray(libEx.target) ? libEx.target : [libEx.target];
+                 }
+              }
               const isImp = units?.weight === 'lbs';
               
               const eqConf = getEquipmentConfig(null, null, ex);
@@ -222,86 +242,77 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
   }, [chartType, language, history, programs, exerciseLibrary, selectedDate, units]);
 
   const effectiveActiveLines = useMemo(() => {
-    const stillRelevant = activeChartLines.length > 0 && activeChartLines.some(item => chartDataObj.items.includes(item));
-    if (stillRelevant) {
-      return activeChartLines.filter(item => chartDataObj.items.includes(item));
+    const custom = customLinesByType[chartType];
+    if (Array.isArray(custom) && custom.length > 0) {
+      const valid = custom.filter(item => chartDataObj.items.includes(item));
+      if (valid.length > 0) return valid.slice(0, 6);
     }
 
     let activeItems = [];
     const todayStr = selectedDate || getLocalYMD(new Date());
-
-    const todayWorkouts = history[todayStr]?.workouts || [];
+    const todayWorkouts = getDayWorkouts(history, programs, activePlanIds, todayStr);
     const activeExpandedId = expandedSessions ? Object.keys(expandedSessions).find(k => expandedSessions[k]) : null;
-    
-    const relevantTodayWorkouts = todayWorkouts.filter(w => {
-      if (activeExpandedId) {
-         if (activeExpandedId === 'extra') {
-            if (w.programId !== 'adhoc') return false;
-         } else {
-            if (w.id !== activeExpandedId) return false;
-         }
-      }
-      if (!activePlanIds || activePlanIds.length === 0) return true;
-      const prog = programs.find(p => p.id === w.programId);
-      const wPlanId = (prog ? prog.planId : null) || 'custom';
-      return activePlanIds.includes(wPlanId) || w.programId === 'adhoc';
-    });
 
-    if (relevantTodayWorkouts.length > 0) {
-      relevantTodayWorkouts.forEach(w => {
-        const prog = programs.find(p => p.id === w.programId);
-        const exercises = w.overriddenExercises || prog?.exercises || [];
-        exercises.forEach(ex => {
-          if (chartType !== 'muscle') {
-            const libEx = exerciseLibrary.find(e => e.id === ex.id) || ex;
-            if (libEx?.name) activeItems.push(libEx.name);
-          } else if (chartType === 'muscle') {
-            const libEx = exerciseLibrary.find(e => e.id === ex.id) || ex;
-            if (libEx?.target) {
-              const targets = Array.isArray(libEx.target) ? libEx.target : [libEx.target];
-              targets.forEach(muscle => {
-                if (typeof muscle === 'string' && muscle) {
-                  activeItems.push(normalizeMuscleKey(muscle));
-                }
-              });
-            }
-          }
-        });
-      });
-    } else if (activePlanIds && activePlanIds.length > 0) {
-        let activeProgs = programs.filter(p => activePlanIds.includes(p.planId || 'custom'));
-        if (activeExpandedId && activeExpandedId !== 'extra') {
-           const targetProgId = resolveProjectedProgramId(activeExpandedId);
-           activeProgs = activeProgs.filter(p => p.id === targetProgId);
-        }
-      
-      activeProgs.forEach(prog => {
-        prog.exercises?.forEach(ex => {
-          if (chartType !== 'muscle') {
-            activeItems.push(ex.name);
-          } else if (chartType === 'muscle') {
-            const libEx = exerciseLibrary.find(e => e.id === ex.id);
-            if (libEx && libEx.target) {
-              const targets = Array.isArray(libEx.target) ? libEx.target : [libEx.target];
-              targets.forEach(muscle => {
-                if (typeof muscle === 'string' && muscle) {
-                  activeItems.push(normalizeMuscleKey(muscle));
-                }
-              });
-            }
-          }
-        });
+    let targetExercises = [];
+
+    if (activeExpandedId === 'extra') {
+      const extraList = (history[todayStr]?._activeSession?.extraExercises) || (todayWorkouts.find(w => w.programId === 'adhoc')?.exercises) || [];
+      targetExercises = extraList;
+    } else if (activeExpandedId) {
+      const targetWorkout = todayWorkouts.find(w => 
+        w.id === activeExpandedId || 
+        w.workoutId === activeExpandedId || 
+        w.programId === activeExpandedId ||
+        w.id === resolveProjectedProgramId(activeExpandedId)
+      );
+      if (targetWorkout) {
+        const prog = programs.find(p => p.id === targetWorkout.programId || p.id === resolveProjectedProgramId(targetWorkout.programId));
+        targetExercises = targetWorkout.overriddenExercises || prog?.exercises || targetWorkout.exercises || [];
+      } else {
+        const targetProgId = resolveProjectedProgramId(activeExpandedId);
+        const prog = programs.find(p => p.id === targetProgId || p.id === activeExpandedId);
+        targetExercises = prog?.exercises || [];
+      }
+    }
+
+    if (targetExercises.length === 0) {
+      todayWorkouts.forEach(w => {
+        const prog = programs.find(p => p.id === w.programId || p.id === resolveProjectedProgramId(w.programId));
+        const exs = w.overriddenExercises || prog?.exercises || w.exercises || [];
+        targetExercises.push(...exs);
       });
     }
-    
-    activeItems = [...new Set(activeItems)];
-    
-    if (activeItems.length > 0) {
-        return activeItems.slice(0, 6);
+
+    if (chartType !== 'muscle') {
+      targetExercises.forEach(ex => {
+        const libEx = exerciseLibrary.find(e => e.id === ex.id || e.id === ex.originalId || e.name?.toLowerCase() === ex.name?.toLowerCase()) || ex;
+        if (libEx?.name) activeItems.push(libEx.name);
+      });
     } else {
-        return chartDataObj.items.slice(0, 6);
+      const muscleFreq = {};
+      targetExercises.forEach(ex => {
+        const libEx = exerciseLibrary.find(e => e.id === ex.id || e.id === ex.originalId || e.name?.toLowerCase() === ex.name?.toLowerCase()) || defaultMasterExercises.find(e => e.id === ex.id || e.name?.toLowerCase() === ex.name?.toLowerCase()) || ex;
+        const targets = Array.isArray(libEx?.target) ? libEx.target : (libEx?.target ? [libEx.target] : ['Lainnya']);
+        targets.forEach(m => {
+          if (typeof m === 'string' && m) {
+            const mKey = normalizeMuscleKey(m);
+            if (mKey !== 'cardio' && mKey !== 'full_body') {
+              muscleFreq[mKey] = (muscleFreq[mKey] || 0) + 1;
+            }
+          }
+        });
+      });
+      activeItems = Object.keys(muscleFreq).sort((a, b) => muscleFreq[b] - muscleFreq[a]);
     }
-  }, [activeChartLines, chartType, chartDataObj, activePlanIds, programs, exerciseLibrary, history, selectedDate, expandedSessions]);
+
+    activeItems = [...new Set(activeItems)].filter(item => chartDataObj.items.includes(item));
+
+    if (activeItems.length > 0) {
+      return activeItems.slice(0, 6);
+    } else {
+      return chartDataObj.items.slice(0, 6);
+    }
+  }, [customLinesByType, chartType, chartDataObj, activePlanIds, programs, exerciseLibrary, history, selectedDate, expandedSessions]);
 
   // Pinch-to-zoom logic
   const [pointWidth, setPointWidth] = useState(() => {
@@ -477,34 +488,245 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
 
   const toggleChartLine = (item) => {
     playSoundEffect('click', soundEnabled);
-    setActiveChartLines(prev => {
-        const currentLines = (prev.length > 0 && prev.some(it => chartDataObj.items.includes(it))) ? prev : effectiveActiveLines;
-        if (currentLines.includes(item)) return currentLines.filter(i => i !== item);
-        if (currentLines.length >= 6) {
-            // Jangan auto-lepas yang paling lama — user harus manual matiin salah satu dulu.
-            // Cuma kasih hint kecil sebentar, bukan block diam-diam.
-            setLimitHintVisible(true);
-            if (limitHintTimeoutRef.current) clearTimeout(limitHintTimeoutRef.current);
-            limitHintTimeoutRef.current = setTimeout(() => setLimitHintVisible(false), 2000);
-            return currentLines;
-        }
-        return [...currentLines, item]; // ditaruh di akhir -> render-nya jadi paling kanan-bawah di antara yang aktif
-    });
+    const currentActive = effectiveActiveLines.filter(it => chartDataObj.items.includes(it));
+    if (currentActive.includes(item)) {
+      const next = currentActive.filter(i => i !== item);
+      setCustomLinesByType(prev => ({ ...prev, [chartType]: next }));
+    } else {
+      if (currentActive.length >= 6) {
+        setLimitHintVisible(true);
+        if (limitHintTimeoutRef.current) clearTimeout(limitHintTimeoutRef.current);
+        limitHintTimeoutRef.current = setTimeout(() => setLimitHintVisible(false), 2000);
+        return;
+      }
+      const next = [...currentActive, item];
+      setCustomLinesByType(prev => ({ ...prev, [chartType]: next }));
+    }
   };
 
   const isImp = units?.weight === 'lbs';
+  const [activePrModal, setActivePrModal] = useState(null);
+
+  useEffect(() => {
+    if (activePrModal) {
+      const origOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = origOverflow;
+      };
+    }
+  }, [activePrModal]);
+
+  const prData = useMemo(() => {
+    if (!history) return null;
+    const lookup = {};
+    defaultMasterExercises.forEach(ex => { if (ex?.id) lookup[ex.id] = ex; });
+    (exerciseLibrary || []).forEach(ex => { if (ex?.id) lookup[ex.id] = ex; });
+    (programs || []).forEach(p => (p.exercises || []).forEach(ex => { if (ex?.id) lookup[ex.id] = ex; }));
+    return calculatePersonalRecords(history, lookup);
+  }, [history, exerciseLibrary, programs]);
 
   return (
     <div className={`${!isSubCard ? 'px-4 pt-4 pb-1' : ''} animate-in fade-in duration-300`}>
         {!isSubCard && (
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex justify-between items-center mb-3">
            <h3 className={`h2 ${t.textMain}`}>Progres Latihan</h3>
         </div>
+        )}
+
+        {/* High-Contrast PR Pill Row on Dashboard */}
+        {!isSubCard && prData && (
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            {/* BIG 3 CARD */}
+            <button
+              onClick={() => { playSoundEffect('click', soundEnabled); setActivePrModal('big3'); }}
+              className="p-3 rounded-2xl flex flex-col justify-center text-left transition-all active:scale-95 bg-black/40 dark:bg-black/45 backdrop-blur-md shadow-sm"
+            >
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-300">Big 3</span>
+              <div className="mt-1 flex items-baseline gap-1">
+                <span className="text-lg font-black text-white">
+                  {prData.big3.total > 0 ? prData.big3.total : '-'}
+                </span>
+                {prData.big3.total > 0 && <span className="text-[10px] font-bold text-slate-300">kg</span>}
+              </div>
+            </button>
+
+            {/* MAX SESI CARD */}
+            <button
+              onClick={() => { playSoundEffect('click', soundEnabled); setActivePrModal('volume'); }}
+              className="p-3 rounded-2xl flex flex-col justify-center text-left transition-all active:scale-95 bg-black/40 dark:bg-black/45 backdrop-blur-md shadow-sm"
+            >
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-300">Max Sesi</span>
+              <div className="mt-1 flex items-baseline gap-1">
+                <span className="text-lg font-black text-white">
+                  {prData.maxSessionVolume.volumeKg >= 1000 
+                    ? (prData.maxSessionVolume.volumeKg / 1000).toFixed(1) 
+                    : (prData.maxSessionVolume.volumeKg > 0 ? prData.maxSessionVolume.volumeKg : '-')}
+                </span>
+                {prData.maxSessionVolume.volumeKg > 0 && (
+                  <span className="text-[10px] font-bold text-slate-300">
+                    {prData.maxSessionVolume.volumeKg >= 1000 ? 'Ton' : 'kg'}
+                  </span>
+                )}
+              </div>
+            </button>
+
+            {/* KONSISTENSI CARD */}
+            <button
+              onClick={() => { playSoundEffect('click', soundEnabled); setActivePrModal('streak'); }}
+              className="p-3 rounded-2xl flex flex-col justify-center text-left transition-all active:scale-95 bg-black/40 dark:bg-black/45 backdrop-blur-md shadow-sm"
+            >
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-300">Konsistensi</span>
+              <div className="mt-1 flex items-baseline gap-1">
+                <span className="text-lg font-black text-white">
+                  {prData.longestWeeklyStreak > 0 ? prData.longestWeeklyStreak : '-'}
+                </span>
+                {prData.longestWeeklyStreak > 0 && <span className="text-[10px] font-bold text-slate-300">Minggu</span>}
+              </div>
+            </button>
+          </div>
+        )}
+
+        {/* PR Detail Modal */}
+        {activePrModal && createPortal(
+          <div 
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/65 backdrop-blur-xl animate-in fade-in overscroll-contain touch-none"
+            onClick={() => setActivePrModal(null)}
+          >
+            <div 
+              className="w-full max-w-md bg-slate-900/60 dark:bg-black/60 backdrop-blur-2xl border border-white/20 text-white rounded-3xl p-6 shadow-[0_16px_40px_rgba(0,0,0,0.5)] ring-1 ring-white/10 animate-in zoom-in-95 duration-200"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="pb-3 border-b border-white/10 mb-4">
+                <h4 className="text-base font-black text-white">
+                  {activePrModal === 'big3' && 'Rincian Big 3 (Estimasi 1RM)'}
+                  {activePrModal === 'volume' && 'Rekor Tonase 1 Sesi'}
+                  {activePrModal === 'streak' && 'Konsistensi Mingguan'}
+                </h4>
+              </div>
+
+              {/* Content for Big 3 */}
+              {activePrModal === 'big3' && (
+                <div className="space-y-3">
+                  <div className="p-4 rounded-2xl bg-blue-500/10 backdrop-blur-md border border-blue-400/25 flex items-baseline justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-blue-400">Total Big 3</span>
+                    <span className="text-3xl font-black text-blue-400">{prData.big3.total} kg</span>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="p-3.5 rounded-2xl bg-white/[0.05] backdrop-blur-md border border-white/10 flex items-center justify-between">
+                      <div className="min-w-0 flex-1 pr-2">
+                        <p className="text-xs font-bold text-white">Bench Press (Dada)</p>
+                        <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                          {prData.big3.bench.name || 'Flat Bench Press'}
+                          {prData.big3.bench.date && ` • ${new Date(prData.big3.bench.date + 'T12:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}`}
+                        </p>
+                      </div>
+                      <span className="text-base font-black text-blue-400 shrink-0 whitespace-nowrap">
+                        {prData.big3.bench.weight1RM > 0 ? `${prData.big3.bench.weight1RM} kg` : '-'}
+                      </span>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-white/[0.05] backdrop-blur-md border border-white/10 flex items-center justify-between">
+                      <div className="min-w-0 flex-1 pr-2">
+                        <p className="text-xs font-bold text-white">Squat (Paha & Kaki)</p>
+                        <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                          {prData.big3.squat.name || 'Barbell Squat'}
+                          {prData.big3.squat.date && ` • ${new Date(prData.big3.squat.date + 'T12:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}`}
+                        </p>
+                      </div>
+                      <span className="text-base font-black text-blue-400 shrink-0 whitespace-nowrap">
+                        {prData.big3.squat.weight1RM > 0 ? `${prData.big3.squat.weight1RM} kg` : '-'}
+                      </span>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-white/[0.05] backdrop-blur-md border border-white/10 flex items-center justify-between">
+                      <div className="min-w-0 flex-1 pr-2">
+                        <p className="text-xs font-bold text-white">Deadlift (Punggung Bawah & Posterior)</p>
+                        <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                          {prData.big3.deadlift.name || 'Deadlift'}
+                          {prData.big3.deadlift.date && ` • ${new Date(prData.big3.deadlift.date + 'T12:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}`}
+                        </p>
+                      </div>
+                      <span className="text-base font-black text-blue-400 shrink-0 whitespace-nowrap">
+                        {prData.big3.deadlift.weight1RM > 0 ? `${prData.big3.deadlift.weight1RM} kg` : '-'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] leading-relaxed text-slate-400 mt-3 pt-2 border-t border-white/10">
+                    * 1RM (One-Rep Max): Estimasi beban maksimal 1 repetisi berdasarkan set terberat Anda (rumus Epley).
+                  </p>
+                </div>
+              )}
+
+              {/* Content for Volume / Tonase */}
+              {activePrModal === 'volume' && (
+                <div className="space-y-3">
+                  <div className="p-5 rounded-2xl bg-blue-500/10 backdrop-blur-md border border-blue-400/25 text-center">
+                    <div className="text-3xl font-black text-blue-400">
+                      {prData.maxSessionVolume.volumeKg >= 1000 
+                        ? `${(prData.maxSessionVolume.volumeKg / 1000).toFixed(1)} Ton` 
+                        : `${prData.maxSessionVolume.volumeKg} kg`}
+                    </div>
+                    {prData.maxSessionVolume.volumeKg > 0 && (
+                      <div className="inline-flex items-center justify-center gap-1 px-3 py-1 mt-2 rounded-full bg-blue-500/20 backdrop-blur-sm text-blue-300 text-xs font-bold whitespace-nowrap">
+                        Setara ~{prData.maxSessionVolume.analogy}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-white/[0.04] backdrop-blur-md border border-white/10 space-y-1.5 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Sesi Latihan:</span>
+                      <span className="font-bold text-white">{prData.maxSessionVolume.workoutName || 'Sesi Latihan'}</span>
+                    </div>
+                    {prData.maxSessionVolume.date && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Tanggal:</span>
+                        <span className="font-bold text-white">
+                          {new Date(prData.maxSessionVolume.date + 'T12:00:00').toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-white/[0.03] backdrop-blur-md border border-white/5 text-[11px] leading-relaxed text-slate-400">
+                    <p>
+                      <b className="text-slate-200">Tonase</b> adalah akumulasi total (beban × repetisi) dari seluruh set dalam 1 sesi untuk mengukur kapasitas kerja (<i className="text-slate-300">work capacity</i>) otot Anda.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Content for Streak */}
+              {activePrModal === 'streak' && (
+                <div className="space-y-3">
+                  <div className="p-5 rounded-2xl bg-blue-500/10 backdrop-blur-md border border-blue-400/25 text-center">
+                    <div className="text-3xl font-black text-blue-400">
+                      {prData.longestWeeklyStreak} Minggu Beruntun
+                    </div>
+                    <p className="text-xs font-bold text-blue-300 mt-1">
+                      Disiplin target mingguan
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-white/[0.03] backdrop-blur-md border border-white/5 text-[11px] leading-relaxed text-slate-400">
+                    <p>
+                      <b className="text-slate-200">Konsistensi Mingguan</b> mengukur kepatuhan jadwal tanpa risiko <i>overtraining</i>. Hari istirahat (<i>Rest Day</i>) tetap menjaga rangkaian streak aktif.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>,
+          document.body
         )}
         
         {!isSubCard && (
         <div className={`mb-5 border-b border-dashed ${t.border} pb-5 no-swipe`} onTouchStart={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
-           <div className={`relative flex w-full p-1 rounded-full ${t.btnBg}`}>
+            <div className={`relative flex w-full p-1 rounded-full ${t.btnBg}`}>
                <div className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full transition-transform duration-300 ease-out ${t.bgAccent} shadow-sm`} style={{ transform: chartType === 'exercise' ? 'translateX(0)' : 'translateX(100%)', left: '4px' }}></div>
 
                <button onClick={() => { playSoundEffect('click', soundEnabled); setChartType('exercise');}} className={`flex-1 py-2 rounded-full body-md font-bold relative z-10 transition-colors duration-300 ${chartType === 'exercise' ? 'text-white' : t.textMuted}`}>{lang?.progExercise || 'Per Latihan'}</button>

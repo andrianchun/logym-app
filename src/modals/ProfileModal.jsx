@@ -384,13 +384,19 @@ export default function ProfileModal({
                 )}
 
                 {/* Header */}
-                <div className={`relative px-4 pt-3 pb-3 border-b ${t.border} shrink-0 min-h-[60px]`}>
+                <div 
+                    className={`relative px-4 pb-3 border-b ${t.border} shrink-0`}
+                    style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top, 24px))' }}
+                >
                     <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: `url('/banner-${theme}.webp')`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
-                    <div className={`absolute top-3 right-3 z-20 flex items-center space-x-2 pl-4 pr-1 py-1 rounded-l-full ${theme === 'dark' ? 'bg-gradient-to-l from-[#0f172a] via-[#0f172a] to-transparent' : 'bg-gradient-to-l from-white via-white to-transparent'}`}>
+                    <div 
+                        className={`absolute right-3 z-20 flex items-center space-x-2 pl-4 pr-1 py-1 rounded-l-full ${theme === 'dark' ? 'bg-gradient-to-l from-[#0f172a] via-[#0f172a] to-transparent' : 'bg-gradient-to-l from-white via-white to-transparent'}`}
+                        style={{ top: 'max(0.75rem, env(safe-area-inset-top, 24px))' }}
+                    >
                         <button onClick={() => setShowLogoutConfirm(true)} className="p-1.5 rounded-full bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors" title="Keluar">
                             <LogOut size={16} />
                         </button>
-                        <button onClick={() => setShowProfileModal(false)} className={`p-1.5 rounded-full ${t.btnBg} transition-colors`}>
+                        <button onClick={() => setShowProfileModal(false)} className={`p-1.5 rounded-full ${t.btnBg} transition-colors`} data-close-modal="true">
                             <X size={16} className={t.textMain} />
                         </button>
                     </div>
@@ -470,6 +476,8 @@ export default function ProfileModal({
                             userProfileData={userProfile}
                             history={history}
                             setHistory={setHistory}
+                            exerciseLibrary={exerciseLibrary}
+                            programs={programs}
                             onReport={() => {}}
                             userAchievements={userAchievements}
                             onAchievementShareComplete={onAchievementShareComplete}

@@ -85,6 +85,20 @@ const extras = [{ id: '900-1786258529614', name: 'Treadmill' }];
   assert.deepEqual(Object.keys(sisa).sort(), ['8', '9'], 'latihan sesi 2 harus selamat sebagai sisa');
 }
 
+// 9. Sesi ber-id projected (mis. projected_p1_2026-09-01) dipisahkan secara presisi
+{
+  const logs = {
+    '101-projected_p1_2026-09-01': [{ w: 50, r: 10, done: true }],
+    '102-projected_p2_2026-09-01': [{ w: 40, r: 10, done: true }],
+  };
+  const { milikSesi, sisa } = splitSessionLogs(logs, {
+    progId: 'projected_p1_2026-09-01',
+    workoutId: 'projected_p1_2026-09-01'
+  });
+  assert.deepEqual(Object.keys(milikSesi), ['101-projected_p1_2026-09-01']);
+  assert.deepEqual(Object.keys(sisa), ['102-projected_p2_2026-09-01']);
+}
+
 // 8. Masukan kosong tidak melempar.
 assert.deepEqual(splitSessionLogs(null, {}), { milikSesi: {}, sisa: {} });
 assert.deepEqual(splitSessionLogs({}, undefined), { milikSesi: {}, sisa: {} });

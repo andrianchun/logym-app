@@ -38,7 +38,12 @@ export default function UserProfileModal({ profileUserId, profileUserName, profi
   return (
     <div className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-200 p-0 sm:p-4 pb-0 overscroll-contain touch-none" onClick={onClose}>
       <div className={`w-full sm:max-w-md h-full sm:h-[90vh] sm:rounded-3xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom-8 flex flex-col relative ${isDark ? 'bg-slate-900' : 'bg-white'}`} onClick={(e) => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute top-4 right-4 z-50 p-2 bg-black/40 text-white rounded-full hover:bg-black/60 transition-colors shadow-lg" data-close-modal="true">
+        <button 
+          onClick={onClose} 
+          className="absolute right-4 z-50 p-2 bg-black/40 text-white rounded-full hover:bg-black/60 transition-colors shadow-lg" 
+          style={{ top: 'max(1rem, env(safe-area-inset-top, 24px))' }}
+          data-close-modal="true"
+        >
           <X size={20} />
         </button>
         <SharedProfileView
