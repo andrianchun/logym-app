@@ -1,11 +1,50 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { doc, setDoc, deleteDoc, getDocs, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Send, X, Check, Loader2, Dumbbell, Menu, Plus, MessageSquare, Trash2, Bookmark, ChevronDown, ChevronRight } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
+import { LocalNotifications } from '@capacitor/local-notifications';
 import { buildSystemPrompt, summarizeWorkoutLogs, summarizeHealthAndRecovery, summarizeBiometrics, summarizeActivePrograms, summarizeFavoriteProgram, needsPersonalContext, needsAppHelpContext, APP_HELP_REFERENCE, chatWithAI, AI_MODELS, getAvailableModels, getProviderStatus, checkOverallAIStatus } from '../utils/aiAgent';
 import { fetchExercisesFromApi, pickRelevantExercises } from '../utils/exerciseDbApi';
 import renderMiniMarkdown from '../utils/miniMarkdown';
 import { db } from '../firebase';
 import { useWakeLock } from '../hooks/useWakeLock';
+
+const sendBackgroundNotification = async (title, body) => {
+    try {
+        if (Capacitor.isNativePlatform()) {
+            await LocalNotifications.schedule({
+                notifications: [
+                    {
+                        id: Math.floor(Math.random() * 100000) + 5000,
+                        title: title || 'Coach Logy',
+                        body: body ? (body.length > 120 ? body.slice(0, 117) + '...' : body) : 'Jawaban analisismu sudah siap!',
+                        schedule: { at: new Date(Date.now() + 100) },
+                        sound: 'beep.wav',
+                        extra: { type: 'logy_chat' },
+                    },
+                ],
+            });
+        } else if (typeof window !== 'undefined' && 'Notification' in window) {
+            if (Notification.permission === 'granted') {
+                new Notification(title || 'Coach Logy', {
+                    body: body ? (body.length > 120 ? body.slice(0, 117) + '...' : body) : 'Jawaban analisismu sudah siap!',
+                    icon: '/logym-icon.webp',
+                });
+            } else if (Notification.permission === 'default') {
+                Notification.requestPermission().then((perm) => {
+                    if (perm === 'granted') {
+                        new Notification(title || 'Coach Logy', {
+                            body: body ? (body.length > 120 ? body.slice(0, 117) + '...' : body) : 'Jawaban analisismu sudah siap!',
+                            icon: '/logym-icon.webp',
+                        });
+                    }
+                });
+            }
+        }
+    } catch (e) {
+        console.warn('Gagal kirim notifikasi AI background Logym:', e);
+    }
+};
 
 const THINKING_PHASES = ['Membaca riwayat latihanmu...', 'Menganalisis progress mingguan...', 'Menyusun jawaban...'];
 
@@ -82,13 +121,25 @@ export default function GymAIChat({
         clearTimeout(phaseTimer.current);
         if (isOpen) {
             setPhase('opening');
+            setIsSidebarOpen(false);
+            // Selalu langsung muat sesi aktif atau sesi terakhir yang tersedia
+            if (sessions.length > 0) {
+                const target = sessions.find((s) => s.id === activeSessionId) || sessions[0];
+                if (target) {
+                    if (target.id !== activeSessionId) setActiveSessionId(target.id);
+                    setMessages(target.messages || []);
+                    if (target.unread) {
+                        setSessions((prev) => prev.map((s) => (s.id === target.id ? { ...s, unread: false } : s)));
+                    }
+                }
+            }
             phaseTimer.current = setTimeout(() => {
                 setPhase('open');
                 setTimeout(() => scrollToBottom('auto'), 50);
             }, 20);
         } else {
             setPhase('closing');
-            phaseTimer.current = setTimeout(() => setPhase('closed'), 360);
+            phaseTimer.current = setTimeout(() => setPhase('closed'), 320);
         }
         return () => clearTimeout(phaseTimer.current);
     }, [isOpen]);
@@ -472,11 +523,17 @@ export default function GymAIChat({
             });
 
             const aiMsg = { role: 'model', content: reply, timestamp: Date.now() };
-            const stillViewing = isStillViewing();
+            const stillViewing = isStillViewing() && (typeof document !== 'undefined' ? !document.hidden : true);
             if (stillViewing) {
                 setMessages(prev => prev.map(m => m.id === tempId ? aiMsg : m));
             }
             setSessions(prev => prev.map(s => s.id === currentSessionId ? { ...s, messages: [...s.messages, aiMsg], updatedAt: Date.now(), unread: !stillViewing } : s));
+
+            // Kirim notifikasi status bar jika user sedang minimize atau buka tab/aplikasi lain
+            if (!stillViewing) {
+                const plainSnippet = reply.replace(/[*_#`[\]()]/g, '').trim();
+                sendBackgroundNotification('Coach Logy', plainSnippet || 'Jawaban program latihanmu sudah selesai disusun!');
+            }
         } catch (err) {
             console.error(err);
             if (isOpenRef.current && activeSessionIdRef.current === currentSessionId) {
@@ -690,12 +747,12 @@ export default function GymAIChat({
         <div
             className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 pointer-events-none"
             style={{
-                transform: scaleVal,
                 transformOrigin: `${ox}px ${oy}px`,
-                // Buka: spring ringan. Tutup: ease-in cepat
+                transform: isAnimatingIn ? 'scale(1)' : 'scale(0.05)',
+                opacity: isAnimatingIn ? 1 : 0,
                 transition: isAnimatingOut
-                    ? 'transform 0.3s cubic-bezier(0.4,0,1,1)'
-                    : 'transform 0.38s cubic-bezier(0.34,1.15,0.64,1)',
+                    ? 'transform 0.32s cubic-bezier(0.32, 1, 0.23, 1), opacity 0.26s ease'
+                    : 'transform 0.38s cubic-bezier(0.34, 1.15, 0.64, 1), opacity 0.3s ease',
             }}
         >
             <div className="pointer-events-auto flex flex-col w-full max-w-md h-[85vh] max-h-[800px] bg-neutral-900/60 backdrop-blur-2xl border border-white/10 rounded-[2rem] shadow-[0_0_40px_rgba(0,0,0,0.5)] overflow-hidden relative">
