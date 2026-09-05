@@ -128,7 +128,7 @@ id,name,target,equipment,level,type,defaultWeight,ytVideo,videoUrl,gifUrl
 ,Cable Rope Rear-Delt Rows,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Rope_Rear-Delt_Rows/0.jpg
 ,Cable Russian Twists,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Russian_Twists/0.jpg
 ,Cable Seated Crunch,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Seated_Crunch/0.jpg
-,Cable Seated Lateral Raise,,,beginner,weight,20,https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA,/exercise-assets/youtube-backup/edb-Cable_Seated_Lateral_Raise.mp4,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Seated_Lateral_Raise/0.jpg
+,Cable Seated Lateral Raise,,,beginner,weight,20,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Seated_Lateral_Raise/0.jpg
 ,Cable Shoulder Press,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Shoulder_Press/0.jpg
 ,Cable Shrugs,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Shrugs/0.jpg
 ,Cable Wrist Curl,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Wrist_Curl/0.jpg
@@ -749,6 +749,7 @@ id,name,target,equipment,level,type,defaultWeight,ytVideo,videoUrl,gifUrl
 ,Standing Bradford Press,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Standing_Bradford_Press/0.jpg
 ,Standing Cable Chest Press,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Standing_Cable_Chest_Press/0.jpg
 ,Standing Cable Lift,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Standing_Cable_Lift/0.jpg
+104,Standing Cable Lateral Raise,Deltoid Samping,Cable,beginner,weight,10,https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA,/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.mp4,/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.webp
 ,Standing Cable Wood Chop,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Standing_Cable_Wood_Chop/0.jpg
 ,Standing Calf Raises,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Standing_Calf_Raises/0.jpg
 ,Standing Concentration Curl,,,,,,,,https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Standing_Concentration_Curl/0.jpg

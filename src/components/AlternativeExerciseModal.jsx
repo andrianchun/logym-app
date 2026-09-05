@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Search, Filter, Dumbbell, Heart, ChevronDown } from 'lucide-react';
-import { formatTarget, getVideoId, muscleOptions, equipmentOptions, normalizeMuscleKey, filterByGymEquipment, exerciseAliasMap } from '../data/constants';
+import { formatTarget, getVideoId, muscleOptions, equipmentOptions, normalizeMuscleKey, filterByGymEquipment, exerciseAliasMap, cleanExerciseNameForMatching, canonicalizeExercise } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
 import { fetchExercisesFromApi } from '../utils/exerciseDbApi';
 import EquipmentIcon from './EquipmentIcon';
@@ -74,23 +74,28 @@ const AlternativeExerciseModal = ({
   const combinedLibrary = useMemo(() => {
     const onlineMap = new Map();
     onlineExercises.forEach(ex => {
-      onlineMap.set(ex.name.trim().toLowerCase(), ex);
-      if (ex.id) onlineMap.set(String(ex.id), ex);
+      const canonicalOnline = canonicalizeExercise(ex);
+      const cleanName = cleanExerciseNameForMatching(canonicalOnline.name);
+      onlineMap.set(cleanName, canonicalOnline);
+      if (ex.id) onlineMap.set(String(ex.id), canonicalOnline);
     });
 
     const localMap = new Map();
     exerciseLibrary.forEach(localEx => {
       const aliasTargetId = exerciseAliasMap?.[String(localEx.id)];
       const onlineExByAlias = aliasTargetId ? onlineMap.get(aliasTargetId) : null;
-      const canonicalName = onlineExByAlias ? onlineExByAlias.name : localEx.name;
-      const key = canonicalName.trim().toLowerCase();
+      const canonicalEx = canonicalizeExercise(localEx);
+      const chosenName = onlineExByAlias ? onlineExByAlias.name : canonicalEx.name;
+      const key = cleanExerciseNameForMatching(chosenName);
       if (!localMap.has(key)) {
-        localMap.set(key, { ...localEx, name: canonicalName });
+        localMap.set(key, { ...canonicalEx, ...localEx, name: chosenName });
       }
     });
 
     const deduplicatedLocal = Array.from(localMap.values());
-    const onlineToAdd = onlineExercises.filter(ex => !localMap.has(ex.name.trim().toLowerCase()));
+    const onlineToAdd = onlineExercises
+      .map(ex => canonicalizeExercise(ex))
+      .filter(ex => !localMap.has(cleanExerciseNameForMatching(ex.name)));
     let list = [...deduplicatedLocal, ...onlineToAdd];
 
     // Filter by Active Gym Equipment — aturannya di filterByGymEquipment (data/constants.js),

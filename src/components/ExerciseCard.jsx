@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { SkipForward, Video, CheckCircle, Play, Square, Info, ArrowLeftRight, X, Dumbbell, ClipboardEdit, Flame, Brain, Plus, ChevronUp, ChevronDown, Activity } from 'lucide-react';
+import { SkipForward, Video, CheckCircle, Play, Square, Info, ArrowLeftRight, X, Dumbbell, ClipboardEdit, Flame, Brain, Plus, ChevronUp, ChevronDown, Activity, Zap } from 'lucide-react';
 import EquipmentIcon from './EquipmentIcon';
 import SwipeInput from './SwipeInput';
 import { formatTarget, exerciseTypeLabels, getVideoId, defaultMasterExercises, findMatchingMasterExercise, canonicalizeExercise } from '../data/constants';
@@ -110,7 +110,7 @@ const ExerciseCard = ({
   });
 
   useEffect(() => {
-    if (activeSetDetail !== null) {
+    if (activeSetDetail !== null || showHint) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -118,7 +118,7 @@ const ExerciseCard = ({
     return () => {
       document.body.style.overflow = '';
     };
-  }, [activeSetDetail]);
+  }, [activeSetDetail, showHint]);
 
   const handleSaveSetDetail = (exId, setIdx, details) => {
     if(onUpdateSet) {
@@ -369,7 +369,7 @@ const ExerciseCard = ({
                           <Brain size={18} className="animate-pulse" />
                       </button>
                       {showHint && createPortal(
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-300" onClick={() => { if (canCloseHint || !overloadHint?.isNewRecord) setShowHint(false); }}>
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-300 overscroll-contain touch-none" data-close-modal="true" onClick={() => { if (canCloseHint || !overloadHint?.isNewRecord) setShowHint(false); }}>
                           <div 
                             className="relative w-full max-w-[340px] mt-28 animate-in fade-in zoom-in-95 duration-300 pointer-events-auto text-center"
                             onClick={e => e.stopPropagation()}
@@ -394,20 +394,39 @@ const ExerciseCard = ({
                               <div className="relative z-20 w-full pt-32 pb-6 px-6 flex flex-col items-center">
                                 {overloadHint ? (
                                   <>
-                                    <h3 className={`font-black ${overloadHint.isNewRecord ? 'text-xl text-sky-400 drop-shadow-[0_0_12px_rgba(56,189,248,0.8)] animate-pulse' : 'text-lg text-white'} tracking-wider uppercase mb-3 drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]`}>
-                                      {overloadHint.title}
+                                    <h3 className={`font-black ${overloadHint.isNewRecord ? 'text-lg sm:text-xl text-sky-400 drop-shadow-[0_0_12px_rgba(56,189,248,0.8)] animate-pulse' : 'text-base sm:text-lg text-white'} tracking-wider uppercase mb-2.5 drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]`}>
+                                      {overloadHint.title || "TARGET HARI INI"}
                                     </h3>
-                                    <p className="text-zinc-100 text-sm font-semibold whitespace-pre-wrap leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
-                                      {overloadHint.text}
+
+                                    {/* Benchmark Chip */}
+                                    {overloadHint.benchmark && (
+                                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-xs font-semibold text-zinc-200 mb-2.5 backdrop-blur-sm shadow-sm">
+                                        {overloadHint.benchmarkLabel && <span className="text-zinc-400 text-[11px] font-medium">{overloadHint.benchmarkLabel}:</span>}
+                                        <span className="text-white font-black">{overloadHint.benchmark}</span>
+                                      </div>
+                                    )}
+
+                                    {/* Mission / Advice text */}
+                                    <p className="text-zinc-200 text-xs sm:text-sm font-medium leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)] max-w-[280px]">
+                                      {overloadHint.message || overloadHint.text}
                                     </p>
+
+                                    {/* Logym Blue 10RM Pill Badge */}
+                                    {overloadHint.rm10 && (
+                                      <div className="mt-3.5 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-sky-500/15 border border-sky-400/40 text-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.25)] backdrop-blur-sm">
+                                        <Zap size={13} className="text-sky-400 fill-sky-400/40" />
+                                        <span className="text-[10px] font-bold tracking-wider uppercase text-sky-300/80">10RM Acuan</span>
+                                        <span className="text-xs font-black text-white">{overloadHint.rm10}</span>
+                                      </div>
+                                    )}
                                   </>
                                 ) : (
                                   <>
-                                    <h3 className="font-black text-lg text-white tracking-wider uppercase mb-3 drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]">
+                                    <h3 className="font-black text-base sm:text-lg text-white tracking-wider uppercase mb-2.5 drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]">
                                       TARGET HARI INI
                                     </h3>
-                                    <p className="text-zinc-100 text-sm font-semibold whitespace-pre-wrap leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
-                                      Belum ada rekor 10RM.{"\n\n"}Gunakan beban yang menantang tapi sanggup diangkat 10x dengan benar (RPE 8).
+                                    <p className="text-zinc-200 text-xs sm:text-sm font-medium leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)] max-w-[280px]">
+                                      Belum ada rekor 10RM. Gunakan beban yang menantang tapi sanggup diangkat 10 repetisi dengan form sempurna (RPE 8).
                                     </p>
                                   </>
                                 )}

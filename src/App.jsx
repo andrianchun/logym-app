@@ -3076,45 +3076,128 @@ export default function App() {
     setLoadedDate(selectedDate);
   }, [selectedDate, activeProgramId, history, programs, isDataLoaded, isHistoryLoaded, loadedDate]);
 
-  const getBaseEx = (exId) => {
+  const getBaseEx = (exId, specificWorkoutId = null) => {
+    if (!exId) return null;
     const exIdStr = String(exId);
     
-    const isMatch = (e) => {
+    const isSimpleMatch = (e, baseStr) => {
       if (!e) return false;
       const eIdStr = String(e.id);
       const eOrigIdStr = e.originalId ? String(e.originalId) : null;
-      return exIdStr === eIdStr || exIdStr.startsWith(eIdStr + '-') ||
-             (eOrigIdStr && (exIdStr === eOrigIdStr || exIdStr.startsWith(eOrigIdStr + '-')));
+      return baseStr === eIdStr || (eOrigIdStr && baseStr === eOrigIdStr) ||
+             baseStr.startsWith(eIdStr + '-') || (eOrigIdStr && baseStr.startsWith(eOrigIdStr + '-'));
     };
-    
-    // 1. Prioritaskan latihan dari program aktif dan extraExercises saat ini
-    const activeMatch = [...programs.map(p => p.exercises || []).flat(), ...extraExercises].find(isMatch);
-    if (activeMatch) return activeMatch;
 
-    // 2. Fallback ke riwayat sesi yang tersimpan pada tanggal ini
+    // 1. Extra exercises have absolute priority for live extra exercises
+    const extraMatch = extraExercises.find(e => isSimpleMatch(e, exIdStr));
+    if (extraMatch) return { ...extraMatch, workoutId: 'extra' };
+
+    // 2. Identify candidate workout sessions for today
     const todayData = history[selectedDate];
-    if (todayData && todayData.workouts) {
-       for (const w of todayData.workouts) {
-          const found = (w.overriddenExercises || w.exercises || []).find(isMatch);
-          if (found) return found;
-       }
+    const sourceWorkouts = getDayWorkouts(history, programs, activePlanIds, selectedDate) || [];
+    const historyWorkouts = (todayData && todayData.workouts) || [];
+    const allDayWorkouts = [...sourceWorkouts, ...historyWorkouts];
+
+    let matchedWorkout = specificWorkoutId ? allDayWorkouts.find(w => w.id === specificWorkoutId) : null;
+    let baseExIdStr = exIdStr;
+
+    if (!matchedWorkout) {
+      for (const w of allDayWorkouts) {
+        if (w.id && exIdStr.endsWith(`-${w.id}`)) {
+          matchedWorkout = w;
+          baseExIdStr = exIdStr.slice(0, -(w.id.length + 1));
+          break;
+        }
+      }
     }
+
+    let matchedProg = null;
+    if (!matchedWorkout) {
+      for (const p of programs) {
+        if (p.id && exIdStr.endsWith(`-${p.id}`)) {
+          matchedProg = p;
+          baseExIdStr = exIdStr.slice(0, -(p.id.length + 1));
+          break;
+        }
+      }
+    }
+
+    if (matchedWorkout) {
+      const isSubMatch = (e) => isSimpleMatch(e, baseExIdStr);
+      const foundInTarget = (matchedWorkout.overriddenExercises || matchedWorkout.exercises || []).find(isSubMatch) ||
+                            (programs.find(p => p.id === matchedWorkout.programId)?.exercises || []).find(isSubMatch);
+      if (foundInTarget) {
+        return { ...foundInTarget, workoutId: matchedWorkout.id };
+      }
+    }
+
+    if (matchedProg) {
+      const foundInProg = (matchedProg.exercises || []).find(e => isSimpleMatch(e, baseExIdStr));
+      if (foundInProg) {
+        return { ...foundInProg, workoutId: matchedProg.id };
+      }
+    }
+
+    // Fallback if no suffix matched: check active session / running workout
+    if (sessionToRun) {
+      const sWorkout = allDayWorkouts.find(w => w.id === sessionToRun || w.programId === sessionToRun);
+      if (sWorkout) {
+        const found = (sWorkout.overriddenExercises || sWorkout.exercises || []).find(e => isSimpleMatch(e, exIdStr)) ||
+                      (programs.find(p => p.id === sWorkout.programId)?.exercises || []).find(e => isSimpleMatch(e, exIdStr));
+        if (found) return { ...found, workoutId: sWorkout.id };
+      }
+    }
+
+    // Search active program
+    const activeProg = programs.find(p => p.id === activeProgramId);
+    if (activeProg && activeProg.exercises) {
+      const found = activeProg.exercises.find(e => isSimpleMatch(e, exIdStr));
+      if (found) return { ...found, workoutId: activeProg.id };
+    }
+
+    // Search any workout in today's workouts
+    for (const w of allDayWorkouts) {
+      const found = (w.overriddenExercises || w.exercises || []).find(e => isSimpleMatch(e, exIdStr)) ||
+                    (programs.find(p => p.id === w.programId)?.exercises || []).find(e => isSimpleMatch(e, exIdStr));
+      if (found) return { ...found, workoutId: w.id };
+    }
+
+    // Search any program
+    for (const p of programs) {
+      const found = (p.exercises || []).find(e => isSimpleMatch(e, exIdStr));
+      if (found) return { ...found, workoutId: p.id };
+    }
+
+    // Fallback ke exerciseLibrary
+    const libMatch = exerciseLibrary.find(e => 
+      String(e.id) === exIdStr || exIdStr.startsWith(String(e.id) + '-') ||
+      (e.name && e.name.toLowerCase() === exIdStr.toLowerCase())
+    );
+    if (libMatch) return { ...libMatch, sets: 3 };
 
     return null;
   };
 
-  const getSetLogs = (ex, idToCheck) => {
-    if (exerciseLogs[idToCheck]) return exerciseLogs[idToCheck];
+  const getSetLogs = (ex, idToCheck, customLogsState = null) => {
+    const logs = customLogsState || exerciseLogs;
+    if (idToCheck && logs[idToCheck]) return [...logs[idToCheck]];
     
-    const matchingKey = Object.keys(exerciseLogs).find(key => 
+    const matchingKey = Object.keys(logs).find(key => 
       idToCheck && typeof idToCheck === 'string' && (idToCheck === key || idToCheck.startsWith(key + '-') || key.startsWith(idToCheck + '-'))
     );
-    if (matchingKey) return exerciseLogs[matchingKey];
+    if (matchingKey && logs[matchingKey]) return [...logs[matchingKey]];
     
     // Cari di riwayat tersimpan (history) hari ini HANYA jika workoutId spesifik cocok
     const dayData = history[selectedDate];
-    if (dayData && dayData.workouts && ex?.workoutId) {
-      const targetWorkouts = dayData.workouts.filter(w => w.id === ex.workoutId);
+    let workoutId = ex?.workoutId;
+    if (!workoutId && idToCheck && typeof idToCheck === 'string' && dayData?.workouts) {
+      const foundW = dayData.workouts.find(w => w.id && (idToCheck.endsWith(`-${w.id}`) || idToCheck === w.id));
+      if (foundW) workoutId = foundW.id;
+    }
+    if (!workoutId) workoutId = sessionToRun;
+
+    if (dayData && dayData.workouts && workoutId) {
+      const targetWorkouts = dayData.workouts.filter(w => w.id === workoutId);
 
       for (const workoutEntry of targetWorkouts) {
         if (workoutEntry && workoutEntry.log) {
@@ -3128,7 +3211,7 @@ export default function App() {
           ].filter(Boolean).map(String);
 
           for (const k of candidateKeys) {
-            if (workoutEntry.log[k]) return workoutEntry.log[k];
+            if (workoutEntry.log[k]) return [...workoutEntry.log[k]];
           }
 
           const rawId = ex?.id || idToCheck;
@@ -3136,7 +3219,7 @@ export default function App() {
             const prefixMatch = Object.entries(workoutEntry.log).find(([k]) => 
               k === String(rawId) || k.startsWith(`${rawId}-`) || (ex?.originalId && (k === String(ex.originalId) || k.startsWith(`${ex.originalId}-`)))
             );
-            if (prefixMatch) return prefixMatch[1];
+            if (prefixMatch && prefixMatch[1]) return [...prefixMatch[1]];
           }
         }
       }
@@ -3165,14 +3248,15 @@ export default function App() {
       total_w: total_w,
       r: ex?.reps || 10, 
       d: ex?.duration || 10, 
-      done: false 
+      done: false,
+      skipped: false
     }));
   };
 
-  const handleSetChange = (exId, setIdx, field, val) => {
+  const handleSetChange = (exId, setIdx, field, val, exParam = null) => {
     setExerciseLogs(prev => {
-      const ex = getBaseEx(exId);
-      const currentLogs = prev[exId] ? [...prev[exId]] : getSetLogs(ex, exId);
+      const ex = exParam || getBaseEx(exId);
+      const currentLogs = prev[exId] ? [...prev[exId]] : [...getSetLogs(ex, exId, prev)];
       
       const finalVal = (field === 'notes') ? val : Number(val);
       const eqConf = getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile);
@@ -3219,11 +3303,11 @@ export default function App() {
     setLastActionTime(Date.now()); 
   };
 
-  const handleToggleSet = (exId, setIdx, siblingIds = null) => {
+  const handleToggleSet = (exId, setIdx, siblingIds = null, exParam = null) => {
     playSoundEffect('click', soundEnabled);
     setExerciseLogs(prev => {
-      const ex = getBaseEx(exId);
-      const currentLogs = prev[exId] ? [...prev[exId]] : getSetLogs(ex, exId);
+      const ex = exParam || getBaseEx(exId);
+      const currentLogs = prev[exId] ? [...prev[exId]] : [...getSetLogs(ex, exId, prev)];
       const isDoneNow = !currentLogs[setIdx].done;
       // `at` = KAPAN set ini diselesaikan. Dipakai untuk menghitung durasi PER SESI di
       // handleSaveWorkout: tanpa ini, sesi mana pun yang disimpan belakangan mengambil seluruh
@@ -3328,11 +3412,11 @@ export default function App() {
     setLastActionTime(Date.now()); 
   };
 
-  const handleSkipSet = (exId, setIdx) => {
+  const handleSkipSet = (exId, setIdx, exParam = null) => {
     playSoundEffect('click', soundEnabled);
     setExerciseLogs(prev => {
-      const ex = getBaseEx(exId);
-      const currentLogs = prev[exId] ? [...prev[exId]] : getSetLogs(ex, exId);
+      const ex = exParam || getBaseEx(exId);
+      const currentLogs = prev[exId] ? [...prev[exId]] : [...getSetLogs(ex, exId, prev)];
       currentLogs[setIdx] = { ...currentLogs[setIdx], done: true, skipped: true };
       return { ...prev, [exId]: currentLogs };
     });
@@ -3347,9 +3431,9 @@ export default function App() {
       ids.forEach(id => {
         const ex = getBaseEx(id);
         if (!ex) return;
-        const currentLogs = newPrev[id] ? [...newPrev[id]] : getSetLogs(ex, id);
+        const currentLogs = newPrev[id] ? [...newPrev[id]] : [...getSetLogs(ex, id, newPrev)];
         const lastSet = currentLogs[currentLogs.length - 1] || { w: ex.defaultWeight || 0, r: ex.reps || 10, d: ex.duration || 10 };
-        currentLogs.push({ w: lastSet.w, r: lastSet.r, d: lastSet.d, done: false });
+        currentLogs.push({ w: lastSet.w, r: lastSet.r, d: lastSet.d, done: false, skipped: false });
         newPrev[id] = currentLogs;
       });
       return newPrev;
@@ -3365,14 +3449,14 @@ export default function App() {
       ids.forEach(id => {
         const ex = getBaseEx(id);
         if (!ex) return;
-        const currentLogs = newPrev[id] ? [...newPrev[id]] : getSetLogs(ex, id);
+        const currentLogs = newPrev[id] ? [...newPrev[id]] : [...getSetLogs(ex, id, newPrev)];
         
         const firstWorkingSet = currentLogs.find(s => s.type !== 'warmup') || currentLogs[0] || { w: ex.defaultWeight || 20 };
         const targetW = Number(firstWorkingSet?.w) || 20;
         
         const warmupSets = [
-          { w: Math.round(targetW * 0.5), r: 8, d: 0, type: 'warmup', notes: 'Warm-up 50%', done: false },
-          { w: Math.round(targetW * 0.75), r: 4, d: 0, type: 'warmup', notes: 'Warm-up 75%', done: false }
+          { w: Math.round(targetW * 0.5), r: 8, d: 0, type: 'warmup', notes: 'Warm-up 50%', done: false, skipped: false },
+          { w: Math.round(targetW * 0.75), r: 4, d: 0, type: 'warmup', notes: 'Warm-up 75%', done: false, skipped: false }
         ];
         
         newPrev[id] = [...warmupSets, ...currentLogs];
@@ -3390,7 +3474,7 @@ export default function App() {
       ids.forEach(id => {
         const ex = getBaseEx(id);
         if (!ex) return;
-        const currentLogs = newPrev[id] ? [...newPrev[id]] : getSetLogs(ex, id);
+        const currentLogs = newPrev[id] ? [...newPrev[id]] : [...getSetLogs(ex, id, newPrev)];
         currentLogs.splice(setIdx, 1);
         newPrev[id] = currentLogs;
       });

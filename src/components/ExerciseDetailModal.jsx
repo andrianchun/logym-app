@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Dumbbell, History, Calculator, Replace, Video, Info, ChevronLeft, ChevronRight, Loader2, Play } from 'lucide-react';
-import { formatTarget, resolveProjectedProgramId, defaultMasterExercises, findMatchingMasterExercise, cleanExerciseNameForMatching, canonicalizeExercise } from '../data/constants';
+import { formatTarget, resolveProjectedProgramId, defaultMasterExercises, findMatchingMasterExercise, cleanExerciseNameForMatching, canonicalizeExercise, exerciseAliasMap } from '../data/constants';
 import { resolveExerciseKind, estimate10RM, estimate1RM, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from '../utils/workoutCalc';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 import SwipeInput from './SwipeInput';
@@ -240,7 +240,15 @@ const ExerciseDetailModal = ({
      if (initialEx && initialEx.name) {
          import('../utils/exerciseDbApi').then(({ fetchExercisesFromApi }) => {
              fetchExercisesFromApi().then(onlineDb => {
-                 const onlineMatch = findMatchingMasterExercise(resolved || initialEx, onlineDb);
+                 let onlineMatch = null;
+                 const rawId = initialEx.originalId || initialEx.id;
+                 const aliasTargetId = exerciseAliasMap?.[String(rawId)];
+                 if (aliasTargetId) {
+                     onlineMatch = onlineDb.find(o => String(o.id) === aliasTargetId || String(o.exerciseId) === aliasTargetId.replace(/^edb-/, ''));
+                 }
+                 if (!onlineMatch) {
+                     onlineMatch = findMatchingMasterExercise(resolved || initialEx, onlineDb);
+                 }
                  if (onlineMatch) {
                      setEx(prev => ({ 
                          ...prev, 

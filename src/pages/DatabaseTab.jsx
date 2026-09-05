@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Search, Filter, Edit2, Plus, Dumbbell, Loader2, RefreshCw, Link as LinkIcon, X, Check, AlertCircle, ChevronDown, Database, Globe, Heart } from 'lucide-react';
-import { formatTarget, normalizeMuscleKey, muscleOptions, equipmentOptions, getVideoId, levelOptions, filterByGymEquipment, exerciseAliasMap } from '../data/constants';
+import { formatTarget, normalizeMuscleKey, muscleOptions, equipmentOptions, getVideoId, levelOptions, filterByGymEquipment, exerciseAliasMap, cleanExerciseNameForMatching, canonicalizeExercise } from '../data/constants';
 import EquipmentIcon from '../components/EquipmentIcon';
 import { fetchExercisesFromApi, clearExerciseDbCache, getCachedExercises } from '../utils/exerciseDbApi';
 import { playSoundEffect } from '../utils/audio';
@@ -450,8 +450,10 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
   const combinedLibrary = useMemo(() => {
     const onlineMap = new Map();
     onlineExercises.forEach(ex => {
-      onlineMap.set(ex.name.trim().toLowerCase(), ex);
-      if (ex.id) onlineMap.set(String(ex.id), ex);
+      const canonicalOnline = canonicalizeExercise(ex);
+      const cleanName = cleanExerciseNameForMatching(canonicalOnline.name);
+      onlineMap.set(cleanName, canonicalOnline);
+      if (ex.id) onlineMap.set(String(ex.id), canonicalOnline);
     });
 
     const localMap = new Map();
@@ -459,17 +461,20 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
       // Periksa apakah nama / ID localEx punya padanan ExerciseDB via alias
       const aliasTargetId = exerciseAliasMap?.[String(localEx.id)];
       const onlineExByAlias = aliasTargetId ? onlineMap.get(aliasTargetId) : null;
+      const canonicalEx = canonicalizeExercise(localEx);
       
-      const canonicalName = onlineExByAlias ? onlineExByAlias.name : localEx.name;
-      const key = canonicalName.trim().toLowerCase();
+      const chosenName = onlineExByAlias ? onlineExByAlias.name : canonicalEx.name;
+      const key = cleanExerciseNameForMatching(chosenName);
       
-      let enrichedEx = { ...localEx, name: canonicalName };
+      let enrichedEx = { ...canonicalEx, ...localEx, name: chosenName };
       if (onlineMap.has(key) || onlineExByAlias) {
         const onlineEx = onlineExByAlias || onlineMap.get(key);
         enrichedEx.instructions = onlineEx.instructions || enrichedEx.instructions;
-        enrichedEx.gifUrl = localEx.gifUrl || onlineEx.gifUrl || enrichedEx.gifUrl;
-        enrichedEx.videoUrl = localEx.videoUrl || onlineEx.videoUrl || enrichedEx.videoUrl;
-        enrichedEx.thumbnailUrl = localEx.thumbnailUrl || onlineEx.thumbnailUrl || enrichedEx.thumbnailUrl;
+        enrichedEx.instructions_id = onlineEx.instructions_id || enrichedEx.instructions_id;
+        enrichedEx.instructions_en = onlineEx.instructions_en || enrichedEx.instructions_en;
+        enrichedEx.gifUrl = enrichedEx.gifUrl || onlineEx.gifUrl;
+        enrichedEx.videoUrl = enrichedEx.videoUrl || onlineEx.videoUrl;
+        enrichedEx.thumbnailUrl = enrichedEx.thumbnailUrl || onlineEx.thumbnailUrl;
         if (!enrichedEx.ytVideo && (onlineEx.ytVideo || onlineEx.videoUrl)) {
           enrichedEx.ytVideo = onlineEx.ytVideo || onlineEx.videoUrl;
         }
@@ -494,7 +499,9 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
     });
 
     const deduplicatedLocal = Array.from(localMap.values());
-    const onlineToAdd = onlineExercises.filter(ex => !localMap.has(ex.name.trim().toLowerCase()));
+    const onlineToAdd = onlineExercises
+      .map(ex => canonicalizeExercise(ex))
+      .filter(ex => !localMap.has(cleanExerciseNameForMatching(ex.name)));
     
     return [...deduplicatedLocal, ...onlineToAdd];
   }, [exerciseLibrary, onlineExercises]);

@@ -74,7 +74,7 @@ export const defaultMasterExercises = [
     "equipment": "Cable",
     "level": "beginner",
     "ytVideo": "https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA",
-    "videoUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.mp4 /exercise-assets/youtube-backup/edb-Cable_Seated_Lateral_Raise.mp4",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.mp4",
     "thumbnailUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.webp",
     "gifUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.webp"
   },
@@ -143,16 +143,16 @@ export const defaultMasterExercises = [
   },
   {
     "id": 110,
-    "name": "Barbell Walking Lunge",
+    "name": "Dumbbell Walking Lunges",
     "target": ["Quads", "Hams", "Glutes"],
     "type": "weight",
     "defaultWeight": 5,
-    "equipment": "Barbell",
+    "equipment": "Dumbbell",
     "level": "intermediate",
-    "ytVideo": "https://youtu.be/mJilHWIBWO8?si=2NCYOofB0EUrY22X",
-    "videoUrl": "/exercise-assets/youtube-backup/edb-Barbell_Walking_Lunge.mp4",
-    "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Walking_Lunge/0.jpg",
-    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Walking_Lunge/0.jpg"
+    "ytVideo": "",
+    "videoUrl": "",
+    "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Lunges/0.jpg",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Lunges/0.jpg"
   },
   {
     "id": 111,
@@ -160,7 +160,7 @@ export const defaultMasterExercises = [
     "target": ["Calves"],
     "type": "weight",
     "defaultWeight": 10,
-    "equipment": "Machine",
+    "equipment": "Barbell",
     "level": "beginner",
     "ytVideo": "https://youtu.be/wdOkFomQNp8?si=PWlxiKYPBMlfLoek",
     "videoUrl": "/exercise-assets/youtube-backup/edb-Rocking_Standing_Calf_Raise.mp4",
@@ -260,7 +260,7 @@ export const defaultMasterExercises = [
   },
   {
     "id": 118,
-    "name": "High Cable Curls",
+    "name": "Standing Biceps Cable Curl",
     "target": ["Biceps"],
     "type": "weight",
     "defaultWeight": 30,
@@ -268,8 +268,8 @@ export const defaultMasterExercises = [
     "level": "beginner",
     "ytVideo": "https://youtu.be/CrbTqNOlFgE?si=xKanrhppuvUAudTj",
     "videoUrl": "/exercise-assets/youtube-backup/edb-High_Cable_Curls.mp4",
-    "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/High_Cable_Curls/0.jpg",
-    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/High_Cable_Curls/0.jpg"
+    "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Standing_Biceps_Cable_Curl/0.jpg",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Standing_Biceps_Cable_Curl/0.jpg"
   },
   {
     "id": 119,
@@ -316,7 +316,7 @@ export const defaultMasterExercises = [
     "target": ["Calves"],
     "type": "weight",
     "defaultWeight": 30,
-    "equipment": "Dumbbell",
+    "equipment": "Machine",
     "level": "beginner",
     "ytVideo": "https://youtu.be/ar8nav0jGoE?si=owieb0xbPHFg7zMA",
     "videoUrl": "/exercise-assets/youtube-backup/edb-Seated_Calf_Raise.mp4",
@@ -624,7 +624,8 @@ export const cleanExerciseNameForMatching = (name) => {
            .replace(/\bshrugs\b/g, 'shrug')
            .replace(/\blunges\b/g, 'lunge')
            .replace(/\bcrunches\b/g, 'crunch')
-           .replace(/\bextensions\b/g, 'extension');
+           .replace(/\bextensions\b/g, 'extension')
+           .replace(/\brows\b/g, 'row');
 
   return str;
 };
@@ -653,6 +654,10 @@ export const findMatchingMasterExercise = (targetEx, masterList = defaultMasterE
   const byExact = masterList.find(m => cleanExerciseNameForMatching(m.name) === rawName);
   if (byExact) return byExact;
 
+  // 2b. Cocokkan dari field aliases di masterList bila ada
+  const byMasterAlias = masterList.find(m => Array.isArray(m.aliases) && m.aliases.some(a => cleanExerciseNameForMatching(a) === rawName));
+  if (byMasterAlias) return byMasterAlias;
+
   // 3. Cocokkan ALIAS KANONIKAL RESMI SAJA (tanpa mencaplok variasi berbeda!)
   const canonicalAliases = {
     // Lat Pulldown
@@ -670,6 +675,9 @@ export const findMatchingMasterExercise = (targetEx, masterList = defaultMasterE
     'barbell incline bench press': 'Barbell Incline Bench Press - Medium Grip',
     'incline barbell bench press': 'Barbell Incline Bench Press - Medium Grip',
     'barbell incline bench press medium grip': 'Barbell Incline Bench Press - Medium Grip',
+    'incline smith machine press': 'Smith Machine Incline Bench Press',
+    'sm flat bench press': 'Smith Machine Bench Press',
+    'smith machine flat bench press': 'Smith Machine Bench Press',
 
     // Deadlift
     'romanian deadlift': 'Romanian Deadlift',
@@ -691,6 +699,16 @@ export const findMatchingMasterExercise = (targetEx, masterList = defaultMasterE
     'smith rdl': 'Smith Machine Romanian Deadlift',
     'sm rdl': 'Smith Machine Romanian Deadlift',
     'sm romanian deadlift': 'Smith Machine Romanian Deadlift',
+    'sm romanian deadlift rdl': 'Smith Machine Romanian Deadlift',
+    'smith machine romanian deadlift rdl': 'Smith Machine Romanian Deadlift',
+
+    // Lunges & Squats
+    'dumbbell walking lunges': 'Dumbbell Walking Lunges',
+    'dumbbell walking lunge': 'Dumbbell Walking Lunges',
+    'walking lunges': 'Dumbbell Walking Lunges',
+    'walking lunge': 'Dumbbell Walking Lunges',
+    'db bulgarian split squat': 'Split Squat with Dumbbells',
+    'dumbbell goblet squat': 'Goblet Squat',
 
     // Lateral Raise
     'standing cable lateral raise': 'Standing Cable Lateral Raise',
@@ -707,11 +725,14 @@ export const findMatchingMasterExercise = (targetEx, masterList = defaultMasterE
     'lateral raise': 'Side Lateral Raise',
     'lateral raises': 'Side Lateral Raise',
 
-    // Delts / Rows / Pushdown / Pulls
+    // Delts / Rows / Pushdown / Pulls / Curls
     'cable rear delt fly': 'Cable Rear Delt Fly',
     'cross cable rear delt': 'Cable Rear Delt Fly',
     'cross cable rear delt fly': 'Cable Rear Delt Fly',
     'cable rear delt flyes': 'Cable Rear Delt Fly',
+    'cable seated row': 'Seated Cable Rows',
+    'cable seated rows': 'Seated Cable Rows',
+    'seated cable row': 'Seated Cable Rows',
     'pull through': 'Pull Through',
     'cable pull through': 'Pull Through',
     'cable pull thru': 'Pull Through',
@@ -720,12 +741,27 @@ export const findMatchingMasterExercise = (targetEx, masterList = defaultMasterE
     'triceps pushdown': 'Triceps Pushdown',
     'cable triceps pushdown': 'Triceps Pushdown',
     'tricep pushdown': 'Triceps Pushdown',
+    'overhead cable triceps extension': 'Cable Rope Overhead Triceps Extension',
     'dumbbell alternate bicep curl': 'Dumbbell Alternate Bicep Curl',
     'dumbbell alternating bicep curl': 'Dumbbell Alternate Bicep Curl',
     'dumbbell bicep curl': 'Dumbbell Alternate Bicep Curl',
     'dumbbell biceps curl': 'Dumbbell Alternate Bicep Curl',
     'bicep curl': 'Dumbbell Alternate Bicep Curl',
     'biceps curl': 'Dumbbell Alternate Bicep Curl',
+    'bicep cable curl': 'Standing Biceps Cable Curl',
+    'biceps cable curl': 'Standing Biceps Cable Curl',
+    'cable bicep curl': 'Standing Biceps Cable Curl',
+    'cable biceps curl': 'Standing Biceps Cable Curl',
+    'standing cable curl': 'Standing Biceps Cable Curl',
+    'standing bicep cable curl': 'Standing Biceps Cable Curl',
+    'standing biceps cable curl': 'Standing Biceps Cable Curl',
+    'high cable curl': 'High Cable Curls',
+    'high cable curls': 'High Cable Curls',
+    'dumbbell wrist curl': 'Palms-Up Dumbbell Wrist Curl Over A Bench',
+
+    // Calves
+    'standing calf raise': 'Rocking Standing Calf Raise',
+    'seated dumbbell calf raise': 'Seated Calf Raise',
 
     // Cardio
     'treadmill': 'Treadmill',
@@ -818,6 +854,10 @@ export const canonicalizeExercise = (ex) => {
     name = 'Triceps Pushdown';
   } else if (locName === 'dumbbell biceps curl' || locName === 'dumbbell bicep curl' || locName === 'biceps curl' || locName === 'bicep curl' || locName === 'dumbbell alternate bicep curl' || locName === 'dumbbell alternating bicep curl') {
     name = 'Dumbbell Alternate Bicep Curl';
+  } else if (locName === 'dumbbell walking lunge' || locName === 'walking lunge') {
+    name = 'Dumbbell Walking Lunges';
+  } else if (locName === 'biceps cable curl' || locName === 'bicep cable curl' || locName === 'cable bicep curl' || locName === 'cable biceps curl' || locName === 'standing cable curl' || locName === 'standing bicep cable curl' || locName === 'standing biceps cable curl') {
+    name = 'Standing Biceps Cable Curl';
   } else if (masterMatch && masterMatch.name && masterMatch.id === (ex.originalId || ex.id)) {
     name = masterMatch.name;
   }
@@ -905,7 +945,7 @@ export const defaultPrograms = [
         "defaultWeight": 10,
         "equipment": "Cable",
         "ytVideo": "https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA",
-        "videoUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.mp4 /exercise-assets/youtube-backup/edb-Cable_Seated_Lateral_Raise.mp4"
+        "videoUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.mp4"
       },
       {
         "id": 105,
@@ -993,7 +1033,7 @@ export const defaultPrograms = [
       },
       {
         "id": 110,
-        "name": "Barbell Walking Lunge",
+        "name": "Dumbbell Walking Lunges",
         "sets": 3,
         "reps": 12,
         "target": [
@@ -1004,8 +1044,8 @@ export const defaultPrograms = [
         "type": "weight",
         "defaultWeight": 5,
         "equipment": "Dumbbell",
-        "ytVideo": "https://youtu.be/mJilHWIBWO8?si=2NCYOofB0EUrY22X",
-        "videoUrl": "/exercise-assets/youtube-backup/edb-Barbell_Walking_Lunge.mp4"
+        "ytVideo": "",
+        "videoUrl": ""
       },
       {
         "id": 111,
@@ -1017,7 +1057,7 @@ export const defaultPrograms = [
         ],
         "type": "weight",
         "defaultWeight": 10,
-        "equipment": "Machine",
+        "equipment": "Barbell",
         "ytVideo": "https://youtu.be/wdOkFomQNp8?si=PWlxiKYPBMlfLoek",
         "videoUrl": "/exercise-assets/youtube-backup/edb-Rocking_Standing_Calf_Raise.mp4"
       },
@@ -1138,7 +1178,7 @@ export const defaultPrograms = [
       },
       {
         "id": 118,
-        "name": "High Cable Curls",
+        "name": "Standing Biceps Cable Curl",
         "sets": 3,
         "reps": 12,
         "target": [
@@ -1230,7 +1270,7 @@ export const defaultPrograms = [
         ],
         "type": "weight",
         "defaultWeight": 30,
-        "equipment": "Dumbbell",
+        "equipment": "Machine",
         "ytVideo": "https://youtu.be/ar8nav0jGoE?si=owieb0xbPHFg7zMA",
         "videoUrl": "/exercise-assets/youtube-backup/edb-Seated_Calf_Raise.mp4"
       },
@@ -1391,13 +1431,13 @@ export const exerciseAliasMap = {
   '101': 'edb-Smith_Machine_Incline_Bench_Press',
   '102': 'edb-Seated_Cable_Rows',
   '103': 'edb-Dumbbell_Bench_Press',
-  '104': 'edb-Cable_Seated_Lateral_Raise',
+  '104': 'edb-Standing_Cable_Lateral_Raise',
   '105': 'edb-Triceps_Pushdown',
   '106': 'edb-Dumbbell_Alternate_Bicep_Curl',
   '107': 'edb-107',
   '108': 'edb-Smith_Machine_Squat',
   '109': 'edb-Romanian_Deadlift',
-  '110': 'edb-Barbell_Walking_Lunge',
+  '110': 'edb-Dumbbell_Lunges',
   '111': 'edb-Rocking_Standing_Calf_Raise',
   '112': 'edb-Cable_Crunch',
   '113': 'edb-Wide-Grip_Lat_Pulldown',
@@ -1405,15 +1445,15 @@ export const exerciseAliasMap = {
   '115': 'edb-Smith_Machine_Bench_Press',
   '116': 'edb-Cable_Rear_Delt_Fly',
   '117': 'edb-Cable_Rope_Overhead_Triceps_Extension',
-  '118': 'edb-High_Cable_Curls',
+  '118': 'edb-Standing_Biceps_Cable_Curl',
   '119': 'edb-Split_Squat_with_Dumbbells',
-  '120': 'edb-120',
+  '120': 'edb-Smith_Machine_Stiff-Legged_Deadlift',
   '121': 'edb-Cable_Hip_Abduction',
   '122': 'edb-Seated_Calf_Raise',
   '123': 'edb-Plank',
   '124': 'edb-Dumbbell_Shrug',
   '125': 'edb-Palms-Up_Dumbbell_Wrist_Curl_Over_A_Bench',
-  '126': 'edb-Treadmill',
+  '126': 'edb-126',
   '127': 'edb-127',
   '128': 'edb-128',
   '129': 'edb-129',
@@ -1424,11 +1464,11 @@ export const exerciseAliasMap = {
   '134': 'edb-Goblet_Squat',
   '135': 'edb-Barbell_Bench_Press_-_Medium_Grip',
   '136': 'edb-136',
-  '137': 'edb-Jogging_Running',
+  '137': 'edb-137',
   '138': 'edb-138',
   '139': 'edb-139',
   '140': 'edb-Pull_Through',
-  '141': 'edb-Trail_Running',
+  '141': 'edb-Trail_Running_Walking',
   '142': 'edb-Barbell_Incline_Bench_Press_-_Medium_Grip'
 };
 

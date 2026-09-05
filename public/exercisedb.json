@@ -2448,9 +2448,7 @@
     "defaultWeight": 5,
     "level": "intermediate",
     "type": "weight",
-    "aliases": [
-      "Dumbbell Walking Lunges"
-    ]
+    "aliases": []
   },
   {
     "exerciseId": "Battling_Ropes",
@@ -8542,6 +8540,10 @@
       "Langkahkan kaki kanan ke depan sekitar 60 cm, turunkan tubuh sambil menjaga torso tetap tegak dan seimbang. Tarik napas saat turun. Pastikan lutut tidak melebihi jari kaki dan tulang kering depan tetap tegak lurus dengan lantai.",
       "Dorong tubuh kembali ke posisi awal menggunakan tumit kaki depan sambil membuang napas.",
       "Ulangi gerakan sesuai repetisi yang ditentukan, lalu lakukan dengan kaki kiri."
+    ],
+    "aliases": [
+      "Dumbbell Walking Lunges",
+      "Walking Lunges"
     ]
   },
   {
@@ -26220,6 +26222,7 @@
     ],
     "videoUrl": "/exercise-assets/edb-Smith_Machine_Stiff-Legged_Deadlift.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Romanian_Deadlift.mp4",
     "aliases": [
+      "SM Romanian Deadlift (RDL)",
       "Smith Machine Stiff-Legged Deadlift",
       "Smith Machine Stiff Leg RDL",
       "SM Romanian Deadlift",
@@ -27518,10 +27521,10 @@
     ],
     "secondaryMuscles": [],
     "instructions": [
-      "Berdirilah tegak sambil memegang stbar cable curl yang terhubung ke katrol bawah. Ganti pegangan selebar bahu dan jaga siku tetap dekat dengan tubuh. Telapak tangan menghadap ke atas (supinasi). Ini adalah posisi awal Anda.",
-      "Jaga lengan atas tetap diam, angkat beban sambil mengontraksikan bisep dan embuskan napas. Hanya lengan bawah yang bergerak. Lanjutkan gerakan hingga bisep berkontraksi penuh dan bar berada di depan dada atau tingkat bahu. Tahan posisi kontraksi sejenak sambil meremas otot.",
-      "Perlahan kembalikan bar ke posisi awal sambil menarik napas.",
-      "Ulangi sesuai jumlah repetisi yang dianjurkan."
+      "Berdirilah tegak sambil memegang stang bar cable curl yang terhubung ke katrol bawah. Genggam pegangan selebar bahu dan jaga siku tetap dekat dengan tubuh. Telapak tangan menghadap ke atas (supinasi). Ini adalah posisi awal Anda.",
+      "Jaga lengan atas tetap diam dan bahu tetap rileks (jangan mengangkat bahu/traps). Angkat beban sambil mengontraksikan otot bisep dan embuskan napas. Hanya lengan bawah yang bergerak hingga bar berada setinggi dada atau bahu. Tahan posisi puncak kontraksi sejenak sambil meremas otot bisep.",
+      "Perlahan turunkan kembali bar ke posisi awal secara terkontrol sambil menarik napas.",
+      "Ulangi sesuai dengan jumlah repetisi yang direkomendasikan."
     ],
     "instructions_en": [
       "Stand up with your torso upright while holding a cable curl bar that is attached to a low pulley. Grab the cable bar at shoulder width and keep the elbows close to the torso. The palm of your hands should be facing up (supinated grip). This will be your starting position.",
@@ -27530,11 +27533,20 @@
       "Repeat for the recommended amount of repetitions."
     ],
     "instructions_id": [
-      "Berdirilah tegak sambil memegang stbar cable curl yang terhubung ke katrol bawah. Ganti pegangan selebar bahu dan jaga siku tetap dekat dengan tubuh. Telapak tangan menghadap ke atas (supinasi). Ini adalah posisi awal Anda.",
-      "Jaga lengan atas tetap diam, angkat beban sambil mengontraksikan bisep dan embuskan napas. Hanya lengan bawah yang bergerak. Lanjutkan gerakan hingga bisep berkontraksi penuh dan bar berada di depan dada atau tingkat bahu. Tahan posisi kontraksi sejenak sambil meremas otot.",
-      "Perlahan kembalikan bar ke posisi awal sambil menarik napas.",
-      "Ulangi sesuai jumlah repetisi yang dianjurkan."
-    ]
+      "Berdirilah tegak sambil memegang stang bar cable curl yang terhubung ke katrol bawah. Genggam pegangan selebar bahu dan jaga siku tetap dekat dengan tubuh. Telapak tangan menghadap ke atas (supinasi). Ini adalah posisi awal Anda.",
+      "Jaga lengan atas tetap diam dan bahu tetap rileks (jangan mengangkat bahu/traps). Angkat beban sambil mengontraksikan otot bisep dan embuskan napas. Hanya lengan bawah yang bergerak hingga bar berada setinggi dada atau bahu. Tahan posisi puncak kontraksi sejenak sambil meremas otot bisep.",
+      "Perlahan turunkan kembali bar ke posisi awal secara terkontrol sambil menarik napas.",
+      "Ulangi sesuai dengan jumlah repetisi yang direkomendasikan."
+    ],
+    "videoUrl": "/exercise-assets/youtube-backup/edb-High_Cable_Curls.mp4",
+    "ytVideo": "https://youtu.be/CrbTqNOlFgE?si=xKanrhppuvUAudTj",
+    "aliases": [
+      "Biceps Cable Curl",
+      "Cable Bicep Curl",
+      "Cable Biceps Curl",
+      "Standing Cable Curl"
+    ],
+    "defaultWeight": 30
   },
   {
     "exerciseId": "Standing_Biceps_Stretch",
@@ -32188,39 +32200,6 @@
     "source": "logym_master"
   },
   {
-    "exerciseId": "120",
-    "name": "SM Romanian Deadlift (RDL)",
-    "targetMuscles": [
-      "Hams",
-      "Glutes"
-    ],
-    "bodyParts": [
-      "waist"
-    ],
-    "equipments": [
-      "Smith Machine"
-    ],
-    "secondaryMuscles": [],
-    "instructions": [
-      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
-    ],
-    "instructions_id": [
-      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
-    ],
-    "instructions_en": [
-      "Perform the movement with proper form and comfortable intensity."
-    ],
-    "videoUrl": "/exercise-assets/youtube-backup/edb-Smith_Machine_Romanian_Deadlift.mp4",
-    "ytVideo": "https://youtu.be/xWnlfJaQZ3k?si=z0FRk3rh4UO7JdUC",
-    "gifUrl": "",
-    "thumbnailUrl": "",
-    "level": "beginner",
-    "type": "weight",
-    "defaultWeight": 20,
-    "duration": 0,
-    "source": "logym_master"
-  },
-  {
     "exerciseId": "126",
     "name": "Treadmill Running",
     "targetMuscles": [
@@ -32616,7 +32595,7 @@
       "Turunkan kabel secara perlahan dan terkontrol kembali ke posisi awal sambil menarik napas.",
       "Ulangi sebanyak repetisi yang ditentukan, lalu lakukan hal yang sama pada sisi lengan lainnya."
     ],
-    "videoUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.mp4 /exercise-assets/youtube-backup/edb-Cable_Seated_Lateral_Raise.mp4",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.mp4",
     "ytVideo": "https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA",
     "defaultWeight": 10,
     "level": "beginner",

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Play, Pause, ChevronRight, ChevronLeft, Dumbbell, Check, Info, Clock, Minimize2, SkipForward, ClipboardEdit, Brain, Flame, Activity, ArrowLeftRight, Square } from 'lucide-react';
+import { X, Play, Pause, ChevronRight, ChevronLeft, Dumbbell, Check, Info, Clock, Minimize2, SkipForward, ClipboardEdit, Brain, Flame, Activity, ArrowLeftRight, Square, Zap } from 'lucide-react';
 import ScrollPicker from './ScrollPicker';
 import { exerciseTypeLabels, defaultMasterExercises, findMatchingMasterExercise, canonicalizeExercise } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
@@ -234,6 +234,14 @@ const ImmersiveWorkout = ({
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const isSavingRef = React.useRef(false);
+
+  useEffect(() => {
+    if (showHint) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = prev; };
+    }
+  }, [showHint]);
 
   // Rest Timer will be handled globally in App.jsx but we can display it here if passed as prop
 
@@ -707,7 +715,7 @@ const ImmersiveWorkout = ({
 
   const handleCardioChange = (field, val) => {
       if (!ex) return;
-      onSetChange(ex.id, activeSetIdx, field, val);
+      onSetChange(ex.id, activeSetIdx, field, val, ex);
       const s = getLogsForEx(ex)[activeSetIdx] || {};
       let dist = field === 'distance' ? Number(val || 0) : Number(s.distance || 0);
       let dur = field === 'duration' ? Number(val || 0) : Number(s.duration || 0);
@@ -963,8 +971,8 @@ const ImmersiveWorkout = ({
                 <Brain size={24} className="animate-pulse" />
               </button>
               {showHint && createPortal(
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                  <div className="absolute inset-0 bg-black/70 backdrop-blur-md animate-in fade-in" onClick={() => setShowHint(false)} />
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 overscroll-contain touch-none">
+                  <div className="absolute inset-0 bg-black/70 backdrop-blur-md animate-in fade-in" data-close-modal="true" onClick={() => setShowHint(false)} />
                   <div 
                     className="relative w-full max-w-[340px] mt-28 animate-in fade-in zoom-in-95 duration-300 pointer-events-auto text-center"
                     onClick={e => e.stopPropagation()}
@@ -992,20 +1000,39 @@ const ImmersiveWorkout = ({
                           <div className="relative z-20 w-full pt-32 pb-6 px-6 flex flex-col items-center">
                             {hint ? (
                               <>
-                                <h3 className={`font-black ${hint.isNewRecord ? 'text-xl text-sky-400 drop-shadow-[0_0_12px_rgba(56,189,248,0.8)] animate-pulse' : 'text-lg text-white'} tracking-wider uppercase mb-3 drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]`}>
-                                  {hint.title}
+                                <h3 className={`font-black ${hint.isNewRecord ? 'text-lg sm:text-xl text-sky-400 drop-shadow-[0_0_12px_rgba(56,189,248,0.8)] animate-pulse' : 'text-base sm:text-lg text-white'} tracking-wider uppercase mb-2.5 drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]`}>
+                                  {hint.title || "TARGET HARI INI"}
                                 </h3>
-                                <p className="text-zinc-100 text-sm font-semibold whitespace-pre-wrap leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
-                                  {hint.text}
+
+                                {/* Benchmark Chip */}
+                                {hint.benchmark && (
+                                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-xs font-semibold text-zinc-200 mb-2.5 backdrop-blur-sm shadow-sm">
+                                    {hint.benchmarkLabel && <span className="text-zinc-400 text-[11px] font-medium">{hint.benchmarkLabel}:</span>}
+                                    <span className="text-white font-black">{hint.benchmark}</span>
+                                  </div>
+                                )}
+
+                                {/* Mission / Advice text */}
+                                <p className="text-zinc-200 text-xs sm:text-sm font-medium leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)] max-w-[280px]">
+                                  {hint.message || hint.text}
                                 </p>
+
+                                {/* Logym Blue 10RM Pill Badge */}
+                                {hint.rm10 && (
+                                  <div className="mt-3.5 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-sky-500/15 border border-sky-400/40 text-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.25)] backdrop-blur-sm">
+                                    <Zap size={13} className="text-sky-400 fill-sky-400/40" />
+                                    <span className="text-[10px] font-bold tracking-wider uppercase text-sky-300/80">10RM Acuan</span>
+                                    <span className="text-xs font-black text-white">{hint.rm10}</span>
+                                  </div>
+                                )}
                               </>
                             ) : (
                               <>
-                                <h3 className="font-black text-lg text-white tracking-wider uppercase mb-3 drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]">
+                                <h3 className="font-black text-base sm:text-lg text-white tracking-wider uppercase mb-2.5 drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]">
                                   TARGET HARI INI
                                 </h3>
-                                <p className="text-zinc-100 text-sm font-semibold whitespace-pre-wrap leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
-                                  Belum ada rekor 10RM.{"\n\n"}Gunakan beban yang menantang tapi sanggup diangkat 10x dengan benar (RPE 8).
+                                <p className="text-zinc-200 text-xs sm:text-sm font-medium leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)] max-w-[280px]">
+                                  Belum ada rekor 10RM. Gunakan beban yang menantang tapi sanggup diangkat 10 repetisi dengan form sempurna (RPE 8).
                                 </p>
                               </>
                             )}
@@ -1095,7 +1122,7 @@ const ImmersiveWorkout = ({
                           </div>
                           <ScrollPicker 
                             value={isImp ? Math.round(Number(itemSet?.w || 0) * 2.20462 * 10)/10 : (itemSet?.w || 0)} 
-                            onChange={(val) => onSetChange(ex.id, activeSetIdx, 'w', isImp ? Number((val / 2.20462).toFixed(2)) : val)}
+                            onChange={(val) => onSetChange(ex.id, activeSetIdx, 'w', isImp ? Number((val / 2.20462).toFixed(2)) : val, ex)}
                             min={0} max={isImp ? 440 : 200} step={eqConf.increment || (isImp ? 5 : 2.5)} width="w-full" theme={theme} t={t}
                           />
                           {hasWeightDiff && (
@@ -1191,7 +1218,7 @@ const ImmersiveWorkout = ({
                       ) : (
                          <ScrollPicker 
                            value={itemSet?.d === undefined ? 0 : itemSet.d} 
-                           onChange={(val) => onSetChange(ex.id, activeSetIdx, 'd', val)}
+                           onChange={(val) => onSetChange(ex.id, activeSetIdx, 'd', val, ex)}
                            min={0} max={300} step={5} width="w-full" theme={theme} t={t}
                          />
                       )}
@@ -1209,7 +1236,7 @@ const ImmersiveWorkout = ({
                           </div>
                           <ScrollPicker 
                             value={itemSet?.r || 10} 
-                            onChange={(val) => onSetChange(ex.id, activeSetIdx, 'r', val)}
+                            onChange={(val) => onSetChange(ex.id, activeSetIdx, 'r', val, ex)}
                             min={1} max={50} step={1} width="w-full" theme={theme} t={t}
                           />
                           {hasWeightDiff && <div className="h-5 mt-1"></div>}

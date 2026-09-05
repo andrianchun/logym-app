@@ -110,9 +110,9 @@ const matchTrail = findMatchingMasterExercise({ name: 'Trail Running' }, default
 assert.equal(matchTrail.name, 'Trail Running');
 assert.equal(matchTrail.id, 141);
 
-// 11. Proteksi Alat & Variasi: Cable Bicep Curl TIDAK boleh tertukar ke Dumbbell Bicep Curl
-assert.equal(canonicalizeExercise({ name: 'Cable Bicep Curl' }).name, 'Cable Bicep Curl');
-assert.equal(findMatchingMasterExercise({ name: 'Cable Bicep Curl' }, defaultMasterExercises), null);
+// 11. Proteksi Alat & Variasi: Cable Bicep Curl TIDAK boleh tertukar ke Dumbbell Bicep Curl (harus Standing Biceps Cable Curl ID 118)
+assert.equal(canonicalizeExercise({ name: 'Cable Bicep Curl' }).name, 'Standing Biceps Cable Curl');
+assert.equal(findMatchingMasterExercise({ name: 'Cable Bicep Curl' }, defaultMasterExercises)?.id, 118);
 
 // 12. Proteksi Triceps: Cable Rope Overhead Triceps Extension (ID 117) TIDAK boleh tertukar ke Triceps Pushdown (ID 105)
 const matchOverhead = findMatchingMasterExercise({ name: 'Cable Rope Overhead Triceps Extension' }, defaultMasterExercises);
@@ -141,5 +141,44 @@ const matchBarbellIncline = findMatchingMasterExercise({ name: 'Barbell Incline 
 assert.ok(matchBarbellIncline, 'Harus menemukan Barbell Incline Bench Press ID 142');
 assert.equal(matchBarbellIncline.id, 142);
 assert.notEqual(matchBarbellIncline.id, 135, 'Barbell Incline TIDAK boleh tertukar dengan Flat Barbell Bench Press (ID 135)');
+
+// 16. Dumbbell Walking Lunges (ID 110)
+const matchDumbbellLunge = findMatchingMasterExercise({ name: 'Dumbbell Walking Lunges' }, defaultMasterExercises);
+assert.ok(matchDumbbellLunge, 'Harus menemukan ID 110');
+assert.equal(matchDumbbellLunge.id, 110);
+assert.equal(matchDumbbellLunge.name, 'Dumbbell Walking Lunges');
+assert.equal(matchDumbbellLunge.equipment, 'Dumbbell');
+assert.equal(matchDumbbellLunge.videoUrl, '');
+assert.ok(matchDumbbellLunge.thumbnailUrl.includes('Dumbbell_Lunges'));
+
+assert.equal(canonicalizeExercise({ name: 'Dumbbell Walking Lunges' }).name, 'Dumbbell Walking Lunges');
+assert.equal(canonicalizeExercise({ name: 'Walking Lunges' }).name, 'Dumbbell Walking Lunges');
+
+// 17. Standing Cable Lateral Raise (ID 104)
+const matchStandingCable = findMatchingMasterExercise({ name: 'Standing Cable Lateral Raise' }, defaultMasterExercises);
+assert.ok(matchStandingCable, 'Harus menemukan ID 104');
+assert.equal(matchStandingCable.id, 104);
+assert.equal(matchStandingCable.videoUrl, '/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.mp4');
+
+// 18. Legacy 11 names in defaultMasterExercises
+const legacyTestCases = [
+  ['Incline Smith Machine Press', 101],
+  ['Cable Seated Row', 102],
+  ['Standing Calf Raise', 111],
+  ['SM Flat Bench Press', 115],
+  ['Overhead Cable Triceps Extension', 117],
+  ['Biceps Cable Curl', 118],
+  ['DB Bulgarian Split Squat', 119],
+  ['Seated Dumbbell Calf Raise', 122],
+  ['Dumbbell Wrist Curl', 125],
+  ['Dumbbell Goblet Squat', 134],
+  ['Dumbbell Walking Lunges', 110],
+];
+
+for (const [legacyName, expectedId] of legacyTestCases) {
+  const match = findMatchingMasterExercise({ name: legacyName }, defaultMasterExercises);
+  assert.ok(match, `Legacy exercise "${legacyName}" harus cocok`);
+  assert.equal(match.id, expectedId, `Legacy exercise "${legacyName}" harus cocok dengan ID ${expectedId}`);
+}
 
 console.log('exerciseMatching OK');

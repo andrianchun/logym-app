@@ -630,19 +630,27 @@ const WorkoutTab = ({
 
       if (isNewRecord) {
         return {
-          title: "REKOR BARU DIPECAHKAN!",
-          text: `Mantap! Kamu baru saja buat rekor 10RM baru: ${currentMax10RM} ${uStr} (${currentMaxWeight} ${uStr} x ${currentMaxReps} Reps)!\n\nLanjutkan kerja kerasnya!`,
+          title: "Rekor Baru!",
+          benchmarkLabel: "Set Terbaik",
+          benchmark: `${currentMaxWeight} ${uStr} × ${currentMaxReps} reps`,
+          message: `Luar biasa! Kamu berhasil memecahkan rekor 10RM baru. Terus pertahankan progres luar biasa ini!`,
+          rm10: `${currentMax10RM} ${uStr}`,
           mode: 'praise',
-          isNewRecord: true
+          isNewRecord: true,
+          text: `Mantap! Kamu baru saja buat rekor 10RM baru: ${currentMax10RM} ${uStr} (${currentMaxWeight} ${uStr} x ${currentMaxReps} Reps)!\n\nLanjutkan kerja kerasnya!`
         };
       }
 
       if (isFirstRecord) {
         return {
-          title: "🎯 10RM PERTAMA TERCATAT!",
-          text: `Keren! 10RM acuan pertamamu berhasil tercatat: ${currentMax10RM} ${uStr} (${currentMaxWeight} ${uStr} x ${currentMaxReps} Reps).\n\nAngka ini otomatis menjadi target acuan progresifmu untuk sesi latihan berikutnya!`,
+          title: "10RM Pertama Tercatat",
+          benchmarkLabel: "Set Acuan",
+          benchmark: `${currentMaxWeight} ${uStr} × ${currentMaxReps} reps`,
+          message: `Keren! 10RM acuan pertamamu berhasil tercatat. Angka ini otomatis menjadi target acuan progresifmu untuk sesi latihan berikutnya.`,
+          rm10: `${currentMax10RM} ${uStr}`,
           mode: 'praise',
-          isNewRecord: true
+          isNewRecord: true,
+          text: `Keren! 10RM acuan pertamamu berhasil tercatat: ${currentMax10RM} ${uStr} (${currentMaxWeight} ${uStr} x ${currentMaxReps} Reps).\n\nAngka ini otomatis menjadi target acuan progresifmu untuk sesi latihan berikutnya!`
         };
       }
       
@@ -652,10 +660,14 @@ const WorkoutTab = ({
       if (isDeload && hasLastSession) {
         const deloadWeight = Math.max(0, Math.round(lastSessionWeight * 0.825 * 2) / 2);
         return {
-          title: "🛡️ MODE DELOAD (PEMULIHAN AKTIF)",
-          text: `Target beban dipangkas ~17.5% untuk pemulihan sendi & sistem saraf:\n(${deloadWeight} ${uStr} x ${lastSessionReps} Reps)\n\nFokus pada kontrol gerakan dan tempo yang sempurna. Jangan memaksakan beban berat!`,
+          title: "Mode Deload",
+          benchmarkLabel: "Target Deload (~82.5%)",
+          benchmark: `${deloadWeight} ${uStr} × ${lastSessionReps} reps`,
+          message: `Beban dipangkas untuk pemulihan sendi dan sistem saraf. Fokus pada kontrol tempo dan kesempurnaan form gerakan, jangan memaksakan beban berat.`,
+          rm10: true10RM > 0 ? `${true10RM} ${uStr}` : null,
           mode: 'push',
-          isDeload: true
+          isDeload: true,
+          text: `Target beban dipangkas ~17.5% untuk pemulihan sendi & sistem saraf:\n(${deloadWeight} ${uStr} x ${lastSessionReps} Reps)\n\nFokus pada kontrol gerakan dan tempo yang sempurna. Jangan memaksakan beban berat!`
         };
       }
 
@@ -670,50 +682,62 @@ const WorkoutTab = ({
         const exp = userProfile?.experience || 'beginner';
         
         if (goal === 'fat_loss') {
-           missionText = `Beban sesi minggu lalu:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nJika sedang defisit kalori, jaga massa otot. Usahakan angkat beban yang sama, jangan paksakan naik jika tidak fit.`;
+           missionText = `Saat defisit kalori, prioritaskan menjaga massa otot. Angkat beban yang sama dengan form solid, jangan memaksakan jika tubuh kurang fit.`;
         } else if (goal === 'strength') {
            if (reachedTarget) {
-             missionText = `Kekuatan optimal di sesi sebelumnya:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nTarget hari ini: NAIK BEBAN! Ayo, semangat!`;
+             missionText = `Target kekuatan tercapai! Saatnya naik beban hari ini. Tetap jaga stabilitas form.`;
            } else {
-             missionText = `Beban sesi minggu lalu:\n${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps\n\nFokus pada kekuatan! Usahakan NAIK BEBAN hari ini, tidak apa jika reps sedikit turun.`;
+             missionText = `Fokus pada adaptasi kekuatan. Coba naikkan beban hari ini, repetisi boleh sedikit turun.`;
            }
         } else if (goal === 'general') {
            if (reachedTarget) {
-             missionText = `Stamina bagus di sesi sebelumnya:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nKamu boleh coba naikkan beban pelan-pelan (+${step} ${uStr}) kalau merasa sanggup.`;
+             missionText = `Stamina sangat bagus di sesi sebelumnya! Kamu bisa coba naikkan beban bertahap (+${step} ${uStr}) jika merasa fit.`;
            } else {
-             missionText = `Beban sesi minggu lalu:\n${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps\n\nJika ini sudah nyaman, ulangi beban ini. Nikmati prosesnya!`;
+             missionText = `Ulangi beban ini dengan ritme yang stabil dan nyaman. Nikmati prosesnya!`;
            }
         } else {
            // muscle_gain / Default
            if (reachedTarget) {
              if (exp === 'beginner') {
-               missionText = `Target reps sesi sebelumnya tercapai:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nSebagai pemula, ototmu gampang berkembang, sikat NAIK BEBAN (+${step} ${uStr}) hari ini!`;
+               missionText = `Target repetisi tembus! Fase perkembangan otot pemula sangat cepat, saatnya naik beban (+${step} ${uStr}) hari ini.`;
              } else if (exp === 'advanced') {
-               missionText = `Target reps sesi sebelumnya tercapai:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nCoba microload (+${microStep} ${uStr}) atau perbaiki tempo hari ini sebelum benar-benar lompat beban.`;
+               missionText = `Target repetisi tercapai! Coba microload (+${microStep} ${uStr}) atau perlambat tempo eksentrik sebelum melompat beban.`;
              } else {
-               missionText = `Sesi sebelumnya kamu berhasil menembus target:\n(${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\nSaatnya NAIK BEBAN (+${step} ${uStr}) hari ini, reps boleh turun sedikit.`;
+               missionText = `Target repetisi tembus! Saatnya naik beban (+${step} ${uStr}) hari ini, repetisi boleh sedikit turun.`;
              }
            } else {
-             missionText = `Beban sesi minggu lalu:\n${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps (Target: ${targetReps} Reps)\n\nHari ini fokus TAMBAH REPETISI dengan beban yang sama, sampai tembus target!`;
+             missionText = `Fokus tambah repetisi dengan beban yang sama sampai menembus target ${targetReps} reps!`;
            }
         }
         
         return {
-          title: "TARGET HARI INI",
-          text: `${missionText}\n\n10RM acuan: ${true10RM} ${uStr}`,
-          mode: 'push'
+          title: "Target Hari Ini",
+          benchmarkLabel: "Sesi Terakhir",
+          benchmark: `${lastSessionWeight} ${uStr} × ${lastSessionReps} reps`,
+          message: missionText,
+          rm10: true10RM > 0 ? `${true10RM} ${uStr}` : null,
+          mode: 'push',
+          text: `Sesi Terakhir: ${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps\n\n${missionText}\n\n10RM acuan: ${true10RM} ${uStr}`
         };
       } else if (currentMax10RM > 0) {
         return {
-          title: "TARGET HARI INI",
-          text: `Beban terbaik sesi ini:\n${currentMaxWeight} ${uStr} x ${currentMaxReps} Reps\n\n10RM acuan saat ini: ${currentMax10RM} ${uStr}.\nFokus tuntaskan sisa set dengan form dan kontrol yang rapi!`,
-          mode: 'push'
+          title: "Target Hari Ini",
+          benchmarkLabel: "Set Terbaik Sesi Ini",
+          benchmark: `${currentMaxWeight} ${uStr} × ${currentMaxReps} reps`,
+          message: `Fokus tuntaskan sisa set dengan form dan kontrol gerakan yang rapi!`,
+          rm10: `${currentMax10RM} ${uStr}`,
+          mode: 'push',
+          text: `Beban terbaik sesi ini:\n${currentMaxWeight} ${uStr} x ${currentMaxReps} Reps\n\n10RM acuan saat ini: ${currentMax10RM} ${uStr}.\nFokus tuntaskan sisa set dengan form dan kontrol yang rapi!`
         };
       } else {
         return {
-          title: "TARGET HARI INI",
-          text: `Atur beban yang cukup menantang untuk diangkat 10 repetisi dengan form benar (RPE 8).\n\n10RM acuan: ${true10RM > 0 ? true10RM + ' ' + uStr : '-'}`,
-          mode: 'push'
+          title: "Target Hari Ini",
+          benchmarkLabel: null,
+          benchmark: null,
+          message: `Atur beban yang cukup menantang untuk diangkat 10 repetisi dengan form sempurna (RPE 8).`,
+          rm10: true10RM > 0 ? `${true10RM} ${uStr}` : null,
+          mode: 'push',
+          text: `Atur beban yang cukup menantang untuk diangkat 10 repetisi dengan form benar (RPE 8).\n\n10RM acuan: ${true10RM > 0 ? true10RM + ' ' + uStr : '-'}`
         };
       }
     };
@@ -1116,10 +1140,10 @@ const WorkoutTab = ({
                                 onStartWorkout={() => handleStartWorkout(prog.workoutId || prog.id)}
                                 onUpdateSet={(exId, setIdx, field, val) => {
                                   if (requestSessionSwitch(prog.workoutId, () => {
-                                    onSetChange(exId, setIdx, field, val);
+                                    onSetChange(exId, setIdx, field, val, ex);
                                   })) return;
                                   setSessionToRun(prog.workoutId);
-                                  onSetChange(exId, setIdx, field, val);
+                                  onSetChange(exId, setIdx, field, val, ex);
                                 }} 
                                 onToggleSet={(exId, setIdx) => {
                                   if (requestSessionSwitch(prog.workoutId, () => {
@@ -1128,7 +1152,7 @@ const WorkoutTab = ({
                                     if (ex.supersetId) {
                                       siblingIds = prog.exercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
                                     }
-                                    onToggleSet(exId, setIdx, siblingIds);
+                                    onToggleSet(exId, setIdx, siblingIds, ex);
                                     advanceIfExerciseFinished(prog.workoutId, exId, setIdx);
                                   })) return;
                                   setActiveExerciseId(exId);
@@ -1137,13 +1161,7 @@ const WorkoutTab = ({
                                   if (ex.supersetId) {
                                     siblingIds = prog.exercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
                                   }
-                                  onToggleSet(exId, setIdx, siblingIds);
-                                  // Set terakhir selesai -> maju ke latihan berikutnya. Kartu program
-                                  // dulu tidak melakukan ini sama sekali (cuma latihan ekstra yang
-                                  // punya), jadi user harus mencari sendiri latihan selanjutnya.
-                                  // scrollToFirstIncompleteExercise dengan ignoreExId sengaja TIDAK
-                                  // punya fallback ke atas sesi — kalau ini latihan terakhir, layar
-                                  // diam di tempat, tidak melompat ke atas.
+                                  onToggleSet(exId, setIdx, siblingIds, ex);
                                   advanceIfExerciseFinished(prog.workoutId, exId, setIdx);
                                 }}
                                 onAddSet={(exId) => {
@@ -1244,10 +1262,10 @@ const WorkoutTab = ({
                                 onStartWorkout={() => handleStartWorkout('extra')}
                                 onUpdateSet={(exId, setIdx, field, val) => {
                                   if (requestSessionSwitch('extra', () => {
-                                    onSetChange(exId, setIdx, field, val);
+                                    onSetChange(exId, setIdx, field, val, ex);
                                   })) return;
                                   setSessionToRun('extra');
-                                  onSetChange(exId, setIdx, field, val);
+                                  onSetChange(exId, setIdx, field, val, ex);
                                 }} 
                                 onToggleSet={(exId, setIdx) => {
                                   if (requestSessionSwitch('extra', () => {
@@ -1256,7 +1274,7 @@ const WorkoutTab = ({
                                     if (ex.supersetId) {
                                       siblingIds = extraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
                                     }
-                                    onToggleSet(exId, setIdx, siblingIds);
+                                    onToggleSet(exId, setIdx, siblingIds, ex);
                                     advanceIfExerciseFinished('extra', exId, setIdx);
                                   })) return;
                                   setActiveExerciseId(exId);
@@ -1265,7 +1283,7 @@ const WorkoutTab = ({
                                   if (ex.supersetId) {
                                     siblingIds = extraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
                                   }
-                                  onToggleSet(exId, setIdx, siblingIds);
+                                  onToggleSet(exId, setIdx, siblingIds, ex);
                                   advanceIfExerciseFinished('extra', exId, setIdx);
                                 }}
                               onAddSet={(exId) => {
