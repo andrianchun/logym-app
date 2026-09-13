@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { 
   getEquipmentConfig, 
   calculateActualWeight, 
+  calculateInputWeight,
+  defaultSetWeight,
   getSetActualWeight, 
   estimate10RM, 
   estimate1RM, 
@@ -50,6 +52,35 @@ assert.equal(calculateActualWeight(40, cable2to1Conf), 20);
 
 // Weighted Pull-Up: input 15 kg belt + 75 kg body weight = 90 kg
 assert.equal(calculateActualWeight(15, weightedConf), 90);
+
+// 2b. Test calculateInputWeight (inverse of calculateActualWeight):
+// input_w = (total_w - base_w) / ratio
+// Barbell: 100 kg actual - 20 kg bar = 80 kg plates
+assert.equal(calculateInputWeight(100, barbellConf), 80);
+// Smith: 65 kg actual - 15 kg smith bar = 50 kg plates
+assert.equal(calculateInputWeight(65, smithConf), 50);
+// Leg Press: 165 kg actual - 45 kg sled = 120 kg plates
+assert.equal(calculateInputWeight(165, sledConf), 120);
+// Cable 2:1: 20 kg actual * (1 / 0.5) = 40 kg pin
+assert.equal(calculateInputWeight(20, cable2to1Conf), 40);
+// Dumbbell: 20 kg actual = 20 kg dumbbell
+assert.equal(calculateInputWeight(20, dumbbellConf), 20);
+// Edge case: actual weight less than bar weight returns 0
+assert.equal(calculateInputWeight(15, barbellConf), 0);
+
+// Roundtrip invariant: calculateActualWeight(calculateInputWeight(W)) === W
+assert.equal(calculateActualWeight(calculateInputWeight(100, barbellConf), barbellConf), 100);
+assert.equal(calculateActualWeight(calculateInputWeight(65, smithConf), smithConf), 65);
+assert.equal(calculateActualWeight(calculateInputWeight(20, cable2to1Conf), cable2to1Conf), 20);
+
+// Test defaultSetWeight with eqConf:
+// User has 10RM 50 kg on Smith Machine (bar 10 kg, increment 2.5 kg).
+// Suggested plate input MUST be 40 kg, so actual weight is 50 kg (NO DOUBLE BASE WEIGHT).
+const customSmith = { baseWeight: 10, ratio: 1 };
+const exBench = { reps: 10 };
+const plateInput = defaultSetWeight({ rm10: 50 }, exBench, 2.5, customSmith);
+assert.equal(plateInput, 40, 'Default plate weight must be 40 kg, not 50 kg');
+assert.equal(calculateActualWeight(plateInput, customSmith), 50, 'Actual weight of set must equal original 10RM 50 kg');
 
 // 3. Test getSetActualWeight with legacy vs new structure
 const legacySet = { w: 80, r: 10 };

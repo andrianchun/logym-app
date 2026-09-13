@@ -53,7 +53,7 @@ import { fetchExercisesFromApi } from './utils/exerciseDbApi';
 import { AI_MODELS, detectPlateaus, getLogyNotification } from './utils/aiAgent';
 import { calculateReadiness, restingHrBaseline } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
-import { calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, recomputeStrengthRecords, buildExLookupByName, canonicalExId, sessionSpanSeconds, repairActualWeights, buildHcSessionDetail, estimate10RM, defaultSetWeight, gymStepFor, mergeRm10, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from './utils/workoutCalc';
+import { calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, recomputeStrengthRecords, buildExLookupByName, canonicalExId, sessionSpanSeconds, repairActualWeights, buildHcSessionDetail, estimate10RM, defaultSetWeight, gymStepFor, mergeRm10, getEquipmentConfig, calculateActualWeight, calculateInputWeight, getSetActualWeight } from './utils/workoutCalc';
 import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcReadHeartRateWindow, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission, capIntradayLog, HC_FIELDS, fillOnlyPatch, hcDroppedTypes } from './utils/healthConnect';
 import { bumpExercisePopularity } from './utils/exercisePopularity';
 import { rapikanNamaProgram, rapikanNamaSesi, pertahankanNamaSesi } from './utils/programNaming';
@@ -3019,7 +3019,7 @@ export default function App() {
           title: 'Pindah Sesi Latihan',
           message: 'Kamu sedang memiliki sesi latihan yang aktif berjalan. Selesaikan dan simpan sesi yang berjalan saat ini, atau langsung membuangnya dan berpindah ke sesi baru ini?',
           onConfirm: () => {
-             if (sessionToRunRef.current) handleSaveWorkout(sessionToRunRef.current);
+             if (sessionToRunRef.current) handleSaveWorkout(sessionToRunRef.current, { stayOnWorkoutTab: true });
              setTimeout(doNav, 100);
           },
           confirmText: 'Simpan & Lanjut',
@@ -3230,14 +3230,14 @@ export default function App() {
     // (WorkoutTab, ImmersiveWorkout) sudah punya klausa itu sejak dulu.
     const libMatch = exerciseLibrary.find(e => e.id === ex?.originalId || e.id === ex?.id || e.name?.toLowerCase() === ex?.name?.toLowerCase());
     const step = gymStepFor(gymProfiles, activeGymId, ex?.equipment, units?.weight === 'lbs');
-    let suggestedWeight = defaultSetWeight(libMatch, ex, step);
+    const eqConf = getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile);
+    let suggestedWeight = defaultSetWeight(libMatch, ex, step, eqConf);
     
     const isDeload = history?.[selectedDate]?.wellness === 'deload' || history?.[selectedDate]?.isDeloadWeek;
     if (isDeload && suggestedWeight > 0) {
       suggestedWeight = Math.max(0, Math.round((suggestedWeight * 0.825) / step) * step);
     }
 
-    const eqConf = getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile);
     const total_w = calculateActualWeight(suggestedWeight, eqConf);
 
     return Array.from({length: ex?.sets || 3}).map(() => ({ 
@@ -4030,9 +4030,11 @@ export default function App() {
 
     pendingRmLogKeys.current = Object.keys(cleanLogs);
 
-    localStorage.setItem('logym_calendar_mode', 'weekly');
-    localStorage.setItem('logym_show_monthly_stats', 'true');
-    setActiveTab('calendar');
+    if (!opts.stayOnWorkoutTab && !opts.auto) {
+      localStorage.setItem('logym_calendar_mode', 'weekly');
+      localStorage.setItem('logym_show_monthly_stats', 'true');
+      setActiveTab('calendar');
+    }
   };
 
   // Kuras antrean sesi yang ikut disimpan, SATU per render.
@@ -4126,7 +4128,7 @@ export default function App() {
           title: 'Pindah Sesi Latihan',
           message: 'Kamu sedang memiliki sesi latihan yang aktif berjalan. Selesaikan dan simpan sesi yang berjalan saat ini, atau langsung membuangnya dan berpindah untuk mengedit riwayat latihan ini?',
           onConfirm: () => {
-             if (sessionToRunRef.current) handleSaveWorkout(sessionToRunRef.current);
+             if (sessionToRunRef.current) handleSaveWorkout(sessionToRunRef.current, { stayOnWorkoutTab: true });
              setTimeout(doEdit, 100);
           },
           confirmText: 'Simpan & Lanjut',

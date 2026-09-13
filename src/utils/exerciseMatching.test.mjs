@@ -33,13 +33,16 @@ const matchPullThrough = findMatchingMasterExercise({ name: 'Cable Pull Through'
 assert.ok(matchPullThrough, 'Cable Pull Through harus menemukan master exercise');
 assert.equal(matchPullThrough.name, 'Pull Through');
 assert.equal(matchPullThrough.id, 140);
+assert.ok(matchPullThrough.videoUrl.includes('edb-Pull_Through.mp4'), 'Pull Through harus memiliki videoUrl edb-Pull_Through.mp4');
+assert.ok(matchPullThrough.ytVideo.includes('sFQtAuiVwyo'), 'Pull Through harus memiliki ytVideo sFQtAuiVwyo');
 
-// 3. Cable Hip Abduction (ID 121)
+// 3. Cable Hip Abduction (ID 121) TIDAK boleh menggunakan video Pull Through
 const matchAbduction = findMatchingMasterExercise({ name: 'Cable Hip Abduction' }, defaultMasterExercises);
 assert.ok(matchAbduction, 'Cable Hip Abduction harus menemukan master ID 121');
 assert.equal(matchAbduction.id, 121);
 assert.equal(matchAbduction.name, 'Cable Hip Abduction');
-assert.ok(matchAbduction.ytVideo.includes('sFQtAuiVwyo'));
+assert.equal(matchAbduction.videoUrl, '', 'Cable Hip Abduction tidak boleh memakai videoUrl Pull Through');
+assert.equal(matchAbduction.ytVideo, '', 'Cable Hip Abduction tidak boleh memakai ytVideo Pull Through');
 
 // 3. Flat Dumbbell Bench Press -> Dumbbell Bench Press
 const matchBench = findMatchingMasterExercise({ name: 'Flat Dumbbell Bench Press' }, defaultMasterExercises);
@@ -180,5 +183,48 @@ for (const [legacyName, expectedId] of legacyTestCases) {
   assert.ok(match, `Legacy exercise "${legacyName}" harus cocok`);
   assert.equal(match.id, expectedId, `Legacy exercise "${legacyName}" harus cocok dengan ID ${expectedId}`);
 }
+
+// 19. Integritas Instruksi defaultMasterExercises (Semua 43 item wajib memiliki instruksi ID & EN yang valid)
+assert.equal(defaultMasterExercises.length, 43, 'Harus ada tepat 43 master exercises');
+for (const ex of defaultMasterExercises) {
+  assert.ok(Array.isArray(ex.instructions_id) && ex.instructions_id.length > 0, `Master exercise "${ex.name}" (ID ${ex.id}) wajib memiliki instructions_id`);
+  assert.ok(Array.isArray(ex.instructions_en) && ex.instructions_en.length > 0, `Master exercise "${ex.name}" (ID ${ex.id}) wajib memiliki instructions_en`);
+  assert.ok(Array.isArray(ex.instructions) && ex.instructions.length > 0, `Master exercise "${ex.name}" (ID ${ex.id}) wajib memiliki instructions`);
+  assert.ok(ex.id && ex.name && ex.target && ex.equipment, `Master exercise "${ex.name}" wajib memiliki field inti`);
+}
+
+// 20. Integritas exercisedb.json (887 item wajib memiliki instruksi ID & EN yang valid dan non-placeholder)
+import fs from 'node:fs';
+const edbRaw = fs.readFileSync(new URL('../../public/exercisedb.json', import.meta.url), 'utf-8');
+const edb = JSON.parse(edbRaw);
+assert.equal(edb.length, 887, 'exercisedb.json harus berisi 887 item');
+for (const ex of edb) {
+  assert.ok(Array.isArray(ex.instructions_id) && ex.instructions_id.length > 0, `exercisedb "${ex.name}" (ID ${ex.id}) instructions_id kosong`);
+  assert.ok(Array.isArray(ex.instructions_en) && ex.instructions_en.length > 0, `exercisedb "${ex.name}" (ID ${ex.id}) instructions_en kosong`);
+  assert.ok(Array.isArray(ex.instructions) && ex.instructions.length > 0, `exercisedb "${ex.name}" (ID ${ex.id}) instructions kosong`);
+  // Pastikan tidak ada instruksi dummy tersisa
+  const firstIdLine = ex.instructions_id[0] || '';
+  assert.notEqual(firstIdLine, 'Lakukan gerakan sesuai panduan dan intensitas yang nyaman.', `exercisedb "${ex.name}" (ID ${ex.id}) masih memakai placeholder`);
+}
+
+// 21. Verifikasi spesifik video Cable Hip Abduction vs Pull Through di exercisedb.json
+const edbHipAbduction = edb.find(e => e.id === 'Cable_Hip_Abduction' || e.name === 'Cable Hip Abduction');
+assert.ok(edbHipAbduction, 'Cable Hip Abduction harus ada di exercisedb.json');
+assert.notEqual(edbHipAbduction.videoUrl, '/exercise-assets/youtube-backup/edb-Pull_Through.mp4', 'Cable Hip Abduction tidak boleh memakai video Pull Through');
+assert.notEqual(edbHipAbduction.ytVideo, 'https://youtu.be/sFQtAuiVwyo?si=GQLiGcITyE4Yzp3G', 'Cable Hip Abduction tidak boleh memakai ytVideo Pull Through');
+
+const edbPullThrough = edb.find(e => e.id === 'Pull_Through' || e.name === 'Pull Through');
+assert.ok(edbPullThrough, 'Pull Through harus ada di exercisedb.json');
+assert.equal(edbPullThrough.videoUrl, '/exercise-assets/youtube-backup/edb-Pull_Through.mp4', 'Pull Through harus memakai video Pull Through');
+assert.equal(edbPullThrough.ytVideo, 'https://youtu.be/sFQtAuiVwyo?si=GQLiGcITyE4Yzp3G', 'Pull Through harus memakai ytVideo Pull Through');
+
+// 22. Verifikasi Canonicalize mempertahankan field instruksi
+const canonicalWithInstr = canonicalizeExercise({
+  name: 'Cable Bicep Curl',
+  instructions_id: ['Instruksi khusus ID'],
+  instructions_en: ['Custom instruction EN'],
+});
+assert.deepEqual(canonicalWithInstr.instructions_id, ['Instruksi khusus ID']);
+assert.deepEqual(canonicalWithInstr.instructions_en, ['Custom instruction EN']);
 
 console.log('exerciseMatching OK');

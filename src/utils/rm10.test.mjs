@@ -222,6 +222,12 @@ console.log('rm10 OK', { r100x10: estimate10RM(100, 10), bulat42_5step5: roundDo
   const ex = { reps: 10 };
   assert.equal(defaultSetWeight({ rm10: estimate10RM(100, 10) }, ex, 2.5), 100, 'sebelum dikoreksi');
   assert.equal(defaultSetWeight({ rm10: estimate10RM(10, 10) }, ex, 2.5), 10, 'sesudah dikoreksi');
+  // Latihan barbel dengan stik 20 kg: 10RM 60 kg aktual harus menyarankan 40 kg plat
+  const confBar = { baseWeight: 20, ratio: 1 };
+  assert.equal(defaultSetWeight({ rm10: 60 }, ex, 2.5, confBar), 40, '10RM 60 kg barbel bar 20 kg harus sarankan 40 kg plat');
+  // Latihan smith dengan stik 10 kg: 10RM 50 kg aktual harus menyarankan 40 kg plat (menghindari keluhan user: 50 kg plat + 10 kg bar = 60 kg aktual)
+  const confSmith10 = { baseWeight: 10, ratio: 1 };
+  assert.equal(defaultSetWeight({ rm10: 50 }, ex, 2.5, confSmith10), 40, '10RM 50 kg smith bar 10 kg harus sarankan 40 kg plat');
   console.log('saran beban OK');
 
   // Latihan baru pertama kali (misal Close Grip Front Lat Pulldown)

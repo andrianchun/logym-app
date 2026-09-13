@@ -4,7 +4,7 @@ import { Plus, Snowflake, Play, CalendarDays, X, CheckCircle, ChevronDown, Chevr
 import { fetchExercisesFromApi } from '../utils/exerciseDbApi';
 import { shareWorkoutToFeed } from '../utils/communityApi';
 import { normalizeMuscleKey, resolveProjectedProgramId, getDayWorkouts, defaultMasterExercises, findMatchingMasterExercise, canonicalizeExercise } from '../data/constants';
-import { estimate10RM, defaultSetWeight, gymStepFor, getEquipmentConfig, calculateActualWeight, getSetActualWeight, rm10Series, buildExLookupByName, canonicalExId } from '../utils/workoutCalc';
+import { estimate10RM, defaultSetWeight, gymStepFor, getEquipmentConfig, calculateActualWeight, calculateInputWeight, getSetActualWeight, rm10Series, buildExLookupByName, canonicalExId } from '../utils/workoutCalc';
 
 // Import Komponen Pecahan
 import WorkoutHeader from '../components/WorkoutHeader';
@@ -374,7 +374,14 @@ const WorkoutTab = ({
              const onlineMatch = findMatchingMasterExercise(fullEx || canonical, onlineDb);
              if (onlineMatch) {
                  // Gabungkan dan utamakan instruksi/gif/equipment dari onlineDb
-                 fullEx = { ...onlineMatch, ...fullEx, instructions: onlineMatch.instructions, equipment: onlineMatch.equipment || fullEx?.equipment };
+                 fullEx = { 
+                     ...onlineMatch, 
+                     ...fullEx, 
+                     instructions: onlineMatch.instructions,
+                     instructions_id: onlineMatch.instructions_id || onlineMatch.instructions,
+                     instructions_en: onlineMatch.instructions_en || onlineMatch.instructions,
+                     equipment: onlineMatch.equipment || fullEx?.equipment 
+                 };
              }
          } catch (err) {}
      }
@@ -382,6 +389,8 @@ const WorkoutTab = ({
      let mergedEx = { ...(fullEx || {}), ...canonical };
      if (fullEx) {
          if (!mergedEx.instructions || mergedEx.instructions.length === 0) mergedEx.instructions = fullEx.instructions;
+         if (!mergedEx.instructions_id || mergedEx.instructions_id.length === 0) mergedEx.instructions_id = fullEx.instructions_id || fullEx.instructions;
+         if (!mergedEx.instructions_en || mergedEx.instructions_en.length === 0) mergedEx.instructions_en = fullEx.instructions_en || fullEx.instructions;
          if (!mergedEx.ytVideo) mergedEx.ytVideo = fullEx.ytVideo;
          if (!mergedEx.videoUrl) mergedEx.videoUrl = fullEx.videoUrl;
          if (!mergedEx.thumbnailUrl) mergedEx.thumbnailUrl = fullEx.thumbnailUrl;
@@ -510,14 +519,14 @@ const WorkoutTab = ({
     // 3. Default: empty template
     const libMatch = exerciseLibrary?.find(e => e.id === ex?.originalId || e.id === ex?.id || e.name?.toLowerCase() === ex?.name?.toLowerCase());
     const step = gymStepFor(gymProfiles, activeGymId, ex?.equipment, units?.weight === 'lbs');
-    let suggestedWeight = defaultSetWeight(libMatch, ex, step);
+    const eqConf = getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile);
+    let suggestedWeight = defaultSetWeight(libMatch, ex, step, eqConf);
     
     const isDeload = history?.[selectedDate]?.wellness === 'deload' || history?.[selectedDate]?.isDeloadWeek;
     if (isDeload && suggestedWeight > 0) {
       suggestedWeight = Math.max(0, Math.round((suggestedWeight * 0.825) / step) * step);
     }
 
-    const eqConf = getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile);
     const total_w = calculateActualWeight(suggestedWeight, eqConf);
 
     return Array.from({length: ex.sets || 3}).map(() => ({
@@ -628,13 +637,32 @@ const WorkoutTab = ({
       const isImp = units?.weight === 'lbs';
       const uStr = isImp ? 'lbs' : 'kg';
 
+      const hasWeightDiff = Boolean(eqConfNow && (eqConfNow.baseWeight > 0 || (eqConfNow.ratio !== undefined && eqConfNow.ratio !== 1)));
+      const formatWeightDetail = (actWeight) => {
+        if (!hasWeightDiff || !actWeight || actWeight <= 0) return null;
+        const plateW = calculateInputWeight(actWeight, eqConfNow);
+        const parts = [];
+        if (eqConfNow.baseWeight > 0) {
+          const baseName = eqConfNow.isBodyweightPlus 
+            ? 'BB' 
+            : (eqConfNow.equipment?.includes('Sled') ? 'Sled' : 'Bar');
+          parts.push(`${eqConfNow.isBodyweightPlus ? 'Beban' : 'Plat'} ${plateW} ${uStr} + ${baseName} ${eqConfNow.baseWeight} ${uStr}`);
+        } else if (eqConfNow.ratio !== 1) {
+          parts.push(`Pin ${plateW} ${uStr} (Katrol ${eqConfNow.ratio}:1)`);
+        }
+        return parts.length > 0 ? parts.join(' • ') : null;
+      };
+
       if (isNewRecord) {
         return {
           title: "Rekor Baru!",
           benchmarkLabel: "Set Terbaik",
           benchmark: `${currentMaxWeight} ${uStr} × ${currentMaxReps} reps`,
+          benchmarkDetail: formatWeightDetail(currentMaxWeight),
           message: `Luar biasa! Kamu berhasil memecahkan rekor 10RM baru. Terus pertahankan progres luar biasa ini!`,
           rm10: `${currentMax10RM} ${uStr}`,
+          rm10Detail: formatWeightDetail(currentMax10RM),
+          hasWeightDiff,
           mode: 'praise',
           isNewRecord: true,
           text: `Mantap! Kamu baru saja buat rekor 10RM baru: ${currentMax10RM} ${uStr} (${currentMaxWeight} ${uStr} x ${currentMaxReps} Reps)!\n\nLanjutkan kerja kerasnya!`
@@ -646,8 +674,11 @@ const WorkoutTab = ({
           title: "10RM Pertama Tercatat",
           benchmarkLabel: "Set Acuan",
           benchmark: `${currentMaxWeight} ${uStr} × ${currentMaxReps} reps`,
+          benchmarkDetail: formatWeightDetail(currentMaxWeight),
           message: `Keren! 10RM acuan pertamamu berhasil tercatat. Angka ini otomatis menjadi target acuan progresifmu untuk sesi latihan berikutnya.`,
           rm10: `${currentMax10RM} ${uStr}`,
+          rm10Detail: formatWeightDetail(currentMax10RM),
+          hasWeightDiff,
           mode: 'praise',
           isNewRecord: true,
           text: `Keren! 10RM acuan pertamamu berhasil tercatat: ${currentMax10RM} ${uStr} (${currentMaxWeight} ${uStr} x ${currentMaxReps} Reps).\n\nAngka ini otomatis menjadi target acuan progresifmu untuk sesi latihan berikutnya!`
@@ -663,8 +694,11 @@ const WorkoutTab = ({
           title: "Mode Deload",
           benchmarkLabel: "Target Deload (~82.5%)",
           benchmark: `${deloadWeight} ${uStr} × ${lastSessionReps} reps`,
+          benchmarkDetail: formatWeightDetail(deloadWeight),
           message: `Beban dipangkas untuk pemulihan sendi dan sistem saraf. Fokus pada kontrol tempo dan kesempurnaan form gerakan, jangan memaksakan beban berat.`,
           rm10: true10RM > 0 ? `${true10RM} ${uStr}` : null,
+          rm10Detail: formatWeightDetail(true10RM),
+          hasWeightDiff,
           mode: 'push',
           isDeload: true,
           text: `Target beban dipangkas ~17.5% untuk pemulihan sendi & sistem saraf:\n(${deloadWeight} ${uStr} x ${lastSessionReps} Reps)\n\nFokus pada kontrol gerakan dan tempo yang sempurna. Jangan memaksakan beban berat!`
@@ -714,8 +748,11 @@ const WorkoutTab = ({
           title: "Target Hari Ini",
           benchmarkLabel: "Sesi Terakhir",
           benchmark: `${lastSessionWeight} ${uStr} × ${lastSessionReps} reps`,
+          benchmarkDetail: formatWeightDetail(lastSessionWeight),
           message: missionText,
           rm10: true10RM > 0 ? `${true10RM} ${uStr}` : null,
+          rm10Detail: formatWeightDetail(true10RM),
+          hasWeightDiff,
           mode: 'push',
           text: `Sesi Terakhir: ${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps\n\n${missionText}\n\n10RM acuan: ${true10RM} ${uStr}`
         };
@@ -724,8 +761,11 @@ const WorkoutTab = ({
           title: "Target Hari Ini",
           benchmarkLabel: "Set Terbaik Sesi Ini",
           benchmark: `${currentMaxWeight} ${uStr} × ${currentMaxReps} reps`,
+          benchmarkDetail: formatWeightDetail(currentMaxWeight),
           message: `Fokus tuntaskan sisa set dengan form dan kontrol gerakan yang rapi!`,
           rm10: `${currentMax10RM} ${uStr}`,
+          rm10Detail: formatWeightDetail(currentMax10RM),
+          hasWeightDiff,
           mode: 'push',
           text: `Beban terbaik sesi ini:\n${currentMaxWeight} ${uStr} x ${currentMaxReps} Reps\n\n10RM acuan saat ini: ${currentMax10RM} ${uStr}.\nFokus tuntaskan sisa set dengan form dan kontrol yang rapi!`
         };
@@ -734,8 +774,11 @@ const WorkoutTab = ({
           title: "Target Hari Ini",
           benchmarkLabel: null,
           benchmark: null,
+          benchmarkDetail: null,
           message: `Atur beban yang cukup menantang untuk diangkat 10 repetisi dengan form sempurna (RPE 8).`,
           rm10: true10RM > 0 ? `${true10RM} ${uStr}` : null,
+          rm10Detail: formatWeightDetail(true10RM),
+          hasWeightDiff,
           mode: 'push',
           text: `Atur beban yang cukup menantang untuk diangkat 10 repetisi dengan form benar (RPE 8).\n\n10RM acuan: ${true10RM > 0 ? true10RM + ' ' + uStr : '-'}`
         };
@@ -796,7 +839,7 @@ const WorkoutTab = ({
           onConfirm: async () => {
             playSoundEffect('click', soundEnabled);
             if (sessionToRun && onSaveWorkout) {
-              await onSaveWorkout(sessionToRun);
+              await onSaveWorkout(sessionToRun, { stayOnWorkoutTab: true });
             }
             setSessionToRun(targetWorkoutId);
             setIsWorkoutActive(true);

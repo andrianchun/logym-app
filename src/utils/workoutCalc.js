@@ -706,6 +706,21 @@ export const calculateActualWeight = (inputWeight, config) => {
 };
 
 /**
+ * Konversi beban aktual (total_w) kembali ke input mentah user (plat/pin).
+ * Kebalikan dari calculateActualWeight:
+ * total_w = (input_w * ratio) + baseWeight
+ * input_w = (total_w - baseWeight) / ratio
+ */
+export const calculateInputWeight = (actualWeight, config) => {
+  const actW = Number(actualWeight) || 0;
+  if (!config) return actW;
+  const ratio = config.ratio !== undefined && Number(config.ratio) > 0 ? Number(config.ratio) : 1;
+  const baseWeight = config.baseWeight !== undefined ? Number(config.baseWeight) : 0;
+  const rawInput = (actW - baseWeight) / ratio;
+  return Math.round(Math.max(0, rawInput) * 100) / 100;
+};
+
+/**
  * Ambil beban aktual dari satu record set.
  * Jika set.total_w sudah tersimpan, pakai itu.
  * Jika belum (data lama), hitung fallback dari set.w / set.input_w dan config.
@@ -751,14 +766,26 @@ export const gymStepFor = (gymProfiles, activeGymId, equipment, isImperial = fal
  * sekarang dan ikut naik begitu user memecahkan rekor, sementara lastWeight cuma "angka yang
  * terakhir diketik" — termasuk kalau sesi terakhir kebetulan ringan. Selalu dibulatkan KE BAWAH
  * ke kelipatan yang benar-benar ada di alat.
+ *
+ * CATATAN PENTING:
+ * rm10 dan lastWeight dari riwayat tersimpan sebagai beban AKTUAL (total load = plat + bar stik/sled).
+ * Kolom input di antarmuka menerima beban PLAT/PIN mentah. Jika eqConf diberikan, beban aktual dikonversi
+ * kembali ke beban plat (calculateInputWeight) sebelum dibulatkan ke kelipatan terdekat (step).
  */
-export const defaultSetWeight = (libEx, ex, step) => {
+export const defaultSetWeight = (libEx, ex, step, eqConf = null) => {
   const rm10 = Number(libEx?.rm10) || 0;
   if (rm10 > 0) {
-    const bulat = roundDownToStep(rm10, step);
+    const rawPlateWeight = eqConf ? calculateInputWeight(rm10, eqConf) : rm10;
+    const bulat = roundDownToStep(rawPlateWeight, step);
     if (bulat > 0) return bulat;
   }
-  return Number(libEx?.lastWeight) || Number(ex?.defaultWeight) || 0;
+  const lastW = Number(libEx?.lastWeight) || 0;
+  if (lastW > 0) {
+    const rawPlateWeight = eqConf ? calculateInputWeight(lastW, eqConf) : lastW;
+    const bulat = roundDownToStep(rawPlateWeight, step);
+    if (bulat > 0) return bulat;
+  }
+  return Number(ex?.defaultWeight) || 0;
 };
 
 /**

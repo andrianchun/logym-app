@@ -8543,7 +8543,10 @@
     ],
     "aliases": [
       "Dumbbell Walking Lunges",
-      "Walking Lunges"
+      "Dumbbell Walking Lunge",
+      "Walking Lunges",
+      "Walking Lunge",
+      "Dumbbell Lunge"
     ]
   },
   {
@@ -11917,13 +11920,14 @@
       "Kembalikan lengan secara perlahan ke posisi awal.",
       "Ulangi sesuai dengan jumlah repetisi yang direkomendasikan."
     ],
-    "videoUrl": "/exercise-assets/youtube-backup/edb-High_Cable_Curls.mp4",
-    "ytVideo": "https://youtu.be/CrbTqNOlFgE?si=xKanrhppuvUAudTj",
+    "videoUrl": "",
+    "ytVideo": "",
     "defaultWeight": 30,
     "level": "beginner",
     "type": "weight",
     "aliases": [
-      "Biceps Cable Curl"
+      "High Cable Curl",
+      "Cable Overhead Curl"
     ]
   },
   {
@@ -20563,8 +20567,8 @@
       "Tahan dan kontraksikan otot bokong samping (glute medius) selama satu detik di puncak gerakan, lalu turunkan kembali kaki secara perlahan ke posisi awal.",
       "Ulangi sesuai jumlah repetisi yang ditentukan, kemudian ganti ke kaki sisi lainnya."
     ],
-    "videoUrl": "/exercise-assets/youtube-backup/edb-Pull_Through.mp4",
-    "ytVideo": "https://youtu.be/sFQtAuiVwyo?si=GQLiGcITyE4Yzp3G",
+    "videoUrl": "",
+    "ytVideo": "",
     "defaultWeight": 15,
     "level": "intermediate",
     "type": "weight",
@@ -20605,8 +20609,8 @@
       "Mulai gerakan dengan mendorong pinggul ke belakang dan menjangkaukan tangan melalui celah kaki sejauh mungkin dengan lutut sedikit ditekuk.",
       "Jaga lengan tetap lurus, lalu dorong pinggul ke depan hingga posisi berdiri tegak. Hindari menarik beban dengan bahu; seluruh tenaga harus berasal dari dorongan pinggul."
     ],
-    "videoUrl": "",
-    "ytVideo": "https://youtu.be/03XwN3vR_2E",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Pull_Through.mp4",
+    "ytVideo": "https://youtu.be/sFQtAuiVwyo?si=GQLiGcITyE4Yzp3G",
     "defaultWeight": 20,
     "level": "intermediate",
     "type": "weight",
@@ -22480,6 +22484,11 @@
       "Stand up straight with your legs together, holding a bodybar or broomstick.",
       "Hold the pole behind your hips with a wider than shoulder width grip. Your palms should be down and your thumbs facing out.",
       "Slowly lift your arms up behind your head. Don't force it if it gets hard to lift further."
+    ],
+    "instructions_id": [
+      "Berdirilah tegak dengan kedua kaki rapat, pegang stik atau broomstick.",
+      "Pegang stik di belakang pinggul dengan genggaman lebih lebar dari bahu. Telapak tangan menghadap ke bawah dan ibu jari menghadap ke luar.",
+      "Angkat lengan secara perlahan ke atas melewati belakang kepala. Jangan dipaksakan jika terasa kaku atau nyeri."
     ]
   },
   {
@@ -27522,7 +27531,7 @@
     "secondaryMuscles": [],
     "instructions": [
       "Berdirilah tegak sambil memegang stang bar cable curl yang terhubung ke katrol bawah. Genggam pegangan selebar bahu dan jaga siku tetap dekat dengan tubuh. Telapak tangan menghadap ke atas (supinasi). Ini adalah posisi awal Anda.",
-      "Jaga lengan atas tetap diam dan bahu tetap rileks (jangan mengangkat bahu/traps). Angkat beban sambil mengontraksikan otot bisep dan embuskan napas. Hanya lengan bawah yang bergerak hingga bar berada setinggi dada atau bahu. Tahan posisi puncak kontraksi sejenak sambil meremas otot bisep.",
+      "Jaga lengan atas tetap diam dan bahu tetap rileks (hindari mengangkat bahu/traps — inilah mengapa video panduan memberi tanda peringatan merah pada area traps agar bahu tidak terangkat). Angkat beban sambil mengontraksikan otot bisep dan embuskan napas. Hanya lengan bawah yang bergerak hingga bar berada setinggi dada atau bahu. Tahan posisi puncak kontraksi sejenak sambil meremas otot bisep.",
       "Perlahan turunkan kembali bar ke posisi awal secara terkontrol sambil menarik napas.",
       "Ulangi sesuai dengan jumlah repetisi yang direkomendasikan."
     ],
@@ -27534,7 +27543,7 @@
     ],
     "instructions_id": [
       "Berdirilah tegak sambil memegang stang bar cable curl yang terhubung ke katrol bawah. Genggam pegangan selebar bahu dan jaga siku tetap dekat dengan tubuh. Telapak tangan menghadap ke atas (supinasi). Ini adalah posisi awal Anda.",
-      "Jaga lengan atas tetap diam dan bahu tetap rileks (jangan mengangkat bahu/traps). Angkat beban sambil mengontraksikan otot bisep dan embuskan napas. Hanya lengan bawah yang bergerak hingga bar berada setinggi dada atau bahu. Tahan posisi puncak kontraksi sejenak sambil meremas otot bisep.",
+      "Jaga lengan atas tetap diam dan bahu tetap rileks (hindari mengangkat bahu/traps — inilah mengapa video panduan memberi tanda peringatan merah pada area traps agar bahu tidak terangkat). Angkat beban sambil mengontraksikan otot bisep dan embuskan napas. Hanya lengan bawah yang bergerak hingga bar berada setinggi dada atau bahu. Tahan posisi puncak kontraksi sejenak sambil meremas otot bisep.",
       "Perlahan turunkan kembali bar ke posisi awal secara terkontrol sambil menarik napas.",
       "Ulangi sesuai dengan jumlah repetisi yang direkomendasikan."
     ],
@@ -27542,9 +27551,11 @@
     "ytVideo": "https://youtu.be/CrbTqNOlFgE?si=xKanrhppuvUAudTj",
     "aliases": [
       "Biceps Cable Curl",
+      "Bicep Cable Curl",
       "Cable Bicep Curl",
       "Cable Biceps Curl",
-      "Standing Cable Curl"
+      "Standing Cable Curl",
+      "Standing Bicep Cable Curl"
     ],
     "defaultWeight": 30
   },
@@ -30248,6 +30259,11 @@
       "Berlari atau mendaki di jalur setapak akan memacu detak jantung dengan cepat. Pastikan menggunakan alas kaki yang sesuai.",
       "Saat mendaki, otot betis dan bokong bekerja menarik tubuh ke atas. Saat turun, lutut, sendi, dan pergelangan kaki meredam beban terbesar.",
       "Gunakan langkah pendek saat berjalan menurun, jaga lutut tetap sedikit menekuk untuk meredam impak, dan kurangi kecepatan guna menghindari risiko jatuh."
+    ],
+    "aliases": [
+      "Trail Running",
+      "Trail Run",
+      "Trail Walking"
     ]
   },
   {
@@ -32181,13 +32197,25 @@
     ],
     "secondaryMuscles": [],
     "instructions": [
-      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+      "Lakukan pemanasan dinamis ringan selama 3–5 menit untuk mempersiapkan detak jantung dan persendian tubuh.",
+      "Mulai aktivitas kardio pilihan Anda (jalan cepat, lari, sepeda, atau mesin kardio) secara bertahap hingga mencapai zona intensitas target.",
+      "Pertahankan postur tubuh tegak, bahu rileks, dan atur pola pernapasan yang stabil serta berirama.",
+      "Jaga kecepatan konstan sesuai durasi yang direncanakan tanpa memaksakan tubuh melampaui batas kemampuan fisik.",
+      "Lakukan pendinginan selama 2–3 menit dengan menurunkan tempo secara bertahap hingga detak jantung kembali normal."
     ],
     "instructions_id": [
-      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+      "Lakukan pemanasan dinamis ringan selama 3–5 menit untuk mempersiapkan detak jantung dan persendian tubuh.",
+      "Mulai aktivitas kardio pilihan Anda (jalan cepat, lari, sepeda, atau mesin kardio) secara bertahap hingga mencapai zona intensitas target.",
+      "Pertahankan postur tubuh tegak, bahu rileks, dan atur pola pernapasan yang stabil serta berirama.",
+      "Jaga kecepatan konstan sesuai durasi yang direncanakan tanpa memaksakan tubuh melampaui batas kemampuan fisik.",
+      "Lakukan pendinginan selama 2–3 menit dengan menurunkan tempo secara bertahap hingga detak jantung kembali normal."
     ],
     "instructions_en": [
-      "Perform the movement with proper form and comfortable intensity."
+      "Perform a 3–5 minute light dynamic warm-up to prepare your heart rate and joints.",
+      "Begin your chosen cardio activity at a gradual pace to smoothly reach your target heart rate zone.",
+      "Maintain an upright posture, relaxed shoulders, and steady rhythmic breathing.",
+      "Sustain a consistent pace for the target duration without overexerting yourself.",
+      "Cool down for 2–3 minutes by gradually decreasing intensity until your heart rate normalizes."
     ],
     "videoUrl": "",
     "ytVideo": "",
@@ -32213,13 +32241,25 @@
     ],
     "secondaryMuscles": [],
     "instructions": [
-      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+      "Naik ke treadmill, pasang safety clip pengaman pada pakaian, dan mulai dengan kecepatan jalan santai 3–4 km/jam untuk pemanasan.",
+      "Tingkatkan kecepatan ke target joging atau lari secara bertahap saat tubuh sudah siap.",
+      "Pertahankan postur tegak, pandangan lurus ke depan, ayunkan lengan rileks dari bahu, dan hindari bertumpu pada pegangan tangan.",
+      "Daratkan kaki dengan lembut pada bagian tengah telapak (midfoot) tepat di bawah pusat gravitasi tubuh dengan langkah ringan berirama.",
+      "Turunkan kecepatan secara bertahap selama 2 menit untuk pendinginan sebelum menekan tombol berhenti."
     ],
     "instructions_id": [
-      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+      "Naik ke treadmill, pasang safety clip pengaman pada pakaian, dan mulai dengan kecepatan jalan santai 3–4 km/jam untuk pemanasan.",
+      "Tingkatkan kecepatan ke target joging atau lari secara bertahap saat tubuh sudah siap.",
+      "Pertahankan postur tegak, pandangan lurus ke depan, ayunkan lengan rileks dari bahu, dan hindari bertumpu pada pegangan tangan.",
+      "Daratkan kaki dengan lembut pada bagian tengah telapak (midfoot) tepat di bawah pusat gravitasi tubuh dengan langkah ringan berirama.",
+      "Turunkan kecepatan secara bertahap selama 2 menit untuk pendinginan sebelum menekan tombol berhenti."
     ],
     "instructions_en": [
-      "Perform the movement with proper form and comfortable intensity."
+      "Step onto the treadmill, attach the safety key to your clothing, and start at an easy walking pace (3–4 km/h) to warm up.",
+      "Gradually increase the belt speed to your target jogging or running pace as your muscles warm up.",
+      "Keep your torso tall, look straight ahead, swing arms naturally from the shoulders, and avoid leaning on the handrails.",
+      "Land softly on your midfoot directly underneath your hips with light, rhythmic strides.",
+      "Gradually reduce the speed for 2 minutes to cool down before pressing stop."
     ],
     "videoUrl": "",
     "ytVideo": "",
@@ -32245,13 +32285,25 @@
     ],
     "secondaryMuscles": [],
     "instructions": [
-      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+      "Sesuaikan tinggi sadel agar sejajar tulang pinggul; saat pedal di titik terendah, lutut harus sedikit tertekuk (sekitar 25-30 derajat).",
+      "Duduk dengan nyaman, letakkan bantalan depan kaki pada pedal dan kencangkan tali pengikat jika tersedia.",
+      "Jaga punggung lurus dan bahu rileks, pegang stang tanpa mencengkeram terlalu kencang.",
+      "Kayuh pedal dengan putaran memutar yang halus dan konsisten, dorong ke bawah dan tarik ke atas secara seimbang.",
+      "Atur resistensi beban kayuhan sesuai target latihan dan bernapaslah secara teratur sepanjang sesi."
     ],
     "instructions_id": [
-      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+      "Sesuaikan tinggi sadel agar sejajar tulang pinggul; saat pedal di titik terendah, lutut harus sedikit tertekuk (sekitar 25-30 derajat).",
+      "Duduk dengan nyaman, letakkan bantalan depan kaki pada pedal dan kencangkan tali pengikat jika tersedia.",
+      "Jaga punggung lurus dan bahu rileks, pegang stang tanpa mencengkeram terlalu kencang.",
+      "Kayuh pedal dengan putaran memutar yang halus dan konsisten, dorong ke bawah dan tarik ke atas secara seimbang.",
+      "Atur resistensi beban kayuhan sesuai target latihan dan bernapaslah secara teratur sepanjang sesi."
     ],
     "instructions_en": [
-      "Perform the movement with proper form and comfortable intensity."
+      "Adjust saddle height level with your hip bone; at the bottom of the pedal stroke, your knee should have a slight bend (25–30 degrees).",
+      "Sit comfortably, place the balls of your feet on the pedals, and secure the straps.",
+      "Maintain a neutral spine, relaxed shoulders, and a light grip on the handlebars.",
+      "Pedal in smooth, controlled continuous circles, pushing down and pulling up evenly.",
+      "Adjust resistance to your target workout intensity and breathe rhythmically throughout."
     ],
     "videoUrl": "",
     "ytVideo": "",
@@ -32277,13 +32329,25 @@
     ],
     "secondaryMuscles": [],
     "instructions": [
-      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+      "Gunakan pakaian dan sepatu olahraga yang nyaman dengan bantalan peredam benturan yang baik.",
+      "Mulai dengan gerakan langkah ringan di tempat atau side-to-side tap untuk menaikkan suhu tubuh.",
+      "Ikuti gerakan aerobik berirama dengan menggerakkan lengan dan kaki secara terkoordinasi.",
+      "Jaga otot inti (core) tetap aktif untuk menjaga keseimbangan dinamis dan melindungi tulang belakang.",
+      "Akhiri sesi dengan peregangan statis pada otot kaki, betis, dan paha setelah pendinginan ringan."
     ],
     "instructions_id": [
-      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+      "Gunakan pakaian dan sepatu olahraga yang nyaman dengan bantalan peredam benturan yang baik.",
+      "Mulai dengan gerakan langkah ringan di tempat atau side-to-side tap untuk menaikkan suhu tubuh.",
+      "Ikuti gerakan aerobik berirama dengan menggerakkan lengan dan kaki secara terkoordinasi.",
+      "Jaga otot inti (core) tetap aktif untuk menjaga keseimbangan dinamis dan melindungi tulang belakang.",
+      "Akhiri sesi dengan peregangan statis pada otot kaki, betis, dan paha setelah pendinginan ringan."
     ],
     "instructions_en": [
-      "Perform the movement with proper form and comfortable intensity."
+      "Wear supportive workout shoes and comfortable attire suitable for continuous movement.",
+      "Begin with gentle steps in place or side-to-side taps to raise your core body temperature.",
+      "Perform rhythmic aerobic movements with coordinated arm and leg motions.",
+      "Keep your core engaged to protect your lower back and maintain dynamic balance.",
+      "Conclude with light cool-down walking followed by static stretches for the legs and hips."
     ],
     "videoUrl": "",
     "ytVideo": "",
@@ -32310,13 +32374,25 @@
     ],
     "secondaryMuscles": [],
     "instructions": [
-      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+      "Awali dengan pemanasan dinamis menyeluruh selama 3–5 menit untuk mempersiapkan otot dan sistem kardiovaskular.",
+      "Lakukan interval kerja intensitas tinggi (all-out effort atau 85–95% kapasitas maksimal) selama durasi target (misal: 20–30 detik).",
+      "Pertahankan form dan teknik gerakan yang presisi meskipun detak jantung dan kelelahan meningkat.",
+      "Manfaatkan interval istirahat (misal: 30–60 detik) untuk mengatur napas dalam-dalam dan memulihkan tenaga.",
+      "Ulangi siklus kerja-istirahat sesuai jumlah ronde yang direncanakan, lalu lakukan pendinginan menyeluruh."
     ],
     "instructions_id": [
-      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+      "Awali dengan pemanasan dinamis menyeluruh selama 3–5 menit untuk mempersiapkan otot dan sistem kardiovaskular.",
+      "Lakukan interval kerja intensitas tinggi (all-out effort atau 85–95% kapasitas maksimal) selama durasi target (misal: 20–30 detik).",
+      "Pertahankan form dan teknik gerakan yang presisi meskipun detak jantung dan kelelahan meningkat.",
+      "Manfaatkan interval istirahat (misal: 30–60 detik) untuk mengatur napas dalam-dalam dan memulihkan tenaga.",
+      "Ulangi siklus kerja-istirahat sesuai jumlah ronde yang direncanakan, lalu lakukan pendinginan menyeluruh."
     ],
     "instructions_en": [
-      "Perform the movement with proper form and comfortable intensity."
+      "Warm up thoroughly with dynamic stretches for 3–5 minutes before beginning high-intensity intervals.",
+      "Perform the work interval at high intensity (85–95% maximum effort) for the assigned duration (e.g., 20–30 seconds).",
+      "Prioritize clean form and controlled body mechanics even as fatigue sets in.",
+      "Use the recovery intervals (e.g., 30–60 seconds) to take deep breaths and lower your heart rate.",
+      "Complete the designated number of rounds, followed by an active cool-down."
     ],
     "videoUrl": "",
     "ytVideo": "",
@@ -32342,13 +32418,25 @@
     ],
     "secondaryMuscles": [],
     "instructions": [
-      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+      "Gelar matras di permukaan rata dan ambil posisi awal yang rileks dengan tulang belakang netral.",
+      "Fokuskan pernapasan lateral (bernapas dalam melebar ke tulang rusuk, buang napas sambil menarik pusar ke arah tulang belakang).",
+      "Aktifkan otot inti bagian dalam (powerhouse: transversus abdominis dan otot dasar panggul) pada setiap repetisi.",
+      "Lakukan setiap gerakan secara perlahan, terarah, dan terkontrol tanpa menggunakan momentum tubuh.",
+      "Jaga leher, rahang, dan bahu tetap bebas dari ketegangan selama transisi antar gerakan."
     ],
     "instructions_id": [
-      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+      "Gelar matras di permukaan rata dan ambil posisi awal yang rileks dengan tulang belakang netral.",
+      "Fokuskan pernapasan lateral (bernapas dalam melebar ke tulang rusuk, buang napas sambil menarik pusar ke arah tulang belakang).",
+      "Aktifkan otot inti bagian dalam (powerhouse: transversus abdominis dan otot dasar panggul) pada setiap repetisi.",
+      "Lakukan setiap gerakan secara perlahan, terarah, dan terkontrol tanpa menggunakan momentum tubuh.",
+      "Jaga leher, rahang, dan bahu tetap bebas dari ketegangan selama transisi antar gerakan."
     ],
     "instructions_en": [
-      "Perform the movement with proper form and comfortable intensity."
+      "Set up a comfortable exercise mat and align your spine in a neutral, relaxed position.",
+      "Focus on lateral ribcage breathing: inhale wide into the sides and exhale while drawing your navel in toward your spine.",
+      "Engage your deep core powerhouse (transverse abdominis and pelvic floor) on each repetition.",
+      "Execute each movement with precision and control, avoiding sudden momentum.",
+      "Keep the neck, shoulders, and jaw relaxed throughout each exercise."
     ],
     "videoUrl": "",
     "ytVideo": "",
@@ -32374,13 +32462,25 @@
     ],
     "secondaryMuscles": [],
     "instructions": [
-      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+      "Siapkan matras di tempat yang tenang dengan sirkulasi udara baik dan bebas dari gangguan.",
+      "Duduk tegak bersila, pejamkan mata sejenak, dan sadari ritme pernapasan alami tubuh Anda.",
+      "Masuk ke setiap pose atau peregangan secara perlahan, sesuaikan kedalaman pose dengan batas kelenturan tubuh.",
+      "Tarik napas untuk memanjangkan tulang belakang dan buang napas untuk memperdalam peregangan atau merilekskan otot.",
+      "Tutup sesi dengan pose istirahat (Savasana) selama beberapa menit untuk memulihkan energi tubuh dan pikiran."
     ],
     "instructions_id": [
-      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+      "Siapkan matras di tempat yang tenang dengan sirkulasi udara baik dan bebas dari gangguan.",
+      "Duduk tegak bersila, pejamkan mata sejenak, dan sadari ritme pernapasan alami tubuh Anda.",
+      "Masuk ke setiap pose atau peregangan secara perlahan, sesuaikan kedalaman pose dengan batas kelenturan tubuh.",
+      "Tarik napas untuk memanjangkan tulang belakang dan buang napas untuk memperdalam peregangan atau merilekskan otot.",
+      "Tutup sesi dengan pose istirahat (Savasana) selama beberapa menit untuk memulihkan energi tubuh dan pikiran."
     ],
     "instructions_en": [
-      "Perform the movement with proper form and comfortable intensity."
+      "Place your mat in a quiet, well-ventilated space free from distractions.",
+      "Sit tall, close your eyes, and center yourself by tuning into your natural breath.",
+      "Flow into each posture smoothly, honoring your body current mobility limits.",
+      "Inhale to lengthen your spine and exhale to relax deeper into the stretch.",
+      "Complete your session in a resting posture (Savasana) for a few minutes to integrate the practice."
     ],
     "videoUrl": "",
     "ytVideo": "",
@@ -32406,13 +32506,25 @@
     ],
     "secondaryMuscles": [],
     "instructions": [
-      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+      "Pilih tali skipping dengan panjang yang tepat (saat diinjak di tengah, kedua ujung gagang mencapai ketiak).",
+      "Posisikan kedua siku dekat dengan pinggang, putar tali menggunakan pergelangan tangan, bukan seluruh lengan.",
+      "Lompat rendah sekitar 2–3 cm dari lantai hanya setinggi yang diperlukan agar tali dapat lewat di bawah kaki.",
+      "Mendaratlah dengan lembut menggunakan bantalan depan kaki (balls of feet) dengan lutut sedikit ditekuk untuk meredam benturan.",
+      "Jaga pandangan lurus ke depan, dada tegap, dan bernapas secara teratur dan konsisten."
     ],
     "instructions_id": [
-      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+      "Pilih tali skipping dengan panjang yang tepat (saat diinjak di tengah, kedua ujung gagang mencapai ketiak).",
+      "Posisikan kedua siku dekat dengan pinggang, putar tali menggunakan pergelangan tangan, bukan seluruh lengan.",
+      "Lompat rendah sekitar 2–3 cm dari lantai hanya setinggi yang diperlukan agar tali dapat lewat di bawah kaki.",
+      "Mendaratlah dengan lembut menggunakan bantalan depan kaki (balls of feet) dengan lutut sedikit ditekuk untuk meredam benturan.",
+      "Jaga pandangan lurus ke depan, dada tegap, dan bernapas secara teratur dan konsisten."
     ],
     "instructions_en": [
-      "Perform the movement with proper form and comfortable intensity."
+      "Adjust your jump rope to the correct length (stepping on the rope center, handles should reach underarms).",
+      "Keep elbows close to your ribs and rotate the rope primarily from your wrists rather than swinging your arms.",
+      "Jump only 2–3 cm off the floor—just enough for the rope to clear under your feet.",
+      "Land softly on the balls of your feet with knees slightly soft to absorb shock.",
+      "Look straight ahead with an upright chest and maintain smooth, rhythmic breathing."
     ],
     "videoUrl": "",
     "ytVideo": "",
@@ -32440,13 +32552,25 @@
     ],
     "secondaryMuscles": [],
     "instructions": [
-      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+      "Lakukan pemanasan peregangan sendi bahu dan leher di pinggir kolam sebelum masuk ke air.",
+      "Mulai dengan 1–2 putaran gaya dada atau gaya bebas santai untuk beradaptasi dengan suhu air.",
+      "Pertahankan posisi tubuh horizontal dan sejajar permukaan air (streamline) untuk meminimalkan hambatan air.",
+      "Lakukan kayuhan tangan secara efisien dipadukan dengan kayuhan kaki yang teratur dari pangkal paha.",
+      "Atur pola pernapasan ritmis (misal: mengambil napas tiap 2 atau 3 kayuhan) dan lakukan pendinginan 1 putaran santai."
     ],
     "instructions_id": [
-      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+      "Lakukan pemanasan peregangan sendi bahu dan leher di pinggir kolam sebelum masuk ke air.",
+      "Mulai dengan 1–2 putaran gaya dada atau gaya bebas santai untuk beradaptasi dengan suhu air.",
+      "Pertahankan posisi tubuh horizontal dan sejajar permukaan air (streamline) untuk meminimalkan hambatan air.",
+      "Lakukan kayuhan tangan secara efisien dipadukan dengan kayuhan kaki yang teratur dari pangkal paha.",
+      "Atur pola pernapasan ritmis (misal: mengambil napas tiap 2 atau 3 kayuhan) dan lakukan pendinginan 1 putaran santai."
     ],
     "instructions_en": [
-      "Perform the movement with proper form and comfortable intensity."
+      "Warm up your shoulders, back, and hips with light stretches poolside before entering the water.",
+      "Swim 1–2 easy warmup laps to adjust to water temperature and establish your breathing rhythm.",
+      "Maintain a streamlined, horizontal body line near the surface to reduce drag.",
+      "Drive your arm strokes with complete extension and kick rhythmically from your hips, not just knees.",
+      "Breathe rhythmically at consistent stroke intervals and finish with an easy cool-down lap."
     ],
     "videoUrl": "",
     "ytVideo": "",
@@ -32474,13 +32598,25 @@
     ],
     "secondaryMuscles": [],
     "instructions": [
-      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+      "Mulai dengan jalan cepat selama 3–5 menit untuk melancarkan sirkulasi darah ke otot kaki.",
+      "Tingkatkan tempo menjadi lari santai (joging) dengan postur tubuh sedikit condong ke depan dari pergelangan kaki.",
+      "Ayunkan lengan ke depan dan ke belakang secara santai dengan sudut siku sekitar 90 derajat.",
+      "Daratkan kaki dengan lembut di bawah panggul, hindari melangkah terlalu jauh ke depan (overstriding).",
+      "Turunkan kecepatan menjadi jalan santai selama 3 menit untuk mendinginkan detak jantung setelah selesai."
     ],
     "instructions_id": [
-      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+      "Mulai dengan jalan cepat selama 3–5 menit untuk melancarkan sirkulasi darah ke otot kaki.",
+      "Tingkatkan tempo menjadi lari santai (joging) dengan postur tubuh sedikit condong ke depan dari pergelangan kaki.",
+      "Ayunkan lengan ke depan dan ke belakang secara santai dengan sudut siku sekitar 90 derajat.",
+      "Daratkan kaki dengan lembut di bawah panggul, hindari melangkah terlalu jauh ke depan (overstriding).",
+      "Turunkan kecepatan menjadi jalan santai selama 3 menit untuk mendinginkan detak jantung setelah selesai."
     ],
     "instructions_en": [
-      "Perform the movement with proper form and comfortable intensity."
+      "Begin with 3–5 minutes of brisk walking to prepare your lower-body muscles and joints.",
+      "Transition into an easy jog with a slight forward lean from the ankles, not the waist.",
+      "Swing your arms naturally front to back with elbows bent at approximately 90 degrees.",
+      "Land softly underneath your center of gravity, avoiding overstriding onto the heel.",
+      "Cool down by walking easily for 3 minutes until your breathing stabilizes."
     ],
     "videoUrl": "",
     "ytVideo": "",
@@ -32506,13 +32642,25 @@
     ],
     "secondaryMuscles": [],
     "instructions": [
-      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+      "Berdirilah tegak dengan bahu rileks ke belakang, dada terbuka, dan pandangan sekitar 3–5 meter ke depan.",
+      "Langkahkan kaki ke depan dengan mendaratkan tumit terlebih dahulu, lalu gulirkan telapak kaki hingga mendorong dari ibu jari.",
+      "Ayunkan kedua lengan secara alami dan bergantian mengikuti irama langkah kaki.",
+      "Pertahankan kecepatan jalan cepat (brisk walk) yang membuat Anda bernapas lebih cepat tetapi masih dapat berbicara.",
+      "Turunkan tempo langkah di 2 menit terakhir sebagai pendinginan bertahap."
     ],
     "instructions_id": [
-      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+      "Berdirilah tegak dengan bahu rileks ke belakang, dada terbuka, dan pandangan sekitar 3–5 meter ke depan.",
+      "Langkahkan kaki ke depan dengan mendaratkan tumit terlebih dahulu, lalu gulirkan telapak kaki hingga mendorong dari ibu jari.",
+      "Ayunkan kedua lengan secara alami dan bergantian mengikuti irama langkah kaki.",
+      "Pertahankan kecepatan jalan cepat (brisk walk) yang membuat Anda bernapas lebih cepat tetapi masih dapat berbicara.",
+      "Turunkan tempo langkah di 2 menit terakhir sebagai pendinginan bertahap."
     ],
     "instructions_en": [
-      "Perform the movement with proper form and comfortable intensity."
+      "Stand tall with relaxed shoulders, open chest, and eyes looking 3–5 meters ahead.",
+      "Step forward with a natural heel-to-toe roll, pushing off gently through your toes.",
+      "Swing your arms naturally in opposition to your leg stride.",
+      "Maintain a brisk pace that raises your heart rate while still allowing comfortable speech.",
+      "Slow your pace during the final 2 minutes for a gradual cool-down."
     ],
     "videoUrl": "",
     "ytVideo": "",
@@ -32539,13 +32687,25 @@
     ],
     "secondaryMuscles": [],
     "instructions": [
-      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+      "Periksa kondisi sepeda (tekanan ban, rem, dan tinggi sadel) serta kenakan helm pengaman sebelum berkendara.",
+      "Mulai bersepeda di jalur yang aman dengan gigi ringan untuk pemanasan otot kaki selama 5 menit.",
+      "Jaga posisi tulang belakang rileks, tekuk siku sedikit saat memegang stang untuk menyerap getaran jalan.",
+      "Pertahankan putaran kayuhan (cadence) yang stabil dan efisien sekitar 70–90 RPM tanpa memaksakan gigi berat.",
+      "Kurangi intensitas kayuhan pada 5 menit terakhir untuk mendinginkan otot sebelum berhenti."
     ],
     "instructions_id": [
-      "Lakukan gerakan sesuai panduan dan intensitas yang nyaman."
+      "Periksa kondisi sepeda (tekanan ban, rem, dan tinggi sadel) serta kenakan helm pengaman sebelum berkendara.",
+      "Mulai bersepeda di jalur yang aman dengan gigi ringan untuk pemanasan otot kaki selama 5 menit.",
+      "Jaga posisi tulang belakang rileks, tekuk siku sedikit saat memegang stang untuk menyerap getaran jalan.",
+      "Pertahankan putaran kayuhan (cadence) yang stabil dan efisien sekitar 70–90 RPM tanpa memaksakan gigi berat.",
+      "Kurangi intensitas kayuhan pada 5 menit terakhir untuk mendinginkan otot sebelum berhenti."
     ],
     "instructions_en": [
-      "Perform the movement with proper form and comfortable intensity."
+      "Check tire pressure, brakes, and saddle height, and always fasten your helmet before riding.",
+      "Start in an easy gear on a safe flat route to warm up your legs for the first 5 minutes.",
+      "Keep your back relaxed and elbows slightly bent on the handlebars to absorb road vibration.",
+      "Maintain a steady, efficient pedaling cadence (around 70–90 RPM) rather than grinding in high gears.",
+      "Ease up on pedal resistance during the final 5 minutes for a smooth cool-down."
     ],
     "videoUrl": "",
     "ytVideo": "",

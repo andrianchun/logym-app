@@ -132,6 +132,66 @@ const LiveRestStats = ({ restTargetTime, setRestTargetTime, isAllDone, theme, t,
   );
 };
 
+const ImmersiveRestBar = ({ restTargetTime, setRestTargetTime, formatTime, theme, t }) => {
+  const [localRestTimer, setLocalRestTimer] = useState(() => {
+    return restTargetTime !== null ? Math.ceil((restTargetTime - Date.now()) / 1000) : 0;
+  });
+  const prevLocalRestRef = React.useRef(null);
+
+  useEffect(() => {
+    let interval;
+    if (restTargetTime !== null) {
+      const initialRemaining = Math.ceil((restTargetTime - Date.now()) / 1000);
+      setLocalRestTimer(initialRemaining);
+      prevLocalRestRef.current = initialRemaining;
+
+      const updateTimer = () => {
+        const remaining = Math.ceil((restTargetTime - Date.now()) / 1000);
+        if (prevLocalRestRef.current !== remaining) {
+          prevLocalRestRef.current = remaining;
+          setLocalRestTimer(remaining);
+          if (remaining <= 0 && remaining >= -30 && Math.abs(remaining) % 5 === 0 && navigator.vibrate) {
+            try { navigator.vibrate([200, 100, 200]); } catch(e) {}
+          }
+        }
+      };
+      updateTimer();
+      interval = setInterval(updateTimer, 500);
+    } else {
+      setLocalRestTimer(0);
+      prevLocalRestRef.current = null;
+    }
+    return () => clearInterval(interval);
+  }, [restTargetTime]);
+
+  const [maxRestTimer, setMaxRestTimer] = useState(0);
+  useEffect(() => {
+    setMaxRestTimer(prev => localRestTimer === 0 ? 0 : Math.max(prev, localRestTimer));
+  }, [localRestTimer]);
+
+  if (restTargetTime === null) return null;
+
+  return (
+    <div className={`w-full relative flex items-stretch justify-between rounded-2xl shadow-xl transition-colors overflow-hidden border ${
+      localRestTimer < -30 ? 'bg-rose-600 border-rose-600 animate-pulse text-white' :
+      localRestTimer <= 0 ? 'bg-amber-500 border-amber-500 text-white' :
+      `${t.bgAccentSoft} ${t.borderAccent}`
+    }`}>
+      {localRestTimer > 0 && maxRestTimer > 0 && (
+        <div 
+          className={`absolute top-0 left-0 h-full transition-all duration-1000 ease-linear pointer-events-none ${theme === 'dark' ? 'bg-white/25' : 'bg-black/25'}`}
+          style={{ width: `${Math.min(100, Math.max(0, ((maxRestTimer - localRestTimer) / maxRestTimer) * 100))}%` }}
+        />
+      )}
+      <button onClick={(e) => { e.stopPropagation(); setRestTargetTime(prev => (prev || Date.now()) - 5000); }} className={`relative z-10 w-16 sm:w-20 flex items-center justify-center bg-transparent ${theme === 'dark' ? 'hover:bg-white/10 active:bg-white/20 border-white/20' : 'hover:bg-black/10 active:bg-black/20 border-black/10'} ${localRestTimer <= 0 ? 'text-white' : t.textMain} font-black transition-colors border-r h2`}>-5</button>
+      <button onClick={() => setRestTargetTime(null)} className={`relative z-10 flex-1 py-4 flex items-center justify-center font-black h2 ${localRestTimer <= 0 ? 'text-white' : t.textMain} ${theme === 'dark' ? 'active:bg-white/10' : 'active:bg-black/10'} transition-colors`}>
+        REST: {formatTime(localRestTimer)}
+      </button>
+      <button onClick={(e) => { e.stopPropagation(); setRestTargetTime(prev => (prev || Date.now()) + 5000); }} className={`relative z-10 w-16 sm:w-20 flex items-center justify-center bg-transparent ${theme === 'dark' ? 'hover:bg-white/10 active:bg-white/20 border-white/20' : 'hover:bg-black/10 active:bg-black/20 border-black/10'} ${localRestTimer <= 0 ? 'text-white' : t.textMain} font-black transition-colors border-l h2`}>+5</button>
+    </div>
+  );
+};
+
 const ImmersiveWorkout = ({
   t,
   units,
@@ -183,8 +243,8 @@ const ImmersiveWorkout = ({
     }
     const libMatch = exerciseLibrary?.find(e => e.id === exItem.originalId || e.id === exItem.id || e.name?.toLowerCase() === exItem.name?.toLowerCase());
     const step = gymStepFor(gymProfiles, activeGymId, exItem.equipment, units?.weight === 'lbs');
-    let suggestedWeight = defaultSetWeight(libMatch, exItem, step);
     const eqConf = getEquipmentConfig(gymProfiles, activeGymId, exItem, userProfile);
+    let suggestedWeight = defaultSetWeight(libMatch, exItem, step, eqConf);
     const total_w = calculateActualWeight(suggestedWeight, eqConf);
     return Array.from({length: exItem.sets || 3}).map(() => ({
       w: suggestedWeight,
@@ -276,41 +336,6 @@ const ImmersiveWorkout = ({
 
 
   const [showWeightInfo, setShowWeightInfo] = useState(false);
-  const [localRestTimer, setLocalRestTimer] = useState(() => {
-    return restTargetTime !== null ? Math.ceil((restTargetTime - Date.now()) / 1000) : 0;
-  });
-  const prevLocalRestRef = React.useRef(null);
-
-  useEffect(() => {
-    let interval;
-    if (restTargetTime !== null) {
-      const initialRemaining = Math.ceil((restTargetTime - Date.now()) / 1000);
-      setLocalRestTimer(initialRemaining);
-      prevLocalRestRef.current = initialRemaining;
-
-      const updateTimer = () => {
-        const remaining = Math.ceil((restTargetTime - Date.now()) / 1000);
-        if (prevLocalRestRef.current !== remaining) {
-          prevLocalRestRef.current = remaining;
-          setLocalRestTimer(remaining);
-          if (remaining <= 0 && remaining >= -30 && Math.abs(remaining) % 5 === 0 && navigator.vibrate) {
-            try { navigator.vibrate([200, 100, 200]); } catch(e) {}
-          }
-        }
-      };
-      updateTimer();
-      interval = setInterval(updateTimer, 500);
-    } else {
-      setLocalRestTimer(0);
-      prevLocalRestRef.current = null;
-    }
-    return () => clearInterval(interval);
-  }, [restTargetTime]);
-
-  const [maxRestTimer, setMaxRestTimer] = useState(0);
-  useEffect(() => {
-    setMaxRestTimer(prev => localRestTimer === 0 ? 0 : Math.max(prev, localRestTimer));
-  }, [localRestTimer]);
 
   // 3. Current Set Logic
   const logs = ex ? getLogsForEx(ex) : [];
@@ -1006,9 +1031,16 @@ const ImmersiveWorkout = ({
 
                                 {/* Benchmark Chip */}
                                 {hint.benchmark && (
-                                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-xs font-semibold text-zinc-200 mb-2.5 backdrop-blur-sm shadow-sm">
-                                    {hint.benchmarkLabel && <span className="text-zinc-400 text-[11px] font-medium">{hint.benchmarkLabel}:</span>}
-                                    <span className="text-white font-black">{hint.benchmark}</span>
+                                  <div className="flex flex-col items-center gap-0.5 mb-2.5">
+                                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-xs font-semibold text-zinc-200 backdrop-blur-sm shadow-sm">
+                                      {hint.benchmarkLabel && <span className="text-zinc-400 text-[11px] font-medium">{hint.benchmarkLabel}:</span>}
+                                      <span className="text-white font-black">{hint.benchmark}</span>
+                                    </div>
+                                    {hint.benchmarkDetail && (
+                                      <span className="text-[10px] font-medium text-sky-300/90 tracking-tight">
+                                        ({hint.benchmarkDetail})
+                                      </span>
+                                    )}
                                   </div>
                                 )}
 
@@ -1019,10 +1051,19 @@ const ImmersiveWorkout = ({
 
                                 {/* Logym Blue 10RM Pill Badge */}
                                 {hint.rm10 && (
-                                  <div className="mt-3.5 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-sky-500/15 border border-sky-400/40 text-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.25)] backdrop-blur-sm">
-                                    <Zap size={13} className="text-sky-400 fill-sky-400/40" />
-                                    <span className="text-[10px] font-bold tracking-wider uppercase text-sky-300/80">10RM Acuan</span>
-                                    <span className="text-xs font-black text-white">{hint.rm10}</span>
+                                  <div className="mt-3.5 flex flex-col items-center gap-1">
+                                    <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-sky-500/15 border border-sky-400/40 text-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.25)] backdrop-blur-sm">
+                                      <Zap size={13} className="text-sky-400 fill-sky-400/40" />
+                                      <span className="text-[10px] font-bold tracking-wider uppercase text-sky-300/80">
+                                        10RM Acuan {hint.hasWeightDiff ? '(Total Aktual)' : ''}
+                                      </span>
+                                      <span className="text-xs font-black text-white">{hint.rm10}</span>
+                                    </div>
+                                    {hint.rm10Detail && (
+                                      <span className="text-[10px] font-semibold text-sky-300/80 tracking-tight">
+                                        (Pasang: {hint.rm10Detail})
+                                      </span>
+                                    )}
                                   </div>
                                 )}
                               </>
@@ -1294,24 +1335,14 @@ const ImmersiveWorkout = ({
               mengulang informasi itu dengan kalimat panjang, animate-bounce, dan emoji —
               berisik untuk sesuatu yang sudah tersampaikan lewat warna. */}
 
-          {localRestTimer !== 0 && !isAllDone ? (
-            <div className={`w-full relative flex items-stretch justify-between rounded-2xl shadow-xl transition-colors overflow-hidden border ${
-              localRestTimer < -30 ? 'bg-rose-600 border-rose-600 animate-pulse text-white' :
-              localRestTimer <= 0 ? 'bg-amber-500 border-amber-500 text-white' :
-              `${t.bgAccentSoft} ${t.borderAccent}`
-            }`}>
-              {localRestTimer > 0 && maxRestTimer > 0 && (
-                <div 
-                  className={`absolute top-0 left-0 h-full transition-all duration-1000 ease-linear pointer-events-none ${theme === 'dark' ? 'bg-white/25' : 'bg-black/25'}`}
-                  style={{ width: `${Math.min(100, Math.max(0, ((maxRestTimer - localRestTimer) / maxRestTimer) * 100))}%` }}
-                />
-              )}
-              <button onClick={(e) => { e.stopPropagation(); setRestTargetTime(prev => (prev || Date.now()) - 5000); }} className={`relative z-10 w-16 sm:w-20 flex items-center justify-center bg-transparent ${theme === 'dark' ? 'hover:bg-white/10 active:bg-white/20 border-white/20' : 'hover:bg-black/10 active:bg-black/20 border-black/10'} ${localRestTimer <= 0 ? 'text-white' : t.textMain} font-black transition-colors border-r h2`}>-5</button>
-              <button onClick={() => setRestTargetTime(null)} className={`relative z-10 flex-1 py-4 flex items-center justify-center font-black h2 ${localRestTimer <= 0 ? 'text-white' : t.textMain} ${theme === 'dark' ? 'active:bg-white/10' : 'active:bg-black/10'} transition-colors`}>
-                REST: {formatTime(localRestTimer)}
-              </button>
-              <button onClick={(e) => { e.stopPropagation(); setRestTargetTime(prev => (prev || Date.now()) + 5000); }} className={`relative z-10 w-16 sm:w-20 flex items-center justify-center bg-transparent ${theme === 'dark' ? 'hover:bg-white/10 active:bg-white/20 border-white/20' : 'hover:bg-black/10 active:bg-black/20 border-black/10'} ${localRestTimer <= 0 ? 'text-white' : t.textMain} font-black transition-colors border-l h2`}>+5</button>
-            </div>
+          {restTargetTime !== null && !isAllDone ? (
+            <ImmersiveRestBar
+              restTargetTime={restTargetTime}
+              setRestTargetTime={setRestTargetTime}
+              formatTime={formatTime}
+              theme={theme}
+              t={t}
+            />
           ) : !isAllDone ? (
             <div className="flex gap-2 w-full">
               {(() => {

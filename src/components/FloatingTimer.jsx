@@ -61,18 +61,30 @@ const FloatingTimer = ({
   const [activeSetTimerInfo, setActiveSetTimerInfo] = React.useState(null);
 
   useEffect(() => {
-    const handleTimerChange = () => {
-      if (window.logymActiveTimer?.timer) {
-        setActiveSetTimerInfo({ ...window.logymActiveTimer });
-      } else {
-        setActiveSetTimerInfo(null);
-      }
-    };
-    window.addEventListener('logym_active_timer_change', handleTimerChange);
-    handleTimerChange();
+    let interval = null;
 
-    const interval = setInterval(() => {
+    const startOrStopInterval = () => {
       if (window.logymActiveTimer?.timer) {
+        if (!interval) {
+          interval = setInterval(() => {
+            if (window.logymActiveTimer?.timer) {
+              const cur = window.logymActiveTimer.timer;
+              let left = 0;
+              if (cur.mode === 'down' && cur.targetTime) {
+                left = Math.max(0, Math.ceil((cur.targetTime - Date.now()) / 1000));
+              } else if (cur.mode === 'up' && cur.startTime) {
+                left = Math.floor((Date.now() - cur.startTime) / 1000);
+              } else {
+                left = cur.timeLeft || 0;
+              }
+              setActiveSetTimerInfo({ ...window.logymActiveTimer, currentSeconds: left });
+            } else {
+              clearInterval(interval);
+              interval = null;
+              setActiveSetTimerInfo(null);
+            }
+          }, 500);
+        }
         const cur = window.logymActiveTimer.timer;
         let left = 0;
         if (cur.mode === 'down' && cur.targetTime) {
@@ -84,13 +96,20 @@ const FloatingTimer = ({
         }
         setActiveSetTimerInfo({ ...window.logymActiveTimer, currentSeconds: left });
       } else {
+        if (interval) {
+          clearInterval(interval);
+          interval = null;
+        }
         setActiveSetTimerInfo(null);
       }
-    }, 500);
+    };
+
+    window.addEventListener('logym_active_timer_change', startOrStopInterval);
+    startOrStopInterval();
 
     return () => {
-      window.removeEventListener('logym_active_timer_change', handleTimerChange);
-      clearInterval(interval);
+      window.removeEventListener('logym_active_timer_change', startOrStopInterval);
+      if (interval) clearInterval(interval);
     };
   }, []);
 

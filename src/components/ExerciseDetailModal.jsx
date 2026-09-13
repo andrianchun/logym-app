@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Dumbbell, History, Calculator, Replace, Video, Info, ChevronLeft, ChevronRight, Loader2, Play } from 'lucide-react';
 import { formatTarget, resolveProjectedProgramId, defaultMasterExercises, findMatchingMasterExercise, cleanExerciseNameForMatching, canonicalizeExercise, exerciseAliasMap } from '../data/constants';
+import { getCachedExercises, fetchExercisesFromApi } from '../utils/exerciseDbApi';
 import { resolveExerciseKind, estimate10RM, estimate1RM, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from '../utils/workoutCalc';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 import SwipeInput from './SwipeInput';
@@ -219,16 +220,50 @@ const ExerciseDetailModal = ({
     if (!raw) return null;
     const canonical = canonicalizeExercise(raw);
     const masterMatch = findMatchingMasterExercise(canonical, defaultMasterExercises);
+
+    let cachedMatch = null;
+    try {
+      const cached = getCachedExercises();
+      if (cached && cached.length > 0) {
+        const rawId = raw.originalId || raw.id;
+        const aliasTargetId = exerciseAliasMap?.[String(rawId)];
+        if (aliasTargetId) {
+          cachedMatch = cached.find(o => String(o.id) === aliasTargetId || String(o.exerciseId) === aliasTargetId.replace(/^edb-/, ''));
+        }
+        if (!cachedMatch) {
+          cachedMatch = findMatchingMasterExercise(masterMatch || canonical, cached);
+        }
+      }
+    } catch (e) {}
+
+    const instId = (canonical.instructions_id && canonical.instructions_id.length > 0)
+      ? canonical.instructions_id
+      : (masterMatch?.instructions_id && masterMatch.instructions_id.length > 0)
+        ? masterMatch.instructions_id
+        : cachedMatch?.instructions_id || canonical.instructions || masterMatch?.instructions;
+
+    const instEn = (canonical.instructions_en && canonical.instructions_en.length > 0)
+      ? canonical.instructions_en
+      : (masterMatch?.instructions_en && masterMatch.instructions_en.length > 0)
+        ? masterMatch.instructions_en
+        : cachedMatch?.instructions_en || canonical.instructions || masterMatch?.instructions;
+
+    const instructions = (Array.isArray(instId) && instId.length > 0)
+      ? instId
+      : (Array.isArray(instEn) && instEn.length > 0)
+        ? instEn
+        : canonical.instructions || masterMatch?.instructions || cachedMatch?.instructions || [];
+
     return {
       ...masterMatch,
       ...canonical,
-      instructions: masterMatch?.instructions || canonical.instructions,
-      instructions_id: masterMatch?.instructions_id || canonical.instructions_id,
-      instructions_en: masterMatch?.instructions_en || canonical.instructions_en,
-      videoUrl: masterMatch?.videoUrl || canonical.videoUrl || '',
-      thumbnailUrl: masterMatch?.thumbnailUrl || canonical.thumbnailUrl || masterMatch?.gifUrl || canonical.gifUrl || '',
-      gifUrl: masterMatch?.gifUrl || canonical.gifUrl || '',
-      ytVideo: masterMatch?.ytVideo || canonical.ytVideo || '',
+      instructions,
+      instructions_id: instId || instructions,
+      instructions_en: instEn || instructions,
+      videoUrl: masterMatch?.videoUrl || canonical.videoUrl || cachedMatch?.videoUrl || '',
+      thumbnailUrl: masterMatch?.thumbnailUrl || canonical.thumbnailUrl || masterMatch?.gifUrl || canonical.gifUrl || cachedMatch?.thumbnailUrl || cachedMatch?.gifUrl || '',
+      gifUrl: masterMatch?.gifUrl || canonical.gifUrl || cachedMatch?.gifUrl || '',
+      ytVideo: masterMatch?.ytVideo || canonical.ytVideo || cachedMatch?.ytVideo || '',
     };
   };
 
@@ -238,40 +273,42 @@ const ExerciseDetailModal = ({
      const resolved = resolveFullExercise(initialEx);
      setEx(resolved);
      if (initialEx && initialEx.name) {
-         import('../utils/exerciseDbApi').then(({ fetchExercisesFromApi }) => {
-             fetchExercisesFromApi().then(onlineDb => {
-                 let onlineMatch = null;
-                 const rawId = initialEx.originalId || initialEx.id;
-                 const aliasTargetId = exerciseAliasMap?.[String(rawId)];
-                 if (aliasTargetId) {
-                     onlineMatch = onlineDb.find(o => String(o.id) === aliasTargetId || String(o.exerciseId) === aliasTargetId.replace(/^edb-/, ''));
-                 }
-                 if (!onlineMatch) {
-                     onlineMatch = findMatchingMasterExercise(resolved || initialEx, onlineDb);
-                 }
-                 if (onlineMatch) {
-                     setEx(prev => ({ 
-                         ...prev, 
-                         instructions: onlineMatch.instructions || prev?.instructions,
-                         instructions_id: onlineMatch.instructions_id || onlineMatch.instructions || prev?.instructions_id,
-                         instructions_en: onlineMatch.instructions_en || onlineMatch.instructions || prev?.instructions_en,
-                         videoUrl: prev?.videoUrl || onlineMatch.videoUrl,
-                         thumbnailUrl: prev?.thumbnailUrl || onlineMatch.thumbnailUrl || onlineMatch.gifUrl,
-                         gifUrl: prev?.gifUrl || onlineMatch.gifUrl,
-                         equipment: prev?.equipment || onlineMatch.equipment
-                     }));
-                 }
-             });
-         }).catch(() => {});
+       fetchExercisesFromApi().then(onlineDb => {
+         let onlineMatch = null;
+         const rawId = initialEx.originalId || initialEx.id;
+         const aliasTargetId = exerciseAliasMap?.[String(rawId)];
+         if (aliasTargetId) {
+           onlineMatch = onlineDb.find(o => String(o.id) === aliasTargetId || String(o.exerciseId) === aliasTargetId.replace(/^edb-/, ''));
+         }
+         if (!onlineMatch) {
+           onlineMatch = findMatchingMasterExercise(resolved || initialEx, onlineDb);
+         }
+         if (onlineMatch) {
+           setEx(prev => ({ 
+             ...prev, 
+             instructions: (onlineMatch.instructions_id && onlineMatch.instructions_id.length > 0) ? onlineMatch.instructions_id : (onlineMatch.instructions || prev?.instructions),
+             instructions_id: (onlineMatch.instructions_id && onlineMatch.instructions_id.length > 0) ? onlineMatch.instructions_id : (onlineMatch.instructions || prev?.instructions_id),
+             instructions_en: (onlineMatch.instructions_en && onlineMatch.instructions_en.length > 0) ? onlineMatch.instructions_en : (onlineMatch.instructions || prev?.instructions_en),
+             videoUrl: prev?.videoUrl || onlineMatch.videoUrl,
+             thumbnailUrl: prev?.thumbnailUrl || onlineMatch.thumbnailUrl || onlineMatch.gifUrl,
+             gifUrl: prev?.gifUrl || onlineMatch.gifUrl,
+             equipment: prev?.equipment || onlineMatch.equipment
+           }));
+         }
+       }).catch(() => {});
      }
   }, [initialEx]);
 
   const activeInstructions = useMemo(() => {
     if (!ex) return [];
     if (lang?.id === 'EN') {
-      return ex.instructions_en || ex.instructions || [];
+      if (Array.isArray(ex.instructions_en) && ex.instructions_en.length > 0) return ex.instructions_en;
+      if (Array.isArray(ex.instructions) && ex.instructions.length > 0) return ex.instructions;
+      return [];
     }
-    return ex.instructions_id || ex.instructions || [];
+    if (Array.isArray(ex.instructions_id) && ex.instructions_id.length > 0) return ex.instructions_id;
+    if (Array.isArray(ex.instructions) && ex.instructions.length > 0) return ex.instructions;
+    return [];
   }, [ex, lang?.id]);
 
 
@@ -844,12 +881,13 @@ const ExerciseDetailModal = ({
                              <div className={`p-3.5 rounded-xl ${t.bgCard} border ${t.border} text-left text-xs ${t.textMuted} space-y-2 shadow-lg mb-4`}>
                                 <p>Kalkulator RM (Repetition Maximum) digunakan untuk mengestimasi beban maksimal yang bisa kamu angkat berdasarkan set terbaikmu.</p>
                                 <p>Acuan 10RM kamu diambil dari <b>sesi terakhir</b> latihan ini (<b>{best10RM} {isImp ? 'lbs' : 'kg'}</b>){historyMax10RM > best10RM ? <> — rekor tertingginya <b>{historyMax10RM} {isImp ? 'lbs' : 'kg'}</b></> : null}. Jadi angkanya ikut turun kalau kamu deload, dan salah input bisa terkoreksi sendiri di sesi berikutnya. Mau menetapkan acuan sendiri? Sesuaikan angkanya lalu <b>Simpan</b>.</p>
+                                <p className="text-sky-400/90 font-medium">💡 <b>Catatan Beban:</b> Angka RM menggunakan <b>total beban aktual</b> (termasuk stik barbel/sled), sehingga standar kekuatan konsisten di semua alat.</p>
                              </div>
                           )}
    
                           <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <label className={`body-md ${t.textMuted} block mb-0.5`}>Beban ({isImp ? 'lbs' : 'kg'})</label>
+                              <label className={`body-md ${t.textMuted} block mb-0.5`}>Beban Total ({isImp ? 'lbs' : 'kg'})</label>
                               <SwipeInput 
                                 value={calcWeight} 
                                 onChange={(val) => setCalcWeight(Math.max(0, val))} 

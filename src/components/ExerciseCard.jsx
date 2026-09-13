@@ -400,9 +400,16 @@ const ExerciseCard = ({
 
                                     {/* Benchmark Chip */}
                                     {overloadHint.benchmark && (
-                                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-xs font-semibold text-zinc-200 mb-2.5 backdrop-blur-sm shadow-sm">
-                                        {overloadHint.benchmarkLabel && <span className="text-zinc-400 text-[11px] font-medium">{overloadHint.benchmarkLabel}:</span>}
-                                        <span className="text-white font-black">{overloadHint.benchmark}</span>
+                                      <div className="flex flex-col items-center gap-0.5 mb-2.5">
+                                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-xs font-semibold text-zinc-200 backdrop-blur-sm shadow-sm">
+                                          {overloadHint.benchmarkLabel && <span className="text-zinc-400 text-[11px] font-medium">{overloadHint.benchmarkLabel}:</span>}
+                                          <span className="text-white font-black">{overloadHint.benchmark}</span>
+                                        </div>
+                                        {overloadHint.benchmarkDetail && (
+                                          <span className="text-[10px] font-medium text-sky-300/90 tracking-tight">
+                                            ({overloadHint.benchmarkDetail})
+                                          </span>
+                                        )}
                                       </div>
                                     )}
 
@@ -413,10 +420,19 @@ const ExerciseCard = ({
 
                                     {/* Logym Blue 10RM Pill Badge */}
                                     {overloadHint.rm10 && (
-                                      <div className="mt-3.5 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-sky-500/15 border border-sky-400/40 text-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.25)] backdrop-blur-sm">
-                                        <Zap size={13} className="text-sky-400 fill-sky-400/40" />
-                                        <span className="text-[10px] font-bold tracking-wider uppercase text-sky-300/80">10RM Acuan</span>
-                                        <span className="text-xs font-black text-white">{overloadHint.rm10}</span>
+                                      <div className="mt-3.5 flex flex-col items-center gap-1">
+                                        <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-sky-500/15 border border-sky-400/40 text-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.25)] backdrop-blur-sm">
+                                          <Zap size={13} className="text-sky-400 fill-sky-400/40" />
+                                          <span className="text-[10px] font-bold tracking-wider uppercase text-sky-300/80">
+                                            10RM Acuan {overloadHint.hasWeightDiff ? '(Total Aktual)' : ''}
+                                          </span>
+                                          <span className="text-xs font-black text-white">{overloadHint.rm10}</span>
+                                        </div>
+                                        {overloadHint.rm10Detail && (
+                                          <span className="text-[10px] font-semibold text-sky-300/80 tracking-tight">
+                                            (Pasang: {overloadHint.rm10Detail})
+                                          </span>
+                                        )}
                                       </div>
                                     )}
                                   </>

@@ -89,7 +89,7 @@ const CalendarTab = ({
   const [monthRange, setMonthRange] = useState(() => {
     const base = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), 1);
     const range = [];
-    for (let i = -24; i <= 12; i++) {
+    for (let i = -12; i <= 6; i++) {
       range.push(new Date(base.getFullYear(), base.getMonth() + i, 1));
     }
     return range;
@@ -1303,6 +1303,7 @@ const CalendarTab = ({
                 key={`${monthDate.getFullYear()}-${monthDate.getMonth()}`}
                 data-month-key={`${monthDate.getFullYear()}-${monthDate.getMonth()}`}
                 className="mb-6"
+                style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 340px' }}
               >
                 {renderMonthPanel(monthDate)}
               </div>

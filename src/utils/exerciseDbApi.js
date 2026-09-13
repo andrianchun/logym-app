@@ -37,7 +37,10 @@ const ytVideoMap = {
   'smith machine bench press': 'https://youtu.be/gQ3afio08V8?si=DfCKjmSAhUMXjMl_',
   'cable rear delt fly': 'https://youtu.be/cGXBVOc5xIk?si=ve9zzcNdiyNqYF5I https://youtu.be/IeOqdw9WI90?si=J4oHxFNn7257r3ak',
   'cable rope overhead triceps extension': 'https://youtu.be/9Ark9S11uXw?si=pEAe5tf66v5yUToU https://youtu.be/NTk0Igxqcsk?si=zX7dHQL0VyHURoC_',
-  'high cable curls': 'https://youtu.be/CrbTqNOlFgE?si=xKanrhppuvUAudTj',
+  'standing biceps cable curl': 'https://youtu.be/CrbTqNOlFgE?si=xKanrhppuvUAudTj',
+  'biceps cable curl': 'https://youtu.be/CrbTqNOlFgE?si=xKanrhppuvUAudTj',
+  'cable bicep curl': 'https://youtu.be/CrbTqNOlFgE?si=xKanrhppuvUAudTj',
+  'cable biceps curl': 'https://youtu.be/CrbTqNOlFgE?si=xKanrhppuvUAudTj',
   'split squat with dumbbells': 'https://youtu.be/or1frhkjBDc?si=FR7v-hKp_QP4-Rpn',
   'pull through': 'https://youtu.be/sFQtAuiVwyo?si=GQLiGcITyE4Yzp3G',
   'cable pull through': 'https://youtu.be/sFQtAuiVwyo?si=GQLiGcITyE4Yzp3G',
@@ -212,8 +215,21 @@ export const mapToLyFitFormat = (apiEx) => {
   // Inject user custom youtube videos if available
   const mappedYtVideo = ytVideoMap[apiEx.name?.toLowerCase()] || apiEx.ytVideo || apiEx.videoUrl || '';
 
+  const instId = (Array.isArray(apiEx.instructions_id) && apiEx.instructions_id.length > 0)
+    ? apiEx.instructions_id
+    : (Array.isArray(apiEx.instructions) && apiEx.instructions.length > 0)
+      ? apiEx.instructions
+      : [];
+
+  const instEn = (Array.isArray(apiEx.instructions_en) && apiEx.instructions_en.length > 0)
+    ? apiEx.instructions_en
+    : (Array.isArray(apiEx.instructions) && apiEx.instructions.length > 0)
+      ? apiEx.instructions
+      : [];
+
   return {
     id: `edb-${apiEx.exerciseId || apiEx.name?.replace(/\s+/g, '_')}`,
+    exerciseId: apiEx.exerciseId || (apiEx.id ? String(apiEx.id) : undefined),
     name: capitalizeWords(apiEx.name || 'Unknown Exercise'),
     target: translatedTargets.length > 0 ? translatedTargets : ['Full Body'],
     type,
@@ -223,9 +239,10 @@ export const mapToLyFitFormat = (apiEx) => {
     thumbnailUrl: apiEx.thumbnailUrl || '',
     ytVideo: mappedYtVideo,
     gifUrl: apiEx.gifUrl || '',
-    instructions: apiEx.instructions_id || apiEx.instructions || [],
-    instructions_id: apiEx.instructions_id || apiEx.instructions || [],
-    instructions_en: apiEx.instructions_en || apiEx.instructions || [],
+    instructions: instId.length > 0 ? instId : instEn,
+    instructions_id: instId,
+    instructions_en: instEn,
+    aliases: Array.isArray(apiEx.aliases) ? apiEx.aliases : [],
     source: apiEx.source || 'exercisedb',
   };
 };

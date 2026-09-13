@@ -10,7 +10,7 @@ import AlternativeExerciseModal from '../components/AlternativeExerciseModal';
 import CreatePostModal from '../components/CreatePostModal';
 import useDialog from '../hooks/useDialog';
 import { getPlanBgConfig } from '../utils/planBg';
-import { defaultSetWeight, gymStepFor } from '../utils/workoutCalc';
+import { defaultSetWeight, gymStepFor, getEquipmentConfig } from '../utils/workoutCalc';
 import UserProfileModal from '../components/UserProfileModal';
 import GymAIChat from '../components/GymAIChat';
 
@@ -889,8 +889,10 @@ const ProgramTab = ({
                                      )}
                                      {(r.exercises || []).map(ex => {
                                          const libEx = exerciseLibrary?.find(e => e.id === ex.id || e.name?.toLowerCase() === ex.name?.toLowerCase());
-                                         const step = gymStepFor(gymProfiles, gymProfiles?.[0]?.id, ex.equipment || libEx?.equipment);
-                                         const kg = (ex.type || libEx?.type) === 'time' ? 0 : defaultSetWeight(libEx, ex, step);
+                                         const activeGym = activeGymId || gymProfiles?.[0]?.id;
+                                         const eqConf = getEquipmentConfig(gymProfiles, activeGym, ex || libEx, userProfile);
+                                         const step = gymStepFor(gymProfiles, activeGym, ex.equipment || libEx?.equipment);
+                                         const kg = (ex.type || libEx?.type) === 'time' ? 0 : defaultSetWeight(libEx, ex, step, eqConf);
                                          const takaran = (ex.type || libEx?.type) === 'time'
                                              ? `${ex.sets || 1} × ${ex.duration || 0} mnt`
                                              : `${ex.sets || 0} × ${ex.reps || 0}${kg > 0 ? ` × ${kg} kg` : ''}`;
