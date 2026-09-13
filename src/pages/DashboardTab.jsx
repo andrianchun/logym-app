@@ -1131,6 +1131,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                          <div className="flex flex-col flex-1 justify-end">
                              <div className={`flex items-baseline space-x-1 ${NUM_ROW}`}>
                                  <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{formatNumber(nutritionCalories, language) || '-'}</span>
+                                 <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold whitespace-nowrap">/ {formatNumber(foodTarget, language)} kkal</span>
                              </div>
                              {/* Bar progres ke target makan — targetnya (`foodTarget`) sudah ada di sini
                                  sejak dulu tapi belum pernah dipakai. Sekalian menyamakan tinggi kotak

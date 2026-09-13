@@ -242,7 +242,7 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
                   return targetActive;
               })(),
               targetSleep: histBio?.targetSleep || targetSleepH,
-              targetCalories: histBio?.targetCalories || lomealTargets?.kcal || targetBurn || null,
+              targetCalories: lomealTargets?.kcal || histBio?.targetCalories || targetBurn || null,
               topBurnKey,
               topSleepKey,
               topActKey,

@@ -388,7 +388,10 @@ export default function App() {
     if (!isDataLoaded) return;
     const { weight, height, dob, gender, activityLevel } = userProfile || {};
     if (!weight || !height || !dob || !gender) return;
-    const age = new Date().getFullYear() - new Date(dob).getFullYear();
+    const dobObj = new Date(dob);
+    let age = new Date().getFullYear() - dobObj.getFullYear();
+    const m = new Date().getMonth() - dobObj.getMonth();
+    if (m < 0 || (m === 0 && new Date().getDate() < dobObj.getDate())) age--;
     const bmr = calcBMR({ weight, height, age, gender });
     if (!bmr) return;
     const tdee = Math.round(bmr * (ACTIVITY_MULTIPLIERS[activityLevel] || 1.2));
@@ -1558,6 +1561,7 @@ export default function App() {
   useEffect(() => {
      if (!isDataLoaded || !activityTargets) return;
      const todayStr = getLocalYMD(new Date());
+     const effectiveTargetCal = lomealTargets?.kcal || activityTargets.activityCalories;
      setHistory(prev => {
         const existingBio = prev[todayStr]?.bioData || {};
         
@@ -1565,7 +1569,7 @@ export default function App() {
            existingBio.targetSteps === activityTargets.steps &&
            existingBio.targetActiveMinutes === (activityTargets.dailyActiveMinutes || (activityTargets.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 5) : 30)) &&
            existingBio.targetSleep === activityTargets.sleep &&
-           existingBio.targetCalories === activityTargets.activityCalories
+           existingBio.targetCalories === effectiveTargetCal
         ) {
            return prev;
         }
@@ -1579,12 +1583,12 @@ export default function App() {
                    targetSteps: activityTargets.steps,
                    targetActiveMinutes: activityTargets.dailyActiveMinutes || (activityTargets.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 5) : 30),
                    targetSleep: activityTargets.sleep,
-                   targetCalories: activityTargets.activityCalories,
+                   targetCalories: effectiveTargetCal,
                }
            }
         };
      });
-  }, [isDataLoaded, activityTargets]);
+  }, [isDataLoaded, activityTargets, lomealTargets?.kcal]);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
