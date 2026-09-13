@@ -242,7 +242,17 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
                   return targetActive;
               })(),
               targetSleep: histBio?.targetSleep || targetSleepH,
-              targetCalories: lomealTargets?.kcal || histBio?.targetCalories || targetBurn || null,
+              targetCalories: (() => {
+                  if (lomealTargets?.kcal) {
+                      const baseTdee = Number(lomealTargets.tdee) || Number(lomealTargets.kcal) || 0;
+                      const programDelta = Number(lomealTargets.kcal || 0) - baseTdee;
+                      if (actCals > baseTdee) {
+                          return Math.round(actCals + programDelta);
+                      }
+                      return lomealTargets.kcal;
+                  }
+                  return histBio?.targetCalories || targetBurn || null;
+              })(),
               topBurnKey,
               topSleepKey,
               topActKey,
