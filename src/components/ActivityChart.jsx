@@ -14,8 +14,8 @@ const CustomStackedBarShape = (props) => {
   const clampedHeight = Math.max(1, height - (clampedY - y));
   const safeWidth = Math.max(1, width);
 
-  const isTop = payload?.topBurnKey === dataKey || payload?.topSleepKey === dataKey || payload?.topActKey === dataKey;
-  const r = isTop ? Math.min(safeWidth / 2, clampedHeight, 14) : 0;
+  const isTop = payload?.topBurnKey === dataKey || payload?.topSleepKey === dataKey || payload?.topActKey === dataKey || dataKey === 'nutritionCalories';
+  const r = isTop ? Math.min(safeWidth / 2, clampedHeight, 18) : 0;
 
   if (r > 0) {
     // Kapsul mulus dengan bagian bawah RATA (flat bottom) agar menyatu rapat tanpa celah
@@ -35,9 +35,16 @@ const CustomStackedBarShape = (props) => {
   );
 };
 
-// Warna garis target, disamakan persis dengan grafik Lomeal (NutritionChart.jsx) supaya "garis
-// kuning = target" berarti sama di kedua app.
 const TARGET_COLOR = (theme) => (theme === 'dark' ? '#facc15' : '#eab308');
+
+const DAY_MIN_PW = 20;
+const MONTH_MIN_PW = 10;
+
+const monthKeyOf = (dateStr) => (dateStr ? dateStr.substring(0, 7) : '');
+const yearKeyOf = (dateStr) => (dateStr ? dateStr.substring(0, 4) : '');
+const avg = (arr) => arr && arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+const round1 = (val) => val != null ? Number(Number(val).toFixed(1)) : null;
+const roundInt = (val) => val != null ? Math.round(Number(val)) : null;
 
 // metricKeys: subset opsional dari metrik di bawah yang mau ditampilin — dipakai buat misahin
 // grafik Aktivitas Harian (langkah/kalori/durasi) dari grafik Tidur & Pemulihan (tidur/skor
@@ -57,7 +64,7 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
       { key: 'calories', label: 'Kalori', color: theme === 'dark' ? '#818cf8' : '#4f46e5', type: 'grouped',  // Indigo
         target: 'targetCalories',
         subMetrics: [
-            { key: 'nutritionCalories', label: 'Masuk', color: theme === 'dark' ? '#34d399' : '#059669' },
+            { key: 'nutritionCalories', label: 'Masuk', color: theme === 'dark' ? '#34d399' : '#059669', stackId: 'eat', top: true },
             { key: 'calBmr', label: 'BMR', color: theme === 'dark' ? '#3b82f6' : '#2563eb', stackId: 'burn' }, // Logym blue
             { key: 'calSteps', label: 'Langkah', color: theme === 'dark' ? '#818cf8' : '#6366f1', stackId: 'burn' }, // Indigo
             { key: 'calCardio', label: 'Kardio', color: theme === 'dark' ? '#9ca3af' : '#6b7280', stackId: 'burn' }, // Gray
@@ -196,6 +203,7 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
           let topActKey = null;
           if (act.total > 0 && act.weightMinutes > 0) topActKey = 'actWeights';
           else if (act.total > 0 && act.cardioMinutes > 0) topActKey = 'actCardio';
+          else if (act.total > 0 && act.isManual) topActKey = 'actManual';
           else if (act.total > 0 && act.stepMinutes > 0) topActKey = 'actSteps';
 
           data.push({
@@ -259,34 +267,363 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
           });
       });
       return data;
+  }, [history, lomealToday, userWeight, activityTargets, userProfile, lomealTargets, chartId]);
+
   // userProfile: lihat catatan yang sama di DashboardTab — profil tiba setelah render pertama.
-  }, [history, lomealToday, activityTargets, lomealTargets, userWeight, userProfile]);
+  // 2. Data agregasi rata-rata per bulan
+  const monthlyPoints = useMemo(() => {
+    const byMonth = {};
+    multiChartData.forEach(p => {
+      const k = monthKeyOf(p.dateFull);
+      if (!byMonth[k]) {
+        byMonth[k] = {
+          ts: [],
+          dates: [],
+          steps: [],
+          nutritionCalories: [],
+          activityCalories: [],
+          calBmr: [],
+          calSteps: [],
+          calCardio: [],
+          calWeights: [],
+          activeMinutes: [],
+          actSteps: [],
+          actManual: [],
+          actCardio: [],
+          actWeights: [],
+          sleep: [],
+          sleepDeepH: [],
+          sleepLightH: [],
+          sleepRemH: [],
+          sleepAwakeH: [],
+          sleepTotalOnly: [],
+          energyScore: [],
+          targetSteps: [],
+          targetActiveMinutes: [],
+          targetSleep: [],
+          targetCalories: [],
+        };
+      }
+      const dObj = new Date(p.dateFull);
+      byMonth[k].ts.push(dObj.getTime());
+      byMonth[k].dates.push(p.dateFull);
+      if (p.steps != null) byMonth[k].steps.push(p.steps);
+      if (p.nutritionCalories != null) byMonth[k].nutritionCalories.push(p.nutritionCalories);
+      if (p.activityCalories != null) byMonth[k].activityCalories.push(p.activityCalories);
+      if (p.calBmr != null) byMonth[k].calBmr.push(p.calBmr);
+      if (p.calSteps != null) byMonth[k].calSteps.push(p.calSteps);
+      if (p.calCardio != null) byMonth[k].calCardio.push(p.calCardio);
+      if (p.calWeights != null) byMonth[k].calWeights.push(p.calWeights);
+      if (p.activeMinutes != null) byMonth[k].activeMinutes.push(p.activeMinutes);
+      if (p.actSteps != null) byMonth[k].actSteps.push(p.actSteps);
+      if (p.actManual != null) byMonth[k].actManual.push(p.actManual);
+      if (p.actCardio != null) byMonth[k].actCardio.push(p.actCardio);
+      if (p.actWeights != null) byMonth[k].actWeights.push(p.actWeights);
+      if (p.sleep != null) byMonth[k].sleep.push(p.sleep);
+      if (p.sleepDeepH != null) byMonth[k].sleepDeepH.push(p.sleepDeepH);
+      if (p.sleepLightH != null) byMonth[k].sleepLightH.push(p.sleepLightH);
+      if (p.sleepRemH != null) byMonth[k].sleepRemH.push(p.sleepRemH);
+      if (p.sleepAwakeH != null) byMonth[k].sleepAwakeH.push(p.sleepAwakeH);
+      if (p.sleepTotalOnly != null) byMonth[k].sleepTotalOnly.push(p.sleepTotalOnly);
+      if (p.energyScore != null) byMonth[k].energyScore.push(p.energyScore);
+      if (p.targetSteps != null) byMonth[k].targetSteps.push(p.targetSteps);
+      if (p.targetActiveMinutes != null) byMonth[k].targetActiveMinutes.push(p.targetActiveMinutes);
+      if (p.targetSleep != null) byMonth[k].targetSleep.push(p.targetSleep);
+      if (p.targetCalories != null) byMonth[k].targetCalories.push(p.targetCalories);
+    });
+
+    return Object.entries(byMonth).map(([k, v]) => {
+      const avgTs = avg(v.ts);
+      const d = new Date(avgTs);
+      const weightCals = roundInt(avg(v.calWeights)) || 0;
+      const cardioCals = roundInt(avg(v.calCardio)) || 0;
+      const stepCals = roundInt(avg(v.calSteps)) || 0;
+      const bmrShown = roundInt(avg(v.calBmr)) || 0;
+
+      let topBurnKey = null;
+      if (weightCals > 0) topBurnKey = 'calWeights';
+      else if (cardioCals > 0) topBurnKey = 'calCardio';
+      else if (stepCals > 0) topBurnKey = 'calSteps';
+      else if (bmrShown > 0) topBurnKey = 'calBmr';
+
+      const awakeH = round1(avg(v.sleepAwakeH)) || 0;
+      const remH = round1(avg(v.sleepRemH)) || 0;
+      const lightH = round1(avg(v.sleepLightH)) || 0;
+      const deepH = round1(avg(v.sleepDeepH)) || 0;
+      const totalOnly = round1(avg(v.sleepTotalOnly)) || 0;
+
+      let topSleepKey = null;
+      if (totalOnly > 0 && deepH === 0 && lightH === 0) topSleepKey = 'sleepTotalOnly';
+      else if (awakeH > 0) topSleepKey = 'sleepAwakeH';
+      else if (remH > 0) topSleepKey = 'sleepRemH';
+      else if (lightH > 0) topSleepKey = 'sleepLightH';
+      else if (deepH > 0) topSleepKey = 'sleepDeepH';
+
+      const actWeights = roundInt(avg(v.actWeights)) || 0;
+      const actCardio = roundInt(avg(v.actCardio)) || 0;
+      const actSteps = roundInt(avg(v.actSteps)) || 0;
+      const actManual = roundInt(avg(v.actManual)) || 0;
+
+      let topActKey = null;
+      if (actWeights > 0) topActKey = 'actWeights';
+      else if (actCardio > 0) topActKey = 'actCardio';
+      else if (actManual > 0) topActKey = 'actManual';
+      else if (actSteps > 0) topActKey = 'actSteps';
+
+      return {
+        ts: avgTs,
+        name: d.toLocaleDateString('id-ID', { month: 'short', year: '2-digit' }),
+        periodLabel: d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' }),
+        dateFull: v.dates[v.dates.length - 1],
+        steps: roundInt(avg(v.steps)),
+        nutritionCalories: roundInt(avg(v.nutritionCalories)),
+        activityCalories: roundInt(avg(v.activityCalories)),
+        calBmr: bmrShown > 0 ? bmrShown : null,
+        calSteps: stepCals > 0 ? stepCals : null,
+        calCardio: cardioCals > 0 ? cardioCals : null,
+        calWeights: weightCals > 0 ? weightCals : null,
+        activeMinutes: roundInt(avg(v.activeMinutes)),
+        actSteps: actSteps > 0 ? actSteps : null,
+        actManual: actManual > 0 ? actManual : null,
+        actCardio: actCardio > 0 ? actCardio : null,
+        actWeights: actWeights > 0 ? actWeights : null,
+        sleep: round1(avg(v.sleep)),
+        sleepDeepH: deepH > 0 ? deepH : null,
+        sleepLightH: lightH > 0 ? lightH : null,
+        sleepRemH: remH > 0 ? remH : null,
+        sleepAwakeH: awakeH > 0 ? awakeH : null,
+        sleepTotalOnly: totalOnly > 0 ? totalOnly : null,
+        energyScore: roundInt(avg(v.energyScore)),
+        targetSteps: roundInt(avg(v.targetSteps)),
+        targetActiveMinutes: roundInt(avg(v.targetActiveMinutes)),
+        targetSleep: round1(avg(v.targetSleep)),
+        targetCalories: roundInt(avg(v.targetCalories)),
+        topBurnKey,
+        topSleepKey,
+        topActKey,
+        count: v.ts.length,
+      };
+    }).sort((a, b) => a.ts - b.ts);
+  }, [multiChartData]);
+
+  // 3. Data agregasi rata-rata per tahun
+  const yearlyPoints = useMemo(() => {
+    const byYear = {};
+    monthlyPoints.forEach(p => {
+      const k = yearKeyOf(p.dateFull);
+      if (!byYear[k]) {
+        byYear[k] = {
+          ts: [],
+          dates: [],
+          steps: [],
+          nutritionCalories: [],
+          activityCalories: [],
+          calBmr: [],
+          calSteps: [],
+          calCardio: [],
+          calWeights: [],
+          activeMinutes: [],
+          actSteps: [],
+          actManual: [],
+          actCardio: [],
+          actWeights: [],
+          sleep: [],
+          sleepDeepH: [],
+          sleepLightH: [],
+          sleepRemH: [],
+          sleepAwakeH: [],
+          sleepTotalOnly: [],
+          energyScore: [],
+          targetSteps: [],
+          targetActiveMinutes: [],
+          targetSleep: [],
+          targetCalories: [],
+        };
+      }
+      const dObj = new Date(p.ts);
+      byYear[k].ts.push(dObj.getTime());
+      byYear[k].dates.push(p.dateFull);
+      if (p.steps != null) byYear[k].steps.push(p.steps);
+      if (p.nutritionCalories != null) byYear[k].nutritionCalories.push(p.nutritionCalories);
+      if (p.activityCalories != null) byYear[k].activityCalories.push(p.activityCalories);
+      if (p.calBmr != null) byYear[k].calBmr.push(p.calBmr);
+      if (p.calSteps != null) byYear[k].calSteps.push(p.calSteps);
+      if (p.calCardio != null) byYear[k].calCardio.push(p.calCardio);
+      if (p.calWeights != null) byYear[k].calWeights.push(p.calWeights);
+      if (p.activeMinutes != null) byYear[k].activeMinutes.push(p.activeMinutes);
+      if (p.actSteps != null) byYear[k].actSteps.push(p.actSteps);
+      if (p.actManual != null) byYear[k].actManual.push(p.actManual);
+      if (p.actCardio != null) byYear[k].actCardio.push(p.actCardio);
+      if (p.actWeights != null) byYear[k].actWeights.push(p.actWeights);
+      if (p.sleep != null) byYear[k].sleep.push(p.sleep);
+      if (p.sleepDeepH != null) byYear[k].sleepDeepH.push(p.sleepDeepH);
+      if (p.sleepLightH != null) byYear[k].sleepLightH.push(p.sleepLightH);
+      if (p.sleepRemH != null) byYear[k].sleepRemH.push(p.sleepRemH);
+      if (p.sleepAwakeH != null) byYear[k].sleepAwakeH.push(p.sleepAwakeH);
+      if (p.sleepTotalOnly != null) byYear[k].sleepTotalOnly.push(p.sleepTotalOnly);
+      if (p.energyScore != null) byYear[k].energyScore.push(p.energyScore);
+      if (p.targetSteps != null) byYear[k].targetSteps.push(p.targetSteps);
+      if (p.targetActiveMinutes != null) byYear[k].targetActiveMinutes.push(p.targetActiveMinutes);
+      if (p.targetSleep != null) byYear[k].targetSleep.push(p.targetSleep);
+      if (p.targetCalories != null) byYear[k].targetCalories.push(p.targetCalories);
+    });
+
+    return Object.entries(byYear).map(([k, v]) => {
+      const avgTs = avg(v.ts);
+      const d = new Date(avgTs);
+      const weightCals = roundInt(avg(v.calWeights)) || 0;
+      const cardioCals = roundInt(avg(v.calCardio)) || 0;
+      const stepCals = roundInt(avg(v.calSteps)) || 0;
+      const bmrShown = roundInt(avg(v.calBmr)) || 0;
+
+      let topBurnKey = null;
+      if (weightCals > 0) topBurnKey = 'calWeights';
+      else if (cardioCals > 0) topBurnKey = 'calCardio';
+      else if (stepCals > 0) topBurnKey = 'calSteps';
+      else if (bmrShown > 0) topBurnKey = 'calBmr';
+
+      const awakeH = round1(avg(v.sleepAwakeH)) || 0;
+      const remH = round1(avg(v.sleepRemH)) || 0;
+      const lightH = round1(avg(v.sleepLightH)) || 0;
+      const deepH = round1(avg(v.sleepDeepH)) || 0;
+      const totalOnly = round1(avg(v.sleepTotalOnly)) || 0;
+
+      let topSleepKey = null;
+      if (totalOnly > 0 && deepH === 0 && lightH === 0) topSleepKey = 'sleepTotalOnly';
+      else if (awakeH > 0) topSleepKey = 'sleepAwakeH';
+      else if (remH > 0) topSleepKey = 'sleepRemH';
+      else if (lightH > 0) topSleepKey = 'sleepLightH';
+      else if (deepH > 0) topSleepKey = 'sleepDeepH';
+
+      const actWeights = roundInt(avg(v.actWeights)) || 0;
+      const actCardio = roundInt(avg(v.actCardio)) || 0;
+      const actSteps = roundInt(avg(v.actSteps)) || 0;
+      const actManual = roundInt(avg(v.actManual)) || 0;
+
+      let topActKey = null;
+      if (actWeights > 0) topActKey = 'actWeights';
+      else if (actCardio > 0) topActKey = 'actCardio';
+      else if (actManual > 0) topActKey = 'actManual';
+      else if (actSteps > 0) topActKey = 'actSteps';
+
+      return {
+        ts: avgTs,
+        name: String(d.getFullYear()),
+        periodLabel: `Tahun ${d.getFullYear()}`,
+        dateFull: v.dates[v.dates.length - 1],
+        steps: roundInt(avg(v.steps)),
+        nutritionCalories: roundInt(avg(v.nutritionCalories)),
+        activityCalories: roundInt(avg(v.activityCalories)),
+        calBmr: bmrShown > 0 ? bmrShown : null,
+        calSteps: stepCals > 0 ? stepCals : null,
+        calCardio: cardioCals > 0 ? cardioCals : null,
+        calWeights: weightCals > 0 ? weightCals : null,
+        activeMinutes: roundInt(avg(v.activeMinutes)),
+        actSteps: actSteps > 0 ? actSteps : null,
+        actManual: actManual > 0 ? actManual : null,
+        actCardio: actCardio > 0 ? actCardio : null,
+        actWeights: actWeights > 0 ? actWeights : null,
+        sleep: round1(avg(v.sleep)),
+        sleepDeepH: deepH > 0 ? deepH : null,
+        sleepLightH: lightH > 0 ? lightH : null,
+        sleepRemH: remH > 0 ? remH : null,
+        sleepAwakeH: awakeH > 0 ? awakeH : null,
+        sleepTotalOnly: totalOnly > 0 ? totalOnly : null,
+        energyScore: roundInt(avg(v.energyScore)),
+        targetSteps: roundInt(avg(v.targetSteps)),
+        targetActiveMinutes: roundInt(avg(v.targetActiveMinutes)),
+        targetSleep: round1(avg(v.targetSleep)),
+        targetCalories: roundInt(avg(v.targetCalories)),
+        topBurnKey,
+        topSleepKey,
+        topActKey,
+        count: v.ts.length,
+      };
+    }).sort((a, b) => a.ts - b.ts);
+  }, [monthlyPoints]);
 
   const scrollRef = useRef(null);
 
   // Pinch-to-zoom logic
-  const [pointWidth, setPointWidth] = useState(45);
+  const [pointWidth, setPointWidth] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`${storageKey}_pointWidth`);
+      if (saved) return Number(saved);
+    } catch(e) {}
+    return 32;
+  });
+  useEffect(() => {
+    localStorage.setItem(`${storageKey}_pointWidth`, pointWidth);
+  }, [pointWidth, storageKey]);
+
+  const resolutionRef = useRef(pointWidth >= DAY_MIN_PW ? 'day' : pointWidth >= MONTH_MIN_PW ? 'month' : 'year');
+  const resolution = useMemo(() => {
+    let cur = resolutionRef.current;
+    if (cur === 'day' && pointWidth < 18) cur = 'month';
+    else if (cur === 'month') {
+      if (pointWidth > 24) cur = 'day';
+      else if (pointWidth < 8) cur = 'year';
+    } else if (cur === 'year' && pointWidth > 12) cur = 'month';
+
+    if (cur !== resolutionRef.current) {
+      resolutionRef.current = cur;
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        try { navigator.vibrate(25); } catch(e) {}
+      }
+    }
+    return cur;
+  }, [pointWidth]);
+
+  const chartData = resolution === 'day' ? multiChartData : resolution === 'month' ? monthlyPoints : yearlyPoints;
+
+  const clientW = typeof window !== 'undefined' ? (window.innerWidth - 64) : 320;
+
+  // Lebar slot per item: seragam, padat, dan rapat tanpa rongga lebar
+  const slotWidth = useMemo(() => {
+    if (resolution === 'day') {
+      return Math.max(20, Math.min(28, Math.round(pointWidth)));
+    } else if (resolution === 'month') {
+      return 28;
+    } else {
+      return 32;
+    }
+  }, [resolution, pointWidth]);
+
+  const slotWidthRef = useRef(slotWidth);
+  useEffect(() => { slotWidthRef.current = slotWidth; }, [slotWidth]);
+
+  const singleBarSize = Math.max(16, slotWidth - 4);
+  const subBarSize = Math.max(10, Math.round((slotWidth - 6) / 2));
+  const stackedBarSize = activeMetric === 'calories' ? subBarSize : singleBarSize;
+
+  const contentWidth = Math.max(chartData.length * slotWidth, 40);
+  const isCentered = contentWidth < clientW;
+
   const [visibleRange, setVisibleRange] = useState(() => ({
-      start: Math.max(0, (multiChartData?.length || 35) - 35),
-      end: Math.max(35, (multiChartData?.length || 35) - 1),
+      start: Math.max(0, (chartData?.length || 35) - 35),
+      end: Math.max(35, (chartData?.length || 35) - 1),
   }));
   const touchState = useRef({ initialDist: 0, initialPointWidth: 45, pinchRatio: 0, scrollRelCenterX: 0 });
 
   const updateVisibleRange = useCallback(() => {
       const el = scrollRef.current;
-      if (!el || multiChartData.length === 0) return;
+      if (!el || chartData.length === 0) return;
+      if (contentWidth <= clientW) {
+          setVisibleRange({ start: 0, end: chartData.length - 1 });
+          return;
+      }
       const sLeft = el.scrollLeft;
-      const cWidth = el.clientWidth || (window.innerWidth - 64);
-      const pWidth = pointWidthRef.current || 45;
+      const cWidth = el.clientWidth || clientW;
+      const sWidth = slotWidthRef.current || 28;
 
-      const start = Math.max(0, Math.floor(sLeft / pWidth));
-      const end = Math.min(multiChartData.length - 1, Math.ceil((sLeft + cWidth) / pWidth));
+      const start = Math.max(0, Math.floor(sLeft / sWidth));
+      const end = Math.min(chartData.length - 1, Math.ceil((sLeft + cWidth) / sWidth));
 
       setVisibleRange(prev => {
           if (prev.start === start && prev.end === end) return prev;
           return { start, end };
       });
-  }, [multiChartData.length]);
+  }, [contentWidth, clientW, chartData.length]);
 
   const scrollTimeoutRef = useRef(null);
 
@@ -317,30 +654,41 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
   const scrollToLatest = useCallback(() => {
       const el = scrollRef.current;
       if (!el) return;
+      if (contentWidth <= clientW) {
+          el.scrollLeft = 0;
+          updateVisibleRange();
+          return;
+      }
       const target = Math.max(0, el.scrollWidth - el.clientWidth);
       el.scrollLeft = target;
 
       requestAnimationFrame(() => {
-          if (el) el.scrollLeft = Math.max(0, el.scrollWidth - el.clientWidth);
+          if (el) el.scrollLeft = contentWidth <= clientW ? 0 : Math.max(0, el.scrollWidth - el.clientWidth);
           updateVisibleRange();
       });
       setTimeout(() => {
-          if (el) el.scrollLeft = Math.max(0, el.scrollWidth - el.clientWidth);
+          if (el) el.scrollLeft = contentWidth <= clientW ? 0 : Math.max(0, el.scrollWidth - el.clientWidth);
           updateVisibleRange();
       }, 50);
       setTimeout(() => {
-          if (el) el.scrollLeft = Math.max(0, el.scrollWidth - el.clientWidth);
+          if (el) el.scrollLeft = contentWidth <= clientW ? 0 : Math.max(0, el.scrollWidth - el.clientWidth);
           updateVisibleRange();
       }, 180);
-  }, [updateVisibleRange]);
+  }, [contentWidth, clientW, updateVisibleRange]);
 
-  // Auto scroll ke data terbaru, default zoom 30 hari terakhir
+  // Auto scroll ke data terbaru, default zoom 30 hari terakhir (hanya jika belum ada saved zoom)
+  const hasInitializedZoom = useRef(false);
   useEffect(() => {
-     if (multiChartData.length > 0) {
-        const data = multiChartData;
-        const clientW = scrollRef.current?.clientWidth || (window.innerWidth - 64);
+     if (multiChartData.length > 0 && !hasInitializedZoom.current) {
+        hasInitializedZoom.current = true;
+        const savedPw = localStorage.getItem(`${storageKey}_pointWidth`);
 
-        // Hitung window 30 hari terakhir dari data point paling akhir
+        if (savedPw) {
+           scrollToLatest();
+           return;
+        }
+
+        const data = multiChartData;
         const latestIdx = data.length - 1;
         const latestDate = new Date(data[latestIdx].dateFull);
         const oneMonthAgo = new Date(latestDate.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -352,9 +700,9 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
         }
 
         const numPoints = latestIdx - startIdx + 1;
-        let newPointWidth = clientW / Math.max(1.5, numPoints);
-        if (newPointWidth > 200) newPointWidth = 200;
-        if (newPointWidth < 25) newPointWidth = 25;
+        let newPointWidth = clientW / Math.max(10, numPoints);
+        if (newPointWidth > 32) newPointWidth = 32;
+        if (newPointWidth < 22) newPointWidth = 22;
         setPointWidth(newPointWidth);
 
         // Scroll ke ujung kanan data terbaru
@@ -362,22 +710,48 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
         if (scrollTarget.current < 0) scrollTarget.current = 0;
         scrollToLatest();
      }
-  }, [multiChartData.length, scrollToLatest]);
+  }, [multiChartData.length, scrollToLatest, storageKey, clientW]);
 
   const scrollTarget = useRef(null);
   const pointWidthRef = useRef(pointWidth);
   useEffect(() => { pointWidthRef.current = pointWidth; }, [pointWidth]);
   const rafRef = useRef(null);
 
+  // Deteksi pergantian resolusi (day <-> month <-> year): reset scrollTarget agar tidak melompat off-screen
+  const prevResolutionRef = useRef(resolution);
   useEffect(() => {
-     if (scrollTarget.current !== null && scrollRef.current) {
-         scrollRef.current.scrollLeft = scrollTarget.current;
-         scrollTarget.current = null;
-         updateVisibleRange();
-     } else {
-         scrollToLatest();
-     }
-  }, [pointWidth, scrollToLatest, updateVisibleRange]);
+    if (prevResolutionRef.current !== resolution) {
+      prevResolutionRef.current = resolution;
+      if (touchState.current.initialDist > 0) {
+        // Sedang pinch-to-zoom: posisi scroll dijaga oleh pinch handler tanpa interupsi scrollToLatest
+        return;
+      }
+      scrollTarget.current = null;
+      if (contentWidth <= clientW && scrollRef.current) {
+        scrollRef.current.scrollLeft = 0;
+        updateVisibleRange();
+      } else {
+        scrollToLatest();
+      }
+    }
+  }, [resolution, contentWidth, clientW, scrollToLatest, updateVisibleRange]);
+
+  useEffect(() => {
+      if (contentWidth <= clientW) {
+          if (scrollRef.current) scrollRef.current.scrollLeft = 0;
+          scrollTarget.current = null;
+          updateVisibleRange();
+          return;
+      }
+      if (scrollTarget.current !== null && scrollRef.current) {
+          const maxScroll = Math.max(0, scrollRef.current.scrollWidth - scrollRef.current.clientWidth);
+          scrollRef.current.scrollLeft = Math.max(0, Math.min(maxScroll, scrollTarget.current));
+          scrollTarget.current = null;
+          updateVisibleRange();
+      } else {
+          updateVisibleRange();
+      }
+   }, [pointWidth, chartData, contentWidth, clientW, updateVisibleRange]);
 
   // Selalu tampilkan data terbaru saat user mengganti tab metrik
   useEffect(() => {
@@ -385,7 +759,7 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
   }, [activeMetric, scrollToLatest]);
 
   const yDomain = useMemo(() => {
-      if (multiChartData.length === 0) return ['auto', 'auto'];
+      if (chartData.length === 0) return ['auto', 'auto'];
       const activeObj = chartMetricsList.find(m => m.key === activeMetric);
       if (!activeObj || activeObj.isExtra) return ['auto', 'auto'];
 
@@ -395,10 +769,10 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
 
       // Ambil HANYA data yang sedang terlihat di layar (viewport) saat digeser/scroll
       const start = Math.max(0, visibleRange.start);
-      const end = Math.min(multiChartData.length - 1, visibleRange.end);
-      const visibleData = (start <= end && multiChartData.length > 0)
-          ? multiChartData.slice(start, end + 1)
-          : multiChartData.slice(-35);
+      const end = Math.min(chartData.length - 1, visibleRange.end);
+      const visibleData = (contentWidth <= clientW || start > end || chartData.length <= 15)
+          ? chartData
+          : chartData.slice(start, end + 1);
 
       let max = 0;
       visibleData.forEach(d => {
@@ -452,7 +826,7 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
           sleep: 10,
       };
       return [0, defaultCeilings[activeMetric] || 100];
-  }, [multiChartData, visibleRange, activeMetric, chartMetricsList]);
+  }, [chartData, visibleRange, activeMetric, chartMetricsList]);
 
 
 
@@ -481,7 +855,7 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
           const scrollRelCenterX = pinchCenterX - rect.left;
           
           const currentScrollLeft = scrollRef.current ? scrollRef.current.scrollLeft : 0;
-          const currentChartWidth = Math.max(multiChartData.length * pointWidthRef.current, window.innerWidth - 64);
+          const currentChartWidth = Math.max(chartData.length * slotWidthRef.current, clientW);
           
           const pinchRatio = (scrollRelCenterX + currentScrollLeft) / currentChartWidth;
           
@@ -504,20 +878,35 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
           );
           const scale = dist / touchState.current.initialDist;
           let newWidth = touchState.current.initialPointWidth * scale;
-          if (newWidth < 25) newWidth = 25;
-          if (newWidth > 200) newWidth = 200;
+          if (newWidth < 6) newWidth = 6;
+          if (newWidth > 40) newWidth = 40;
 
           // Deadzone: lewati getaran mikro jari di bawah 1px untuk menghemat render cycles
           if (Math.abs(newWidth - lastCommittedWidthRef.current) < 1.0) return;
 
-          const nextChartWidth = Math.max(multiChartData.length * newWidth, window.innerWidth - 64);
-          const newPinchAbsX = touchState.current.pinchRatio * nextChartWidth;
-          scrollTarget.current = Math.max(0, newPinchAbsX - touchState.current.scrollRelCenterX);
+          const calcNextSlot = (w) => {
+              if (w >= DAY_MIN_PW) return Math.max(20, Math.min(28, Math.round(w)));
+              if (w >= MONTH_MIN_PW) return 28;
+              return 32;
+          };
+
+          const nextRes = newWidth >= DAY_MIN_PW ? 'day' : newWidth >= MONTH_MIN_PW ? 'month' : 'year';
+          const nextDataLen = nextRes === 'day' ? multiChartData.length : nextRes === 'month' ? monthlyPoints.length : yearlyPoints.length;
+          const nextContentWidth = nextDataLen * calcNextSlot(newWidth);
+
+          const targetScroll = nextContentWidth <= clientW 
+              ? 0 
+              : Math.max(0, touchState.current.pinchRatio * Math.max(nextContentWidth, clientW) - touchState.current.scrollRelCenterX);
+
+          scrollTarget.current = targetScroll;
           lastCommittedWidthRef.current = newWidth;
 
           if (!pinchRafRef.current) {
               pinchRafRef.current = requestAnimationFrame(() => {
                   pinchRafRef.current = null;
+                  if (scrollRef.current) {
+                      scrollRef.current.scrollLeft = targetScroll;
+                  }
                   setPointWidth(newWidth);
               });
           }
@@ -530,14 +919,25 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
           pinchRafRef.current = null;
       }
       touchState.current.initialDist = 0;
+      if (contentWidth <= clientW && scrollRef.current) {
+          scrollRef.current.scrollLeft = 0;
+      }
       updateVisibleRange();
   };
 
-  const chartWidth = Math.max(multiChartData.length * pointWidth, window.innerWidth - 64);
   const activeObj = chartMetricsList.find(m => m.key === activeMetric);
 
   return (
-    <div className="p-5">
+    <div className="p-5 relative">
+       {/* Background Grid Lines: Selalu melintang penuh di kartu, tidak pernah tergeser/hilang */}
+       <div className="absolute inset-x-5 top-7 h-[224px] pointer-events-none z-0">
+           <svg className="w-full h-full" style={{ padding: '10px 0 30px 0' }}>
+               {[0, 25, 50, 75, 100].map((pct, i) => (
+                   <line key={i} x1="0" y1={`${pct}%`} x2="100%" y2={`${pct}%`} stroke={theme === 'dark' ? '#3f3f46' : '#cbd5e1'} strokeDasharray="3 3" strokeWidth="1" />
+               ))}
+           </svg>
+       </div>
+
        {activeObj?.isExtra ? renderExtra(activeMetric) : (
          <div ref={scrollRef}
               onScroll={handleScroll}
@@ -545,27 +945,27 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
               onTouchMoveCapture={handleTouchMove}
               onTouchEndCapture={handleTouchEnd}
               onTouchCancelCapture={handleTouchEnd}
-              className="w-full overflow-x-auto scrollbar-hide mb-4 touch-pan-x pt-2 flex"
+              className="w-full scrollbar-hide mb-4 touch-pan-x pt-2 relative z-10"
               style={{
                   WebkitOverflowScrolling: 'touch',
                   touchAction: 'pan-x pan-y',
                   willChange: 'scroll-position',
                   transform: 'translateZ(0)',
                   contain: 'paint layout',
+                  overflowX: isCentered ? 'hidden' : 'auto',
               }}>
-             <div style={{ width: `${chartWidth}px`, height: '224px', marginLeft: (multiChartData.length * pointWidth) < (window.innerWidth - 64) ? 'auto' : '0' }} className="cursor-crosshair relative shrink-0">
-                 <svg className="absolute inset-0 w-full h-full pointer-events-none z-0" style={{ padding: '10px 0 30px 0' }}>
-                     {[0, 25, 50, 75, 100].map((pct, i) => (
-                         <line key={i} x1="0" y1={`${pct}%`} x2="100%" y2={`${pct}%`} stroke={theme === 'dark' ? '#3f3f46' : '#cbd5e1'} strokeDasharray="3 3" strokeWidth="1" />
-                     ))}
-                 </svg>
-
+             <div style={{
+                 width: isCentered ? '100%' : `${contentWidth}px`,
+                 display: isCentered ? 'flex' : 'block',
+                 justifyContent: isCentered ? 'center' : undefined,
+                 height: '224px',
+             }} className="cursor-crosshair relative shrink-0 z-10">
                  <ComposedChart
-                    width={chartWidth}
+                    width={contentWidth}
                     height={224}
-                    data={multiChartData}
+                    data={chartData}
                     barGap={2}
-                    barCategoryGap="8%"
+                    barCategoryGap={3}
                     style={{ outline: 'none' }}
                     onClick={(e) => {
                         if(e && e.activePayload && e.activePayload.length > 0) {
@@ -574,32 +974,81 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
                     }}
                  >
                     <Tooltip
-                       formatter={(value, name, props) => {
-                           const k = props.dataKey;
-                           // Tidur ditulis "5 jam 18 mnt", bukan "5,3 h" — jam desimal itu tidak
-                           // pernah jadi cara orang membaca durasi tidur.
-                           if (k === 'sleep' || k?.startsWith('sleep')) return [formatSleepDuration(value), name];
-                           if (k === 'targetSleep') return [formatSleepDuration(value), 'Target'];
-                           if (k?.startsWith('target')) return [`${formatNumber(value, language)}${k === 'targetActiveMinutes' ? ' m' : k === 'targetSteps' ? '' : ' kcal'}`, 'Target'];
-                           let unit = '';
-                           if (k === 'nutritionCalories' || k === 'activityCalories' || k?.startsWith('cal')) unit = ' kcal';
-                           else if (k === 'activeMinutes') unit = ' m';
-                           return [`${formatNumber(value, language)}${unit}`, name];
-                       }}
-                       // Tooltip tidur cuma merinci per tahap; totalnya — angka yang paling
-                       // dicari — tidak muncul di mana pun karena `sleep` sendiri bukan bar.
-                       labelFormatter={(label, payload) => {
-                           const total = payload?.[0]?.payload?.sleep;
-                           return activeMetric === 'sleep' && total > 0
-                               ? `${label} · Total ${formatSleepDuration(total)}`
-                               : label;
-                       }}
-                       cursor={{ fill: theme === 'dark' ? '#27272a' : '#f4f4f5' }}
-                       contentStyle={{ backgroundColor: theme === 'dark' ? '#18181b' : '#ffffff', borderRadius: '12px', border: '1px solid ' + t.border, padding: '8px 12px', fontSize: '11px', fontWeight: 'bold', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} 
-                       itemStyle={{ padding: 0, margin: 0, marginTop: '4px' }} 
-                       labelStyle={{ color: theme === 'dark' ? '#a1a1aa' : '#71717a', marginBottom: '4px', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }} 
+                        cursor={{ fill: theme === 'dark' ? '#27272a' : '#f4f4f5' }}
+                        content={({ active, payload }) => {
+                            if (!active || !payload || !payload.length) return null;
+                            const p = payload[0]?.payload;
+                            if (!p) return null;
+
+                            let title = '';
+                            if ((resolution === 'month' || resolution === 'year') && p.periodLabel) {
+                                title = p.periodLabel;
+                            } else if (p.dateFull) {
+                                const d = new Date(p.dateFull.includes('T') ? p.dateFull : p.dateFull + 'T12:00:00');
+                                title = d.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+                            }
+
+                            return (
+                                <div
+                                    style={{
+                                        backgroundColor: theme === 'dark' ? '#18181b' : '#ffffff',
+                                        borderRadius: '12px',
+                                        border: '1px solid ' + t.border,
+                                        padding: '8px 12px',
+                                        fontSize: '11px',
+                                        fontWeight: 'bold',
+                                        boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                                        minWidth: '140px',
+                                    }}
+                                >
+                                    <div style={{ color: theme === 'dark' ? '#a1a1aa' : '#71717a', marginBottom: '6px', fontSize: '10px' }}>
+                                        {title}
+                                    </div>
+
+                                    {activeMetric === 'sleep' && p.sleep > 0 && (
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '6px', paddingBottom: '4px', borderBottom: `1px solid ${theme === 'dark' ? '#27272a' : '#e4e4e7'}` }}>
+                                            <span style={{ color: theme === 'dark' ? '#c4b5fd' : '#7c3aed' }}>Total Tidur :</span>
+                                            <span style={{ color: theme === 'dark' ? '#f4f4f5' : '#18181b' }}>{formatSleepDuration(p.sleep)}</span>
+                                        </div>
+                                    )}
+
+                                    {payload.map((item, idx) => {
+                                        const k = item.dataKey;
+                                        if (!k || item.value == null || item.value === 0) return null;
+                                        if (k === 'sleepTotalOnly' && (p.sleepDeepH || p.sleepLightH || p.sleepRemH)) return null;
+
+                                        let formattedVal = '';
+                                        let label = item.name;
+                                        if (k === 'sleep' || k.startsWith('sleep')) {
+                                            formattedVal = formatSleepDuration(item.value);
+                                        } else if (k === 'targetSleep') {
+                                            formattedVal = formatSleepDuration(item.value);
+                                            label = 'Target';
+                                        } else if (k.startsWith('target')) {
+                                            formattedVal = `${formatNumber(item.value, language)}${k === 'targetActiveMinutes' ? ' m' : k === 'targetSteps' ? '' : ' kcal'}`;
+                                            label = 'Target';
+                                        } else {
+                                            let unit = '';
+                                            if (k === 'nutritionCalories' || k === 'activityCalories' || k.startsWith('cal')) unit = ' kcal';
+                                            else if (k === 'activeMinutes' || k.startsWith('act')) unit = ' m';
+                                            else if (k === 'energyScore') unit = ' / 100';
+                                            formattedVal = `${formatNumber(item.value, language)}${unit}`;
+                                        }
+
+                                        const color = item.color || item.fill || (theme === 'dark' ? '#f4f4f5' : '#18181b');
+
+                                        return (
+                                            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginTop: '3px' }}>
+                                                <span style={{ color }}>{label} :</span>
+                                                <span style={{ color: theme === 'dark' ? '#f4f4f5' : '#18181b' }}>{formattedVal}</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        }}
                     />
-                    <XAxis dataKey="name" stroke={theme === 'dark' ? '#a1a1aa' : '#64748b'} fontSize={10} tickLine={false} axisLine={false} interval={Math.max(0, Math.ceil(50 / pointWidth) - 1)} />
+                    <XAxis dataKey="name" stroke={theme === 'dark' ? '#a1a1aa' : '#64748b'} fontSize={10} tickLine={false} axisLine={false} interval={Math.max(0, Math.ceil(30 / slotWidth) - 1)} />
                     <YAxis domain={yDomain} hide={true} allowDataOverflow={true} />
                     
                     {activeObj.type === 'single' ? (
@@ -607,9 +1056,9 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
                             dataKey={activeMetric}
                             name={activeObj.label}
                             fill={activeObj.color}
-                            radius={[50, 50, 0, 0]}
+                            radius={[12, 12, 0, 0]}
                             isAnimationActive={false}
-                            maxBarSize={28}
+                            barSize={singleBarSize}
                         />
                     ) : (
                         activeObj.subMetrics.map(sub => {
@@ -620,9 +1069,9 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
                                         dataKey={sub.key}
                                         name={sub.label}
                                         fill={sub.color}
-                                        radius={[50, 50, 0, 0]}
+                                        radius={[12, 12, 0, 0]}
                                         isAnimationActive={false}
-                                        maxBarSize={24}
+                                        barSize={subBarSize}
                                     />
                                 );
                             }
@@ -636,7 +1085,7 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
                                     fill={sub.color}
                                     shape={<CustomStackedBarShape chartId={chartId} />}
                                     isAnimationActive={false}
-                                    maxBarSize={28}
+                                    barSize={stackedBarSize}
                                 />
                             );
                         })
@@ -661,6 +1110,7 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
              </div>
          </div>
        )}
+
 
        {activeMetric === 'sleep' && (
            <div className="flex flex-wrap gap-x-4 gap-y-2 justify-center mb-4 px-2" style={{ fontSize: '10px' }}>

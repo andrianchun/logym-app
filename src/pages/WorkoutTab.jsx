@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Snowflake, Play, CalendarDays, X, CheckCircle, ChevronDown, ChevronUp, Dumbbell, Share2, Flame, Brain } from 'lucide-react';
+import { Plus, Snowflake, Play, CalendarDays, X, CheckCircle, ChevronDown, ChevronUp, Dumbbell, Share2, Flame, Brain, ShieldAlert, Activity, Zap } from 'lucide-react';
 import { fetchExercisesFromApi } from '../utils/exerciseDbApi';
 import { shareWorkoutToFeed } from '../utils/communityApi';
 import { normalizeMuscleKey, resolveProjectedProgramId, getDayWorkouts, defaultMasterExercises, findMatchingMasterExercise, canonicalizeExercise } from '../data/constants';
@@ -17,6 +17,7 @@ import WellnessCheckModal from '../components/WellnessCheckModal';
 import useDialog from '../hooks/useDialog';
 
 const WorkoutTab = ({
+  isActive = true,
   // Dikirim App.jsx tapi dulu tidak pernah di-destructure — padahal dipakai di
   // `if (setConfirmModal)` saat user memulai latihan lain sementara satu sesi masih jalan.
   // Identifier yang tidak dideklarasikan MELEMPAR ReferenceError, bukan bernilai undefined,
@@ -72,100 +73,108 @@ const WorkoutTab = ({
 
   const todayStr = getLocalYMD(new Date());
 
-  let sourceWorkouts = getDayWorkouts(history, programs, activePlanIds, selectedDate);
+  const sourceWorkouts = useMemo(() => {
+    let list = getDayWorkouts(history, programs, activePlanIds, selectedDate);
 
-  // FORCE INJECT ACTIVE WORKOUT (If it's running but not found in sourceWorkouts, e.g. started from past date)
-  if (isWorkoutActive && sessionToRun) {
-    const isAlreadyInSource = sourceWorkouts.some(w => w.id === sessionToRun || w.programId === sessionToRun);
-    if (!isAlreadyInSource) {
-      let progId = sessionToRun;
-      if (sessionToRun.startsWith('projected_')) {
-         progId = resolveProjectedProgramId(sessionToRun);
-      }
-      
-      // Sesi Ekstra SENGAJA tidak disuntikkan ke sini. Dulu blok ini mendorong workout adhoc
-      // tanpa exercises, jadi selama sesi ekstra berjalan tab Latihan menampilkan kartu
-      // "Sesi N: Latihan Ekstra" yang kosong melompong tepat di atas kartu "Ekstra" yang berisi
-      // latihannya — dua kartu untuk satu sesi. Extras punya kartunya sendiri di bawah, dan
-      // sessionPrograms memang mengembalikan [] untuk sessionToRun === 'extra'.
-      if (progId !== 'extra') {
-         const prog = programs.find(p => p.id === progId);
-         if (prog) {
-           sourceWorkouts.push({
-             id: sessionToRun,
-             programId: progId,
-             programName: prog.name,
-             status: 'planned',
-             isProjected: true,
-             log: {}
-           });
-         }
+    // FORCE INJECT ACTIVE WORKOUT (If it's running but not found in sourceWorkouts, e.g. started from past date)
+    if (isWorkoutActive && sessionToRun) {
+      const isAlreadyInSource = list.some(w => w.id === sessionToRun || w.programId === sessionToRun);
+      if (!isAlreadyInSource) {
+        let progId = sessionToRun;
+        if (sessionToRun.startsWith('projected_')) {
+           progId = resolveProjectedProgramId(sessionToRun);
+        }
+        
+        // Sesi Ekstra SENGAJA tidak disuntikkan ke sini. Dulu blok ini mendorong workout adhoc
+        // tanpa exercises, jadi selama sesi ekstra berjalan tab Latihan menampilkan kartu
+        // "Sesi N: Latihan Ekstra" yang kosong melompong tepat di atas kartu "Ekstra" yang berisi
+        // latihannya — dua kartu untuk satu sesi. Extras punya kartunya sendiri di bawah, dan
+        // sessionPrograms memang mengembalikan [] untuk sessionToRun === 'extra'.
+        if (progId !== 'extra') {
+           const prog = programs.find(p => p.id === progId);
+           if (prog) {
+             list.push({
+               id: sessionToRun,
+               programId: progId,
+               programName: prog.name,
+               status: 'planned',
+               isProjected: true,
+               log: {}
+             });
+           }
+        }
       }
     }
-  }
 
-  // Pengaman render: buang entri dengan id kembar (mis. sisa program duplikat di `programs`
-  // yang belum sempat ke-upload bersih) — apa pun sumber duplikatnya, daftar yang di-render
-  // dijamin gak pernah punya key ganda.
-  {
+    // Pengaman render: buang entri dengan id kembar
     const seenIds = new Set();
-    sourceWorkouts = sourceWorkouts.filter(w => {
+    return list.filter(w => {
        if (seenIds.has(w.id)) return false;
        seenIds.add(w.id);
        return true;
     });
-  }
+  }, [history, programs, activePlanIds, selectedDate, isWorkoutActive, sessionToRun]);
 
-  const activeProgramsList = sourceWorkouts
-    .map(w => {
-      if (w.programId === 'adhoc') {
-         return { 
-           id: 'adhoc', 
-           name: w.programName || 'Ekstra', 
-           workoutId: w.id, 
-           status: w.status, 
-           log: w.log,
-           exercises: (w.exercises || []).map(ex => ({
-              ...ex,
-              originalId: ex.originalId || ex.id,
-              id: `${ex.id}-${w.id}`,
-              workoutId: w.id
-           }))
-         };
-      }
-      let p = programs.find(p => p.id === w.programId);
-      
-      // Fallback untuk program yang sudah dihapus tapi ada di history
-      if (!p && w.status === 'completed') {
-        p = {
-          id: w.programId,
-          name: w.programName || 'Sesi Terdahulu',
-          exercises: w.overriddenExercises || w.exercises || []
-        };
-      }
+  const activeProgramsList = useMemo(() => {
+    return sourceWorkouts
+      .map(w => {
+        if (w.programId === 'adhoc') {
+           return { 
+             id: 'adhoc', 
+             name: w.programName || 'Ekstra', 
+             workoutId: w.id, 
+             status: w.status, 
+             log: w.log,
+             exercises: (w.exercises || []).map(ex => ({
+                ...ex,
+                originalId: ex.originalId || ex.id,
+                id: `${ex.id}-${w.id}`,
+                workoutId: w.id
+             }))
+           };
+        }
+        let p = programs.find(p => p.id === w.programId);
+        
+        // Fallback untuk program yang sudah dihapus tapi ada di history
+        if (!p && w.status === 'completed') {
+          p = {
+            id: w.programId,
+            name: w.programName || 'Sesi Terdahulu',
+            exercises: w.overriddenExercises || w.exercises || []
+          };
+        }
 
-      return p ? { 
-          ...p, 
-          workoutId: w.id, 
-          status: w.status, 
-          log: w.log,
-          exercises: p.exercises ? (w.overriddenExercises || p.exercises).map(ex => ({
-              ...ex,
-              originalId: ex.id,
-              id: `${ex.id}-${w.id}`,
-              workoutId: w.id
-          })) : []
-      } : null;
-    })
-    .filter(Boolean);
+        return p ? { 
+            ...p, 
+            workoutId: w.id, 
+            status: w.status, 
+            log: w.log,
+            exercises: p.exercises ? (w.overriddenExercises || p.exercises).map(ex => ({
+                ...ex,
+                originalId: ex.id,
+                id: `${ex.id}-${w.id}`,
+                workoutId: w.id
+            })) : []
+        } : null;
+      })
+      .filter(Boolean);
+  }, [sourceWorkouts, programs]);
 
   // Isi sesi yang lagi dijalankan. Dipakai ImmersiveWorkout, dan dilaporkan ke App supaya
   // FloatingTimer (pill saat di-minimize) menghitung kalori dari sesi yang SAMA — bukan dari
   // seluruh log hari itu. Satu turunan, satu angka.
-  const sessionPrograms = sessionToRun === 'extra' ? [] : activeProgramsList.filter(p => p.workoutId === sessionToRun || p.id === sessionToRun);
-  const sessionExtras = sessionToRun === 'extra' ? extraExercises : [];
-  const sessionExercises = [...sessionPrograms.flatMap(p => p.exercises || []), ...sessionExtras]
-    .filter(ex => !skippedExercises[ex.id]);
+  const sessionPrograms = useMemo(() => {
+    return sessionToRun === 'extra' ? [] : activeProgramsList.filter(p => p.workoutId === sessionToRun || p.id === sessionToRun);
+  }, [sessionToRun, activeProgramsList]);
+
+  const sessionExtras = useMemo(() => {
+    return sessionToRun === 'extra' ? extraExercises : [];
+  }, [sessionToRun, extraExercises]);
+
+  const sessionExercises = useMemo(() => {
+    return [...sessionPrograms.flatMap(p => p.exercises || []), ...sessionExtras]
+      .filter(ex => !skippedExercises[ex.id]);
+  }, [sessionPrograms, sessionExtras, skippedExercises]);
 
   // activeProgramsList dirakit ulang tiap render, jadi kunci efeknya pakai daftar id (stabil)
   // supaya tidak setState tanpa henti.
@@ -638,33 +647,62 @@ const WorkoutTab = ({
       const uStr = isImp ? 'lbs' : 'kg';
 
       const hasWeightDiff = Boolean(eqConfNow && (eqConfNow.baseWeight > 0 || (eqConfNow.ratio !== undefined && eqConfNow.ratio !== 1)));
-      const formatWeightDetail = (actWeight) => {
+
+      const inputLabel = eqConfNow?.isBodyweightPlus 
+        ? 'Beban' 
+        : (eqConfNow?.inputRule === 'pin' || (eqConfNow?.ratio !== 1 && (!eqConfNow?.baseWeight || eqConfNow?.baseWeight <= 0))
+            ? 'Pin' 
+            : 'Plat');
+
+      const formatHeroTarget = (actWeight, reps) => {
+        if (!actWeight || actWeight <= 0) return null;
+        if (hasWeightDiff) {
+          const inputW = calculateInputWeight(actWeight, eqConfNow);
+          return `${inputLabel} ${inputW} ${uStr} × ${reps} reps`;
+        }
+        return `${actWeight} ${uStr} × ${reps} reps`;
+      };
+
+      const formatSubTotal = (actWeight) => {
         if (!hasWeightDiff || !actWeight || actWeight <= 0) return null;
-        const plateW = calculateInputWeight(actWeight, eqConfNow);
-        const parts = [];
         if (eqConfNow.baseWeight > 0) {
           const baseName = eqConfNow.isBodyweightPlus 
             ? 'BB' 
             : (eqConfNow.equipment?.includes('Sled') ? 'Sled' : 'Bar');
-          parts.push(`${eqConfNow.isBodyweightPlus ? 'Beban' : 'Plat'} ${plateW} ${uStr} + ${baseName} ${eqConfNow.baseWeight} ${uStr}`);
+          return `Total Beban: ${actWeight} ${uStr} (${baseName} ${eqConfNow.baseWeight} ${uStr})`;
         } else if (eqConfNow.ratio !== 1) {
-          parts.push(`Pin ${plateW} ${uStr} (Katrol ${eqConfNow.ratio}:1)`);
+          return `Beban Efektif: ${actWeight} ${uStr} (Katrol ${eqConfNow.ratio}:1)`;
         }
-        return parts.length > 0 ? parts.join(' • ') : null;
+        return `Total Beban: ${actWeight} ${uStr}`;
+      };
+
+      const formatRefWeight = (actWeight, reps = null) => {
+        if (!actWeight || actWeight <= 0) return null;
+        if (hasWeightDiff) {
+          const inputW = calculateInputWeight(actWeight, eqConfNow);
+          return reps ? `${inputLabel} ${inputW} ${uStr} × ${reps} reps` : `${inputLabel} ${inputW} ${uStr}`;
+        }
+        return reps ? `${actWeight} ${uStr} × ${reps} reps` : `${actWeight} ${uStr}`;
       };
 
       if (isNewRecord) {
         return {
           title: "Rekor Baru!",
-          benchmarkLabel: "Set Terbaik",
-          benchmark: `${currentMaxWeight} ${uStr} × ${currentMaxReps} reps`,
-          benchmarkDetail: formatWeightDetail(currentMaxWeight),
+          targetWeightNumber: hasWeightDiff ? calculateInputWeight(currentMaxWeight, eqConfNow) : currentMaxWeight,
+          targetRepsNumber: currentMaxReps,
+          weightUnit: uStr,
+          weightLabel: hasWeightDiff ? inputLabel : null,
+          target: formatHeroTarget(currentMaxWeight, currentMaxReps),
+          targetDetail: formatSubTotal(currentMaxWeight),
+          lastSession: lastSessionWeight > 0 ? formatRefWeight(lastSessionWeight, lastSessionReps) : null,
           message: `Luar biasa! Kamu berhasil memecahkan rekor 10RM baru. Terus pertahankan progres luar biasa ini!`,
           rm10: `${currentMax10RM} ${uStr}`,
-          rm10Detail: formatWeightDetail(currentMax10RM),
+          rm10Detail: formatSubTotal(currentMax10RM),
           hasWeightDiff,
           mode: 'praise',
           isNewRecord: true,
+          benchmark: formatHeroTarget(currentMaxWeight, currentMaxReps),
+          benchmarkDetail: formatSubTotal(currentMaxWeight),
           text: `Mantap! Kamu baru saja buat rekor 10RM baru: ${currentMax10RM} ${uStr} (${currentMaxWeight} ${uStr} x ${currentMaxReps} Reps)!\n\nLanjutkan kerja kerasnya!`
         };
       }
@@ -672,36 +710,72 @@ const WorkoutTab = ({
       if (isFirstRecord) {
         return {
           title: "10RM Pertama Tercatat",
-          benchmarkLabel: "Set Acuan",
-          benchmark: `${currentMaxWeight} ${uStr} × ${currentMaxReps} reps`,
-          benchmarkDetail: formatWeightDetail(currentMaxWeight),
+          targetWeightNumber: hasWeightDiff ? calculateInputWeight(currentMaxWeight, eqConfNow) : currentMaxWeight,
+          targetRepsNumber: currentMaxReps,
+          weightUnit: uStr,
+          weightLabel: hasWeightDiff ? inputLabel : null,
+          target: formatHeroTarget(currentMaxWeight, currentMaxReps),
+          targetDetail: formatSubTotal(currentMaxWeight),
+          lastSession: null,
           message: `Keren! 10RM acuan pertamamu berhasil tercatat. Angka ini otomatis menjadi target acuan progresifmu untuk sesi latihan berikutnya.`,
           rm10: `${currentMax10RM} ${uStr}`,
-          rm10Detail: formatWeightDetail(currentMax10RM),
+          rm10Detail: formatSubTotal(currentMax10RM),
           hasWeightDiff,
           mode: 'praise',
           isNewRecord: true,
+          benchmark: formatHeroTarget(currentMaxWeight, currentMaxReps),
+          benchmarkDetail: formatSubTotal(currentMaxWeight),
           text: `Keren! 10RM acuan pertamamu berhasil tercatat: ${currentMax10RM} ${uStr} (${currentMaxWeight} ${uStr} x ${currentMaxReps} Reps).\n\nAngka ini otomatis menjadi target acuan progresifmu untuk sesi latihan berikutnya!`
         };
       }
       
       const hasLastSession = lastSessionWeight > 0;
       const isDeload = history?.[selectedDate]?.wellness === 'deload' || history?.[selectedDate]?.isDeloadWeek;
+      const isDoms = history?.[selectedDate]?.wellness === 'doms';
 
       if (isDeload && hasLastSession) {
         const deloadWeight = Math.max(0, Math.round(lastSessionWeight * 0.825 * 2) / 2);
+        const deloadReps = exItem.reps || lastSessionReps;
         return {
           title: "Mode Deload",
-          benchmarkLabel: "Target Deload (~82.5%)",
-          benchmark: `${deloadWeight} ${uStr} × ${lastSessionReps} reps`,
-          benchmarkDetail: formatWeightDetail(deloadWeight),
-          message: `Beban dipangkas untuk pemulihan sendi dan sistem saraf. Fokus pada kontrol tempo dan kesempurnaan form gerakan, jangan memaksakan beban berat.`,
+          targetWeightNumber: hasWeightDiff ? calculateInputWeight(deloadWeight, eqConfNow) : deloadWeight,
+          targetRepsNumber: deloadReps,
+          weightUnit: uStr,
+          weightLabel: hasWeightDiff ? inputLabel : null,
+          target: formatHeroTarget(deloadWeight, deloadReps),
+          targetDetail: formatSubTotal(deloadWeight),
+          lastSession: formatRefWeight(lastSessionWeight, lastSessionReps),
+          message: `Beban dipangkas ~17.5% untuk pemulihan sendi dan sistem saraf. Fokus pada kontrol tempo dan kesempurnaan form gerakan.`,
           rm10: true10RM > 0 ? `${true10RM} ${uStr}` : null,
-          rm10Detail: formatWeightDetail(true10RM),
+          rm10Detail: formatSubTotal(true10RM),
           hasWeightDiff,
           mode: 'push',
           isDeload: true,
-          text: `Target beban dipangkas ~17.5% untuk pemulihan sendi & sistem saraf:\n(${deloadWeight} ${uStr} x ${lastSessionReps} Reps)\n\nFokus pada kontrol gerakan dan tempo yang sempurna. Jangan memaksakan beban berat!`
+          benchmark: formatHeroTarget(deloadWeight, deloadReps),
+          benchmarkDetail: formatSubTotal(deloadWeight),
+          text: `Target beban dipangkas ~17.5% untuk pemulihan sendi & sistem saraf:\n(${deloadWeight} ${uStr} x ${deloadReps} Reps)\n\nFokus pada kontrol gerakan dan tempo yang sempurna. Jangan memaksakan beban berat!`
+        };
+      }
+
+      if (isDoms && hasLastSession) {
+        const targetReps = exItem.reps || lastSessionReps;
+        return {
+          title: "Mode Pegal / Fokus Form",
+          targetWeightNumber: hasWeightDiff ? calculateInputWeight(lastSessionWeight, eqConfNow) : lastSessionWeight,
+          targetRepsNumber: targetReps,
+          weightUnit: uStr,
+          weightLabel: hasWeightDiff ? inputLabel : null,
+          target: formatHeroTarget(lastSessionWeight, targetReps),
+          targetDetail: formatSubTotal(lastSessionWeight),
+          lastSession: formatRefWeight(lastSessionWeight, lastSessionReps),
+          message: `Kondisi otot sedang lelah/pegal. Beban dipertahankan di angka sesi lalu tanpa kenaikan beban progresif. Prioritaskan tempo repetisi lambat dan form yang bersih.`,
+          rm10: true10RM > 0 ? `${true10RM} ${uStr}` : null,
+          rm10Detail: formatSubTotal(true10RM),
+          hasWeightDiff,
+          mode: 'push',
+          benchmark: formatHeroTarget(lastSessionWeight, targetReps),
+          benchmarkDetail: formatSubTotal(lastSessionWeight),
+          text: `Beban dipertahankan di sesi lalu (${lastSessionWeight} ${uStr} x ${targetReps} Reps).\n\nOtot sedang pegal/lelah, jangan memaksakan naik beban hari ini. Prioritaskan kontrol repetisi dan kesempurnaan form gerakan!`
         };
       }
 
@@ -714,6 +788,7 @@ const WorkoutTab = ({
         let missionText = "";
         const goal = userProfile?.goal || 'muscle_gain';
         const exp = userProfile?.experience || 'beginner';
+        const inc = exp === 'advanced' ? microStep : step;
         
         if (goal === 'fat_loss') {
            missionText = `Saat defisit kalori, prioritaskan menjaga massa otot. Angkat beban yang sama dengan form solid, jangan memaksakan jika tubuh kurang fit.`;
@@ -744,42 +819,66 @@ const WorkoutTab = ({
            }
         }
         
+        // TARGET HARI INI:
+        // Jika target repetisi sesi lalu tercapai, naikkan beban progresif (+inc).
+        // Jika belum tercapai, pertahankan beban dan kejar targetReps.
+        const targetWeight = reachedTarget ? (lastSessionWeight + inc) : lastSessionWeight;
+        const displayTargetReps = targetReps;
+        
         return {
           title: "Target Hari Ini",
-          benchmarkLabel: "Sesi Terakhir",
-          benchmark: `${lastSessionWeight} ${uStr} × ${lastSessionReps} reps`,
-          benchmarkDetail: formatWeightDetail(lastSessionWeight),
+          targetWeightNumber: hasWeightDiff ? calculateInputWeight(targetWeight, eqConfNow) : targetWeight,
+          targetRepsNumber: displayTargetReps,
+          weightUnit: uStr,
+          weightLabel: hasWeightDiff ? inputLabel : null,
+          target: formatHeroTarget(targetWeight, displayTargetReps),
+          targetDetail: formatSubTotal(targetWeight),
+          lastSession: formatRefWeight(lastSessionWeight, lastSessionReps),
           message: missionText,
           rm10: true10RM > 0 ? `${true10RM} ${uStr}` : null,
-          rm10Detail: formatWeightDetail(true10RM),
+          rm10Detail: formatSubTotal(true10RM),
           hasWeightDiff,
           mode: 'push',
-          text: `Sesi Terakhir: ${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps\n\n${missionText}\n\n10RM acuan: ${true10RM} ${uStr}`
+          benchmark: formatHeroTarget(targetWeight, displayTargetReps),
+          benchmarkDetail: formatSubTotal(targetWeight),
+          text: `Target: ${targetWeight} ${uStr} x ${displayTargetReps} Reps (Sesi Lalu: ${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\n${missionText}\n\n10RM acuan: ${true10RM} ${uStr}`
         };
       } else if (currentMax10RM > 0) {
         return {
           title: "Target Hari Ini",
-          benchmarkLabel: "Set Terbaik Sesi Ini",
-          benchmark: `${currentMaxWeight} ${uStr} × ${currentMaxReps} reps`,
-          benchmarkDetail: formatWeightDetail(currentMaxWeight),
+          targetWeightNumber: hasWeightDiff ? calculateInputWeight(currentMaxWeight, eqConfNow) : currentMaxWeight,
+          targetRepsNumber: currentMaxReps,
+          weightUnit: uStr,
+          weightLabel: hasWeightDiff ? inputLabel : null,
+          target: formatHeroTarget(currentMaxWeight, currentMaxReps),
+          targetDetail: formatSubTotal(currentMaxWeight),
+          lastSession: null,
           message: `Fokus tuntaskan sisa set dengan form dan kontrol gerakan yang rapi!`,
           rm10: `${currentMax10RM} ${uStr}`,
-          rm10Detail: formatWeightDetail(currentMax10RM),
+          rm10Detail: formatSubTotal(currentMax10RM),
           hasWeightDiff,
           mode: 'push',
+          benchmark: formatHeroTarget(currentMaxWeight, currentMaxReps),
+          benchmarkDetail: formatSubTotal(currentMaxWeight),
           text: `Beban terbaik sesi ini:\n${currentMaxWeight} ${uStr} x ${currentMaxReps} Reps\n\n10RM acuan saat ini: ${currentMax10RM} ${uStr}.\nFokus tuntaskan sisa set dengan form dan kontrol yang rapi!`
         };
       } else {
         return {
           title: "Target Hari Ini",
-          benchmarkLabel: null,
-          benchmark: null,
-          benchmarkDetail: null,
+          targetWeightNumber: null,
+          targetRepsNumber: null,
+          weightUnit: uStr,
+          weightLabel: null,
+          target: null,
+          targetDetail: null,
+          lastSession: null,
           message: `Atur beban yang cukup menantang untuk diangkat 10 repetisi dengan form sempurna (RPE 8).`,
           rm10: true10RM > 0 ? `${true10RM} ${uStr}` : null,
-          rm10Detail: formatWeightDetail(true10RM),
+          rm10Detail: formatSubTotal(true10RM),
           hasWeightDiff,
           mode: 'push',
+          benchmark: null,
+          benchmarkDetail: null,
           text: `Atur beban yang cukup menantang untuk diangkat 10 repetisi dengan form benar (RPE 8).\n\n10RM acuan: ${true10RM > 0 ? true10RM + ' ' + uStr : '-'}`
         };
       }
@@ -791,17 +890,16 @@ const WorkoutTab = ({
   }, [exerciseLogs, sessionExercises, isWorkoutActive, selectedDate]);
 
   const handleStartWorkout = (progId) => {
-    const todayWellness = history?.[selectedDate]?.wellness || history?.[selectedDate]?.isDeloadWeek;
-    let isCheckedSession = false;
-    try { isCheckedSession = Boolean(sessionStorage.getItem(`wellness_checked_${selectedDate}`)); } catch (e) {}
-
-    if (!todayWellness && !isCheckedSession) {
-      setPendingProgId(progId);
-      setShowWellnessModal(true);
+    // Jika sesi ini sedang berjalan aktif, langsung lanjutkan tanpa tanya ulang
+    if (isWorkoutActive && sessionToRun === progId) {
+      proceedStartWorkout(progId);
       return;
     }
 
-    proceedStartWorkout(progId);
+    // Setiap kali memulai sesi latihan baru (atau setelah batal/cancel),
+    // selalu tanyakan kondisi tubuh agar intensitas latihan sesuai kondisi terkini
+    setPendingProgId(progId);
+    setShowWellnessModal(true);
   };
 
   const handleSelectWellness = (option) => {
@@ -823,6 +921,30 @@ const WorkoutTab = ({
       proceedStartWorkout(targetProg);
     }
   };
+
+  const currentWellness = history?.[selectedDate]?.wellness 
+    || (history?.[selectedDate]?.isDeloadWeek ? 'deload' : 'prima');
+
+  const wellnessConfig = useMemo(() => {
+    const map = {
+      prima: {
+        label: 'Prima',
+        icon: <Zap size={14} className="text-emerald-400" />,
+        btnStyle: 'bg-emerald-500/15 border-emerald-500/30 hover:bg-emerald-500/25 text-emerald-400 shadow-emerald-950/20'
+      },
+      doms: {
+        label: 'Pegal',
+        icon: <Activity size={14} className="text-amber-400" />,
+        btnStyle: 'bg-amber-500/15 border-amber-500/30 hover:bg-amber-500/25 text-amber-400 shadow-amber-950/20'
+      },
+      deload: {
+        label: 'Nyeri (Deload)',
+        icon: <ShieldAlert size={14} className="text-rose-400" />,
+        btnStyle: 'bg-rose-500/15 border-rose-500/30 hover:bg-rose-500/25 text-rose-400 shadow-rose-950/20'
+      }
+    };
+    return map[currentWellness] || map.prima;
+  }, [currentWellness]);
 
   const requestSessionSwitch = (targetWorkoutId, onProceed) => {
     if (isWorkoutActive && sessionToRun && sessionToRun !== targetWorkoutId) {
@@ -1064,38 +1186,8 @@ const WorkoutTab = ({
         aria-hidden={isImmersiveMode || undefined}
         style={{ paddingBottom: showsFloatingStartButton ? 'calc(9.5rem + env(safe-area-inset-bottom, 20px))' : '2rem' }}
       >
-        {/* DELOAD BANNER */}
-        {(history?.[selectedDate]?.wellness === 'deload' || history?.[selectedDate]?.isDeloadWeek) && (
-          <div className="mb-4 p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-between gap-3 animate-in fade-in">
-            <div className="flex items-center gap-2.5">
-              <span className="text-xl">🛡️</span>
-              <div>
-                <h4 className="text-xs font-black text-rose-400">Mode Deload / Pemulihan Aktif</h4>
-                <p className="text-[11px] text-zinc-400">Target beban dipangkas 15-20% untuk memulihkan sendi & sistem saraf.</p>
-              </div>
-            </div>
-            <button 
-              onClick={() => {
-                if (setHistory) {
-                  setHistory(prev => ({
-                    ...prev,
-                    [selectedDate]: {
-                      ...(prev[selectedDate] || {}),
-                      wellness: 'prima',
-                      isDeloadWeek: false
-                    }
-                  }));
-                }
-              }}
-              className="text-[10px] font-bold text-zinc-300 hover:text-white px-2.5 py-1.5 rounded-xl bg-black/30 shrink-0 transition active:scale-95"
-            >
-              Ubah
-            </button>
-          </div>
-        )}
-        
         {isCompletelyEmpty ? (
-          createPortal(
+          isActive && createPortal(
             <EmptyWorkoutState 
               t={t}
               showProgramSelect={showProgramSelect}
@@ -1122,38 +1214,49 @@ const WorkoutTab = ({
             />
 
             <div className="space-y-4 mt-4">
-              {/* LATIHAN DARI PROGRAM ASLI */}
-              {activeProgramsList.map((prog, pIdx) => {
-                const isExpanded = !!(expandedSessions || {})[prog.workoutId];
-                return (
-                  <div id={`session-${prog.workoutId}`} key={prog.workoutId} className={`mb-6 rounded-[2rem] border ${prog.status === 'completed' ? 'border-emerald-500/30' : 'border-white/20 dark:border-white/10'} bg-white/60 dark:bg-black/50 backdrop-blur-xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.4)] overflow-hidden transition-all`}>
-                    <div
-                      className={`w-full p-5 sm:p-6 flex items-start justify-between font-black text-left transition-colors`}
-                    >
-                      <div
-                        onClick={() => { playSoundEffect('click', soundEnabled); toggleSession(prog.workoutId); }}
-                        className="flex flex-col items-start gap-0.5 flex-1 min-w-0 pr-4 cursor-pointer"
-                      >
-                        {/* Centang "semua set tercatat" dihapus. Statusnya sudah disampaikan di tempat
-                            yang lebih benar dan lebih penting: badge di kalender membedakan "Selesai"
-                            (benar-benar tersimpan) dari "Belum disimpan". Centang di sini cuma berarti
-                            "setnya tercentang", yang gampang dikira sudah aman padahal belum. */}
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xl sm:text-2xl uppercase tracking-widest break-words leading-tight flex-1">Sesi {pIdx + 1}: {prog.name}</span>
-                        </div>
-                        {prog.planName && (
-                          <span className={`text-xs ${t.textMuted} font-medium`}>Program: {prog.planName}</span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0 mt-0.5">
+                  {/* LATIHAN DARI PROGRAM ASLI */}
+                  {activeProgramsList.map((prog, pIdx) => {
+                    const isExpanded = !!(expandedSessions || {})[prog.workoutId];
+                    return (
+                      <div id={`session-${prog.workoutId}`} key={prog.workoutId} className={`mb-6 rounded-[2rem] border ${prog.status === 'completed' ? 'border-emerald-500/30' : 'border-white/20 dark:border-white/10'} bg-white/60 dark:bg-black/50 backdrop-blur-xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.4)] overflow-hidden transition-all`}>
                         <div
-                          onClick={() => { playSoundEffect('click', soundEnabled); toggleSession(prog.workoutId); }}
-                          className="caption opacity-60 font-bold cursor-pointer flex items-center gap-1"
+                          className={`w-full p-5 sm:p-6 flex items-start justify-between font-black text-left transition-colors`}
                         >
-                          {isExpanded ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
+                          <div
+                            onClick={() => { playSoundEffect('click', soundEnabled); toggleSession(prog.workoutId); }}
+                            className="flex flex-col items-start gap-0.5 flex-1 min-w-0 pr-4 cursor-pointer"
+                          >
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xl sm:text-2xl uppercase tracking-widest break-words leading-tight flex-1">Sesi {pIdx + 1}: {prog.name}</span>
+                            </div>
+                            {prog.planName && (
+                              <span className={`text-xs ${t.textMuted} font-medium`}>Program: {prog.planName}</span>
+                            )}
+                          </div>
+                          
+                          {/* Sisi Kanan: Chevron Atas & Tombol Wellness Bawah */}
+                          <div className="flex flex-col items-center justify-between self-stretch shrink-0 py-0.5 pl-2 gap-2">
+                            <div
+                              onClick={() => { playSoundEffect('click', soundEnabled); toggleSession(prog.workoutId); }}
+                              className="caption opacity-60 hover:opacity-100 font-bold cursor-pointer flex items-center p-1 transition-opacity"
+                              title={isExpanded ? "Tutup Sesi" : "Buka Sesi"}
+                            >
+                              {isExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                playSoundEffect('click', soundEnabled);
+                                setShowWellnessModal(true);
+                              }}
+                              className={`w-7 h-7 rounded-full flex items-center justify-center transition-all active:scale-90 border shadow-sm ${wellnessConfig.btnStyle}`}
+                              title={`Kondisi Tubuh: ${wellnessConfig.label} (Ketuk untuk detail / ubah)`}
+                            >
+                              {wellnessConfig.icon}
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    </div>
                     
                     {/* sm:no-swipe: pada lebar tablet daftar latihan men-scroll horizontal sehingga
                         swipe pindah tab dikunci khusus tablet. Di HP (tampilan vertikal), swipe kanan-kiri
@@ -1165,7 +1268,7 @@ const WorkoutTab = ({
                           <div key={`${prog.id}-group-${gIdx}`} className={`sm:w-[340px] sm:shrink-0 sm:snap-center sm:bg-black/5 sm:dark:bg-white/5 sm:rounded-3xl sm:border sm:border-black/5 sm:dark:border-white/5 sm:overflow-hidden relative flex flex-col mb-4 sm:mb-0 last:mb-0 ${group.isSuperset ? 'pr-0' : ''}`}>
                             {group.isSuperset && <div className={`absolute top-0 bottom-0 right-0 w-[6px] rounded-l-md z-20 ${t.bgAccent}`}></div>}
                             {group.items.map(({ex, idx}) => (
-                              <div id={`exercise-card-${ex.id}`} key={`${prog.id}-${ex.id}-${idx}`}>
+                              <div id={`exercise-card-${ex.id}`} key={`${prog.id}-${ex.id}-${idx}`} style={{ contentVisibility: 'auto', containIntrinsicSize: '0 160px' }}>
                               <ExerciseCard 
                                 ex={ex} idx={idx} isExtra={false}
                                 t={t} lang={lang} soundEnabled={soundEnabled}
@@ -1273,16 +1376,40 @@ const WorkoutTab = ({
               {/* LATIHAN TAMBAHAN (EKSTRA) */}
               {extraExercises.length > 0 && (
                 <div id="session-extra" className={`mb-6 rounded-[2rem] border border-white/20 dark:border-white/10 bg-white/60 dark:bg-black/50 backdrop-blur-xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.4)] overflow-hidden transition-all`}>
-                  <button 
-                    onClick={() => { playSoundEffect('click', soundEnabled); toggleSession('extra'); }}
+                  <div 
                     className={`w-full p-5 sm:p-6 flex items-start justify-between font-black text-left transition-colors`}
                   >
-                    <div className="flex flex-col items-start gap-0.5 flex-1 min-w-0 pr-4">
+                    <div 
+                      onClick={() => { playSoundEffect('click', soundEnabled); toggleSession('extra'); }}
+                      className="flex flex-col items-start gap-0.5 flex-1 min-w-0 pr-4 cursor-pointer"
+                    >
                       <span className="text-xl sm:text-2xl uppercase tracking-widest break-words leading-tight">Sesi {activeProgramsList.length + 1}: Ekstra</span>
                       <span className={`text-xs ${t.textMuted} font-medium`}>{extraExercises.length} latihan di luar program</span>
                     </div>
-                    <div className="caption opacity-60 font-bold flex items-center gap-1 shrink-0 mt-0.5">{(expandedSessions || {})['extra'] ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}</div>
-                  </button>
+
+                    {/* Sisi Kanan: Chevron Atas & Tombol Wellness Bawah */}
+                    <div className="flex flex-col items-center justify-between self-stretch shrink-0 py-0.5 pl-2 gap-2">
+                      <div 
+                        onClick={() => { playSoundEffect('click', soundEnabled); toggleSession('extra'); }}
+                        className="caption opacity-60 hover:opacity-100 font-bold cursor-pointer flex items-center p-1 transition-opacity"
+                        title={(expandedSessions || {})['extra'] ? "Tutup Sesi" : "Buka Sesi"}
+                      >
+                        {(expandedSessions || {})['extra'] ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          playSoundEffect('click', soundEnabled);
+                          setShowWellnessModal(true);
+                        }}
+                        className={`w-7 h-7 rounded-full flex items-center justify-center transition-all active:scale-90 border shadow-sm ${wellnessConfig.btnStyle}`}
+                        title={`Kondisi Tubuh: ${wellnessConfig.label} (Ketuk untuk detail / ubah)`}
+                      >
+                        {wellnessConfig.icon}
+                      </button>
+                    </div>
+                  </div>
                   
                   {(expandedSessions || {})['extra'] && (
                     <div className="sm:no-swipe p-2 sm:p-6 pt-0 space-y-4 sm:space-y-0 sm:flex sm:flex-row sm:overflow-x-auto sm:snap-x sm:gap-6 hide-scrollbar animate-in slide-in-from-top-2 fade-in duration-200">
@@ -1291,7 +1418,7 @@ const WorkoutTab = ({
                           <div key={`extra-group-${gIdx}`} className={`sm:w-[340px] sm:shrink-0 sm:snap-center sm:bg-black/5 sm:dark:bg-white/5 sm:rounded-3xl sm:border sm:border-black/5 sm:dark:border-white/5 sm:overflow-hidden relative flex flex-col mb-4 sm:mb-0 last:mb-0 ${group.isSuperset ? 'pr-3' : ''}`}>
                             {group.isSuperset && <div className={`absolute top-0 bottom-0 right-0 w-[6px] rounded-l-md z-20 ${t.bgAccent}`}></div>}
                             {group.items.map(({ex, idx}) => (
-                            <div id={`exercise-card-${ex.id}`} key={`extra-${ex.id}-${idx}`}>
+                            <div id={`exercise-card-${ex.id}`} key={`extra-${ex.id}-${idx}`} style={{ contentVisibility: 'auto', containIntrinsicSize: '0 160px' }}>
                               <ExerciseCard 
                                 ex={ex} idx={activeProgram?.exercises?.length ? activeProgram.exercises.length + idx : idx} isExtra={true}
                                 t={t} lang={lang} soundEnabled={soundEnabled}
@@ -1416,7 +1543,7 @@ const WorkoutTab = ({
 
       {/* FLOATING START / RESUME WORKOUT BUTTON */}
       {(() => {
-        if (isImmersiveMode || isWorkoutActive) return null;
+        if (!isActive || isImmersiveMode || isWorkoutActive) return null;
 
         // 1. Kumpulkan seluruh sesi latihan hari ini (Program + Ekstra)
         const allSessionsList = [
@@ -1536,7 +1663,7 @@ const WorkoutTab = ({
       {dialog}
       {/* CELEBRATION MODAL */}
       {/* CELEBRATION MODAL */}
-      {showCelebration && createPortal(
+      {isActive && showCelebration && createPortal(
         <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 overscroll-contain touch-none no-swipe">
            <div className="absolute inset-0 bg-black/80 backdrop-blur-md animate-in fade-in duration-300"></div>
            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200vw] h-[200vw] bg-[radial-gradient(ellipse_at_center,rgba(59,130,246,0.2)_0%,transparent_50%)] animate-spin-slow pointer-events-none"></div>
@@ -1554,8 +1681,12 @@ const WorkoutTab = ({
       {/* WELLNESS CHECK MODAL */}
       <WellnessCheckModal 
         isOpen={showWellnessModal} 
+        currentWellness={history?.[selectedDate]?.wellness}
         onSelect={handleSelectWellness} 
-        onClose={() => setShowWellnessModal(false)} 
+        onClose={() => {
+          setShowWellnessModal(false);
+          setPendingProgId(null);
+        }} 
         t={t} 
         soundEnabled={soundEnabled} 
       />

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { defaultMasterExercises, findMatchingMasterExercise, canonicalizeExercise } from '../data/constants.js';
+import { defaultMasterExercises, findMatchingMasterExercise, canonicalizeExercise, exerciseAliasMap } from '../data/constants.js';
 
 console.log('Testing exercise matching and entity merging...');
 
@@ -226,5 +226,21 @@ const canonicalWithInstr = canonicalizeExercise({
 });
 assert.deepEqual(canonicalWithInstr.instructions_id, ['Instruksi khusus ID']);
 assert.deepEqual(canonicalWithInstr.instructions_en, ['Custom instruction EN']);
+
+// 23. Verifikasi normalisasi variasi SM, Smith, DB, BB
+assert.equal(canonicalizeExercise({ name: 'SM Squat' }).name, 'Smith Machine Squat');
+assert.equal(canonicalizeExercise({ name: 'Smith Squat' }).name, 'Smith Machine Squat');
+assert.equal(canonicalizeExercise({ name: 'SM Bench Press' }).name, 'Smith Machine Bench Press');
+assert.equal(canonicalizeExercise({ name: 'Smith Bench Press' }).name, 'Smith Machine Bench Press');
+assert.equal(canonicalizeExercise({ name: 'SM Incline Bench Press' }).name, 'Smith Machine Incline Bench Press');
+assert.equal(canonicalizeExercise({ name: 'Smith Incline Press' }).name, 'Smith Machine Incline Bench Press');
+assert.equal(canonicalizeExercise({ name: 'Smith RDL' }).name, 'Smith Machine Romanian Deadlift');
+assert.equal(canonicalizeExercise({ name: 'SM RDL' }).name, 'Smith Machine Romanian Deadlift');
+
+assert.equal(findMatchingMasterExercise({ name: 'DB Shoulder Press' })?.id, 114);
+assert.equal(findMatchingMasterExercise({ name: 'DB Shrug' })?.id, 124);
+assert.equal(findMatchingMasterExercise({ name: 'BB Bench Press' })?.id, 135);
+assert.equal(findMatchingMasterExercise({ name: 'BB Incline Bench Press' })?.id, 142);
+assert.equal(exerciseAliasMap['143'], 'edb-Side_Lateral_Raise');
 
 console.log('exerciseMatching OK');

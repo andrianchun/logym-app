@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Search, Filter, Dumbbell, Heart, ChevronDown } from 'lucide-react';
 import { formatTarget, getVideoId, muscleOptions, equipmentOptions, normalizeMuscleKey, filterByGymEquipment, exerciseAliasMap, cleanExerciseNameForMatching, canonicalizeExercise } from '../data/constants';
@@ -51,6 +51,22 @@ const AlternativeExerciseModal = ({
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [sortOrder, setSortOrder] = useState('recommendation');
   const [onlineExercises, setOnlineExercises] = useState([]);
+  const [visibleCount, setVisibleCount] = useState(30);
+  const listRef = useRef(null);
+
+  // Reset visible count ketika filter/search berubah
+  React.useEffect(() => {
+    setVisibleCount(30);
+    if (listRef.current) listRef.current.scrollTop = 0;
+  }, [searchTerm, muscleFilter, equipFilter, showFavoritesOnly, sortOrder]);
+
+  // Infinite scroll handler
+  const handleScroll = useCallback((e) => {
+    const el = e.target;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 200) {
+      setVisibleCount(prev => prev + 30);
+    }
+  }, []);
   
   React.useEffect(() => {
     let mounted = true;
@@ -78,6 +94,10 @@ const AlternativeExerciseModal = ({
       const cleanName = cleanExerciseNameForMatching(canonicalOnline.name);
       onlineMap.set(cleanName, canonicalOnline);
       if (ex.id) onlineMap.set(String(ex.id), canonicalOnline);
+      if (ex.exerciseId) {
+        onlineMap.set(String(ex.exerciseId), canonicalOnline);
+        onlineMap.set(`edb-${ex.exerciseId}`, canonicalOnline);
+      }
     });
 
     const localMap = new Map();
@@ -114,7 +134,27 @@ const AlternativeExerciseModal = ({
   const alternatives = useMemo(() => {
     if (!originalEx) return [];
 
-    let filtered = combinedLibrary.filter(ex => ex.id !== originalEx.id);
+    // Latihan asal TIDAK boleh muncul sebagai alternatif untuk dirinya sendiri,
+    // baik dicocokkan via id, originalId, exerciseId, maupun nama/kanonikal.
+    const isSameExercise = (a, b) => {
+      if (!a || !b) return false;
+      if (a.id !== undefined && b.id !== undefined && String(a.id) === String(b.id)) return true;
+      if (a.originalId !== undefined && (String(a.originalId) === String(b.id) || String(a.originalId) === String(b.originalId))) return true;
+      if (b.originalId !== undefined && (String(b.originalId) === String(a.id))) return true;
+      if (a.exerciseId && b.exerciseId && String(a.exerciseId) === String(b.exerciseId)) return true;
+
+      const normA = cleanExerciseNameForMatching(a.name);
+      const normB = cleanExerciseNameForMatching(b.name);
+      if (normA && normB && normA === normB) return true;
+
+      const canonA = cleanExerciseNameForMatching(canonicalizeExercise(a)?.name);
+      const canonB = cleanExerciseNameForMatching(canonicalizeExercise(b)?.name);
+      if (canonA && canonB && canonA === canonB) return true;
+
+      return false;
+    };
+
+    let filtered = combinedLibrary.filter(ex => !isSameExercise(ex, originalEx));
 
     // Filter by Muscle
     if (muscleFilter.length > 0) {
@@ -200,7 +240,7 @@ const AlternativeExerciseModal = ({
       });
     }
 
-    return filtered.slice(0, 1500); // Limit raised to 1500 to show virtually the entire database
+    return filtered.slice(0, 500); // Capped at 500; infinite scroll menampilkan 30 per batch
   }, [combinedLibrary, originalEx, searchTerm, muscleFilter, equipFilter, showFavoritesOnly, sortOrder, lang]);
 
   if (!isOpen || !originalEx) return null;
@@ -325,64 +365,71 @@ const AlternativeExerciseModal = ({
           )}
         </div>
 
-        {/* List */}
+        {/* List — Infinite scroll: render hanya visibleCount item, tambah 30 saat scroll mendekati bawah */}
         {/* overscroll-contain: gulirannya berhenti di daftar ini, tidak merembet menggulir
             halaman di belakang begitu sampai ujung. */}
-        <div className="flex-1 overflow-y-auto overscroll-contain p-2 space-y-2" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
+        <div ref={listRef} onScroll={handleScroll} className="flex-1 overflow-y-auto overscroll-contain p-2 space-y-2" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
           {alternatives.length === 0 ? (
             <div className={`text-center py-12 ${t.textMuted}`}>
               <p className="body-lg font-bold">Tidak ada latihan yang ditemukan.</p>
             </div>
           ) : (
-            alternatives.map(ex => {
-              const isCustom = ex.id > 1000000 && ex.source !== 'exercisedb';
-              return (
-              <div 
-                key={ex.id}
-                onClick={() => {
-                  playSoundEffect('click', soundEnabled);
-                  const exToAdd = ex.source === 'exercisedb' ? { ...ex, id: Date.now() + Math.floor(Math.random() * 1000) } : ex;
-                  onSelectAlternative(exToAdd);
-                }}
-                className={`p-3 rounded-2xl border ${t.border} ${t.bgCard} flex items-center justify-between gap-3 hover:${t.borderAccentSoft} cursor-pointer transition-all active:scale-95`}
-              >
-                {/* Thumbnail */}
-                <div className="relative inline-block flex-shrink-0">
-                  <div className="w-12 h-12 rounded-xl bg-black/5 flex items-center justify-center overflow-hidden border border-black/5 relative">
-                     {(() => {
-                        const ytId = getVideoId(ex.ytVideo);
-                        if (ex.gifUrl) {
-                           return <img src={ex.gifUrl} alt={ex.name} className="w-full h-full object-cover opacity-80" />;
-                        } else if (ytId) {
-                           return <img src={`https://img.youtube.com/vi/${ytId}/default.jpg`} alt={ex.name} className="w-full h-full object-cover opacity-80" />;
-                        } else {
-                           return <EquipmentIcon equipment={ex.equipment} size={20} className={t.textMuted} />;
-                        }
-                     })()}
-                     {isCustom && <div className="absolute bottom-0 inset-x-0 bg-slate-900/90 backdrop-blur text-emerald-400 text-[6.5px] font-black uppercase tracking-widest text-center py-0.5 leading-none">CUSTOM</div>}
-                  </div>
-                  {/* Recommendation Badge */}
-                  {ex.score >= 50 && (
-                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full border-2 border-white dark:border-[#0f172a] z-10"></div>
-                  )}
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <h4 className={`font-black body-lg ${t.textMain} truncate flex items-center gap-1.5 flex-wrap`}>
-                    {ex.name}
-                  </h4>
-                  <div className="flex flex-col gap-1 mt-1">
-                    <div className="flex gap-1.5 flex-wrap items-center">
-                       {ex.score >= 50 && <span className="text-[9px] font-black text-amber-500 uppercase tracking-wider mr-1">Disarankan</span>}
-                       <span className={`text-[10px] font-black uppercase tracking-wider ${t.textAccent}`}>{ex.equipment || 'Lainnya'}</span>
+            <>
+              {alternatives.slice(0, visibleCount).map(ex => {
+                const isCustom = ex.id > 1000000 && ex.source !== 'exercisedb';
+                return (
+                <div 
+                  key={ex.id}
+                  onClick={() => {
+                    playSoundEffect('click', soundEnabled);
+                    const exToAdd = ex.source === 'exercisedb' ? { ...ex, id: Date.now() + Math.floor(Math.random() * 1000) } : ex;
+                    onSelectAlternative(exToAdd);
+                  }}
+                  className={`p-3 rounded-2xl border ${t.border} ${t.bgCard} flex items-center justify-between gap-3 hover:${t.borderAccentSoft} cursor-pointer transition-all active:scale-95`}
+                >
+                  {/* Thumbnail */}
+                  <div className="relative inline-block flex-shrink-0">
+                    <div className="w-12 h-12 rounded-xl bg-black/5 flex items-center justify-center overflow-hidden border border-black/5 relative">
+                       {(() => {
+                          const ytId = getVideoId(ex.ytVideo);
+                          if (ex.gifUrl) {
+                             return <img src={ex.gifUrl} alt={ex.name} loading="lazy" className="w-full h-full object-cover opacity-80" />;
+                          } else if (ytId) {
+                             return <img src={`https://img.youtube.com/vi/${ytId}/default.jpg`} alt={ex.name} loading="lazy" className="w-full h-full object-cover opacity-80" />;
+                          } else {
+                             return <EquipmentIcon equipment={ex.equipment} size={20} className={t.textMuted} />;
+                          }
+                       })()}
+                       {isCustom && <div className="absolute bottom-0 inset-x-0 bg-slate-900/90 backdrop-blur text-emerald-400 text-[6.5px] font-black uppercase tracking-widest text-center py-0.5 leading-none">CUSTOM</div>}
                     </div>
-                    <div className="flex gap-1 flex-wrap items-center -ml-1.5">{ex.target?.map(m => (
-                        <span key={m} className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold ${t.inputBg} ${t.textMuted} border ${t.border}`}>{formatTarget(m, lang?.id)}</span>
-                      ))}</div>
+                    {/* Recommendation Badge */}
+                    {ex.score >= 50 && (
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full border-2 border-white dark:border-[#0f172a] z-10"></div>
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <h4 className={`font-black body-lg ${t.textMain} truncate flex items-center gap-1.5 flex-wrap`}>
+                      {ex.name}
+                    </h4>
+                    <div className="flex flex-col gap-1 mt-1">
+                      <div className="flex gap-1.5 flex-wrap items-center">
+                         {ex.score >= 50 && <span className="text-[9px] font-black text-amber-500 uppercase tracking-wider mr-1">Disarankan</span>}
+                         <span className={`text-[10px] font-black uppercase tracking-wider ${t.textAccent}`}>{ex.equipment || 'Lainnya'}</span>
+                      </div>
+                      <div className="flex gap-1 flex-wrap items-center -ml-1.5">{ex.target?.map(m => (
+                          <span key={m} className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold ${t.inputBg} ${t.textMuted} border ${t.border}`}>{formatTarget(m, lang?.id)}</span>
+                        ))}</div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )})
+              )})}
+              {visibleCount < alternatives.length && (
+                <div className={`text-center py-4 ${t.textMuted}`}>
+                  <p className="text-xs font-bold">{alternatives.length - visibleCount} latihan lainnya · scroll ke bawah</p>
+                </div>
+              )}
+            </>
           )}
         </div>
 

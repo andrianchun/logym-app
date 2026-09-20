@@ -454,6 +454,10 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
       const cleanName = cleanExerciseNameForMatching(canonicalOnline.name);
       onlineMap.set(cleanName, canonicalOnline);
       if (ex.id) onlineMap.set(String(ex.id), canonicalOnline);
+      if (ex.exerciseId) {
+        onlineMap.set(String(ex.exerciseId), canonicalOnline);
+        onlineMap.set(`edb-${ex.exerciseId}`, canonicalOnline);
+      }
     });
 
     const localMap = new Map();

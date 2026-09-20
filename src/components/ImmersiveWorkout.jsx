@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Play, Pause, ChevronRight, ChevronLeft, Dumbbell, Check, Info, Clock, Minimize2, SkipForward, ClipboardEdit, Brain, Flame, Activity, ArrowLeftRight, Square, Zap } from 'lucide-react';
+import { X, Play, ChevronRight, ChevronLeft, Dumbbell, Check, Info, Clock, Minimize2, SkipForward, ClipboardEdit, Brain, Flame, Activity, ArrowLeftRight, Square, Zap } from 'lucide-react';
 import ScrollPicker from './ScrollPicker';
 import { exerciseTypeLabels, defaultMasterExercises, findMatchingMasterExercise, canonicalizeExercise } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
@@ -9,21 +9,21 @@ import { getCachedExercises } from '../utils/exerciseDbApi';
 import { WorkoutTimerPlugin } from '../App';
 import TwoFrameMotionLoop from './TwoFrameMotionLoop';
 
-const LiveWorkoutStats = ({ workoutStartTime, isPaused, userProfile, validExercises, exerciseLogs, t, formatTime }) => {
+const LiveWorkoutStats = ({ workoutStartTime, userProfile, validExercises, exerciseLogs, t, formatTime }) => {
   const [workoutSeconds, setWorkoutSeconds] = useState(() => {
     return workoutStartTime ? Math.floor((Date.now() - workoutStartTime) / 1000) : 0;
   });
 
   useEffect(() => {
     let interval;
-    if (!isPaused && workoutStartTime) {
+    if (workoutStartTime) {
       setWorkoutSeconds(Math.floor((Date.now() - workoutStartTime) / 1000));
       interval = setInterval(() => {
         setWorkoutSeconds(Math.floor((Date.now() - workoutStartTime) / 1000));
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [isPaused, workoutStartTime]);
+  }, [workoutStartTime]);
 
   const caloriesBurned = calculateLiveWorkoutCalories(userProfile?.weight || 70, validExercises, exerciseLogs, workoutSeconds);
 
@@ -290,7 +290,6 @@ const ImmersiveWorkout = ({
     if (ex?.id) onActiveExercise?.(ex.id);
   }, [ex?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const [isPaused, setIsPaused] = useState(false);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const isSavingRef = React.useRef(false);
@@ -529,13 +528,13 @@ const ImmersiveWorkout = ({
 
   const activeMedia = mediaItems[activeMediaIndex];
 
-  // Pause / Play Logic
+  // Active Media Playback Logic
   React.useEffect(() => {
     const iframes = document.querySelectorAll('.immersive-video-iframe');
     const videoObjs = document.querySelectorAll('.immersive-video-html5');
     
     iframes.forEach((iframe, idx) => {
-      if (idx === activeMediaIndex && !isPaused) {
+      if (idx === activeMediaIndex) {
         iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
       } else {
         iframe.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
@@ -544,20 +543,14 @@ const ImmersiveWorkout = ({
 
     videoObjs.forEach((videoObj, idx) => {
       if (idx === activeMediaIndex) {
-        if (!isPaused) {
-          videoObj.playbackRate = 1;
-          videoObj.play().catch(() => {});
-        } else {
-          videoObj.playbackRate = 0;
-          // Kita biarkan video statusnya "playing" di mata browser agar overlay pause tidak muncul
-          videoObj.play().catch(() => {});
-        }
+        videoObj.playbackRate = 1;
+        videoObj.play().catch(() => {});
       } else {
         videoObj.playbackRate = 1;
         videoObj.pause();
       }
     });
-  }, [isPaused, activeMediaIndex, currentIndex]);
+  }, [activeMediaIndex, currentIndex]);
 
   // Swipe Logic on Center Visual (Video & Image)
   const [touchStartX, setTouchStartX] = React.useState(null);
@@ -830,7 +823,6 @@ const ImmersiveWorkout = ({
           <div className="flex items-center gap-4">
             <LiveWorkoutStats 
               workoutStartTime={workoutStartTime} 
-              isPaused={isPaused} 
               userProfile={userProfile} 
               validExercises={validExercises} 
               exerciseLogs={exerciseLogs} 
@@ -841,9 +833,6 @@ const ImmersiveWorkout = ({
 
           {/* Controls */}
           <div className="flex items-center gap-2">
-            <button onClick={() => { playSoundEffect('click', soundEnabled); setIsPaused(!isPaused); }} className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-white/5 hover:bg-white/10' : 'bg-black/5 hover:bg-black/10'} flex items-center justify-center transition shadow-sm`} title="Play/Pause">
-              {isPaused ? <Play size={18} className={`${t.textAccent}`} /> : <Pause size={18} />}
-            </button>
             <button data-close-modal="true" onClick={() => { playSoundEffect('click', soundEnabled); handleMinimize(); }} className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-white/5 hover:bg-white/10' : 'bg-black/5 hover:bg-black/10'} flex items-center justify-center transition shadow-sm`} title="Minimize">
               <Minimize2 size={18} />
             </button>
@@ -893,7 +882,7 @@ const ImmersiveWorkout = ({
                   <video 
                     src={media.url} 
                     poster={resolvedEx?.thumbnailUrl || resolvedEx?.gifUrl || ''} 
-                    autoPlay={idx === activeMediaIndex && !isPaused} 
+                    autoPlay={idx === activeMediaIndex} 
                     loop 
                     muted 
                     playsInline 
@@ -1008,6 +997,17 @@ const ImmersiveWorkout = ({
                       return (
                         <div className={`relative w-full rounded-[32px] ${hint?.isNewRecord ? 'bg-[#0c1427]/90 border border-sky-400/40 shadow-[0_0_30px_rgba(56,189,248,0.25)]' : 'bg-[#0c1427]/90 border border-white/15'} backdrop-blur-2xl shadow-2xl shadow-black/90 overflow-visible text-center`}>
                           
+                          {/* Close Button */}
+                          <button
+                            type="button"
+                            data-close-modal="true"
+                            onClick={() => setShowHint(false)}
+                            className="absolute top-4 right-4 z-30 p-2 rounded-full bg-white/10 hover:bg-white/20 text-zinc-300 hover:text-white transition-colors"
+                            title="Tutup"
+                          >
+                            <X size={16} />
+                          </button>
+
                           {/* Coach Popout Avatar (Atas keluar kotak, Bawah terpotong pas di rounded bottom kotak) */}
                           <div className="absolute -top-44 inset-x-0 bottom-0 pointer-events-none z-10 overflow-hidden rounded-b-[32px] flex items-start justify-center">
                             <img 
@@ -1022,54 +1022,84 @@ const ImmersiveWorkout = ({
                           </div>
 
                           {/* Content Container (Z-Index di DEPAN Coach, tanpa kotak di dalam kotak) */}
-                          <div className="relative z-20 w-full pt-32 pb-6 px-6 flex flex-col items-center">
+                          <div className="relative z-20 w-full pt-32 pb-6 px-6 flex flex-col items-center text-center">
                             {hint ? (
                               <>
-                                <h3 className={`font-black ${hint.isNewRecord ? 'text-lg sm:text-xl text-sky-400 drop-shadow-[0_0_12px_rgba(56,189,248,0.8)] animate-pulse' : 'text-base sm:text-lg text-white'} tracking-wider uppercase mb-2.5 drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]`}>
+                                <h3 className={`font-black ${hint.isNewRecord ? 'text-lg sm:text-xl text-sky-400 drop-shadow-[0_0_12px_rgba(56,189,248,0.8)] animate-pulse' : 'text-xs sm:text-sm text-sky-300/90'} tracking-widest uppercase mb-1.5 drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]`}>
                                   {hint.title || "TARGET HARI INI"}
                                 </h3>
 
-                                {/* Benchmark Chip */}
-                                {hint.benchmark && (
-                                  <div className="flex flex-col items-center gap-0.5 mb-2.5">
-                                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-xs font-semibold text-zinc-200 backdrop-blur-sm shadow-sm">
-                                      {hint.benchmarkLabel && <span className="text-zinc-400 text-[11px] font-medium">{hint.benchmarkLabel}:</span>}
-                                      <span className="text-white font-black">{hint.benchmark}</span>
-                                    </div>
-                                    {hint.benchmarkDetail && (
-                                      <span className="text-[10px] font-medium text-sky-300/90 tracking-tight">
-                                        ({hint.benchmarkDetail})
+                                {/* Target Angka Utama (Fokus di Angka, tulisan plat & reps kecil) */}
+                                {(hint.targetWeightNumber !== undefined || hint.target || hint.benchmark) && (
+                                  <div className="flex flex-col items-center mb-2.5">
+                                    {hint.weightLabel && (
+                                      <span className="text-[10px] font-bold uppercase tracking-widest text-sky-400/90 mb-1 px-2.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20">
+                                        Beban {hint.weightLabel}
                                       </span>
+                                    )}
+                                    
+                                    {hint.targetWeightNumber !== undefined && hint.targetWeightNumber !== null ? (
+                                      <div className="flex items-baseline justify-center gap-1 drop-shadow-[0_4px_16px_rgba(0,0,0,0.95)]">
+                                        <span className="text-4xl sm:text-5xl font-black text-white tracking-tight">
+                                          {hint.targetWeightNumber}
+                                        </span>
+                                        <span className="text-xs sm:text-sm font-semibold text-zinc-400 mr-1.5">
+                                          {hint.weightUnit || 'kg'}
+                                        </span>
+                                        {hint.targetRepsNumber && (
+                                          <>
+                                            <span className="text-2xl sm:text-3xl font-light text-zinc-500 mx-1">
+                                              ×
+                                            </span>
+                                            <span className="text-4xl sm:text-5xl font-black text-white tracking-tight">
+                                              {hint.targetRepsNumber}
+                                            </span>
+                                            <span className="text-xs sm:text-sm font-semibold text-zinc-400 ml-0.5">
+                                              reps
+                                            </span>
+                                          </>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <div className="text-3xl sm:text-4xl font-black text-white tracking-tight drop-shadow-[0_4px_16px_rgba(0,0,0,0.95)]">
+                                        {hint.target || hint.benchmark}
+                                      </div>
+                                    )}
+
+                                    {hint.targetDetail && (
+                                      <div className="mt-1.5 text-[11px] font-semibold text-emerald-300/90 px-3 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 max-w-full text-center">
+                                        {hint.targetDetail}
+                                      </div>
                                     )}
                                   </div>
                                 )}
 
-                                {/* Mission / Advice text */}
+                                {/* Acuan Deketan: Sesi Lalu & 10RM Acuan berdampingan tepat di bawah target */}
+                                {(hint.lastSession || hint.rm10) && (
+                                  <div className="flex items-center justify-center flex-wrap gap-1.5 mb-3.5">
+                                    {hint.lastSession && (
+                                      <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] font-medium text-zinc-300 backdrop-blur-sm">
+                                        <span className="text-zinc-500">Sesi Lalu:</span>
+                                        <span className="text-zinc-200 font-semibold">{hint.lastSession}</span>
+                                      </div>
+                                    )}
+                                    {hint.rm10 && (
+                                      <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] font-medium text-zinc-300 backdrop-blur-sm">
+                                        <span className="text-zinc-500">10RM:</span>
+                                        <span className="text-sky-300 font-bold">{hint.rm10}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Pesan Arahan Coach */}
                                 <p className="text-zinc-200 text-xs sm:text-sm font-medium leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)] max-w-[280px]">
                                   {hint.message || hint.text}
                                 </p>
-
-                                {/* Logym Blue 10RM Pill Badge */}
-                                {hint.rm10 && (
-                                  <div className="mt-3.5 flex flex-col items-center gap-1">
-                                    <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-sky-500/15 border border-sky-400/40 text-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.25)] backdrop-blur-sm">
-                                      <Zap size={13} className="text-sky-400 fill-sky-400/40" />
-                                      <span className="text-[10px] font-bold tracking-wider uppercase text-sky-300/80">
-                                        10RM Acuan {hint.hasWeightDiff ? '(Total Aktual)' : ''}
-                                      </span>
-                                      <span className="text-xs font-black text-white">{hint.rm10}</span>
-                                    </div>
-                                    {hint.rm10Detail && (
-                                      <span className="text-[10px] font-semibold text-sky-300/80 tracking-tight">
-                                        (Pasang: {hint.rm10Detail})
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
                               </>
                             ) : (
                               <>
-                                <h3 className="font-black text-base sm:text-lg text-white tracking-wider uppercase mb-2.5 drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]">
+                                <h3 className="font-black text-xs sm:text-sm text-sky-300/90 tracking-widest uppercase mb-2 drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]">
                                   TARGET HARI INI
                                 </h3>
                                 <p className="text-zinc-200 text-xs sm:text-sm font-medium leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)] max-w-[280px]">
@@ -1126,7 +1156,7 @@ const ImmersiveWorkout = ({
                                  type="button"
                                  onClick={(e) => { e.stopPropagation(); setShowWeightInfo(prev => !prev); }}
                                  className={`p-0.5 rounded-full transition-all ${showWeightInfo ? 'text-sky-400 scale-110' : 'text-zinc-400 hover:text-sky-400'}`}
-                                 title="Info Beban Aktual"
+                                 title="Info Beban Total"
                                >
                                  <Info size={14} strokeWidth={2.2} />
                                </button>
@@ -1139,7 +1169,7 @@ const ImmersiveWorkout = ({
                                      onClick={(e) => { e.stopPropagation(); setShowWeightInfo(false); }} 
                                    />
                                    <div 
-                                     className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-max max-w-[240px] px-3.5 py-2 rounded-2xl bg-[#0c1427]/90 border border-white/15 backdrop-blur-2xl text-left shadow-2xl shadow-black/80 z-40 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto"
+                                     className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-max max-w-[240px] px-3.5 py-2 rounded-2xl bg-[#0a1022] border border-white/15 backdrop-blur-xl text-left shadow-2xl shadow-black/80 z-40 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto"
                                      onClick={(e) => e.stopPropagation()}
                                    >
                                      <div className="font-bold text-xs text-sky-400 whitespace-nowrap">
@@ -1169,7 +1199,7 @@ const ImmersiveWorkout = ({
                           {hasWeightDiff && (
                             <div className="h-5 mt-1 flex items-center justify-center">
                               <span className="text-[11px] text-sky-400 font-bold">
-                                Aktual: {isImp ? Number((actW * 2.20462).toFixed(1)) + ' lbs' : actW + ' kg'}
+                                Total: {isImp ? Number((actW * 2.20462).toFixed(1)) + ' lbs' : actW + ' kg'}
                               </span>
                             </div>
                           )}

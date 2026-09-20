@@ -22,7 +22,8 @@ const CalendarTab = ({
   setActiveTab, soundEnabled, playSoundEffect, navigateToWorkoutDate,
   exerciseLogs, skippedExercises, handleEditPastWorkout,
   weekStartDay = 0, defaultReminderTime = "15:00", reminderEnabled = true,
-  unitSystem, setConfirmModal, activePlanIds = [], userProfile, logyPersona = 'santai', activityTargets, sessionToRun, isWorkoutActive, workoutStartTime
+  unitSystem, setConfirmModal, activePlanIds = [], userProfile, logyPersona = 'santai', activityTargets, sessionToRun, isWorkoutActive, workoutStartTime,
+  extraExercises = [], setExtraExercises
 }) => {
 
   // DURASI & KALORI SESI YANG SEDANG BERJALAN.
@@ -794,6 +795,9 @@ const CalendarTab = ({
           
           if (workoutId === 'virtual_adhoc') {
               newActiveSession.extraExercises = [];
+              if (typeof setExtraExercises === 'function' && (dateStr === selectedDate || dateStr === calendarSelectedDate)) {
+                  setExtraExercises([]);
+              }
           } else {
               const workoutToRemove = newWorkouts.find(w => String(w.id) === String(workoutId));
               if (workoutToRemove) {
@@ -857,15 +861,30 @@ const CalendarTab = ({
   const getSelectedWorkoutsForDate = (dateStr) => {
     let wks = [...getDayWorkouts(dateStr)];
     const dData = history[dateStr] || {};
-    if (dData._activeSession?.extraExercises?.length > 0 && !wks.some(w => w.programId === 'adhoc' && w.status !== 'completed' && w.id !== 'virtual_adhoc')) {
-      wks.push({
-        id: 'virtual_adhoc',
-        programId: 'adhoc',
-        programName: 'Ekstra',
-        status: 'planned',
-        log: dData._activeSession.exerciseLogs || {},
-        exercises: dData._activeSession.extraExercises
+    const rawExtras = dData._activeSession?.extraExercises || (dateStr === selectedDate ? extraExercises : []);
+    if (rawExtras?.length > 0 && !wks.some(w => w.programId === 'adhoc' && w.status !== 'completed' && w.id !== 'virtual_adhoc')) {
+      const uniqueExtras = [];
+      const seenKeys = new Set();
+      rawExtras.forEach(ex => {
+        if (!ex) return;
+        const nameKey = (ex.name || '').toLowerCase().trim();
+        const baseId = String(ex.originalId || ex.id || '').split('-')[0];
+        const key = nameKey || baseId;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          uniqueExtras.push(ex);
+        }
       });
+      if (uniqueExtras.length > 0) {
+        wks.push({
+          id: 'virtual_adhoc',
+          programId: 'adhoc',
+          programName: 'Ekstra',
+          status: 'planned',
+          log: dData._activeSession?.exerciseLogs || {},
+          exercises: uniqueExtras
+        });
+      }
     }
     return wks;
   };
@@ -1843,7 +1862,7 @@ const CalendarTab = ({
                                                               const wStr = isImp ? formatNumber(Math.round(maxW * 2.20462 * 10)/10, langId) + ' lbs' : formatNumber(maxW, langId) + ' kg';
                                                               const actWStr = isImp ? formatNumber(Math.round(maxActW * 2.20462 * 10)/10, langId) + ' lbs' : formatNumber(maxActW, langId) + ' kg';
                                                               textStr = `${doneSets.length} x ${formatNumber(maxR, langId)} x ${wStr}`;
-                                                              if (maxActW !== maxW && maxActW > 0) aktualStr = `Aktual ${actWStr}`;
+                                                              if (maxActW !== maxW && maxActW > 0) aktualStr = `Total ${actWStr}`;
                                                             }
                                                         }
                                                      } else textStr = "Belum dimulai";
@@ -1911,15 +1930,6 @@ const CalendarTab = ({
                              >
                                 <Plus size={18} /> Tambah Sesi
                              </button>
-                         )}
-
-                         {panelWorkouts.some(w => !checkIsCompletedStrict(w, targetDateStr)) && targetDateStr === todayStr && (
-                           <button 
-                             onClick={() => { navigateToWorkoutDate(targetDateStr); }} 
-                             className={`w-full p-4 rounded-full font-bold text-white transition-colors bg-gradient-to-r ${t.gradientBg} shadow-lg flex justify-center items-center`}
-                           >
-                             <PlayCircle size={18} className="mr-2"/> Mulai Latihan Sekarang
-                           </button>
                          )}
                        </div>
                      </div>

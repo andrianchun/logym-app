@@ -314,7 +314,102 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
     }
   }, [customLinesByType, chartType, chartDataObj, activePlanIds, programs, exerciseLibrary, history, selectedDate, expandedSessions]);
 
-  // Pinch-to-zoom logic
+  const DAY_MIN_PW = 20;
+  const MONTH_MIN_PW = 10;
+
+  // Agregasi rata-rata / peak per bulan
+  const monthlyPoints = useMemo(() => {
+    const byMonth = {};
+    (chartDataObj?.data || []).forEach(p => {
+      const k = p.rawDate ? p.rawDate.substring(0, 7) : '';
+      if (!k) return;
+      if (!byMonth[k]) {
+        byMonth[k] = { dates: [], rawDates: [] };
+        (chartDataObj.items || []).forEach(item => { byMonth[k][item] = []; });
+      }
+      byMonth[k].dates.push(p.date);
+      byMonth[k].rawDates.push(p.rawDate);
+      (chartDataObj.items || []).forEach(item => {
+        if (p[item] != null && !isNaN(p[item])) {
+          byMonth[k][item].push(p[item]);
+        }
+      });
+    });
+
+    return Object.entries(byMonth).map(([k, v]) => {
+      const dObj = new Date(`${k}-15T12:00:00`);
+      const dateLabel = dObj.toLocaleDateString(language === 'ID' ? 'id-ID' : 'en-US', { month: 'short', year: '2-digit' });
+      const periodLabel = dObj.toLocaleDateString(language === 'ID' ? 'id-ID' : 'en-US', { month: 'long', year: 'numeric' });
+      const lastRaw = v.rawDates[v.rawDates.length - 1];
+
+      const row = {
+        date: dateLabel,
+        rawDate: lastRaw,
+        periodLabel,
+        count: v.rawDates.length,
+      };
+
+      (chartDataObj.items || []).forEach(item => {
+        const arr = v[item];
+        if (arr && arr.length > 0) {
+          if (chartType === 'muscle') {
+            const sum = arr.reduce((a, b) => a + b, 0);
+            row[item] = Number((sum / arr.length).toFixed(1));
+          } else {
+            row[item] = Number(Math.max(...arr).toFixed(1));
+          }
+        }
+      });
+
+      return row;
+    }).sort((a, b) => a.rawDate.localeCompare(b.rawDate));
+  }, [chartDataObj, chartType, language]);
+
+  // Agregasi rata-rata / peak per tahun
+  const yearlyPoints = useMemo(() => {
+    const byYear = {};
+    monthlyPoints.forEach(p => {
+      const k = p.rawDate ? p.rawDate.substring(0, 4) : '';
+      if (!k) return;
+      if (!byYear[k]) {
+        byYear[k] = { dates: [], rawDates: [] };
+        (chartDataObj.items || []).forEach(item => { byYear[k][item] = []; });
+      }
+      byYear[k].dates.push(p.date);
+      byYear[k].rawDates.push(p.rawDate);
+      (chartDataObj.items || []).forEach(item => {
+        if (p[item] != null && !isNaN(p[item])) {
+          byYear[k][item].push(p[item]);
+        }
+      });
+    });
+
+    return Object.entries(byYear).map(([k, v]) => {
+      const yearStr = k;
+      const lastRaw = v.rawDates[v.rawDates.length - 1];
+      const row = {
+        date: yearStr,
+        rawDate: lastRaw,
+        periodLabel: language === 'ID' ? `Tahun ${yearStr}` : `Year ${yearStr}`,
+        count: v.rawDates.length,
+      };
+
+      (chartDataObj.items || []).forEach(item => {
+        const arr = v[item];
+        if (arr && arr.length > 0) {
+          if (chartType === 'muscle') {
+            const sum = arr.reduce((a, b) => a + b, 0);
+            row[item] = Number((sum / arr.length).toFixed(1));
+          } else {
+            row[item] = Number(Math.max(...arr).toFixed(1));
+          }
+        }
+      });
+
+      return row;
+    }).sort((a, b) => a.rawDate.localeCompare(b.rawDate));
+  }, [monthlyPoints, chartDataObj.items, chartType, language]);
+
   const [pointWidth, setPointWidth] = useState(() => {
       try {
           const saved = localStorage.getItem('lyfit_prog_pointWidth');
@@ -323,12 +418,49 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
       return 55;
   });
   useEffect(() => { localStorage.setItem('lyfit_prog_pointWidth', pointWidth); }, [pointWidth]);
+
+  const [resolution, setResolution] = useState(() => {
+      if (pointWidth >= DAY_MIN_PW) return 'day';
+      if (pointWidth >= MONTH_MIN_PW) return 'month';
+      return 'year';
+  });
+
+  useEffect(() => {
+      setResolution(prev => {
+          let next = prev;
+          if (prev === 'day' && pointWidth < 18) next = 'month';
+          else if (prev === 'month') {
+              if (pointWidth > 24) next = 'day';
+              else if (pointWidth < 8) next = 'year';
+          } else if (prev === 'year' && pointWidth > 12) next = 'month';
+
+          if (next !== prev && navigator.vibrate) {
+              try { navigator.vibrate(25); } catch(e) {}
+          }
+          return next;
+      });
+  }, [pointWidth]);
+
+  const chartData = resolution === 'day' ? chartDataObj.data : resolution === 'month' ? monthlyPoints : yearlyPoints;
+
+  const effectivePointWidth = useMemo(() => {
+      const bWidth = typeof window !== 'undefined' ? window.innerWidth - 112 : 280;
+      if (resolution === 'day') return pointWidth;
+      if (resolution === 'month') return Math.max(50, Math.round(bWidth / Math.max(1, monthlyPoints.length)));
+      return Math.max(80, Math.round(bWidth / Math.max(1, yearlyPoints.length)));
+  }, [resolution, pointWidth, monthlyPoints.length, yearlyPoints.length]);
+
   const touchState = useRef({ initialDist: 0, initialPointWidth: 55, pinchRatio: 0, scrollRelCenterX: 0 });
   const scrollTarget = useRef(null);
   const scrollRef = useRef(null);
+  const pointWidthRef = useRef(pointWidth);
+  useEffect(() => { pointWidthRef.current = pointWidth; }, [pointWidth]);
+  const rafRef = useRef(null);
+  const pinchRafRef = useRef(null);
+  const lastCommittedWidthRef = useRef(pointWidth);
 
   useEffect(() => {
-     if(scrollRef.current && chartDataObj.data.length > 0 && effectiveActiveLines.length > 0) {
+     if(scrollRef.current && chartData.length > 0 && effectiveActiveLines.length > 0) {
         if (isSubCard) {
             const savedScroll = localStorage.getItem('lyfit_prog_scrollLeft');
             if (savedScroll !== null) {
@@ -337,7 +469,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
             return;
         }
 
-        const data = chartDataObj.data;
+        const data = chartData;
         
         let latestIdxWithData = -1;
         for (let i = data.length - 1; i >= 0; i--) {
@@ -363,7 +495,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
              const numPoints = latestIdxWithData - startIdx + 1;
              const clientW = scrollRef.current.clientWidth || (window.innerWidth - 40);
              
-             let newPointWidth = clientW / Math.max(1.5, numPoints); // Use 1.5 to leave slight padding if only 1 point
+             let newPointWidth = clientW / Math.max(1.5, numPoints);
              if (newPointWidth > 200) newPointWidth = 200;
              if (newPointWidth < 15) newPointWidth = 15;
 
@@ -379,20 +511,16 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
       }
    }, [chartDataObj, selectedDate, effectiveActiveLines]);
 
-  const pointWidthRef = useRef(pointWidth);
-  useEffect(() => { pointWidthRef.current = pointWidth; }, [pointWidth]);
-  const rafRef = useRef(null);
-
   const allDisplayItems = useMemo(() => {
      return [...new Set([...effectiveActiveLines, ...chartDataObj.items])];
   }, [effectiveActiveLines, chartDataObj.items]);
 
   const yDomain = useMemo(() => {
-      if (chartDataObj.data.length === 0) return ['auto', 'auto'];
+      if (chartData.length === 0) return ['auto', 'auto'];
       
       let min = Infinity;
       let max = -Infinity;
-      chartDataObj.data.forEach(d => {
+      chartData.forEach(d => {
           effectiveActiveLines.forEach(key => {
               let val = d[key];
               if (val !== undefined && val !== null) {
@@ -415,7 +543,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
               return [Math.floor(Math.max(0, min - diff * 0.1)), Math.ceil(max + diff * 0.1)];
           }
       }
-  }, [chartDataObj.data, effectiveActiveLines]);
+  }, [chartData, effectiveActiveLines]);
 
   const handleScroll = () => {
       if (!rafRef.current) {
@@ -428,11 +556,10 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
       }
   };
 
-  // Agar zoom tetap mulus walau jumlah data sedikit
   const calculateChartWidth = (pw) => {
-      const bWidth = window.innerWidth - 112; 
-      const scaledBaseWidth = bWidth * (pw / 55);
-      return Math.max(chartDataObj.data.length * pw, scaledBaseWidth);
+      const bWidth = typeof window !== 'undefined' ? window.innerWidth - 112 : 280;
+      const pWidth = resolution === 'day' ? pw : effectivePointWidth;
+      return Math.max(chartData.length * pWidth, bWidth);
   };
 
   const handleTouchStart = (e) => {
@@ -441,36 +568,56 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
               e.touches[0].clientX - e.touches[1].clientX,
               e.touches[0].clientY - e.touches[1].clientY
           );
+          if (dist <= 0) return;
           
           const pinchCenterX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-          const rect = scrollRef.current.getBoundingClientRect();
+          const rect = scrollRef.current ? scrollRef.current.getBoundingClientRect() : { left: 0 };
           const scrollRelCenterX = pinchCenterX - rect.left;
           
-          const currentScrollLeft = scrollRef.current.scrollLeft;
-          const currentChartWidth = calculateChartWidth(pointWidth);
+          const currentScrollLeft = scrollRef.current ? scrollRef.current.scrollLeft : 0;
+          const currentChartWidth = calculateChartWidth(pointWidthRef.current);
           
           const pinchRatio = (scrollRelCenterX + currentScrollLeft) / currentChartWidth;
           
-          touchState.current = { initialDist: dist, initialPointWidth: pointWidth, pinchRatio, scrollRelCenterX };
+          touchState.current = { initialDist: dist, initialPointWidth: pointWidthRef.current, pinchRatio, scrollRelCenterX };
+          lastCommittedWidthRef.current = pointWidthRef.current;
       }
   };
 
   const handleTouchMove = (e) => {
-      if (e.touches.length === 2) {
+      if (e.touches.length === 2 && touchState.current.initialDist > 0) {
+          if (e.cancelable) e.preventDefault();
           const dist = Math.hypot(
               e.touches[0].clientX - e.touches[1].clientX,
               e.touches[0].clientY - e.touches[1].clientY
           );
           const scale = dist / touchState.current.initialDist;
           let newWidth = touchState.current.initialPointWidth * scale;
-          if (newWidth < 15) newWidth = 15;
-          if (newWidth > 200) newWidth = 200;
-          setPointWidth(newWidth);
-          
+          if (newWidth < 6) newWidth = 6;
+          if (newWidth > 120) newWidth = 120;
+
+          if (Math.abs(newWidth - lastCommittedWidthRef.current) < 1.0) return;
+
           const nextChartWidth = calculateChartWidth(newWidth);
           const newPinchAbsX = touchState.current.pinchRatio * nextChartWidth;
-          scrollTarget.current = newPinchAbsX - touchState.current.scrollRelCenterX;
+          scrollTarget.current = Math.max(0, newPinchAbsX - touchState.current.scrollRelCenterX);
+          lastCommittedWidthRef.current = newWidth;
+
+          if (!pinchRafRef.current) {
+              pinchRafRef.current = requestAnimationFrame(() => {
+                  pinchRafRef.current = null;
+                  setPointWidth(newWidth);
+              });
+          }
       }
+  };
+
+  const handleTouchEnd = () => {
+      if (pinchRafRef.current) {
+          cancelAnimationFrame(pinchRafRef.current);
+          pinchRafRef.current = null;
+      }
+      touchState.current.initialDist = 0;
   };
 
   useEffect(() => {
@@ -478,13 +625,83 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
          scrollRef.current.scrollLeft = scrollTarget.current;
          scrollTarget.current = null;
      }
-  }, [pointWidth]);
+  }, [pointWidth, chartData]);
 
   const chartWidth = calculateChartWidth(pointWidth);
 
   const [limitHintVisible, setLimitHintVisible] = useState(false);
   const limitHintTimeoutRef = useRef(null);
   useEffect(() => () => { if (limitHintTimeoutRef.current) clearTimeout(limitHintTimeoutRef.current); }, []);
+
+  const pressTimerRef = useRef(null);
+  const isLongPressRef = useRef(false);
+  const startPosRef = useRef({ x: 0, y: 0 });
+  const lastTouchTimeRef = useRef(0);
+
+  useEffect(() => () => {
+    if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
+  }, []);
+
+  const soloChartLine = (item) => {
+    playSoundEffect('click', soundEnabled);
+    if (navigator.vibrate) {
+      try { navigator.vibrate(50); } catch(e) {}
+    }
+    const currentActive = effectiveActiveLines.filter(it => chartDataObj.items.includes(it));
+    // Jika saat ini item ini sudah satu-satunya yang aktif, kembalikan ke default (maksimal 6 item)
+    if (currentActive.length === 1 && currentActive[0] === item) {
+      const resetItems = allDisplayItems.slice(0, 6);
+      setCustomLinesByType(prev => ({ ...prev, [chartType]: resetItems }));
+    } else {
+      setCustomLinesByType(prev => ({ ...prev, [chartType]: [item] }));
+    }
+  };
+
+  const startPillPress = (item, e) => {
+    const isTouch = e.type?.startsWith('touch');
+    if (isTouch) {
+      lastTouchTimeRef.current = Date.now();
+    } else if (Date.now() - lastTouchTimeRef.current < 600) {
+      return;
+    }
+    isLongPressRef.current = false;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    startPosRef.current = { x: clientX, y: clientY };
+
+    if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
+    pressTimerRef.current = setTimeout(() => {
+      isLongPressRef.current = true;
+      soloChartLine(item);
+    }, 450);
+  };
+
+  const movePillPress = (e) => {
+    if (!pressTimerRef.current) return;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const dx = Math.abs(clientX - startPosRef.current.x);
+    const dy = Math.abs(clientY - startPosRef.current.y);
+    if (dx > 8 || dy > 8) {
+      clearTimeout(pressTimerRef.current);
+      pressTimerRef.current = null;
+    }
+  };
+
+  const endPillPress = () => {
+    if (pressTimerRef.current) {
+      clearTimeout(pressTimerRef.current);
+      pressTimerRef.current = null;
+    }
+  };
+
+  const handlePillClick = (item) => {
+    if (isLongPressRef.current) {
+      isLongPressRef.current = false;
+      return;
+    }
+    toggleChartLine(item);
+  };
 
   const toggleChartLine = (item) => {
     playSoundEffect('click', soundEnabled);
@@ -737,11 +954,11 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
         
         <div className={`flex ${isSubCard ? 'mb-1' : 'mb-5'} ${theme === 'dark' ? 'bg-black/40' : 'bg-black/5'} backdrop-blur-md rounded-2xl relative no-swipe`} onTouchStart={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
           
-          {chartDataObj.data.length > 0 && (
+          {chartData.length > 0 && (
               <div className={`w-12 shrink-0 pointer-events-none flex items-center border-r border-slate-500/10 z-10 bg-transparent py-3`}>
-                    <LineChart width={48} height={isSubCard ? 250 : 288} data={chartDataObj.data} margin={{ top: 5, right: 0, left: 4, bottom: 5 }}>
+                    <LineChart width={48} height={isSubCard ? 250 : 288} data={chartData} margin={{ top: 5, right: 0, left: 4, bottom: 5 }}>
                        <YAxis stroke={theme === 'dark' ? '#a1a1aa' : '#64748b'} fontSize={10} tickLine={false} axisLine={false} width={40} domain={yDomain} allowDataOverflow={true} tickFormatter={(v) => v > 999 ? (v/1000).toFixed(1)+'k' : v} />
-                       {allDisplayItems.map((item, idx) => ( effectiveActiveLines.includes(item) && <Line key={item} type="monotone" dataKey={item} stroke="transparent" dot={false} activeDot={false} isAnimationActive={false} /> ))}
+                       {allDisplayItems.map((item, idx) => ( effectiveActiveLines.includes(item) && <Line key={item} type="monotone" dataKey={item} stroke="transparent" strokeWidth={0} dot={() => null} activeDot={false} isAnimationActive={false} /> ))}
                     </LineChart>
               </div>
           )}
@@ -752,9 +969,9 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                onTouchMoveCapture={!isSubCard ? handleTouchMove : undefined}
                className={`flex-1 overflow-x-auto scrollbar-hide touch-pan-x p-3 pl-0 ${isSubCard ? 'pointer-events-none' : ''}`} 
                style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}>
-            {chartDataObj.data.length > 0 ? (
-               <div style={{ width: `${chartWidth}px`, height: isSubCard ? '250px' : '288px' }}>
-                <LineChart width={chartWidth} height={isSubCard ? 250 : 288} data={chartDataObj.data} style={{ outline: 'none' }}>
+            {chartData.length > 0 ? (
+               <div style={{ width: `${chartWidth}px`, height: isSubCard ? '250px' : '288px' }} className="transition-opacity duration-200 ease-out">
+                <LineChart width={chartWidth} height={isSubCard ? 250 : 288} data={chartData} style={{ outline: 'none' }}>
                   <defs>
                       <filter id="glowProgress" x="-20%" y="-20%" width="140%" height="140%">
                           <feGaussianBlur stdDeviation="4" result="blur" />
@@ -766,6 +983,17 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#3f3f46' : '#cbd5e1'} vertical={false} />
                   <Tooltip 
+                     labelFormatter={(label, payload) => {
+                         const p = payload?.[0]?.payload;
+                         if ((resolution === 'month' || resolution === 'year') && p?.periodLabel) {
+                             return p.periodLabel;
+                         }
+                         if (p?.rawDate) {
+                             const d = new Date(p.rawDate + 'T12:00:00');
+                             return d.toLocaleDateString(language === 'ID' ? 'id-ID' : 'en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+                         }
+                         return label;
+                     }}
                      formatter={(value, name, props) => {
                          let unit = '';
                          if (chartType === 'muscle') {
@@ -794,7 +1022,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                      itemStyle={{ padding: 0, margin: 0, marginTop: '4px', whiteSpace: 'normal' }} 
                      labelStyle={{ color: theme === 'dark' ? '#a1a1aa' : '#71717a', marginBottom: '4px', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }} 
                   />
-                  <XAxis dataKey="date" stroke={theme === 'dark' ? '#a1a1aa' : '#64748b'} fontSize={10} tickLine={false} axisLine={false} padding={{ left: 20, right: 20 }} interval={Math.max(0, Math.ceil(50 / pointWidth) - 1)} />
+                  <XAxis dataKey="date" stroke={theme === 'dark' ? '#a1a1aa' : '#64748b'} fontSize={10} tickLine={false} axisLine={false} padding={{ left: 20, right: 20 }} interval={Math.max(0, Math.ceil(50 / effectivePointWidth) - 1)} />
                   <YAxis hide={true} domain={yDomain} allowDataOverflow={true} />
                   {allDisplayItems.map((item, idx) => ( effectiveActiveLines.includes(item) && <Line key={item} type="monotone" name={chartType === 'muscle' ? formatTarget(item, lang?.id) : item} dataKey={item} stroke={chartColors[idx % chartColors.length]} strokeWidth={1.5} dot={false} activeDot={{ r: 5, strokeWidth: 0, fill: chartColors[idx % chartColors.length] }} connectNulls={true} isAnimationActive={false} /> ))}
                 </LineChart>
@@ -835,7 +1063,21 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                  const idx = allDisplayItems.indexOf(item);
                  const isActive = effectiveActiveLines.includes(item);
                  return (
-                   <button key={item} onClick={() => toggleChartLine(item)} className="px-3 py-1.5 rounded-full caption font-black transition-all border active:scale-95 whitespace-nowrap snap-start flex items-center justify-center h-8" style={{ backgroundColor: isActive ? chartColors[idx % chartColors.length] : 'transparent', borderColor: chartColors[idx % chartColors.length], color: isActive ? '#fff' : chartColors[idx % chartColors.length], opacity: isActive ? 1 : 0.5 }}>
+                   <button
+                      key={item}
+                      onTouchStart={(e) => startPillPress(item, e)}
+                      onTouchMove={movePillPress}
+                      onTouchEnd={endPillPress}
+                      onTouchCancel={endPillPress}
+                      onMouseDown={(e) => startPillPress(item, e)}
+                      onMouseMove={movePillPress}
+                      onMouseUp={endPillPress}
+                      onMouseLeave={endPillPress}
+                      onClick={() => handlePillClick(item)}
+                      onContextMenu={(e) => e.preventDefault()}
+                      className="px-3 py-1.5 rounded-full caption font-black transition-all border active:scale-95 whitespace-nowrap snap-start flex items-center justify-center h-8 select-none"
+                      style={{ backgroundColor: isActive ? chartColors[idx % chartColors.length] : 'transparent', borderColor: chartColors[idx % chartColors.length], color: isActive ? '#fff' : chartColors[idx % chartColors.length], opacity: isActive ? 1 : 0.5 }}
+                    >
                       {chartType === 'muscle' ? formatTarget(item, lang?.id) : item}
                    </button>
                  )

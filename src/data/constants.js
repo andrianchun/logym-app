@@ -42,6 +42,16 @@ export const defaultMasterExercises = [
     "videoUrl": "/exercise-assets/edb-Smith_Machine_Incline_Bench_Press.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Incline_Bench_Press.mp4",
     "thumbnailUrl": "/exercise-assets/edb-Smith_Machine_Incline_Bench_Press.webp",
     "gifUrl": "/exercise-assets/edb-Smith_Machine_Incline_Bench_Press.webp",
+    "aliases": [
+      "Incline Smith Machine Press",
+      "Smith Machine Incline Bench Press",
+      "Smith Machine Incline Bench",
+      "SM Incline Bench Press",
+      "SM Incline Press",
+      "Smith Incline Press",
+      "Smith Incline Bench Press",
+      "Incline Smith Press"
+    ],
     "instructions": [
       "Atur bangku incline di bawah smith machine. Posisikan barbell pada ketinggian yang terjangkau saat berbaring dengan lengan hampir lurus. Setelah mengatur beban, berbaringlah dan pastikan dada bagian atas sejajar dengan barbell. Genggam bar dengan posisi telapak tangan menghadap ke depan (lebih lebar dari bahu), lepas kunci bar, lalu luruskan lengan ke atas sebagai posisi awal.",
       "Tarik napas, lalu turunkan bar secara perlahan hingga hampir menyentuh dada bagian atas.",
@@ -79,6 +89,11 @@ export const defaultMasterExercises = [
     "videoUrl": "/exercise-assets/edb-Seated_Cable_Rows.mp4 /exercise-assets/youtube-backup/edb-Seated_Cable_Rows.mp4",
     "thumbnailUrl": "/exercise-assets/edb-Seated_Cable_Rows.webp",
     "gifUrl": "/exercise-assets/edb-Seated_Cable_Rows.webp",
+    "aliases": [
+      "Cable Seated Row",
+      "Cable Seated Rows",
+      "Seated Cable Row"
+    ],
     "instructions": [
       "Gunakan mesin low pulley row dengan V-bar (pegangan netral saling berhadapan). Duduklah di mesin dan letakkan kaki di platform depan dengan lutut sedikit ditekuk (tidak terkunci).",
       "Condongkan badan ke depan dengan punggung tetap lurus alami, lalu raih pegangan V-bar.",
@@ -116,6 +131,12 @@ export const defaultMasterExercises = [
     "videoUrl": "/exercise-assets/edb-Dumbbell_Bench_Press.mp4 /exercise-assets/youtube-backup/edb-Dumbbell_Bench_Press.mp4",
     "thumbnailUrl": "/exercise-assets/edb-Dumbbell_Bench_Press.webp",
     "gifUrl": "/exercise-assets/edb-Dumbbell_Bench_Press.webp",
+    "aliases": [
+      "Flat Dumbbell Bench Press",
+      "Dumbbell Flat Bench Press",
+      "DB Bench Press",
+      "Flat DB Bench Press"
+    ],
     "instructions": [
       "Berbaringlah di bangku datar dengan posisi dumbbell di atas paha. Telapak tangan saling berhadapan.",
       "Gunakan dorongan paha untuk mengangkat dumbbell satu per satu hingga berada di depan bahu.",
@@ -152,6 +173,11 @@ export const defaultMasterExercises = [
     "videoUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.mp4",
     "thumbnailUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.webp",
     "gifUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.webp",
+    "aliases": [
+      "Cable Lateral Raise",
+      "Cable Lateral Raises",
+      "Standing Cable Lateral Raises"
+    ],
     "instructions": [
       "Pasang single handle (d-handle) pada katrol kabel di posisi paling bawah (low pulley). Berdirilah tegak di samping mesin katrol.",
       "Pegang handle dengan tangan yang berada di sisi luar (menyilang di depan badan atau dari samping). Jaga tubuh tetap tegak, dada membusung, dan siku sedikit ditekuk.",
@@ -188,6 +214,11 @@ export const defaultMasterExercises = [
     "videoUrl": "/exercise-assets/edb-Triceps_Pushdown.mp4 /exercise-assets/youtube-backup/edb-Triceps_Pushdown.mp4",
     "thumbnailUrl": "/exercise-assets/edb-Triceps_Pushdown.webp",
     "gifUrl": "/exercise-assets/edb-Triceps_Pushdown.webp",
+    "aliases": [
+      "Cable Triceps Pushdown",
+      "Tricep Pushdown",
+      "Triceps Pushdowns"
+    ],
     "instructions": [
       "Pasang stbar lurus atau bengkok pada katrol atas, lalu pegang dengan genggaman menghadap ke bawah (overhand) selebar bahu.",
       "Berdirilah tegak dengan torso lurus dan condongkan tubuh sedikit ke depan. Rapatkan lengan atas ke sisi tubuh dan posisikan tegak lurus dengan lantai. Lengan bawah mengarah ke atas menuju katrol. Ini adalah posisi awal Anda.",
@@ -224,6 +255,14 @@ export const defaultMasterExercises = [
     "videoUrl": "/exercise-assets/edb-Dumbbell_Alternate_Bicep_Curl.mp4 /exercise-assets/youtube-backup/edb-Dumbbell_Alternate_Bicep_Curl.mp4",
     "thumbnailUrl": "/exercise-assets/edb-Dumbbell_Alternate_Bicep_Curl.webp",
     "gifUrl": "/exercise-assets/edb-Dumbbell_Alternate_Bicep_Curl.webp",
+    "aliases": [
+      "Dumbbell Biceps Curl",
+      "Dumbbell Bicep Curl",
+      "Biceps Curl",
+      "Bicep Curl",
+      "Dumbbell Alternating Bicep Curl",
+      "Alternate Bicep Curl"
+    ],
     "instructions": [
       "Berdiri tegak dengan memegang dumbbell di masing-masing tangan di sisi tubuh. Siku dekat dengan torso dan telapak tangan menghadap paha.",
       "Tahan lengan atas tetap diam, angkat beban kanan sambil memutar telapak tangan ke depan. Buang napas saat menekuk bisep hingga beban sejajar dengan bahu. Tahan selama sedetik sambil mengontraksikan bisep. Catatan: Hanya lengan bawah yang bergerak.",
@@ -296,6 +335,13 @@ export const defaultMasterExercises = [
     "videoUrl": "/exercise-assets/edb-Smith_Machine_Squat.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Squat.mp4",
     "thumbnailUrl": "/exercise-assets/edb-Smith_Machine_Squat.webp",
     "gifUrl": "/exercise-assets/edb-Smith_Machine_Squat.webp",
+    "aliases": [
+      "Smith Squat",
+      "Smith Machine Squats",
+      "SM Squat",
+      "SM Squats",
+      "Smith Squats"
+    ],
     "instructions": [
       "Atur tinggi bar sesuai tubuh Anda. Setelah beban terpasang, posisikan bahu bagian belakang (sedikit di bawah leher) di bawah bar.",
       "Genggam bar dengan kedua tangan (telapak menghadap depan), buka kunci, dan angkat dari rak dengan mendorong kaki sambil menegakkan tubuh.",
@@ -336,6 +382,13 @@ export const defaultMasterExercises = [
     "videoUrl": "/exercise-assets/edb-Romanian_Deadlift.mp4 /exercise-assets/youtube-backup/edb-Romanian_Deadlift.mp4",
     "thumbnailUrl": "/exercise-assets/edb-Romanian_Deadlift.webp",
     "gifUrl": "/exercise-assets/edb-Romanian_Deadlift.webp",
+    "aliases": [
+      "Romanian Deadlift (RDL)",
+      "RDL",
+      "Barbell RDL",
+      "Barbell Romanian Deadlift",
+      "Rumanian Deadlift"
+    ],
     "instructions": [
       "Posisikan barbel di depan kaki, pegang dengan telapak tangan menghadap ke bawah (pronated), sedikit lebih lebar dari bahu.",
       "Tekuk lutut sedikit, pastikan tulang kering vertikal, dorong pinggul ke belakang, dan jaga punggung tetap lurus. Ini posisi awal.",
@@ -374,6 +427,13 @@ export const defaultMasterExercises = [
     "videoUrl": "",
     "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Lunges/0.jpg",
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Lunges/0.jpg",
+    "aliases": [
+      "Dumbbell Walking Lunge",
+      "Walking Lunges",
+      "Walking Lunge",
+      "Dumbbell Lunges",
+      "Dumbbell Lunge"
+    ],
     "instructions": [
       "Berdirilah dengan tegak sambil memegang dua dumbbell di samping tubuh. Ini adalah posisi awal Anda.",
       "Langkahkan kaki kanan ke depan sekitar 60 cm, turunkan tubuh sambil menjaga torso tetap tegak dan seimbang. Tarik napas saat turun. Pastikan lutut tidak melebihi jari kaki dan tulang kering depan tetap tegak lurus dengan lantai.",
@@ -407,6 +467,11 @@ export const defaultMasterExercises = [
     "videoUrl": "/exercise-assets/youtube-backup/edb-Rocking_Standing_Calf_Raise.mp4",
     "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Rocking_Standing_Calf_Raise/0.jpg",
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Rocking_Standing_Calf_Raise/0.jpg",
+    "aliases": [
+      "Standing Calf Raise",
+      "Standing Calf Raises",
+      "Rocking Standing Calf Raises"
+    ],
     "instructions": [
       "Gunakan squat rack untuk keamanan. Atur barbel setinggi bahu, lalu letakkan di punggung atas bawah leher.",
       "Pegang barbel dengan kedua tangan, angkat dari rack dengan mendorong kaki dan menegakkan tubuh.",
@@ -492,6 +557,11 @@ export const defaultMasterExercises = [
     "videoUrl": "/exercise-assets/edb-Wide-Grip_Lat_Pulldown.mp4 /exercise-assets/youtube-backup/edb-Wide-Grip_Lat_Pulldown.mp4",
     "thumbnailUrl": "/exercise-assets/edb-Wide-Grip_Lat_Pulldown.webp",
     "gifUrl": "/exercise-assets/edb-Wide-Grip_Lat_Pulldown.webp",
+    "aliases": [
+      "Lat Pulldown",
+      "Wide Grip Lat Pulldown",
+      "Wide Grip Lat Pull Down"
+    ],
     "instructions": [
       "Duduklah pada mesin lat pulldown yang dilengkapi bar panjang pada katrol atas. Sesuaikan bantalan lutut mesin dengan tinggi badan Anda agar tubuh tidak terangkat oleh beban.",
       "Genggam bar dengan telapak tangan menghadap ke depan sesuai lebar genggaman yang ditentukan. Catatan: Untuk genggaman lebar, letakkan tangan lebih lebar dari bahu. Untuk genggaman sedang, selebar bahu. Untuk genggaman sempit, lebih sempit dari lebar bahu.",
@@ -532,6 +602,12 @@ export const defaultMasterExercises = [
     "videoUrl": "/exercise-assets/edb-Dumbbell_Shoulder_Press.mp4 /exercise-assets/youtube-backup/edb-Dumbbell_Shoulder_Press.mp4",
     "thumbnailUrl": "/exercise-assets/edb-Dumbbell_Shoulder_Press.webp",
     "gifUrl": "/exercise-assets/edb-Dumbbell_Shoulder_Press.webp",
+    "aliases": [
+      "DB Shoulder Press",
+      "Seated Dumbbell Shoulder Press",
+      "Dumbbell Overhead Press",
+      "DB Overhead Press"
+    ],
     "instructions": [
       "Duduk di bangku dengan sandaran punggung. Pegang dumbbell dan letakkan di atas paha.",
       "Angkat dumbbell ke bahu satu per satu dengan bantuan dorongan paha.",
@@ -572,6 +648,11 @@ export const defaultMasterExercises = [
     "videoUrl": "/exercise-assets/youtube-backup/edb-Dumbbell_Shrug.mp4",
     "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Shrug/0.jpg",
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Shrug/0.jpg",
+    "aliases": [
+      "DB Shrug",
+      "Dumbbell Shrugs",
+      "DB Shrugs"
+    ],
     "instructions": [
       "Berdiri tegak dengan dumbbell di masing-masing tangan (telapak menghadap tubuh), lengan lurus di samping.",
       "Hembuskan napas, angkat bahu setinggi mungkin. Tahan kontraksi selama satu detik. Pastikan lengan tetap lurus dan tidak menggunakan otot bisep.",
@@ -606,6 +687,13 @@ export const defaultMasterExercises = [
     "videoUrl": "/exercise-assets/edb-Smith_Machine_Bench_Press.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Bench_Press.mp4",
     "thumbnailUrl": "/exercise-assets/edb-Smith_Machine_Bench_Press.webp",
     "gifUrl": "/exercise-assets/edb-Smith_Machine_Bench_Press.webp",
+    "aliases": [
+      "SM Flat Bench Press",
+      "SM Bench Press",
+      "Smith Bench Press",
+      "Smith Machine Flat Bench Press",
+      "Smith Flat Bench Press"
+    ],
     "instructions": [
       "Letakkan bangku datar di bawah Smith Machine. Atur ketinggian palang agar dapat dijangkau saat berbaring dengan lengan hampir lurus. Berbaringlah, pegang palang dengan genggaman pronasi lebih lebar dari bahu, buka kunci palang, dan tahan lurus di atas dada dengan lengan terkunci sebagai posisi awal.",
       "Tarik napas dan turunkan palang perlahan hingga menyentuh dada bagian tengah.",
@@ -642,6 +730,11 @@ export const defaultMasterExercises = [
     "videoUrl": "/exercise-assets/edb-Cable_Rear_Delt_Fly_1.mp4 /exercise-assets/edb-Cable_Rear_Delt_Fly_2.mp4 /exercise-assets/youtube-backup/edb-Cable_Rear_Delt_Fly_1.mp4",
     "thumbnailUrl": "/exercise-assets/edb-Cable_Rear_Delt_Fly.webp",
     "gifUrl": "/exercise-assets/edb-Cable_Rear_Delt_Fly.webp",
+    "aliases": [
+      "Cross Cable Rear Delt",
+      "Cross Cable Rear Delt Fly",
+      "Cable Rear Delt Flyes"
+    ],
     "instructions": [
       "Atur tinggi pulley sedikit di atas kepala dan sesuaikan beban.",
       "Pegang pulley kiri dengan tangan kanan dan pulley kanan dengan tangan kiri, sehingga kabel menyilang di depan dada. Ini posisi awal Anda.",
@@ -675,6 +768,10 @@ export const defaultMasterExercises = [
     "videoUrl": "/exercise-assets/edb-Cable_Rope_Overhead_Triceps_Extension.mp4 /exercise-assets/youtube-backup/edb-Cable_Rope_Overhead_Triceps_Extension.mp4",
     "thumbnailUrl": "/exercise-assets/edb-Cable_Rope_Overhead_Triceps_Extension.webp",
     "gifUrl": "/exercise-assets/edb-Cable_Rope_Overhead_Triceps_Extension.webp",
+    "aliases": [
+      "Overhead Cable Triceps Extension",
+      "Cable Overhead Triceps Extension"
+    ],
     "instructions": [
       "Pasang aksesori tali (rope attachment) pada katrol bawah mesin kabel.",
       "Pegang tali dengan kedua tangan, lalu luruskan lengan hingga posisi tangan berada tepat di atas kepala menggunakan genggaman netral (telapak tangan saling berhadapan). Jaga siku tetap dekat dengan kepala dan lengan tegak lurus dengan lantai dengan buku jari menghadap ke atas. Ini adalah posisi awal Anda.",
@@ -708,9 +805,17 @@ export const defaultMasterExercises = [
     "equipment": "Cable",
     "level": "beginner",
     "ytVideo": "https://youtu.be/CrbTqNOlFgE?si=xKanrhppuvUAudTj",
-    "videoUrl": "/exercise-assets/youtube-backup/edb-High_Cable_Curls.mp4",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Standing_Biceps_Cable_Curl.mp4 /exercise-assets/youtube-backup/edb-High_Cable_Curls.mp4",
     "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Standing_Biceps_Cable_Curl/0.jpg",
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Standing_Biceps_Cable_Curl/0.jpg",
+    "aliases": [
+      "Biceps Cable Curl",
+      "Bicep Cable Curl",
+      "Cable Bicep Curl",
+      "Cable Biceps Curl",
+      "Standing Cable Curl",
+      "Standing Bicep Cable Curl"
+    ],
     "instructions": [
       "Berdirilah tegak sambil memegang stang bar cable curl yang terhubung ke katrol bawah. Genggam pegangan selebar bahu dan jaga siku tetap dekat dengan tubuh. Telapak tangan menghadap ke atas (supinasi). Ini adalah posisi awal Anda.",
       "Jaga lengan atas tetap diam dan bahu tetap rileks (hindari mengangkat bahu/traps — inilah mengapa video panduan memberi tanda peringatan merah pada area traps agar bahu tidak terangkat). Angkat beban sambil mengontraksikan otot bisep dan embuskan napas. Hanya lengan bawah yang bergerak hingga bar berada setinggi dada atau bahu. Tahan posisi puncak kontraksi sejenak sambil meremas otot bisep.",
@@ -746,6 +851,11 @@ export const defaultMasterExercises = [
     "videoUrl": "/exercise-assets/edb-Split_Squat_with_Dumbbells.mp4 /exercise-assets/youtube-backup/edb-Split_Squat_with_Dumbbells.mp4",
     "thumbnailUrl": "/exercise-assets/edb-Split_Squat_with_Dumbbells.webp",
     "gifUrl": "/exercise-assets/edb-Split_Squat_with_Dumbbells.webp",
+    "aliases": [
+      "DB Bulgarian Split Squat",
+      "Bulgarian Split Squat",
+      "Split Squat"
+    ],
     "instructions": [
       "Ambil posisi melangkah dengan kaki belakang diletakkan di atas tumpuan dan kaki depan menapak di lantai.",
       "Pegang dumbbell di masing-masing tangan dengan posisi lengan tergantung di samping tubuh.",
@@ -780,6 +890,15 @@ export const defaultMasterExercises = [
     "videoUrl": "/exercise-assets/edb-Smith_Machine_Stiff-Legged_Deadlift.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Romanian_Deadlift.mp4",
     "thumbnailUrl": "/exercise-assets/edb-Smith_Machine_Stiff-Legged_Deadlift.webp",
     "gifUrl": "/exercise-assets/edb-Smith_Machine_Stiff-Legged_Deadlift.webp",
+    "aliases": [
+      "SM Romanian Deadlift (RDL)",
+      "Smith Machine Romanian Deadlift (RDL)",
+      "SM Romanian Deadlift",
+      "Smith RDL",
+      "SM RDL",
+      "Smith Machine Stiff-Legged Deadlift",
+      "Smith Machine Stiff Leg Deadlift"
+    ],
     "instructions": [
       "Atur tinggi bar Smith Machine setinggi pertengahan paha. Genggam bar dengan pegangan pronasi (telapak menghadap depan) selebar bahu.",
       "Angkat bar dengan meluruskan lengan sepenuhnya, punggung tetap lurus. Berdiri tegak dengan kaki selebar bahu dan lutut sedikit ditekuk sebagai posisi awal.",
@@ -852,6 +971,10 @@ export const defaultMasterExercises = [
     "videoUrl": "/exercise-assets/youtube-backup/edb-Seated_Calf_Raise.mp4",
     "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Seated_Calf_Raise/0.jpg",
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Seated_Calf_Raise/0.jpg",
+    "aliases": [
+      "Seated Dumbbell Calf Raise",
+      "Dumbbell Seated Calf Raise"
+    ],
     "instructions": [
       "Duduklah pada mesin dan tempatkan ujung kaki pada bagian bawah platform dengan tumit menggantung. Pilih arah hadap ujung kaki Anda (lurus ke depan, ke dalam, atau ke luar) sesuai kenyamanan.",
       "Posisikan paha bagian bawah di bawah bantalan tuas, sesuaikan dengan tinggi paha Anda. Letakkan tangan di atas bantalan tuas untuk mencegahnya bergeser ke depan.",
@@ -919,6 +1042,11 @@ export const defaultMasterExercises = [
     "videoUrl": "/exercise-assets/youtube-backup/edb-Palms-Up_Dumbbell_Wrist_Curl_Over_A_Bench.mp4",
     "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Palms-Up_Dumbbell_Wrist_Curl_Over_A_Bench/0.jpg",
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Palms-Up_Dumbbell_Wrist_Curl_Over_A_Bench/0.jpg",
+    "aliases": [
+      "Dumbbell Wrist Curl",
+      "Palms Up Dumbbell Wrist Curl",
+      "Palms-Up Dumbbell Wrist Curl"
+    ],
     "instructions": [
       "Letakkan dua dumbel di sisi bangku datar.",
       "Berlututlah dengan kedua kaki menghadap ke arah bangku.",
@@ -1224,6 +1352,9 @@ export const defaultMasterExercises = [
     "level": "beginner",
     "ytVideo": "https://youtu.be/MeIiIdhgPgl",
     "videoUrl": "/exercise-assets/youtube-backup/edb-Goblet_Squat.mp4",
+    "aliases": [
+      "Dumbbell Goblet Squat"
+    ],
     "instructions": [
       "Berdiri tegak sambil memegang kettlebell ringan di bagian pegangan dekat dada. Ini adalah posisi awal.",
       "Jongkok di antara kedua kaki hingga hamstring menyentuh betis. Pastikan dada dan kepala tetap tegak serta punggung lurus.",
@@ -1254,6 +1385,11 @@ export const defaultMasterExercises = [
     "level": "intermediate",
     "ytVideo": "https://youtu.be/rT7DgCr-3pg",
     "videoUrl": "/exercise-assets/edb-Barbell_Bench_Press_-_Medium_Grip.mp4 /exercise-assets/youtube-backup/edb-Barbell_Bench_Press_-_Medium_Grip.mp4",
+    "aliases": [
+      "Barbell Bench Press",
+      "Flat Barbell Bench Press",
+      "Barbell Flat Bench Press"
+    ],
     "instructions": [
       "Berbaringlah di atas bangku datar. Gunakan genggaman dengan lebar sedang (genggaman yang membentuk sudut 90 derajat di tengah gerakan antara lengan bawah dan lengan atas), angkat barbel dari rak dan tahan lurus di atas Anda dengan tangan terkunci. Ini adalah posisi awal Anda.",
       "Dari posisi awal, tarik napas dan mulailah turunkan secara perlahan hingga barbel menyentuh dada bagian tengah.",
@@ -1432,6 +1568,11 @@ export const defaultMasterExercises = [
     "videoUrl": "/exercise-assets/youtube-backup/edb-Pull_Through.mp4",
     "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Pull_Through/0.jpg",
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Pull_Through/0.jpg",
+    "aliases": [
+      "Cable Pull-Through",
+      "Cable Pull Through",
+      "Cable Pull Thru"
+    ],
     "instructions": [
       "Berdiri beberapa langkah di depan mesin katrol rendah yang sudah dipasangi tali atau pegangan. Posisikan tubuh membelakangi mesin, buka kaki lebar, dan posisikan kabel di antara kedua kaki.",
       "Mulai gerakan dengan mendorong pinggul ke belakang dan menjangkaukan tangan melalui celah kaki sejauh mungkin dengan lutut sedikit ditekuk.",
@@ -1493,6 +1634,11 @@ export const defaultMasterExercises = [
     "videoUrl": "",
     "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Incline_Bench_Press_-_Medium_Grip/0.jpg",
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Incline_Bench_Press_-_Medium_Grip/0.jpg",
+    "aliases": [
+      "Incline Barbell Bench Press",
+      "Barbell Incline Bench Press",
+      "Barbell Incline Bench Press - Medium Grip"
+    ],
     "instructions": [
       "Berbaringlah di bangku inklin (incline bench). Dengan genggaman lebar sedang (genggaman yang membentuk sudut 90 derajat di tengah gerakan antara lengan bawah dan lengan atas), angkat barbel dari rak dan tahan lurus di atas Anda dengan lengan terkunci. Ini adalah posisi awal Anda.",
       "Sambil menarik napas, turunkan barbel secara perlahan hingga menyentuh dada bagian atas.",
@@ -1529,6 +1675,14 @@ export const defaultMasterExercises = [
     "videoUrl": "",
     "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Side_Lateral_Raise/0.jpg",
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Side_Lateral_Raise/0.jpg",
+    "aliases": [
+      "Side Lateral Raises",
+      "Dumbbell Lateral Raise",
+      "Dumbbell Lateral Raises",
+      "Dumbbell Side Lateral Raise",
+      "Lateral Raise",
+      "Lateral Raises"
+    ],
     "instructions": [
       "Ambil sepasang dumbbell, berdiri tegak dengan posisi lengan lurus di samping tubuh dan telapak tangan menghadap ke dalam. Ini adalah posisi awal Anda.",
       "Jaga tubuh tetap stabil (tanpa mengayun), angkat dumbbell ke samping dengan sedikit menekuk siku dan posisi tangan sedikit miring ke depan seperti sedang menuang air ke dalam gelas. Lanjutkan hingga lengan sejajar dengan lantai. Buang napas saat melakukan gerakan ini dan tahan selama satu detik di atas.",
@@ -1559,6 +1713,9 @@ export const cleanExerciseNameForMatching = (name) => {
     .replace(/\brdl\b/g, 'romanian deadlift')
     .replace(/\b(romanian deadlift)(\s+romanian deadlift)+\b/g, 'romanian deadlift')
     .replace(/\bsm\b/g, 'smith machine')
+    .replace(/\bsmith\b(?!\s+machine)/g, 'smith machine')
+    .replace(/\bdb\b/g, 'dumbbell')
+    .replace(/\bbb\b/g, 'barbell')
     .replace(/\bdumbell\b/g, 'dumbbell')
     .replace(/\bdumbel\b/g, 'dumbbell')
     .replace(/\bpull\s+thru\b/g, 'pull through')
@@ -1788,6 +1945,7 @@ export const canonicalizeExercise = (ex) => {
     locName === 'smith machine romanian deadlift' ||
     locName === 'smith rdl' ||
     locName === 'sm rdl' ||
+    locName === 'smith romanian deadlift' ||
     locName === 'smith machine rdl' ||
     locName === 'sm romanian deadlift rdl' ||
     locName === 'smith machine stiff-legged deadlift' ||
@@ -1802,6 +1960,35 @@ export const canonicalizeExercise = (ex) => {
     locName === 'smith machine stiff legged romanian deadlift'
   ) {
     name = 'Smith Machine Romanian Deadlift';
+  } else if (
+    locName === 'sm squat' ||
+    locName === 'sm squats' ||
+    locName === 'smith squat' ||
+    locName === 'smith squats' ||
+    locName === 'smith machine squat' ||
+    locName === 'smith machine squats'
+  ) {
+    name = 'Smith Machine Squat';
+  } else if (
+    locName === 'sm bench press' ||
+    locName === 'sm flat bench press' ||
+    locName === 'smith bench press' ||
+    locName === 'smith flat bench press' ||
+    locName === 'smith machine bench press' ||
+    locName === 'smith machine flat bench press'
+  ) {
+    name = 'Smith Machine Bench Press';
+  } else if (
+    locName === 'sm incline bench press' ||
+    locName === 'sm incline press' ||
+    locName === 'smith incline bench press' ||
+    locName === 'smith incline press' ||
+    locName === 'smith machine incline bench press' ||
+    locName === 'smith machine incline press' ||
+    locName === 'incline smith machine press' ||
+    locName === 'incline smith press'
+  ) {
+    name = 'Smith Machine Incline Bench Press';
   } else if (locName === 'romanian deadlift' || locName === 'rumanian deadlift' || locName === 'rdl' || locName === 'barbell rdl' || locName === 'barbell romanian deadlift') {
     name = 'Romanian Deadlift';
   } else if (locName === 'flat dumbbell bench press' || locName === 'dumbbell flat bench press' || locName === 'db bench press') {
@@ -2177,7 +2364,7 @@ export const defaultPrograms = [
         "defaultWeight": 30,
         "equipment": "Cable",
         "ytVideo": "https://youtu.be/CrbTqNOlFgE?si=xKanrhppuvUAudTj",
-        "videoUrl": "/exercise-assets/youtube-backup/edb-High_Cable_Curls.mp4"
+        "videoUrl": "/exercise-assets/youtube-backup/edb-Standing_Biceps_Cable_Curl.mp4 /exercise-assets/youtube-backup/edb-High_Cable_Curls.mp4"
       },
       {
         "id": 125,
@@ -2458,7 +2645,8 @@ export const exerciseAliasMap = {
   '139': 'edb-139',
   '140': 'edb-Pull_Through',
   '141': 'edb-Trail_Running_Walking',
-  '142': 'edb-Barbell_Incline_Bench_Press_-_Medium_Grip'
+  '142': 'edb-Barbell_Incline_Bench_Press_-_Medium_Grip',
+  '143': 'edb-Side_Lateral_Raise'
 };
 
 export const resolveLoggedExercise = (logKey, exLookup) => {

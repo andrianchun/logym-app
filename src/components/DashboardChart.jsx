@@ -1,11 +1,24 @@
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, Tooltip } from 'recharts';
 import { getLocalYMD } from '../data/constants';
 import { formatNumber } from '../utils/numberFormat';
 import { dayBmr } from '../utils/bmr';
 
-const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPointClick, unitSystem, language, userProfile, isSubCard = false }) => {
-  const isImp = unitSystem === 'imperial';
+// Resolusi pinch-to-zoom bertingkat (sama persis dengan arsitektur VitalsChart):
+// Zoom-in: detail harian (per hari)
+// Zoom-out sedang: rata-rata per bulan (bisa melihat tren 1 tahun dalam satu layar penuh)
+// Zoom-out maksimal: rata-rata per tahun (melihat progres jangka panjang tanpa scroll ribuan px)
+const DAY_MIN_PW = 20;
+const MONTH_MIN_PW = 10;
+
+const monthKeyOf = (dateStr) => (dateStr ? dateStr.substring(0, 7) : ''); // 'YYYY-MM'
+const yearKeyOf = (dateStr) => (dateStr ? dateStr.substring(0, 4) : '');  // 'YYYY'
+const avg = (arr) => arr && arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+const round1 = (val) => val != null ? Number(Number(val).toFixed(1)) : null;
+const roundInt = (val) => val != null ? Math.round(Number(val)) : null;
+
+const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPointClick, unitSystem, units, language, userProfile, isSubCard = false }) => {
+  const isImp = unitSystem === 'imperial' || units?.weight === 'lbs';
   const chartMetricsList = [
       { key: 'weight', label: 'Berat Badan', color: theme === 'dark' ? '#38bdf8' : '#0284c7' }, // Sky Blue
       { key: 'bodyFat', label: 'Kadar Lemak', color: theme === 'dark' ? '#60a5fa' : '#2563eb' }, // Lighter Blue
@@ -13,9 +26,6 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
       { key: 'visceralFat', label: 'Lemak Visceral', color: theme === 'dark' ? '#2dd4bf' : '#0d9488' }, // Teal
       { key: 'bmr', label: 'BMR', color: theme === 'dark' ? '#94a3b8' : '#64748b' }, // Slate
       { key: 'waist', label: 'Lingkar Perut', color: theme === 'dark' ? '#3b82f6' : '#1d4ed8' }, // Blue
-      // Tensi/Nadi/SpO2 dipindah ke kartu Aktivitas Harian (grafik VitalsChart, detail per jam
-      // dari Health Connect) — di sini cuma satu angka ringkasan per hari, kurang berguna
-      // buat data yang aslinya beresolusi tinggi.
   ];
 
   const [activeChartMetrics, setActiveChartMetrics] = useState(() => {
@@ -26,6 +36,78 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
       return ['weight', 'bodyFat', 'musclePercent', 'visceralFat', 'waist'];
   });
 
+  const pressTimerRef = useRef(null);
+  const isLongPressRef = useRef(false);
+  const startPosRef = useRef({ x: 0, y: 0 });
+  const lastTouchTimeRef = useRef(0);
+
+  useEffect(() => () => {
+    if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
+  }, []);
+
+  const soloChartMetric = (key) => {
+    playSoundEffect('click', soundEnabled);
+    if (navigator.vibrate) {
+      try { navigator.vibrate(50); } catch(e) {}
+    }
+    setActiveChartMetrics(prev => {
+      let newMetrics;
+      if (prev.length === 1 && prev[0] === key) {
+        newMetrics = ['weight', 'bodyFat', 'musclePercent', 'visceralFat', 'waist'];
+      } else {
+        newMetrics = [key];
+      }
+      localStorage.setItem('lyfit_chart_metrics', JSON.stringify(newMetrics));
+      return newMetrics;
+    });
+  };
+
+  const startPillPress = (key, e) => {
+    const isTouch = e.type?.startsWith('touch');
+    if (isTouch) {
+      lastTouchTimeRef.current = Date.now();
+    } else if (Date.now() - lastTouchTimeRef.current < 600) {
+      return;
+    }
+    isLongPressRef.current = false;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    startPosRef.current = { x: clientX, y: clientY };
+
+    if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
+    pressTimerRef.current = setTimeout(() => {
+      isLongPressRef.current = true;
+      soloChartMetric(key);
+    }, 450);
+  };
+
+  const movePillPress = (e) => {
+    if (!pressTimerRef.current) return;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const dx = Math.abs(clientX - startPosRef.current.x);
+    const dy = Math.abs(clientY - startPosRef.current.y);
+    if (dx > 8 || dy > 8) {
+      clearTimeout(pressTimerRef.current);
+      pressTimerRef.current = null;
+    }
+  };
+
+  const endPillPress = () => {
+    if (pressTimerRef.current) {
+      clearTimeout(pressTimerRef.current);
+      pressTimerRef.current = null;
+    }
+  };
+
+  const handlePillClick = (key) => {
+    if (isLongPressRef.current) {
+      isLongPressRef.current = false;
+      return;
+    }
+    toggleChartMetric(key);
+  };
+
   const toggleChartMetric = (key) => {
       playSoundEffect('click', soundEnabled);
       setActiveChartMetrics(prev => {
@@ -35,7 +117,8 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
       });
   };
 
-  const multiChartData = useMemo(() => {
+  // 1. Data mentah per hari
+  const dailyPoints = useMemo(() => {
       const data = [];
       const bioEntries = [];
       const todayStr = getLocalYMD(new Date());
@@ -49,95 +132,164 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
       bioEntries.forEach(entry => {
           const d = new Date(entry.dateStr);
           const histBio = entry.bioData;
-          
-          let bpSys = null;
-          if (histBio?.bloodPressure) {
-              const parts = histBio.bloodPressure.split('/');
-              if (parts.length === 2) bpSys = Number(parts[0]);
-          }
 
           data.push({
+              ts: d.getTime(),
               name: d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }),
               dateFull: entry.dateStr,
               weight: histBio?.weight ? Number((isImp ? Number(histBio.weight) * 2.20462 : Number(histBio.weight)).toFixed(1)) : null,
               bodyFat: histBio?.bodyFat ? Number(histBio.bodyFat) : null,
               musclePercent: histBio?.musclePercent ? Number(histBio.musclePercent) : null,
               visceralFat: histBio?.visceralFat ? Number(histBio.visceralFat) : null,
-              // Turunan Logym, bukan bioData.bmr mentah — lihat dayBmr. Titiknya cuma digambar
-              // kalau hari itu memang punya data komposisi, supaya garisnya tidak mengarang.
               bmr: histBio?.weight || histBio?.bmr ? (dayBmr(histBio, userProfile) || null) : null,
               waist: histBio?.waist ? Number((isImp ? Number(histBio.waist) * 0.393701 : Number(histBio.waist)).toFixed(1)) : null,
-              bpSys: bpSys,
-              heartRate: histBio?.heartRate ? Number(histBio.heartRate) : null,
-              oxygenSaturation: histBio?.oxygenSaturation ? Number(histBio.oxygenSaturation) : null,
           });
       });
       return data;
-  }, [history]);
+  }, [history, isImp, userProfile]);
+
+  // 2. Data agregasi rata-rata per bulan
+  const monthlyPoints = useMemo(() => {
+      const byMonth = {};
+      dailyPoints.forEach((p) => {
+          const k = monthKeyOf(p.dateFull);
+          if (!byMonth[k]) {
+              byMonth[k] = {
+                  ts: [],
+                  dates: [],
+                  weight: [],
+                  bodyFat: [],
+                  musclePercent: [],
+                  visceralFat: [],
+                  bmr: [],
+                  waist: [],
+              };
+          }
+          byMonth[k].ts.push(p.ts);
+          byMonth[k].dates.push(p.dateFull);
+          if (p.weight != null) byMonth[k].weight.push(p.weight);
+          if (p.bodyFat != null) byMonth[k].bodyFat.push(p.bodyFat);
+          if (p.musclePercent != null) byMonth[k].musclePercent.push(p.musclePercent);
+          if (p.visceralFat != null) byMonth[k].visceralFat.push(p.visceralFat);
+          if (p.bmr != null) byMonth[k].bmr.push(p.bmr);
+          if (p.waist != null) byMonth[k].waist.push(p.waist);
+      });
+
+      return Object.entries(byMonth).map(([k, v]) => {
+          const avgTs = avg(v.ts);
+          const d = new Date(avgTs);
+          return {
+              ts: avgTs,
+              dateFull: v.dates[v.dates.length - 1],
+              name: d.toLocaleDateString('id-ID', { month: 'short', year: '2-digit' }),
+              periodLabel: d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' }),
+              weight: round1(avg(v.weight)),
+              bodyFat: round1(avg(v.bodyFat)),
+              musclePercent: round1(avg(v.musclePercent)),
+              visceralFat: round1(avg(v.visceralFat)),
+              bmr: roundInt(avg(v.bmr)),
+              waist: round1(avg(v.waist)),
+              count: v.ts.length,
+          };
+      }).sort((a, b) => a.ts - b.ts);
+  }, [dailyPoints]);
+
+  // 3. Data agregasi rata-rata per tahun
+  const yearlyPoints = useMemo(() => {
+      const byYear = {};
+      monthlyPoints.forEach((p) => {
+          const k = yearKeyOf(p.dateFull);
+          if (!byYear[k]) {
+              byYear[k] = {
+                  ts: [],
+                  dates: [],
+                  weight: [],
+                  bodyFat: [],
+                  musclePercent: [],
+                  visceralFat: [],
+                  bmr: [],
+                  waist: [],
+              };
+          }
+          byYear[k].ts.push(p.ts);
+          byYear[k].dates.push(p.dateFull);
+          if (p.weight != null) byYear[k].weight.push(p.weight);
+          if (p.bodyFat != null) byYear[k].bodyFat.push(p.bodyFat);
+          if (p.musclePercent != null) byYear[k].musclePercent.push(p.musclePercent);
+          if (p.visceralFat != null) byYear[k].visceralFat.push(p.visceralFat);
+          if (p.bmr != null) byYear[k].bmr.push(p.bmr);
+          if (p.waist != null) byYear[k].waist.push(p.waist);
+      });
+
+      return Object.entries(byYear).map(([k, v]) => {
+          const avgTs = avg(v.ts);
+          const d = new Date(avgTs);
+          return {
+              ts: avgTs,
+              dateFull: v.dates[v.dates.length - 1],
+              name: String(d.getFullYear()),
+              periodLabel: `Tahun ${d.getFullYear()}`,
+              weight: round1(avg(v.weight)),
+              bodyFat: round1(avg(v.bodyFat)),
+              musclePercent: round1(avg(v.musclePercent)),
+              visceralFat: round1(avg(v.visceralFat)),
+              bmr: roundInt(avg(v.bmr)),
+              waist: round1(avg(v.waist)),
+              count: v.ts.length,
+          };
+      }).sort((a, b) => a.ts - b.ts);
+  }, [monthlyPoints]);
 
   const scrollRef = useRef(null);
-
-  // Pinch-to-zoom logic
   const [pointWidth, setPointWidth] = useState(45);
   const touchState = useRef({ initialDist: 0, initialPointWidth: 45, pinchRatio: 0, scrollRelCenterX: 0 });
-
-  // Auto scroll ke tengah titik data terbaru
-  useEffect(() => {
-     if(scrollRef.current && multiChartData.length > 0 && activeChartMetrics.length > 0) {
-        const data = multiChartData;
-        
-        let latestIdxWithData = -1;
-        for (let i = data.length - 1; i >= 0; i--) {
-            if (activeChartMetrics.some(metric => {
-                const val = data[i][metric];
-                return val !== undefined && val !== null && val !== 0;
-            })) {
-                latestIdxWithData = i;
-                break;
-            }
-        }
-        
-        if (latestIdxWithData !== -1) {
-             const latestDateObj = new Date(data[latestIdxWithData].dateFull);
-             const oneMonthAgo = new Date(latestDateObj.getTime() - 30 * 24 * 60 * 60 * 1000);
-             const oneMonthAgoStr = getLocalYMD(oneMonthAgo);
-
-             let startIdx = latestIdxWithData;
-             while (startIdx > 0 && data[startIdx - 1].dateFull >= oneMonthAgoStr) {
-                 startIdx--;
-             }
-
-             const numPoints = latestIdxWithData - startIdx + 1;
-             const clientW = scrollRef.current.clientWidth || (window.innerWidth - 64);
-             
-             let newPointWidth = clientW / Math.max(1.5, numPoints);
-             if (newPointWidth > 200) newPointWidth = 200;
-             if (newPointWidth < 15) newPointWidth = 15;
-
-             setPointWidth(newPointWidth);
-             // Scroll ke ujung kanan data terbaru (bukan ke awal range)
-             scrollTarget.current = (latestIdxWithData + 1) * newPointWidth - clientW;
-             if (scrollTarget.current < 0) scrollTarget.current = 0;
-        } else {
-             const clientW = scrollRef.current.clientWidth || (window.innerWidth - 64);
-             scrollTarget.current = Math.max(0, ((data.length) * pointWidth) - clientW);
-        }
-     }
-  }, [multiChartData, activeChartMetrics]);
   const scrollTarget = useRef(null);
   const pointWidthRef = useRef(pointWidth);
   useEffect(() => { pointWidthRef.current = pointWidth; }, [pointWidth]);
   const rafRef = useRef(null);
+  const pinchRafRef = useRef(null);
+  const lastCommittedWidthRef = useRef(pointWidth);
+
+  const [resolution, setResolution] = useState(() => {
+    if (pointWidth >= DAY_MIN_PW) return 'day';
+    if (pointWidth >= MONTH_MIN_PW) return 'month';
+    return 'year';
+  });
+
+  useEffect(() => {
+    setResolution(prev => {
+      let next = prev;
+      if (prev === 'day' && pointWidth < 18) next = 'month';
+      else if (prev === 'month') {
+        if (pointWidth > 24) next = 'day';
+        else if (pointWidth < 8) next = 'year';
+      } else if (prev === 'year' && pointWidth > 12) next = 'month';
+
+      if (next !== prev && navigator.vibrate) {
+        try { navigator.vibrate(25); } catch(e) {}
+      }
+      return next;
+    });
+  }, [pointWidth]);
+
+  const chartData = resolution === 'day' ? dailyPoints : resolution === 'month' ? monthlyPoints : yearlyPoints;
+
+  const effectivePointWidth = useMemo(() => {
+    const bWidth = typeof window !== 'undefined' ? window.innerWidth - 64 : 320;
+    if (resolution === 'day') return pointWidth;
+    if (resolution === 'month') return Math.max(50, Math.round(bWidth / Math.max(1, monthlyPoints.length)));
+    return Math.max(80, Math.round(bWidth / Math.max(1, yearlyPoints.length)));
+  }, [resolution, pointWidth, monthlyPoints.length, yearlyPoints.length]);
 
   const yDomains = useMemo(() => {
-      if (multiChartData.length === 0) return {};
+      if (chartData.length === 0) return {};
       
       const newDomains = {};
       activeChartMetrics.forEach(metric => {
           let min = Infinity;
           let max = -Infinity;
 
-          multiChartData.forEach(d => {
+          chartData.forEach(d => {
               let val = d[metric];
               if (val !== undefined && val !== null) {
                   val = Number(val);
@@ -160,7 +312,7 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
           }
       });
       return newDomains;
-  }, [multiChartData, activeChartMetrics]);
+  }, [chartData, activeChartMetrics]);
 
   const handleScroll = () => {
       if (!rafRef.current) {
@@ -176,47 +328,72 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
               e.touches[0].clientX - e.touches[1].clientX,
               e.touches[0].clientY - e.touches[1].clientY
           );
-          
+          if (dist <= 0) return;
           const pinchCenterX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-          const rect = scrollRef.current.getBoundingClientRect();
+          const rect = scrollRef.current ? scrollRef.current.getBoundingClientRect() : { left: 0 };
           const scrollRelCenterX = pinchCenterX - rect.left;
-          
-          const currentScrollLeft = scrollRef.current.scrollLeft;
-          const currentChartWidth = Math.max(multiChartData.length * pointWidth, window.innerWidth - 64);
-          
+          const currentScrollLeft = scrollRef.current ? scrollRef.current.scrollLeft : 0;
+          const currentChartWidth = Math.max(chartData.length * pointWidthRef.current, window.innerWidth - 64);
           const pinchRatio = (scrollRelCenterX + currentScrollLeft) / currentChartWidth;
-          
-          touchState.current = { initialDist: dist, initialPointWidth: pointWidth, pinchRatio, scrollRelCenterX };
+          touchState.current = { initialDist: dist, initialPointWidth: pointWidthRef.current, pinchRatio, scrollRelCenterX };
+          lastCommittedWidthRef.current = pointWidthRef.current;
       }
   };
 
   const handleTouchMove = (e) => {
-      if (e.touches.length === 2) {
+      if (e.touches.length === 2 && touchState.current.initialDist > 0) {
+          if (e.cancelable) e.preventDefault();
           const dist = Math.hypot(
               e.touches[0].clientX - e.touches[1].clientX,
               e.touches[0].clientY - e.touches[1].clientY
           );
           const scale = dist / touchState.current.initialDist;
           let newWidth = touchState.current.initialPointWidth * scale;
-          if (newWidth < 15) newWidth = 15;
-          if (newWidth > 200) newWidth = 200;
-          setPointWidth(newWidth);
-          
-          const nextChartWidth = Math.max(multiChartData.length * newWidth, window.innerWidth - 64);
+          if (newWidth < 6) newWidth = 6;
+          if (newWidth > 120) newWidth = 120;
+
+          if (Math.abs(newWidth - lastCommittedWidthRef.current) < 1.0) return;
+
+          const nextChartWidth = Math.max(chartData.length * newWidth, window.innerWidth - 64);
           const newPinchAbsX = touchState.current.pinchRatio * nextChartWidth;
-          scrollTarget.current = newPinchAbsX - touchState.current.scrollRelCenterX;
+          scrollTarget.current = Math.max(0, newPinchAbsX - touchState.current.scrollRelCenterX);
+          lastCommittedWidthRef.current = newWidth;
+
+          if (!pinchRafRef.current) {
+              pinchRafRef.current = requestAnimationFrame(() => {
+                  pinchRafRef.current = null;
+                  setPointWidth(newWidth);
+              });
+          }
       }
   };
 
-  useEffect(() => {
-     if (scrollTarget.current !== null && scrollRef.current) {
-         scrollRef.current.scrollLeft = scrollTarget.current;
-         scrollTarget.current = null;
-     }
-  }, [pointWidth]);
+  const handleTouchEnd = () => {
+      if (pinchRafRef.current) {
+          cancelAnimationFrame(pinchRafRef.current);
+          pinchRafRef.current = null;
+      }
+      touchState.current.initialDist = 0;
+  };
 
-  // Lebar grafik dinamis berdasarkan pointWidth yang di-zoom
-  const chartWidth = Math.max(multiChartData.length * pointWidth, window.innerWidth - 64);
+  useEffect(() => {
+      if (scrollTarget.current !== null && scrollRef.current) {
+          scrollRef.current.scrollLeft = scrollTarget.current;
+          scrollTarget.current = null;
+      }
+  }, [pointWidth, chartData]);
+
+  // Auto scroll ke ujung kanan (data terbaru) saat ganti metrik atau data masuk
+  useEffect(() => {
+      if (scrollRef.current && chartData.length > 0) {
+          const clientW = scrollRef.current.clientWidth || (window.innerWidth - 64);
+          const nextChartWidth = Math.max(chartData.length * pointWidth, clientW);
+          scrollTarget.current = nextChartWidth - clientW;
+      }
+  }, [chartData.length, activeChartMetrics]);
+
+  const currentPW = resolution === 'day' ? pointWidth : effectivePointWidth;
+  const chartWidth = Math.max(chartData.length * currentPW, typeof window !== 'undefined' ? window.innerWidth - 64 : 320);
 
   return (
     <div className={!isSubCard ? "px-5 pb-5 pt-2" : ""}>
@@ -225,9 +402,22 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
               onScroll={!isSubCard ? handleScroll : undefined}
               onTouchStartCapture={!isSubCard ? handleTouchStart : undefined} 
               onTouchMoveCapture={!isSubCard ? handleTouchMove : undefined}
-              className={`w-full overflow-x-auto scrollbar-hide mb-4 touch-pan-x ${isSubCard ? 'pointer-events-none' : ''}`} 
-              style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}>
-             <div style={{ width: `${chartWidth}px`, height: '224px' }} className="cursor-crosshair relative">
+              onTouchEndCapture={!isSubCard ? handleTouchEnd : undefined}
+              onTouchCancelCapture={!isSubCard ? handleTouchEnd : undefined}
+              className={`w-full overflow-x-auto scrollbar-hide mb-4 touch-pan-x flex ${isSubCard ? 'pointer-events-none' : ''}`} 
+              style={{
+                WebkitOverflowScrolling: 'touch',
+                touchAction: 'pan-x pan-y',
+                willChange: 'scroll-position',
+                transform: 'translateZ(0)',
+                contain: 'paint layout',
+              }}>
+             {chartData.length > 0 ? (
+               <div style={{
+                 width: `${chartWidth}px`,
+                 height: '224px',
+                 marginLeft: (chartData.length * currentPW) < (typeof window !== 'undefined' ? window.innerWidth - 64 : 320) ? 'auto' : '0'
+               }} className="cursor-crosshair relative shrink-0 transition-all duration-200 ease-out">
                  {/* Gimmick Grid Lines */}
                  <svg className="absolute inset-0 w-full h-full pointer-events-none z-0" style={{ padding: '10px 0 30px 0' }}>
                      {[0, 25, 50, 75, 100].map((pct, i) => (
@@ -238,26 +428,19 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
                  <LineChart 
                     width={chartWidth}
                     height={224}
-                    data={multiChartData} 
+                    data={chartData} 
+                    margin={{ top: 5, right: 10, left: 0, bottom: 0 }}
                     style={{ outline: 'none' }}
                     onClick={(e) => {
                         if(e && e.activePayload && e.activePayload.length > 0) {
-                            onPointClick(e.activePayload[0].payload.dateFull);
+                            onPointClick?.(e.activePayload[0].payload.dateFull);
 
-                            // Chart ini di dalam container yang scroll horizontal (bisa jauh lebih
-                            // lebar dari layar). Tooltip Recharts diposisikan dekat titik yang diklik,
-                            // jadi kalau titiknya dekat tepi kiri/kanan area yang terlihat, tooltip-nya
-                            // ikut kepotong. Ukur posisi tooltip asli setelah render, lalu geser scroll
-                            // horizontal seperlunya supaya tooltip-nya tetap utuh kelihatan.
-                            // Dicoba beberapa kali (bukan sekali di 50ms) karena Recharts memposisikan
-                            // ulang tooltip lewat efek internal yang bisa telat beberapa frame,
-                            // terutama di device yang lebih lambat.
                             const adjustScrollForTooltip = () => {
                                 const container = scrollRef.current;
                                 const tooltipEl = container?.querySelector('.recharts-tooltip-wrapper');
                                 if (!container || !tooltipEl) return;
                                 const tooltipRect = tooltipEl.getBoundingClientRect();
-                                if (tooltipRect.width === 0) return; // belum benar-benar diposisikan
+                                if (tooltipRect.width === 0) return;
                                 const containerRect = container.getBoundingClientRect();
                                 let delta = 0;
                                 if (tooltipRect.left < containerRect.left) {
@@ -273,15 +456,6 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
                         }
                     }}
                  >
-                    <defs>
-                        <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-                            <feGaussianBlur stdDeviation="4" result="blur" />
-                            <feMerge>
-                                <feMergeNode in="blur" />
-                                <feMergeNode in="SourceGraphic" />
-                            </feMerge>
-                        </filter>
-                    </defs>
                     <Tooltip 
                        formatter={(value, name, props) => {
                            let unit = '';
@@ -289,16 +463,28 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
                            else if (props.dataKey === 'waist') unit = isImp ? ' in' : ' cm';
                            else if (['bodyFat', 'musclePercent', 'waterPercent', 'proteinPercent'].includes(props.dataKey)) unit = '%';
                            else if (props.dataKey === 'bmr') unit = ' kcal';
-                           else if (props.dataKey === 'activeMinutes' || props.dataKey === 'weeklyDuration') unit = ' m';
-                           else if (props.dataKey === 'heartRate') unit = ' bpm';
                            return [`${formatNumber(value, language)}${unit}`, name];
+                       }}
+                       labelFormatter={(label, payload) => {
+                           const p = payload?.[0]?.payload;
+                           if ((resolution === 'month' || resolution === 'year') && p?.periodLabel) {
+                               return p.periodLabel;
+                           }
+                           return label;
                        }}
                        cursor={{ stroke: theme === 'dark' ? '#52525b' : '#d4d4d8', strokeWidth: 1, strokeDasharray: '3 3' }} 
                        contentStyle={{ backgroundColor: theme === 'dark' ? '#18181b' : '#ffffff', borderRadius: '12px', border: '1px solid ' + t.border, padding: '8px 12px', fontSize: '11px', fontWeight: 'bold', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} 
                        itemStyle={{ padding: 0, margin: 0, marginTop: '4px' }} 
-                       labelStyle={{ color: theme === 'dark' ? '#a1a1aa' : '#71717a', marginBottom: '4px', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }} 
+                       labelStyle={{ color: theme === 'dark' ? '#a1a1aa' : '#71717a', marginBottom: '4px', fontSize: '10px' }} 
                     />
-                    <XAxis dataKey="name" stroke={theme === 'dark' ? '#a1a1aa' : '#64748b'} fontSize={10} tickLine={false} axisLine={false} interval={Math.max(0, Math.ceil(50 / pointWidth) - 1)} />
+                    <XAxis 
+                       dataKey="name" 
+                       stroke={theme === 'dark' ? '#a1a1aa' : '#64748b'} 
+                       fontSize={9} 
+                       tickLine={false} 
+                       axisLine={false} 
+                       interval={Math.max(0, Math.ceil(50 / effectivePointWidth) - 1)} 
+                    />
                     {chartMetricsList.map(metric => {
                         if (!activeChartMetrics.includes(metric.key)) return null;
                         const isFirstActive = activeChartMetrics[0] === metric.key;
@@ -311,7 +497,12 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
                         <Line key={metric.key} yAxisId={metric.key} type="monotone" name={metric.label} dataKey={metric.key} stroke={metric.color} strokeWidth={1.5} dot={false} activeDot={{ r: 5, strokeWidth: 0, fill: metric.color }} connectNulls={true} isAnimationActive={false} />
                     ))}
                  </LineChart>
-             </div>
+               </div>
+             ) : (
+               <div className="w-full h-[224px] flex items-center justify-center">
+                 <span className={`text-xs ${t.textMuted}`}>Belum ada data komposisi tubuh</span>
+               </div>
+             )}
          </div>
          
          {isSubCard && (
@@ -330,9 +521,23 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
             {chartMetricsList.map(metric => {
                 const isActive = activeChartMetrics.includes(metric.key);
                 return (
-                    <button key={metric.key} onClick={() => toggleChartMetric(metric.key)} className="px-3 py-1.5 rounded-full caption font-black transition-all border active:scale-95 whitespace-nowrap snap-start flex items-center justify-center h-8" style={{ backgroundColor: isActive ? metric.color : 'transparent', borderColor: metric.color, color: isActive ? '#fff' : metric.color, opacity: isActive ? 1 : 0.5 }}>
-                        {metric.label}
-                    </button>
+                     <button
+                        key={metric.key}
+                        onTouchStart={(e) => startPillPress(metric.key, e)}
+                        onTouchMove={movePillPress}
+                        onTouchEnd={endPillPress}
+                        onTouchCancel={endPillPress}
+                        onMouseDown={(e) => startPillPress(metric.key, e)}
+                        onMouseMove={movePillPress}
+                        onMouseUp={endPillPress}
+                        onMouseLeave={endPillPress}
+                        onClick={() => handlePillClick(metric.key)}
+                        onContextMenu={(e) => e.preventDefault()}
+                        className="px-3 py-1.5 rounded-full caption font-black transition-all border active:scale-95 whitespace-nowrap snap-start flex items-center justify-center h-8 select-none"
+                        style={{ backgroundColor: isActive ? metric.color : 'transparent', borderColor: metric.color, color: isActive ? '#fff' : metric.color, opacity: isActive ? 1 : 0.5 }}
+                     >
+                         {metric.label}
+                     </button>
                 )
             })}
          </div>

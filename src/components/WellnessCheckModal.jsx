@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { Zap, Activity, ShieldAlert, X } from 'lucide-react';
 import { playSoundEffect } from '../utils/audio';
 
-const WellnessCheckModal = ({ isOpen, onSelect, onClose, t, soundEnabled }) => {
+const WellnessCheckModal = ({ isOpen, onSelect, onClose, t, soundEnabled, currentWellness = null }) => {
   useEffect(() => {
     if (!isOpen) return;
     const origBody = document.body.style.overflow;
@@ -41,72 +41,61 @@ const WellnessCheckModal = ({ isOpen, onSelect, onClose, t, soundEnabled }) => {
           <X size={18} className={t.textMain} />
         </button>
 
-        {/* Header */}
-        <div className="text-center mb-5 pt-1">
+        {/* Header - Bersih tanpa subteks */}
+        <div className="text-center mb-4 pt-1">
           <h3 className={`text-lg font-black ${t.textMain}`}>Kondisi Tubuh Hari Ini</h3>
-          <p className={`text-xs ${t.textMuted} mt-1`}>
-            Sesuaikan intensitas dan target beban latihanmu.
-          </p>
         </div>
 
-        {/* 3 Opsi Efisien & Bersih */}
+        {/* 3 Opsi Langsung: Prima, Pegal, Nyeri */}
         <div className="space-y-2.5">
           {/* Option 1: Prima */}
           <button
             onClick={() => handleChoose('prima')}
-            className="w-full p-3.5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-[0.98] transition-all text-left flex items-center justify-between group"
+            className={`w-full p-3.5 rounded-2xl border ${currentWellness === 'prima' ? 'border-emerald-400 bg-emerald-500/20 ring-1 ring-emerald-400/50' : 'border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20'} active:scale-[0.98] transition-all text-left flex items-center gap-3.5 group`}
           >
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 shrink-0">
-                <Zap size={20} className="group-hover:scale-110 transition-transform" />
-              </div>
-              <div>
-                <h4 className="font-bold text-sm text-emerald-400">Prima</h4>
-                <p className="text-xs text-zinc-400">Target 100% & progresi normal</p>
-              </div>
+            <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 shrink-0">
+              <Zap size={20} className="group-hover:scale-110 transition-transform" />
             </div>
-            <span className="text-xs font-bold text-emerald-400/70 group-hover:text-emerald-400">Normal</span>
+            <div className="flex-1 min-w-0">
+              <h4 className="font-bold text-sm text-emerald-400 leading-tight flex items-center gap-2">
+                Prima {currentWellness === 'prima' && <span className="text-[10px] py-0.5 px-2 rounded-full bg-emerald-500/30 text-emerald-300 font-bold">Aktif</span>}
+              </h4>
+              <p className="text-xs text-zinc-400 mt-0.5 leading-snug">Target beban 100% & progresi normal</p>
+            </div>
           </button>
 
-          {/* Option 2: DOMS / Pegal */}
+          {/* Option 2: Pegal */}
           <button
             onClick={() => handleChoose('doms')}
-            className="w-full p-3.5 rounded-2xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 active:scale-[0.98] transition-all text-left flex items-center justify-between group"
+            className={`w-full p-3.5 rounded-2xl border ${currentWellness === 'doms' ? 'border-amber-400 bg-amber-500/20 ring-1 ring-amber-400/50' : 'border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20'} active:scale-[0.98] transition-all text-left flex items-center gap-3.5 group`}
           >
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 shrink-0">
-                <Activity size={20} className="group-hover:scale-110 transition-transform" />
-              </div>
-              <div>
-                <h4 className="font-bold text-sm text-amber-400">Pegal / Lelah</h4>
-                <p className="text-xs text-zinc-400">Fokus form & kontrol repetisi</p>
-              </div>
+            <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 shrink-0">
+              <Activity size={20} className="group-hover:scale-110 transition-transform" />
             </div>
-            <span className="text-xs font-bold text-amber-400/70 group-hover:text-amber-400">Fokus Form</span>
+            <div className="flex-1 min-w-0">
+              <h4 className="font-bold text-sm text-amber-400 leading-tight flex items-center gap-2">
+                Pegal {currentWellness === 'doms' && <span className="text-[10px] py-0.5 px-2 rounded-full bg-amber-500/30 text-amber-300 font-bold">Aktif</span>}
+              </h4>
+              <p className="text-xs text-zinc-400 mt-0.5 leading-snug">Fokus teknik form & kontrol repetisi</p>
+            </div>
           </button>
 
-          {/* Option 3: Deload / Nyeri Sendi */}
+          {/* Option 3: Nyeri */}
           <button
             onClick={() => handleChoose('deload')}
-            className="w-full p-3.5 rounded-2xl border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 active:scale-[0.98] transition-all text-left flex items-center justify-between group"
+            className={`w-full p-3.5 rounded-2xl border ${currentWellness === 'deload' ? 'border-rose-400 bg-rose-500/20 ring-1 ring-rose-400/50' : 'border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20'} active:scale-[0.98] transition-all text-left flex items-center gap-3.5 group`}
           >
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-rose-500/20 text-rose-400 shrink-0">
-                <ShieldAlert size={20} className="group-hover:scale-110 transition-transform" />
-              </div>
-              <div>
-                <h4 className="font-bold text-sm text-rose-400">Nyeri / Butuh Deload</h4>
-                <p className="text-xs text-zinc-400">Pangkas beban 15-20%</p>
-              </div>
+            <div className="p-2.5 rounded-xl bg-rose-500/20 text-rose-400 shrink-0">
+              <ShieldAlert size={20} className="group-hover:scale-110 transition-transform" />
             </div>
-            <span className="text-xs font-bold text-rose-400/70 group-hover:text-rose-400">-20% Beban</span>
+            <div className="flex-1 min-w-0">
+              <h4 className="font-bold text-sm text-rose-400 leading-tight flex items-center gap-2">
+                Nyeri {currentWellness === 'deload' && <span className="text-[10px] py-0.5 px-2 rounded-full bg-rose-500/30 text-rose-300 font-bold">Aktif</span>}
+              </h4>
+              <p className="text-xs text-zinc-400 mt-0.5 leading-snug">Pangkas beban 15–20% untuk cegah cedera</p>
+            </div>
           </button>
         </div>
-
-        {/* Footer Note */}
-        <p className="text-[10px] text-center text-zinc-500 mt-4">
-          Kamu bisa mengubah status ini kapan saja di sesi latihan.
-        </p>
       </div>
     </div>
   );

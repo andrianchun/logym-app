@@ -737,7 +737,7 @@ const ProgramTab = ({
             if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }, 150);
         }}
-        className={`scroll-mt-24 rounded-[2rem] border ${isActive ? t.borderAccent : 'border-white/10'} shadow-[0_8px_30px_rgb(0,0,0,0.25)] overflow-hidden transition-all flex flex-col relative min-h-[350px] group/card bg-[#0c1427]/85 backdrop-blur-2xl cursor-pointer hover:border-white/20 active:scale-[0.99]`}
+        className={`scroll-mt-24 rounded-[2rem] border border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.25)] overflow-hidden transition-all flex flex-col relative min-h-[350px] group/card bg-[#0c1427]/85 backdrop-blur-2xl cursor-pointer hover:border-white/20 active:scale-[0.99]`}
       >
               
         {/* Split Header (Left empty, Right glassmorphism) */}

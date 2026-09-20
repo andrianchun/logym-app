@@ -801,7 +801,7 @@ const ExerciseDetailModal = ({
                                         <th className="py-1 text-center w-14">Beban</th>
                                         {/* Beban aktual = yang benar-benar diangkat (input x rasio + beban dasar alat).
                                             Sebelumnya cuma hidup di dalam perhitungan dan tidak pernah terlihat di riwayat. */}
-                                        <th className="py-1 text-center w-14">Aktual</th>
+                                        <th className="py-1 text-center w-14">Total</th>
                                         <th className="py-1 text-center w-10">Reps</th>
                                         <th className="py-1 text-center border-l border-black/5 dark:border-white/5 w-8">RPE</th>
                                         <th className="py-1 px-2 text-left">Notes</th>

@@ -508,7 +508,28 @@ export default function App() {
       const ymd = getLocalYMD(d);
       for (const w of history[ymd]?.workouts || []) {
         if (w.status !== 'completed' || w.hr) continue;
-        const { start, end, guessed } = workoutWindow(w, ymd);
+        let { start, end, guessed } = workoutWindow(w, ymd);
+
+        // Fallback: kalau workoutWindow guessed (startedAt & timestamp hilang),
+        // coba rekonstruksi dari stempel `at` di set-set yang sudah done.
+        // Ini perbaiki kasus setelah save+edit riwayat atau migrasi yang kehilangan startedAt.
+        if (guessed && w.log) {
+          const stamps = [];
+          Object.values(w.log).forEach(sets => {
+            (Array.isArray(sets) ? sets : Object.values(sets || {})).forEach(s => {
+              if (s?.done && Number(s.at) > 0) stamps.push(Number(s.at));
+            });
+          });
+          if (stamps.length >= 1) {
+            const minAt = Math.min(...stamps);
+            const maxAt = Math.max(...stamps);
+            // Padding 2 menit di kedua sisi untuk menangkap warm-up/cool-down
+            start = new Date(minAt - 120000);
+            end = new Date(maxAt + 120000);
+            guessed = false;
+          }
+        }
+
         if (guessed) continue;
         const hr = summarizeHeartRate(await hcReadHeartRateWindow(start.toISOString(), end.toISOString()));
         if (hr) { (bySession[ymd] = bySession[ymd] || {})[w.id] = hr; count++; }
@@ -770,6 +791,15 @@ export default function App() {
   // yang beratnya saja, dan render tundaannya bisa dipotong React supaya frame animasi lewat.
   const contentTab = useDeferredValue(activeTab);
   const [tabSlideDir, setTabSlideDir] = useState('');
+  const [mountedTabs, setMountedTabs] = useState(() => new Set(['dashboard', activeTab]));
+  useEffect(() => {
+    setMountedTabs(prev => {
+      if (prev.has(contentTab)) return prev;
+      const next = new Set(prev);
+      next.add(contentTab);
+      return next;
+    });
+  }, [contentTab]);
   
   const [expandedSessions, _setExpandedSessions] = useState(() => {
     try {
@@ -3281,26 +3311,10 @@ export default function App() {
 
       currentLogs[setIdx] = updatedSet;
 
-      if (['w', 'r', 'd', 'input_w'].includes(field)) {
-        if (currentLogs[setIdx].type !== 'warmup') {
-          for (let i = setIdx + 1; i < currentLogs.length; i++) {
-            if (!currentLogs[i].done && currentLogs[i].type !== 'warmup') {
-              if (field === 'w' || field === 'input_w') {
-                currentLogs[i] = {
-                  ...currentLogs[i],
-                  w: updatedSet.w,
-                  input_w: updatedSet.input_w,
-                  base_w: updatedSet.base_w,
-                  ratio: updatedSet.ratio,
-                  total_w: updatedSet.total_w
-                };
-              } else {
-                currentLogs[i] = { ...currentLogs[i], [field]: finalVal };
-              }
-            }
-          }
-        }
-      }
+
+      // Cascade per-swipe dihapus — propagasi sekarang hanya via cascade-on-done
+      // di handleToggleSet, lebih ringan karena trigger 1x saja.
+
 
       return { ...prev, [exId]: currentLogs };
     });
@@ -3322,6 +3336,29 @@ export default function App() {
       else delete currentLogs[setIdx].at; // undefined ditolak Firestore — hapus kuncinya
       if (!isDoneNow) {
         currentLogs[setIdx].skipped = false;
+      }
+
+      // Cascade-on-done: saat set di-done, propagasi beban & reps ke set-set
+      // di bawahnya yang belum done (skip warmup). Ini lebih ringan daripada
+      // cascade per-swipe karena cuma trigger sekali saat confirm.
+      if (isDoneNow && currentLogs[setIdx].type !== 'warmup') {
+        const doneSet = currentLogs[setIdx];
+        const eqConf = getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile);
+        for (let i = setIdx + 1; i < currentLogs.length; i++) {
+          if (!currentLogs[i].done && currentLogs[i].type !== 'warmup') {
+            const input_w = Number(doneSet.w) || 0;
+            const total_w = calculateActualWeight(input_w, eqConf);
+            currentLogs[i] = {
+              ...currentLogs[i],
+              w: input_w,
+              input_w: input_w,
+              base_w: eqConf.baseWeight,
+              ratio: eqConf.ratio,
+              total_w: total_w,
+              r: doneSet.r !== undefined ? doneSet.r : currentLogs[i].r,
+            };
+          }
+        }
       }
       
       const activeProgram = programs.find(p => p.id === activeProgramId) || programs[0];
@@ -3573,6 +3610,7 @@ export default function App() {
             setRestTargetTime(null);
             clearCloudSession(); 
             const targetDateStr = selectedDate;
+            try { sessionStorage.removeItem(`wellness_checked_${targetDateStr}`); } catch (e) {}
             
             // Membatalkan SATU sesi tidak boleh menggulung sesi lain yang belum disimpan.
             // Snapshot dipulihkan hanya untuk kunci milik sesi yang dibatalkan; kunci sesi lain
@@ -3734,9 +3772,13 @@ export default function App() {
       exerciseLogs
     );
 
-    const durationSecs = rentangSesiSecs > 0
-      ? rentangSesiSecs
-      : (workoutStartTime ? Math.floor((Date.now() - workoutStartTime) / 1000) : 0);
+    // Ambil TERBESAR dari tiga sumber durasi: span stempel set, timer global, dan durasi
+    // yang sudah tersimpan sebelumnya (kalau ini edit riwayat dari kalender).
+    // Dulu rentangSesiSecs > 0 langsung menang — padahal saat edit riwayat, set yang
+    // di-uncheck lalu recheck mendapat stempel `at` baru yang mencakup waktu edit saja,
+    // bukan total waktu latihan asli + edit.
+    const timerSecs = workoutStartTime ? Math.floor((Date.now() - workoutStartTime) / 1000) : 0;
+    const durationSecs = Math.max(rentangSesiSecs, timerSecs);
     if (healthConnectEnabled && workoutStartTime) {
       hcPushAfterSave.current = true;
     }
@@ -4164,7 +4206,17 @@ export default function App() {
       const progId = activeAddModalTarget.progId;
       setPrograms(prev => prev.map(p => p.id === progId ? { ...p, exercises: [...p.exercises, { ...ex, id: crypto.randomUUID(), sets: defaultSets, reps: defaultReps, duration: defaultDuration }] } : p));
     } else if (activeAddModalTarget.type === 'adhoc') { 
-      setExtraExercises(prev => [...prev, { ...ex, id: `${ex.id}-${Date.now()}`, sets: defaultSets, reps: defaultReps, duration: defaultDuration }]); 
+      setExtraExercises(prev => {
+        const cleanTargetName = (ex.name || '').toLowerCase().trim();
+        const baseTargetId = String(ex.originalId || ex.id || '').split('-')[0];
+        const isDuplicate = prev.some(existing => {
+          const cleanExistingName = (existing.name || '').toLowerCase().trim();
+          const baseExistingId = String(existing.originalId || existing.id || '').split('-')[0];
+          return (baseTargetId && baseExistingId === baseTargetId) || (cleanTargetName && cleanExistingName === cleanTargetName);
+        });
+        if (isDuplicate) return prev;
+        return [...prev, { ...ex, id: `${ex.id}-${Date.now()}`, sets: defaultSets, reps: defaultReps, duration: defaultDuration }];
+      }); 
       setLastActionTime(Date.now()); 
     } else if (activeAddModalTarget.type === 'replace') {
       const exToReplaceId = activeAddModalTarget.id;
@@ -4479,97 +4531,108 @@ export default function App() {
              />
          </div>
          
-         {contentTab === 'workout' && (
-             <WorkoutTab 
-              setConfirmModal={setConfirmModal}
-              t={t} theme={theme} lang={lang} language={language} programs={programs} selectedDate={selectedDate} setSelectedDate={setSelectedDate}
-              history={history} setHistory={setHistory} setActiveTab={setActiveTab}
-              units={units} userProfile={userProfile}
-              tabSlideDir={tabSlideDir}
-              activeProgramId={activeProgramId} setActiveProgramId={setActiveProgramId} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
-               warmupVideos={warmupVideos} cooldownVideos={cooldownVideos} onOpenDetail={setGlobalDetailExercise}
-               exerciseLibrary={exerciseLibrary} setExerciseLibrary={setExerciseLibrary}
-               exerciseLogs={exerciseLogs} skippedExercises={skippedExercises} extraExercises={extraExercises}
-               expandedSessions={expandedSessions} setExpandedSessions={setExpandedSessions}
-               onSetChange={handleSetChange} onToggleSet={handleToggleSet} onSkipSet={handleSkipSet} onAddSet={handleAddSet} onAddWarmupSets={handleAddWarmupSets} onRemoveSet={handleRemoveSet}
-               onToggleSkip={handleToggleSkip} onRemoveExtra={handleRemoveExtraEx} onRemoveProgramExercise={handleRemoveProgramExercise}
-               isCurrentlyCompleted={isCurrentlyCompleted} onSaveWorkout={handleSaveWorkout} onCancelWorkout={handleCancelWorkout}
-               gymProfiles={gymProfiles} activeGymId={activeGymId}
-               onAddExtraClick={() => setActiveAddModalTarget({type: 'adhoc'})} 
-               onAddExtraExercise={(ex) => setExtraExercises([...extraExercises, ex])}
-               
-               // New Global Timer Props
-               isWorkoutActive={isWorkoutActive} setIsWorkoutActive={setIsWorkoutActive}
-               workoutStartTime={workoutStartTime} setWorkoutStartTime={setWorkoutStartTime}
-               restTargetTime={restTargetTime} setRestTargetTime={setRestTargetTime}
-               isImmersiveMode={isImmersiveMode} setIsImmersiveMode={setIsImmersiveMode}
-               sessionToRun={sessionToRun} setSessionToRun={setSessionToRun}
-               onSessionExercises={setSessionExercises}
-               resumeDurationSecs={resumeDurationSecs} setResumeDurationSecs={setResumeDurationSecs}
-               showSupersetToast={showSupersetToast}
-               
-               // Focus
-               focusWorkoutId={focusWorkoutId} setFocusWorkoutId={setFocusWorkoutId}
-               activeExerciseId={activeExerciseId} setActiveExerciseId={setActiveExerciseId}
-               activePlanIds={activePlanIds}
-             />
+         {mountedTabs.has('workout') && (
+             <div style={{ display: contentTab === 'workout' ? 'contents' : 'none' }}>
+                 <WorkoutTab 
+                  isActive={contentTab === 'workout'}
+                  setConfirmModal={setConfirmModal}
+                  t={t} theme={theme} lang={lang} language={language} programs={programs} selectedDate={selectedDate} setSelectedDate={setSelectedDate}
+                  history={history} setHistory={setHistory} setActiveTab={setActiveTab}
+                  units={units} userProfile={userProfile}
+                  tabSlideDir={tabSlideDir}
+                  activeProgramId={activeProgramId} setActiveProgramId={setActiveProgramId} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
+                   warmupVideos={warmupVideos} cooldownVideos={cooldownVideos} onOpenDetail={setGlobalDetailExercise}
+                   exerciseLibrary={exerciseLibrary} setExerciseLibrary={setExerciseLibrary}
+                   exerciseLogs={exerciseLogs} skippedExercises={skippedExercises} extraExercises={extraExercises}
+                   expandedSessions={expandedSessions} setExpandedSessions={setExpandedSessions}
+                   onSetChange={handleSetChange} onToggleSet={handleToggleSet} onSkipSet={handleSkipSet} onAddSet={handleAddSet} onAddWarmupSets={handleAddWarmupSets} onRemoveSet={handleRemoveSet}
+                   onToggleSkip={handleToggleSkip} onRemoveExtra={handleRemoveExtraEx} onRemoveProgramExercise={handleRemoveProgramExercise}
+                   isCurrentlyCompleted={isCurrentlyCompleted} onSaveWorkout={handleSaveWorkout} onCancelWorkout={handleCancelWorkout}
+                   gymProfiles={gymProfiles} activeGymId={activeGymId}
+                   onAddExtraClick={() => setActiveAddModalTarget({type: 'adhoc'})} 
+                   onAddExtraExercise={(ex) => setExtraExercises([...extraExercises, ex])}
+                   
+                   // New Global Timer Props
+                   isWorkoutActive={isWorkoutActive} setIsWorkoutActive={setIsWorkoutActive}
+                   workoutStartTime={workoutStartTime} setWorkoutStartTime={setWorkoutStartTime}
+                   restTargetTime={restTargetTime} setRestTargetTime={setRestTargetTime}
+                   isImmersiveMode={isImmersiveMode} setIsImmersiveMode={setIsImmersiveMode}
+                   sessionToRun={sessionToRun} setSessionToRun={setSessionToRun}
+                   onSessionExercises={setSessionExercises}
+                   resumeDurationSecs={resumeDurationSecs} setResumeDurationSecs={setResumeDurationSecs}
+                   showSupersetToast={showSupersetToast}
+                   
+                   // Focus
+                   focusWorkoutId={focusWorkoutId} setFocusWorkoutId={setFocusWorkoutId}
+                   activeExerciseId={activeExerciseId} setActiveExerciseId={setActiveExerciseId}
+                   activePlanIds={activePlanIds}
+                 />
+             </div>
          )}
          
-         {contentTab === 'calendar' && (
-             <CalendarTab setConfirmModal={setConfirmModal} 
-               t={t} lang={lang} theme={theme} history={history} setHistory={setHistory} programs={programs} 
-               soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} navigateToWorkoutDate={navigateToWorkoutDate} 
-               exerciseLogs={exerciseLogs} skippedExercises={skippedExercises} handleEditPastWorkout={handleEditPastWorkout}
-               sessionToRun={sessionToRun} isWorkoutActive={isWorkoutActive}
-               selectedDate={selectedDate} setSelectedDate={setSelectedDate} setActiveTab={setActiveTab}
-               weekStartDay={weekStartDay} defaultReminderTime={defaultReminderTime} reminderEnabled={reminderEnabled}
-               units={units}
-               activePlanIds={activePlanIds}
-               userProfile={userProfile}
-               logyPersona={logyPersona}
-               activityTargets={activityTargets}
-               workoutStartTime={workoutStartTime}
-             />
+         {mountedTabs.has('calendar') && (
+             <div style={{ display: contentTab === 'calendar' ? 'contents' : 'none' }}>
+                 <CalendarTab setConfirmModal={setConfirmModal} 
+                   t={t} lang={lang} theme={theme} history={history} setHistory={setHistory} programs={programs} 
+                   soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} navigateToWorkoutDate={navigateToWorkoutDate} 
+                   exerciseLogs={exerciseLogs} skippedExercises={skippedExercises} handleEditPastWorkout={handleEditPastWorkout}
+                   sessionToRun={sessionToRun} isWorkoutActive={isWorkoutActive}
+                   selectedDate={selectedDate} setSelectedDate={setSelectedDate} setActiveTab={setActiveTab}
+                   weekStartDay={weekStartDay} defaultReminderTime={defaultReminderTime} reminderEnabled={reminderEnabled}
+                   units={units}
+                   activePlanIds={activePlanIds}
+                   userProfile={userProfile}
+                   logyPersona={logyPersona}
+                   activityTargets={activityTargets}
+                   workoutStartTime={workoutStartTime}
+                   extraExercises={extraExercises}
+                   setExtraExercises={setExtraExercises}
+                 />
+             </div>
          )}
 
-         {contentTab === 'program' && (
-             <ProgramTab setConfirmModal={setConfirmModal} 
-               onPostCreated={handlePostCreated}
-               t={t} theme={theme} lang={lang} programs={programs} setPrograms={setPrograms} 
-               user={user} exerciseLibrary={exerciseLibrary} soundEnabled={soundEnabled}
-               setActiveAddModalTarget={setActiveAddModalTarget}
-               saveStateToHistory={saveStateToHistory}
-               openQuestionnaire={() => setShowQuestionnaire(true)}
-               activePlanIds={activePlanIds} setActivePlanIds={setActivePlanIds}
-               // activeGymId ikut dikirim supaya dialog "Alternatif Latihan" di editor program
-               // menyaring alat sesuai gym aktif — sama persis dengan yang dibuka dari tab Latihan.
-               gymProfiles={gymProfiles} activeGymId={activeGymId}
-               focusRoutineId={focusRoutineId} setFocusRoutineId={setFocusRoutineId}
-               activityTargets={activityTargets}
-               userApiKeys={userApiKeys}
-               keyStatuses={keyStatuses} setKeyStatuses={setKeyStatuses}
-               userProfile={userProfile} history={history}
-               setShowSettings={setShowSettings}
-               onAcceptProgram={handleAcceptAiProgram}
-               setHighlightPostId={setHighlightPostId}
-               setShowProfileModal={setShowProfileModal}
-               setProfileForceTab={setProfileForceTab}
-             />
+         {mountedTabs.has('program') && (
+             <div style={{ display: contentTab === 'program' ? 'contents' : 'none' }}>
+                 <ProgramTab setConfirmModal={setConfirmModal} 
+                   onPostCreated={handlePostCreated}
+                   t={t} theme={theme} lang={lang} programs={programs} setPrograms={setPrograms} 
+                   user={user} exerciseLibrary={exerciseLibrary} soundEnabled={soundEnabled}
+                   setActiveAddModalTarget={setActiveAddModalTarget}
+                   saveStateToHistory={saveStateToHistory}
+                   openQuestionnaire={() => setShowQuestionnaire(true)}
+                   activePlanIds={activePlanIds} setActivePlanIds={setActivePlanIds}
+                   // activeGymId ikut dikirim supaya dialog "Alternatif Latihan" di editor program
+                   // menyaring alat sesuai gym aktif — sama persis dengan yang dibuka dari tab Latihan.
+                   gymProfiles={gymProfiles} activeGymId={activeGymId}
+                   focusRoutineId={focusRoutineId} setFocusRoutineId={setFocusRoutineId}
+                   activityTargets={activityTargets}
+                   userApiKeys={userApiKeys}
+                   keyStatuses={keyStatuses} setKeyStatuses={setKeyStatuses}
+                   userProfile={userProfile} history={history}
+                   setShowSettings={setShowSettings}
+                   onAcceptProgram={handleAcceptAiProgram}
+                   setHighlightPostId={setHighlightPostId}
+                   setShowProfileModal={setShowProfileModal}
+                   setProfileForceTab={setProfileForceTab}
+                 />
+             </div>
          )}
 
-         {contentTab === 'database' && (
-             <DatabaseTab setConfirmModal={setConfirmModal} 
-                t={t} lang={lang}
-                exerciseLibrary={exerciseLibrary} setExerciseLibrary={setExerciseLibrary} 
-                history={history}
-                soundEnabled={soundEnabled}
-                warmupVideos={warmupVideos} setWarmupVideos={setWarmupVideos}
-                cooldownVideos={cooldownVideos} setCooldownVideos={setCooldownVideos}
-                onOpenDetail={setGlobalDetailExercise}
-                theme={theme}
-                gymProfiles={gymProfiles} setGymProfiles={setGymProfiles}
-                activeGymId={activeGymId} setActiveGymId={setActiveGymId}
-             />
+         {mountedTabs.has('database') && (
+             <div style={{ display: contentTab === 'database' ? 'contents' : 'none' }}>
+                 <DatabaseTab setConfirmModal={setConfirmModal} 
+                    t={t} lang={lang}
+                    exerciseLibrary={exerciseLibrary} setExerciseLibrary={setExerciseLibrary} 
+                    history={history}
+                    soundEnabled={soundEnabled}
+                    warmupVideos={warmupVideos} setWarmupVideos={setWarmupVideos}
+                    cooldownVideos={cooldownVideos} setCooldownVideos={setCooldownVideos}
+                    onOpenDetail={setGlobalDetailExercise}
+                    theme={theme}
+                    gymProfiles={gymProfiles} setGymProfiles={setGymProfiles}
+                    activeGymId={activeGymId} setActiveGymId={setActiveGymId}
+                 />
+             </div>
          )}
         </TabSlider>
       </main>

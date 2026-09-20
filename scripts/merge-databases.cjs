@@ -20,7 +20,7 @@ const pairMapping = {
   101: { edbId: 'Smith_Machine_Incline_Bench_Press', edbName: 'Smith Machine Incline Bench Press' },
   102: { edbId: 'Seated_Cable_Rows', edbName: 'Seated Cable Rows' },
   103: { edbId: 'Dumbbell_Bench_Press', edbName: 'Dumbbell Bench Press' },
-  104: { edbId: 'Cable_Seated_Lateral_Raise', edbName: 'Cable Seated Lateral Raise' },
+  104: { edbId: 'Standing_Cable_Lateral_Raise', edbName: 'Standing Cable Lateral Raise' },
   105: { edbId: 'Triceps_Pushdown', edbName: 'Triceps Pushdown' },
   106: { edbId: 'Dumbbell_Alternate_Bicep_Curl', edbName: 'Dumbbell Alternate Bicep Curl' },
   107: null, // Cardio container (Unique Master)
@@ -35,7 +35,7 @@ const pairMapping = {
   115: { edbId: 'Smith_Machine_Bench_Press', edbName: 'Smith Machine Bench Press' },
   116: { edbId: 'Cable_Rear_Delt_Fly', edbName: 'Cable Rear Delt Fly' },
   117: { edbId: 'Cable_Rope_Overhead_Triceps_Extension', edbName: 'Cable Rope Overhead Triceps Extension' },
-  118: { edbId: 'High_Cable_Curls', edbName: 'High Cable Curls' },
+  118: { edbId: 'Standing_Biceps_Cable_Curl', edbName: 'Standing Biceps Cable Curl' },
   119: { edbId: 'Split_Squat_with_Dumbbells', edbName: 'Split Squat with Dumbbells' },
   120: null, // SM Romanian Deadlift (Unique Master)
   121: { edbId: 'Pull_Through', edbName: 'Pull Through' },
