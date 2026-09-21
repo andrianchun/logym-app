@@ -13,6 +13,7 @@ import SwipeInput from '../components/SwipeInput';
 import { formatNumber, sleepHoursToParts } from '../utils/numberFormat';
 import { dailyBurnCalories, dailyActiveMinutes } from '../utils/workoutCalc';
 import { dayBmr } from '../utils/bmr';
+import { calculateBodyComposition } from '../utils/xiaomiScaleCalc';
 import { AreaChart, Area, ResponsiveContainer, YAxis, XAxis, ReferenceArea } from 'recharts';
 
 
@@ -272,6 +273,28 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
              }
          }
      }
+
+      if (latestBodyData && Number(latestBodyData.impedance) > 0 && Number(latestBodyData.weight) > 0) {
+          const profileH = Number((latestBodyData && latestBodyData.height) || fallbackHeight || userProfile?.height || userProfile?.biometrics?.height || 0);
+          const dobStr = userProfile?.dob || userProfile?.birthDate || userProfile?.biometrics?.birthDate;
+          const profileGender = userProfile?.gender || userProfile?.biometrics?.gender || 'male';
+          let profileAge = 30;
+          if (dobStr) {
+            const bDate = new Date(dobStr);
+            if (!isNaN(bDate.getTime())) {
+              const today = new Date();
+              profileAge = today.getFullYear() - bDate.getFullYear();
+              const m = today.getMonth() - bDate.getMonth();
+              if (m < 0 || (m === 0 && today.getDate() < bDate.getDate())) profileAge--;
+            }
+          }
+          if (profileH > 0 && profileAge > 0) {
+            const reComp = calculateBodyComposition(Number(latestBodyData.weight), Number(latestBodyData.impedance), profileH, profileAge, profileGender);
+            if (reComp) {
+              latestBodyData = { ...latestBodyData, ...reComp };
+            }
+          }
+      }
 
      const mergedData = {
          ...emptyBio,

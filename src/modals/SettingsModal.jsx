@@ -395,9 +395,25 @@ export default function SettingsModal({
                 <span className={`font-bold text-sm ${t.textMain}`}>Sinkron data kesehatan</span>
                 <button
                   disabled={hcConnecting}
-                  onClick={async () => {
+                  onClick={() => {
+                    if (healthConnectEnabled) {
+                      setConfirmModal({
+                        isOpen: true,
+                        title: 'Putuskan Health Connect?',
+                        message: 'Sinkronisasi otomatis langkah, tidur, detak jantung, dan sesi latihan dari/ke Health Connect akan dihentikan.',
+                        confirmText: 'Putuskan',
+                        isDestructive: true,
+                        onConfirm: async () => {
+                          setHcConnecting(true);
+                          try { await onToggleHealthConnect(); } finally { setHcConnecting(false); }
+                        }
+                      });
+                      return;
+                    }
                     setHcConnecting(true);
-                    try { await onToggleHealthConnect(); } finally { setHcConnecting(false); }
+                    (async () => {
+                      try { await onToggleHealthConnect(); } finally { setHcConnecting(false); }
+                    })();
                   }}
                   className={`shrink-0 px-4 py-1.5 rounded-full text-xs font-bold transition-all disabled:opacity-50 ${healthConnectEnabled ? `${t.bgAccent} text-white shadow-sm` : `${t.btnBg} ${t.textMuted}`}`}
                 >
@@ -408,24 +424,30 @@ export default function SettingsModal({
                 Langkah, tidur, detak jantung, berat, SpO2, dan tensi.
                 {!healthAvailable && ' Aktif di aplikasi Android — belum tersedia di browser web.'}
               </p>
-              {/* SATU tombol, bukan dua. Dulu "Sinkron Ulang Histori 30 Hari" dan "Tambal Data
-                  Bolong" terpisah, padahal yang manual sudah menjalankan keduanya berurutan —
-                  tombol kedua cuma mengulang bagian yang sama. */}
               {healthConnectEnabled && (
-                <>
-                  <button
-                    disabled={hcBackfilling}
-                    onClick={async () => {
-                      setHcBackfilling(true);
-                      try { await onHcBackfill(30); } finally { setHcBackfilling(false); }
-                    }}
-                    className={`w-full py-2.5 rounded-xl border border-dashed ${t.border} ${t.btnBg} ${t.textMain} font-bold text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50`}
-                  >
-                    {hcBackfilling ? 'Menyinkronkan...' : 'Sinkron Ulang'}
-                  </button>
+                <div className={`pt-2.5 mt-1 border-t ${t.border} space-y-2`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                      <span className="text-[11px] font-bold text-emerald-500">Sinkron Otomatis Aktif</span>
+                    </div>
+                    <button
+                      disabled={hcBackfilling}
+                      onClick={async () => {
+                        setHcBackfilling(true);
+                        try { await onHcBackfill(30); } finally { setHcBackfilling(false); }
+                      }}
+                      className={`text-[11px] font-semibold text-zinc-400 hover:${t.textAccent} transition-colors flex items-center gap-1.5 disabled:opacity-50 active:scale-95`}
+                      title="Sinkronkan ulang histori 30 hari secara manual"
+                    >
+                      <RefreshCw size={12} className={hcBackfilling ? 'animate-spin' : ''} />
+                      <span>{hcBackfilling ? 'Menyinkronkan...' : 'Sinkron Ulang'}</span>
+                    </button>
+                  </div>
                   <p className={`text-[10px] ${t.textMuted} leading-tight`}>
+                    Data otomatis diperbarui saat aplikasi dibuka dan saat sesi latihan selesai.
                   </p>
-                </>
+                </div>
               )}
             </div>
 

@@ -434,9 +434,6 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
               else if (pointWidth < 8) next = 'year';
           } else if (prev === 'year' && pointWidth > 12) next = 'month';
 
-          if (next !== prev && navigator.vibrate) {
-              try { navigator.vibrate(25); } catch(e) {}
-          }
           return next;
       });
   }, [pointWidth]);
@@ -644,9 +641,6 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
 
   const soloChartLine = (item) => {
     playSoundEffect('click', soundEnabled);
-    if (navigator.vibrate) {
-      try { navigator.vibrate(50); } catch(e) {}
-    }
     const currentActive = effectiveActiveLines.filter(it => chartDataObj.items.includes(it));
     // Jika saat ini item ini sudah satu-satunya yang aktif, kembalikan ke default (maksimal 6 item)
     if (currentActive.length === 1 && currentActive[0] === item) {

@@ -507,7 +507,7 @@ export default function App() {
       d.setDate(d.getDate() - i);
       const ymd = getLocalYMD(d);
       for (const w of history[ymd]?.workouts || []) {
-        if (w.status !== 'completed' || w.hr) continue;
+        if (w.status !== 'completed' || (w.hr?.points?.length > 0)) continue;
         let { start, end, guessed } = workoutWindow(w, ymd);
 
         // Fallback: kalau workoutWindow guessed (startedAt & timestamp hilang),
@@ -543,7 +543,7 @@ export default function App() {
           if (!day || !Array.isArray(day.workouts)) return;
           next[ymd] = {
             ...day,
-            workouts: day.workouts.map(w => (byId[w.id] && !w.hr ? { ...w, hr: byId[w.id] } : w)),
+            workouts: day.workouts.map(w => (byId[w.id] && (!w.hr || !w.hr.points || w.hr.points.length === 0) ? { ...w, hr: byId[w.id] } : w)),
           };
         });
         return next;
@@ -777,7 +777,6 @@ export default function App() {
       await hcRequestPermissions();
       await hcRequestWorkoutWritePermission();
       setHealthConnectEnabled(true);
-      handleHcBackfill(30);
     } catch (e) {
       showOtaAlert('Gagal menyambungkan Health Connect: ' + e.message);
     }
@@ -4572,7 +4571,9 @@ export default function App() {
          
          {mountedTabs.has('calendar') && (
              <div style={{ display: contentTab === 'calendar' ? 'contents' : 'none' }}>
-                 <CalendarTab setConfirmModal={setConfirmModal} 
+                 <CalendarTab 
+                   isActive={contentTab === 'calendar'}
+                   setConfirmModal={setConfirmModal} 
                    t={t} lang={lang} theme={theme} history={history} setHistory={setHistory} programs={programs} 
                    soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} navigateToWorkoutDate={navigateToWorkoutDate} 
                    exerciseLogs={exerciseLogs} skippedExercises={skippedExercises} handleEditPastWorkout={handleEditPastWorkout}

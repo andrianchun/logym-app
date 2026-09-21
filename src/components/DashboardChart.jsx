@@ -47,9 +47,6 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
 
   const soloChartMetric = (key) => {
     playSoundEffect('click', soundEnabled);
-    if (navigator.vibrate) {
-      try { navigator.vibrate(50); } catch(e) {}
-    }
     setActiveChartMetrics(prev => {
       let newMetrics;
       if (prev.length === 1 && prev[0] === key) {
@@ -265,9 +262,6 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
         else if (pointWidth < 8) next = 'year';
       } else if (prev === 'year' && pointWidth > 12) next = 'month';
 
-      if (next !== prev && navigator.vibrate) {
-        try { navigator.vibrate(25); } catch(e) {}
-      }
       return next;
     });
   }, [pointWidth]);

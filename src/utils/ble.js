@@ -341,9 +341,21 @@ export const saveMeasurement = async (reading, { setHistory, userProfile } = {})
     
     // Hitung Komposisi Tubuh jika ada data profil dan impedansi
     let comp = null;
-    if (reading.impedance > 0 && userProfile && userProfile.height > 0 && userProfile.dob && userProfile.gender) {
-        const age = new Date().getFullYear() - new Date(userProfile.dob).getFullYear();
-        comp = calculateBodyComposition(reading.weight, reading.impedance, userProfile.height, age, userProfile.gender);
+    const profileH = Number(userProfile?.height || userProfile?.biometrics?.height || 0);
+    const dobStr = userProfile?.dob || userProfile?.birthDate || userProfile?.biometrics?.birthDate;
+    const profileGender = userProfile?.gender || userProfile?.biometrics?.gender || 'male';
+    let profileAge = 30;
+    if (dobStr) {
+      const bDate = new Date(dobStr);
+      if (!isNaN(bDate.getTime())) {
+        const today = new Date();
+        profileAge = today.getFullYear() - bDate.getFullYear();
+        const m = today.getMonth() - bDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < bDate.getDate())) profileAge--;
+      }
+    }
+    if (reading.impedance > 0 && profileH > 0 && profileAge > 0) {
+      comp = calculateBodyComposition(reading.weight, reading.impedance, profileH, profileAge, profileGender);
     }
     
     // Fallback: BodyFat yang dikirim langsung (jika ada timbangan yang ngirim tanpa impedansi)

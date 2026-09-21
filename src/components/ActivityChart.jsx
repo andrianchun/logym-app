@@ -567,9 +567,6 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
 
     if (cur !== resolutionRef.current) {
       resolutionRef.current = cur;
-      if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        try { navigator.vibrate(25); } catch(e) {}
-      }
     }
     return cur;
   }, [pointWidth]);

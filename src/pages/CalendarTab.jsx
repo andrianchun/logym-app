@@ -23,7 +23,8 @@ const CalendarTab = ({
   exerciseLogs, skippedExercises, handleEditPastWorkout,
   weekStartDay = 0, defaultReminderTime = "15:00", reminderEnabled = true,
   unitSystem, setConfirmModal, activePlanIds = [], userProfile, logyPersona = 'santai', activityTargets, sessionToRun, isWorkoutActive, workoutStartTime,
-  extraExercises = [], setExtraExercises
+  extraExercises = [], setExtraExercises,
+  isActive = true
 }) => {
 
   // DURASI & KALORI SESI YANG SEDANG BERJALAN.
@@ -135,7 +136,7 @@ const CalendarTab = ({
   // kali calendarDate berubah — karena calendarDate juga di-update oleh scroll observer di
   // bawah, dan kalau effect ini ikut dengar calendarDate akan jadi tarik-menarik dengan scroll user.
   useEffect(() => {
-    if (calendarMode === 'monthly') {
+    if (isActive && calendarMode === 'monthly') {
       ensureMonthInRange(calendarDate);
       // Delay supaya render ulang monthRange (kalau diperluas oleh ensureMonthInRange) sempat
       // masuk DOM dulu sebelum kita cari elemennya untuk di-scroll.
@@ -143,7 +144,7 @@ const CalendarTab = ({
       return () => clearTimeout(timer);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [calendarMode]);
+  }, [calendarMode, isActive]);
 
   // Deteksi bulan mana yang sedang terlihat saat discroll, lalu sinkronkan ke header tahun.
   useEffect(() => {
@@ -223,9 +224,10 @@ const CalendarTab = ({
   }, []);
 
   const [weeklyBlockHeight, setWeeklyBlockHeight] = useState(168);
-  const [peekHeight, setPeekHeight] = useState(48);
+  const [peekHeight, setPeekHeight] = useState(230);
 
   useEffect(() => {
+    if (!isActive) return;
     const measure = () => {
       // +32 = padding kolom header di mode mingguan (pt-2 + pb-6) yang tidak ikut terukur
       // dari fixedHeaderRef/weeklyRulerRef sendiri.
@@ -235,22 +237,24 @@ const CalendarTab = ({
     measure();
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
-    // mingguStrip ikut jadi dependensi: jumlah baris strip berubah berarti tinggi penggarisnya
-    // berubah, dan tanpa pengukuran ulang tingginya tertinggal di nilai satu baris.
-  }, [mingguStrip]);
+  }, [mingguStrip, isActive]);
 
   // Bottom nav mengambang (fixed, tidak makan ruang layout) di atas konten — jadi peek sheet
   // perlu ekstra jarak seukuran tinggi nav supaya tombol di dalam peek tidak ketutupan olehnya.
   const [bottomNavClearance, setBottomNavClearance] = useState(90);
   useEffect(() => {
+    if (!isActive) return;
     const measure = () => {
       const nav = document.querySelector('[data-bottom-nav]');
-      if (nav) setBottomNavClearance(nav.getBoundingClientRect().height + 16);
+      if (nav) {
+        const navH = nav.getBoundingClientRect().height;
+        if (navH > 0) setBottomNavClearance(navH + 16);
+      }
     };
     measure();
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
-  }, []);
+  }, [isActive]);
 
   // --- DRAG STATE untuk bottom sheet (persis seperti AuthPage) ---
   const sheetDragStartRef = useRef({ y: 0, translate: 0 });
@@ -268,18 +272,16 @@ const CalendarTab = ({
   // Ubah peek height agar di mode bulanan hanya tersisa sedikit handle di atas bottom nav
   useEffect(() => {
     if (calendarMode !== 'monthly') return;
-    const timer = setTimeout(() => {
-      const handleH = 140; // area drag handle + sedikit isi konten (biar nggak terlalu tenggelam)
-      // Hanya menampilkan drag handle dan sedikit border di atas navigasi bawah
-      setPeekHeight(handleH + bottomNavClearance);
-    }, 50);
-    return () => clearTimeout(timer);
+    const handleH = 140; // area drag handle + sedikit isi konten (biar nggak terlalu tenggelam)
+    setPeekHeight(handleH + bottomNavClearance);
   }, [calendarMode, bottomNavClearance]);
 
   // Note: auto-switch ke weekly dihapus — mode hanya berubah lewat gesture user (toggle / drag handle).
 
   const handleSheetPointerDown = (e) => {
-    const startTranslate = calendarMode === 'monthly' ? ((sheetRef.current?.offsetHeight || 500) - peekHeight) : 0;
+    const defaultSheetH = typeof window !== 'undefined' ? Math.round(window.innerHeight * 0.7) : 500;
+    const sheetH = (sheetRef.current && sheetRef.current.offsetHeight > 0) ? sheetRef.current.offsetHeight : defaultSheetH;
+    const startTranslate = calendarMode === 'monthly' ? Math.max(0, sheetH - peekHeight) : 0;
     sheetDragStartRef.current = { y: e.clientY, translate: startTranslate };
     sheetVelocityRef.current = { lastY: e.clientY, lastT: performance.now(), v: 0 };
     setSheetDragY(startTranslate);
@@ -289,7 +291,8 @@ const CalendarTab = ({
   const handleSheetPointerMove = (e) => {
     if (sheetDragY === null) return;
     const { y, translate } = sheetDragStartRef.current;
-    const maxH = sheetRef.current?.offsetHeight || 500;
+    const defaultSheetH = typeof window !== 'undefined' ? Math.round(window.innerHeight * 0.7) : 500;
+    const maxH = (sheetRef.current && sheetRef.current.offsetHeight > 0) ? sheetRef.current.offsetHeight : defaultSheetH;
     const delta = e.clientY - y;
     setSheetDragY(Math.min(maxH, Math.max(0, translate + delta)));
 
@@ -305,7 +308,8 @@ const CalendarTab = ({
 
   const handleSheetPointerUp = () => {
     if (sheetDragY === null) return;
-    const maxH = sheetRef.current?.offsetHeight || 500;
+    const defaultSheetH = typeof window !== 'undefined' ? Math.round(window.innerHeight * 0.7) : 500;
+    const maxH = (sheetRef.current && sheetRef.current.offsetHeight > 0) ? sheetRef.current.offsetHeight : defaultSheetH;
     const { translate: startTranslate } = sheetDragStartRef.current;
     const moved = Math.abs(sheetDragY - startTranslate);
     const velocity = sheetVelocityRef.current.v; // px/ms, positif = ke bawah
@@ -1337,10 +1341,14 @@ const CalendarTab = ({
         ref={sheetRef}
         className={`no-swipe absolute inset-x-0 bottom-0 flex flex-col z-20${sheetDragY === null ? ' transition-all duration-300 ease-out' : ''}`}
         style={{
-          height: calendarMode === 'weekly' ? `calc(100% - ${(fixedHeaderRef.current?.offsetHeight || 0) + (weeklyRulerRef.current?.offsetHeight || 0) + 20}px)` : '70vh',
+          height: calendarMode === 'weekly' ? `calc(100% - ${(weeklyBlockHeight || 168) + 20}px)` : '70vh',
           transform: sheetDragY !== null
             ? `translateY(${sheetDragY}px)`
-            : `translateY(${(calendarMode === 'monthPicker' || calendarMode === 'yearPicker') ? (sheetRef.current?.offsetHeight || 1000) : (calendarMode === 'monthly' ? ((sheetRef.current?.offsetHeight || 0) - peekHeight) : 0)}px)`
+            : (calendarMode === 'monthPicker' || calendarMode === 'yearPicker')
+              ? 'translateY(100%)'
+              : calendarMode === 'monthly'
+                ? `translateY(calc(100% - ${peekHeight}px))`
+                : 'translateY(0px)'
         }}
       >
          {/* Fixed Glassmorphism Background Container */}
