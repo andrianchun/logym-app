@@ -257,3 +257,42 @@ console.log('rm10 OK', { r100x10: estimate10RM(100, 10), bulat42_5step5: roundDo
   assert.equal(rResult.rm10Best, estimate10RM(55, 10), 'rm10Best pertama kali harus sama dengan 10RM');
   console.log('10RM pertama latihan baru OK');
 }
+
+// ---- Multi-set 10RM progression test ----
+{
+  const rmSet1 = estimate10RM(30, 10);
+  const rmSet2 = estimate10RM(50, 10);
+  const rmSet3 = estimate10RM(55, 10);
+
+  assert.equal(rmSet1, 30);
+  assert.equal(rmSet2, 50);
+  assert.equal(rmSet3, 55);
+  assert.ok(rmSet2 > rmSet1, 'Set 2 harus mengungguli Set 1');
+  assert.ok(rmSet3 > rmSet2, 'Set 3 harus mengungguli Set 2');
+
+  let baseline = 0;
+  let celebrated = 0;
+
+  // Set 1: 30 kg
+  let curMax = rmSet1;
+  let isFirst = curMax > 0 && baseline === 0;
+  assert.ok(isFirst, 'Set 1 memicu rekor pertama');
+  if (curMax > celebrated) celebrated = curMax;
+  assert.equal(celebrated, 30);
+
+  // Set 2: 50 kg
+  curMax = Math.max(curMax, rmSet2);
+  let isProgress = celebrated > 0 && curMax > celebrated;
+  assert.ok(isProgress, 'Set 2 harus memicu selebrasi Rekor Baru (mengalahkan Set 1)');
+  if (curMax > celebrated) celebrated = curMax;
+  assert.equal(celebrated, 50);
+
+  // Set 3: 55 kg
+  curMax = Math.max(curMax, rmSet3);
+  isProgress = celebrated > 0 && curMax > celebrated;
+  assert.ok(isProgress, 'Set 3 harus memicu selebrasi Rekor Baru (mengalahkan Set 2)');
+  if (curMax > celebrated) celebrated = curMax;
+  assert.equal(celebrated, 55);
+
+  console.log('multi-set 10RM progression OK');
+}

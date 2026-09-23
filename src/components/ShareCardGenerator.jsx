@@ -773,7 +773,9 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                                             <span className="text-[9px] text-white/70 mb-0 font-bold uppercase tracking-wider">Body Fat</span>
                                             <div className="flex items-baseline space-x-1">
                                                 <span className="text-xl font-black text-white leading-tight">{formatNumber(bioData.bodyFat) || '-'} <span className="text-[8px] font-normal text-white/50">%</span></span>
-                                                <span className={`text-[9px] font-bold ${bioData.bodyFatStatus === 'Normal' ? 'text-emerald-500' : bioData.bodyFatStatus === 'Overfat' ? 'text-amber-400' : bioData.bodyFatStatus === 'Obese' ? 'text-rose-500' : 'text-blue-400'}`}>{bioData.bodyFatStatus}</span>
+                                                <span className={`text-[9px] font-bold ${bioData.bodyFatStatus === 'Normal' ? 'text-emerald-500' : (bioData.bodyFatStatus === 'Tinggi' || bioData.bodyFatStatus === 'Overfat') ? 'text-amber-400' : (bioData.bodyFatStatus === 'Sangat Tinggi' || bioData.bodyFatStatus === 'Obese') ? 'text-rose-500' : 'text-blue-400'}`}>
+                                                    {bioData.bodyFatStatus === 'Obese' ? 'Sangat Tinggi' : bioData.bodyFatStatus === 'Overfat' ? 'Tinggi' : bioData.bodyFatStatus}
+                                                </span>
                                             </div>
                                         </div>
 

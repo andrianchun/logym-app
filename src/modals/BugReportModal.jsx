@@ -83,7 +83,7 @@ export default function BugReportModal({ showModal, setShowModal, user }) {
     };
 
     return (
-        <div className="fixed inset-0 z-[1000] flex flex-col bg-black/90 sm:bg-black/60 sm:items-center sm:justify-center animate-in fade-in duration-200 overscroll-contain">
+        <div className="fixed inset-0 z-[1000] flex flex-col bg-black/90 sm:bg-black/60 sm:items-center sm:justify-center animate-in fade-in duration-200 overscroll-contain touch-none">
             <div className="w-full h-full sm:h-auto sm:max-h-[85vh] sm:max-w-md bg-neutral-900 sm:rounded-3xl shadow-2xl flex flex-col relative overflow-hidden">
                 {/* Header with Safe Area Top Padding */}
                 <div 

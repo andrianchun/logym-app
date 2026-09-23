@@ -19,10 +19,7 @@ const TOP_N = 500;
 
 // Nama latihan -> id dokumen. Firestore melarang '/' di id dan menolak id kosong; sisanya
 // dinormalkan supaya "Bench Press", "bench press ", dan "Bench  Press" jadi satu baris.
-export const exerciseSlug = (name) => {
-  const s = String(name || '').trim().toLowerCase().replace(/\s+/g, ' ').replace(/\//g, '-');
-  return s.slice(0, 300);
-};
+export { exerciseSlug } from './exerciseSearch.js';
 
 /**
  * Tambah hitungan pemakaian untuk latihan-latihan sebuah sesi yang baru selesai.

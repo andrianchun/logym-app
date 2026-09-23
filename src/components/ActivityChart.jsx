@@ -132,10 +132,9 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
 
       const dayWeight = Number(userWeight) || 70;
       const targetSteps = activityTargets?.steps || null;
-      // Target durasi HARIAN diturunkan dari target mingguan dengan pembagi yang sama dengan
-      // kartu Durasi Aktif (5 hari latihan seminggu) — kalau beda, garis di grafik tidak akan
-      // cocok dengan angka target di kartunya.
-      const targetActive = activityTargets?.dailyActiveMinutes || (activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 5) : null);
+      // Target durasi HARIAN diturunkan dari target mingguan (WHO) dibagi 7 hari.
+      // Fallback ke dailyActiveMinutes lama untuk backward compat.
+      const targetActive = activityTargets?.weeklyActiveMinutes ? Math.round(activityTargets.weeklyActiveMinutes / 7) : (activityTargets?.dailyActiveMinutes || null);
       const targetSleepH = activityTargets?.sleep || null;
       const targetBurn = activityTargets?.activityCalories || null;
 
@@ -1002,45 +1001,134 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
                                         {title}
                                     </div>
 
-                                    {activeMetric === 'sleep' && p.sleep > 0 && (
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '6px', paddingBottom: '4px', borderBottom: `1px solid ${theme === 'dark' ? '#27272a' : '#e4e4e7'}` }}>
-                                            <span style={{ color: theme === 'dark' ? '#c4b5fd' : '#7c3aed' }}>Total Tidur :</span>
-                                            <span style={{ color: theme === 'dark' ? '#f4f4f5' : '#18181b' }}>{formatSleepDuration(p.sleep)}</span>
-                                        </div>
-                                    )}
-
-                                    {payload.map((item, idx) => {
-                                        const k = item.dataKey;
-                                        if (!k || item.value == null || item.value === 0) return null;
-                                        if (k === 'sleepTotalOnly' && (p.sleepDeepH || p.sleepLightH || p.sleepRemH)) return null;
-
-                                        let formattedVal = '';
-                                        let label = item.name;
-                                        if (k === 'sleep' || k.startsWith('sleep')) {
-                                            formattedVal = formatSleepDuration(item.value);
-                                        } else if (k === 'targetSleep') {
-                                            formattedVal = formatSleepDuration(item.value);
-                                            label = 'Target';
-                                        } else if (k.startsWith('target')) {
-                                            formattedVal = `${formatNumber(item.value, language)}${k === 'targetActiveMinutes' ? ' m' : k === 'targetSteps' ? '' : ' kcal'}`;
-                                            label = 'Target';
+                                    {/* 1. TARGET DI PALING ATAS */}
+                                    {(() => {
+                                        const targetItem = payload.find(item => item.dataKey && item.dataKey.startsWith('target') && item.value != null && item.value > 0);
+                                        if (!targetItem) return null;
+                                        const k = targetItem.dataKey;
+                                        let targetFormatted = '';
+                                        if (k === 'targetSleep') {
+                                            targetFormatted = formatSleepDuration(targetItem.value);
+                                        } else if (k === 'targetActiveMinutes') {
+                                            targetFormatted = `${formatNumber(targetItem.value, language)} m`;
+                                        } else if (k === 'targetCalories') {
+                                            targetFormatted = `${formatNumber(targetItem.value, language)} kcal`;
                                         } else {
-                                            let unit = '';
-                                            if (k === 'nutritionCalories' || k === 'activityCalories' || k.startsWith('cal')) unit = ' kcal';
-                                            else if (k === 'activeMinutes' || k.startsWith('act')) unit = ' m';
-                                            else if (k === 'energyScore') unit = ' / 100';
-                                            formattedVal = `${formatNumber(item.value, language)}${unit}`;
+                                            targetFormatted = `${formatNumber(targetItem.value, language)}`;
                                         }
 
-                                        const color = item.color || item.fill || (theme === 'dark' ? '#f4f4f5' : '#18181b');
-
                                         return (
-                                            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginTop: '3px' }}>
-                                                <span style={{ color }}>{label} :</span>
-                                                <span style={{ color: theme === 'dark' ? '#f4f4f5' : '#18181b' }}>{formattedVal}</span>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '6px', paddingBottom: '4px', borderBottom: `1px solid ${theme === 'dark' ? '#27272a' : '#e4e4e7'}` }}>
+                                                <span style={{ color: TARGET_COLOR(theme) }}>Target :</span>
+                                                <span style={{ color: theme === 'dark' ? '#f4f4f5' : '#18181b', fontWeight: 'bold' }}>{targetFormatted}</span>
                                             </div>
                                         );
-                                    })}
+                                    })()}
+
+                                    {/* 2. KONTEN METRIK AKTIF */}
+                                    {activeMetric === 'calories' ? (
+                                        <>
+                                            {/* Kalori Masuk (Nutrisi) */}
+                                            {p.nutritionCalories != null && p.nutritionCalories > 0 && (
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginTop: '3px' }}>
+                                                    <span style={{ color: theme === 'dark' ? '#34d399' : '#059669' }}>Masuk :</span>
+                                                    <span style={{ color: theme === 'dark' ? '#f4f4f5' : '#18181b' }}>{formatNumber(p.nutritionCalories, language)} kcal</span>
+                                                </div>
+                                            )}
+
+                                            {/* Total Dibakar */}
+                                            {(() => {
+                                                const totalBurn = p.activityCalories != null && p.activityCalories > 0
+                                                    ? p.activityCalories
+                                                    : ((p.calBmr || 0) + (p.calSteps || 0) + (p.calCardio || 0) + (p.calWeights || 0));
+
+                                                if (!totalBurn || totalBurn <= 0) return null;
+
+                                                const burnSubItems = [
+                                                    { label: 'BMR', val: p.calBmr, color: theme === 'dark' ? '#3b82f6' : '#2563eb' },
+                                                    { label: 'Langkah', val: p.calSteps, color: theme === 'dark' ? '#818cf8' : '#6366f1' },
+                                                    { label: 'Kardio', val: p.calCardio, color: theme === 'dark' ? '#9ca3af' : '#6b7280' },
+                                                    { label: 'Beban', val: p.calWeights, color: theme === 'dark' ? '#38bdf8' : '#0369a1' },
+                                                ].filter(item => item.val != null && item.val > 0);
+
+                                                return (
+                                                    <>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginTop: '4px', paddingTop: (p.nutritionCalories != null && p.nutritionCalories > 0) ? '4px' : '0px', borderTop: (p.nutritionCalories != null && p.nutritionCalories > 0) ? `1px dashed ${theme === 'dark' ? '#27272a' : '#e4e4e7'}` : 'none' }}>
+                                                            <span style={{ color: theme === 'dark' ? '#818cf8' : '#4f46e5', fontWeight: '900' }}>Dibakar :</span>
+                                                            <span style={{ color: theme === 'dark' ? '#f4f4f5' : '#18181b', fontWeight: '900' }}>{formatNumber(totalBurn, language)} kcal</span>
+                                                        </div>
+                                                        {burnSubItems.map((sub, sIdx) => (
+                                                            <div key={sIdx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginTop: '2px', paddingLeft: '8px', fontSize: '10px' }}>
+                                                                <span style={{ color: sub.color }}>• {sub.label} :</span>
+                                                                <span style={{ color: theme === 'dark' ? '#d4d4d8' : '#3f3f46' }}>{formatNumber(sub.val, language)} kcal</span>
+                                                            </div>
+                                                        ))}
+                                                    </>
+                                                );
+                                            })()}
+                                        </>
+                                    ) : activeMetric === 'activeMinutes' ? (
+                                        <>
+                                            {p.activeMinutes != null && p.activeMinutes > 0 && (
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginTop: '3px' }}>
+                                                    <span style={{ color: theme === 'dark' ? '#3b82f6' : '#1d4ed8', fontWeight: '900' }}>Durasi Aktif :</span>
+                                                    <span style={{ color: theme === 'dark' ? '#f4f4f5' : '#18181b', fontWeight: '900' }}>{formatNumber(p.activeMinutes, language)} m</span>
+                                                </div>
+                                            )}
+                                            {(() => {
+                                                const actSubItems = [
+                                                    { label: 'Langkah', val: p.actSteps, color: theme === 'dark' ? '#818cf8' : '#6366f1' },
+                                                    { label: 'Manual', val: p.actManual, color: theme === 'dark' ? '#a1a1aa' : '#71717a' },
+                                                    { label: 'Kardio', val: p.actCardio, color: theme === 'dark' ? '#9ca3af' : '#6b7280' },
+                                                    { label: 'Beban', val: p.actWeights, color: theme === 'dark' ? '#38bdf8' : '#0369a1' },
+                                                ].filter(item => item.val != null && item.val > 0);
+
+                                                return actSubItems.map((sub, sIdx) => (
+                                                    <div key={sIdx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginTop: '2px', paddingLeft: '8px', fontSize: '10px' }}>
+                                                        <span style={{ color: sub.color }}>• {sub.label} :</span>
+                                                        <span style={{ color: theme === 'dark' ? '#d4d4d8' : '#3f3f46' }}>{formatNumber(sub.val, language)} m</span>
+                                                    </div>
+                                                ));
+                                            })()}
+                                        </>
+                                    ) : activeMetric === 'sleep' ? (
+                                        <>
+                                            {p.sleep != null && p.sleep > 0 && (
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginTop: '3px' }}>
+                                                    <span style={{ color: theme === 'dark' ? '#c4b5fd' : '#7c3aed', fontWeight: '900' }}>Total Tidur :</span>
+                                                    <span style={{ color: theme === 'dark' ? '#f4f4f5' : '#18181b', fontWeight: '900' }}>{formatSleepDuration(p.sleep)}</span>
+                                                </div>
+                                            )}
+                                            {(() => {
+                                                const sleepSubItems = [
+                                                    { label: 'Deep', val: p.sleepDeepH, color: theme === 'dark' ? '#8b5cf6' : '#7c3aed' },
+                                                    { label: 'Light', val: p.sleepLightH, color: theme === 'dark' ? '#818cf8' : '#6366f1' },
+                                                    { label: 'REM', val: p.sleepRemH, color: theme === 'dark' ? '#38bdf8' : '#0284c7' },
+                                                    { label: 'Bangun', val: p.sleepAwakeH, color: theme === 'dark' ? '#9ca3af' : '#6b7280' },
+                                                ].filter(item => item.val != null && item.val > 0);
+
+                                                return sleepSubItems.map((sub, sIdx) => (
+                                                    <div key={sIdx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginTop: '2px', paddingLeft: '8px', fontSize: '10px' }}>
+                                                        <span style={{ color: sub.color }}>• {sub.label} :</span>
+                                                        <span style={{ color: theme === 'dark' ? '#d4d4d8' : '#3f3f46' }}>{formatSleepDuration(sub.val)}</span>
+                                                    </div>
+                                                ));
+                                            })()}
+                                        </>
+                                    ) : (
+                                        payload.map((item, idx) => {
+                                            const k = item.dataKey;
+                                            if (!k || item.value == null || item.value === 0 || k.startsWith('target')) return null;
+                                            let unit = '';
+                                            if (k === 'energyScore') unit = ' / 100';
+                                            return (
+                                                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginTop: '3px' }}>
+                                                    <span style={{ color: item.color || item.fill || (theme === 'dark' ? '#f4f4f5' : '#18181b') }}>{item.name} :</span>
+                                                    <span style={{ color: theme === 'dark' ? '#f4f4f5' : '#18181b' }}>{formatNumber(item.value, language)}{unit}</span>
+                                                </div>
+                                            );
+                                        })
+                                    )}
                                 </div>
                             );
                         }}

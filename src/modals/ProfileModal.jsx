@@ -546,9 +546,9 @@ export default function ProfileModal({
             Ditaruh di luar wrapper utama (z-[100]) karena tiap fixed+z-index bikin stacking context
             sendiri — z-[200] di dalam wrapper z-[100] tetap kalah dari sibling lain yang z-[110]. */}
         {cropSourceUrl && (
-            <div className="fixed inset-0 z-[200] flex flex-col bg-black animate-in fade-in duration-150">
+            <div className="fixed inset-0 z-[200] flex flex-col bg-black animate-in fade-in duration-150 overscroll-contain touch-none">
                 <div className="flex items-center justify-between px-4 py-3 text-white shrink-0">
-                    <button onClick={closeCropper} disabled={isUploading} className="p-2 -ml-2 disabled:opacity-40">
+                    <button data-close-modal="true" onClick={closeCropper} disabled={isUploading} className="p-2 -ml-2 disabled:opacity-40">
                         <X size={22} />
                     </button>
                     <h3 className="font-black text-sm">Atur Foto Profil</h3>
@@ -794,8 +794,8 @@ export default function ProfileModal({
 
         {/* Achievement Details Modal */}
         {selectedAchievement && (
-            <div className="fixed inset-0 z-[120] bg-black/60 flex items-end sm:items-center justify-center sm:p-4 pb-16 animate-in fade-in duration-200 overscroll-contain" onClick={() => setSelectedAchievement(null)}>
-                <div className={`w-full max-w-sm rounded-t-3xl sm:rounded-3xl p-6 ${isDark ? 'bg-slate-900 border border-white/10' : 'bg-white'} shadow-2xl animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-0 sm:zoom-in-95`} onClick={e => e.stopPropagation()}>
+            <div className="fixed inset-0 z-[120] bg-black/60 flex items-end sm:items-center justify-center sm:p-4 pb-16 animate-in fade-in duration-200 overscroll-contain touch-none" onClick={() => setSelectedAchievement(null)}>
+                <div className={`w-full max-w-sm rounded-t-3xl sm:rounded-3xl p-6 ${isDark ? 'bg-slate-900 border border-white/10' : 'bg-white'} shadow-2xl animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-0 sm:zoom-in-95 overscroll-contain`} onClick={e => e.stopPropagation()}>
                     <div className="flex justify-end mb-2">
                         <button onClick={() => setSelectedAchievement(null)} className={`p-1.5 rounded-full ${isDark ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-black/5 hover:bg-black/10 text-black'} transition-colors`} data-close-modal="true">
                             <X size={18}/>

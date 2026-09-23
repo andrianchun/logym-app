@@ -4,7 +4,7 @@ import { Plus, Snowflake, Play, CalendarDays, X, CheckCircle, ChevronDown, Chevr
 import { fetchExercisesFromApi } from '../utils/exerciseDbApi';
 import { shareWorkoutToFeed } from '../utils/communityApi';
 import { normalizeMuscleKey, resolveProjectedProgramId, getDayWorkouts, defaultMasterExercises, findMatchingMasterExercise, canonicalizeExercise } from '../data/constants';
-import { estimate10RM, defaultSetWeight, gymStepFor, getEquipmentConfig, calculateActualWeight, calculateInputWeight, getSetActualWeight, rm10Series, buildExLookupByName, canonicalExId } from '../utils/workoutCalc';
+import { estimate10RM, defaultSetWeight, gymStepFor, getEquipmentConfig, calculateActualWeight, calculateInputWeight, getSetActualWeight, rm10Series, buildExLookupByName, canonicalExId, calculateProgressiveOverloadTarget } from '../utils/workoutCalc';
 
 // Import Komponen Pecahan
 import WorkoutHeader from '../components/WorkoutHeader';
@@ -65,6 +65,7 @@ const WorkoutTab = ({
   const [pendingProgId, setPendingProgId] = useState(null);
   const isDark = theme === 'dark' || (t?.bgApp?.includes('dark') ?? true);
   const { dialog, showAlert } = useDialog(isDark);
+  const isSwitchingSessionRef = React.useRef(false);
 
   const getLocalYMD = (d) => {
     const offset = d.getTimezoneOffset();
@@ -167,9 +168,30 @@ const WorkoutTab = ({
     return sessionToRun === 'extra' ? [] : activeProgramsList.filter(p => p.workoutId === sessionToRun || p.id === sessionToRun);
   }, [sessionToRun, activeProgramsList]);
 
+  const activeProgramExIds = useMemo(() => {
+    const set = new Set();
+    activeProgramsList.forEach(p => {
+      (p.exercises || []).forEach(e => {
+        if (e.name) set.add(e.name.toLowerCase().trim());
+        if (e.id) set.add(String(e.id).split('-')[0]);
+        if (e.originalId) set.add(String(e.originalId).split('-')[0]);
+      });
+    });
+    return set;
+  }, [activeProgramsList]);
+
+  const displayExtraExercises = useMemo(() => {
+    return (extraExercises || []).filter(ex => {
+      if (!ex) return false;
+      const name = (ex.name || '').toLowerCase().trim();
+      const baseId = String(ex.originalId || ex.id || '').split('-')[0];
+      return !activeProgramExIds.has(name) && (!baseId || !activeProgramExIds.has(baseId));
+    });
+  }, [extraExercises, activeProgramExIds]);
+
   const sessionExtras = useMemo(() => {
-    return sessionToRun === 'extra' ? extraExercises : [];
-  }, [sessionToRun, extraExercises]);
+    return sessionToRun === 'extra' ? displayExtraExercises : [];
+  }, [sessionToRun, displayExtraExercises]);
 
   const sessionExercises = useMemo(() => {
     return [...sessionPrograms.flatMap(p => p.exercises || []), ...sessionExtras]
@@ -229,7 +251,7 @@ const WorkoutTab = ({
   const scrollToFirstIncompleteExercise = (wId, ignoreExId = null, instant = false) => {
     let targetExId = null;
     let forceScroll = false;
-    let list = wId === 'extra' ? extraExercises : activeProgramsList.find(p => p.workoutId === wId || p.id === wId)?.exercises;
+    let list = wId === 'extra' ? displayExtraExercises : activeProgramsList.find(p => p.workoutId === wId || p.id === wId)?.exercises;
     if (list) {
       let startIndex = 0;
       if (ignoreExId) {
@@ -313,8 +335,8 @@ const WorkoutTab = ({
       }
       setExpandedSessions({ [targetWorkoutId]: true });
       setTimeout(() => {
-        scrollToFirstIncompleteExercise(targetWorkoutId);
-      }, 150);
+        scrollToFirstIncompleteExercise(targetWorkoutId, null, true);
+      }, 50);
       setScrolledTargets(prev => ({ ...prev, [focusWorkoutId]: true }));
       hasAutoExpanded.current = true;
     } else if (activeProgramsList.length > 0 && Object.keys(expandedSessions || {}).length === 0 && !hasAutoExpanded.current) {
@@ -551,19 +573,7 @@ const WorkoutTab = ({
     }));
   };
 
-    // Kelompok otot besar (compound lift: dada/punggung/paha) bisa toleransi lompatan
-    // beban lebih besar; otot kecil/isolasi (lengan, bahu isolasi, betis, core) lebih
-    // sensitif ke perubahan beban jadi lompatannya lebih halus — pola umum yang dipakai
-    // banyak program strength training (linear progression compound vs isolasi).
-    const LARGE_MUSCLE_GROUPS = new Set(['chest', 'upper-back', 'lower-back', 'quadriceps', 'hamstring', 'gluteal']);
-    const getSuggestedIncrement = (exItem, lastWeight, isImp) => {
-        const targets = Array.isArray(exItem?.target) ? exItem.target : [exItem?.target];
-        const isLarge = targets.some(t => LARGE_MUSCLE_GROUPS.has(normalizeMuscleKey(t)));
-        const flatStep = isImp ? (isLarge ? 5 : 2.5) : (isLarge ? 2.5 : 1.25);
-        const roundTo = flatStep;
-        const pctStep = lastWeight > 0 ? Math.round((lastWeight * 0.025) / roundTo) * roundTo : 0;
-        return Math.max(flatStep, pctStep);
-    };
+
 
     const historicalStatsRef = React.useRef({});
 
@@ -583,18 +593,16 @@ const WorkoutTab = ({
       if (!exItem || !exerciseLibrary || exItem.type === 'time' || exItem.type === 'cardio' || exItem.target?.includes('Cardio')) return null;
 
       if (!historicalStatsRef.current[exItem.id]) {
-        // DUA angka, bukan satu. `best10RM` = rekor sepanjang masa (acuan "rekor baru dipecahkan"),
-        // `last10RM` = 10RM sesi TERAKHIR (acuan beban hari ini, dan boleh turun kalau user deload
-        // atau mengoreksi salah ketik 100 kg jadi 10 kg). Dulu keduanya satu variabel bernilai
-        // maksimum seumur hidup, jadi 10RM tidak pernah bisa turun.
-        //
-        // rm10Series = rumus yang sama dengan grafik progres & rekor pustaka, termasuk actual
-        // weight (total_w). Salinan lokal di sini dulu memakai `s.w` mentah, jadi beban barbel
-        // 80 kg + bar 20 kg dihitung sebagai 80.
+        // DUA angka, bukan satu. `best10RM` = rekor sepanjang masa sebelum sesi ini dimulai
+        // (acuan "rekor baru dipecahkan"), `last10RM` = 10RM sesi TERAKHIR (acuan beban hari ini).
         const seri = rm10Series(history, canonicalExId(exItem.name), rmLookup);
         const terakhir = seri[seri.length - 1];
+        const histBest = seri.reduce((m, p) => Math.max(m, p.rm10), 0);
+        const libMatch = exerciseLibrary?.find(e => e.id === exItem.originalId || e.id === exItem.id
+          || e.name?.toLowerCase() === exItem.name?.toLowerCase());
+        const libBest = Number(libMatch?.rm10Best) || 0;
         historicalStatsRef.current[exItem.id] = {
-          best10RM: seri.reduce((m, p) => Math.max(m, p.rm10), 0),
+          best10RM: Math.max(histBest, libBest),
           last10RM: terakhir?.rm10 || 0,
           lastSessionWeight: terakhir?.weight || 0,
           lastSessionReps: terakhir?.reps || 0,
@@ -604,16 +612,15 @@ const WorkoutTab = ({
       let { best10RM, last10RM, lastSessionWeight, lastSessionReps } = historicalStatsRef.current[exItem.id];
 
 
-      // 2. Scan current session — pakai beban AKTUAL, sama seperti riwayat di atas. Kalau di sini
-      // `s.w` mentah sementara rekornya dari total_w, barbel 80 kg + bar 20 kg selalu kalah dari
-      // rekornya sendiri dan badge REKOR BARU tidak pernah muncul untuk alat berbasis bar.
+      // 2. Scan current session — pakai beban AKTUAL. Abaikan set pemanasan (warmup)
+      // agar tidak prematur memicu acuan 10RM pada beban ringan.
       let currentMax10RM = 0;
       let currentMaxWeight = 0;
       let currentMaxReps = 0;
       const eqConfNow = getEquipmentConfig(gymProfiles, activeGymId, exItem, userProfile);
       const currentLogs = getSetLogs(exItem) || exerciseLogs[exItem.id] || [];
       currentLogs.forEach(s => {
-        if (s.done && !s.skipped && (Number(s.w) > 0 || Number(s.total_w) > 0) && s.r > 0) {
+        if (s.done && !s.skipped && s.type !== 'warmup' && (Number(s.w) > 0 || Number(s.total_w) > 0) && s.r > 0) {
           const actW = getSetActualWeight(s, eqConfNow);
           const c10RM = estimate10RM(actW, s.r);
           if (c10RM > currentMax10RM) {
@@ -625,20 +632,13 @@ const WorkoutTab = ({
       });
 
       // rm10 dibaca dari PUSTAKA, bukan dari exItem. exItem adalah salinan beku yang dibuat saat
-      // latihan ditambahkan ke program — dengan id UUID baru — dan tidak ada satu pun kode yang
-      // pernah menulis rm10 ke sana. Jadi exItem.rm10 praktis selalu 0, dan 10RM yang disimpan
-      // manual lewat ExerciseDetailModal tidak pernah sampai ke tombol otak biru.
+      // latihan ditambahkan ke program — dengan id UUID baru.
       const libEx = exerciseLibrary?.find(e => e.id === exItem.originalId || e.id === exItem.id
         || e.name?.toLowerCase() === exItem.name?.toLowerCase());
       const stored10RM = Number(libEx?.rm10 ?? exItem.rm10) || 0;
 
-      // Acuan REKOR = yang tertinggi sepanjang masa. Acuan BEBAN HARI INI = sesi terakhir (atau
-      // override manual dari kalkulator 10RM kalau riwayatnya belum ada).
-      //
-      // stored10RM SENGAJA tidak ikut ke acuan rekor. Nilainya ditulis ulang tiap sesi disimpan,
-      // jadi begitu ia ikut dibandingkan, rekornya selalu terlihat "sudah pernah dicapai" dan
-      // badge REKOR BARU tidak pernah muncul.
-      const record10RM = Math.max(best10RM, Number(libEx?.rm10Best) || 0);
+      // Acuan REKOR = best10RM yang dibekukan dari sebelum sesi dimulai (tidak bermutasi di tengah sesi)
+      const record10RM = best10RM;
       const true10RM = last10RM > 0 ? last10RM : (stored10RM > 0 ? stored10RM : currentMax10RM);
       const isNewRecord = currentMax10RM > record10RM && record10RM > 0;
       const isFirstRecord = currentMax10RM > 0 && record10RM === 0;
@@ -697,6 +697,7 @@ const WorkoutTab = ({
           lastSession: lastSessionWeight > 0 ? formatRefWeight(lastSessionWeight, lastSessionReps) : null,
           message: `Luar biasa! Kamu berhasil memecahkan rekor 10RM baru. Terus pertahankan progres luar biasa ini!`,
           rm10: `${currentMax10RM} ${uStr}`,
+          rm10Number: currentMax10RM,
           rm10Detail: formatSubTotal(currentMax10RM),
           hasWeightDiff,
           mode: 'praise',
@@ -708,8 +709,15 @@ const WorkoutTab = ({
       }
 
       if (isFirstRecord) {
+        const alreadyCelebrated = (typeof window !== 'undefined' && window.logymCelebrated10RM?.[exItem.id]) || 0;
+        const isProgressRecord = alreadyCelebrated > 0 && currentMax10RM > alreadyCelebrated;
+        const titleText = isProgressRecord ? "Rekor Baru!" : "10RM Pertama Tercatat";
+        const messageText = isProgressRecord
+          ? `Luar biasa! Kamu berhasil memecahkan rekor 10RM baru. Terus pertahankan progres luar biasa ini!`
+          : `Keren! 10RM acuan pertamamu berhasil tercatat. Angka ini otomatis menjadi target acuan progresifmu untuk sesi latihan berikutnya.`;
+
         return {
-          title: "10RM Pertama Tercatat",
+          title: titleText,
           targetWeightNumber: hasWeightDiff ? calculateInputWeight(currentMaxWeight, eqConfNow) : currentMaxWeight,
           targetRepsNumber: currentMaxReps,
           weightUnit: uStr,
@@ -717,15 +725,18 @@ const WorkoutTab = ({
           target: formatHeroTarget(currentMaxWeight, currentMaxReps),
           targetDetail: formatSubTotal(currentMaxWeight),
           lastSession: null,
-          message: `Keren! 10RM acuan pertamamu berhasil tercatat. Angka ini otomatis menjadi target acuan progresifmu untuk sesi latihan berikutnya.`,
+          message: messageText,
           rm10: `${currentMax10RM} ${uStr}`,
+          rm10Number: currentMax10RM,
           rm10Detail: formatSubTotal(currentMax10RM),
           hasWeightDiff,
           mode: 'praise',
           isNewRecord: true,
           benchmark: formatHeroTarget(currentMaxWeight, currentMaxReps),
           benchmarkDetail: formatSubTotal(currentMaxWeight),
-          text: `Keren! 10RM acuan pertamamu berhasil tercatat: ${currentMax10RM} ${uStr} (${currentMaxWeight} ${uStr} x ${currentMaxReps} Reps).\n\nAngka ini otomatis menjadi target acuan progresifmu untuk sesi latihan berikutnya!`
+          text: isProgressRecord
+            ? `Mantap! Kamu baru saja buat rekor 10RM baru: ${currentMax10RM} ${uStr} (${currentMaxWeight} ${uStr} x ${currentMaxReps} Reps)!\n\nLanjutkan kerja kerasnya!`
+            : `Keren! 10RM acuan pertamamu berhasil tercatat: ${currentMax10RM} ${uStr} (${currentMaxWeight} ${uStr} x ${currentMaxReps} Reps).\n\nAngka ini otomatis menjadi target acuan progresifmu untuk sesi latihan berikutnya!`
         };
       }
       
@@ -781,49 +792,24 @@ const WorkoutTab = ({
 
       if (hasLastSession) {
         const targetReps = exItem.reps || 10;
-        const reachedTarget = lastSessionReps >= targetReps;
-        const step = getSuggestedIncrement(exItem, lastSessionWeight, isImp);
-        const microStep = Math.round((step / 2) * 100) / 100;
-
-        let missionText = "";
+        const equipStep = Number(eqConfNow?.increment) || gymStepFor(gymProfiles, activeGymId, exItem?.equipment, isImp) || (isImp ? 5 : 2.5);
         const goal = userProfile?.goal || 'muscle_gain';
         const exp = userProfile?.experience || 'beginner';
-        const inc = exp === 'advanced' ? microStep : step;
-        
-        if (goal === 'fat_loss') {
-           missionText = `Saat defisit kalori, prioritaskan menjaga massa otot. Angkat beban yang sama dengan form solid, jangan memaksakan jika tubuh kurang fit.`;
-        } else if (goal === 'strength') {
-           if (reachedTarget) {
-             missionText = `Target kekuatan tercapai! Saatnya naik beban hari ini. Tetap jaga stabilitas form.`;
-           } else {
-             missionText = `Fokus pada adaptasi kekuatan. Coba naikkan beban hari ini, repetisi boleh sedikit turun.`;
-           }
-        } else if (goal === 'general') {
-           if (reachedTarget) {
-             missionText = `Stamina sangat bagus di sesi sebelumnya! Kamu bisa coba naikkan beban bertahap (+${step} ${uStr}) jika merasa fit.`;
-           } else {
-             missionText = `Ulangi beban ini dengan ritme yang stabil dan nyaman. Nikmati prosesnya!`;
-           }
-        } else {
-           // muscle_gain / Default
-           if (reachedTarget) {
-             if (exp === 'beginner') {
-               missionText = `Target repetisi tembus! Fase perkembangan otot pemula sangat cepat, saatnya naik beban (+${step} ${uStr}) hari ini.`;
-             } else if (exp === 'advanced') {
-               missionText = `Target repetisi tercapai! Coba microload (+${microStep} ${uStr}) atau perlambat tempo eksentrik sebelum melompat beban.`;
-             } else {
-               missionText = `Target repetisi tembus! Saatnya naik beban (+${step} ${uStr}) hari ini, repetisi boleh sedikit turun.`;
-             }
-           } else {
-             missionText = `Fokus tambah repetisi dengan beban yang sama sampai menembus target ${targetReps} reps!`;
-           }
-        }
-        
-        // TARGET HARI INI:
-        // Jika target repetisi sesi lalu tercapai, naikkan beban progresif (+inc).
-        // Jika belum tercapai, pertahankan beban dan kejar targetReps.
-        const targetWeight = reachedTarget ? (lastSessionWeight + inc) : lastSessionWeight;
-        const displayTargetReps = targetReps;
+
+        const overloadPlan = calculateProgressiveOverloadTarget({
+          lastSessionWeight,
+          lastSessionReps,
+          targetReps,
+          equipStep,
+          ratio: eqConfNow?.ratio || 1,
+          goal,
+          experience: exp,
+          isImperial: isImp,
+        });
+
+        const targetWeight = overloadPlan.targetWeight;
+        const displayTargetReps = overloadPlan.targetReps;
+        const missionText = overloadPlan.message;
         
         return {
           title: "Target Hari Ini",
@@ -929,17 +915,17 @@ const WorkoutTab = ({
     const map = {
       prima: {
         label: 'Prima',
-        icon: <Zap size={14} className="text-emerald-400" />,
+        icon: <Zap size={20} strokeWidth={2} className="text-emerald-400" />,
         btnStyle: 'bg-emerald-500/15 border-emerald-500/30 hover:bg-emerald-500/25 text-emerald-400 shadow-emerald-950/20'
       },
       doms: {
         label: 'Pegal',
-        icon: <Activity size={14} className="text-amber-400" />,
+        icon: <Activity size={20} strokeWidth={2} className="text-amber-400" />,
         btnStyle: 'bg-amber-500/15 border-amber-500/30 hover:bg-amber-500/25 text-amber-400 shadow-amber-950/20'
       },
       deload: {
         label: 'Nyeri (Deload)',
-        icon: <ShieldAlert size={14} className="text-rose-400" />,
+        icon: <ShieldAlert size={20} strokeWidth={2} className="text-rose-400" />,
         btnStyle: 'bg-rose-500/15 border-rose-500/30 hover:bg-rose-500/25 text-rose-400 shadow-rose-950/20'
       }
     };
@@ -947,6 +933,7 @@ const WorkoutTab = ({
   }, [currentWellness]);
 
   const requestSessionSwitch = (targetWorkoutId, onProceed) => {
+    if (isSwitchingSessionRef.current) return true;
     if (isWorkoutActive && sessionToRun && sessionToRun !== targetWorkoutId) {
       const currentProg = activeProgramsList.find(p => p.workoutId === sessionToRun || p.id === sessionToRun);
       const currentSessionName = sessionToRun === 'extra' ? 'Sesi Ekstra' : (currentProg?.name ? `Sesi ${currentProg.name}` : 'sesi berjalan');
@@ -959,29 +946,53 @@ const WorkoutTab = ({
           title: 'Pindah Sesi Latihan',
           message: `Kamu sedang memiliki ${currentSessionName} yang aktif berjalan. Selesaikan dan simpan ${currentSessionName} terlebih dahulu sebelum melanjutkan ke ${targetSessionName}?`,
           onConfirm: async () => {
+            if (isSwitchingSessionRef.current) return;
+            isSwitchingSessionRef.current = true;
+            setConfirmModal(null);
             playSoundEffect('click', soundEnabled);
-            if (sessionToRun && onSaveWorkout) {
-              await onSaveWorkout(sessionToRun, { stayOnWorkoutTab: true });
-            }
-            setSessionToRun(targetWorkoutId);
-            setIsWorkoutActive(true);
-            setWorkoutStartTime(Date.now());
-            if (typeof onProceed === 'function') onProceed();
-          },
-          confirmText: 'Simpan & Lanjut',
-          onDiscard: () => {
-            playSoundEffect('click', soundEnabled);
-            setIsImmersiveMode(false);
-            setIsWorkoutActive(false);
-            setWorkoutStartTime(null);
-            if (setRestTargetTime) setRestTargetTime(null);
-
-            setTimeout(() => {
+            try {
+              if (sessionToRun && onSaveWorkout) {
+                await onSaveWorkout(sessionToRun, { stayOnWorkoutTab: true, workoutId: sessionToRun });
+              }
               setSessionToRun(targetWorkoutId);
+              setFocusWorkoutId?.(targetWorkoutId);
               setIsWorkoutActive(true);
               setWorkoutStartTime(Date.now());
               if (typeof onProceed === 'function') onProceed();
-            }, 50);
+            } finally {
+              setTimeout(() => {
+                isSwitchingSessionRef.current = false;
+              }, 350);
+            }
+          },
+          confirmText: 'Simpan & Lanjut',
+          onDiscard: () => {
+            if (isSwitchingSessionRef.current) return;
+            isSwitchingSessionRef.current = true;
+            setConfirmModal(null);
+            playSoundEffect('click', soundEnabled);
+            try {
+              if (sessionToRun && onCancelWorkout) {
+                onCancelWorkout(sessionToRun);
+              }
+              setIsImmersiveMode(false);
+              setIsWorkoutActive(false);
+              setWorkoutStartTime(null);
+              if (setRestTargetTime) setRestTargetTime(null);
+
+              setTimeout(() => {
+                setSessionToRun(targetWorkoutId);
+                setFocusWorkoutId?.(targetWorkoutId);
+                setIsWorkoutActive(true);
+                setWorkoutStartTime(Date.now());
+                if (typeof onProceed === 'function') onProceed();
+                setTimeout(() => {
+                  isSwitchingSessionRef.current = false;
+                }, 300);
+              }, 50);
+            } catch (err) {
+              isSwitchingSessionRef.current = false;
+            }
           },
           discardText: 'Buang Sesi Sebelumnya'
         });
@@ -998,7 +1009,7 @@ const WorkoutTab = ({
 
       // Temukan latihan pertama yang belum selesai agar saat resume langsung ke latihan tersebut
       const currentProg = activeProgramsList.find(p => p.workoutId === progId || p.id === progId);
-      const exList = progId === 'extra' ? extraExercises : (currentProg?.exercises || []);
+      const exList = progId === 'extra' ? displayExtraExercises : (currentProg?.exercises || []);
       const firstIncomplete = exList.find(ex => {
         if (skippedExercises[ex.id]) return false;
         const logs = getSetLogs(ex);
@@ -1072,14 +1083,14 @@ const WorkoutTab = ({
      onAddExtraClick();
   };
 
-  const isCompletelyEmpty = (activeProgramsList.length === 0 || activeProgramsList.every(p => !p.exercises || p.exercises.length === 0)) && extraExercises.length === 0;
+  const isCompletelyEmpty = (activeProgramsList.length === 0 || activeProgramsList.every(p => !p.exercises || p.exercises.length === 0)) && displayExtraExercises.length === 0;
 
   // Dipakai untuk kasih jarak ekstra di bawah supaya "Tambah Latihan Ekstra"/"Pendinginan"
   // tidak ketutup tombol floating "Mulai Sesi Latihan" saat sebuah sesi sedang diexpand.
   const hasExpandedSessionWithExercises = (() => {
     const activeExpandedId = Object.keys(expandedSessions || {}).find(k => (expandedSessions || {})[k]);
     if (!activeExpandedId) return false;
-    if (activeExpandedId === 'extra') return extraExercises.length > 0;
+    if (activeExpandedId === 'extra') return displayExtraExercises.length > 0;
     const sessionData = activeProgramsList.find(p => p.workoutId === activeExpandedId);
     return !!(sessionData?.exercises?.length > 0);
   })();
@@ -1173,6 +1184,7 @@ const WorkoutTab = ({
         onSelectAlternative={handleSelectAlternative}
         t={t} lang={lang} soundEnabled={soundEnabled}
         gymProfiles={gymProfiles} activeGymId={activeGymId}
+        history={history}
       />
 
       {/* `invisible`, BUKAN `hidden`. `hidden` itu display:none, sehingga tinggi dokumen runtuh
@@ -1182,27 +1194,24 @@ const WorkoutTab = ({
           apa adanya tanpa perlu menyimpan/memulihkan apa pun. pointer-events-none supaya kartu di
           belakang overlay tidak bisa tersentuh. */}
       <div
-        className={`space-y-4 animate-in fade-in ${isImmersiveMode ? 'invisible pointer-events-none' : ''}`}
+        className={`space-y-4 ${isImmersiveMode ? 'invisible pointer-events-none' : ''}`}
         aria-hidden={isImmersiveMode || undefined}
         style={{ paddingBottom: showsFloatingStartButton ? 'calc(9.5rem + env(safe-area-inset-bottom, 20px))' : '2rem' }}
       >
         {isCompletelyEmpty ? (
-          isActive && createPortal(
-            <EmptyWorkoutState 
-              t={t}
-              showProgramSelect={showProgramSelect}
-              setShowProgramSelect={setShowProgramSelect}
-              playSoundEffect={playSoundEffect}
-              soundEnabled={soundEnabled}
-              setActiveTab={setActiveTab}
-              handleAddAdhocSession={handleAddAdhocSession}
-              programs={programs}
-              handleAddProgramToToday={handleAddProgramToToday}
-              activePlanIds={activePlanIds}
-              tabSlideDir={tabSlideDir}
-            />,
-            document.body
-          )
+          <EmptyWorkoutState 
+            t={t}
+            showProgramSelect={showProgramSelect}
+            setShowProgramSelect={setShowProgramSelect}
+            playSoundEffect={playSoundEffect}
+            soundEnabled={soundEnabled}
+            setActiveTab={setActiveTab}
+            handleAddAdhocSession={handleAddAdhocSession}
+            programs={programs}
+            handleAddProgramToToday={handleAddProgramToToday}
+            activePlanIds={activePlanIds}
+            tabSlideDir={tabSlideDir}
+          />
         ) : (
           <>
             <WorkoutHeader
@@ -1211,6 +1220,8 @@ const WorkoutTab = ({
               soundEnabled={soundEnabled} playSoundEffect={playSoundEffect}
               warmupVideos={activeProgram?.warmupVideoUrls?.length > 0 ? activeProgram.warmupVideoUrls.join(' ') : warmupVideos}
               onOpenWarmup={() => setDetailExercise({ name: 'Pemanasan', ytVideo: activeProgram?.warmupVideoUrls?.length > 0 ? activeProgram.warmupVideoUrls.join(' ') : warmupVideos, type: 'warmup' })}
+              wellnessConfig={wellnessConfig}
+              onOpenWellness={() => setShowWellnessModal(true)}
             />
 
             <div className="space-y-4 mt-4">
@@ -1218,9 +1229,9 @@ const WorkoutTab = ({
                   {activeProgramsList.map((prog, pIdx) => {
                     const isExpanded = !!(expandedSessions || {})[prog.workoutId];
                     return (
-                      <div id={`session-${prog.workoutId}`} key={prog.workoutId} className={`mb-6 rounded-[2rem] border ${prog.status === 'completed' ? 'border-emerald-500/30' : 'border-white/20 dark:border-white/10'} bg-white/60 dark:bg-black/50 backdrop-blur-xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.4)] overflow-hidden transition-all`}>
+                      <div id={`session-${prog.workoutId}`} key={prog.workoutId} className={`mb-6 rounded-[2rem] border ${prog.status === 'completed' ? 'border-emerald-500/30' : 'border-black/5 dark:border-white/10'} bg-white dark:bg-[#0c1427]/90 shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.4)] overflow-hidden transition-colors duration-150`}>
                         <div
-                          className={`w-full p-5 sm:p-6 flex items-start justify-between font-black text-left transition-colors`}
+                          className={`w-full p-5 sm:p-6 flex items-center justify-between font-black text-left transition-colors`}
                         >
                           <div
                             onClick={() => { playSoundEffect('click', soundEnabled); toggleSession(prog.workoutId); }}
@@ -1234,27 +1245,13 @@ const WorkoutTab = ({
                             )}
                           </div>
                           
-                          {/* Sisi Kanan: Chevron Atas & Tombol Wellness Bawah */}
-                          <div className="flex flex-col items-center justify-between self-stretch shrink-0 py-0.5 pl-2 gap-2">
-                            <div
-                              onClick={() => { playSoundEffect('click', soundEnabled); toggleSession(prog.workoutId); }}
-                              className="caption opacity-60 hover:opacity-100 font-bold cursor-pointer flex items-center p-1 transition-opacity"
-                              title={isExpanded ? "Tutup Sesi" : "Buka Sesi"}
-                            >
-                              {isExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                playSoundEffect('click', soundEnabled);
-                                setShowWellnessModal(true);
-                              }}
-                              className={`w-7 h-7 rounded-full flex items-center justify-center transition-all active:scale-90 border shadow-sm ${wellnessConfig.btnStyle}`}
-                              title={`Kondisi Tubuh: ${wellnessConfig.label} (Ketuk untuk detail / ubah)`}
-                            >
-                              {wellnessConfig.icon}
-                            </button>
+                          {/* Sisi Kanan: Chevron Toggle */}
+                          <div
+                            onClick={() => { playSoundEffect('click', soundEnabled); toggleSession(prog.workoutId); }}
+                            className="caption opacity-60 hover:opacity-100 font-bold cursor-pointer flex items-center p-2 transition-opacity shrink-0"
+                            title={isExpanded ? "Tutup Sesi" : "Buka Sesi"}
+                          >
+                            {isExpanded ? <ChevronUp size={20}/> : <ChevronDown size={20}/>}
                           </div>
                         </div>
                     
@@ -1262,13 +1259,13 @@ const WorkoutTab = ({
                         swipe pindah tab dikunci khusus tablet. Di HP (tampilan vertikal), swipe kanan-kiri
                         tetap aktif untuk pindah tab. */}
                     {isExpanded && (
-                      <div className="sm:no-swipe pb-4 sm:p-6 sm:pt-0 space-y-4 sm:space-y-0 sm:flex sm:flex-row sm:overflow-x-auto sm:snap-x sm:gap-6 hide-scrollbar animate-in slide-in-from-top-2 fade-in duration-200">
+                      <div className="sm:no-swipe pb-4 sm:p-6 sm:pt-0 space-y-4 sm:space-y-0 sm:flex sm:flex-row sm:overflow-x-auto sm:snap-x sm:gap-6 hide-scrollbar">
                         {groupExercises(prog.exercises).map((group, gIdx) => {
                           return (
                           <div key={`${prog.id}-group-${gIdx}`} className={`sm:w-[340px] sm:shrink-0 sm:snap-center sm:bg-black/5 sm:dark:bg-white/5 sm:rounded-3xl sm:border sm:border-black/5 sm:dark:border-white/5 sm:overflow-hidden relative flex flex-col mb-4 sm:mb-0 last:mb-0 ${group.isSuperset ? 'pr-0' : ''}`}>
                             {group.isSuperset && <div className={`absolute top-0 bottom-0 right-0 w-[6px] rounded-l-md z-20 ${t.bgAccent}`}></div>}
                             {group.items.map(({ex, idx}) => (
-                              <div id={`exercise-card-${ex.id}`} key={`${prog.id}-${ex.id}-${idx}`} style={{ contentVisibility: 'auto', containIntrinsicSize: '0 160px' }}>
+                              <div id={`exercise-card-${ex.id}`} key={`${prog.id}-${ex.id}-${idx}`}>
                               <ExerciseCard 
                                 ex={ex} idx={idx} isExtra={false}
                                 t={t} lang={lang} soundEnabled={soundEnabled}
@@ -1374,51 +1371,51 @@ const WorkoutTab = ({
               })}
 
               {/* LATIHAN TAMBAHAN (EKSTRA) */}
-              {extraExercises.length > 0 && (
-                <div id="session-extra" className={`mb-6 rounded-[2rem] border border-white/20 dark:border-white/10 bg-white/60 dark:bg-black/50 backdrop-blur-xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.4)] overflow-hidden transition-all`}>
+              {displayExtraExercises.length > 0 && (
+                <div id="session-extra" className={`mb-6 rounded-[2rem] border border-black/5 dark:border-white/10 bg-white dark:bg-[#0c1427]/90 shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.4)] overflow-hidden transition-colors duration-150`}>
                   <div 
-                    className={`w-full p-5 sm:p-6 flex items-start justify-between font-black text-left transition-colors`}
+                    className={`w-full p-5 sm:p-6 flex items-center justify-between font-black text-left transition-colors`}
                   >
                     <div 
                       onClick={() => { playSoundEffect('click', soundEnabled); toggleSession('extra'); }}
                       className="flex flex-col items-start gap-0.5 flex-1 min-w-0 pr-4 cursor-pointer"
                     >
                       <span className="text-xl sm:text-2xl uppercase tracking-widest break-words leading-tight">Sesi {activeProgramsList.length + 1}: Ekstra</span>
-                      <span className={`text-xs ${t.textMuted} font-medium`}>{extraExercises.length} latihan di luar program</span>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs ${t.textMuted} font-medium`}>{displayExtraExercises.length} latihan di luar program</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            playSoundEffect('click', soundEnabled);
+                            (displayExtraExercises || []).forEach(ex => onRemoveExtra(ex.id));
+                          }}
+                          className="text-[10px] text-rose-400 hover:text-rose-500 font-bold px-2 py-0.5 rounded-md bg-rose-500/10 hover:bg-rose-500/20 transition-colors"
+                          title="Bersihkan latihan ekstra"
+                        >
+                          Bersihkan
+                        </button>
+                      </div>
                     </div>
 
-                    {/* Sisi Kanan: Chevron Atas & Tombol Wellness Bawah */}
-                    <div className="flex flex-col items-center justify-between self-stretch shrink-0 py-0.5 pl-2 gap-2">
-                      <div 
-                        onClick={() => { playSoundEffect('click', soundEnabled); toggleSession('extra'); }}
-                        className="caption opacity-60 hover:opacity-100 font-bold cursor-pointer flex items-center p-1 transition-opacity"
-                        title={(expandedSessions || {})['extra'] ? "Tutup Sesi" : "Buka Sesi"}
-                      >
-                        {(expandedSessions || {})['extra'] ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          playSoundEffect('click', soundEnabled);
-                          setShowWellnessModal(true);
-                        }}
-                        className={`w-7 h-7 rounded-full flex items-center justify-center transition-all active:scale-90 border shadow-sm ${wellnessConfig.btnStyle}`}
-                        title={`Kondisi Tubuh: ${wellnessConfig.label} (Ketuk untuk detail / ubah)`}
-                      >
-                        {wellnessConfig.icon}
-                      </button>
+                    {/* Sisi Kanan: Chevron Toggle */}
+                    <div 
+                      onClick={() => { playSoundEffect('click', soundEnabled); toggleSession('extra'); }}
+                      className="caption opacity-60 hover:opacity-100 font-bold cursor-pointer flex items-center p-2 transition-opacity shrink-0"
+                      title={(expandedSessions || {})['extra'] ? "Tutup Sesi" : "Buka Sesi"}
+                    >
+                      {(expandedSessions || {})['extra'] ? <ChevronUp size={20}/> : <ChevronDown size={20}/>}
                     </div>
                   </div>
                   
                   {(expandedSessions || {})['extra'] && (
-                    <div className="sm:no-swipe p-2 sm:p-6 pt-0 space-y-4 sm:space-y-0 sm:flex sm:flex-row sm:overflow-x-auto sm:snap-x sm:gap-6 hide-scrollbar animate-in slide-in-from-top-2 fade-in duration-200">
-                        {groupExercises(extraExercises).map((group, gIdx) => {
+                    <div className="sm:no-swipe p-2 sm:p-6 pt-0 space-y-4 sm:space-y-0 sm:flex sm:flex-row sm:overflow-x-auto sm:snap-x sm:gap-6 hide-scrollbar">
+                        {groupExercises(displayExtraExercises).map((group, gIdx) => {
                           return (
                           <div key={`extra-group-${gIdx}`} className={`sm:w-[340px] sm:shrink-0 sm:snap-center sm:bg-black/5 sm:dark:bg-white/5 sm:rounded-3xl sm:border sm:border-black/5 sm:dark:border-white/5 sm:overflow-hidden relative flex flex-col mb-4 sm:mb-0 last:mb-0 ${group.isSuperset ? 'pr-3' : ''}`}>
                             {group.isSuperset && <div className={`absolute top-0 bottom-0 right-0 w-[6px] rounded-l-md z-20 ${t.bgAccent}`}></div>}
                             {group.items.map(({ex, idx}) => (
-                            <div id={`exercise-card-${ex.id}`} key={`extra-${ex.id}-${idx}`} style={{ contentVisibility: 'auto', containIntrinsicSize: '0 160px' }}>
+                            <div id={`exercise-card-${ex.id}`} key={`extra-${ex.id}-${idx}`}>
                               <ExerciseCard 
                                 ex={ex} idx={activeProgram?.exercises?.length ? activeProgram.exercises.length + idx : idx} isExtra={true}
                                 t={t} lang={lang} soundEnabled={soundEnabled}
@@ -1442,7 +1439,7 @@ const WorkoutTab = ({
                                     setActiveExerciseId(exId);
                                     let siblingIds = null;
                                     if (ex.supersetId) {
-                                      siblingIds = extraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
+                                      siblingIds = displayExtraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
                                     }
                                     onToggleSet(exId, setIdx, siblingIds, ex);
                                     advanceIfExerciseFinished('extra', exId, setIdx);
@@ -1451,7 +1448,7 @@ const WorkoutTab = ({
                                   setSessionToRun('extra');
                                   let siblingIds = null;
                                   if (ex.supersetId) {
-                                    siblingIds = extraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
+                                    siblingIds = displayExtraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
                                   }
                                   onToggleSet(exId, setIdx, siblingIds, ex);
                                   advanceIfExerciseFinished('extra', exId, setIdx);
@@ -1459,7 +1456,7 @@ const WorkoutTab = ({
                               onAddSet={(exId) => {
                                 if (requestSessionSwitch('extra', () => {
                                   if (ex.supersetId) {
-                                    const siblings = extraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
+                                    const siblings = displayExtraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
                                     onAddSet(siblings);
                                   } else {
                                     onAddSet(exId);
@@ -1467,7 +1464,7 @@ const WorkoutTab = ({
                                 })) return;
                                 setSessionToRun('extra');
                                 if (ex.supersetId) {
-                                  const siblings = extraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
+                                  const siblings = displayExtraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
                                   onAddSet(siblings);
                                 } else {
                                   onAddSet(exId);
@@ -1476,7 +1473,7 @@ const WorkoutTab = ({
                               onAddWarmupSets={(exId) => {
                                 if (requestSessionSwitch('extra', () => {
                                   if (ex.supersetId) {
-                                    const siblings = extraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
+                                    const siblings = displayExtraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
                                     onAddWarmupSets(siblings);
                                   } else {
                                     onAddWarmupSets(exId);
@@ -1484,7 +1481,7 @@ const WorkoutTab = ({
                                 })) return;
                                 setSessionToRun('extra');
                                 if (ex.supersetId) {
-                                  const siblings = extraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
+                                  const siblings = displayExtraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
                                   onAddWarmupSets(siblings);
                                 } else {
                                   onAddWarmupSets(exId);
@@ -1493,7 +1490,7 @@ const WorkoutTab = ({
                               onRemoveSet={(exId, setIdx) => {
                                 if (requestSessionSwitch('extra', () => {
                                   if (ex.supersetId) {
-                                    const siblings = extraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
+                                    const siblings = displayExtraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
                                     onRemoveSet(siblings, setIdx);
                                   } else {
                                     onRemoveSet(exId, setIdx);
@@ -1501,7 +1498,7 @@ const WorkoutTab = ({
                                 })) return;
                                 setSessionToRun('extra');
                                 if (ex.supersetId) {
-                                  const siblings = extraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
+                                  const siblings = displayExtraExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
                                   onRemoveSet(siblings, setIdx);
                                 } else {
                                   onRemoveSet(exId, setIdx);
@@ -1553,11 +1550,11 @@ const WorkoutTab = ({
             isExtra: false,
             exercises: p.exercises || []
           })),
-          ...(extraExercises.length > 0 ? [{
+          ...(displayExtraExercises.length > 0 ? [{
             workoutId: 'extra',
             name: 'Ekstra',
             isExtra: true,
-            exercises: extraExercises
+            exercises: displayExtraExercises
           }] : [])
         ];
 
@@ -1619,7 +1616,7 @@ const WorkoutTab = ({
         const areAllSessionsFinished = evaluatedSessions.length > 0 && evaluatedSessions.every(s => s.isFinished || !s.hasExercises || s.allSkipped);
 
         if (areAllSessionsFinished) {
-          return createPortal(
+          return (
             <div className="fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 pointer-events-none flex justify-center animate-in fade-in duration-200">
               <button 
                 disabled={true}
@@ -1627,8 +1624,7 @@ const WorkoutTab = ({
               >
                 <CheckCircle size={24} /> SESI SELESAI
               </button>
-            </div>,
-            document.body
+            </div>
           );
         }
 
@@ -1638,7 +1634,7 @@ const WorkoutTab = ({
         const btnText = isResume ? "LANJUTKAN LATIHAN" : (targetSession.isExtra ? "MULAI EKSTRA" : "MULAI LATIHAN");
         const btnIcon = <Play size={24} className="ml-1" />;
 
-        return createPortal(
+        return (
           <div className="fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 pointer-events-none flex justify-center animate-in fade-in duration-200">
             <button 
               onClick={() => {
@@ -1656,8 +1652,7 @@ const WorkoutTab = ({
             >
               {btnIcon} {btnText}
             </button>
-          </div>,
-          document.body
+          </div>
         );
       })()}
       {dialog}
@@ -1699,4 +1694,14 @@ const WorkoutTab = ({
   );
 };
 
-export default WorkoutTab;
+// Inactive tab is frozen completely to prevent background CPU/battery drain.
+export default React.memo(WorkoutTab, (prev, next) => {
+  if (prev.isActive !== next.isActive) return false;
+  if (!next.isActive) return true;
+  const keys = Object.keys(next);
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i];
+    if (prev[k] !== next[k] && typeof next[k] !== 'function') return false;
+  }
+  return true;
+});

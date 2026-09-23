@@ -28,22 +28,34 @@ const ExerciseCard = ({
   const [canCloseHint, setCanCloseHint] = useState(false);
   const [showWeightInfo, setShowWeightInfo] = useState(false);
   const eqConfig = getEquipmentConfig(gymProfiles, activeGymId, ex);
-  const playedRecordSound = React.useRef(false);
+  const lastCelebrated10RM = React.useRef(
+    (typeof window !== 'undefined' && window.logymCelebrated10RM?.[ex?.id]) || 0
+  );
 
   useEffect(() => {
     if (!ex) return;
     const hint = overloadHint;
     if (hint?.isNewRecord) {
-      if (!window.logymShownRecords) window.logymShownRecords = new Set();
-      
-      if (!playedRecordSound.current && !window.logymShownRecords.has(ex.id)) {
+      if (typeof window !== 'undefined' && !window.logymCelebrated10RM) {
+        window.logymCelebrated10RM = {};
+      }
+      const currentVal = Number(hint.rm10Number) || parseFloat(hint.rm10) || 0;
+      const alreadyCelebrated = Math.max(
+        lastCelebrated10RM.current,
+        (typeof window !== 'undefined' && Number(window.logymCelebrated10RM?.[ex.id])) || 0
+      );
+
+      if (currentVal > 0 && currentVal > alreadyCelebrated) {
         if (soundEnabled) {
           const audio = new Audio('/success.wav');
           audio.volume = 1.0;
           audio.play().catch(() => {});
         }
-        playedRecordSound.current = true;
-        window.logymShownRecords.add(ex.id);
+        lastCelebrated10RM.current = currentVal;
+        if (typeof window !== 'undefined') {
+          window.logymCelebrated10RM[ex.id] = currentVal;
+        }
+        setCanCloseHint(false);
         setShowHint(true); // Auto-show the gamified popup
         setTimeout(() => setCanCloseHint(true), 2500); // Wait 2.5s before allowing close
       }
@@ -234,6 +246,7 @@ const ExerciseCard = ({
                     src={finalImgUrl} 
                     alt={canonical.name || ex.name} 
                     loading="lazy" 
+                    decoding="async"
                     className="absolute inset-0 w-full h-full object-cover" 
                     onError={(e) => {
                       if (e.target.src.endsWith('.webp')) {
@@ -254,6 +267,7 @@ const ExerciseCard = ({
                   }}
                   alt={canonical.name || ex.name} 
                   loading="lazy" 
+                  decoding="async"
                   className="absolute inset-0 w-full h-full object-cover" 
                 />;
             } else {
@@ -655,7 +669,7 @@ const ExerciseCard = ({
                                 {showWeightInfo && (
                                   <>
                                     <div 
-                                      className="fixed inset-0 z-20 bg-transparent" 
+                                      className="fixed inset-0 z-20 bg-transparent overscroll-contain touch-none" 
                                       onClick={(e) => { e.stopPropagation(); setShowWeightInfo(false); }} 
                                     />
                                     <div 
@@ -826,12 +840,12 @@ const ExerciseCard = ({
 
         {/* SET DETAILS MODAL (BOTTOM SHEET) */}
         {activeSetDetail !== null && createPortal(
-          <div className="fixed inset-0 z-[999] flex flex-col justify-end bg-black/50 backdrop-blur-sm animate-in fade-in" onClick={() => { setActiveSetDetail(null); setShowIntensityInfo(false); }}>
-            <div className={`w-full max-w-lg mx-auto bg-white/70 dark:bg-[#121a2f]/70 backdrop-blur-2xl border-t border-white/30 dark:border-white/10 shadow-2xl rounded-t-[2.5rem] p-6 pb-12 sm:pb-8 animate-in slide-in-from-bottom-1/2 duration-300`} onClick={e => e.stopPropagation()}>
+          <div className="fixed inset-0 z-[999] flex flex-col justify-end bg-black/50 backdrop-blur-sm animate-in fade-in overscroll-contain touch-none" onClick={() => { setActiveSetDetail(null); setShowIntensityInfo(false); }}>
+            <div className={`w-full max-w-lg mx-auto bg-white/70 dark:bg-[#121a2f]/70 backdrop-blur-2xl border-t border-white/30 dark:border-white/10 shadow-2xl rounded-t-[2.5rem] p-6 pb-12 sm:pb-8 animate-in slide-in-from-bottom-1/2 duration-300 overscroll-contain`} onClick={e => e.stopPropagation()}>
               
               <div className="flex items-center justify-between mb-5">
                 <h3 className="text-xl font-black">Catatan Set {sets[activeSetDetail.setIdx]?.type === 'warmup' ? 'Pemanasan' : getWorkingSetNumber(activeSetDetail.setIdx)}</h3>
-                <button onClick={() => setActiveSetDetail(null)} className={`p-2 rounded-full bg-black/5 dark:bg-white/5 hover:bg-black/10 transition-colors`}>
+                <button data-close-modal="true" onClick={() => setActiveSetDetail(null)} className={`p-2 rounded-full bg-black/5 dark:bg-white/5 hover:bg-black/10 transition-colors`}>
                   <X size={20} />
                 </button>
               </div>
@@ -903,7 +917,7 @@ const ExerciseCard = ({
                   {/* POPUP INFO */}
                   {showIntensityInfo && (
                     <>
-                      <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setShowIntensityInfo(false); }} />
+                      <div className="fixed inset-0 z-40 overscroll-contain touch-none" onClick={(e) => { e.stopPropagation(); setShowIntensityInfo(false); }} />
                       <div className="absolute bottom-full right-0 mb-4 w-64 p-4 rounded-3xl bg-white/98 dark:bg-[#121a2f]/98 shadow-2xl border border-black/10 dark:border-white/10 animate-in slide-in-from-bottom-2 z-50 pointer-events-none">
                         <div className="text-xs text-zinc-600 dark:text-zinc-300 space-y-2">
                           {rpeMode ? (
@@ -1006,7 +1020,9 @@ const areEqual = (prev, next) => {
     if (
       prev.overloadHint?.text !== next.overloadHint?.text ||
       prev.overloadHint?.isNewRecord !== next.overloadHint?.isNewRecord ||
-      prev.overloadHint?.mode !== next.overloadHint?.mode
+      prev.overloadHint?.mode !== next.overloadHint?.mode ||
+      prev.overloadHint?.rm10Number !== next.overloadHint?.rm10Number ||
+      prev.overloadHint?.rm10 !== next.overloadHint?.rm10
     ) {
       return false;
     }

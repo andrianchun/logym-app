@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, useDeferredValue } from 'react';
 import { Search, Filter, Edit2, Plus, Dumbbell, Loader2, RefreshCw, Link as LinkIcon, X, Check, AlertCircle, ChevronDown, Database, Globe, Heart } from 'lucide-react';
 import { formatTarget, normalizeMuscleKey, muscleOptions, equipmentOptions, getVideoId, levelOptions, filterByGymEquipment, exerciseAliasMap, cleanExerciseNameForMatching, canonicalizeExercise } from '../data/constants';
 import EquipmentIcon from '../components/EquipmentIcon';
@@ -10,7 +10,9 @@ import FilterChips from '../components/FilterChips';
 import SwipeInput from '../components/SwipeInput';
 import GymManagerModal from '../components/GymManagerModal';
 import GeneralVideosModal from '../components/GeneralVideosModal';
-import { fetchExercisePopularity, getCachedPopularity, exerciseSlug } from '../utils/exercisePopularity';
+import { fetchExercisePopularity, getCachedPopularity } from '../utils/exercisePopularity';
+import { prepareSearchableExercise, scoreExerciseMatch, computeOwnExerciseUsage, exerciseSlug } from '../utils/exerciseSearch';
+import { buildExLookupByName } from '../utils/workoutCalc';
 
 // ─── Blank exercise template ───────────────────────────────────────
 const blankExercise = () => ({
@@ -79,6 +81,14 @@ const ExerciseForm = ({ t, lang, formData, setFormData, originalData, onSave, on
       return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  React.useEffect(() => {
+    const origOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = origOverflow;
+    };
+  }, []);
+
   const toggleMuscle = (m) => {
     setFormData(prev => ({
       ...prev,
@@ -100,9 +110,9 @@ const ExerciseForm = ({ t, lang, formData, setFormData, originalData, onSave, on
   const canSave = formData.name.trim().length > 0 && formData.target.length > 0 && hasChanges;
 
   return (
-    <div className={`fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in`} onClick={onCancel}>
+    <div className={`fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in overscroll-contain touch-none`} onClick={onCancel}>
       <div 
-        className={`w-full max-w-md sm:max-w-3xl mx-auto ${t.bgCard} rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200 border ${t.border} p-6`}
+        className={`w-full max-w-md sm:max-w-3xl mx-auto ${t.bgCard} rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto overscroll-contain animate-in zoom-in-95 duration-200 border ${t.border} p-6`}
         onClick={e => e.stopPropagation()}
       >
       <div className="flex flex-col sm:grid sm:grid-cols-2 sm:gap-8 space-y-5 sm:space-y-0">
@@ -311,6 +321,7 @@ const ExerciseForm = ({ t, lang, formData, setFormData, originalData, onSave, on
       {/* Action Buttons */}
       <div className="flex space-x-3 mt-4">
         <button 
+          data-close-modal="true"
           onClick={onCancel}
           className={`flex-1 flex items-center justify-center py-4 rounded-xl body-lg font-black transition-all bg-black/5 dark:bg-white/5 border ${t.border} ${t.textMain} hover:bg-black/10 dark:hover:bg-white/10 active:scale-95`}
         >
@@ -340,7 +351,7 @@ const ExerciseForm = ({ t, lang, formData, setFormData, originalData, onSave, on
 
 // ═══════════════════════════════════════════════════════════════════
 // ─── Main Component: DatabaseTab ──────────────────────────────────
-const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, soundEnabled, warmupVideos, setWarmupVideos, cooldownVideos, setCooldownVideos, onOpenDetail, setConfirmModal, theme, gymProfiles, setGymProfiles, activeGymId, setActiveGymId }) => {
+const DatabaseTab = ({ isActive = true, t, lang, exerciseLibrary, setExerciseLibrary, history, soundEnabled, warmupVideos, setWarmupVideos, cooldownVideos, setCooldownVideos, onOpenDetail, setConfirmModal, theme, gymProfiles, setGymProfiles, activeGymId, setActiveGymId }) => {
   // ── Tab State ────────────────────────────────────────────────────
   const [viewMode, setViewMode] = useState('all'); // 'all' | 'custom'
 
@@ -393,6 +404,7 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
 
   // ── Filter & Search State ────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearch = useDeferredValue(searchQuery);
   const [muscleFilter, setMuscleFilter] = useState([]);
   const [equipFilter, setEquipFilter] = useState([]);
   const [levelFilter, setLevelFilter] = useState([]);
@@ -523,22 +535,13 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
   }, []);
 
   // ── Pemakaian sendiri ─────────────────────────────────────────────
+  const exLookup = useMemo(() => {
+    return buildExLookupByName(history, exerciseLibrary);
+  }, [history, exerciseLibrary]);
+
   const ownScores = useMemo(() => {
-    const scores = {};
-    Object.values(history || {}).forEach(day => {
-      (day.workouts || []).forEach(w => {
-        // `overriddenExercises` WAJIB ikut: sesi program menyimpan daftar latihannya di situ,
-        // sementara `exercises` cuma dipakai sesi Ekstra. Dulu yang dibaca hanya `exercises`,
-        // jadi seluruh sesi program tidak pernah menyumbang popularitas sama sekali.
-        (w.overriddenExercises || w.exercises || []).forEach(ex => {
-          if (!ex?.name) return;
-          const key = exerciseSlug(ex.name);
-          scores[key] = (scores[key] || 0) + 1;
-        });
-      });
-    });
-    return scores;
-  }, [history]);
+    return computeOwnExerciseUsage(history, exLookup);
+  }, [history, exLookup]);
 
   // Hitung frekuensi latihan per kelompok otot dari riwayat user
   const musclePopularityScores = useMemo(() => {
@@ -566,6 +569,7 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
     Object.entries(ownScores).forEach(([k, v]) => { merged[k] = (merged[k] || 0) + v * 10; });
     return merged;
   }, [globalScores, ownScores]);
+
   // ── Apply Gym Constraints First ──────────────────────────────────
   const gymFilteredLibrary = useMemo(() => {
     let list = [...combinedLibrary];
@@ -574,9 +578,14 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
     return list;
   }, [combinedLibrary, gymProfiles, activeGymId]);
 
+  // Pre-index library untuk pencarian ultra-cepat & relevansi cerdas tanpa format string berulang
+  const indexedLibrary = useMemo(() => {
+    return gymFilteredLibrary.map(ex => prepareSearchableExercise(ex, lang?.id));
+  }, [gymFilteredLibrary, lang?.id]);
+
   // ── Filter and Sort ──────────────────────────────────────────────
   const filteredList = useMemo(() => {
-    let list = [...gymFilteredLibrary];
+    let list = [...indexedLibrary];
 
     // Mode Filter (Custom Only)
     // ID custom biasanya hasil Date.now() yang > 1000000, ID default < 1000, source API='exercisedb'
@@ -589,16 +598,14 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
       list = list.filter(ex => ex.isFavorite);
     }
 
-    // Search (Smart: matches any order of words)
-    if (searchQuery.trim()) {
-      const queryWords = searchQuery.toLowerCase().trim().split(/\s+/);
-      const lowSearch = searchQuery.toLowerCase().trim();
-      list = list.filter(ex => {
-        const nameStr = ex.name.toLowerCase();
-        const targetStr = formatTarget(ex.target, lang?.id).toLowerCase();
-        
-        return nameStr.includes(lowSearch) || targetStr.includes(lowSearch);
-      });
+    // Search (Smart scoring & synonym expansion)
+    const isSearching = Boolean(deferredSearch && deferredSearch.trim());
+    if (isSearching) {
+      list = list.map(ex => {
+        const usage = ownScores[ex._slug] || ownScores[String(ex.id)] || 0;
+        const score = scoreExerciseMatch(ex, deferredSearch, usage);
+        return { ...ex, _searchScore: score };
+      }).filter(ex => ex._searchScore > -1);
     }
 
     // Muscle filter
@@ -624,9 +631,20 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
     // Urutan di dalam kelompok. Favoritnya sendiri diangkat setelah ini.
     const byOrder = (a, b) => {
       if (sortOrder === 'popular') {
-        const scoreA = popularityScores[exerciseSlug(a.name)] || 0;
-        const scoreB = popularityScores[exerciseSlug(b.name)] || 0;
-        if (scoreB !== scoreA) return scoreB - scoreA;
+        if (isSearching) {
+          const diff = (b._searchScore || 0) - (a._searchScore || 0);
+          if (diff !== 0) return diff;
+        }
+
+        // Prioritas UTAMA: Latihan yang benar-benar pernah dilatih oleh user di riwayatnya
+        const ownA = ownScores[a._slug || exerciseSlug(a.name)] || ownScores[String(a.id)] || (a.exerciseId ? ownScores[exerciseSlug(a.exerciseId)] : 0) || 0;
+        const ownB = ownScores[b._slug || exerciseSlug(b.name)] || ownScores[String(b.id)] || (b.exerciseId ? ownScores[exerciseSlug(b.exerciseId)] : 0) || 0;
+        if (ownB !== ownA) return ownB - ownA;
+
+        // Jika sama-sama belum pernah dilatih user (own === 0), urutkan berdasarkan popularitas global/komunitas
+        const globA = globalScores[a._slug || exerciseSlug(a.name)] || 0;
+        const globB = globalScores[b._slug || exerciseSlug(b.name)] || 0;
+        if (globB !== globA) return globB - globA;
 
         // Fallback jika sudah habis / sama-sama belum pernah dilatih (score === 0):
         // 1. Urutkan berdasarkan kelompok otot yang paling sering dilatih user
@@ -652,10 +670,6 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
       // "Terbaru" = terakhir DITAMBAHKAN user. Latihan buatan/tambahan sendiri memakai
       // `id: Date.now()`, jadi id-nya sudah berupa stempel waktu — id terbesar = paling baru.
       // Latihan bawaan (id kecil) dan latihan online (bukan angka) turun dengan sendirinya.
-      //
-      // Versi lama cuma `list.reverse()` atas gabungan [lokal…, online…]; karena latihan online
-      // ditempel di belakang, membaliknya justru menaruh latihan ONLINE paling atas — kebalikan
-      // dari maksudnya.
       const ta = Number(a.id);
       const tb = Number(b.id);
       const va = Number.isFinite(ta) ? ta : -1;
@@ -674,14 +688,14 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
     });
 
     return list;
-  }, [gymFilteredLibrary, viewMode, showFavoritesOnly, searchQuery, muscleFilter, equipFilter, levelFilter, sortOrder, popularityScores, musclePopularityScores]);
+  }, [indexedLibrary, viewMode, showFavoritesOnly, deferredSearch, muscleFilter, equipFilter, levelFilter, sortOrder, popularityScores, musclePopularityScores, ownScores]);
 
   // Pagination for performance (Render top 30 initially, load more on demand)
   const [displayCount, setDisplayCount] = useState(30);
 
   useEffect(() => {
     setDisplayCount(30);
-  }, [searchQuery, muscleFilter, equipFilter, levelFilter, viewMode, showFavoritesOnly]);
+  }, [deferredSearch, muscleFilter, equipFilter, levelFilter, viewMode, showFavoritesOnly]);
 
   const displayedList = useMemo(() => {
     return filteredList.slice(0, displayCount);
@@ -841,7 +855,7 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
             {/* Dropdown Menu */}
             {showGymSelector && (
               <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowGymSelector(false)}></div>
+                <div className="fixed inset-0 z-40 touch-none overscroll-contain" onClick={() => setShowGymSelector(false)}></div>
                 <div className={`absolute top-full left-0 right-0 mt-2 z-50 ${t.bgCard} border ${t.border} rounded-2xl shadow-xl overflow-hidden py-2 max-h-60 overflow-y-auto animate-in fade-in slide-in-from-top-2`}>
                   {gymProfiles.map(g => (
                     <div 
@@ -984,10 +998,10 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
                       onChange={(e) => setSortOrder(e.target.value)}
                       className={`px-2.5 py-1.5 rounded-xl ${t.inputBg} ${t.textMain} text-[11px] font-bold outline-none appearance-none cursor-pointer pr-6 border ${t.border}`}
                     >
-                      <option value="popular">Sering Dilatih</option>
-                      <option value="newest">Terbaru</option>
-                      <option value="az">A - Z</option>
-                      <option value="za">Z - A</option>
+                      <option value="popular" className="bg-slate-900 text-white dark:bg-slate-900 dark:text-white">Sering Dilatih</option>
+                      <option value="newest" className="bg-slate-900 text-white dark:bg-slate-900 dark:text-white">Terbaru</option>
+                      <option value="az" className="bg-slate-900 text-white dark:bg-slate-900 dark:text-white">A - Z</option>
+                      <option value="za" className="bg-slate-900 text-white dark:bg-slate-900 dark:text-white">Z - A</option>
                     </select>
                     <ChevronDown size={11} className={`absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none ${t.textMuted}`} />
                   </div>
@@ -1164,4 +1178,14 @@ const DatabaseTab = ({ t, lang, exerciseLibrary, setExerciseLibrary, history, so
   );
 };
 
-export default DatabaseTab;
+// Inactive tab is frozen completely to prevent background CPU/battery drain.
+export default React.memo(DatabaseTab, (prev, next) => {
+  if (prev.isActive !== next.isActive) return false;
+  if (!next.isActive) return true;
+  const keys = Object.keys(next);
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i];
+    if (prev[k] !== next[k] && typeof next[k] !== 'function') return false;
+  }
+  return true;
+});

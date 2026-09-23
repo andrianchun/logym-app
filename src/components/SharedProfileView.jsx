@@ -56,14 +56,14 @@ export default function SharedProfileView({
   const [isCapturing, setIsCapturing] = useState(false);
 
   useEffect(() => {
-    if (activePrModal) {
+    if (activePrModal || selectedBadgeInfo) {
       const origOverflow = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
       return () => {
         document.body.style.overflow = origOverflow;
       };
     }
-  }, [activePrModal]);
+  }, [activePrModal, selectedBadgeInfo]);
   
   const profileContainerRef = useRef(null);
 
@@ -821,8 +821,8 @@ export default function SharedProfileView({
 
       {/* Badge Detail Modal */}
       {selectedBadgeInfo && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-6 bg-black/50 backdrop-blur-sm animate-in fade-in duration-150" onClick={() => setSelectedBadgeInfo(null)}>
-           <div className={`w-full max-w-sm rounded-3xl p-6 shadow-2xl border animate-in zoom-in-95 duration-200 flex flex-col items-center text-center ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200'}`} onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-6 bg-black/50 backdrop-blur-sm animate-in fade-in duration-150 overscroll-contain touch-none" onClick={() => setSelectedBadgeInfo(null)}>
+           <div className={`w-full max-w-sm rounded-3xl p-6 shadow-2xl border animate-in zoom-in-95 duration-200 flex flex-col items-center text-center overscroll-contain ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200'}`} onClick={e => e.stopPropagation()}>
               <div className={`w-28 h-28 rounded-full ${selectedBadgeInfo.ach.bg} ${selectedBadgeInfo.ach.color} flex items-center justify-center mb-5 shadow-sm relative ${selectedBadgeInfo.ach.borderColor ? `border-2 ${selectedBadgeInfo.ach.borderColor}` : ''} overflow-hidden ${!selectedBadgeInfo.isUnlocked ? 'opacity-50 grayscale' : ''}`}>
                  {selectedBadgeInfo.ach.imageUrl ? (
                    <img src={selectedBadgeInfo.ach.imageUrl} alt={selectedBadgeInfo.ach.title} className="w-full h-full object-cover mix-blend-screen" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} />
@@ -847,7 +847,7 @@ export default function SharedProfileView({
               )}
 
               <div className="flex gap-3 w-full">
-                 <button onClick={() => setSelectedBadgeInfo(null)} className={`flex-1 py-3.5 rounded-2xl font-black text-sm transition-all active:scale-95 ${isDark ? 'bg-white/10 text-white hover:bg-white/15' : 'bg-slate-100 text-slate-900 hover:bg-slate-200'}`}>
+                 <button data-close-modal="true" onClick={() => setSelectedBadgeInfo(null)} className={`flex-1 py-3.5 rounded-2xl font-black text-sm transition-all active:scale-95 ${isDark ? 'bg-white/10 text-white hover:bg-white/15' : 'bg-slate-100 text-slate-900 hover:bg-slate-200'}`}>
                    Tutup
                  </button>
                  

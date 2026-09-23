@@ -1,5 +1,6 @@
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase.js';
+import { enrichBioWithImpedance } from './xiaomiScaleCalc.js';
 
 // Shared API keys sekarang hidup di backend (functions/.env), bukan di bundle client.
 // Alur: key pribadi user dipanggil langsung dari browser; tanpa key -> proxy Cloud Functions.
@@ -287,6 +288,8 @@ export const summarizeHealthAndRecovery = (historyObj, userProfile, lomealToday 
             latestBioDate = d;
         }
     });
+    if (latestBio) latestBio = enrichBioWithImpedance(latestBio, userProfile, null, latestBioDate);
+    if (oldestBio) oldestBio = enrichBioWithImpedance(oldestBio, userProfile, null, dates[0]);
 
     const todayBio = history[todayStr]?.bioData || {};
     const lines = [];

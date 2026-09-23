@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { X } from 'lucide-react';
 
 export default function ImageModal({ images = [], initialIndex = 0, onClose }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
@@ -97,9 +98,18 @@ export default function ImageModal({ images = [], initialIndex = 0, onClose }) {
 
   return (
     <div 
-      className="fixed inset-0 z-[1000] bg-slate-950/80 backdrop-blur-xl flex flex-col justify-center animate-in fade-in duration-300 overflow-hidden"
+      className="fixed inset-0 z-[1000] bg-slate-950/80 backdrop-blur-xl flex flex-col justify-center animate-in fade-in duration-300 overflow-hidden overscroll-contain touch-none"
       onClick={(e) => { if(e.target === e.currentTarget) handleClose(); }}
     >
+      {/* Close button */}
+      <button 
+        data-close-modal="true"
+        onClick={handleClose} 
+        aria-label="Tutup"
+        className="absolute top-4 right-4 z-30 p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white backdrop-blur-md transition-all active:scale-95"
+      >
+        <X size={20} />
+      </button>
       
       {/* Pagination indicators - Bottom */}
       {images.length > 1 && (

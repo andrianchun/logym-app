@@ -106,9 +106,9 @@ const LibManagerModal = ({ showLibManager, setShowLibManager, t, exerciseLibrary
                         <input type="text" placeholder="Cari..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className={`ml-3 bg-transparent w-full outline-none ${t.textMain} font-medium`} />
                     </div>
                     <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className={`w-28 ${t.inputBg} ${t.textMain} rounded-xl px-2 outline-none font-bold body-md cursor-pointer`}>
-                        <option value="new">Terbaru</option>
-                        <option value="az">A - Z</option>
-                        <option value="za">Z - A</option>
+                        <option value="new" className="bg-slate-900 text-white dark:bg-slate-900 dark:text-white">Terbaru</option>
+                        <option value="az" className="bg-slate-900 text-white dark:bg-slate-900 dark:text-white">A - Z</option>
+                        <option value="za" className="bg-slate-900 text-white dark:bg-slate-900 dark:text-white">Z - A</option>
                     </select>
                 </div>
                 

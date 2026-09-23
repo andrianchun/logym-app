@@ -12,6 +12,14 @@ export default function ModerationPanel({ isDark, t, onClose, onNavigateToPost, 
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    const orig = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = orig;
+    };
+  }, []);
+
+  useEffect(() => {
     if (activeTab === 'reports') fetchReports();
     else fetchBannedUsers();
   }, [activeTab]);
@@ -124,8 +132,8 @@ export default function ModerationPanel({ isDark, t, onClose, onNavigateToPost, 
   };
 
   return (
-    <div className="fixed inset-0 z-[1100] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center animate-in fade-in duration-200">
-      <div className={`w-full sm:max-w-md h-[85vh] ${isDark ? 'bg-slate-900' : 'bg-white'} rounded-t-3xl sm:rounded-3xl flex flex-col shadow-2xl`}>
+    <div className="fixed inset-0 z-[1100] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center animate-in fade-in duration-200 overscroll-contain touch-none" onClick={onClose}>
+      <div className={`w-full sm:max-w-md h-[85vh] ${isDark ? 'bg-slate-900' : 'bg-white'} rounded-t-3xl sm:rounded-3xl flex flex-col shadow-2xl overscroll-contain`} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className={`px-4 pt-4 pb-3 flex items-center justify-between border-b ${isDark ? 'border-white/10' : 'border-black/8'}`}>
           <h3 className={`font-black text-lg flex items-center gap-2 ${isDark ? 'text-rose-400' : 'text-rose-600'}`}>
@@ -135,7 +143,7 @@ export default function ModerationPanel({ isDark, t, onClose, onNavigateToPost, 
             <button onClick={seedLeaderboard} title="Isi Dummy Leaderboard" className="p-2 rounded-full bg-amber-500/20 text-amber-500 hover:bg-amber-500/40 transition-colors">
               <Bug size={18} />
             </button>
-            <button onClick={onClose} className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors">
+            <button data-close-modal="true" onClick={onClose} className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors">
               <X size={20} />
             </button>
           </div>

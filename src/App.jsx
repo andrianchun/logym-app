@@ -53,7 +53,7 @@ import { fetchExercisesFromApi } from './utils/exerciseDbApi';
 import { AI_MODELS, detectPlateaus, getLogyNotification } from './utils/aiAgent';
 import { calculateReadiness, restingHrBaseline } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
-import { calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, recomputeStrengthRecords, buildExLookupByName, canonicalExId, sessionSpanSeconds, repairActualWeights, buildHcSessionDetail, estimate10RM, defaultSetWeight, gymStepFor, mergeRm10, getEquipmentConfig, calculateActualWeight, calculateInputWeight, getSetActualWeight } from './utils/workoutCalc';
+import { calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, deduplicateWorkouts, recomputeStrengthRecords, buildExLookupByName, canonicalExId, sessionSpanSeconds, repairActualWeights, buildHcSessionDetail, estimate10RM, defaultSetWeight, gymStepFor, mergeRm10, getEquipmentConfig, calculateActualWeight, calculateInputWeight, getSetActualWeight } from './utils/workoutCalc';
 import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcReadHeartRateWindow, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission, capIntradayLog, HC_FIELDS, fillOnlyPatch, hcDroppedTypes } from './utils/healthConnect';
 import { bumpExercisePopularity } from './utils/exercisePopularity';
 import { rapikanNamaProgram, rapikanNamaSesi, pertahankanNamaSesi } from './utils/programNaming';
@@ -368,7 +368,7 @@ export default function App() {
   const [logyMemory, _setLogyMemory] = useState([]);
   const setLogyMemory = _setLogyMemory;
   const [hasUnreadChat, setHasUnreadChat] = useState(false);
-  const [activityTargets, _setActivityTargets] = useState(() => readCache('__CACHED_ACTIVITY_TARGETS', { steps: 10000, dailyActiveMinutes: 30, sleep: 8 }));
+  const [activityTargets, _setActivityTargets] = useState(() => readCache('__CACHED_ACTIVITY_TARGETS', { steps: 10000, dailyActiveMinutes: 30, weeklyActiveMinutes: 150, sleep: 8 }));
   const setActivityTargets = _setActivityTargets;
 
   useEffect(() => { writeCache('__CACHED_THEME', theme); }, [theme]);
@@ -438,10 +438,27 @@ export default function App() {
   const historyMirror = useRef(history);
   historyMirror.current = history;
   useEffect(() => {
-    if (!writeCache('__CACHED_HISTORY', history)) {
-      setCloudSaveError('Penyimpanan lokal penuh — cache latihan tidak bisa ditulis. Kosongkan ruang penyimpanan; sampai itu beres, data antar perangkat bisa tidak sinkron.');
-    }
+    const timer = setTimeout(() => {
+      if (!writeCache('__CACHED_HISTORY', history)) {
+        setCloudSaveError('Penyimpanan lokal penuh — cache latihan tidak bisa ditulis. Kosongkan ruang penyimpanan; sampai itu beres, data antar perangkat bisa tidak sinkron.');
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
   }, [history]);
+
+  // Flush pending history cache write saat aplikasi ditutup/berpindah latar belakang
+  useEffect(() => {
+    const flushCache = () => {
+      writeCache('__CACHED_HISTORY', historyMirror.current);
+    };
+    window.addEventListener('beforeunload', flushCache);
+    window.addEventListener('pagehide', flushCache);
+    return () => {
+      window.removeEventListener('beforeunload', flushCache);
+      window.removeEventListener('pagehide', flushCache);
+    };
+  }, []);
   
   const setHistory = _setHistory;
 
@@ -784,11 +801,8 @@ export default function App() {
 
 
   const [activeTab, _setActiveTab] = useState('dashboard');
-  // BottomNav pakai activeTab (urgent, pindah seketika), isi <main> pakai contentTab.
-  // Sebelumnya _setActiveTab dibungkus startTransition — itu ikut menahan animasi navnya
-  // sampai tab berat selesai render, jadi tap terasa nyangkut. useDeferredValue menunda
-  // yang beratnya saja, dan render tundaannya bisa dipotong React supaya frame animasi lewat.
-  const contentTab = useDeferredValue(activeTab);
+  // Transisi tab instan tanpa artificial deferral: kedua BottomNav dan konten berpindah sinkron
+  const contentTab = activeTab;
   const [tabSlideDir, setTabSlideDir] = useState('');
   const [mountedTabs, setMountedTabs] = useState(() => new Set(['dashboard', activeTab]));
   useEffect(() => {
@@ -799,6 +813,24 @@ export default function App() {
       return next;
     });
   }, [contentTab]);
+
+  // Pre-mount semua tab saat browser idle agar transisi tab instan dan tidak mengalami freeze first-mount
+  useEffect(() => {
+    if (isInitialSplash) return;
+    const scheduleWarmup = typeof window !== 'undefined' && 'requestIdleCallback' in window
+      ? window.requestIdleCallback
+      : (cb) => setTimeout(cb, 1200);
+
+    const handle = scheduleWarmup(() => {
+      setMountedTabs(new Set(['dashboard', 'workout', 'calendar', 'program', 'database']));
+    });
+
+    return () => {
+      if (typeof window !== 'undefined' && 'cancelIdleCallback' in window && typeof handle === 'number') {
+        window.cancelIdleCallback(handle);
+      }
+    };
+  }, [isInitialSplash]);
   
   const [expandedSessions, _setExpandedSessions] = useState(() => {
     try {
@@ -818,6 +850,13 @@ export default function App() {
   const setActiveTab = (newTab) => {
     if (typeof newTab === 'function') newTab = newTab(activeTab);
     if (newTab === activeTab) return;
+
+    setMountedTabs(prev => {
+      if (prev.has(newTab)) return prev;
+      const next = new Set(prev);
+      next.add(newTab);
+      return next;
+    });
 
     const tabsList = ['dashboard', 'workout', 'calendar', 'program', 'database'];
     const curIdx = tabsList.indexOf(activeTab);
@@ -1619,6 +1658,25 @@ export default function App() {
      });
   }, [isDataLoaded, activityTargets, lomealTargets?.kcal]);
 
+  // Sembuhkan & rapikan sesi kembar (misal ekstra duplikat saat save) yang terlanjur tersimpan di history hari ini
+  useEffect(() => {
+    if (!isDataLoaded || !isHistoryLoaded) return;
+    const todayStr = getLocalYMD(new Date());
+    const dayData = history[todayStr];
+    if (dayData && Array.isArray(dayData.workouts)) {
+      const deduped = deduplicateWorkouts(dayData.workouts);
+      if (deduped.length !== dayData.workouts.length) {
+        setHistory(prev => ({
+          ...prev,
+          [todayStr]: {
+            ...prev[todayStr],
+            workouts: deduped
+          }
+        }));
+      }
+    }
+  }, [isDataLoaded, isHistoryLoaded, history]);
+
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
     
@@ -1715,7 +1773,7 @@ export default function App() {
         setUnits({ weight: 'kg', height: 'cm', distance: 'km', temp: 'c' });
         setGymProfiles([{ id: 'default', name: 'Logym', equipment: 'all', config: {} }]);
         setActiveGymId('default');
-        setActivityTargets({ steps: 10000, dailyActiveMinutes: 30, sleep: 8 });
+        setActivityTargets({ steps: 10000, dailyActiveMinutes: 30, weeklyActiveMinutes: 150, sleep: 8 });
         setActivePlanIds(['custom']);
         setBiometricStandard('asia');
       }
@@ -3403,11 +3461,9 @@ export default function App() {
               if (existingIdx >= 0) {
                   const cur = lib[existingIdx];
                   const updatedLastWeight = weight > 0 ? weight : cur.lastWeight;
-                  const updatedRm10 = cur.rm10 ? cur.rm10 : c10RM;
-                  const updatedRm10Best = Math.max(Number(cur.rm10Best) || 0, c10RM);
-                  if (cur.lastWeight === updatedLastWeight && cur.rm10 === updatedRm10 && (cur.rm10Best || 0) === updatedRm10Best) return lib;
+                  if (cur.lastWeight === updatedLastWeight) return lib;
                   const newLib = [...lib];
-                  newLib[existingIdx] = { ...cur, lastWeight: updatedLastWeight, rm10: updatedRm10, rm10Best: updatedRm10Best };
+                  newLib[existingIdx] = { ...cur, lastWeight: updatedLastWeight };
                   return newLib;
               }
               return lib;
@@ -3432,6 +3488,9 @@ export default function App() {
               }
            }
            setSessionSnapshot({ exerciseLogs: JSON.parse(JSON.stringify(exerciseLogs)), skippedExercises: JSON.parse(JSON.stringify(skippedExercises)), extraExercises: JSON.parse(JSON.stringify(extraExercises)) });
+           if (typeof window !== 'undefined') {
+              window.logymCelebrated10RM = {};
+           }
            setIsWorkoutActive(true);
            setWorkoutStartTime(Date.now() - (prevSecsToUse * 1000));
            setResumeDurationSecs(0);
@@ -3748,7 +3807,10 @@ export default function App() {
   // beruntun harus lewat setFocusWorkoutId dan menunggu state — dan sesi kedua akan memakai
   // fokus sesi pertama yang belum sempat berubah.
   const handleSaveWorkout = (progId, opts = {}) => {
-    const fokusSesi = opts.workoutId !== undefined ? opts.workoutId : focusWorkoutId;
+    let fokusSesi = opts.workoutId !== undefined ? opts.workoutId : focusWorkoutId;
+    if (progId && progId !== 'extra' && fokusSesi === 'extra') {
+      fokusSesi = progId;
+    }
     playSoundEffect('success', soundEnabled);
 
     // DURASI SESI INI SAJA, bukan seluruh waktu timer.
@@ -3809,6 +3871,9 @@ export default function App() {
       return totalDoneSets > 0 ? Math.max(60, totalDoneSets * 90) : 0;
     };
 
+    if (typeof window !== 'undefined') {
+      window.logymCelebrated10RM = {};
+    }
     setIsWorkoutActive(false);
     setWorkoutStartTime(null);
     setRestTargetTime(null);
@@ -3853,7 +3918,9 @@ export default function App() {
 
     setExerciseLogs(belah.sisa);
     setSkippedExercises(belahSkip.sisa);
-    if (isSesiEkstra) setExtraExercises([]);
+    if (isSesiEkstra || sessionToRun === 'extra' || fokusSesi === 'extra') setExtraExercises([]);
+    if (focusWorkoutId === 'extra' || focusWorkoutId === progId) setFocusWorkoutId(null);
+    if (sessionToRun === 'extra' || sessionToRun === progId) setSessionToRun(null);
     setSessionSnapshot(null);
 
     let cleanLogs = {};
@@ -3876,10 +3943,24 @@ export default function App() {
       const dayData = h[targetDateStr] || { workouts: [] };
       let workouts = [...(dayData.workouts || [])];
       
+      // Bersihkan workout adhoc kosong (tanpa exercise) dan deduplikasi sesi kembar dari history hari ini
+      workouts = deduplicateWorkouts(workouts.filter(w => w.programId !== 'adhoc' || (w.exercises && w.exercises.length > 0)));
+
       if (progId === 'extra') {
-        const adhocIdx = workouts.findIndex(w => w.programId === 'adhoc' && w.status !== 'completed');
+        const adhocUncompletedIdx = workouts.findIndex(w => w.programId === 'adhoc' && w.status !== 'completed');
         const targetAdhocIdx = (fokusSesi && fokusSesi !== 'extra') ? workouts.findIndex(w => w.id === fokusSesi) : -1;
-        const matchedIdx = adhocIdx >= 0 ? adhocIdx : targetAdhocIdx;
+        
+        // Cari adhoc workout hari ini yang sudah ada dengan daftar exercise yang identik
+        const cleanExIds = (cleanExtra || []).map(e => String(e.originalId || e.id)).sort().join('|');
+        const matchingAdhocIdx = cleanExIds ? workouts.findIndex(w => {
+          if (w.programId !== 'adhoc') return false;
+          const wExIds = (w.exercises || []).map(e => String(e.originalId || e.id)).sort().join('|');
+          return wExIds === cleanExIds;
+        }) : -1;
+
+        const matchedIdx = adhocUncompletedIdx >= 0 
+          ? adhocUncompletedIdx 
+          : (targetAdhocIdx >= 0 ? targetAdhocIdx : matchingAdhocIdx);
 
         if (matchedIdx >= 0) {
           const existingW = workouts[matchedIdx];
@@ -3898,12 +3979,12 @@ export default function App() {
             status: 'completed',
             log: cleanLogs,
             skipped: cleanSkipped,
-            exercises: cleanExtra,
+            exercises: cleanExtra.length > 0 ? cleanExtra : existingW.exercises,
             timestamp: endStamp,
             startedAt: startedAtFor(finalSecs),
             duration: formatDur(finalSecs)
           };
-        } else {
+        } else if (cleanExtra.length > 0) {
           const finalSecs = calcFallbackDurationSecs(cleanLogs, durationSecs);
           workouts.push({
             id: (fokusSesi && fokusSesi !== 'extra') ? fokusSesi : `adhoc_${Date.now()}`,
@@ -4037,8 +4118,9 @@ export default function App() {
                  pId = p.id;
               }
               const finalSecs = calcFallbackDurationSecs(cleanLogs, durationSecs);
+              const workoutIdToUse = (focusWorkoutId && focusWorkoutId !== 'extra') ? focusWorkoutId : (progId || `completed_${Date.now()}`);
               workouts.push({
-                 id: focusWorkoutId || progId || `completed_${Date.now()}`,
+                 id: workoutIdToUse,
                  programId: pId,
                  programName: pName,
                  status: 'completed',
@@ -4062,7 +4144,7 @@ export default function App() {
           ...(dayData._activeSession || {}),
           exerciseLogs: sisaLogs,
           skippedExercises: sisaSkipped,
-          extraExercises: isSesiEkstra ? [] : (cleanExtra || [])
+          extraExercises: (isSesiEkstra || sessionToRun === 'extra' || fokusSesi === 'extra') ? [] : (cleanExtra || [])
         }
       };
       
@@ -4076,8 +4158,12 @@ export default function App() {
     pendingRmLogKeys.current = Object.keys(cleanLogs);
 
     if (!opts.stayOnWorkoutTab && !opts.auto) {
+      localStorage.setItem('Logym_calendar_mode', 'weekly');
       localStorage.setItem('logym_calendar_mode', 'weekly');
       localStorage.setItem('logym_show_monthly_stats', 'true');
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('logym_set_calendar_mode', { detail: 'weekly' }));
+      }
       setActiveTab('calendar');
     }
   };
@@ -4094,7 +4180,7 @@ export default function App() {
   useEffect(() => {
     if (autoSaveQueue.current.length === 0) return;
     const id = autoSaveQueue.current.shift();
-    const t = setTimeout(() => handleSaveWorkout(id, { workoutId: id, auto: true }), 0);
+    const t = setTimeout(() => handleSaveWorkout(id, { workoutId: id, auto: true }), 100);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exerciseLogs]);
@@ -4121,6 +4207,9 @@ export default function App() {
         }
       }
       
+      if (typeof window !== 'undefined') {
+        window.logymCelebrated10RM = {};
+      }
       setIsWorkoutActive(true);
       setWorkoutStartTime(Date.now() - (prevSecs * 1000));
       setResumeDurationSecs(0);
@@ -4178,6 +4267,9 @@ export default function App() {
           },
           confirmText: 'Simpan & Lanjut',
           onDiscard: () => {
+             if (typeof window !== 'undefined') {
+                window.logymCelebrated10RM = {};
+             }
              setIsImmersiveMode(false);
              setIsWorkoutActive(false);
              setWorkoutStartTime(null);
@@ -4361,7 +4453,7 @@ export default function App() {
   return (
     <>
       <div 
-      className={`min-h-screen flex flex-col ${t.bgApp} ${t.textMain} font-sans ${contentTab === 'calendar' ? 'h-[100dvh] overflow-hidden' : 'pb-32'} transition-colors duration-300 w-full`}
+      className={`min-h-screen flex flex-col ${t.bgApp} ${t.textMain} font-sans ${contentTab === 'calendar' ? 'h-[100dvh] overflow-hidden' : 'pb-32'} w-full`}
       ref={swipeAreaRef}
       onTouchStart={handleGlobalTouchStart}
       onTouchEnd={handleGlobalTouchEnd}
@@ -4387,7 +4479,7 @@ export default function App() {
           )}
         </div>
       )}
-      <AddExerciseModal t={t} lang={lang} activeAddModalTarget={activeAddModalTarget} setActiveAddModalTarget={setActiveAddModalTarget} exerciseLibrary={exerciseLibrary} onAddExerciseTarget={addExerciseTarget} setActiveTab={setActiveTab} />
+      <AddExerciseModal t={t} lang={lang} activeAddModalTarget={activeAddModalTarget} setActiveAddModalTarget={setActiveAddModalTarget} exerciseLibrary={exerciseLibrary} onAddExerciseTarget={addExerciseTarget} setActiveTab={setActiveTab} history={history} />
       <HelpModal showHelp={showHelp} setShowHelp={setShowHelp} t={t} lang={lang} />
       {globalDetailExercise && (
         <ExerciseDetailModal 
@@ -4505,9 +4597,10 @@ export default function App() {
       />
       
       <main className={`${contentTab === 'calendar' ? 'p-0 flex-1 flex flex-col min-h-0 overflow-hidden' : contentTab === 'database' ? 'px-4 pb-4 pt-0 min-h-[70vh] max-w-5xl mx-auto w-full' : 'p-4 min-h-[70vh] max-w-5xl mx-auto w-full'}`}>
-        <TabSlider activeTab={contentTab} tabIndex={['dashboard','workout','calendar','program','database'].indexOf(contentTab)} className={contentTab === 'calendar' ? 'flex-1 flex flex-col min-h-0' : ''}>
+        <TabSlider activeTab={contentTab} tabSlideDir={tabSlideDir} tabIndex={['dashboard','workout','calendar','program','database'].indexOf(contentTab)} className={contentTab === 'calendar' ? 'flex-1 flex flex-col min-h-0' : ''}>
          <div style={{ display: contentTab === 'dashboard' ? 'contents' : 'none' }}>
              <DashboardTab setConfirmModal={setConfirmModal} 
+               isActive={contentTab === 'dashboard'}
                t={t} lang={lang} language={language} user={user} 
                history={history} setHistory={setHistory} 
                programs={programs} exerciseLibrary={exerciseLibrary} 
@@ -4595,6 +4688,7 @@ export default function App() {
          {mountedTabs.has('program') && (
              <div style={{ display: contentTab === 'program' ? 'contents' : 'none' }}>
                  <ProgramTab setConfirmModal={setConfirmModal} 
+                   isActive={contentTab === 'program'}
                    onPostCreated={handlePostCreated}
                    t={t} theme={theme} lang={lang} programs={programs} setPrograms={setPrograms} 
                    user={user} exerciseLibrary={exerciseLibrary} soundEnabled={soundEnabled}
@@ -4622,6 +4716,7 @@ export default function App() {
          {mountedTabs.has('database') && (
              <div style={{ display: contentTab === 'database' ? 'contents' : 'none' }}>
                  <DatabaseTab setConfirmModal={setConfirmModal} 
+                    isActive={contentTab === 'database'}
                     t={t} lang={lang}
                     exerciseLibrary={exerciseLibrary} setExerciseLibrary={setExerciseLibrary} 
                     history={history}

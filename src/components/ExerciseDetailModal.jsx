@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Dumbbell, History, Calculator, Replace, Video, Info, ChevronLeft, ChevronRight, Loader2, Play } from 'lucide-react';
 import { formatTarget, resolveProjectedProgramId, defaultMasterExercises, findMatchingMasterExercise, cleanExerciseNameForMatching, canonicalizeExercise, exerciseAliasMap } from '../data/constants';
@@ -43,6 +43,14 @@ const ExerciseDetailModal = ({
   setExerciseLibrary,
   programs
 }) => {
+  useEffect(() => {
+    const orig = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = orig;
+    };
+  }, []);
+
   const isImp = units?.weight === 'lbs';
   const initialExType = resolveExerciseKind(initialEx);
   const historyData = useMemo(() => {
@@ -495,7 +503,7 @@ const ExerciseDetailModal = ({
     }).filter(v => v.videoId);
 
     return createPortal(
-      <div role="dialog" aria-modal="true" className={`fixed inset-0 z-[100] flex flex-col ${t.bgApp} no-swipe`}>
+      <div role="dialog" aria-modal="true" className={`fixed inset-0 z-[100] flex flex-col ${t.bgApp} no-swipe overscroll-contain touch-pan-y`}>
         <div className="p-4 flex justify-between items-center bg-black/80 absolute top-0 w-full z-20" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
           <h2 className="h2 text-white drop-shadow-md">{ex.name}</h2>
           <button data-close-modal="true" onClick={onClose} className="p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition">

@@ -3,6 +3,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip } from 'recharts';
 import { getLocalYMD } from '../data/constants';
 import { formatNumber } from '../utils/numberFormat';
 import { dayBmr } from '../utils/bmr';
+import { enrichBioWithImpedance } from '../utils/xiaomiScaleCalc';
 
 // Resolusi pinch-to-zoom bertingkat (sama persis dengan arsitektur VitalsChart):
 // Zoom-in: detail harian (per hari)
@@ -17,23 +18,42 @@ const avg = (arr) => arr && arr.length ? arr.reduce((a, b) => a + b, 0) / arr.le
 const round1 = (val) => val != null ? Number(Number(val).toFixed(1)) : null;
 const roundInt = (val) => val != null ? Math.round(Number(val)) : null;
 
+const MAX_ACTIVE_CHART_METRICS = 6;
+const DEFAULT_ACTIVE_METRICS = ['weight', 'bodyFat', 'musclePercent', 'ffmi', 'visceralFat', 'waist'];
+
 const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPointClick, unitSystem, units, language, userProfile, isSubCard = false }) => {
   const isImp = unitSystem === 'imperial' || units?.weight === 'lbs';
-  const chartMetricsList = [
-      { key: 'weight', label: 'Berat Badan', color: theme === 'dark' ? '#38bdf8' : '#0284c7' }, // Sky Blue
-      { key: 'bodyFat', label: 'Kadar Lemak', color: theme === 'dark' ? '#60a5fa' : '#2563eb' }, // Lighter Blue
-      { key: 'musclePercent', label: 'Kadar Otot', color: theme === 'dark' ? '#818cf8' : '#4f46e5' }, // Soft Indigo
-      { key: 'visceralFat', label: 'Lemak Visceral', color: theme === 'dark' ? '#2dd4bf' : '#0d9488' }, // Teal
+  const isID = language === 'ID';
+
+  const chartMetricsList = useMemo(() => [
+      { key: 'weight', label: isID ? 'Berat Badan' : 'Weight', color: theme === 'dark' ? '#38bdf8' : '#0284c7' }, // Sky Blue
+      { key: 'bodyFat', label: isID ? 'Kadar Lemak' : 'Body Fat', color: theme === 'dark' ? '#60a5fa' : '#2563eb' }, // Blue
+      { key: 'musclePercent', label: isID ? 'Kadar Otot' : 'Muscle', color: theme === 'dark' ? '#818cf8' : '#4f46e5' }, // Soft Indigo
+      { key: 'ffmi', label: 'FFMI', color: theme === 'dark' ? '#c084fc' : '#9333ea' }, // Purple
+      { key: 'visceralFat', label: isID ? 'Lemak Visceral' : 'Visceral Fat', color: theme === 'dark' ? '#2dd4bf' : '#0d9488' }, // Teal
+      { key: 'waist', label: isID ? 'Perut' : 'Waist', color: theme === 'dark' ? '#06b6d4' : '#0891b2' }, // Cyan
+      { key: 'proteinPercent', label: isID ? 'Kadar Protein' : 'Protein', color: theme === 'dark' ? '#fbbf24' : '#d97706' }, // Amber
+      { key: 'waterPercent', label: isID ? 'Kadar Air' : 'Water', color: theme === 'dark' ? '#34d399' : '#059669' }, // Emerald / Mint
+      { key: 'boneMass', label: isID ? 'Mineral Tulang' : 'Bone Mass', color: theme === 'dark' ? '#fb7185' : '#e11d48' }, // Rose
+      { key: 'bodyAge', label: isID ? 'Usia Tubuh' : 'Body Age', color: theme === 'dark' ? '#fb923c' : '#ea580c' }, // Orange
       { key: 'bmr', label: 'BMR', color: theme === 'dark' ? '#94a3b8' : '#64748b' }, // Slate
-      { key: 'waist', label: 'Lingkar Perut', color: theme === 'dark' ? '#3b82f6' : '#1d4ed8' }, // Blue
-  ];
+      { key: 'wthr', label: 'WTHR', color: theme === 'dark' ? '#a78bfa' : '#7c3aed' }, // Violet
+  ], [theme, isID]);
 
   const [activeChartMetrics, setActiveChartMetrics] = useState(() => {
       try {
           const saved = localStorage.getItem('lyfit_chart_metrics');
-          if (saved) return JSON.parse(saved);
+          if (saved) {
+              const parsed = JSON.parse(saved);
+              const validKeys = [
+                'weight', 'bodyFat', 'musclePercent', 'ffmi', 'visceralFat', 'waist',
+                'proteinPercent', 'waterPercent', 'boneMass', 'bodyAge', 'bmr', 'wthr'
+              ];
+              const filtered = parsed.filter(k => validKeys.includes(k));
+              if (filtered.length > 0) return filtered.slice(0, MAX_ACTIVE_CHART_METRICS);
+          }
       } catch(e) {}
-      return ['weight', 'bodyFat', 'musclePercent', 'visceralFat', 'waist'];
+      return DEFAULT_ACTIVE_METRICS;
   });
 
   const pressTimerRef = useRef(null);
@@ -50,7 +70,7 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
     setActiveChartMetrics(prev => {
       let newMetrics;
       if (prev.length === 1 && prev[0] === key) {
-        newMetrics = ['weight', 'bodyFat', 'musclePercent', 'visceralFat', 'waist'];
+        newMetrics = DEFAULT_ACTIVE_METRICS;
       } else {
         newMetrics = [key];
       }
@@ -108,7 +128,16 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
   const toggleChartMetric = (key) => {
       playSoundEffect('click', soundEnabled);
       setActiveChartMetrics(prev => {
-          const newMetrics = prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key];
+          let newMetrics;
+          if (prev.includes(key)) {
+              if (prev.length === 1) return prev; // Minimal 1 metrik aktif
+              newMetrics = prev.filter(k => k !== key);
+          } else if (prev.length >= MAX_ACTIVE_CHART_METRICS) {
+              // Jika sudah 6 aktif, rotasi FIFO: geser metrik terlama yang diaktifkan
+              newMetrics = [...prev.slice(1), key];
+          } else {
+              newMetrics = [...prev, key];
+          }
           localStorage.setItem('lyfit_chart_metrics', JSON.stringify(newMetrics));
           return newMetrics;
       });
@@ -119,27 +148,54 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
       const data = [];
       const bioEntries = [];
       const todayStr = getLocalYMD(new Date());
+      let fallbackHeight = userProfile?.height || userProfile?.biometrics?.height || null;
+
       Object.keys(history).forEach(dateStr => {
           if (history[dateStr]?.bioData && dateStr <= todayStr) {
-              bioEntries.push({ dateStr, bioData: history[dateStr].bioData });
+              const b = history[dateStr].bioData;
+              bioEntries.push({ dateStr, bioData: b });
+              if (!fallbackHeight && b.height) fallbackHeight = b.height;
           }
       });
       bioEntries.sort((a, b) => a.dateStr.localeCompare(b.dateStr));
 
       bioEntries.forEach(entry => {
           const d = new Date(entry.dateStr);
-          const histBio = entry.bioData;
+          const histBio = enrichBioWithImpedance(entry.bioData, userProfile, fallbackHeight, entry.dateStr);
+
+          const uH = Number(histBio?.height || fallbackHeight || userProfile?.height || 0);
+          const uW = Number(histBio?.weight || 0);
+          const uBf = Number(histBio?.bodyFat || 0);
+          const uWaist = Number(histBio?.waist || 0);
+
+          let ffmi = null;
+          if (uH > 0 && uW > 0 && uBf > 0) {
+              const hMeter = uH / 100;
+              const ffmKg = uW * (1 - (uBf / 100));
+              ffmi = Number((ffmKg / (hMeter * hMeter)).toFixed(1));
+          }
+
+          let wthr = null;
+          if (uH > 0 && uWaist > 0) {
+              wthr = Number((uWaist / uH).toFixed(2));
+          }
 
           data.push({
               ts: d.getTime(),
-              name: d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }),
+              name: d.toLocaleDateString(language === 'ID' ? 'id-ID' : 'en-US', { day: 'numeric', month: 'short' }),
               dateFull: entry.dateStr,
               weight: histBio?.weight ? Number((isImp ? Number(histBio.weight) * 2.20462 : Number(histBio.weight)).toFixed(1)) : null,
               bodyFat: histBio?.bodyFat ? Number(histBio.bodyFat) : null,
               musclePercent: histBio?.musclePercent ? Number(histBio.musclePercent) : null,
+              ffmi,
               visceralFat: histBio?.visceralFat ? Number(histBio.visceralFat) : null,
-              bmr: histBio?.weight || histBio?.bmr ? (dayBmr(histBio, userProfile) || null) : null,
               waist: histBio?.waist ? Number((isImp ? Number(histBio.waist) * 0.393701 : Number(histBio.waist)).toFixed(1)) : null,
+              proteinPercent: histBio?.proteinPercent ? Number(histBio.proteinPercent) : null,
+              waterPercent: histBio?.waterPercent ? Number(histBio.waterPercent) : null,
+              boneMass: histBio?.boneMass ? Number(histBio.boneMass) : null,
+              bodyAge: histBio?.bodyAge ? Number(histBio.bodyAge) : null,
+              bmr: histBio?.weight || histBio?.bmr ? (dayBmr(histBio, userProfile) || null) : null,
+              wthr,
           });
       });
       return data;
@@ -157,9 +213,15 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
                   weight: [],
                   bodyFat: [],
                   musclePercent: [],
+                  ffmi: [],
                   visceralFat: [],
-                  bmr: [],
                   waist: [],
+                  proteinPercent: [],
+                  waterPercent: [],
+                  boneMass: [],
+                  bodyAge: [],
+                  bmr: [],
+                  wthr: [],
               };
           }
           byMonth[k].ts.push(p.ts);
@@ -167,9 +229,15 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
           if (p.weight != null) byMonth[k].weight.push(p.weight);
           if (p.bodyFat != null) byMonth[k].bodyFat.push(p.bodyFat);
           if (p.musclePercent != null) byMonth[k].musclePercent.push(p.musclePercent);
+          if (p.ffmi != null) byMonth[k].ffmi.push(p.ffmi);
           if (p.visceralFat != null) byMonth[k].visceralFat.push(p.visceralFat);
-          if (p.bmr != null) byMonth[k].bmr.push(p.bmr);
           if (p.waist != null) byMonth[k].waist.push(p.waist);
+          if (p.proteinPercent != null) byMonth[k].proteinPercent.push(p.proteinPercent);
+          if (p.waterPercent != null) byMonth[k].waterPercent.push(p.waterPercent);
+          if (p.boneMass != null) byMonth[k].boneMass.push(p.boneMass);
+          if (p.bodyAge != null) byMonth[k].bodyAge.push(p.bodyAge);
+          if (p.bmr != null) byMonth[k].bmr.push(p.bmr);
+          if (p.wthr != null) byMonth[k].wthr.push(p.wthr);
       });
 
       return Object.entries(byMonth).map(([k, v]) => {
@@ -183,9 +251,15 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
               weight: round1(avg(v.weight)),
               bodyFat: round1(avg(v.bodyFat)),
               musclePercent: round1(avg(v.musclePercent)),
+              ffmi: round1(avg(v.ffmi)),
               visceralFat: round1(avg(v.visceralFat)),
-              bmr: roundInt(avg(v.bmr)),
               waist: round1(avg(v.waist)),
+              proteinPercent: round1(avg(v.proteinPercent)),
+              waterPercent: round1(avg(v.waterPercent)),
+              boneMass: round1(avg(v.boneMass)),
+              bodyAge: roundInt(avg(v.bodyAge)),
+              bmr: roundInt(avg(v.bmr)),
+              wthr: v.wthr?.length ? Number(avg(v.wthr).toFixed(2)) : null,
               count: v.ts.length,
           };
       }).sort((a, b) => a.ts - b.ts);
@@ -203,9 +277,15 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
                   weight: [],
                   bodyFat: [],
                   musclePercent: [],
+                  ffmi: [],
                   visceralFat: [],
-                  bmr: [],
                   waist: [],
+                  proteinPercent: [],
+                  waterPercent: [],
+                  boneMass: [],
+                  bodyAge: [],
+                  bmr: [],
+                  wthr: [],
               };
           }
           byYear[k].ts.push(p.ts);
@@ -213,9 +293,15 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
           if (p.weight != null) byYear[k].weight.push(p.weight);
           if (p.bodyFat != null) byYear[k].bodyFat.push(p.bodyFat);
           if (p.musclePercent != null) byYear[k].musclePercent.push(p.musclePercent);
+          if (p.ffmi != null) byYear[k].ffmi.push(p.ffmi);
           if (p.visceralFat != null) byYear[k].visceralFat.push(p.visceralFat);
-          if (p.bmr != null) byYear[k].bmr.push(p.bmr);
           if (p.waist != null) byYear[k].waist.push(p.waist);
+          if (p.proteinPercent != null) byYear[k].proteinPercent.push(p.proteinPercent);
+          if (p.waterPercent != null) byYear[k].waterPercent.push(p.waterPercent);
+          if (p.boneMass != null) byYear[k].boneMass.push(p.boneMass);
+          if (p.bodyAge != null) byYear[k].bodyAge.push(p.bodyAge);
+          if (p.bmr != null) byYear[k].bmr.push(p.bmr);
+          if (p.wthr != null) byYear[k].wthr.push(p.wthr);
       });
 
       return Object.entries(byYear).map(([k, v]) => {
@@ -229,9 +315,15 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
               weight: round1(avg(v.weight)),
               bodyFat: round1(avg(v.bodyFat)),
               musclePercent: round1(avg(v.musclePercent)),
+              ffmi: round1(avg(v.ffmi)),
               visceralFat: round1(avg(v.visceralFat)),
-              bmr: roundInt(avg(v.bmr)),
               waist: round1(avg(v.waist)),
+              proteinPercent: round1(avg(v.proteinPercent)),
+              waterPercent: round1(avg(v.waterPercent)),
+              boneMass: round1(avg(v.boneMass)),
+              bodyAge: roundInt(avg(v.bodyAge)),
+              bmr: roundInt(avg(v.bmr)),
+              wthr: v.wthr?.length ? Number(avg(v.wthr).toFixed(2)) : null,
               count: v.ts.length,
           };
       }).sort((a, b) => a.ts - b.ts);
@@ -455,8 +547,10 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
                            let unit = '';
                            if (props.dataKey === 'weight') unit = isImp ? ' lbs' : ' kg';
                            else if (props.dataKey === 'waist') unit = isImp ? ' in' : ' cm';
-                           else if (['bodyFat', 'musclePercent', 'waterPercent', 'proteinPercent'].includes(props.dataKey)) unit = '%';
+                           else if (['bodyFat', 'musclePercent', 'waterPercent', 'proteinPercent', 'boneMass'].includes(props.dataKey)) unit = '%';
                            else if (props.dataKey === 'bmr') unit = ' kcal';
+                           else if (props.dataKey === 'bodyAge') unit = isID ? ' th' : ' yo';
+                           else if (['ffmi', 'visceralFat', 'wthr'].includes(props.dataKey)) unit = '';
                            return [`${formatNumber(value, language)}${unit}`, name];
                        }}
                        labelFormatter={(label, payload) => {

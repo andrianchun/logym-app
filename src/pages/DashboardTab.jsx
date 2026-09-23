@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Activity, Zap, Brain, Footprints, HeartPulse, Moon, Droplets, Droplet, Dumbbell, Scale, RefreshCw, Trophy, Link2, Pencil, Settings, Info, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Wind, Utensils, Flame, Clock, Cloud, CloudOff, Bluetooth } from 'lucide-react';
+import { Activity, Zap, Brain, Footprints, HeartPulse, Moon, Droplets, Droplet, Dumbbell, Scale, RefreshCw, Trophy, Link2, Pencil, Settings, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Wind, Utensils, Flame, Clock, Cloud, CloudOff, Bluetooth, Target } from 'lucide-react';
 import { getLocalYMD, hasDeletedProjected, isLomealOwned } from '../data/constants';
 import { calculateReadiness, restingHrBaseline } from '../utils/readinessEngine';
 import DashboardModals from '../components/DashboardModals';
@@ -11,9 +11,9 @@ import ProgressTab from './ProgressTab';
 import { MuscleProgress } from '../components/MuscleProgress';
 import SwipeInput from '../components/SwipeInput';
 import { formatNumber, sleepHoursToParts } from '../utils/numberFormat';
-import { dailyBurnCalories, dailyActiveMinutes } from '../utils/workoutCalc';
+import { dailyBurnCalories, dailyActiveMinutes, deduplicateWorkouts } from '../utils/workoutCalc';
 import { dayBmr } from '../utils/bmr';
-import { calculateBodyComposition } from '../utils/xiaomiScaleCalc';
+import { calculateBodyComposition, enrichBioWithImpedance } from '../utils/xiaomiScaleCalc';
 import { AreaChart, Area, ResponsiveContainer, YAxis, XAxis, ReferenceArea } from 'recharts';
 
 
@@ -70,7 +70,7 @@ const LEGEND_ROW = 'h-8 items-start content-start';
 // diisi manual), titik + angka telanjang tidak memberi tahu apa-apa soal asal angkanya.
 // Segmen bernilai 0 dibuang dari keterangan, bukan cuma dari bar: "0" tidak menambah informasi
 // apa pun tapi memakan lebar yang justru bikin barisnya melipat lebih cepat.
-const StackedBar = ({ parts, basis, language, align = 'left' }) => {
+const StackedBar = ({ parts, basis, language, align = 'left', showLegend = true }) => {
     const safeBasis = basis > 0 ? basis : 1;
     const shown = parts.filter(p => p.value > 0);
     return (
@@ -81,14 +81,16 @@ const StackedBar = ({ parts, basis, language, align = 'left' }) => {
                          style={{ width: `${Math.min(100, (p.value / safeBasis) * 100)}%` }} />
                 ))}
             </div>
-            <div className={`flex flex-wrap gap-x-2 ${LEGEND_ROW} ${align === 'right' ? 'justify-end' : ''}`}>
-                {shown.map(p => (
-                    <span key={p.key} className="flex items-center gap-1 whitespace-nowrap text-[9px] text-zinc-500 dark:text-zinc-400">
-                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${PART_COLORS[p.key].dot}`} />
-                        {p.label} {formatNumber(p.value, language)}
-                    </span>
-                ))}
-            </div>
+            {showLegend && (
+                <div className={`flex flex-wrap gap-x-2 ${LEGEND_ROW} ${align === 'right' ? 'justify-end' : ''}`}>
+                    {shown.map(p => (
+                        <span key={p.key} className="flex items-center gap-1 whitespace-nowrap text-[9px] text-zinc-500 dark:text-zinc-400">
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${PART_COLORS[p.key].dot}`} />
+                            {p.label} {formatNumber(p.value, language)}
+                        </span>
+                    ))}
+                </div>
+            )}
         </>
     );
 };
@@ -100,26 +102,115 @@ const MiniBox = ({ label, value, unit, t, theme }) => (
     </div>
 );
 
-const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, exerciseLibrary, navigateToWorkoutDate, soundEnabled, playSoundEffect, theme, selectedDate, biometricStandard, units, setConfirmModal, activityTargets, setActivityTargets, gymProfiles, activeGymId, activePlanIds, userApiKeys, userAchievements, connectedApps, userProfile, keyStatuses, setKeyStatuses, setShowSettings, lomealToday, lomealTargets, syncStatus, isBleBusy, expandedSessions, bleManager }) => {
+const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHistory, programs, exerciseLibrary, navigateToWorkoutDate, soundEnabled, playSoundEffect, theme, selectedDate, biometricStandard, units, setConfirmModal, activityTargets, setActivityTargets, gymProfiles, activeGymId, activePlanIds, userApiKeys, userAchievements, connectedApps, userProfile, keyStatuses, setKeyStatuses, setShowSettings, lomealToday, lomealTargets, syncStatus, isBleBusy, expandedSessions, bleManager }) => {
   const todayStr = getLocalYMD(new Date());
   const activeDate = todayStr;
+  const isID = (language || lang?.id || 'ID').toUpperCase() === 'ID';
+  const resolveBfStatus = (bfVal, isFemaleUser, isIndo) => {
+    const bf = Number(bfVal);
+    if (!bf || bf <= 0) return '-';
+    if (isFemaleUser) {
+      if (bf < 18) return isIndo ? 'Rendah' : 'Low';
+      if (bf <= 28) return isIndo ? 'Normal' : 'Normal';
+      if (bf <= 33) return isIndo ? 'Tinggi' : 'High';
+      return isIndo ? 'Sangat Tinggi' : 'Very High';
+    } else {
+      if (bf < 10) return isIndo ? 'Rendah' : 'Low';
+      if (bf <= 20) return isIndo ? 'Normal' : 'Normal';
+      if (bf <= 25) return isIndo ? 'Tinggi' : 'High';
+      return isIndo ? 'Sangat Tinggi' : 'Very High';
+    }
+  };
+  const resolveBfColor = (bfVal, isFemaleUser) => {
+    const bf = Number(bfVal);
+    if (!bf || bf <= 0) return 'text-zinc-500';
+    const limitNorm = isFemaleUser ? 28 : 20;
+    const limitLow = isFemaleUser ? 18 : 10;
+    const limitHigh = isFemaleUser ? 33 : 25;
+    if (bf < limitLow) return 'text-sky-500';
+    if (bf <= limitNorm) return 'text-emerald-500';
+    if (bf <= limitHigh) return 'text-amber-500';
+    return 'text-rose-500';
+  };
+  const resolveBmiStatus = (status, isIndo) => {
+    if (!status || status === '-') return '-';
+    const s = String(status).toLowerCase();
+    if (s.includes('under') || s.includes('kurang')) return isIndo ? 'Kurang' : 'Underweight';
+    if (s.includes('normal') || s.includes('standar')) return isIndo ? 'Normal' : 'Normal';
+    if (s.includes('over') || s.includes('lebih')) return isIndo ? 'Berlebih' : 'Overweight';
+    if (s.includes('obese') || s.includes('tinggi') || s.includes('obesitas')) return isIndo ? 'Obesitas' : 'Obese';
+    return status;
+  };
 
   // ==========================================
   // STATE KONEKSI & SINKRONISASI
   // ==========================================
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showCalorieModal, setShowCalorieModal] = useState(false);
+  const [showDurationModal, setShowDurationModal] = useState(false);
+  const [showStepsModal, setShowStepsModal] = useState(false);
+  const [showSleepTargetModal, setShowSleepTargetModal] = useState(false);
+  const [showManualModal, setShowManualModal] = useState(false);
   const [isLogyHidden, setIsLogyHidden] = useState(() => localStorage.getItem('lyfit_logy_hidden') === 'true');
+  const detailsScrollRef = useRef(null);
+
+  // Mencegah scroll chaining / rubber-banding ke background saat mentok atas atau bawah
+  useEffect(() => {
+    const el = detailsScrollRef.current;
+    if (!el || !showDetailsModal) return;
+
+    let touchStartY = 0;
+    const handleTouchStart = (e) => {
+      touchStartY = e.touches[0].clientY;
+    };
+
+    const handleTouchMove = (e) => {
+      const currentY = e.touches[0].clientY;
+      const deltaY = currentY - touchStartY;
+      const isAtTop = el.scrollTop <= 1;
+      const isAtBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 2;
+
+      // Mentok atas dan ditarik ke bawah (pull down at top boundary)
+      if (isAtTop && deltaY > 0) {
+        if (e.cancelable) e.preventDefault();
+        return;
+      }
+      // Mentok bawah dan didorong ke atas (push up at bottom boundary)
+      if (isAtBottom && deltaY < 0) {
+        if (e.cancelable) e.preventDefault();
+        return;
+      }
+    };
+
+    el.addEventListener('touchstart', handleTouchStart, { passive: true });
+    el.addEventListener('touchmove', handleTouchMove, { passive: false });
+
+    return () => {
+      el.removeEventListener('touchstart', handleTouchStart);
+      el.removeEventListener('touchmove', handleTouchMove);
+    };
+  }, [showDetailsModal]);
 
   useEffect(() => {
-    if (showCalorieModal) {
-      const origOverflow = document.body.style.overflow;
+    if (showCalorieModal || showDurationModal || showStepsModal || showSleepTargetModal || showDetailsModal || showManualModal) {
+      const origBodyOverflow = document.body.style.overflow;
+      const origHtmlOverflow = document.documentElement.style.overflow;
+      const origBodyOverscroll = document.body.style.overscrollBehavior;
+      const origHtmlOverscroll = document.documentElement.style.overscrollBehavior;
+
       document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      document.body.style.overscrollBehavior = 'none';
+      document.documentElement.style.overscrollBehavior = 'none';
+
       return () => {
-        document.body.style.overflow = origOverflow;
+        document.body.style.overflow = origBodyOverflow;
+        document.documentElement.style.overflow = origHtmlOverflow;
+        document.body.style.overscrollBehavior = origBodyOverscroll;
+        document.documentElement.style.overscrollBehavior = origHtmlOverscroll;
       };
     }
-  }, [showCalorieModal]);
+  }, [showCalorieModal, showDurationModal, showStepsModal, showSleepTargetModal, showDetailsModal, showManualModal]);
 
   useEffect(() => {
       const handleToggle = (e) => {
@@ -139,7 +230,6 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   // ==========================================
   // STATE MODAL INPUT MANUAL & TANGGAL
   // ==========================================
-  const [showManualModal, setShowManualModal] = useState(false);
   const [manualTab, setManualTab] = useState('komposisi');
   const [modalDate, setModalDate] = useState(activeDate);
   const [isProgressExpanded, setIsProgressExpanded] = useState(() => {
@@ -154,21 +244,45 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
       localStorage.setItem('lyfit_progress_expanded', JSON.stringify(isProgressExpanded));
   }, [isProgressExpanded]);
   
-  // TARGET SETTINGS
-  const [showTargetModal, setShowTargetModal] = useState(false);
-
-  const [targetForm, setTargetForm] = useState(activityTargets || { steps: 10000, dailyActiveMinutes: 30, sleep: 8, activityCalories: 2500, calorieDelta: 0 });
+  // TARGET SETTINGS PER KARTU
+  const [editSteps, setEditSteps] = useState(activityTargets?.steps || 10000);
+  const [editWeeklyDuration, setEditWeeklyDuration] = useState(activityTargets?.weeklyActiveMinutes || 150);
+  const [editSleepHours, setEditSleepHours] = useState(Math.floor(activityTargets?.sleep || 8));
+  const [editSleepMinutes, setEditSleepMinutes] = useState(Math.round(((activityTargets?.sleep || 8) % 1) * 60));
 
   useEffect(() => {
      if (activityTargets) {
-        setTargetForm(activityTargets);
+        if (activityTargets.steps) setEditSteps(activityTargets.steps);
+        if (activityTargets.weeklyActiveMinutes) {
+           setEditWeeklyDuration(activityTargets.weeklyActiveMinutes);
+        }
+        if (activityTargets.sleep != null) {
+           setEditSleepHours(Math.floor(activityTargets.sleep));
+           setEditSleepMinutes(Math.round((activityTargets.sleep % 1) * 60));
+        }
      }
   }, [activityTargets]);
 
-  const handleSaveTargets = () => {
+  const handleSaveStepsTarget = (val) => {
+     const s = Number(val ?? editSteps) || 10000;
      playSoundEffect('click', soundEnabled);
-     setActivityTargets(targetForm);
-     setShowTargetModal(false);
+     setActivityTargets(prev => ({ ...prev, steps: s }));
+     setShowStepsModal(false);
+  };
+
+  const handleSaveWeeklyDurationTarget = (val) => {
+     const d = Number(val ?? editWeeklyDuration) || 150;
+     playSoundEffect('click', soundEnabled);
+     setActivityTargets(prev => ({ ...prev, weeklyActiveMinutes: d }));
+  };
+
+  const handleSaveSleepTarget = (hVal, mVal) => {
+     const hrs = Number(hVal ?? editSleepHours) || 0;
+     const mins = Number(mVal ?? editSleepMinutes) || 0;
+     const total = Number((hrs + (mins / 60)).toFixed(2)) || 8;
+     playSoundEffect('click', soundEnabled);
+     setActivityTargets(prev => ({ ...prev, sleep: total }));
+     setShowSleepTargetModal(false);
   };
 
   const parseSleepHours = (str) => {
@@ -274,26 +388,8 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          }
      }
 
-      if (latestBodyData && Number(latestBodyData.impedance) > 0 && Number(latestBodyData.weight) > 0) {
-          const profileH = Number((latestBodyData && latestBodyData.height) || fallbackHeight || userProfile?.height || userProfile?.biometrics?.height || 0);
-          const dobStr = userProfile?.dob || userProfile?.birthDate || userProfile?.biometrics?.birthDate;
-          const profileGender = userProfile?.gender || userProfile?.biometrics?.gender || 'male';
-          let profileAge = 30;
-          if (dobStr) {
-            const bDate = new Date(dobStr);
-            if (!isNaN(bDate.getTime())) {
-              const today = new Date();
-              profileAge = today.getFullYear() - bDate.getFullYear();
-              const m = today.getMonth() - bDate.getMonth();
-              if (m < 0 || (m === 0 && today.getDate() < bDate.getDate())) profileAge--;
-            }
-          }
-          if (profileH > 0 && profileAge > 0) {
-            const reComp = calculateBodyComposition(Number(latestBodyData.weight), Number(latestBodyData.impedance), profileH, profileAge, profileGender);
-            if (reComp) {
-              latestBodyData = { ...latestBodyData, ...reComp };
-            }
-          }
+      if (latestBodyData) {
+          latestBodyData = enrichBioWithImpedance(latestBodyData, userProfile, fallbackHeight, bodyDataDate, biometricStandard);
       }
 
      const mergedData = {
@@ -393,7 +489,8 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      if (showManualModal) {
          let initialBio = { ...emptyBio };
          if (history[modalDate] && history[modalDate].bioData) {
-             initialBio = { ...history[modalDate].bioData };
+             const enriched = enrichBioWithImpedance(history[modalDate].bioData, userProfile, null, modalDate, biometricStandard);
+             initialBio = { ...enriched };
          }
 
          // Prefill height dan waist dari riwayat jika hari ini kosong (berguna jika timbangan
@@ -489,11 +586,9 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
          }
      }
      if (newData.bodyFat > 0) {
-         if (newData.bodyFat < 10) newData.bodyFatStatus = 'Rendah';
-         else if (newData.bodyFat <= 20) newData.bodyFatStatus = 'Normal';
-         else if (newData.bodyFat <= 25) newData.bodyFatStatus = 'Overfat';
-         else newData.bodyFatStatus = 'Obese';
-     }
+          const isFemale = userProfile?.gender === 'female';
+          newData.bodyFatStatus = resolveBfStatus(newData.bodyFat, isFemale, isID);
+      }
      return newData;
   };
 
@@ -648,11 +743,32 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   const dispMainHeight = isImp && bioData.height ? Number((bioData.height * 0.393701).toFixed(1)) : bioData.height || '-';
   const dispMainMuscle = isImp && bioData.muscleMass ? Number((bioData.muscleMass * 2.20462).toFixed(1)) : bioData.muscleMass || '-';
   const dispMainWaist = units?.height === 'ft' && bioData.waist ? Number((bioData.waist * 0.393701).toFixed(1)) : bioData.waist || '-';
+  const mainFfmi = useMemo(() => {
+    const hCm = Number(bioData.height || userProfile?.height || 0);
+    const wKg = Number(bioData.weight || 0);
+    const bf = Number(bioData.bodyFat || 0);
+    if (hCm > 0 && wKg > 0 && bf > 0) {
+      const hMeter = hCm / 100;
+      const ffmKg = wKg * (1 - (bf / 100));
+      return Number((ffmKg / (hMeter * hMeter)).toFixed(1));
+    }
+    return '-';
+  }, [bioData.height, bioData.weight, bioData.bodyFat, userProfile?.height]);
+
+  const mainWthr = useMemo(() => {
+    const hCm = Number(bioData.height || userProfile?.height || 0);
+    const waistCm = Number(bioData.waist || 0);
+    if (hCm > 0 && waistCm > 0) {
+      return Number((waistCm / hCm).toFixed(2));
+    }
+    return '-';
+  }, [bioData.height, bioData.waist, userProfile?.height]);
 
   // Smart Merge Deduplication (LyFit Internal + BioData/HealthConnect)
   const { 
     mergedDailyActiveMinutes, 
     mergedDurationParts, 
+    actDetail = null,
     mergedCalorieParts, 
     mergedDailyCalories, 
     mergedDailyCaloriesFloor, 
@@ -667,7 +783,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
   } = useMemo(() => {
      const currentWeight = Number(bioData.weight) || 70; // Asumsi 70kg jika tidak ada data
 
-     const todayWks = history[activeDate]?.workouts || [];
+     const todayWks = deduplicateWorkouts(history[activeDate]?.workouts || []);
      const todayCompletedWks = todayWks.filter(w => w.status === 'completed' || w.programId === 'adhoc');
 
      // Ambil data nutrisi fresh dari Lomeal jika ada (termasuk Protein, Karbohidrat, Lemak)
@@ -763,6 +879,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      
      return {
          mergedDailyActiveMinutes: dailyActive,
+         actDetail: act,
          // Rincian buat bar bertumpuk di kartu Aktivitas Harian. Segmennya WAJIB berjumlah persis
          // sama dengan angka besar di atasnya — makanya dirakit di sini, di tempat cabang manual
          // masih kelihatan, bukan dihitung ulang di JSX. Saat kalori diset manual, basis BMR+langkah
@@ -868,8 +985,77 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
      }));
   }, [activityTargets?.nutritionGoal, activityTargets?.calorieDelta, activityTargets?.tdee, activeDate, todayStr]);
 
+  const targetScrollMetricRef = useRef(null);
+
+  const scrollToMetricInModal = (targetMetricId, retryCount = 0) => {
+    if (!targetMetricId) return;
+    const container = detailsScrollRef.current;
+    if (!container) {
+      if (retryCount < 6) {
+        setTimeout(() => scrollToMetricInModal(targetMetricId, retryCount + 1), 50);
+      }
+      return;
+    }
+
+    if (targetMetricId === 'score') {
+      container.scrollTo({ top: 0, behavior: 'smooth' });
+      const scoreEl = document.getElementById('bio-detail-score');
+      if (scoreEl) {
+        scoreEl.classList.add('highlight-logym-pulse');
+        setTimeout(() => scoreEl.classList.remove('highlight-logym-pulse'), 1500);
+      }
+      return;
+    }
+
+    if (targetMetricId === 'weight' || targetMetricId === 'height') {
+      container.scrollTo({ top: 0, behavior: 'smooth' });
+      const targetEl = document.getElementById(targetMetricId === 'height' ? 'bio-detail-height' : 'bio-detail-weight');
+      if (targetEl) {
+        targetEl.classList.add('highlight-logym-pulse');
+        setTimeout(() => targetEl.classList.remove('highlight-logym-pulse'), 1500);
+      }
+      return;
+    }
+
+    const targetEl = document.getElementById(`bio-detail-${targetMetricId}`);
+    if (targetEl) {
+      const containerRect = container.getBoundingClientRect();
+      const targetRect = targetEl.getBoundingClientRect();
+      const offset = targetRect.top - containerRect.top + container.scrollTop;
+      const targetTop = offset - (container.clientHeight / 2) + (targetEl.clientHeight / 2);
+      container.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+      targetEl.classList.add('highlight-logym-pulse');
+      setTimeout(() => {
+        targetEl.classList.remove('highlight-logym-pulse');
+      }, 1500);
+    } else if (retryCount < 6) {
+      setTimeout(() => scrollToMetricInModal(targetMetricId, retryCount + 1), 50);
+    }
+  };
+
+  const handleOpenBioDetails = (targetMetricId = null) => {
+    playSoundEffect('click', soundEnabled);
+    setModalDate(bioDataDate || activeDate);
+    targetScrollMetricRef.current = targetMetricId;
+    if (showDetailsModal && targetMetricId) {
+      setTimeout(() => scrollToMetricInModal(targetMetricId), 60);
+    } else {
+      setShowDetailsModal(true);
+    }
+  };
+
+  useEffect(() => {
+    if (!showDetailsModal || !targetScrollMetricRef.current) return;
+    const metricId = targetScrollMetricRef.current;
+    targetScrollMetricRef.current = null;
+    const timer = setTimeout(() => {
+      scrollToMetricInModal(metricId);
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [showDetailsModal]);
+
   return (
-    <div className="space-y-4 animate-in fade-in duration-300 pb-6 overflow-x-hidden">
+    <div className="space-y-4 pb-6 overflow-x-hidden">
       
       {/* HEADER & INTEGRASI APPS */}
       <div className="pt-2 px-4 flex justify-between items-center mb-2 anim-rise">
@@ -951,34 +1137,53 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                    )}
                </div>
                <div className="flex items-center space-x-2">
-                   <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(bioDataDate || activeDate); setShowDetailsModal(true); }} className={`p-2 rounded-full bg-blue-500/10 dark:bg-blue-500/20 shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Info size={16}/></button>
+                   
                    <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(activeDate); setManualTab('komposisi'); setShowManualModal(true); }} className={`p-2 rounded-full bg-blue-500/10 dark:bg-blue-500/20 shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Pencil size={16}/></button>
                </div>
            </div>
            
            <div className="flex justify-between items-end w-full relative z-10 mb-1 flex-1">
-                <div className={`w-[calc(50%-4px)] flex flex-col space-y-1 justify-end h-full p-3 rounded-2xl bg-blue-500/10 dark:bg-blue-500/20`}>
+                <div 
+                   onClick={() => handleOpenBioDetails('weight')} 
+                   role="button" 
+                   tabIndex={0} 
+                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenBioDetails('weight'); } }} 
+                   className={`w-[calc(50%-4px)] flex flex-col space-y-1 justify-end h-full p-3 rounded-2xl bg-blue-500/10 dark:bg-blue-500/20 cursor-pointer active:scale-[0.98] hover:bg-blue-500/15 dark:hover:bg-blue-500/25 transition-all select-none`}
+                   title={isID ? 'Buka Analisis Biometrik' : 'Open Biometric Analysis'}
+                >
                    {/* Fisik */}
-                   <div className="flex flex-col">
+                   <div 
+                       onClick={(e) => { e.stopPropagation(); handleOpenBioDetails('weight'); }} 
+                       className="flex flex-col p-1 -m-1 rounded-lg hover:bg-white/10 active:bg-white/20 transition-colors cursor-pointer"
+                       title={isID ? 'Buka Analisis Berat & Tinggi' : 'Open Weight & Height Analysis'}
+                   >
                        <span className={`text-[10px] ${t.textMuted} mb-0.5 font-bold`}>Fisik</span>
-                       <div className="flex items-baseline space-x-1.5">
-                           <span className={`text-lg font-black ${t.textMain} leading-none`}>{isImp && bioData.weight ? Number((bioData.weight * 2.20462).toFixed(1)) : bioData.weight || '-'} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">{isImp ? 'lbs' : 'kg'}</span></span>
-                           <span className="text-zinc-300 dark:text-zinc-600 text-[10px]">|</span>
-                           <span className={`text-lg font-black ${t.textMain} leading-none`}>{isImp && bioData.height ? Number((bioData.height * 0.393701).toFixed(1)) : bioData.height || '-'} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">{isImp ? 'in' : 'cm'}</span></span>
-                       </div>
+                        <div className="flex items-baseline space-x-1.5">
+                            <span onClick={(e) => { e.stopPropagation(); handleOpenBioDetails('weight'); }} className={`text-lg font-black ${t.textMain} leading-none cursor-pointer hover:underline`} title={isID ? 'Buka Analisis Berat' : 'Open Weight Analysis'}>{isImp && bioData.weight ? Number((bioData.weight * 2.20462).toFixed(1)) : bioData.weight || '-'} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">{isImp ? 'lbs' : 'kg'}</span></span>
+                            <span className="text-zinc-300 dark:text-zinc-600 text-[10px]">|</span>
+                            <span onClick={(e) => { e.stopPropagation(); handleOpenBioDetails('height'); }} className={`text-lg font-black ${t.textMain} leading-none cursor-pointer hover:underline`} title={isID ? 'Buka Analisis Tinggi' : 'Open Height Analysis'}>{isImp && bioData.height ? Number((bioData.height * 0.393701).toFixed(1)) : bioData.height || '-'} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">{isImp ? 'in' : 'cm'}</span></span>
+                        </div>
                    </div>
 
                    {/* BMI */}
-                   <div className="flex flex-col">
+                   <div 
+                       onClick={(e) => { e.stopPropagation(); handleOpenBioDetails('bmi'); }} 
+                       className="flex flex-col p-1 -m-1 rounded-lg hover:bg-white/10 active:bg-white/20 transition-colors cursor-pointer"
+                       title={isID ? 'Buka Analisis BMI' : 'Open BMI Analysis'}
+                   >
                        <span className={`text-[10px] ${t.textMuted} mb-0.5 font-bold`}>BMI ({biometricStandard === 'western' ? 'Western' : 'Asia'})</span>
                        <div className="flex items-baseline space-x-1.5">
                            <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.bmi, language) || '-'}</span>
-                           <span className={`text-[10px] font-bold ${bioData.bmiStatus === 'Normal' ? 'text-emerald-500' : bioData.bmiStatus === 'Overweight' ? 'text-amber-400' : bioData.bmiStatus === 'Obese' ? 'text-rose-500' : 'text-blue-400'}`}>{bioData.bmiStatus}</span>
+                           <span className={`text-[10px] font-bold ${bioData.bmiStatus === 'Normal' ? 'text-emerald-500' : bioData.bmiStatus === 'Overweight' ? 'text-amber-400' : 'text-rose-500'}`}>{resolveBmiStatus(bioData.bmiStatus, isID)}</span>
                        </div>
                    </div>
 
                    {/* BMR */}
-                   <div className="flex flex-col">
+                   <div 
+                       onClick={(e) => { e.stopPropagation(); handleOpenBioDetails('bmr'); }} 
+                       className="flex flex-col p-1 -m-1 rounded-lg hover:bg-white/10 active:bg-white/20 transition-colors cursor-pointer"
+                       title={isID ? 'Buka Analisis BMR' : 'Open BMR Analysis'}
+                   >
                        <span className={`text-[10px] ${t.textMuted} mb-0.5 font-bold`}>BMR</span>
                        <div>
                            <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.bmr, language) || '-'} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">kcal</span></span>
@@ -986,40 +1191,92 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                    </div>
 
                    {/* Body Fat */}
-                   <div className="flex flex-col">
-                       <span className={`text-[10px] ${t.textMuted} mb-0.5 font-bold`}>Kadar Lemak</span>
+                   <div 
+                       onClick={(e) => { e.stopPropagation(); handleOpenBioDetails('bodyFat'); }} 
+                       className="flex flex-col p-1 -m-1 rounded-lg hover:bg-white/10 active:bg-white/20 transition-colors cursor-pointer"
+                       title={isID ? 'Buka Analisis Kadar Lemak' : 'Open Body Fat Analysis'}
+                   >
+                       <span className={`text-[10px] ${t.textMuted} mb-0.5 font-bold`}>{isID ? 'Kadar Lemak' : 'Body Fat'}</span>
                        <div className="flex items-baseline space-x-1.5">
                            <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.bodyFat, language) || '-'} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span>
-                           <span className={`text-[10px] font-bold ${bioData.bodyFatStatus === 'Normal' ? 'text-emerald-500' : bioData.bodyFatStatus === 'Overfat' ? 'text-amber-400' : bioData.bodyFatStatus === 'Obese' ? 'text-rose-500' : 'text-blue-400'}`}>{bioData.bodyFatStatus}</span>
+                           <span className={`text-[10px] font-bold ${resolveBfColor(bioData.bodyFat, userProfile?.gender === 'female')}`}>{resolveBfStatus(bioData.bodyFat, userProfile?.gender === 'female', isID)}</span>
                        </div>
                    </div>
-               </div>
+                </div>
 
-               <div className="flex flex-col justify-end items-end pb-1 pr-1">
-                    <div className="relative w-24 h-24 shrink-0 flex items-center justify-center">
-                       <div className={`absolute inset-1 rounded-full ${theme === 'dark' ? 'bg-black/60' : 'bg-white/60'} border ${t.border} z-0`} />
-                      <svg className="absolute inset-0 -rotate-90 z-10" viewBox="0 0 96 96">
-                         <circle cx="48" cy="48" r={scoreRadius} fill="none" strokeWidth="5" strokeLinecap="round" strokeDasharray="1.5 6.2" className={theme === 'dark' ? 'stroke-white/15' : 'stroke-black/10'} />
-                         <circle cx="48" cy="48" r={scoreRadius} fill="none" stroke={scoreArcColor} strokeWidth="5" strokeLinecap="round" strokeDasharray={scoreCircumference} strokeDashoffset={scoreDashOffset} style={{ transition: 'stroke-dashoffset 0.6s ease' }} />
-                      </svg>
-                      <div className="flex flex-col items-center justify-center relative z-10">
-                         <span className="text-3xl font-black leading-none" style={{ color: scoreArcColor }}>{formatNumber(bioData.bodyScore, language) || '-'}</span>
-                         <span className={`text-[10px] mt-0.5 font-bold leading-tight ${t.textMuted}`}>SCORE</span>
-                      </div>
-                   </div>
-               </div>
-           </div>
-  
-           <div className={`grid grid-cols-4 gap-2 relative z-10 mt-1`}>
-                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{dispMainMuscle} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">{isImp ? 'lbs' : 'kg'}</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Massa<br/>Otot</span></div>
-                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.musclePercent, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Otot</span></div>
-                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.proteinPercent, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Protein</span></div>
-                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.waterPercent, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Air</span></div>
-                
-                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.visceralFat, language) || '-'}</span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Lemak<br/>Visceral</span></div>
-                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{dispMainWaist} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">{isImp ? 'in' : 'cm'}</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Lingkar<br/>Perut</span></div>
-                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.boneMass, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Mineral<br/>Tulang</span></div>
-                <div className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center`}><span className={`body-lg font-black ${t.textMain}`}>{formatNumber(bioData.bodyAge, language) || '-'} <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">th</span></span><span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Usia<br/>Tubuh</span></div>
+                <div 
+                   onClick={() => handleOpenBioDetails('score')} 
+                   role="button" 
+                   tabIndex={0} 
+                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenBioDetails('score'); } }} 
+                   className="flex flex-col justify-end items-end pb-1 pr-1 cursor-pointer active:scale-95 transition-all select-none"
+                   title={isID ? 'Buka Analisis Skor Tubuh' : 'Open Body Score Analysis'}
+                >
+                     <div className="relative w-24 h-24 shrink-0 flex items-center justify-center">
+                        <div className={`absolute inset-1 rounded-full ${theme === 'dark' ? 'bg-black/60' : 'bg-white/60'} border ${t.border} z-0`} />
+                       <svg className="absolute inset-0 -rotate-90 z-10" viewBox="0 0 96 96">
+                          <circle cx="48" cy="48" r={scoreRadius} fill="none" strokeWidth="5" strokeLinecap="round" strokeDasharray="1.5 6.2" className={theme === 'dark' ? 'stroke-white/15' : 'stroke-black/10'} />
+                          <circle cx="48" cy="48" r={scoreRadius} fill="none" stroke={scoreArcColor} strokeWidth="5" strokeLinecap="round" strokeDasharray={scoreCircumference} strokeDashoffset={scoreDashOffset} style={{ transition: 'stroke-dashoffset 0.6s ease' }} />
+                       </svg>
+                       <div className="flex flex-col items-center justify-center relative z-10">
+                          <span className="text-3xl font-black leading-none" style={{ color: scoreArcColor }}>{formatNumber(bioData.bodyScore, language) || '-'}</span>
+                          <span className={`text-[10px] mt-0.5 font-bold leading-tight ${t.textMuted}`}>SCORE</span>
+                       </div>
+                    </div>
+                </div>
+            </div>
+   
+            <div className={`grid grid-cols-4 gap-2 relative z-10 mt-1`}>
+                 {/* 1. FFMI */}
+                 <div onClick={() => handleOpenBioDetails('ffmi')} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenBioDetails('ffmi'); } }} className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center min-h-[72px] cursor-pointer active:scale-95 hover:bg-blue-500/15 dark:hover:bg-blue-500/25 transition-all select-none`} title={isID ? 'Buka Analisis FFMI' : 'Open FFMI Analysis'}>
+                     <span className={`body-lg font-black ${t.textMain} leading-tight`}>{mainFfmi}</span>
+                     <span className="text-[9px] font-bold text-sky-400 leading-none mt-0.5">{mainFfmi !== '-' ? 'index' : '-'}</span>
+                     <span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>FFMI</span>
+                 </div>
+
+                 {/* 2. Otot (+ Kadar Otot) */}
+                 <div onClick={() => handleOpenBioDetails('muscleMass')} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenBioDetails('muscleMass'); } }} className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center min-h-[72px] cursor-pointer active:scale-95 hover:bg-blue-500/15 dark:hover:bg-blue-500/25 transition-all select-none`} title={isID ? 'Buka Analisis Otot' : 'Open Muscle Analysis'}>
+                     <span className={`body-lg font-black ${t.textMain} leading-tight`}>{dispMainMuscle} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">{isImp ? 'lbs' : 'kg'}</span></span>
+                     <span className="text-[9px] font-bold text-sky-400 leading-none mt-0.5">{bioData.musclePercent ? `${formatNumber(bioData.musclePercent, language)}%` : '-'}</span>
+                     <span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>{isID ? 'Otot' : 'Muscle'}</span>
+                 </div>
+
+                 {/* 3. Kadar Protein */}
+                 <div onClick={() => handleOpenBioDetails('proteinPercent')} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenBioDetails('proteinPercent'); } }} className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center min-h-[72px] cursor-pointer active:scale-95 hover:bg-blue-500/15 dark:hover:bg-blue-500/25 transition-all select-none`} title={isID ? 'Buka Analisis Kadar Protein' : 'Open Protein Analysis'}>
+                     <span className={`body-lg font-black ${t.textMain} leading-tight`}>{formatNumber(bioData.proteinPercent, language) || '-'} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span>
+                     <span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Protein</span>
+                 </div>
+
+                 {/* 4. Kadar Air */}
+                 <div onClick={() => handleOpenBioDetails('waterPercent')} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenBioDetails('waterPercent'); } }} className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center min-h-[72px] cursor-pointer active:scale-95 hover:bg-blue-500/15 dark:hover:bg-blue-500/25 transition-all select-none`} title={isID ? 'Buka Analisis Kadar Air' : 'Open Water Analysis'}>
+                     <span className={`body-lg font-black ${t.textMain} leading-tight`}>{formatNumber(bioData.waterPercent, language) || '-'} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span>
+                     <span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Air</span>
+                 </div>
+                 
+                 {/* 5. Lemak Visceral */}
+                 <div onClick={() => handleOpenBioDetails('visceralFat')} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenBioDetails('visceralFat'); } }} className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center min-h-[72px] cursor-pointer active:scale-95 hover:bg-blue-500/15 dark:hover:bg-blue-500/25 transition-all select-none`} title={isID ? 'Buka Analisis Lemak Visceral' : 'Open Visceral Fat Analysis'}>
+                     <span className={`body-lg font-black ${t.textMain} leading-tight`}>{formatNumber(bioData.visceralFat, language) || '-'}</span>
+                     <span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Lemak<br/>Visceral</span>
+                 </div>
+
+                 {/* 6. Lingkar Perut (+ WtHR) */}
+                 <div onClick={() => handleOpenBioDetails('waist')} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenBioDetails('waist'); } }} className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center min-h-[72px] cursor-pointer active:scale-95 hover:bg-blue-500/15 dark:hover:bg-blue-500/25 transition-all select-none`} title={isID ? 'Buka Analisis Perut & WTHR' : 'Open Waist & WTHR Analysis'}>
+                     <span className={`body-lg font-black ${t.textMain} leading-tight`}>{dispMainWaist} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">{isImp ? 'in' : 'cm'}</span></span>
+                     <span className="text-[9px] font-bold text-sky-400 leading-none mt-0.5">{mainWthr !== '-' ? `${mainWthr} WTHR` : '-'}</span>
+                     <span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>{isID ? 'Perut' : 'Waist'}</span>
+                 </div>
+
+                 {/* 7. Mineral Tulang */}
+                 <div onClick={() => handleOpenBioDetails('boneMass')} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenBioDetails('boneMass'); } }} className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center min-h-[72px] cursor-pointer active:scale-95 hover:bg-blue-500/15 dark:hover:bg-blue-500/25 transition-all select-none`} title={isID ? 'Buka Analisis Mineral Tulang' : 'Open Bone Mass Analysis'}>
+                     <span className={`body-lg font-black ${t.textMain} leading-tight`}>{formatNumber(bioData.boneMass, language) || '-'} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span>
+                     <span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Mineral<br/>Tulang</span>
+                 </div>
+
+                 {/* 8. Usia Tubuh */}
+                 <div onClick={() => handleOpenBioDetails('bodyAge')} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenBioDetails('bodyAge'); } }} className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center min-h-[72px] cursor-pointer active:scale-95 hover:bg-blue-500/15 dark:hover:bg-blue-500/25 transition-all select-none`} title={isID ? 'Buka Analisis Usia Tubuh' : 'Open Body Age Analysis'}>
+                     <span className={`body-lg font-black ${t.textMain} leading-tight`}>{formatNumber(bioData.bodyAge, language) || '-'} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">th</span></span>
+                     <span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Usia<br/>Tubuh</span>
+                 </div>
             </div>
            
            <button
@@ -1058,6 +1315,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                    soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
                    onPointClick={handleChartPointClick}
                    units={units} userProfile={userProfile}
+                   language={language}
                 />
                 </div>
               )}
@@ -1094,7 +1352,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                  </div>
                  <div className="flex space-x-2">
 
-                     <button onClick={() => { playSoundEffect('click', soundEnabled); setShowTargetModal(true); }} className={`p-2 rounded-full bg-blue-500/10 dark:bg-blue-500/20 shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Settings size={16}/></button>
+
                      <button onClick={() => { playSoundEffect('click', soundEnabled); setModalDate(activeDate); setManualTab('harian'); setShowManualModal(true); }} className={`p-2 rounded-full bg-blue-500/10 dark:bg-blue-500/20 shadow-sm ${t.textMuted} hover:${t.textMain} border ${t.border}`}><Pencil size={16}/></button>
                  </div>
              </div>
@@ -1103,9 +1361,17 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                  <div className="px-1">
                      <div className="grid grid-cols-2 gap-x-5 gap-y-5 h-full content-between">
                          {/* Langkah Kaki */}
-                         <div className="flex flex-col h-full">
-                     <div className="flex items-center space-x-1.5 mb-1"><span className="w-5 h-5 rounded-full bg-blue-500/15 text-blue-500 flex items-center justify-center shrink-0"><Footprints size={11}/></span> <span className={`caption ${t.textMuted} capitalize`}>Langkah Kaki</span></div>
-                     <div className="flex flex-col flex-1 justify-end">
+                         <div 
+                             onClick={() => {
+                                 playSoundEffect('click', soundEnabled);
+                                 setEditSteps(activityTargets?.steps || 10000);
+                                 setShowStepsModal(true);
+                             }}
+                             className="flex flex-col h-full cursor-pointer group active:opacity-80 transition-opacity"
+                             title="Klik untuk menentukan target langkah kaki"
+                         >
+                     <div className="flex items-center space-x-1.5 mb-1"><span className="w-5 h-5 rounded-full bg-blue-500/15 text-blue-500 flex items-center justify-center shrink-0"><Footprints size={11}/></span> <span className={`caption ${t.textMuted} capitalize group-hover:text-blue-400 transition-colors`}>Langkah Kaki</span></div>
+                     <div className="flex flex-col flex-1">
                          <div className={`flex items-baseline space-x-1 ${NUM_ROW}`}>
                              <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{bioData.steps > 0 ? formatNumber(bioData.steps, language) : '-'}</span>
                              <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold whitespace-nowrap">/ {formatNumber(activityTargets?.steps || 10000, language)}</span>
@@ -1113,25 +1379,30 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                          <div className={`w-full ${BAR_ROW} bg-black/10 dark:bg-white/10 rounded-full overflow-hidden shrink-0`}>
                              <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Number(bioData.steps || 0) / (activityTargets?.steps || 10000)) * 100)}%` }}></div>
                          </div>
-                         {/* Kotak ini tidak punya rincian, tapi tetap memesan tinggi baris keterangan
-                             supaya angkanya sebaris dengan Durasi Aktif di sebelahnya. */}
-                         <div className={LEGEND_ROW} />
                      </div>
                  </div>
                  
                  {/* Durasi Aktif (Hari Ini) */}
                   {(() => {
                       const todayDur = mergedDailyActiveMinutes;
-                      const targetDur = activityTargets?.dailyActiveMinutes || (activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 5) : 30);
+                      const weeklyTarget = activityTargets?.weeklyActiveMinutes || 150;
+                      const weeklyDur = mergedWeeklyActiveMinutes || 0;
                       return (
-                          <div className="flex flex-col h-full text-right items-end">
-                              <div className="flex items-center justify-end space-x-1.5 mb-1"><span className={`caption ${t.textMuted} capitalize`}>Durasi Aktif</span> <span className={`w-5 h-5 rounded-full ${t.bgAccentSoft} ${t.textAccent} flex items-center justify-center shrink-0`}><Clock size={11}/></span></div>
-                              <div className="flex flex-col flex-1 justify-end w-full">
+                          <div 
+                              onClick={() => { playSoundEffect('click', soundEnabled); setShowDurationModal(true); }}
+                              className="flex flex-col h-full text-right items-end cursor-pointer group active:opacity-80 transition-opacity"
+                              title="Klik untuk melihat rincian Langkah, Kardio, dan Beban"
+                          >
+                              <div className="flex items-center justify-end space-x-1.5 mb-1"><span className={`caption ${t.textMuted} capitalize group-hover:text-blue-400 transition-colors`}>Durasi Aktif</span> <span className={`w-5 h-5 rounded-full ${t.bgAccentSoft} ${t.textAccent} flex items-center justify-center shrink-0`}><Clock size={11}/></span></div>
+                              <div className="flex flex-col flex-1 w-full">
                                   <div className={`flex items-baseline justify-end space-x-1 ${NUM_ROW}`}>
                                       <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{todayDur > 0 ? formatNumber(todayDur, language) : '-'}</span>
-                                      <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold whitespace-nowrap">/ {targetDur} mnt</span>
+                                      <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold whitespace-nowrap">mnt</span>
                                   </div>
-                                  <StackedBar parts={mergedDurationParts} basis={targetDur} language={language} align="right" />
+                                  <div className="text-[9px] text-zinc-500 dark:text-zinc-400 font-semibold mt-0.5">
+                                      {formatNumber(weeklyDur, language)}/{weeklyTarget} mnt minggu ini
+                                  </div>
+                                  <StackedBar parts={mergedDurationParts} basis={weeklyTarget} language={language} align="right" showLegend={false} />
                               </div>
                           </div>
                       );
@@ -1151,7 +1422,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                        const nutritionCalories = lomealFresh?.kcal ?? bioData.nutritionCalories;
                        const foodTarget = lomealTargets?.kcal || 2000;
                        return (
-                         <div className="flex flex-col flex-1 justify-end">
+                         <div className="flex flex-col flex-1">
                              <div className={`flex items-baseline space-x-1 ${NUM_ROW}`}>
                                  <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{formatNumber(nutritionCalories, language) || '-'}</span>
                                  <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold whitespace-nowrap">/ {formatNumber(foodTarget, language)} kkal</span>
@@ -1162,14 +1433,12 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                              <div className={`w-full ${BAR_ROW} bg-black/10 dark:bg-white/10 rounded-full overflow-hidden shrink-0`}>
                                  <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Number(nutritionCalories || 0) / foodTarget) * 100)}%` }}></div>
                              </div>
-                             <div className={`flex ${LEGEND_ROW}`}>
-                                {lomealFresh && (
-                                  <div className={`font-medium ${t.textMuted} truncate flex items-center gap-1.5`} style={{fontSize: '0.65rem'}}>
-                                    <span className="px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-500 text-[8px] uppercase font-bold tracking-wider">LOMEAL</span>
-                                    {lomealFresh.mealsCount || 0} konsumsi
-                                  </div>
-                                )}
-                             </div>
+                             {lomealFresh && (
+                               <div className="mt-1 flex items-center gap-1.5 font-medium" style={{fontSize: '0.65rem'}}>
+                                 <span className="px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-500 text-[8px] uppercase font-bold tracking-wider">LOMEAL</span>
+                                 <span className={t.textMuted}>{lomealFresh.mealsCount || 0} konsumsi</span>
+                               </div>
+                             )}
                          </div>
                        );
                      })()}
@@ -1185,11 +1454,11 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                         <span className={`caption ${t.textMuted} capitalize group-hover:text-blue-400 transition-colors`}>Kalori Dibakar</span> 
                         <span className="w-5 h-5 rounded-full bg-blue-500/15 text-blue-500 flex items-center justify-center shrink-0"><Flame size={11}/></span>
                      </div>
-                     <div className="flex flex-col flex-1 justify-end w-full">
+                     <div className="flex flex-col flex-1 w-full">
                          <div className={`flex items-baseline justify-end ${NUM_ROW}`}>
                              <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{mergedDailyCalories > 0 ? formatNumber(mergedDailyCalories, language) : '-'}</span>
                          </div>
-                         <StackedBar parts={mergedCalorieParts} basis={mergedDailyCalories} language={language} align="right" />
+                         <StackedBar parts={mergedCalorieParts} basis={mergedDailyCalories} language={language} align="right" showLegend={false} />
                      </div>
                  </div>
                      </div>
@@ -1406,66 +1675,97 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
              </div>
 
              <div className="flex flex-col mb-2 mt-4 space-y-4 relative z-20">
-                 <div>
-                     <div className="flex items-center space-x-2">
-                         <span className={`text-[10px] font-bold uppercase tracking-widest ${t.textMuted}`}>Kualitas & Durasi Tidur</span>
-                     </div>
-                     <div className="flex items-baseline space-x-3 mt-1">
-                         <div className="flex items-baseline space-x-1">
-                             {(() => {
-                                 const sleepStr = sleepBio.sleep;
-                                 if (!sleepStr || parseFloat(sleepStr) <= 0) {
-                                     return <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>-</span>;
-                                 }
-                                 if (typeof sleepStr === 'string' && sleepStr.includes('h')) {
-                                     const parts = sleepStr.split(' ');
-                                     const h = parts[0]?.replace('h', '') || '0';
-                                     const m = parts[1]?.replace('m', '') || '0';
-                                     return (
-                                         <>
-                                             <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>{h}</span>
-                                             <span className={`body-lg font-bold ${t.textMuted} mr-1`}>jam</span>
-                                             <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>{m}</span>
-                                             <span className={`body-lg font-bold ${t.textMuted}`}>mnt</span>
-                                         </>
-                                     );
-                                 }
-                                 // sleepHoursToParts membulatkan dari TOTAL menit — cara lama
-                                 // (`(h % 1) * 60` dibulatkan sendiri) memberi "5 jam 60 mnt".
-                                 const { jam, menit } = sleepHoursToParts(sleepStr) || { jam: 0, menit: 0 };
-                                 return (
-                                     <>
-                                         <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>{jam}</span>
-                                         <span className={`body-lg font-bold ${t.textMuted} mr-1`}>jam</span>
-                                         <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>{menit}</span>
-                                         <span className={`body-lg font-bold ${t.textMuted}`}>mnt</span>
-                                     </>
-                                 );
-                             })()}
+                 {(() => {
+                     const targetSleepHours = Number(activityTargets?.sleep || 8);
+                     const targetSleepH = Math.floor(targetSleepHours);
+                     const targetSleepM = Math.round((targetSleepHours % 1) * 60);
+                     const targetSleepLabel = targetSleepM > 0 ? `${targetSleepH}j ${targetSleepM}m` : `${targetSleepH} jam`;
+                     const sleepHrs = parseFloat(sleepBio.sleep) || 0;
+                     return (
+                         <div 
+                             onClick={() => {
+                                 playSoundEffect('click', soundEnabled);
+                                 setEditSleepHours(targetSleepH);
+                                 setEditSleepMinutes(targetSleepM);
+                                 setShowSleepTargetModal(true);
+                             }}
+                             className="cursor-pointer group active:opacity-85 transition-opacity"
+                             title="Klik untuk menentukan target durasi tidur"
+                         >
+                             <div className="flex items-center justify-between mb-1">
+                                 <div className="flex items-center space-x-1.5">
+                                     <Moon size={12} className="text-indigo-400" />
+                                     <span className={`text-[10px] font-bold uppercase tracking-widest ${t.textMuted} group-hover:text-indigo-400 transition-colors`}>Kualitas & Durasi Tidur</span>
+                                 </div>
+                                 <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${t.btnBg} border ${t.border} ${t.textMuted} group-hover:${t.textMain} transition-colors flex items-center gap-1`}>
+                                     <Target size={10} className="text-indigo-400" />
+                                     <span>Target: {targetSleepLabel}</span>
+                                 </span>
+                             </div>
+                             <div className="flex items-baseline space-x-3 mt-1">
+                                 <div className="flex items-baseline space-x-1">
+                                     {(() => {
+                                         const sleepStr = sleepBio.sleep;
+                                         if (!sleepStr || parseFloat(sleepStr) <= 0) {
+                                             return <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>-</span>;
+                                         }
+                                         if (typeof sleepStr === 'string' && sleepStr.includes('h')) {
+                                             const parts = sleepStr.split(' ');
+                                             const h = parts[0]?.replace('h', '') || '0';
+                                             const m = parts[1]?.replace('m', '') || '0';
+                                             return (
+                                                 <>
+                                                     <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>{h}</span>
+                                                     <span className={`body-lg font-bold ${t.textMuted} mr-1`}>jam</span>
+                                                     <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>{m}</span>
+                                                     <span className={`body-lg font-bold ${t.textMuted}`}>mnt</span>
+                                                 </>
+                                             );
+                                         }
+                                         const { jam, menit } = sleepHoursToParts(sleepStr) || { jam: 0, menit: 0 };
+                                         return (
+                                             <>
+                                                 <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>{jam}</span>
+                                                 <span className={`body-lg font-bold ${t.textMuted} mr-1`}>jam</span>
+                                                 <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>{menit}</span>
+                                                 <span className={`body-lg font-bold ${t.textMuted}`}>mnt</span>
+                                             </>
+                                         );
+                                     })()}
+                                     <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold whitespace-nowrap ml-1">/ {targetSleepLabel}</span>
+                                 </div>
+                                 {(() => {
+                                     if (sleepHrs <= 0) return null;
+                                     
+                                     let text = 'Sangat Kurang';
+                                     let color = 'bg-rose-500/90 text-white border-rose-500/20';
+                                     if (sleepHrs >= 9) {
+                                         text = 'Berlebih';
+                                         color = 'bg-amber-500/90 text-white border-amber-500/20';
+                                     } else if (sleepHrs >= 7) {
+                                         text = 'Optimal';
+                                         color = 'bg-emerald-500/90 text-white border-emerald-500/20';
+                                     } else if (sleepHrs >= 6) {
+                                         text = 'Cukup';
+                                         color = 'bg-sky-500/90 text-white border-sky-500/20';
+                                     } else if (sleepHrs >= 4) {
+                                         text = 'Kurang';
+                                         color = 'bg-amber-500/90 text-white border-amber-500/20';
+                                     }
+                                     return <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider ${color} border shadow-sm`}>{text}</span>;
+                                 })()}
+                             </div>
+                             {sleepHrs > 0 && (
+                                 <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden mt-2 shrink-0">
+                                     <div 
+                                         className="h-full bg-indigo-500 rounded-full transition-all duration-500" 
+                                         style={{ width: `${Math.min(100, Math.round((sleepHrs / targetSleepHours) * 100))}%` }}
+                                     />
+                                 </div>
+                             )}
                          </div>
-                         {(() => {
-                             const sleepHrs = parseFloat(sleepBio.sleep) || 0;
-                             if (sleepHrs <= 0) return null;
-                             
-                             let text = 'Sangat Kurang';
-                             let color = 'bg-rose-500/90 text-white border-rose-500/20';
-                             if (sleepHrs >= 9) {
-                                 text = 'Berlebih';
-                                 color = 'bg-amber-500/90 text-white border-amber-500/20';
-                             } else if (sleepHrs >= 7) {
-                                 text = 'Optimal';
-                                 color = 'bg-emerald-500/90 text-white border-emerald-500/20';
-                             } else if (sleepHrs >= 6) {
-                                 text = 'Cukup';
-                                 color = 'bg-sky-500/90 text-white border-sky-500/20';
-                             } else if (sleepHrs >= 4) {
-                                 text = 'Kurang';
-                                 color = 'bg-amber-500/90 text-white border-amber-500/20';
-                             }
-                             return <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider ${color} border shadow-sm`}>{text}</span>;
-                         })()}
-                     </div>
-                 </div>
+                     );
+                 })()}
 
                  {/* SKOR KESIAPAN — dihitung Logym sendiri dari tidur, tahap tidur, dan deviasi
                      nadi istirahat terhadap kebiasaan 14 hari. Dulu di sini tampil "Skor Energi"
@@ -1866,55 +2166,289 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
 
       {/* DETAIL BIOMETRIK MODAL */}
       {showDetailsModal && createPortal((
-        <div className={`fixed inset-0 -top-24 -bottom-24 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in ${t.textMain} font-sans`} onClick={() => setShowDetailsModal(false)}>
-           <div className={`w-full max-w-md mx-auto ${t.bgCard} rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 border ${t.border}`} onClick={(e) => e.stopPropagation()}>
-               {/* Modal Header */}
-               <div className="flex justify-between items-center px-6 pt-6 pb-2 shrink-0">
-                   <div className="flex items-center space-x-2">
-                       <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-500"><Activity size={12}/></div>
-                       <div className="flex flex-col">
-                           <span className={`text-[10px] font-bold ${t.textMain}`}>Logym Analysis</span>
-                           <div className="relative flex items-center w-max cursor-pointer">
-                               <span className={`text-[8px] ${t.textAccent} underline decoration-dashed underline-offset-2 mt-0.5`}>{new Date(modalDate || Date.now()).toLocaleDateString(lang.workout === 'Latihan' ? 'id-ID' : 'en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                               <input type="date" value={modalDate} onChange={(e) => setModalDate(e.target.value)} onClick={(e) => { try { e.target.showPicker() } catch(err){} }} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
-                           </div>
-                       </div>
-                   </div>
-                   <button onClick={() => setShowDetailsModal(false)} className={`p-2 rounded-full bg-[#3b82f6]/20 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors ${t.textMain}`}><X size={16}/></button>
-               </div>
+        <div 
+          className={`fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in overscroll-contain touch-none ${t.textMain} font-sans`} 
+          onClick={() => setShowDetailsModal(false)}
+          onTouchMove={(e) => { if (e.target === e.currentTarget && e.cancelable) e.preventDefault(); }}
+        >
+           <div 
+             className={`w-full max-w-md mx-auto ${t.bgCard} rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 border ${t.border} overscroll-contain`} 
+             onClick={(e) => e.stopPropagation()}
+           >
+               {(() => {
+                   const displayBioData = enrichBioWithImpedance(history[modalDate]?.bioData, userProfile, bioData?.height, modalDate, biometricStandard) || emptyBio;
+                   const dispWeight = isImp && displayBioData.weight ? Number((displayBioData.weight * 2.20462).toFixed(1)) : displayBioData.weight || '0';
+                   const dispMuscle = isImp && displayBioData.muscleMass ? Number((displayBioData.muscleMass * 2.20462).toFixed(1)) : displayBioData.muscleMass || 0;
+                   const dispWaist = isImp && displayBioData.waist ? Number((displayBioData.waist * 0.393701).toFixed(1)) : displayBioData.waist || 0;
+                   const userHeightCm = Number(displayBioData.height || bioData?.height || userProfile?.height || 0);
+                    const dispHeight = isImp && userHeightCm ? Number((userHeightCm * 0.393701).toFixed(1)) : userHeightCm || '-';
+                   const userWeightKg = Number(displayBioData.weight || bioData?.weight || 0);
+                   const userBodyFat = Number(displayBioData.bodyFat || 0);
+                   const userWaistCm = Number(displayBioData.waist || 0);
 
-               <div className="flex-1 overflow-y-auto px-4 pb-10 hide-scrollbar space-y-3">
-                   {(() => {
-                       const displayBioData = history[modalDate]?.bioData || emptyBio;
-                       const dispWeight = isImp && displayBioData.weight ? Number((displayBioData.weight * 2.20462).toFixed(1)) : displayBioData.weight || '0';
-                       const dispMuscle = isImp && displayBioData.muscleMass ? Number((displayBioData.muscleMass * 2.20462).toFixed(1)) : displayBioData.muscleMass || 0;
-                       const dispWaist = isImp && displayBioData.waist ? Number((displayBioData.waist * 0.393701).toFixed(1)) : displayBioData.waist || 0;
-                       return (
-                           <>
-                               {/* Hero Weight */}
-                               <div className="flex flex-col items-center justify-center py-6 relative">
-                                   <div className="flex items-baseline relative z-10">
-                                       <span className={`text-6xl font-black tracking-tighter ${t.textMain}`}>{dispWeight}</span>
-                                       <span className={`body-lg ml-1 ${t.textMuted}`}>{isImp ? 'lbs' : 'kg'}</span>
-                                   </div>
-                                   <div className="flex items-center justify-center space-x-2 mt-2">
-                                       <div className="h-px w-6 bg-zinc-500/30"></div>
-                                       <span className={`text-[10px] font-bold ${t.textMuted}`}>Body Score: <span className={t.textMain}>{displayBioData.bodyScore || '-'}</span></span>
+                    const userAge = (() => {
+                        const dobStr = userProfile?.dob || userProfile?.birthDate || userProfile?.biometrics?.birthDate;
+                        if (!dobStr) return null;
+                        const bDate = new Date(dobStr);
+                        if (isNaN(bDate.getTime())) return null;
+                        const today = new Date();
+                        let age = today.getFullYear() - bDate.getFullYear();
+                        const m = today.getMonth() - bDate.getMonth();
+                        if (m < 0 || (m === 0 && today.getDate() < bDate.getDate())) age--;
+                        return age > 0 ? age : null;
+                    })();
+                   // FFMI calculation (Fat-Free Mass Index)
+                   let ffmiVal = 0;
+                   if (userHeightCm > 0 && userWeightKg > 0 && userBodyFat > 0) {
+                       const hMeter = userHeightCm / 100;
+                       const ffmKg = userWeightKg * (1 - (userBodyFat / 100));
+                       ffmiVal = Number((ffmKg / (hMeter * hMeter)).toFixed(1));
+                   }
+
+                   // WtHR calculation (Waist-to-Height Ratio)
+                   let wthrVal = 0;
+                   if (userHeightCm > 0 && userWaistCm > 0) {
+                       wthrVal = Number((userWaistCm / userHeightCm).toFixed(2));
+                   }
+
+                   const isFemale = userProfile?.gender === 'female';
+                   const ffmiThresholds = isFemale ? [14.5, 16.5, 18.5, 21.0] : [18.0, 20.0, 22.0, 25.0];
+                   const getFfmiStatus = (val) => {
+                       if (!val || val <= 0) return isID ? 'Butuh Lemak & TB' : 'Needs BF & Height';
+                       if (isFemale) {
+                           if (val < 14.5) return isID ? 'Kurus' : 'Low';
+                           if (val <= 16.5) return isID ? 'Standar' : 'Average';
+                           if (val <= 18.5) return isID ? 'Atletis' : 'Athletic';
+                           if (val <= 21.0) return isID ? 'Sangat Berotot' : 'Advanced';
+                           return isID ? 'Elit Alami' : 'Elite';
+                       } else {
+                           if (val < 18.0) return isID ? 'Kurus' : 'Low';
+                           if (val <= 20.0) return isID ? 'Standar' : 'Average';
+                           if (val <= 22.0) return isID ? 'Atletis' : 'Athletic';
+                           if (val <= 25.0) return isID ? 'Sangat Berotot' : 'Advanced';
+                           return isID ? 'Elit Alami' : 'Elite';
+                       }
+                   };
+                   const getFfmiColor = (val) => {
+                       if (!val || val <= 0) return 'text-zinc-500';
+                       const lim = isFemale ? [14.5, 16.5, 18.5, 21.0] : [18.0, 20.0, 22.0, 25.0];
+                       if (val < lim[0]) return 'text-sky-500';
+                       if (val <= lim[1]) return 'text-emerald-500';
+                       if (val <= lim[2]) return 'text-blue-400';
+                       if (val <= lim[3]) return 'text-amber-400';
+                       return 'text-purple-400';
+                   };
+
+                   const getWthrStatus = (val) => {
+                       if (!val || val <= 0) return isID ? 'Belum Diisi' : 'Not Set';
+                       if (val < 0.40) return isID ? 'Ramping' : 'Slim';
+                       if (val <= 0.49) return isID ? 'Ideal' : 'Ideal';
+                       if (val <= 0.59) return isID ? 'Waspada' : 'Warning';
+                       return isID ? 'Tinggi' : 'High';
+                   };
+                   const getWthrColor = (val) => {
+                       if (!val || val <= 0) return 'text-zinc-500';
+                       if (val < 0.40) return 'text-sky-500';
+                       if (val <= 0.49) return 'text-emerald-500';
+                       if (val <= 0.59) return 'text-amber-500';
+                       return 'text-rose-500';
+                   };
+
+                   return (
+                       <>
+                           {/* Modal Header: Title & Date (left), Skor Tubuh (right) */}
+                           <div 
+                             className="flex justify-between items-center px-6 pt-6 pb-2 shrink-0 touch-none select-none"
+                             onTouchMove={(e) => { if (e.cancelable) e.preventDefault(); }}
+                           >
+                               <div className="flex flex-col">
+                                   <span className={`body-md font-bold ${t.textMain}`}>{isID ? 'Komposisi Tubuh' : 'Body Composition'}</span>
+                                   <div className="relative flex items-center w-max cursor-pointer">
+                                       <span className={`caption font-semibold text-sky-400 underline decoration-dashed underline-offset-2 mt-0.5`}>{new Date(modalDate || Date.now()).toLocaleDateString(lang.workout === 'Latihan' ? 'id-ID' : 'en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                       <input type="date" value={modalDate} onChange={(e) => setModalDate(e.target.value)} onClick={(e) => { try { e.target.showPicker() } catch(err){} }} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
                                    </div>
                                </div>
+                               <div id="bio-detail-score" className="flex flex-col items-end text-right transition-all duration-300">
+                                   <span className="caption font-semibold text-slate-400">{isID ? 'Skor Tubuh' : 'Body Score'}</span>
+                                   <span className={`h2 font-black ${t.textMain} leading-tight mt-0.5`}>{displayBioData.bodyScore || '-'}</span>
+                               </div>
+                           </div>
 
-                               {/* List of metrics with Segmented Bars */}
-                               <div className="flex flex-col space-y-3">
-                                   {[
-                                       { label: 'BMI', val: displayBioData.bmi, unit: '', t: biometricStandard === 'western' ? [18.5, 25.0, 30.0] : [18.5, 23.0, 25.0], c: ['bg-sky-500', 'bg-emerald-500', 'bg-amber-500', 'bg-orange-500'], labels: ['Under', 'Standard', 'Overweight', 'High'], status: displayBioData.bmiStatus, sColor: displayBioData.bmiStatus === 'Normal' ? 'text-emerald-500' : 'text-amber-500' },
-                                       { label: 'Body fat percentage', val: displayBioData.bodyFat, unit: '%', t: [10, 20, 25], c: ['bg-sky-500', 'bg-emerald-500', 'bg-amber-500', 'bg-orange-500'], labels: ['Low', 'Standard', 'Overfat', 'Obese'], status: displayBioData.bodyFatStatus, sColor: displayBioData.bodyFatStatus === 'Normal' ? 'text-emerald-500' : 'text-amber-500' },
-                                       { label: 'Muscle mass', val: dispMuscle, unit: isImp ? 'lbs' : 'kg', t: isImp ? [66] : [30], c: ['bg-sky-500', 'bg-emerald-500'], labels: ['Under', 'Standard'], status: displayBioData.musclePercent >= 33 ? 'Standard' : 'Under', sColor: displayBioData.musclePercent >= 33 ? 'text-emerald-500' : 'text-amber-500' },
-                                       { label: 'Muscle percentage', val: displayBioData.musclePercent, unit: '%', t: [30], c: ['bg-sky-500', 'bg-emerald-500'], labels: ['Under', 'Standard'], status: displayBioData.musclePercent >= 33 ? 'Standard' : 'Under', sColor: displayBioData.musclePercent >= 33 ? 'text-emerald-500' : 'text-amber-500' },
-                                       { label: 'Protein percentage', val: displayBioData.proteinPercent, unit: '%', t: [16], c: ['bg-sky-500', 'bg-emerald-500'], labels: ['Under', 'Standard'], status: displayBioData.proteinPercent >= 16 ? 'Standard' : 'Under', sColor: displayBioData.proteinPercent >= 16 ? 'text-emerald-500' : 'text-amber-500' },
-                                       { label: 'Water percentage', val: displayBioData.waterPercent, unit: '%', t: [45, 65], c: ['bg-sky-500', 'bg-emerald-500', 'bg-amber-500'], labels: ['Low', 'Standard', 'High'], status: (displayBioData.waterPercent >= 45 && displayBioData.waterPercent <= 65) ? 'Standard' : 'Low', sColor: (displayBioData.waterPercent >= 45 && displayBioData.waterPercent <= 65) ? 'text-emerald-500' : 'text-amber-500' },
-                                       { label: 'Visceral fat rating', val: displayBioData.visceralFat, unit: '', t: [10, 15], c: ['bg-emerald-500', 'bg-amber-500', 'bg-orange-500'], labels: ['Standard', 'High', 'Very high'], status: displayBioData.visceralFat < 10 ? 'Standard' : 'Very high', sColor: displayBioData.visceralFat < 10 ? 'text-emerald-500' : 'text-orange-500' },
-                                       { label: 'Waist circumference', val: dispWaist, unit: isImp ? 'in' : 'cm', t: isImp ? [35.4] : [90], c: ['bg-emerald-500', 'bg-orange-500'], labels: ['Standard', 'Over'], status: displayBioData.waist < 90 ? 'Standard' : 'Over', sColor: displayBioData.waist < 90 ? 'text-emerald-500' : 'text-orange-500' }
-                       ].map((item, idx) => {
+                           <div 
+                             ref={detailsScrollRef}
+                             className="flex-1 overflow-y-auto px-4 pb-10 hide-scrollbar space-y-3 overscroll-contain"
+                             style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
+                           >
+                                {/* Hero Weight & Height */}
+                                <div className="grid grid-cols-2 gap-3 py-2 relative transition-all duration-300">
+                                    {/* Berat Badan */}
+                                    <div id="bio-detail-weight" className={`p-4 rounded-2xl flex flex-col items-center justify-center border ${t.border} ${t.bgCard} shadow-sm transition-all duration-300`}>
+                                        <span className="caption font-semibold text-slate-400 mb-1">{isID ? 'Berat Badan' : 'Body Weight'}</span>
+                                        <div className="flex items-baseline">
+                                            <span className={`text-3xl sm:text-4xl font-black tracking-tight ${t.textMain}`}>{dispWeight}</span>
+                                            <span className={`body-sm ml-1.5 font-bold ${t.textMuted}`}>{isImp ? 'lbs' : 'kg'}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Tinggi Badan */}
+                                    <div id="bio-detail-height" className={`p-4 rounded-2xl flex flex-col items-center justify-center border ${t.border} ${t.bgCard} shadow-sm transition-all duration-300`}>
+                                        <span className="caption font-semibold text-slate-400 mb-1">{isID ? 'Tinggi Badan' : 'Body Height'}</span>
+                                        <div className="flex items-baseline">
+                                            <span className={`text-3xl sm:text-4xl font-black tracking-tight ${t.textMain}`}>{dispHeight}</span>
+                                            <span className={`body-sm ml-1.5 font-bold ${t.textMuted}`}>{isImp ? 'in' : 'cm'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* List of metrics with Segmented Bars */}
+                                 <div className="flex flex-col space-y-3">
+                                     {[
+                                          { 
+                                             id: 'bmi',
+                                             label: 'BMI', 
+                                             val: displayBioData.bmi, 
+                                             unit: '', 
+                                             t: biometricStandard === 'western' ? [18.5, 25.0, 30.0] : [18.5, 23.0, 25.0], 
+                                             c: ['bg-sky-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500'], 
+                                             labels: isID ? ['Kurang', 'Normal', 'Berlebih', 'Obesitas'] : ['Under', 'Standard', 'Overweight', 'Obese'], 
+                                             status: resolveBmiStatus(displayBioData.bmiStatus, isID), 
+                                             sColor: displayBioData.bmiStatus === 'Normal' ? 'text-emerald-500' : displayBioData.bmiStatus === 'Overweight' ? 'text-amber-500' : 'text-rose-500' 
+                                         },
+                                          { 
+                                             id: 'bmr',
+                                             label: 'BMR', 
+                                             subtitle: isID ? 'Laju Metabolisme Basal' : 'Basal Metabolic Rate',
+                                             val: displayBioData.bmr || '-', 
+                                             unit: 'kcal', 
+                                             t: userProfile?.gender === 'female' ? [1100, 1400] : [1300, 1600], 
+                                             c: ['bg-sky-500', 'bg-emerald-500', 'bg-amber-500'], 
+                                             labels: isID ? ['Rendah', 'Standar', 'Tinggi'] : ['Low', 'Standard', 'High'], 
+                                             status: !displayBioData.bmr ? '-' : displayBioData.bmr < (userProfile?.gender === 'female' ? 1100 : 1300) ? (isID ? 'Rendah' : 'Low') : displayBioData.bmr <= (userProfile?.gender === 'female' ? 1400 : 1600) ? (isID ? 'Standar' : 'Standard') : (isID ? 'Tinggi' : 'High'), 
+                                             sColor: !displayBioData.bmr ? 'text-zinc-500' : (displayBioData.bmr >= (userProfile?.gender === 'female' ? 1100 : 1300) && displayBioData.bmr <= (userProfile?.gender === 'female' ? 1400 : 1600)) ? 'text-emerald-500' : 'text-amber-500' 
+                                         },
+                                          { 
+                                             id: 'bodyFat',
+                                             label: isID ? 'Kadar Lemak' : 'Body Fat Percentage', 
+                                             val: displayBioData.bodyFat, 
+                                             unit: '%', 
+                                             t: userProfile?.gender === 'female' ? [18, 28, 33] : [10, 20, 25], 
+                                             c: ['bg-sky-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500'], 
+                                             labels: isID ? ['Rendah', 'Normal', 'Tinggi', 'Sangat Tinggi'] : ['Low', 'Normal', 'High', 'Very High'], 
+                                             status: resolveBfStatus(displayBioData.bodyFat, userProfile?.gender === 'female', isID), 
+                                             sColor: resolveBfColor(displayBioData.bodyFat, userProfile?.gender === 'female') 
+                                         },
+                                          { 
+                                             id: 'ffmi',
+                                             label: 'FFMI', 
+                                             subtitle: 'Fat-Free Mass Index',
+                                             val: ffmiVal > 0 ? ffmiVal : '-', 
+                                             unit: '', 
+                                             t: ffmiThresholds, 
+                                             c: ['bg-sky-500', 'bg-emerald-500', 'bg-blue-500', 'bg-amber-500', 'bg-purple-500'], 
+                                             labels: isID ? ['Kurus', 'Standar', 'Atletis', 'Lanjutan', 'Elit'] : ['Low', 'Average', 'Athletic', 'Advanced', 'Elite'], 
+                                             status: getFfmiStatus(ffmiVal), 
+                                             sColor: getFfmiColor(ffmiVal) 
+                                         },
+                                          { 
+                                             id: 'muscleMass',
+                                             label: isID ? 'Massa Otot' : 'Muscle Mass', 
+                                             val: dispMuscle, 
+                                             unit: isImp ? 'lbs' : 'kg', 
+                                             t: isImp ? [66] : [30], 
+                                             c: ['bg-sky-500', 'bg-emerald-500'], 
+                                             labels: isID ? ['Kurang', 'Standar'] : ['Under', 'Standard'], 
+                                             status: (Number(dispMuscle) || 0) >= (isImp ? 66 : 30) ? (isID ? 'Standar' : 'Standard') : (isID ? 'Kurang' : 'Under'), 
+                                             sColor: (Number(dispMuscle) || 0) >= (isImp ? 66 : 30) ? 'text-emerald-500' : 'text-amber-500' 
+                                         },
+                                          { 
+                                             id: 'musclePercent',
+                                             label: isID ? 'Kadar Otot' : 'Muscle Percentage', 
+                                             val: displayBioData.musclePercent, 
+                                             unit: '%', 
+                                             t: [30], 
+                                             c: ['bg-sky-500', 'bg-emerald-500'], 
+                                             labels: isID ? ['Kurang', 'Standar'] : ['Under', 'Standard'], 
+                                             status: displayBioData.musclePercent >= 30 ? (isID ? 'Standar' : 'Standard') : (isID ? 'Kurang' : 'Under'), 
+                                             sColor: displayBioData.musclePercent >= 30 ? 'text-emerald-500' : 'text-amber-500' 
+                                         },
+                                          { 
+                                             id: 'proteinPercent',
+                                             label: isID ? 'Kadar Protein' : 'Protein Percentage', 
+                                             val: displayBioData.proteinPercent, 
+                                             unit: '%', 
+                                             t: [16], 
+                                             c: ['bg-sky-500', 'bg-emerald-500'], 
+                                             labels: isID ? ['Kurang', 'Standar'] : ['Under', 'Standard'], 
+                                             status: displayBioData.proteinPercent >= 16 ? (isID ? 'Standar' : 'Standard') : (isID ? 'Kurang' : 'Under'), 
+                                             sColor: displayBioData.proteinPercent >= 16 ? 'text-emerald-500' : 'text-amber-500' 
+                                         },
+                                          { 
+                                             id: 'waterPercent',
+                                             label: isID ? 'Kadar Air' : 'Water Percentage', 
+                                             val: displayBioData.waterPercent, 
+                                             unit: '%', 
+                                             t: [45, 65], 
+                                             c: ['bg-sky-500', 'bg-emerald-500', 'bg-amber-500'], 
+                                             labels: isID ? ['Rendah', 'Standar', 'Tinggi'] : ['Low', 'Standard', 'High'], 
+                                             status: !displayBioData.waterPercent ? '-' : displayBioData.waterPercent < 45 ? (isID ? 'Rendah' : 'Low') : displayBioData.waterPercent <= 65 ? (isID ? 'Standar' : 'Standard') : (isID ? 'Tinggi' : 'High'), 
+                                             sColor: !displayBioData.waterPercent ? 'text-zinc-500' : (displayBioData.waterPercent >= 45 && displayBioData.waterPercent <= 65) ? 'text-emerald-500' : 'text-amber-500' 
+                                         },
+                                          { 
+                                             id: 'visceralFat',
+                                             label: isID ? 'Lemak Visceral' : 'Visceral Fat Rating', 
+                                             val: displayBioData.visceralFat, 
+                                             unit: '', 
+                                             t: [10, 15], 
+                                             c: ['bg-emerald-500', 'bg-amber-500', 'bg-rose-500'], 
+                                             labels: isID ? ['Standar', 'Tinggi', 'Sangat Tinggi'] : ['Standard', 'High', 'Very High'], 
+                                             status: !displayBioData.visceralFat ? '-' : displayBioData.visceralFat < 10 ? (isID ? 'Standar' : 'Standard') : displayBioData.visceralFat < 15 ? (isID ? 'Tinggi' : 'High') : (isID ? 'Sangat Tinggi' : 'Very High'), 
+                                             sColor: !displayBioData.visceralFat ? 'text-zinc-500' : displayBioData.visceralFat < 10 ? 'text-emerald-500' : displayBioData.visceralFat < 15 ? 'text-amber-500' : 'text-rose-500' 
+                                         },
+                                          { 
+                                             id: 'waist',
+                                             label: isID ? 'Lingkar Perut' : 'Waist Circumference', 
+                                             val: dispWaist, 
+                                             unit: isImp ? 'in' : 'cm', 
+                                             t: isImp ? (userProfile?.gender === 'female' ? [31.5] : [35.4]) : (userProfile?.gender === 'female' ? [80] : [90]), 
+                                             c: ['bg-emerald-500', 'bg-rose-500'], 
+                                             labels: isID ? ['Standar', 'Berlebih'] : ['Standard', 'Over'], 
+                                             status: !displayBioData.waist ? '-' : displayBioData.waist < (userProfile?.gender === 'female' ? 80 : 90) ? (isID ? 'Standar' : 'Standard') : (isID ? 'Berlebih' : 'Over'), 
+                                             sColor: !displayBioData.waist ? 'text-zinc-500' : displayBioData.waist < (userProfile?.gender === 'female' ? 80 : 90) ? 'text-emerald-500' : 'text-rose-500' 
+                                         },
+                                          { 
+                                             id: 'wthr',
+                                             label: isID ? 'Rasio Lingkar Perut/Tinggi' : 'Waist-to-Height Ratio', 
+                                             val: wthrVal > 0 ? wthrVal : '-', 
+                                             unit: '', 
+                                             t: [0.40, 0.50, 0.60], 
+                                             c: ['bg-sky-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500'], 
+                                             labels: isID ? ['Ramping', 'Ideal', 'Waspada', 'Tinggi'] : ['Slim', 'Ideal', 'Warning', 'High'], 
+                                             status: getWthrStatus(wthrVal), 
+                                             sColor: getWthrColor(wthrVal) 
+                                         },
+                                          { 
+                                             id: 'boneMass',
+                                             label: isID ? 'Mineral Tulang' : 'Bone Mass', 
+                                             val: displayBioData.boneMass, 
+                                             unit: '%', 
+                                             t: [2.0, 3.2], 
+                                             c: ['bg-sky-500', 'bg-emerald-500', 'bg-amber-500'], 
+                                             labels: isID ? ['Kurang', 'Standar', 'Cukup'] : ['Under', 'Standard', 'Good'], 
+                                             status: !displayBioData.boneMass ? '-' : displayBioData.boneMass < 2.0 ? (isID ? 'Kurang' : 'Under') : displayBioData.boneMass <= 3.2 ? (isID ? 'Standar' : 'Standard') : (isID ? 'Cukup' : 'Good'), 
+                                             sColor: !displayBioData.boneMass ? 'text-zinc-500' : displayBioData.boneMass >= 2.0 ? 'text-emerald-500' : 'text-amber-500' 
+                                         },
+                                          { 
+                                             id: 'bodyAge',
+                                             label: isID ? (userAge ? `Usia Tubuh (Aktual: ${userAge} th)` : 'Usia Tubuh') : (userAge ? `Metabolic Age (Actual: ${userAge} yo)` : 'Metabolic Age'), 
+                                             val: displayBioData.bodyAge, 
+                                             unit: isID ? 'th' : 'yo', 
+                                             t: userAge ? [userAge - 3, userAge + 3] : [25, 45], 
+                                             c: ['bg-emerald-500', 'bg-sky-500', 'bg-amber-500'], 
+                                             labels: isID ? ['Muda', 'Sesuai', 'Tua'] : ['Young', 'Matching', 'Older'], 
+                                             status: !displayBioData.bodyAge ? '-' : userAge ? (displayBioData.bodyAge < userAge - 2 ? (isID ? 'Lebih Muda' : 'Younger') : displayBioData.bodyAge <= userAge + 2 ? (isID ? 'Sesuai' : 'Matching') : (isID ? 'Lebih Tua' : 'Older')) : (isID ? 'Standar' : 'Standard'), 
+                                             sColor: !displayBioData.bodyAge ? 'text-zinc-500' : userAge ? (displayBioData.bodyAge <= userAge ? 'text-emerald-500' : 'text-amber-500') : 'text-emerald-500' 
+                                         }
+                                    ].map((item, idx) => {
                            const v = Number(item.val) || 0;
                            let pointerPos = 0;
                            if (item.t && item.t.length > 0) {
@@ -1934,39 +2468,42 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                            }
                            
                            return (
-                                <div key={idx} className={`p-5 rounded-2xl flex flex-col border ${t.border} ${t.bgCard} shadow-sm`}>
+                                <div key={idx} id={item.id ? `bio-detail-${item.id}` : undefined} className={`p-5 rounded-2xl flex flex-col border ${t.border} ${t.bgCard} shadow-sm transition-all duration-300`}>
                                     <div className="flex justify-between items-start mb-4">
-                                        <span className={`body-lg font-bold ${t.textMain}`}>{item.label}</span>
-                                        <div className="text-right">
+                                        <div className="flex flex-col pr-3 min-w-0">
+                                            <span className={`body-lg font-bold ${t.textMain} leading-snug`}>{item.label}</span>
+                                            {item.subtitle && <span className="caption font-medium text-slate-300 dark:text-slate-300 mt-0.5 leading-snug">{item.subtitle}</span>}
+                                            {item.status && <span className={`caption font-extrabold ${item.sColor} uppercase tracking-wider mt-1.5`}>{item.status}</span>}
+                                        </div>
+                                        <div className="text-right shrink-0">
                                             <div className="flex items-baseline space-x-1 justify-end">
                                                 <span className="h1 font-light">{item.val || '-'}</span>
-                                                <span className={`text-[10px] font-bold ${t.textMuted}`}>{item.unit}</span>
+                                                {item.unit && <span className={`caption font-bold ${t.textMuted}`}>{item.unit}</span>}
                                             </div>           
                                         </div>
-                                        {item.status && <span className={`text-[9px] font-black ${item.sColor} uppercase tracking-widest mt-1.5`}>{item.status}</span>}
                                    </div>
                                    
                                    {item.c && item.c.length > 0 && (
                                        <div className="relative mt-2 mb-2 px-1">
                                            {/* Pointer */}
-                                           <div className={`absolute -top-3 w-2.5 h-2.5 transition-all duration-500 ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`} style={{ left: `calc(${pointerPos}% - 5px)` }}>
+                                           <div className={`absolute -top-3.5 w-3 h-3 transition-all duration-500 ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`} style={{ left: `calc(${pointerPos}% - 6px)` }}>
                                                <svg viewBox="0 0 10 10" fill="currentColor"><polygon points="0,0 10,0 5,6" /></svg>
                                            </div>
                                            {/* Bar */}
-                                           <div className="flex h-2 rounded-full overflow-hidden mb-2 opacity-90">
+                                           <div className="flex h-2.5 rounded-full overflow-hidden mb-2.5 opacity-90">
                                                {item.c.map((color, i) => <div key={i} className={`flex-1 ${color}`}></div>)}
                                            </div>
-                                            <div className={`relative h-4 text-[9px] font-bold text-zinc-400`}>
+                                            <div className="relative h-6 caption font-semibold text-slate-300 dark:text-slate-400">
                                                 {item.t.map((threshold, i) => (
                                                     <span key={i} className="absolute transform -translate-x-1/2" style={{ left: `${(i + 1) * (100 / (item.t.length + 1))}%` }}>{threshold}</span>
                                                 ))}
                                             </div>
                                            {/* Legends */}
-                                           <div className="flex flex-wrap gap-x-5 gap-y-2 mt-4 pt-4 border-t border-dashed border-zinc-500/20">
+                                           <div className="flex flex-wrap gap-x-5 gap-y-2 mt-4 pt-4 border-t border-dashed border-white/10 dark:border-white/10">
                                                {item.labels.map((lbl, i) => (
                                                    <div key={i} className="flex items-center space-x-1.5">
-                                                       <div className={`w-2.5 h-2.5 rounded-sm ${item.c[i]}`}></div>
-                                                       <span className={`text-[10px] font-bold ${t.textMuted}`}>{lbl}</span>
+                                                       <div className={`w-3 h-3 rounded-full ${item.c[i]} shrink-0 shadow-sm`}></div>
+                                                       <span className="caption font-semibold text-slate-200 dark:text-slate-300">{lbl}</span>
                                                    </div>
                                                ))}
                                            </div>
@@ -1976,123 +2513,270 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                            );
                        })}
                     </div>
-                           </>
-                       );
-                   })()}
-               </div>
-           </div>
-        </div>
+                           </div>
+               </>
+            );
+        })()}
+    </div>
+ </div>
       ), document.body)}
 
-      {/* MODAL PENGATURAN TARGET */}
-      {showTargetModal && createPortal(
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm anim-fade-in" onClick={() => setShowTargetModal(false)}>
-              <div className={`w-full max-w-sm rounded-[2rem] border ${t.border} ${t.bgCard} p-6 shadow-2xl anim-scale-in`} onClick={e => e.stopPropagation()}>
-                  <div className="flex items-center justify-between mb-6">
-                      <h3 className={`h2 ${t.textMain} flex items-center gap-2`}><Settings size={20} className={t.textAccent}/> Target</h3>
-                      <button onClick={() => { playSoundEffect('click', soundEnabled); setShowTargetModal(false); }} className={`p-1.5 rounded-full ${t.bgBox} ${t.textMuted} hover:${t.textMain} transition-colors`}><X size={16}/></button>
-                  </div>
-
-                  <div className="space-y-4">
-                      {/* Langkah */}
-                      <div className={`p-4 rounded-2xl ${t.bgBox} border ${t.borderDashed}`}>
-                          <div className="flex items-center gap-3 mb-3">
-                              <div className="w-8 h-8 rounded-full bg-blue-500/20 text-blue-500 flex items-center justify-center shrink-0">
-                                  <Footprints size={14} />
-                              </div>
-                              <div className="flex-1">
-                                  <label className={`text-xs font-bold uppercase tracking-wider ${t.textMuted}`}>Langkah Kaki</label>
-                              </div>
+      {/* MODAL TARGET LANGKAH KAKI */}
+      {showStepsModal && createPortal(
+          <div 
+              className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/65 backdrop-blur-xl anim-fade-in overscroll-contain touch-none" 
+              onClick={() => setShowStepsModal(false)}
+          >
+              <div 
+                  className={`w-full max-w-sm rounded-[2rem] border ${t.border} ${t.bgCard} p-6 shadow-2xl anim-scale-in`} 
+                  onClick={e => e.stopPropagation()}
+              >
+                  {/* Header */}
+                  <div className="flex items-center justify-between mb-5">
+                      <div className="flex items-center gap-2.5">
+                          <div className="w-9 h-9 rounded-full bg-blue-500/15 text-blue-500 flex items-center justify-center shrink-0">
+                              <Footprints size={18}/>
                           </div>
-                          <div className="relative">
-                              <SwipeInput 
-                                  value={targetForm.steps || ''} 
-                                  onChange={(v) => setTargetForm(p => ({...p, steps: Number(v)}))} 
-                                  min={0} max={50000} step={1000} 
-                                  placeholder="Contoh: 10000"
-                                  language={language}
-                                  className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-4 rounded-xl outline-none font-black text-center text-xl pr-14`}
-                              />
-                              <span className={`absolute right-4 top-1/2 -translate-y-1/2 caption font-bold ${t.textMuted}`}>Langkah</span>
+                          <div>
+                              <h3 className={`h3 ${t.textMain} leading-tight`}>Target Langkah</h3>
+                              <p className={`caption ${t.textMuted}`} style={{ fontSize: '0.7rem' }}>Sasaran langkah harian</p>
                           </div>
                       </div>
-
-                      {/* Durasi Aktif Mingguan */}
-                      <div className={`p-4 rounded-2xl ${t.bgBox} border ${t.borderDashed}`}>
-                          <div className="flex items-center gap-3 mb-3">
-                              <div className="w-8 h-8 rounded-full bg-sky-500/20 text-sky-500 flex items-center justify-center shrink-0">
-                                  <Clock size={14} />
-                              </div>
-                              <div className="flex-1">
-                                  <label className={`text-xs font-bold uppercase tracking-wider ${t.textMuted}`}>Durasi Aktif (Harian)</label>
-                              </div>
-                          </div>
-                          <div className="relative">
-                              <SwipeInput 
-                                  value={targetForm.dailyActiveMinutes || targetForm.weeklyDuration ? Math.round(targetForm.weeklyDuration / 5) : ''} 
-                                  onChange={(v) => setTargetForm(p => ({...p, dailyActiveMinutes: Number(v)}))} 
-                                  min={0} max={180} step={5} 
-                                  placeholder="Contoh: 30"
-                                  language={language}
-                                  className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-4 rounded-xl outline-none font-black text-center text-xl pr-14`}
-                              />
-                              <span className={`absolute right-4 top-1/2 -translate-y-1/2 caption font-bold ${t.textMuted}`}>Mnt</span>
-                          </div>
-                      </div>
-
-                      {/* Tidur */}
-                      <div className={`p-4 rounded-2xl ${t.bgBox} border ${t.borderDashed}`}>
-                          <div className="flex items-center gap-3 mb-3">
-                              <div className="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-500 flex items-center justify-center shrink-0">
-                                  <Moon size={14} />
-                              </div>
-                              <div className="flex-1">
-                                  <label className={`text-xs font-bold uppercase tracking-wider ${t.textMuted}`}>Durasi Tidur</label>
-                              </div>
-                          </div>
-                          <div className="flex gap-2">
-                              <div className="relative flex-1">
-                                  <SwipeInput 
-                                      value={Math.floor(targetForm.sleep || 0) || ''} 
-                                      onChange={(v) => {
-                                          const currentMins = Math.round(((targetForm.sleep || 0) % 1) * 60);
-                                          setTargetForm(p => ({...p, sleep: (Number(v) || 0) + (currentMins/60)}));
-                                      }} 
-                                      min={0} max={24} step={1} 
-                                      placeholder="0"
-                                      language={language}
-                                      className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-4 rounded-xl outline-none font-black text-center text-xl pr-14`}
-                                  />
-                                  <span className={`absolute right-4 top-1/2 -translate-y-1/2 caption font-bold ${t.textMuted}`}>Jam</span>
-                              </div>
-                              <div className="relative flex-1">
-                                  <SwipeInput 
-                                      value={Math.round(((targetForm.sleep || 0) % 1) * 60) || ''} 
-                                      onChange={(v) => {
-                                          const currentHrs = Math.floor(targetForm.sleep || 0) || 0;
-                                          setTargetForm(p => ({...p, sleep: currentHrs + ((Number(v) || 0)/60)}));
-                                      }} 
-                                      min={0} max={59} step={1} 
-                                      placeholder="0"
-                                      language={language}
-                                      className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} p-4 rounded-xl outline-none font-black text-center text-xl pr-14`}
-                                  />
-                                  <span className={`absolute right-4 top-1/2 -translate-y-1/2 caption font-bold ${t.textMuted}`}>Mnt</span>
-                              </div>
-                          </div>
-                      </div>
-                  </div>
-
-                  <div className={`flex space-x-3 mt-6 border-t ${t.borderDashed} pt-5`}>
                       <button 
-                          onClick={() => { playSoundEffect('click', soundEnabled); setShowTargetModal(false); }}
-                          className={`w-1/3 py-3 rounded-xl font-bold body-lg ${t.textMuted} ${t.btnBg} active:scale-[0.98] transition-all`}
+                          data-close-modal="true"
+                          onClick={() => { playSoundEffect('click', soundEnabled); setShowStepsModal(false); }} 
+                          className={`p-2 rounded-full ${t.btnBg} ${t.textMuted} hover:${t.textMain} border ${t.border} transition-colors`}
+                      >
+                          <X size={16}/>
+                      </button>
+                  </div>
+
+                  {/* Capaian Hari Ini (Clean status row, no nested box) */}
+                  <div className="mb-5 pb-4 border-b border-dashed border-zinc-500/20">
+                      <div className="flex items-baseline justify-between mb-2">
+                          <span className={`caption font-semibold ${t.textMuted}`}>Capaian Hari Ini</span>
+                          <div className="flex items-baseline gap-1">
+                              <span className={`text-2xl font-black ${t.textMain} tracking-tight`}>
+                                  {bioData.steps > 0 ? formatNumber(bioData.steps, language) : '0'}
+                              </span>
+                              <span className={`caption font-medium ${t.textMuted}`}>
+                                  / {formatNumber(editSteps, language)}
+                              </span>
+                          </div>
+                      </div>
+                      <div className="w-full h-2 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden shrink-0">
+                          <div 
+                              className="h-full bg-blue-500 rounded-full transition-all duration-500" 
+                              style={{ width: `${Math.min(100, (Number(bioData.steps || 0) / (Number(editSteps) || 10000)) * 100)}%` }}
+                          />
+                      </div>
+                  </div>
+
+                  {/* Input Target (Hero input, no wrapper box) */}
+                  <div className="mb-4">
+                      <label className={`caption font-bold uppercase tracking-wider ${t.textMuted} block mb-2`}>
+                          Tentukan Target Harian
+                      </label>
+                      <div className="relative">
+                          <SwipeInput 
+                              value={editSteps || ''} 
+                              onChange={(v) => setEditSteps(Number(v))} 
+                              min={1000} max={50000} step={500} 
+                              placeholder="10000"
+                              soundEnabled={soundEnabled}
+                              language={language}
+                              className={`w-full ${t.inputBg} border ${t.border} focus:border-blue-500 ${t.textMain} py-3.5 px-4 rounded-2xl outline-none font-black text-center text-3xl transition-all shadow-inner`}
+                          />
+                          <span className={`absolute right-4 top-1/2 -translate-y-1/2 caption font-bold ${t.textMuted} pointer-events-none`}>
+                              Langkah
+                          </span>
+                      </div>
+                  </div>
+
+                  {/* Quick Presets */}
+                  <div className="mb-6">
+                      <span className={`text-[10px] font-bold uppercase tracking-wider ${t.textMuted} block mb-2`}>
+                          Pilihan Cepat
+                      </span>
+                      <div className="grid grid-cols-5 gap-1.5">
+                          {[5000, 7500, 10000, 12500, 15000].map(s => {
+                              const isSelected = editSteps === s;
+                              return (
+                                  <button
+                                      key={s}
+                                      type="button"
+                                      onClick={() => { playSoundEffect('click', soundEnabled); setEditSteps(s); }}
+                                      className={`py-2 px-1 rounded-xl text-xs font-bold transition-all text-center ${
+                                          isSelected 
+                                              ? 'bg-blue-500 text-white shadow-md shadow-blue-500/25 scale-[1.02]' 
+                                              : `${t.btnBg} ${t.textMuted} hover:${t.textMain} border ${t.border} active:scale-95`
+                                      }`}
+                                  >
+                                      {s >= 1000 ? `${s / 1000}k` : s}
+                                  </button>
+                              );
+                          })}
+                      </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-3 pt-3 border-t border-dashed border-zinc-500/20">
+                      <button 
+                          data-close-modal="true"
+                          onClick={() => { playSoundEffect('click', soundEnabled); setShowStepsModal(false); }}
+                          className={`w-1/3 py-3 rounded-xl font-bold body-md ${t.textMuted} ${t.btnBg} border ${t.border} hover:${t.textMain} active:scale-[0.98] transition-all`}
                       >
                           Batal
                       </button>
                       <button 
-                          onClick={handleSaveTargets}
-                          className={`flex-1 py-3 rounded-xl font-bold body-lg text-white ${t.bgAccent} shadow-lg active:scale-[0.98] transition-all`}
+                          onClick={() => handleSaveStepsTarget(editSteps)}
+                          className="flex-1 py-3 rounded-xl font-bold body-md text-white bg-blue-500 hover:bg-blue-600 shadow-lg shadow-blue-500/25 active:scale-[0.98] transition-all"
+                      >
+                          Simpan
+                      </button>
+                  </div>
+              </div>
+          </div>,
+          document.body
+      )}
+
+      {/* MODAL TARGET DURASI TIDUR */}
+      {showSleepTargetModal && createPortal(
+          <div 
+              className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/65 backdrop-blur-xl anim-fade-in overscroll-contain touch-none" 
+              onClick={() => setShowSleepTargetModal(false)}
+          >
+              <div 
+                  className={`w-full max-w-sm rounded-[2rem] border ${t.border} ${t.bgCard} p-6 shadow-2xl anim-scale-in`} 
+                  onClick={e => e.stopPropagation()}
+              >
+                  {/* Header */}
+                  <div className="flex items-center justify-between mb-5">
+                      <div className="flex items-center gap-2.5">
+                          <div className="w-9 h-9 rounded-full bg-indigo-500/15 text-indigo-400 flex items-center justify-center shrink-0">
+                              <Moon size={18}/>
+                          </div>
+                          <div>
+                              <h3 className={`h3 ${t.textMain} leading-tight`}>Target Durasi Tidur</h3>
+                              <p className={`caption ${t.textMuted}`} style={{ fontSize: '0.7rem' }}>Sasaran istirahat malam</p>
+                          </div>
+                      </div>
+                      <button 
+                          data-close-modal="true"
+                          onClick={() => { playSoundEffect('click', soundEnabled); setShowSleepTargetModal(false); }} 
+                          className={`p-2 rounded-full ${t.btnBg} ${t.textMuted} hover:${t.textMain} border ${t.border} transition-colors`}
+                      >
+                          <X size={16}/>
+                      </button>
+                  </div>
+
+                  {/* Target Terpilih (Clean status row, no nested box) */}
+                  <div className="mb-5 pb-4 border-b border-dashed border-zinc-500/20">
+                      <div className="flex items-baseline justify-between">
+                          <span className={`caption font-semibold ${t.textMuted}`}>Target Terpilih</span>
+                          <div className="flex items-baseline gap-1">
+                              <span className="text-2xl font-black text-indigo-400 tracking-tight">
+                                  {editSleepHours}
+                              </span>
+                              <span className={`caption font-medium ${t.textMuted} mr-1`}>jam</span>
+                              {editSleepMinutes > 0 && (
+                                  <>
+                                      <span className="text-2xl font-black text-indigo-400 tracking-tight">
+                                          {editSleepMinutes}
+                                      </span>
+                                      <span className={`caption font-medium ${t.textMuted}`}>mnt</span>
+                                  </>
+                              )}
+                          </div>
+                      </div>
+                  </div>
+
+                  {/* Input Target (Jam & Menit side-by-side, no wrapper box) */}
+                  <div className="mb-4">
+                      <label className={`caption font-bold uppercase tracking-wider ${t.textMuted} block mb-2`}>
+                          Atur Durasi Tidur
+                      </label>
+                      <div className="flex gap-2.5">
+                          <div className="relative flex-1">
+                              <SwipeInput 
+                                  value={editSleepHours || ''} 
+                                  onChange={(v) => setEditSleepHours(Number(v))} 
+                                  min={0} max={24} step={1} 
+                                  placeholder="8"
+                                  soundEnabled={soundEnabled}
+                                  language={language}
+                                  className={`w-full ${t.inputBg} border ${t.border} focus:border-indigo-500 ${t.textMain} py-3.5 px-4 rounded-2xl outline-none font-black text-center text-2xl transition-all shadow-inner`}
+                              />
+                              <span className={`absolute right-3.5 top-1/2 -translate-y-1/2 caption font-bold ${t.textMuted} pointer-events-none`}>Jam</span>
+                          </div>
+                          <div className="relative flex-1">
+                              <SwipeInput 
+                                  value={editSleepMinutes || ''} 
+                                  onChange={(v) => setEditSleepMinutes(Number(v))} 
+                                  min={0} max={55} step={5} 
+                                  placeholder="0"
+                                  soundEnabled={soundEnabled}
+                                  language={language}
+                                  className={`w-full ${t.inputBg} border ${t.border} focus:border-indigo-500 ${t.textMain} py-3.5 px-4 rounded-2xl outline-none font-black text-center text-2xl transition-all shadow-inner`}
+                              />
+                              <span className={`absolute right-3.5 top-1/2 -translate-y-1/2 caption font-bold ${t.textMuted} pointer-events-none`}>Mnt</span>
+                          </div>
+                      </div>
+                  </div>
+
+                  {/* Quick Presets */}
+                  <div className="mb-4">
+                      <span className={`text-[10px] font-bold uppercase tracking-wider ${t.textMuted} block mb-2`}>
+                          Rekomendasi Cepat
+                      </span>
+                      <div className="grid grid-cols-3 gap-2">
+                          {[
+                              { label: '6 Jam', h: 6, m: 0 },
+                              { label: '7 Jam', h: 7, m: 0 },
+                              { label: '7.5 Jam', h: 7, m: 30 },
+                              { label: '8 Jam', h: 8, m: 0 },
+                              { label: '8.5 Jam', h: 8, m: 30 },
+                              { label: '9 Jam', h: 9, m: 0 },
+                          ].map(preset => {
+                              const isSelected = editSleepHours === preset.h && editSleepMinutes === preset.m;
+                              return (
+                                  <button
+                                      key={preset.label}
+                                      type="button"
+                                      onClick={() => {
+                                          playSoundEffect('click', soundEnabled);
+                                          setEditSleepHours(preset.h);
+                                          setEditSleepMinutes(preset.m);
+                                      }}
+                                      className={`py-2 px-1 rounded-xl text-xs font-bold transition-all text-center ${
+                                          isSelected 
+                                              ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/25 scale-[1.02]' 
+                                              : `${t.btnBg} ${t.textMuted} hover:${t.textMain} border ${t.border} active:scale-95`
+                                      }`}
+                                  >
+                                      {preset.label}
+                                  </button>
+                              );
+                          })}
+                      </div>
+                  </div>
+
+                  <p className={`text-[10px] leading-relaxed ${t.textMuted} opacity-75 mb-6`}>
+                      *National Sleep Foundation merekomendasikan 7–9 jam tidur untuk orang dewasa guna pemulihan optimal.
+                  </p>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-3 pt-3 border-t border-dashed border-zinc-500/20">
+                      <button 
+                          data-close-modal="true"
+                          onClick={() => { playSoundEffect('click', soundEnabled); setShowSleepTargetModal(false); }}
+                          className={`w-1/3 py-3 rounded-xl font-bold body-md ${t.textMuted} ${t.btnBg} border ${t.border} hover:${t.textMain} active:scale-[0.98] transition-all`}
+                      >
+                          Batal
+                      </button>
+                      <button 
+                          onClick={() => handleSaveSleepTarget(editSleepHours, editSleepMinutes)}
+                          className="flex-1 py-3 rounded-xl font-bold body-md text-white bg-indigo-500 hover:bg-indigo-600 shadow-lg shadow-indigo-500/25 active:scale-[0.98] transition-all"
                       >
                           Simpan
                       </button>
@@ -2121,9 +2805,7 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
                   <h3 className="h2 text-white font-black">
                     Metabolisme Harian (TDEE)
                   </h3>
-                  <p className="caption text-slate-400 mt-1 leading-snug">
-                    Total seluruh energi yang dibakar tubuh dalam 24 jam.
-                  </p>
+
                 </div>
                 <button 
                   data-close-modal="true" 
@@ -2229,13 +2911,212 @@ const DashboardTab = ({ t, lang, language, user, history, setHistory, programs, 
         document.body
       )}
 
+      {/* MODAL PENJELASAN DURASI AKTIF (Langkah, Kardio, Beban) */}
+      {showDurationModal && createPortal(
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/65 backdrop-blur-xl animate-in fade-in overscroll-contain touch-none"
+          onClick={() => setShowDurationModal(false)}
+        >
+          <div 
+            className="w-full max-w-md bg-slate-900/60 dark:bg-black/60 backdrop-blur-2xl border border-white/20 text-white rounded-3xl p-6 shadow-[0_16px_40px_rgba(0,0,0,0.5)] ring-1 ring-white/10 animate-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="pb-4 border-b border-white/10">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="h2 text-white font-black">
+                    Rincian Durasi Aktif
+                  </h3>
+
+                </div>
+                <button 
+                  data-close-modal="true" 
+                  onClick={() => setShowDurationModal(false)} 
+                  className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-colors shrink-0 ml-3"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Total Banner */}
+              <div className="mt-4 pt-3 border-t border-dashed border-white/10 flex items-baseline justify-between">
+                <span className="caption text-slate-300 font-semibold uppercase tracking-wider">Total Hari Ini</span>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-2xl font-black text-blue-400">
+                    {mergedDailyActiveMinutes > 0 ? formatNumber(mergedDailyActiveMinutes, language) : '0'}
+                  </span>
+                  <span className="caption text-slate-400 font-normal">
+                    mnt
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* List Pilar Durasi Aktif */}
+            <div className="divide-y divide-white/10 py-1">
+              {/* 1. Langkah Kaki */}
+              <div className="py-3 flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="body-md font-bold text-indigo-400 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-indigo-400 shrink-0" />
+                    Langkah Kaki
+                  </div>
+                  <p className="caption text-slate-300 mt-0.5 leading-snug">
+                    Estimasi waktu dari langkah harian aktif ({formatNumber(bioData.steps || 0, language)} langkah).
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="body-lg font-black text-white whitespace-nowrap">
+                    {formatNumber(actDetail?.stepMinutes || 0, language)} <span className="caption font-normal text-slate-400">mnt</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* 2. Latihan Kardio */}
+              <div className="py-3 flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="body-md font-bold text-zinc-300 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-zinc-400 shrink-0" />
+                    Latihan Kardio
+                  </div>
+                  <p className="caption text-slate-300 mt-0.5 leading-snug">
+                    Sesi kardio terencana di Logym (treadmill, sepeda, lari, dll).
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="body-lg font-black text-white whitespace-nowrap">
+                    {formatNumber(actDetail?.cardioMinutes || 0, language)} <span className="caption font-normal text-slate-400">mnt</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* 3. Latihan Beban */}
+              <div className="py-3 flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="body-md font-bold text-sky-400 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-sky-400 shrink-0" />
+                    Latihan Beban
+                  </div>
+                  <p className="caption text-slate-300 mt-0.5 leading-snug">
+                    Sesi latihan angkat beban dan resistensi terencana.
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="body-lg font-black text-white whitespace-nowrap">
+                    {formatNumber(actDetail?.weightMinutes || 0, language)} <span className="caption font-normal text-slate-400">mnt</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* 4. Manual (jika ada) */}
+              {(actDetail?.manual > actDetail?.auto) && (
+                <div className="py-3 flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="body-md font-bold text-amber-400 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                      Penyesuaian Manual
+                    </div>
+                    <p className="caption text-slate-300 mt-0.5 leading-snug">
+                      Tambahan durasi dari input manual di luar hitungan otomatis.
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="body-lg font-black text-white whitespace-nowrap">
+                      {formatNumber(actDetail.manual - actDetail.auto, language)} <span className="caption font-normal text-slate-400">mnt</span>
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Target Durasi Mingguan (WHO) */}
+            <div className="mt-4 pt-4 border-t border-white/10">
+              <div className="flex items-center justify-between mb-3">
+                <label className="caption text-slate-300 font-semibold uppercase tracking-wider">
+                  Target Durasi Mingguan
+                </label>
+                <span className="caption font-bold text-sky-400">
+                  {editWeeklyDuration} mnt / minggu
+                </span>
+              </div>
+
+              {/* Weekly Progress Bar */}
+              <div className="mb-3">
+                <div className="flex items-baseline justify-between mb-1.5">
+                  <span className="text-xs text-slate-400">Progres minggu ini</span>
+                  <span className="text-xs font-bold text-white">
+                    {formatNumber(mergedWeeklyActiveMinutes || 0, language)} <span className="text-slate-400 font-normal">/ {editWeeklyDuration} mnt</span>
+                  </span>
+                </div>
+                <div className="w-full h-2.5 bg-white/10 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full rounded-full transition-all duration-500 ${(mergedWeeklyActiveMinutes || 0) >= editWeeklyDuration ? 'bg-emerald-400' : 'bg-sky-400'}`}
+                    style={{ width: `${Math.min(100, ((mergedWeeklyActiveMinutes || 0) / editWeeklyDuration) * 100)}%` }}
+                  />
+                </div>
+                {(mergedWeeklyActiveMinutes || 0) >= editWeeklyDuration && (
+                  <p className="text-[10px] text-emerald-400 font-semibold mt-1">✔ Target mingguan tercapai!</p>
+                )}
+              </div>
+
+              {/* SwipeInput */}
+              <div className="flex items-center gap-2 mb-2">
+                <div className="relative flex-1">
+                  <SwipeInput 
+                    value={editWeeklyDuration || ''} 
+                    onChange={(v) => {
+                      const val = Number(v) || 0;
+                      setEditWeeklyDuration(val);
+                      handleSaveWeeklyDurationTarget(val);
+                    }} 
+                    min={30} max={600} step={15} 
+                    placeholder="150"
+                    language={language}
+                    className="w-full bg-black/40 border border-white/15 text-white p-2.5 rounded-xl outline-none font-black text-center text-lg pr-12 focus:border-sky-400 transition-colors"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 caption font-bold text-slate-400">mnt</span>
+                </div>
+              </div>
+              <div className="flex gap-1.5">
+                {[75, 150, 200, 300].map((mins) => (
+                  <button
+                    key={mins}
+                    type="button"
+                    onClick={() => {
+                      playSoundEffect('click', soundEnabled);
+                      setEditWeeklyDuration(mins);
+                      handleSaveWeeklyDurationTarget(mins);
+                    }}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      editWeeklyDuration === mins
+                        ? 'bg-sky-500 text-white shadow-sm'
+                        : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'
+                    }`}
+                  >
+                    {mins}m
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-slate-500 mt-2 leading-snug">
+                WHO merekomendasikan minimal 150 menit aktivitas aerobik intensitas sedang per minggu.
+              </p>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
     </div>
   );
 };
 
 // Skip re-render when only function props changed (always new references but same behavior).
 // Data props are compared shallowly — if any data prop changes, component re-renders.
+// Inactive tab is frozen completely to prevent background CPU/battery drain.
 export default React.memo(DashboardTab, (prev, next) => {
+  if (prev.isActive !== next.isActive) return false;
+  if (!next.isActive) return true;
   const keys = Object.keys(next);
   for (let i = 0; i < keys.length; i++) {
     const k = keys[i];

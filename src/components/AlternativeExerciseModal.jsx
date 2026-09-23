@@ -1,9 +1,11 @@
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useDeferredValue } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Search, Filter, Dumbbell, Heart, ChevronDown } from 'lucide-react';
 import { formatTarget, getVideoId, muscleOptions, equipmentOptions, normalizeMuscleKey, filterByGymEquipment, exerciseAliasMap, cleanExerciseNameForMatching, canonicalizeExercise } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
 import { fetchExercisesFromApi } from '../utils/exerciseDbApi';
+import { prepareSearchableExercise, scoreExerciseMatch, computeOwnExerciseUsage, exerciseSlug } from '../utils/exerciseSearch';
+import { buildExLookupByName } from '../utils/workoutCalc';
 import EquipmentIcon from './EquipmentIcon';
 import FilterChips from './FilterChips';
 
@@ -42,9 +44,11 @@ const AlternativeExerciseModal = ({
   lang,
   soundEnabled,
   gymProfiles,
-  activeGymId
+  activeGymId,
+  history
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const deferredSearch = useDeferredValue(searchTerm);
   const [showFilters, setShowFilters] = useState(false);
   const [muscleFilter, setMuscleFilter] = useState([]);
   const [equipFilter, setEquipFilter] = useState([]);
@@ -58,7 +62,7 @@ const AlternativeExerciseModal = ({
   React.useEffect(() => {
     setVisibleCount(30);
     if (listRef.current) listRef.current.scrollTop = 0;
-  }, [searchTerm, muscleFilter, equipFilter, showFavoritesOnly, sortOrder]);
+  }, [deferredSearch, muscleFilter, equipFilter, showFavoritesOnly, sortOrder]);
 
   // Infinite scroll handler
   const handleScroll = useCallback((e) => {
@@ -127,6 +131,20 @@ const AlternativeExerciseModal = ({
     return list;
   }, [exerciseLibrary, onlineExercises, gymProfiles, activeGymId]);
 
+  // Hitung frekuensi pemakaian latihan sendiri dari riwayat
+  const exLookup = useMemo(() => {
+    return buildExLookupByName(history, exerciseLibrary);
+  }, [history, exerciseLibrary]);
+
+  const ownScores = useMemo(() => {
+    return computeOwnExerciseUsage(history, exLookup);
+  }, [history, exLookup]);
+
+  // Pre-index library untuk pencarian cepat & relevansi cerdas
+  const indexedLibrary = useMemo(() => {
+    return combinedLibrary.map(ex => prepareSearchableExercise(ex, lang?.id));
+  }, [combinedLibrary, lang?.id]);
+
   const toggleFilter = (arr, setArr, val) => {
     setArr(prev => prev.includes(val) ? prev.filter(x => x !== val) : [...prev, val]);
   };
@@ -154,7 +172,7 @@ const AlternativeExerciseModal = ({
       return false;
     };
 
-    let filtered = combinedLibrary.filter(ex => !isSameExercise(ex, originalEx));
+    let filtered = indexedLibrary.filter(ex => !isSameExercise(ex, originalEx));
 
     // Filter by Muscle
     if (muscleFilter.length > 0) {
@@ -169,53 +187,57 @@ const AlternativeExerciseModal = ({
       filtered = filtered.filter(ex => equipFilter.includes(ex.equipment));
     }
 
-    const queryWords = searchTerm.toLowerCase().trim().split(/\s+/).filter(Boolean);
-    const origWords = originalEx.name.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 2);
     // Filter by Favorites
     if (showFavoritesOnly) {
       filtered = filtered.filter(ex => ex.isFavorite);
     }
 
+    const isSearching = Boolean(deferredSearch && deferredSearch.trim());
+    const origWords = (originalEx.name || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 2);
+
     filtered = filtered.map(ex => {
       let score = 0;
-      
-      // If there is a search term, strict matching is required
-      if (queryWords.length > 0) {
-        const nameStr = ex.name.toLowerCase();
-        const targetStr = ex.target ? formatTarget(ex.target, lang?.id).toLowerCase() : '';
-        const matches = queryWords.every(word => nameStr.includes(word) || targetStr.includes(word));
-        if (!matches) return { ...ex, score: -1 }; // Hide if it doesn't match search
-        score += 100; // Passed search
+      const usage = ownScores[ex._slug || exerciseSlug(ex.name)] || ownScores[String(ex.id)] || (ex.exerciseId ? ownScores[exerciseSlug(ex.exerciseId)] : 0) || 0;
+
+      // Jika ada kata pencarian: gunakan algoritma smart search & bobot riwayat user
+      if (isSearching) {
+        score = scoreExerciseMatch(ex, deferredSearch, usage);
+        return { ...ex, score };
       }
 
-      // Smart recommendation scoring (only matters if no strict search is hiding it)
-      if (queryWords.length === 0) {
-        const nameLower = ex.name.toLowerCase();
-        
-        // 1. Exact target match bonus
-        const hasSameTarget = ex.target?.some(t => originalEx.target?.includes(t));
-        if (hasSameTarget) score += 50;
+      // Smart recommendation scoring saat tidak sedang mencari:
+      const nameLower = ex.name.toLowerCase();
 
-        // 2. Same body part bonus
-        const hasSameBodyPart = ex.bodyParts?.some(b => originalEx.bodyParts?.includes(b));
-        if (hasSameBodyPart) score += 20;
+      // 1. Exact target match bonus
+      const hasSameTarget = ex.target?.some(t => originalEx.target?.includes(t));
+      if (hasSameTarget) score += 50;
 
-        // 3. Name match bonus (e.g. "Smith", "Incline")
-        // Only give name bonus if it at least targets the same body part
-        if (hasSameBodyPart || hasSameTarget) {
-           origWords.forEach(w => {
-             if (nameLower.includes(w)) score += 30;
-           });
-        }
-        
-        // If completely unrelated, lower score but don't hide
-        if (score === 0) score = 1; 
+      // 2. Same body part bonus
+      const hasSameBodyPart = ex.bodyParts?.some(b => originalEx.bodyParts?.includes(b));
+      if (hasSameBodyPart) score += 20;
+
+      // 3. Name match bonus (e.g. "Smith", "Incline")
+      if (hasSameBodyPart || hasSameTarget) {
+        origWords.forEach(w => {
+          if (nameLower.includes(w)) score += 30;
+        });
       }
 
+      // 4. Riwayat latihan user: alternatif yang sering dilatih user otomatis naik ke atas
+      if (usage > 0) {
+        score += Math.min(usage * 100, 5000);
+      }
+
+      if (score === 0) score = 1; 
       return { ...ex, score };
-    }).filter(ex => ex.score > -1); // Remove items that failed strict search
+    }).filter(ex => ex.score > -1);
 
-    if (sortOrder === 'recommendation') {
+    if (isSearching) {
+      filtered.sort((a, b) => {
+        if (a.score !== b.score) return b.score - a.score;
+        return a.name.localeCompare(b.name);
+      });
+    } else if (sortOrder === 'recommendation') {
       filtered.sort((a, b) => {
         if (a.score !== b.score) return b.score - a.score;
         const targetA = Array.isArray(a.target) && a.target.length > 0 ? a.target[0] : (a.target || '');
@@ -232,7 +254,6 @@ const AlternativeExerciseModal = ({
     } else if (sortOrder === 'za') {
       filtered.sort((a, b) => b.name.localeCompare(a.name));
     } else if (sortOrder === 'newest') {
-      // online exercise id's are usually timestamps if newly added, otherwise string
       filtered.sort((a, b) => {
          const idA = typeof a.id === 'number' ? a.id : 0;
          const idB = typeof b.id === 'number' ? b.id : 0;
@@ -241,7 +262,7 @@ const AlternativeExerciseModal = ({
     }
 
     return filtered.slice(0, 500); // Capped at 500; infinite scroll menampilkan 30 per batch
-  }, [combinedLibrary, originalEx, searchTerm, muscleFilter, equipFilter, showFavoritesOnly, sortOrder, lang]);
+  }, [indexedLibrary, originalEx, deferredSearch, muscleFilter, equipFilter, showFavoritesOnly, sortOrder, lang, ownScores]);
 
   if (!isOpen || !originalEx) return null;
 
@@ -338,10 +359,10 @@ const AlternativeExerciseModal = ({
                       onChange={(e) => setSortOrder(e.target.value)}
                       className={`px-3 py-1.5 rounded-lg ${t.inputBg} ${t.textMain} body-md outline-none appearance-none cursor-pointer pr-7`}
                     >
-                      <option value="recommendation">Direkomendasikan</option>
-                      <option value="newest">{lang?.newest || 'Terbaru'}</option>
-                      <option value="az">A - Z</option>
-                      <option value="za">Z - A</option>
+                      <option value="recommendation" className="bg-slate-900 text-white dark:bg-slate-900 dark:text-white">Direkomendasikan</option>
+                      <option value="newest" className="bg-slate-900 text-white dark:bg-slate-900 dark:text-white">{lang?.newest || 'Terbaru'}</option>
+                      <option value="az" className="bg-slate-900 text-white dark:bg-slate-900 dark:text-white">A - Z</option>
+                      <option value="za" className="bg-slate-900 text-white dark:bg-slate-900 dark:text-white">Z - A</option>
                     </select>
                     <ChevronDown size={12} className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${t.textMuted}`} />
                   </div>

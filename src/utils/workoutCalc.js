@@ -982,6 +982,35 @@ export const buildHcSessionDetail = (workout, logs, startMs, endMs) => {
 };
 
 /**
+ * Deduplikasi sesi latihan harian (mencegah sesi kembar/dobel akibat sinkronisasi atau spam simpan).
+ */
+export const deduplicateWorkouts = (workouts) => {
+  const rawList = Array.isArray(workouts) ? workouts : [];
+  const seenIds = new Set();
+  const byId = [];
+  rawList.forEach(w => {
+    if (!w) return;
+    const wId = String(w.id || '');
+    if (wId && seenIds.has(wId)) return;
+    if (wId) seenIds.add(wId);
+    byId.push(w);
+  });
+
+  const seenAdhocKeys = new Set();
+  const result = [];
+  byId.forEach(w => {
+    if (w.programId === 'adhoc') {
+      const exKey = (w.exercises || []).map(e => String(e.originalId || e.id)).sort().join('|');
+      if (exKey && seenAdhocKeys.has(exKey)) return;
+      if (exKey) seenAdhocKeys.add(exKey);
+    }
+    result.push(w);
+  });
+
+  return result;
+};
+
+/**
  * Menit aktif SATU HARI: menit jalan + durasi latihan.
  *
  * SATU rumus untuk kartu, grafik, dan kartu bagikan — alasan yang sama dengan dailyBurnCalories.
@@ -1001,8 +1030,17 @@ export const buildHcSessionDetail = (workout, logs, startMs, endMs) => {
  */
 export const dailyActiveMinutes = (bioData, workouts, dayExerciseLogs = null) => {
   const bio = bioData || {};
-  const list = (Array.isArray(workouts) ? workouts : [])
-    .filter(w => w?.status === 'completed' || w?.programId === 'adhoc');
+  const list = deduplicateWorkouts(workouts)
+    .filter(w => {
+      if (w?.status === 'completed') return true;
+      if (w?.programId === 'adhoc') {
+        const l = w.log || {};
+        return Object.values(l).some(sets => 
+          (Array.isArray(sets) ? sets : Object.values(sets || {})).some(s => s?.done && !s?.skipped)
+        );
+      }
+      return false;
+    });
 
   let workoutMinutes = 0;
   let cardioMinutes = 0;
@@ -1067,10 +1105,21 @@ export const dailyBurnCalories = (bioData, workouts, fallbackWeightKg, dayExerci
   let kardio = 0;
   let beban = 0;
   let sessions = 0;
-  (Array.isArray(workouts) ? workouts : [])
-    .filter(w => w?.status === 'completed' || w?.programId === 'adhoc')
+  const list = deduplicateWorkouts(workouts);
+
+  list
+    .filter(w => {
+      if (w?.status === 'completed') return true;
+      if (w?.programId === 'adhoc') {
+        const l = w.log || {};
+        return Object.values(l).some(sets => 
+          (Array.isArray(sets) ? sets : Object.values(sets || {})).some(s => s?.done && !s?.skipped)
+        );
+      }
+      return false;
+    })
     .forEach(w => {
-      const logs = (w.log && Object.keys(w.log).length > 0) ? w.log : dayExerciseLogs;
+      const logs = (w.log && Object.keys(w.log).length > 0) ? w.log : (w.programId === 'adhoc' ? null : dayExerciseLogs);
       workout += calculateSmartWorkoutCalories(weight, w, logs, 90, profile);
       // Rincian diambil dari splitWorkoutCalories, yang menjamin kardio+beban = total sesi itu —
       // jadi segmen bar tidak pernah meleset dari angka besarnya.
@@ -1434,4 +1483,137 @@ export const getTonaseAnalogy = (weightKg) => {
   if (tons < 50) return '1 Paus Bungkuk Dewasa 🐋';
   return '1 Pesawat Boeing ✈️';
 };
+
+/**
+ * Target Progresif Cerdas (Dynamic Double Progression)
+ *
+ * Prinsip Olahraga & Hipertrofi:
+ * 1. Alignment Alat: Beban hanya boleh naik kelipatan yang benar-benar ada di alat gym
+ *    (misal 2.5 kg atau 5 kg). Tidak boleh menyarankan +1.25 kg jika alatnya hanya punya lompatan 2.5 kg.
+ * 2. Double Progression:
+ *    - Tahap 1 (Reps First): Jika beban berikutnya di alat lompatannya besar (misal 50 -> 52.5 kg atau 20 -> 25 kg),
+ *      dan proyeksi repetisi di beban baru masih di bawah target range (< targetReps),
+ *      user disarankan menaikkan repetisi dulu pada beban yang sama (+1 reps) dan mematangkan form/tempo.
+ *    - Tahap 2 (Weight Jump): Begitu repetisi sesi lalu cukup tinggi sehingga estimasi 1RM mampu
+ *      mengangkat beban baru setidaknya di targetReps (misal 50 kg x 14 reps -> mampu angkat 52.5 kg x 10 reps),
+ *      target beban melompat ke kelipatan alat berikutnya (+step) dan repetisi di-reset kembali ke target dasar.
+ */
+export const calculateProgressiveOverloadTarget = ({
+  lastSessionWeight = 0,
+  lastSessionReps = 0,
+  targetReps = 10,
+  equipStep = 2.5,
+  ratio = 1,
+  goal = 'muscle_gain',
+  experience = 'intermediate',
+  isImperial = false,
+}) => {
+  const uStr = isImperial ? 'lbs' : 'kg';
+  const effectiveStep = Math.round(Number(equipStep) * (Number(ratio) || 1) * 100) / 100 || (isImperial ? 5 : 2.5);
+
+  // Kenaikan persentase 2.5% dibulatkan ke kelipatan effectiveStep
+  const pctStep = lastSessionWeight > 0 ? Math.round((lastSessionWeight * 0.025) / effectiveStep) * effectiveStep : 0;
+  const step = Math.max(effectiveStep, pctStep);
+  const nextWeight = Math.round((lastSessionWeight + step) * 100) / 100;
+
+  // Latihan tanpa beban (Body Weight murni)
+  if (lastSessionWeight <= 0) {
+    const nextReps = lastSessionReps > 0 ? Math.max(targetReps, lastSessionReps + 1) : targetReps;
+    return {
+      targetWeight: 0,
+      targetReps: nextReps,
+      step: 0,
+      mode: 'reps_first',
+      repsReadyThreshold: targetReps,
+      isWeightJump: false,
+      message: `Fokus tambah repetisi (${nextReps} reps) dengan form bersih dan tempo terkontrol!`
+    };
+  }
+
+  // Double Progression Threshold:
+  // Berapa repetisi minimal di lastSessionWeight agar saat naik ke nextWeight, repetisi tidak jatuh di bawah targetReps?
+  // Rumus Epley: 1RM = W * (1 + R/30) => W_next * (1 + targetReps/30) = W_last * (1 + R_ready/30)
+  const repRatio = (nextWeight / lastSessionWeight) * (1 + targetReps / 30);
+  const calculatedThreshold = Math.ceil(30 * (repRatio - 1));
+  const repsReadyThreshold = Math.min(
+    Math.max(targetReps + 2, calculatedThreshold),
+    targetReps + 5
+  );
+
+  const isReadyForWeightJump = lastSessionReps >= repsReadyThreshold;
+  const reachedTargetReps = lastSessionReps >= targetReps;
+
+  if (goal === 'fat_loss') {
+    return {
+      targetWeight: lastSessionWeight,
+      targetReps,
+      step,
+      mode: 'maintain',
+      repsReadyThreshold,
+      isWeightJump: false,
+      message: `Saat defisit kalori, prioritaskan menjaga massa otot. Angkat beban yang sama (${lastSessionWeight} ${uStr}) dengan form solid, jangan memaksakan jika tubuh kurang fit.`
+    };
+  }
+
+  if (goal === 'strength') {
+    if (reachedTargetReps) {
+      return {
+        targetWeight: nextWeight,
+        targetReps,
+        step,
+        mode: 'weight_jump',
+        repsReadyThreshold,
+        isWeightJump: true,
+        message: `Target kekuatan tercapai! Saatnya naik ke beban alat berikutnya (+${step} ${uStr} -> ${nextWeight} ${uStr}) hari ini. Tetap jaga stabilitas form.`
+      };
+    } else {
+      return {
+        targetWeight: lastSessionWeight,
+        targetReps,
+        step,
+        mode: 'reps_first',
+        repsReadyThreshold,
+        isWeightJump: false,
+        message: `Fokus pada adaptasi kekuatan di ${lastSessionWeight} ${uStr}. Kejar target ${targetReps} reps dengan form solid sebelum naik beban.`
+      };
+    }
+  }
+
+  // Default: muscle_gain / general (Hypertrophy Double Progression)
+  if (isReadyForWeightJump) {
+    return {
+      targetWeight: nextWeight,
+      targetReps,
+      step,
+      mode: 'weight_jump',
+      repsReadyThreshold,
+      isWeightJump: true,
+      message: `Target repetisi tembus (${lastSessionReps} reps)! Kekuatanmu sudah matang untuk naik ke beban alat berikutnya (+${step} ${uStr}) hari ini, repetisi kembali ke ${targetReps} reps.`
+    };
+  }
+
+  if (reachedTargetReps) {
+    const nextTargetReps = Math.min(lastSessionReps + 1, repsReadyThreshold);
+    return {
+      targetWeight: lastSessionWeight,
+      targetReps: nextTargetReps,
+      step,
+      mode: 'reps_first',
+      repsReadyThreshold,
+      isWeightJump: false,
+      message: `Target repetisi dasar tercapai (${lastSessionReps} reps)! Karena kenaikan beban alat berikutnya adalah +${step} ${uStr} (${nextWeight} ${uStr}), kejar ${nextTargetReps} reps dulu dengan form solid dan tempo terkontrol sebelum melompat beban.`
+    };
+  }
+
+  return {
+    targetWeight: lastSessionWeight,
+    targetReps,
+    step,
+    mode: 'reps_first',
+    repsReadyThreshold,
+    isWeightJump: false,
+    message: `Fokus tambah repetisi dengan beban yang sama (${lastSessionWeight} ${uStr}) sampai menembus target ${targetReps} reps!`
+  };
+};
+
 

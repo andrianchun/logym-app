@@ -2,7 +2,7 @@
 // Jalankan: node src/utils/dashboardCalc.test.mjs
 // Kalau rincian tidak berjumlah sama dengan angka besarnya, user berhenti percaya semua angkanya.
 import assert from 'node:assert/strict';
-import { splitWorkoutCalories, isCardioExercise, calculateSmartWorkoutCalories, dailyBurnCalories, dailyActiveMinutes, heartRateCalories } from './workoutCalc.js';
+import { splitWorkoutCalories, isCardioExercise, calculateSmartWorkoutCalories, dailyBurnCalories, dailyActiveMinutes, heartRateCalories, deduplicateWorkouts } from './workoutCalc.js';
 import { sleepHoursToParts, formatSleepDuration } from './numberFormat.js';
 import { buildLogymSyncPayload } from '../data/constants.js';
 
@@ -456,4 +456,67 @@ assert.equal(formatSleepDuration(5.999), '6 jam');
   assert.equal(emptyPayload.logymSync.today.exercisesCount, 0);
 }
 
+// --- DEDUPLIKASI SESI & PENCEGAHAN LONJAKAN KALORI (REGRESI 23 SEP) --------
+{
+  const exA = { id: 101, name: 'Bicep Curl', type: 'weight' };
+  const exB = { id: 102, name: 'Hammer Curl', type: 'weight' };
+
+  const adhoc1 = {
+    id: 'adhoc_1',
+    programId: 'adhoc',
+    exercises: [exA, exB],
+    duration: '15:00',
+    log: { '101': [{ done: true, w: 15, r: 10 }] }
+  };
+  const adhoc2_dup_id = {
+    id: 'adhoc_1',
+    programId: 'adhoc',
+    exercises: [exA, exB],
+    duration: '15:00',
+    log: { '101': [{ done: true, w: 15, r: 10 }] }
+  };
+  const adhoc3_dup_exercises = {
+    id: 'adhoc_2',
+    programId: 'adhoc',
+    exercises: [exA, exB],
+    duration: '15:00',
+    log: { '101': [{ done: true, w: 15, r: 10 }] }
+  };
+  const scheduledProgram = {
+    id: 'prog_push',
+    programId: 'push_day',
+    status: 'scheduled',
+    exercises: [{ id: 201, name: 'Bench Press' }],
+    duration: '27:00'
+  };
+  const completedProgram = {
+    id: 'prog_push_completed',
+    programId: 'push_day',
+    status: 'completed',
+    exercises: [{ id: 201, name: 'Bench Press' }],
+    duration: '60:00',
+    log: { '201': [{ done: true, w: 60, r: 10 }] }
+  };
+
+  // 1. deduplicateWorkouts membuang duplikat id dan duplikat exercise list untuk adhoc
+  const listWithDuplicates = [completedProgram, adhoc1, adhoc2_dup_id, adhoc3_dup_exercises, scheduledProgram];
+  const deduped = deduplicateWorkouts(listWithDuplicates);
+  assert.equal(deduped.length, 3, 'Harus tersisa 3 sesi: completedProgram, 1 adhoc, dan scheduledProgram');
+  assert.ok(deduped.some(w => w.id === 'prog_push_completed'));
+  assert.ok(deduped.some(w => w.id === 'adhoc_1'));
+  assert.ok(deduped.some(w => w.id === 'prog_push'));
+
+  // 2. dailyBurnCalories tidak meledak saat adhoc terduplikasi 4-5 kali
+  const burnWithSingleAdhoc = dailyBurnCalories({}, [completedProgram, adhoc1], 75);
+  const burnWithQuadrupleAdhoc = dailyBurnCalories({}, [completedProgram, adhoc1, adhoc2_dup_id, adhoc3_dup_exercises, { ...adhoc1, id: 'adhoc_99' }], 75);
+  assert.equal(burnWithQuadrupleAdhoc.workout, burnWithSingleAdhoc.workout, 'Kalori workout tidak boleh berlipat ganda karena duplikat sesi ekstra');
+  assert.equal(burnWithQuadrupleAdhoc.total, burnWithSingleAdhoc.total, 'Total burn tidak boleh melonjak karena duplikat sesi ekstra');
+
+  // 3. dailyActiveMinutes tidak melipatgandakan menit saat adhoc terduplikasi
+  const actWithSingleAdhoc = dailyActiveMinutes({}, [completedProgram, adhoc1]);
+  const actWithQuadrupleAdhoc = dailyActiveMinutes({}, [completedProgram, adhoc1, adhoc2_dup_id, adhoc3_dup_exercises, { ...adhoc1, id: 'adhoc_99' }]);
+  assert.equal(actWithQuadrupleAdhoc.workoutMinutes, actWithSingleAdhoc.workoutMinutes, 'Menit workout tidak boleh berlipat ganda karena duplikat sesi');
+}
+
 console.log('dashboardCalc OK');
+

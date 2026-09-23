@@ -102,12 +102,24 @@ const matchDeficit = findMatchingMasterExercise({ name: 'Romanian Deadlift from 
 assert.equal(matchDeficit, null, 'Romanian Deadlift from Deficit tidak boleh tertukar dengan RDL biasa di master');
 assert.equal(canonicalizeExercise({ name: 'Romanian Deadlift from Deficit' }).name, 'Romanian Deadlift from Deficit');
 
-// 10. Treadmill & Trail Running
-assert.equal(canonicalizeExercise({ name: 'Treadmill Running' }).name, 'Treadmill');
+// 10. Treadmill, Bicycling, Stationary Bike & Trail Running
+assert.equal(canonicalizeExercise({ name: 'Treadmill Running' }).name, 'Running, Treadmill');
+assert.equal(canonicalizeExercise({ name: 'Treadmill' }).name, 'Running, Treadmill');
 assert.equal(canonicalizeExercise({ name: 'Trail Running' }).name, 'Trail Running');
 const matchTreadmill = findMatchingMasterExercise({ name: 'Treadmill Running' }, defaultMasterExercises);
-assert.equal(matchTreadmill.name, 'Treadmill');
+assert.equal(matchTreadmill.name, 'Running, Treadmill');
 assert.equal(matchTreadmill.id, 126);
+
+// Bicycling & Stationary Bike canonicalization
+assert.equal(canonicalizeExercise({ name: 'Cycling / Sepeda' }).name, 'Bicycling');
+assert.equal(canonicalizeExercise({ name: 'Sepeda' }).name, 'Bicycling');
+assert.equal(canonicalizeExercise({ name: 'Stationary Bike' }).name, 'Bicycling, Stationary');
+assert.equal(canonicalizeExercise({ name: 'Sepeda Statis' }).name, 'Bicycling, Stationary');
+assert.equal(findMatchingMasterExercise({ name: 'Cycling / Sepeda' }, defaultMasterExercises)?.id, 139);
+assert.equal(findMatchingMasterExercise({ name: 'Stationary Bike' }, defaultMasterExercises)?.id, 127);
+assert.equal(exerciseAliasMap['126'], 'edb-Running_Treadmill');
+assert.equal(exerciseAliasMap['127'], 'edb-Bicycling_Stationary');
+assert.equal(exerciseAliasMap['139'], 'edb-Bicycling');
 
 const matchTrail = findMatchingMasterExercise({ name: 'Trail Running' }, defaultMasterExercises);
 assert.equal(matchTrail.name, 'Trail Running');

@@ -141,6 +141,7 @@ const SortableExerciseItem = ({ ex, prevEx, idx, routineId, t, lang, soundEnable
 };
 
 const ProgramTab = ({
+  isActive = true,
   t, theme, lang, programs, setPrograms, user, exerciseLibrary, soundEnabled,
   setActiveAddModalTarget, saveStateToHistory, openQuestionnaire,
   activePlanIds, setActivePlanIds, gymProfiles, activeGymId,
@@ -686,58 +687,28 @@ const ProgramTab = ({
   // ==========================================
 
   const closeEditAndScrollToPlan = (pId) => {
-      const el = document.getElementById(`plan-mobile-${pId}`);
+      const el = document.getElementById(`plan-${pId}`) || document.getElementById(`plan-mobile-${pId}`);
       if (el) {
           const endY = el.getBoundingClientRect().top + window.scrollY - 80;
-          const startY = window.scrollY;
-          const distance = endY - startY;
-          const duration = 500; // Match CSS duration exactly
-          const startTime = performance.now();
-          
-          const easeInOutQuad = (t, b, c, d) => {
-            let time = t / (d / 2);
-            if (time < 1) return c / 2 * time * time + b;
-            time--;
-            return -c / 2 * (time * (time - 2) - 1) + b;
-          };
-
-          const animation = (currentTime) => {
-            const elapsed = currentTime - startTime;
-            if (elapsed < duration) {
-              window.scrollTo(0, easeInOutQuad(elapsed, startY, distance, duration));
-              requestAnimationFrame(animation);
-            } else {
-              window.scrollTo(0, endY);
-            }
-          };
-          requestAnimationFrame(animation);
+          window.scrollTo({ top: endY, behavior: 'smooth' });
       }
-      setTimeout(() => {
-          setEditingPlanId(null);
-          // Prevent double layout calculation lag by resetting inner accordion after outer closes
-          setTimeout(() => {
-              setExpandedRoutineId(null);
-          }, 550);
-      }, 0); // start immediately, but in next tick so requestAnimationFrame registers first
+      setEditingPlanId(null);
+      setExpandedRoutineId(null);
   };
 
-  const renderPlanCard = (planId, group, isActive, layout = 'mobile') => {
+  const renderPlanCard = (planId, group, isActive) => {
     const bgConfig = getPlanBgConfig(group.planName, planId);
 
     return (
       <div 
-        id={`plan-${layout}-${planId}`} 
+        id={`plan-${planId}`} 
         key={planId} 
         onClick={() => {
           playSoundEffect('click', soundEnabled);
           setEditingPlanId(planId);
           setProgramsSnapshot(JSON.parse(JSON.stringify(programs)));
-          setTimeout(() => {
-            const el = document.getElementById(`plan-${layout}-${planId}`);
-            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }, 150);
         }}
-        className={`scroll-mt-24 rounded-[2rem] border border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.25)] overflow-hidden transition-all flex flex-col relative min-h-[350px] group/card bg-[#0c1427]/85 backdrop-blur-2xl cursor-pointer hover:border-white/20 active:scale-[0.99]`}
+        className={`scroll-mt-24 rounded-[2rem] border border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.25)] overflow-hidden transition-colors duration-150 flex flex-col relative min-h-[350px] group/card bg-[#0c1427]/95 cursor-pointer hover:border-white/20`}
       >
               
         {/* Split Header (Left empty, Right glassmorphism) */}
@@ -783,7 +754,7 @@ const ProgramTab = ({
           </div>
           
           {/* Right Side: Content */}
-          <div className="w-[55%] flex flex-col p-4 sm:p-5 border-l bg-black/60 backdrop-blur-xl border-white/5 shadow-[-10px_0_30px_rgba(0,0,0,0.3)]">
+          <div className="w-[55%] flex flex-col p-4 sm:p-5 border-l bg-black/80 border-white/10 shadow-[-10px_0_30px_rgba(0,0,0,0.3)]">
             
             {/* PLAN HEADER */}
             <div className="flex items-start justify-between gap-2 mb-3">
@@ -922,7 +893,7 @@ const ProgramTab = ({
                     } else {
                       setActivePlanIds([...activePlanIds, planId]); 
                       setTimeout(() => {
-                        const el = document.getElementById(`plan-${layout}-${planId}`);
+                        const el = document.getElementById(`plan-${planId}`) || document.getElementById(`plan-mobile-${planId}`);
                         if (el) {
                           const y = el.getBoundingClientRect().top + window.scrollY - 80;
                           window.scrollTo({ top: y, behavior: 'smooth' });
@@ -958,7 +929,7 @@ const ProgramTab = ({
     );
   };
   return (
-    <div className="flex flex-col animate-in fade-in duration-300 pb-6 max-w-4xl mx-auto w-full space-y-3 sm:space-y-4">
+    <div className="flex flex-col pb-6 max-w-4xl mx-auto w-full space-y-3 sm:space-y-4">
       {editingPlanId && groupedPrograms[editingPlanId] && (
         <div className="fixed inset-0 z-[100] bg-neutral-950 overflow-y-auto overflow-x-hidden flex flex-col animate-in slide-in-from-bottom-10 fade-in duration-300 w-full h-full pb-20 no-swipe overscroll-contain touch-pan-y">
             {/* DEDICATED VIEW HEADER */}
@@ -1171,21 +1142,13 @@ const ProgramTab = ({
         </div>
       </div>
   
-      {/* Programs List */}
+      {/* Programs List - Single Responsive Grid (1 kolom di HP, 2 kolom di tablet/desktop) */}
       <div className="w-full">
-        {/* MOBILE VIEW: Flat List (Hidden on Tablet) */}
-        <div className="flex flex-col gap-3 sm:hidden">
-          {Object.entries(groupedPrograms).map(([planId, group]) => renderPlanCard(planId, group, activePlanIds.includes(planId), 'mobile'))}
-        </div>
-
-        {/* DESKTOP VIEW: Split Columns (Hidden on Mobile) */}
-        <div className="hidden sm:grid sm:grid-cols-2 gap-4 items-start">
-          <div className="flex flex-col gap-4 w-full">
-            {Object.entries(groupedPrograms).filter(([id]) => !activePlanIds.includes(id)).map(([planId, group]) => renderPlanCard(planId, group, false, 'desktop'))}
-          </div>
-          <div className="flex flex-col gap-4 w-full">
-            {Object.entries(groupedPrograms).filter(([id]) => activePlanIds.includes(id)).map(([planId, group]) => renderPlanCard(planId, group, true, 'desktop'))}
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start w-full">
+          {[
+            ...Object.entries(groupedPrograms).filter(([id]) => activePlanIds.includes(id)),
+            ...Object.entries(groupedPrograms).filter(([id]) => !activePlanIds.includes(id))
+          ].map(([planId, group]) => renderPlanCard(planId, group, activePlanIds.includes(planId)))}
         </div>
       </div>
 
@@ -1199,6 +1162,7 @@ const ProgramTab = ({
         onSelectAlternative={handleSelectAlternative}
         t={t} lang={lang} soundEnabled={soundEnabled}
         gymProfiles={gymProfiles} activeGymId={activeGymId}
+        history={history}
       />
 
       {pendingShareProgram && (
@@ -1293,4 +1257,14 @@ const ProgramTab = ({
   );
 };
 
-export default ProgramTab;
+// Inactive tab is frozen completely to prevent background CPU/battery drain.
+export default React.memo(ProgramTab, (prev, next) => {
+  if (prev.isActive !== next.isActive) return false;
+  if (!next.isActive) return true;
+  const keys = Object.keys(next);
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i];
+    if (prev[k] !== next[k] && typeof next[k] !== 'function') return false;
+  }
+  return true;
+});

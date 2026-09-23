@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types, react/no-unescaped-entities, no-unused-vars */
-import React from 'react';
+import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
@@ -109,11 +109,20 @@ const PrivacyContent = ({ t }) => (
 );
 
 export default function LegalModal({ type, onClose, t, isDark }) {
+  useEffect(() => {
+    if (!type) return;
+    const orig = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = orig;
+    };
+  }, [type]);
+
   if (!type) return null;
 
   return createPortal(
     <div
-      className={`fixed inset-0 z-[9999] w-full h-[100dvh] flex flex-col overflow-hidden ${isDark ? 'bg-[#0f0f0f]' : 'bg-white'} animate-in slide-in-from-bottom-8 duration-300 ease-out`}
+      className={`fixed inset-0 z-[9999] w-full h-[100dvh] flex flex-col overflow-hidden ${isDark ? 'bg-[#0f0f0f]' : 'bg-white'} animate-in slide-in-from-bottom-8 duration-300 ease-out overscroll-contain touch-pan-y`}
     >
       {/* Header */}
       <div className={`flex items-center justify-between p-4 pt-safe sm:pt-4 border-b ${isDark ? 'border-white/10' : 'border-black/5'}`}>
@@ -121,6 +130,7 @@ export default function LegalModal({ type, onClose, t, isDark }) {
           {type === 'tos' ? 'Syarat & Ketentuan' : 'Kebijakan Privasi'}
         </h3>
         <button
+          data-close-modal="true"
           onClick={onClose}
           className={`p-2 rounded-full transition-colors ${isDark ? 'hover:bg-white/10 text-white/70 hover:text-white' : 'hover:bg-black/5 text-black/50 hover:text-black'}`}
         >
@@ -136,6 +146,7 @@ export default function LegalModal({ type, onClose, t, isDark }) {
       {/* Footer */}
       <div className={`p-4 pb-safe sm:pb-4 border-t ${isDark ? 'border-white/10' : 'border-black/5'}`}>
         <button
+          data-close-modal="true"
           onClick={onClose}
           className={`w-full py-3.5 rounded-2xl font-bold transition-all active:scale-[0.98] bg-[var(--color-accent)] text-white shadow-lg shadow-[var(--color-accent)]/20`}
         >

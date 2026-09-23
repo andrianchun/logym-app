@@ -1077,15 +1077,28 @@ export const defaultMasterExercises = [
   },
   {
     "id": 126,
-    "name": "Treadmill",
+    "name": "Running, Treadmill",
+    "exerciseId": "Running_Treadmill",
     "target": [
-      "Cardio"
+      "Cardio",
+      "Quads",
+      "Calves",
+      "Glutes",
+      "Hamstrings"
     ],
     "type": "cardio",
     "defaultWeight": 0,
     "duration": 15,
-    "equipment": "Treadmill",
+    "equipment": "Machine",
     "level": "beginner",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Running_Treadmill/0.jpg",
+    "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Running_Treadmill/0.jpg",
+    "aliases": [
+      "Treadmill",
+      "Treadmill Running",
+      "Running on Treadmill",
+      "Lari Treadmill"
+    ],
     "ytVideo": "",
     "instructions": [
       "Naik ke treadmill, pasang safety clip pengaman pada pakaian, dan mulai dengan kecepatan jalan santai 3–4 km/jam untuk pemanasan.",
@@ -1111,15 +1124,29 @@ export const defaultMasterExercises = [
   },
   {
     "id": 127,
-    "name": "Stationary Bike",
+    "name": "Bicycling, Stationary",
+    "exerciseId": "Bicycling_Stationary",
     "target": [
-      "Cardio"
+      "Cardio",
+      "Quads",
+      "Calves",
+      "Glutes",
+      "Hamstrings"
     ],
     "type": "cardio",
     "defaultWeight": 0,
     "duration": 15,
-    "equipment": "Stationary Bike",
+    "equipment": "Machine",
     "level": "beginner",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Bicycling_Stationary/0.jpg",
+    "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Bicycling_Stationary/0.jpg",
+    "aliases": [
+      "Stationary Bike",
+      "Sepeda Statis",
+      "Sepeda Gym",
+      "Spin Bike",
+      "Spinning"
+    ],
     "ytVideo": "",
     "instructions": [
       "Sesuaikan tinggi sadel agar sejajar tulang pinggul; saat pedal di titik terendah, lutut harus sedikit tertekuk (sekitar 25-30 derajat).",
@@ -1520,16 +1547,30 @@ export const defaultMasterExercises = [
   },
   {
     "id": 139,
-    "name": "Cycling / Sepeda",
+    "name": "Bicycling",
+    "exerciseId": "Bicycling",
     "target": [
       "Cardio",
-      "Quads"
+      "Quads",
+      "Calves",
+      "Glutes",
+      "Hamstrings"
     ],
     "type": "cardio",
     "defaultWeight": 0,
     "duration": 30,
     "equipment": "Bicycle",
     "level": "beginner",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Bicycling/0.jpg",
+    "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Bicycling/0.jpg",
+    "aliases": [
+      "Cycling",
+      "Cycling / Sepeda",
+      "Sepeda",
+      "Bersepeda",
+      "Sepeda Luar",
+      "Outdoor Bicycling"
+    ],
     "ytVideo": "",
     "instructions": [
       "Periksa kondisi sepeda (tekanan ban, rem, dan tinggi sadel) serta kenakan helm pengaman sebelum berkendara.",
@@ -1889,9 +1930,27 @@ export const findMatchingMasterExercise = (targetEx, masterList = defaultMasterE
     'seated dumbbell calf raise': 'Seated Calf Raise',
 
     // Cardio
-    'treadmill': 'Treadmill',
-    'treadmill running': 'Treadmill',
-    'running on treadmill': 'Treadmill',
+    'treadmill': 'Running, Treadmill',
+    'treadmill running': 'Running, Treadmill',
+    'running on treadmill': 'Running, Treadmill',
+    'running, treadmill': 'Running, Treadmill',
+    'running treadmill': 'Running, Treadmill',
+    'lari treadmill': 'Running, Treadmill',
+    'cycling': 'Bicycling',
+    'cycling / sepeda': 'Bicycling',
+    'cycling sepeda': 'Bicycling',
+    'sepeda': 'Bicycling',
+    'bersepeda': 'Bicycling',
+    'sepeda luar': 'Bicycling',
+    'outdoor bicycling': 'Bicycling',
+    'bicycling': 'Bicycling',
+    'stationary bike': 'Bicycling, Stationary',
+    'sepeda statis': 'Bicycling, Stationary',
+    'sepeda gym': 'Bicycling, Stationary',
+    'spin bike': 'Bicycling, Stationary',
+    'spinning': 'Bicycling, Stationary',
+    'bicycling stationary': 'Bicycling, Stationary',
+    'bicycling, stationary': 'Bicycling, Stationary',
     'trail running': ['Trail Running', 'Trail Running/Walking', 'Trail Running Walking'],
     'trail run': ['Trail Running', 'Trail Running/Walking', 'Trail Running Walking'],
     'jogging': 'Jogging / Running',
@@ -2005,8 +2064,12 @@ export const canonicalizeExercise = (ex) => {
     name = 'Seated Side Lateral Raise';
   } else if (locName === 'side lateral raise' || locName === 'side lateral raises' || locName === 'dumbbell lateral raise' || locName === 'dumbbell lateral raises' || locName === 'dumbbell side lateral raise' || locName === 'dumbbell side lateral raises' || locName === 'lateral raise' || locName === 'lateral raises') {
     name = 'Side Lateral Raise';
-  } else if (locName === 'treadmill running' || locName === 'running on treadmill' || locName === 'treadmill') {
-    name = 'Treadmill';
+  } else if (locName === 'treadmill running' || locName === 'running on treadmill' || locName === 'treadmill' || locName === 'running treadmill' || locName === 'running, treadmill' || locName === 'lari treadmill') {
+    name = 'Running, Treadmill';
+  } else if (locName === 'cycling / sepeda' || locName === 'cycling sepeda' || locName === 'cycling' || locName === 'sepeda' || locName === 'bersepeda' || locName === 'sepeda luar' || locName === 'outdoor bicycling' || locName === 'bicycling') {
+    name = 'Bicycling';
+  } else if (locName === 'stationary bike' || locName === 'sepeda statis' || locName === 'sepeda gym' || locName === 'spin bike' || locName === 'spinning' || locName === 'bicycling stationary' || locName === 'bicycling, stationary') {
+    name = 'Bicycling, Stationary';
   } else if (locName === 'trail running' || locName === 'trail run') {
     name = 'Trail Running';
   } else if (locName === 'jogging' || locName === 'running' || locName === 'jogging running' || locName === 'jogging / running') {
@@ -2629,8 +2692,8 @@ export const exerciseAliasMap = {
   '123': 'edb-Plank',
   '124': 'edb-Dumbbell_Shrug',
   '125': 'edb-Palms-Up_Dumbbell_Wrist_Curl_Over_A_Bench',
-  '126': 'edb-126',
-  '127': 'edb-127',
+  '126': 'edb-Running_Treadmill',
+  '127': 'edb-Bicycling_Stationary',
   '128': 'edb-128',
   '129': 'edb-129',
   '130': 'edb-130',
@@ -2642,7 +2705,7 @@ export const exerciseAliasMap = {
   '136': 'edb-136',
   '137': 'edb-137',
   '138': 'edb-138',
-  '139': 'edb-139',
+  '139': 'edb-Bicycling',
   '140': 'edb-Pull_Through',
   '141': 'edb-Trail_Running_Walking',
   '142': 'edb-Barbell_Incline_Bench_Press_-_Medium_Grip',
@@ -2828,7 +2891,18 @@ export const getDayWorkouts = (history, programs, activePlanIds, dateStr) => {
       });
   }
 
-  result.push(...ekstra);
+  // Deduplikasi adhoc kembar (misal akibat spam klik simpan atau re-trigger konfirmasi pindah sesi)
+  const deduplicatedEkstra = [];
+  const seenAdhocKeys = new Set();
+  ekstra.forEach(w => {
+    const exKey = (w.exercises || []).map(e => String(e.originalId || e.id)).sort().join('|');
+    if (!seenAdhocKeys.has(exKey)) {
+      seenAdhocKeys.add(exKey);
+      deduplicatedEkstra.push(w);
+    }
+  });
+
+  result.push(...deduplicatedEkstra);
 
   // Pengaman render: buang id kembar (sisa program duplikat yang belum ke-upload bersih).
   const seen = new Set();

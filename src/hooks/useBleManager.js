@@ -118,7 +118,7 @@ export function useBleManager({ setHistory, userProfile }) {
     return Object.values(status).some(s => s === 'connecting' || s === 'listening');
   }, [status]);
 
-  return {
+  return useMemo(() => ({
     available,
     devices,
     status,
@@ -131,5 +131,16 @@ export function useBleManager({ setHistory, userProfile }) {
     listen,
     setWarn,
     setErrors
-  };
+  }), [
+    available,
+    devices,
+    status,
+    readings,
+    errors,
+    warn,
+    isBleBusy,
+    addDevice,
+    forgetDevice,
+    listen
+  ]);
 }

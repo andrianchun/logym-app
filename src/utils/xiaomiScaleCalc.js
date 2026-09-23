@@ -116,3 +116,76 @@ export const calculateBodyComposition = (weight, impedance, heightCm, age, gende
         bodyScore: score
     };
 };
+
+/**
+ * Memperkaya objek bioData dengan kalkulasi BIA jika terdapat data berat dan impedansi.
+ * Fungsi ini bertindak sebagai Single Source of Truth (SSOT) agar kartu dasbor, grafik garis,
+ * modal detail biometrik, dan AI selalu menampilkan angka yang identik dan tersinkronisasi.
+ */
+export const enrichBioWithImpedance = (bio, userProfile = null, fallbackHeight = null, dateStr = null, biometricStandard = 'asian') => {
+  if (!bio || typeof bio !== 'object') return bio;
+  const w = Number(bio.weight);
+  const z = Number(bio.impedance);
+  if (!w || w <= 0 || !z || z <= 0) return bio;
+
+  const p = userProfile || {};
+  const h = Number(bio.height || fallbackHeight || p.height || p.biometrics?.height || 0);
+  const dobStr = p.dob || p.birthDate || p.biometrics?.birthDate;
+  const gender = p.gender || p.biometrics?.gender || 'male';
+  const isMale = String(gender).toLowerCase() === 'male' || String(gender).toLowerCase() === 'pria';
+
+  let age = 30;
+  if (dobStr) {
+    const bDate = new Date(dobStr);
+    if (!isNaN(bDate.getTime())) {
+      const refDate = dateStr ? new Date(dateStr) : new Date();
+      age = refDate.getFullYear() - bDate.getFullYear();
+      const m = refDate.getMonth() - bDate.getMonth();
+      if (m < 0 || (m === 0 && refDate.getDate() < bDate.getDate())) age--;
+    }
+  }
+  age = Math.max(1, age);
+
+  if (h <= 0 || age <= 0) return bio;
+
+  const comp = calculateBodyComposition(w, z, h, age, gender);
+  if (!comp) return bio;
+
+  const standard = p.biometrics?.standard || biometricStandard;
+  let bmiStatus = bio.bmiStatus || '-';
+  if (comp.bmi > 0) {
+    if (standard === 'western') {
+      if (comp.bmi < 18.5) bmiStatus = 'Underweight';
+      else if (comp.bmi <= 24.9) bmiStatus = 'Normal';
+      else if (comp.bmi <= 29.9) bmiStatus = 'Overweight';
+      else bmiStatus = 'Obese';
+    } else {
+      if (comp.bmi < 18.5) bmiStatus = 'Underweight';
+      else if (comp.bmi <= 22.9) bmiStatus = 'Normal';
+      else if (comp.bmi <= 24.9) bmiStatus = 'Overweight';
+      else bmiStatus = 'Obese';
+    }
+  }
+
+  let bodyFatStatus = bio.bodyFatStatus || '-';
+  if (comp.bodyFat > 0) {
+    if (isMale) {
+      if (comp.bodyFat < 10) bodyFatStatus = 'Rendah';
+      else if (comp.bodyFat <= 20) bodyFatStatus = 'Normal';
+      else if (comp.bodyFat <= 25) bodyFatStatus = 'Tinggi';
+      else bodyFatStatus = 'Sangat Tinggi';
+    } else {
+      if (comp.bodyFat < 18) bodyFatStatus = 'Rendah';
+      else if (comp.bodyFat <= 28) bodyFatStatus = 'Normal';
+      else if (comp.bodyFat <= 33) bodyFatStatus = 'Tinggi';
+      else bodyFatStatus = 'Sangat Tinggi';
+    }
+  }
+
+  return {
+    ...bio,
+    ...comp,
+    bmiStatus,
+    bodyFatStatus
+  };
+};

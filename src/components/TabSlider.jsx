@@ -6,11 +6,9 @@ import React from 'react';
  * (getBoundingClientRect) agar perpindahan tab instan dan BottomNav tidak pernah
  * mengalami freeze/stuck di tengah animasi.
  */
-const TabSlider = ({ activeTab, tabIndex, children, className = '' }) => {
+const TabSlider = ({ activeTab, tabIndex, tabSlideDir = 'right', children, className = '' }) => {
   return (
-    <div
-      className={`w-full ${className}`}
-    >
+    <div className={`w-full ${className}`}>
       {children}
     </div>
   );

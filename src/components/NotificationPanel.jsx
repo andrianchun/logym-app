@@ -50,9 +50,9 @@ export default function NotificationPanel({ user, isDark, t, onClose, onNotifCli
   };
 
   const modalContent = (
-    <div className="fixed inset-0 z-[1000] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300 overscroll-contain" onClick={onClose}>
+    <div className="fixed inset-0 z-[1000] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300 overscroll-contain touch-none" onClick={onClose}>
       <div
-        className={`w-full max-w-sm glass-card ${isDark ? 'bg-[#0d1f2d]/70' : 'bg-white/70'} rounded-3xl flex flex-col max-h-[85vh] shadow-2xl animate-in zoom-in-95 border ${isDark ? 'border-white/10' : 'border-black/8'}`}
+        className={`w-full max-w-sm glass-card ${isDark ? 'bg-[#0d1f2d]/70' : 'bg-white/70'} rounded-3xl flex flex-col max-h-[85vh] shadow-2xl animate-in zoom-in-95 border ${isDark ? 'border-white/10' : 'border-black/8'} overscroll-contain`}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}

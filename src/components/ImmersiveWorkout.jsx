@@ -295,12 +295,38 @@ const ImmersiveWorkout = ({
   const isSavingRef = React.useRef(false);
 
   useEffect(() => {
-    if (showHint) {
-      const prev = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
-      return () => { document.body.style.overflow = prev; };
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  const lastCelebrated10RM = React.useRef(
+    (typeof window !== 'undefined' && window.logymCelebrated10RM?.[ex?.id]) || 0
+  );
+
+  useEffect(() => {
+    if (!ex) return;
+    const hint = getOverloadHint ? getOverloadHint(ex) : null;
+    if (hint?.isNewRecord) {
+      if (typeof window !== 'undefined' && !window.logymCelebrated10RM) {
+        window.logymCelebrated10RM = {};
+      }
+      const currentVal = Number(hint.rm10Number) || parseFloat(hint.rm10) || 0;
+      const alreadyCelebrated = Math.max(
+        lastCelebrated10RM.current,
+        (typeof window !== 'undefined' && Number(window.logymCelebrated10RM?.[ex.id])) || 0
+      );
+
+      if (currentVal > 0 && currentVal > alreadyCelebrated) {
+        playSoundEffect('success', soundEnabled);
+        lastCelebrated10RM.current = currentVal;
+        if (typeof window !== 'undefined') {
+          window.logymCelebrated10RM[ex.id] = currentVal;
+        }
+        setShowHint(true);
+      }
     }
-  }, [showHint]);
+  }, [ex, exerciseLogs, soundEnabled, getOverloadHint]);
 
   // Rest Timer will be handled globally in App.jsx but we can display it here if passed as prop
 
@@ -797,7 +823,7 @@ const ImmersiveWorkout = ({
   return (
     <div 
       ref={rootRef}
-      className={`fixed inset-0 z-[100] flex flex-col ${t.bgApp} ${t.textMain} overflow-hidden duration-300 ${isClosing ? 'animate-out slide-out-to-bottom-full' : 'animate-in slide-in-from-bottom-full'} no-swipe`}
+      className={`fixed inset-0 z-[100] flex flex-col ${t.bgApp} ${t.textMain} overflow-hidden duration-300 ${isClosing ? 'animate-out slide-out-to-bottom-full' : 'animate-in slide-in-from-bottom-full'} no-swipe overscroll-contain`}
     >
       
       {/* TOP HEADER SECTION (WITH SWIPE-DOWN MINIMIZE PROTECTION) */}
@@ -1165,7 +1191,7 @@ const ImmersiveWorkout = ({
                                {showWeightInfo && (
                                  <>
                                    <div 
-                                     className="fixed inset-0 z-30 bg-transparent" 
+                                     className="fixed inset-0 z-30 bg-transparent overscroll-contain touch-none" 
                                      onClick={(e) => { e.stopPropagation(); setShowWeightInfo(false); }} 
                                    />
                                    <div 
@@ -1427,12 +1453,13 @@ const ImmersiveWorkout = ({
 
       {/* FINISH CONFIRMATION MODAL */}
       {showFinishConfirm && (
-        <div className={`fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in`}>
+        <div className={`fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in overscroll-contain touch-none`}>
           <div className={`${t.bgCard} border border-white/10 p-6 rounded-3xl w-full max-w-sm shadow-2xl scale-in-center`}>
             <h3 className={`h1 ${t.textMain} mb-2`}>Selesai Latihan?</h3>
             <p className={`${t.textMuted} mb-6 body-lg`}>Yakin ingin menyelesaikan sesi latihan ini sekarang? Log latihan akan disimpan.</p>
             <div className="flex gap-3">
               <button 
+                data-close-modal="true"
                 onClick={() => setShowFinishConfirm(false)}
                 className={`flex-1 py-3 rounded-xl bg-black/10 dark:bg-white/10 hover:bg-black/20 dark:bg-white/20 ${t.textMain} font-bold transition-colors`}
               >
@@ -1457,12 +1484,12 @@ const ImmersiveWorkout = ({
 
       {/* SET DETAILS MODAL (BOTTOM SHEET) */}
       {activeSetDetail !== null && createPortal(
-        <div className="fixed inset-0 z-[999] flex flex-col justify-end bg-black/50 backdrop-blur-sm animate-in fade-in" onClick={() => { setActiveSetDetail(null); setShowIntensityInfo(false); }}>
-          <div className={`w-full max-w-lg mx-auto bg-white/70 dark:bg-[#121a2f]/70 backdrop-blur-2xl border-t border-white/30 dark:border-white/10 shadow-2xl rounded-t-[2.5rem] p-6 pb-12 sm:pb-8 animate-in slide-in-from-bottom-1/2 duration-300`} onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[999] flex flex-col justify-end bg-black/50 backdrop-blur-sm animate-in fade-in overscroll-contain touch-none" onClick={() => { setActiveSetDetail(null); setShowIntensityInfo(false); }}>
+          <div className={`w-full max-w-lg mx-auto bg-white/70 dark:bg-[#121a2f]/70 backdrop-blur-2xl border-t border-white/30 dark:border-white/10 shadow-2xl rounded-t-[2.5rem] p-6 pb-12 sm:pb-8 animate-in slide-in-from-bottom-1/2 duration-300 overscroll-contain`} onClick={e => e.stopPropagation()}>
             
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-xl font-black">Catatan Set {logs[activeSetDetail.setIdx]?.type === 'warmup' ? 'Pemanasan' : (activeSetDetail.setIdx + 1)}</h3>
-              <button onClick={() => setActiveSetDetail(null)} className={`p-2 rounded-full bg-black/5 dark:bg-white/5 hover:bg-black/10 transition-colors`}>
+              <button data-close-modal="true" onClick={() => setActiveSetDetail(null)} className={`p-2 rounded-full bg-black/5 dark:bg-white/5 hover:bg-black/10 transition-colors`}>
                 <X size={20} />
               </button>
             </div>
@@ -1573,7 +1600,7 @@ const ImmersiveWorkout = ({
                   {/* POPUP INFO */}
                   {showIntensityInfo && (
                     <>
-                      <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setShowIntensityInfo(false); }} />
+                      <div className="fixed inset-0 z-40 overscroll-contain touch-none" onClick={(e) => { e.stopPropagation(); setShowIntensityInfo(false); }} />
                       <div className="absolute bottom-full right-0 mb-4 w-64 p-4 rounded-3xl bg-white/95 dark:bg-[#121a2f]/95 backdrop-blur-2xl shadow-2xl border border-black/10 dark:border-white/10 animate-in slide-in-from-bottom-2 z-50 pointer-events-none">
                         <div className="text-xs text-zinc-600 dark:text-zinc-300 space-y-2">
                           {rpeMode ? (

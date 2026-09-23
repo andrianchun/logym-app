@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useDeferredValue, useMemo } from 'react';
 import { X, Search, Filter } from 'lucide-react';
 import { formatTarget, normalizeMuscleKey, muscleOptions, equipmentOptions, levelOptions, exerciseAliasMap } from '../data/constants';
 import { fetchExercisesFromApi, getCachedExercises } from '../utils/exerciseDbApi';
+import { prepareSearchableExercise, scoreExerciseMatch, computeOwnExerciseUsage } from '../utils/exerciseSearch';
 import FilterChips from '../components/FilterChips';
 import UnifiedExerciseCard from '../components/UnifiedExerciseCard';
 
@@ -9,9 +10,11 @@ const AddExerciseModal = ({
   t, lang, 
   activeAddModalTarget, setActiveAddModalTarget,
   exerciseLibrary, 
-  onAddExerciseTarget, setActiveTab
+  onAddExerciseTarget, setActiveTab,
+  history
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearch = useDeferredValue(searchQuery);
   const [muscleFilter, setMuscleFilter] = useState([]);
   const [equipFilter, setEquipFilter] = useState([]);
   const [levelFilter, setLevelFilter] = useState([]);
@@ -50,32 +53,63 @@ const AddExerciseModal = ({
     return [...deduplicatedLocal, ...onlineToAdd];
   }, [exerciseLibrary, onlineExercises]);
 
+  const ownScores = useMemo(() => {
+    return computeOwnExerciseUsage(history);
+  }, [history]);
 
-  let filteredLib = combinedLibrary;
-  if (searchQuery.trim()) {
-      const queryWords = searchQuery.toLowerCase().trim().split(/\s+/);
-      const lowSearch = searchQuery.toLowerCase().trim();
-      filteredLib = filteredLib.filter(ex => {
-          const nameStr = ex.name.toLowerCase();
-          const targetStr = formatTarget(ex.target, lang?.id).toLowerCase();
-          return nameStr.includes(lowSearch) || targetStr.includes(lowSearch) || queryWords.every(word => nameStr.includes(word) || targetStr.includes(word));
-      });
-  }
-  if (muscleFilter.length > 0) {
-      filteredLib = filteredLib.filter(ex => {
+  const indexedLibrary = useMemo(() => {
+    return combinedLibrary.map(ex => prepareSearchableExercise(ex, lang?.id));
+  }, [combinedLibrary, lang?.id]);
+
+  const filteredLib = useMemo(() => {
+    let list = [...indexedLibrary];
+
+    // Muscle filter
+    if (muscleFilter.length > 0) {
+      list = list.filter(ex => {
         const exTargets = Array.isArray(ex.target) ? ex.target : [ex.target || 'Lainnya'];
         return exTargets.some(m => muscleFilter.includes(normalizeMuscleKey(m)));
       });
-  }
-  if (equipFilter.length > 0) {
-      filteredLib = filteredLib.filter(ex => equipFilter.includes(ex.equipment));
-  }
-  if (levelFilter.length > 0) {
-      filteredLib = filteredLib.filter(ex => levelFilter.includes(ex.level));
-  }
-  
-  // limit to 100 to prevent lag
-  filteredLib = filteredLib.slice(0, 100);
+    }
+
+    // Equipment filter
+    if (equipFilter.length > 0) {
+      list = list.filter(ex => equipFilter.includes(ex.equipment));
+    }
+
+    // Level filter
+    if (levelFilter.length > 0) {
+      list = list.filter(ex => levelFilter.includes(ex.level));
+    }
+
+    const isSearching = Boolean(deferredSearch && deferredSearch.trim());
+    if (isSearching) {
+      list = list.map(ex => {
+        const usage = ownScores[ex._slug] || ownScores[String(ex.id)] || 0;
+        const score = scoreExerciseMatch(ex, deferredSearch, usage);
+        return { ...ex, _searchScore: score };
+      }).filter(ex => ex._searchScore > -1);
+
+      list.sort((a, b) => {
+        const fa = a.isFavorite ? 1 : 0;
+        const fb = b.isFavorite ? 1 : 0;
+        if (fa !== fb) return fb - fa;
+        return (b._searchScore || 0) - (a._searchScore || 0);
+      });
+    } else {
+      list.sort((a, b) => {
+        const fa = a.isFavorite ? 1 : 0;
+        const fb = b.isFavorite ? 1 : 0;
+        if (fa !== fb) return fb - fa;
+        const uA = ownScores[a._slug] || ownScores[String(a.id)] || 0;
+        const uB = ownScores[b._slug] || ownScores[String(b.id)] || 0;
+        if (uB !== uA) return uB - uA;
+        return a.name.localeCompare(b.name);
+      });
+    }
+
+    return list.slice(0, 100);
+  }, [indexedLibrary, muscleFilter, equipFilter, levelFilter, deferredSearch, ownScores]);
 
   React.useEffect(() => {
     if (!activeAddModalTarget) return;

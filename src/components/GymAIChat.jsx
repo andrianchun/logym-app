@@ -118,6 +118,16 @@ export default function GymAIChat({
     const phaseTimer = useRef(null);
 
     useEffect(() => {
+        if (isOpen) {
+            const orig = document.body.style.overflow;
+            document.body.style.overflow = 'hidden';
+            return () => {
+                document.body.style.overflow = orig;
+            };
+        }
+    }, [isOpen]);
+
+    useEffect(() => {
         clearTimeout(phaseTimer.current);
         if (isOpen) {
             setPhase('opening');
@@ -732,7 +742,7 @@ export default function GymAIChat({
         <>
         {/* Backdrop terpisah — hanya fade, tidak di-scale supaya tidak ganggu transform */}
         <div
-            className="fixed inset-0 z-[99] bg-black/70 backdrop-blur-sm"
+            className="fixed inset-0 z-[99] bg-black/70 backdrop-blur-sm overscroll-contain touch-none"
             style={{
                 opacity: isAnimatingIn ? 1 : 0,
                 transition: isAnimatingIn
@@ -745,7 +755,7 @@ export default function GymAIChat({
 
         {/* Panel chat — di-scale dari titik avatar */}
         <div
-            className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 pointer-events-none"
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 pointer-events-none overscroll-contain"
             style={{
                 transformOrigin: `${ox}px ${oy}px`,
                 transform: isAnimatingIn ? 'scale(1)' : 'scale(0.05)',
@@ -755,7 +765,7 @@ export default function GymAIChat({
                     : 'transform 0.38s cubic-bezier(0.34, 1.15, 0.64, 1), opacity 0.3s ease',
             }}
         >
-            <div className="pointer-events-auto flex flex-col w-full max-w-md h-[85vh] max-h-[800px] bg-neutral-900/60 backdrop-blur-2xl border border-white/10 rounded-[2rem] shadow-[0_0_40px_rgba(0,0,0,0.5)] overflow-hidden relative">
+            <div className="pointer-events-auto flex flex-col w-full max-w-md h-[85vh] max-h-[800px] bg-neutral-900/60 backdrop-blur-2xl border border-white/10 rounded-[2rem] shadow-[0_0_40px_rgba(0,0,0,0.5)] overflow-hidden relative overscroll-contain">
             {isSidebarOpen && <div className="absolute inset-0 bg-black/60 z-[110] transition-opacity cursor-pointer" onClick={() => setIsSidebarOpen(false)} />}
 
             <div className={`absolute inset-y-0 left-0 w-64 bg-neutral-900 border-r border-white/10 z-[120] transform transition-transform duration-300 flex flex-col ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
@@ -815,7 +825,7 @@ export default function GymAIChat({
                             </div>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 text-neutral-400 hover:text-white rounded-full bg-white/5 hover:bg-white/10 transition-colors">
+                    <button data-close-modal="true" onClick={onClose} className="p-2 text-neutral-400 hover:text-white rounded-full bg-white/5 hover:bg-white/10 transition-colors">
                         <X size={20} />
                     </button>
                 </div>

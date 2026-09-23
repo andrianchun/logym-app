@@ -24,6 +24,16 @@ const DashboardModals = ({
   const [scanError, setScanError] = useState('');
   const [scanSuccess, setScanSuccess] = useState(false);
 
+  React.useEffect(() => {
+    if (showManualModal) {
+      const orig = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = orig;
+      };
+    }
+  }, [showManualModal]);
+
   // Field yang MEMANG bisa diisi Health Connect. Sengaja daftar eksplisit, bukan "semua yang ada
   // di kartu ini": `activeMinutes` misalnya tidak pernah bisa datang dari HC (HC tidak punya
   // metrik menit aktif sama sekali — Logym menurunkannya dari sebaran langkah), jadi menguncinya
@@ -256,7 +266,7 @@ const DashboardModals = ({
 
       {/* 2. MODAL INPUT MANUAL & IN-DEPTH EDITING */}
       {showManualModal && createPortal((
-        <div className={`fixed inset-0 -top-24 -bottom-24 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in ${t.textMain} font-sans`} onClick={() => setShowManualModal(false)}>
+        <div className={`fixed inset-0 -top-24 -bottom-24 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in overscroll-contain touch-none ${t.textMain} font-sans`} onClick={() => setShowManualModal(false)}>
            <div className={`w-full max-w-md mx-auto ${t.bgCard} rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 border ${t.border}`} onClick={(e) => e.stopPropagation()}>
               
               <div className="flex justify-between items-start p-5 pb-4 shrink-0">
@@ -505,7 +515,7 @@ const DashboardModals = ({
 
               <div className="px-5 pb-5 pt-2 mt-auto shrink-0">
                   <div className="flex gap-3">
-                      <button onClick={() => setShowManualModal(false)} className={`w-1/3 py-3 rounded-xl font-bold body-lg ${t.textMuted} ${t.btnBg} active:scale-[0.98] transition-all`}>Batal</button>
+                      <button data-close-modal="true" onClick={() => setShowManualModal(false)} className={`w-1/3 py-3 rounded-xl font-bold body-lg ${t.textMuted} ${t.btnBg} active:scale-[0.98] transition-all`}>Batal</button>
                       <button onClick={handleSaveManualData} className={`flex-1 py-3 rounded-xl font-black body-lg text-white ${t.bgAccent} shadow-lg shadow-black/20 active:scale-[0.98] transition-all`}>Simpan</button>
                   </div>
               </div>

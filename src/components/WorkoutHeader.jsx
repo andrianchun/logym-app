@@ -1,7 +1,17 @@
 import React from 'react';
 import { Flame } from 'lucide-react';
 
-const WorkoutHeader = ({ t, language, selectedDate, soundEnabled, playSoundEffect, warmupVideos, onOpenWarmup }) => {
+const WorkoutHeader = ({
+  t,
+  language,
+  selectedDate,
+  soundEnabled,
+  playSoundEffect,
+  warmupVideos,
+  onOpenWarmup,
+  wellnessConfig,
+  onOpenWellness
+}) => {
   const dateObj = new Date(selectedDate);
   const dayName = dateObj.toLocaleDateString(language === 'ID' ? 'id-ID' : 'en-US', { weekday: 'long' });
   const dateName = dateObj.toLocaleDateString(language === 'ID' ? 'id-ID' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -17,15 +27,30 @@ const WorkoutHeader = ({ t, language, selectedDate, soundEnabled, playSoundEffec
             {dateName}
           </h2>
         </div>
-        {warmupVideos && (
-          <button
-            onClick={() => { playSoundEffect('click', soundEnabled); onOpenWarmup(); }}
-            className={`shrink-0 flex items-center justify-center w-10 h-10 rounded-full transition-all active:scale-95 ${t.btnBg} ${t.textMuted} hover:${t.textAccent}`}
-            title="Pemanasan"
-          >
-            <Flame size={20} strokeWidth={2} />
-          </button>
-        )}
+        <div className="flex flex-col items-center gap-2.5 shrink-0">
+          {warmupVideos && (
+            <button
+              onClick={() => { playSoundEffect('click', soundEnabled); onOpenWarmup(); }}
+              className={`flex items-center justify-center w-10 h-10 rounded-full transition-all active:scale-95 ${t.btnBg} ${t.textMuted} hover:${t.textAccent} border border-black/5 dark:border-white/5 shadow-sm`}
+              title="Pemanasan"
+            >
+              <Flame size={20} strokeWidth={2} />
+            </button>
+          )}
+          {wellnessConfig && (
+            <button
+              type="button"
+              onClick={() => {
+                playSoundEffect('click', soundEnabled);
+                onOpenWellness?.();
+              }}
+              className={`flex items-center justify-center w-10 h-10 rounded-full transition-all active:scale-95 ${t.btnBg} ${t.textMuted} hover:${t.textAccent} border border-black/5 dark:border-white/5 shadow-sm`}
+              title={`Kondisi Tubuh: ${wellnessConfig.label} (Ketuk untuk detail / ubah)`}
+            >
+              {wellnessConfig.icon}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

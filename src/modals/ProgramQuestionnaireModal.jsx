@@ -47,6 +47,10 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
     duration: null,
     consents: userProfile?.consents || { tos: false, data: false, ai: false }
   });
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [recommendedPlan, setRecommendedPlan] = useState(null);
+  const [showGymManager, setShowGymManager] = useState(false);
+
   useEffect(() => {
     if (!isOpen) return;
     const origBody = document.body.style.overflow;

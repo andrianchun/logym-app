@@ -380,3 +380,72 @@ console.log('workoutCalc OK', { cardioKcal, plankKcal, liftKcal });
 
   console.log('dailyBurnCalories with TEF OK', { bmr: burnFood.bmr, steps: burnFood.steps, tef: burnFood.tef, tefMacros: burnMacros.tef, total: burnFood.total });
 }
+
+// ---- calculateProgressiveOverloadTarget: Dynamic Double Progression & Equipment Step Alignment ----
+{
+  const { calculateProgressiveOverloadTarget } = await import('./workoutCalc.js');
+
+  // 1. Kasus User Screenshot:
+  //    Sesi lalu: 50 kg x 14 reps, targetReps: 10, alat gym naik kelipatan 2.5 kg.
+  //    Dulu bug: naik +1.25 kg jadi 51.25 kg (padahal di alat tidak ada 51.25 kg!).
+  //    Sekarang: karena 14 reps >= threshold (12 reps), beban naik kelipatan alat (+2.5 kg) jadi 52.5 kg x 10 reps.
+  const planUser = calculateProgressiveOverloadTarget({
+    lastSessionWeight: 50,
+    lastSessionReps: 14,
+    targetReps: 10,
+    equipStep: 2.5,
+    goal: 'muscle_gain',
+  });
+  assert.equal(planUser.targetWeight, 52.5, 'Beban harus naik ke 52.5 kg sesuai kelipatan alat 2.5 kg, BUKAN 51.25 kg');
+  assert.equal(planUser.targetReps, 10, 'Repetisi kembali ke target dasar 10 reps');
+  assert.equal(planUser.isWeightJump, true);
+  assert.equal(planUser.step, 2.5);
+
+  // 2. Kasus Double Progression (Reps First):
+  //    Sesi lalu: 50 kg x 10 reps (baru pas di target dasar 10 reps).
+  //    Jika langsung lompat ke 52.5 kg, repetisi akan anjlok ke 8 reps.
+  //    Maka Double Progression: pertahankan beban 50 kg, kejar 11 reps dulu dengan form solid!
+  const planRepsFirst = calculateProgressiveOverloadTarget({
+    lastSessionWeight: 50,
+    lastSessionReps: 10,
+    targetReps: 10,
+    equipStep: 2.5,
+    goal: 'muscle_gain',
+  });
+  assert.equal(planRepsFirst.targetWeight, 50, 'Beban dipertahankan di 50 kg sebelum melompat');
+  assert.equal(planRepsFirst.targetReps, 11, 'Target repetisi naik ke 11 reps');
+  assert.equal(planRepsFirst.isWeightJump, false);
+  assert.equal(planRepsFirst.mode, 'reps_first');
+
+  // 3. Alat dengan pin berat (lompatan 5 kg):
+  //    Sesi lalu: 20 kg x 10 reps, target: 10 reps, equipStep: 5 kg.
+  //    Lompatan 5 kg (25%) terlalu drastis. Harus kejar reps dulu sampai 11-12 reps.
+  const planHeavyStep = calculateProgressiveOverloadTarget({
+    lastSessionWeight: 20,
+    lastSessionReps: 10,
+    targetReps: 10,
+    equipStep: 5,
+    goal: 'muscle_gain',
+  });
+  assert.equal(planHeavyStep.targetWeight, 20);
+  assert.equal(planHeavyStep.targetReps, 11);
+  assert.equal(planHeavyStep.isWeightJump, false);
+
+  // 4. Latihan Bodyweight murni (beban 0 kg):
+  //    Pushup / Pullup: progresif murni pada repetisi (+1 rep).
+  const planBW = calculateProgressiveOverloadTarget({
+    lastSessionWeight: 0,
+    lastSessionReps: 15,
+    targetReps: 10,
+    equipStep: 2.5,
+  });
+  assert.equal(planBW.targetWeight, 0);
+  assert.equal(planBW.targetReps, 16);
+
+  console.log('calculateProgressiveOverloadTarget OK', {
+    userTargetWeight: planUser.targetWeight,
+    userTargetReps: planUser.targetReps,
+    repsFirstTarget: planRepsFirst.targetReps
+  });
+}
+

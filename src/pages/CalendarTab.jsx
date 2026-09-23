@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Info, CheckCircle, CalendarDays, Edit2, PlayCircle, X, Copy, Repeat, Plus, Clock, Bell, CalendarPlus, CalendarCheck, BellOff, BellRing, ToggleLeft, ToggleRight, Flame, Check, Activity } from 'lucide-react';
 // Tanpa import ini, `typeof Capacitor === 'undefined'` di penjadwalan notifikasi selalu bernilai
 // true — jadi setiap pengingat latihan diam-diam berhenti di baris pertama dan tidak pernah
@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Info, CheckCircle, C
 // "notifikasinya kok tidak pernah bunyi".
 import { Capacitor } from '@capacitor/core';
 import SwipeInput from '../components/SwipeInput';
-import { getLocalYMD, resolveProjectedProgramId, getDayWorkouts as sharedGetDayWorkouts, deletedProjectedMap, hasDeletedProjected, weekStripDates } from '../data/constants';
+import { getLocalYMD, resolveProjectedProgramId, getDayWorkouts as sharedGetDayWorkouts, deletedProjectedMap, hasDeletedProjected, weekStripDates, canonicalizeExercise } from '../data/constants';
 import { formatNumber } from '../utils/numberFormat';
 import { parseWorkoutDurationMinutes, calculateWorkoutCalories, calculateSmartWorkoutCalories, calculateLiveWorkoutCalories, resolveExerciseKind, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from '../utils/workoutCalc';
 import PanoramicSlider from '../components/PanoramicSlider';
@@ -73,14 +73,39 @@ const CalendarTab = ({
   
   const [isTablet, setIsTablet] = useState(window.innerWidth >= 640);
   const [calendarMode, setCalendarMode] = useState(() => {
-    return localStorage.getItem('Logym_calendar_mode') || 'weekly';
+    return localStorage.getItem('Logym_calendar_mode') || localStorage.getItem('logym_calendar_mode') || 'weekly';
   });
 
   useEffect(() => {
     if (calendarMode === 'weekly' || calendarMode === 'monthly') {
       localStorage.setItem('Logym_calendar_mode', calendarMode);
+      localStorage.setItem('logym_calendar_mode', calendarMode);
     }
   }, [calendarMode]);
+
+  // Dengarkan sinyal ganti mode (misal dari selesai latihan di WorkoutTab)
+  useEffect(() => {
+    const handleSetMode = (e) => {
+      if (e.detail === 'weekly' || e.detail === 'monthly') {
+        setCalendarMode(e.detail);
+        if (e.detail === 'weekly') {
+          setShowBottomSheet(true);
+        }
+      }
+    };
+    window.addEventListener('logym_set_calendar_mode', handleSetMode);
+    return () => window.removeEventListener('logym_set_calendar_mode', handleSetMode);
+  }, []);
+
+  // Sinkronkan mode saat tab menjadi aktif
+  useEffect(() => {
+    if (isActive) {
+      const savedMode = localStorage.getItem('Logym_calendar_mode') || localStorage.getItem('logym_calendar_mode');
+      if (savedMode && (savedMode === 'weekly' || savedMode === 'monthly')) {
+        setCalendarMode(prev => (prev === savedMode ? prev : savedMode));
+      }
+    }
+  }, [isActive]);
   const [showBottomSheet, setShowBottomSheet] = useState(false);
   const [showMonthlyStats, setShowMonthlyStats] = useState(false);
 
@@ -224,7 +249,7 @@ const CalendarTab = ({
   }, []);
 
   const [weeklyBlockHeight, setWeeklyBlockHeight] = useState(168);
-  const [peekHeight, setPeekHeight] = useState(230);
+  const [peekHeight, setPeekHeight] = useState(300);
 
   useEffect(() => {
     if (!isActive) return;
@@ -232,11 +257,14 @@ const CalendarTab = ({
       // +32 = padding kolom header di mode mingguan (pt-2 + pb-6) yang tidak ikut terukur
       // dari fixedHeaderRef/weeklyRulerRef sendiri.
       const h = (fixedHeaderRef.current?.getBoundingClientRect().height || 0) + (weeklyRulerRef.current?.getBoundingClientRect().height || 0) + 32;
-      if (h > 32) setWeeklyBlockHeight(h);
+      if (h > 32) setWeeklyBlockHeight(prev => (Math.abs(prev - h) < 1 ? prev : h));
     };
-    measure();
+    const rafId = requestAnimationFrame(measure);
     window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', measure);
+    };
   }, [mingguStrip, isActive]);
 
   // Bottom nav mengambang (fixed, tidak makan ruang layout) di atas konten — jadi peek sheet
@@ -248,12 +276,15 @@ const CalendarTab = ({
       const nav = document.querySelector('[data-bottom-nav]');
       if (nav) {
         const navH = nav.getBoundingClientRect().height;
-        if (navH > 0) setBottomNavClearance(navH + 16);
+        if (navH > 0) setBottomNavClearance(prev => (Math.abs(prev - (navH + 16)) < 1 ? prev : navH + 16));
       }
     };
-    measure();
+    const rafId = requestAnimationFrame(measure);
     window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', measure);
+    };
   }, [isActive]);
 
   // --- DRAG STATE untuk bottom sheet (persis seperti AuthPage) ---
@@ -269,12 +300,51 @@ const CalendarTab = ({
   const calendarModeRef = useRef(calendarMode);
   calendarModeRef.current = calendarMode;
 
-  // Ubah peek height agar di mode bulanan hanya tersisa sedikit handle di atas bottom nav
+  // Ukur tinggi peek di mode bulanan agar kartu pertama (beserta tombol "Selesai" & durasi)
+  // tampil utuh di atas BottomNav tanpa terpotong.
   useEffect(() => {
-    if (calendarMode !== 'monthly') return;
-    const handleH = 140; // area drag handle + sedikit isi konten (biar nggak terlalu tenggelam)
-    setPeekHeight(handleH + bottomNavClearance);
-  }, [calendarMode, bottomNavClearance]);
+    if (!isActive || calendarMode !== 'monthly') return;
+    const measurePeek = () => {
+      const defaultClearance = bottomNavClearance || 90;
+      const workouts = sharedGetDayWorkouts(history, programs, activePlanIds, calendarSelectedDate);
+      const hasWorkouts = Array.isArray(workouts) && workouts.length > 0;
+
+      if (!sheetRef.current) {
+        const next = (hasWorkouts ? 210 : 110) + defaultClearance;
+        setPeekHeight(prev => (Math.abs(prev - next) < 1 ? prev : next));
+        return;
+      }
+
+      const sheetRect = sheetRef.current.getBoundingClientRect();
+      const firstCard = sheetContentRef.current?.querySelector('[id^="workout-card-"]');
+
+      if (firstCard) {
+        const cardRect = firstCard.getBoundingClientRect();
+        // cardRect.bottom - sheetRect.top adalah jarak dari puncak sheet ke tepi bawah kartu pertama
+        const contentNeeded = Math.round(cardRect.bottom - sheetRect.top + 14);
+        const next = Math.max(200, contentNeeded + defaultClearance);
+        setPeekHeight(prev => (Math.abs(prev - next) < 1 ? prev : next));
+      } else {
+        const emptyEl = sheetContentRef.current?.querySelector('.caption') || sheetContentRef.current?.firstElementChild;
+        if (emptyEl) {
+          const emptyRect = emptyEl.getBoundingClientRect();
+          const contentNeeded = Math.round(emptyRect.bottom - sheetRect.top + 16);
+          const next = Math.max(110, contentNeeded + defaultClearance);
+          setPeekHeight(prev => (Math.abs(prev - next) < 1 ? prev : next));
+        } else {
+          const next = (hasWorkouts ? 210 : 110) + defaultClearance;
+          setPeekHeight(prev => (Math.abs(prev - next) < 1 ? prev : next));
+        }
+      }
+    };
+
+    const rafId = requestAnimationFrame(measurePeek);
+    window.addEventListener('resize', measurePeek);
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', measurePeek);
+    };
+  }, [isActive, calendarMode, calendarSelectedDate, bottomNavClearance, history, programs, activePlanIds]);
 
   // Note: auto-switch ke weekly dihapus — mode hanya berubah lewat gesture user (toggle / drag handle).
 
@@ -481,7 +551,13 @@ const CalendarTab = ({
     }
   }, [calendarSelectedDate, calendarMode]);
 
-  const getDayWorkouts = (dateStr) => sharedGetDayWorkouts(history, programs, activePlanIds, dateStr);
+  const dayWorkoutsCache = useMemo(() => new Map(), [history, programs, activePlanIds]);
+  const getDayWorkouts = useCallback((dateStr) => {
+    if (!dayWorkoutsCache.has(dateStr)) {
+      dayWorkoutsCache.set(dateStr, sharedGetDayWorkouts(history, programs, activePlanIds, dateStr));
+    }
+    return dayWorkoutsCache.get(dateStr);
+  }, [dayWorkoutsCache, history, programs, activePlanIds]);
 
   const scheduleWorkoutNotification = async (workoutId, programName, dateStr, timeStr) => {
     if (!reminderEnabled || !timeStr || typeof Capacitor === 'undefined' || !Capacitor.isNativePlatform()) return null;
@@ -632,9 +708,9 @@ const CalendarTab = ({
           const prog = programs.find(p => p.id === w.programId);
           if (prog && (w.overriddenExercises || prog.exercises)) {
              const exrs = w.overriddenExercises || prog.exercises;
-             exList = "\n\nDaftar Latihan:\n" + exrs.map((ex, i) => `${i+1}. ${ex.name}`).join("\n");
+             exList = "\n\nDaftar Latihan:\n" + exrs.map((ex, i) => `${i+1}. ${canonicalizeExercise(ex)?.name || ex.name}`).join("\n");
           } else if (w.programId === 'adhoc' && w.exercises) {
-             exList = "\n\nDaftar Latihan:\n" + w.exercises.map((ex, i) => `${i+1}. ${ex.name}`).join("\n");
+             exList = "\n\nDaftar Latihan:\n" + w.exercises.map((ex, i) => `${i+1}. ${canonicalizeExercise(ex)?.name || ex.name}`).join("\n");
           }
        }
     }
@@ -1453,10 +1529,10 @@ const CalendarTab = ({
                                          <p className="caption font-bold text-yellow-500 flex justify-between"><span>Langkah</span> <span>{formatNumber(dailySteps)} / {formatNumber(tSteps)}</span></p>
                                        </div>
                                      </div>
-                                     {(bio.weight || bio.fat || bio.bloodPressure || bio.heartRate || bio.bloodSugar || bio.sleep || bio.temperature || bio.notes) && (
+                                     {(bio.weight || bio.fat || bio.bodyFat || bio.bloodPressure || bio.heartRate || bio.bloodSugar || bio.sleep || bio.temperature || bio.notes) && (
                                        <div className="mt-2 pt-4 border-t border-black/10 dark:border-white/10 grid grid-cols-2 gap-y-3 gap-x-2 text-[11px] opacity-80">
                                          {bio.weight && <div><b className="opacity-70">Berat:</b><br/>{bio.weight} {isImp ? 'lbs' : 'kg'}</div>}
-                                         {bio.fat && <div><b className="opacity-70">Lemak:</b><br/>{bio.fat}%</div>}
+                                         {(bio.fat || bio.bodyFat) && <div><b className="opacity-70">Lemak:</b><br/>{bio.bodyFat || bio.fat}%</div>}
                                          {bio.bloodPressure && <div><b className="opacity-70">Tensi:</b><br/>{bio.bloodPressure} mmHg</div>}
                                          {bio.heartRate && <div><b className="opacity-70">Detak Jantung:</b><br/>{bio.heartRate} bpm</div>}
                                          {bio.minHeartRate && bio.maxHeartRate && <div><b className="opacity-70">Nadi (Min/Max):</b><br/>{bio.minHeartRate} - {bio.maxHeartRate} bpm</div>}
@@ -1808,7 +1884,8 @@ const CalendarTab = ({
                                             {isExpanded && (
                                               <div className="mt-4 pt-4 border-t border-black/10 dark:border-white/10 animate-in slide-in-from-top-2 fade-in duration-300 ease-out">
                                                 <div className="space-y-1.5 mb-4">
-                                                  {(w.overriddenExercises || prog?.exercises)?.map((ex, idx) => {
+                                                  {(w.overriddenExercises || prog?.exercises)?.map((rawEx, idx) => {
+                                                     const ex = canonicalizeExercise(rawEx);
                                                      const exLogKey = `${ex.id}-${w.id}`;
                                                      const exLogs = logsToUse?.[exLogKey] || logsToUse?.[ex.id];
                                                      const doneSets = exLogs ? exLogs.filter(s => s.done && !s.skipped) : [];
@@ -2156,4 +2233,14 @@ const NotificationModal = ({ t, target, defaultReminderTime, soundEnabled, remin
   );
 };
 
-export default CalendarTab;
+// Inactive tab is frozen completely to prevent background CPU/battery drain.
+export default React.memo(CalendarTab, (prev, next) => {
+  if (prev.isActive !== next.isActive) return false;
+  if (!next.isActive) return true;
+  const keys = Object.keys(next);
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i];
+    if (prev[k] !== next[k] && typeof next[k] !== 'function') return false;
+  }
+  return true;
+});
