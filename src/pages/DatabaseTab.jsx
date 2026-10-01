@@ -894,7 +894,7 @@ const DatabaseTab = ({ isActive = true, t, lang, exerciseLibrary, setExerciseLib
                 }`}
             >
                 Semua
-                <span className={`ml-1 px-1.5 py-0.5 rounded-md text-[10px] ${
+                <span className={`ml-1 px-1.5 py-0.5 rounded-md text-xs ${
                   viewMode === 'all' ? 'bg-white/20' : `${t.bgCard}`
                 }`}>
                   {gymFilteredLibrary.length}
@@ -907,7 +907,7 @@ const DatabaseTab = ({ isActive = true, t, lang, exerciseLibrary, setExerciseLib
                 }`}
             >
                 Custom
-                <span className={`ml-1 px-1.5 py-0.5 rounded-md text-[10px] ${
+                <span className={`ml-1 px-1.5 py-0.5 rounded-md text-xs ${
                   viewMode === 'custom' ? 'bg-white/20' : `${t.bgCard}`
                 }`}>
                   {gymFilteredLibrary.filter(ex => ex.id > 1000000 && ex.source !== 'exercisedb').length}
@@ -991,12 +991,12 @@ const DatabaseTab = ({ isActive = true, t, lang, exerciseLibrary, setExerciseLib
               {/* Baris 4: Sort + Reset */}
               <div className={`flex items-center justify-between gap-2 w-full pt-1.5 border-t ${t.border}`}>
                 <div className="flex items-center gap-2">
-                  <span className={`text-[10px] font-black uppercase tracking-wider ${t.textMuted}`}>Urutkan</span>
+                  <span className={`text-xs font-black uppercase tracking-wider ${t.textMuted}`}>Urutkan</span>
                   <div className="relative">
                     <select 
                       value={sortOrder}
                       onChange={(e) => setSortOrder(e.target.value)}
-                      className={`px-2.5 py-1.5 rounded-xl ${t.inputBg} ${t.textMain} text-[11px] font-bold outline-none appearance-none cursor-pointer pr-6 border ${t.border}`}
+                      className={`px-2.5 py-1.5 rounded-xl ${t.inputBg} ${t.textMain} text-xs font-bold outline-none appearance-none cursor-pointer pr-6 border ${t.border}`}
                     >
                       <option value="popular" className="bg-slate-900 text-white dark:bg-slate-900 dark:text-white">Sering Dilatih</option>
                       <option value="newest" className="bg-slate-900 text-white dark:bg-slate-900 dark:text-white">Terbaru</option>
@@ -1009,7 +1009,7 @@ const DatabaseTab = ({ isActive = true, t, lang, exerciseLibrary, setExerciseLib
                 {(muscleFilter.length > 0 || equipFilter.length > 0 || levelFilter.length > 0) && (
                   <button
                     onClick={() => { setMuscleFilter([]); setEquipFilter([]); setLevelFilter([]); }}
-                    className="px-2.5 py-1 rounded-lg text-[10px] font-black text-rose-500 hover:bg-rose-500/10 transition-colors shrink-0"
+                    className="px-2.5 py-1 rounded-lg text-xs font-black text-rose-500 hover:bg-rose-500/10 transition-colors shrink-0"
                   >
                     Reset Filter
                   </button>
@@ -1023,9 +1023,9 @@ const DatabaseTab = ({ isActive = true, t, lang, exerciseLibrary, setExerciseLib
             <div className={`flex items-center justify-between p-3 rounded-xl border border-rose-500/30 bg-rose-500/5`}>
               <div className="flex items-center gap-2">
                 <AlertCircle size={16} className="text-rose-500" />
-                <p className={`text-[10px] font-bold ${t.textMain}`}>Database online gagal dimuat. Menampilkan library offline.</p>
+                <p className={`text-xs font-bold ${t.textMain}`}>Database online gagal dimuat. Menampilkan library offline.</p>
               </div>
-              <button onClick={() => handleFetchOnline(true)} className="text-[10px] font-black text-rose-500">Coba Lagi</button>
+              <button onClick={() => handleFetchOnline(true)} className="text-xs font-black text-rose-500">Coba Lagi</button>
             </div>
           )}
 
@@ -1104,7 +1104,7 @@ const DatabaseTab = ({ isActive = true, t, lang, exerciseLibrary, setExerciseLib
               <div className="pt-8 pb-4">
                  <div className="flex items-center gap-3 mb-4">
                     <div className={`flex-1 h-px bg-black/10 dark:bg-white/10`}></div>
-                    <div className={`text-[10px] font-black uppercase tracking-widest ${t.textMuted} opacity-50`}>PENGATURAN TAMBAHAN</div>
+                    <div className={`text-xs font-black uppercase tracking-widest ${t.textMuted} opacity-50`}>PENGATURAN TAMBAHAN</div>
                     <div className={`flex-1 h-px bg-black/10 dark:bg-white/10`}></div>
                  </div>
 

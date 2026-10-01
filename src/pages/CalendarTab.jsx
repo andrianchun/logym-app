@@ -1085,10 +1085,10 @@ const CalendarTab = ({
 
     return (
       <div className="flex flex-col px-2">
-        <h2 className={`text-[1.5rem] font-black mb-2 px-1 shrink-0 ${t.textMain} tracking-tight`}>{panelMonthName} {panelYear}</h2>
+        <h2 className={`text-2xl font-black mb-2 px-1 shrink-0 ${t.textMain} tracking-tight`}>{panelMonthName} {panelYear}</h2>
         <div className="grid grid-cols-7 gap-1 mb-2 px-1 shrink-0">
           {(weekStartDay === 1 ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'] : ['S', 'M', 'T', 'W', 'T', 'F', 'S']).map((day, i) => (
-            <div key={i} className="text-center text-[9px] font-bold uppercase text-zinc-500 tracking-widest opacity-80">{day}</div>
+            <div key={i} className="text-center text-xs font-bold uppercase text-slate-500 tracking-widest opacity-80">{day}</div>
           ))}
         </div>
         <div className="grid grid-cols-7 gap-0 px-1" style={{ gridAutoRows: '46px' }}>
@@ -1100,7 +1100,7 @@ const CalendarTab = ({
             const isToday = dateKey === todayStr;
             const isSelected = dateKey === calendarSelectedDate;
 
-            let cellStyle = `w-full h-full max-w-[44px] max-h-[44px] mx-auto relative flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer border border-transparent hover:bg-black/5 dark:hover:bg-white/5 text-zinc-500 dark:text-zinc-300`;
+            let cellStyle = `w-full h-full max-w-[44px] max-h-[44px] mx-auto relative flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer border border-transparent hover:bg-black/5 dark:hover:bg-white/5 text-slate-500 dark:text-slate-300`;
             if (isSelected) {
               cellStyle = `w-full h-full max-w-[44px] max-h-[44px] mx-auto relative flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer ${t.bgAccent} text-white shadow-lg ${t.shadowAccent} scale-[1.1] z-10`;
             } else if (isToday) {
@@ -1160,11 +1160,11 @@ const CalendarTab = ({
                       {workouts.slice(0, workouts.length > 3 ? 2 : 3).map(w => {
                         const isDone = checkIsCompletedStrict(w, dateKey);
                         return (
-                          <div key={w.id} className={`w-1 h-1 rounded-full ${isSelected ? (isDone ? 'bg-white' : 'bg-white/30 border border-white/50') : (isDone ? t.bgAccent.replace('text-', 'bg-') : 'bg-transparent border border-zinc-400')}`}></div>
+                          <div key={w.id} className={`w-1 h-1 rounded-full ${isSelected ? (isDone ? 'bg-white' : 'bg-white/30 border border-white/50') : (isDone ? t.bgAccent.replace('text-', 'bg-') : 'bg-transparent border border-slate-400')}`}></div>
                         );
                       })}
                       {workouts.length > 3 && (
-                        <span className={`text-[7px] font-bold leading-none ${isSelected ? 'text-white/80' : 'text-zinc-400'}`}>+{workouts.length - 2}</span>
+                        <span className={`text-xs font-bold leading-none ${isSelected ? 'text-white/80' : 'text-slate-400'}`}>+{workouts.length - 2}</span>
                       )}
                     </div>
                   )}
@@ -1204,7 +1204,7 @@ const CalendarTab = ({
                     setShowBottomSheet(false);
                   }
                 }}
-                className={`p-2 text-zinc-400 dark:text-zinc-500 hover:${t.textAccent} transition-colors`}
+                className={`p-2 text-slate-400 dark:text-slate-500 hover:${t.textAccent} transition-colors`}
                 title="Ganti Mode Kalender"
               >
                 {calendarMode === 'monthly' ? (
@@ -1219,7 +1219,7 @@ const CalendarTab = ({
                   onClick={() => {
                     setShowMonthlyStats(!showMonthlyStats);
                   }}
-                  className={`p-2 transition-colors ${showMonthlyStats ? t.textAccent : 'text-zinc-400 dark:text-zinc-500 hover:' + t.textAccent}`}
+                  className={`p-2 transition-colors ${showMonthlyStats ? t.textAccent : 'text-slate-400 dark:text-slate-500 hover:' + t.textAccent}`}
                   title="Tampilkan Statistik Aktivitas"
                 >
                   <Activity size={20} strokeWidth={2.5} />
@@ -1246,7 +1246,7 @@ const CalendarTab = ({
                     setCalendarDate(new Date());
                     if (calendarMode === 'monthly') scrollToMonth(new Date());
                   }}
-                  className={`text-[10px] font-bold px-3 py-1.5 rounded-full ${t.bgAccent} text-white hover:opacity-80 transition-opacity shadow-sm`}
+                  className={`text-xs font-bold px-3 py-1.5 rounded-full ${t.bgAccent} text-white hover:opacity-80 transition-opacity shadow-sm`}
                 >
                   Hari Ini
                 </button>
@@ -1260,7 +1260,7 @@ const CalendarTab = ({
         <div ref={weeklyRulerRef} aria-hidden="true" className="absolute opacity-0 pointer-events-none -z-10 left-0 right-0">
           <div className="grid grid-cols-7 gap-1 mb-1 px-2 py-1">
             {[0, 1, 2, 3, 4, 5, 6].map(i => (
-              <div key={i} className="text-center text-[9px] font-medium uppercase tracking-wider">D</div>
+              <div key={i} className="text-center text-xs font-medium uppercase tracking-wider">D</div>
             ))}
           </div>
           {/* Tetap satu baris: strip mingguan sekarang memanjang ke samping, tingginya tidak
@@ -1307,7 +1307,7 @@ const CalendarTab = ({
             <div className="grid gap-1 mb-1 px-2 py-1" style={{ gridTemplateColumns: `repeat(${7 * mingguStrip}, minmax(0, 1fr))` }}>
               {Array.from({ length: mingguStrip }).flatMap((_, m) =>
                 (weekStartDay === 1 ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'] : ['S', 'M', 'T', 'W', 'T', 'F', 'S']).map((day, i) => (
-                  <div key={`${m}-${i}`} className={`text-center text-[9px] font-medium uppercase text-zinc-500 tracking-wider`}>{day}</div>
+                  <div key={`${m}-${i}`} className={`text-center text-xs font-medium uppercase text-slate-500 tracking-wider`}>{day}</div>
                 ))
               )}
             </div>
@@ -1350,7 +1350,7 @@ const CalendarTab = ({
                       
                       // Ukuran & scale disamakan persis dengan sel mode bulanan (w/h-11 = 44px,
                       // scale-[1.1]) supaya "cursor" biru terasa konsisten saat mode berpindah.
-                      let cellStyle = `w-full h-11 max-w-[44px] mx-auto relative flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer border border-transparent hover:bg-black/5 dark:hover:bg-white/5 text-zinc-500 dark:text-zinc-300`;
+                      let cellStyle = `w-full h-11 max-w-[44px] mx-auto relative flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer border border-transparent hover:bg-black/5 dark:hover:bg-white/5 text-slate-500 dark:text-slate-300`;
                       if (isSelected) {
                         cellStyle = `w-full h-11 max-w-[44px] mx-auto relative flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer ${t.bgAccent} text-white shadow-lg ${t.shadowAccent} scale-[1.1] z-10`;
                       } else if (isToday) {
@@ -1439,7 +1439,7 @@ const CalendarTab = ({
            onPointerUp={handleSheetPointerUp}
            onPointerCancel={handleSheetPointerUp}
          >
-           <div className="w-12 h-1.5 bg-zinc-300 dark:bg-zinc-700 rounded-full" />
+           <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full" />
          </div>
 
          <div
@@ -1526,11 +1526,11 @@ const CalendarTab = ({
                                        <div className="flex-1 space-y-2">
                                          <p className="caption font-bold text-rose-500 flex justify-between"><span>Kalori</span> <span>{formatNumber(dailyCalories)} / {formatNumber(tCalories)}</span></p>
                                          <p className="caption font-bold text-emerald-500 flex justify-between"><span>Durasi</span> <span>{formatNumber(dailyDuration)} / {formatNumber(tDuration)}</span></p>
-                                         <p className="caption font-bold text-yellow-500 flex justify-between"><span>Langkah</span> <span>{formatNumber(dailySteps)} / {formatNumber(tSteps)}</span></p>
+                                         <p className="caption font-bold text-amber-500 flex justify-between"><span>Langkah</span> <span>{formatNumber(dailySteps)} / {formatNumber(tSteps)}</span></p>
                                        </div>
                                      </div>
                                      {(bio.weight || bio.fat || bio.bodyFat || bio.bloodPressure || bio.heartRate || bio.bloodSugar || bio.sleep || bio.temperature || bio.notes) && (
-                                       <div className="mt-2 pt-4 border-t border-black/10 dark:border-white/10 grid grid-cols-2 gap-y-3 gap-x-2 text-[11px] opacity-80">
+                                       <div className="mt-2 pt-4 border-t border-black/10 dark:border-white/10 grid grid-cols-2 gap-y-3 gap-x-2 text-xs opacity-80">
                                          {bio.weight && <div><b className="opacity-70">Berat:</b><br/>{bio.weight} {isImp ? 'lbs' : 'kg'}</div>}
                                          {(bio.fat || bio.bodyFat) && <div><b className="opacity-70">Lemak:</b><br/>{bio.bodyFat || bio.fat}%</div>}
                                          {bio.bloodPressure && <div><b className="opacity-70">Tensi:</b><br/>{bio.bloodPressure} mmHg</div>}
@@ -1596,7 +1596,7 @@ const CalendarTab = ({
                                             const chartData = hrData ? hrData.map((val, i) => ({ index: i, value: val })) : [];
 
                                             const zoneLabels = [
-                                                { name: 'Warm Up', color: 'bg-zinc-400', pct: 50, val: zoneMins[0] },
+                                                { name: 'Warm Up', color: 'bg-slate-400', pct: 50, val: zoneMins[0] },
                                                 { name: 'Fat Burn', color: 'bg-sky-400', pct: 60, val: zoneMins[1] },
                                                 { name: 'Cardio', color: 'bg-emerald-400', pct: 70, val: zoneMins[2] },
                                                 { name: 'Anaerobic', color: 'bg-amber-400', pct: 80, val: zoneMins[3] },
@@ -1614,9 +1614,9 @@ const CalendarTab = ({
                                             return (
                                                 <div key={w.id} className="mt-6 pt-6 border-t border-black/10 dark:border-white/10">
                                                     <div className="flex items-center justify-between mb-4">
-                                                        <h4 className={`text-[10px] font-black uppercase tracking-widest ${t.textMain} truncate pr-2`}>{title}</h4>
+                                                        <h4 className={`text-xs font-black uppercase tracking-widest ${t.textMain} truncate pr-2`}>{title}</h4>
                                                         {realHr && (
-                                                            <span className="text-[8px] font-bold bg-emerald-500/20 text-emerald-500 px-1.5 py-0.5 rounded shrink-0">HEALTH CONNECT</span>
+                                                            <span className="text-xs font-bold bg-emerald-500/20 text-emerald-500 px-1.5 py-0.5 rounded shrink-0">HEALTH CONNECT</span>
                                                         )}
                                                     </div>
                                                     
@@ -1624,12 +1624,12 @@ const CalendarTab = ({
                                                         <>
                                                           <div className="flex justify-between items-end mb-4">
                                                               <div>
-                                                                  <div className={`text-[9px] font-bold uppercase tracking-widest ${t.textMuted}`}>Rata-rata</div>
-                                                                  <div className="flex items-baseline gap-1"><span className={`text-2xl font-black tracking-tighter ${t.textMain}`}>{avgHr}</span><span className={`text-[9px] font-bold ${t.textMuted}`}>bpm</span></div>
+                                                                  <div className={`text-xs font-bold uppercase tracking-widest ${t.textMuted}`}>Rata-rata</div>
+                                                                  <div className="flex items-baseline gap-1"><span className={`text-2xl font-black tracking-tighter ${t.textMain}`}>{avgHr}</span><span className={`text-xs font-bold ${t.textMuted}`}>bpm</span></div>
                                                               </div>
                                                               <div className="text-right">
-                                                                  <div className={`text-[9px] font-bold uppercase tracking-widest ${t.textMuted}`}>Maksimal</div>
-                                                                  <div className="flex items-baseline justify-end gap-1"><span className={`text-xl font-black tracking-tighter ${t.textMain}`}>{maxDataHr}</span><span className={`text-[9px] font-bold ${t.textMuted}`}>bpm</span></div>
+                                                                  <div className={`text-xs font-bold uppercase tracking-widest ${t.textMuted}`}>Maksimal</div>
+                                                                  <div className="flex items-baseline justify-end gap-1"><span className={`text-xl font-black tracking-tighter ${t.textMain}`}>{maxDataHr}</span><span className={`text-xs font-bold ${t.textMuted}`}>bpm</span></div>
                                                               </div>
                                                           </div>
                                                             <div className="relative w-full h-24 mb-5 border-b border-black/10 dark:border-white/10">
@@ -1669,7 +1669,7 @@ const CalendarTab = ({
                                                                     const wPct = (z.val / totalMins) * 100;
                                                                     return (
                                                                         <div key={i} className="flex flex-col gap-1">
-                                                                            <div className="flex justify-between items-center text-[9px]">
+                                                                            <div className="flex justify-between items-center text-xs">
                                                                                 <span className={`font-bold ${t.textMain}`}>{z.name} <span className="opacity-50">(&gt;{Math.round(maxHR * (z.pct/100))} bpm)</span></span>
                                                                                 <span className="font-bold opacity-80">{Math.round(wPct)}%</span>
                                                                             </div>
@@ -1758,9 +1758,9 @@ const CalendarTab = ({
                                 return Object.entries(groupedPanel).map(([groupName, workouts], gIdx) => (
                                    <div key={groupName} className="mb-6 last:mb-0">
                                      <div className="flex items-center mb-4 px-1 w-full">
-                                       <span className={`text-[10px] font-black uppercase tracking-widest text-zinc-400 shrink-0`}>{groupName}</span>
+                                       <span className={`text-xs font-black uppercase tracking-widest text-slate-400 shrink-0`}>{groupName}</span>
                                      </div>
-                                     <div className="relative pl-7 sm:pl-9 space-y-4 before:absolute before:left-[11px] before:top-4 before:bottom-0 before:w-px before:border-l-2 before:border-dashed before:border-zinc-200 dark:before:border-zinc-800">
+                                     <div className="relative pl-7 sm:pl-9 space-y-4 before:absolute before:left-[11px] before:top-4 before:bottom-0 before:w-px before:border-l-2 before:border-dashed before:border-slate-200 dark:before:border-slate-800">
                                        {workouts.map((w, wIdx) => {
                                        const isCompleted = checkIsCompletedStrict(w, targetDateStr);
                                        const isExpanded = expandedWorkoutId === w.id;
@@ -1822,7 +1822,7 @@ const CalendarTab = ({
                                        return (
                                           <div id={`workout-card-${w.id}`} key={w.id} className="relative group">
                                             {/* Timeline Node — posisi disamakan tengah dengan garis titik-titik (before:left-[11px] pada parent) */}
-                                            <div className={`absolute -left-6 sm:-left-8 top-4 w-4 h-4 rounded-full border-[3.5px] z-10 ${isCompleted ? `${t.bgAccent} border-white dark:border-black` : 'bg-white dark:bg-black border-zinc-300 dark:border-zinc-600'}`}></div>
+                                            <div className={`absolute -left-6 sm:-left-8 top-4 w-4 h-4 rounded-full border-[3.5px] z-10 ${isCompleted ? `${t.bgAccent} border-white dark:border-black` : 'bg-white dark:bg-black border-slate-300 dark:border-slate-600'}`}></div>
 
                                             {/* Card Content */}
                                             <div className={`p-4 rounded-3xl ${c.bg} flex flex-col relative transition-all ${isExpanded ? 'ring-2 ring-white/50 shadow-md' : 'hover:scale-[1.01] cursor-pointer'}`} onClick={() => {
@@ -1855,7 +1855,7 @@ const CalendarTab = ({
                                                 </button>
                                               </div>
                                               
-                                              <span className={`font-black text-left leading-tight break-words text-[1.1rem] pr-8 mb-4 ${c.text}`}>
+                                              <span className={`font-black text-left leading-tight break-words text-md pr-8 mb-4 ${c.text}`}>
                                                 {w.programName}
                                               </span>
                                               
@@ -1870,7 +1870,7 @@ const CalendarTab = ({
                                                     disimpan dulu ikut dicap "Selesai" — user mengira latihannya sudah aman
                                                     padahal masih menggantung di sesi berjalan, dan yang tersimpan cuma di
                                                     perangkat itu. Durasi 0 menit di kartunya adalah gejala yang sama. */}
-                                                <div className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
+                                                <div className={`text-xs font-bold px-2.5 py-1 rounded-full ${
                                                   isRunningSession ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 animate-pulse'
                                                     : w.status === 'completed' ? c.badge
                                                     : isCompleted ? 'bg-amber-500/20 text-amber-500 border border-amber-500/40'
@@ -1897,7 +1897,7 @@ const CalendarTab = ({
                                                         return (
                                                           <div key={ex.id} className={`p-2 px-3 rounded-lg bg-black/5 dark:bg-white/5 opacity-50 flex justify-between items-center`}>
                                                             <div className="body-md truncate mr-2 line-through opacity-70">{idx + 1}. {ex.name}</div>
-                                                            <div className="text-[10px] font-bold text-rose-500">{isSkipped ? 'Di-skip' : 'Tidak Dikerjakan'}</div>
+                                                            <div className="text-xs font-bold text-rose-500">{isSkipped ? 'Di-skip' : 'Tidak Dikerjakan'}</div>
                                                           </div>
                                                         );
                                                      }
@@ -1929,9 +1929,9 @@ const CalendarTab = ({
                                                             textStr = `${totalDist > 0 ? formatNumber(totalDist, langId) + ' km | ' : ''}${totalDur} mnt`;
                                                             if (zone) {
                                                               if (zone.error === 'MISSING_AGE') {
-                                                                zoneNode = <span className="text-[9px] text-amber-500 font-bold ml-2 px-1.5 py-0.5 bg-amber-500/10 rounded" title="Set Umur di Profil">Set Umur Profil</span>;
+                                                                zoneNode = <span className="text-xs text-amber-500 font-bold ml-2 px-1.5 py-0.5 bg-amber-500/10 rounded" title="Set Umur di Profil">Set Umur Profil</span>;
                                                               } else {
-                                                                zoneNode = <span className={`text-[9px] font-bold ml-2 px-1.5 py-0.5 rounded ${zone.color} bg-black/5 dark:bg-white/5`}>{zone.label}</span>;
+                                                                zoneNode = <span className={`text-xs font-bold ml-2 px-1.5 py-0.5 rounded ${zone.color} bg-black/5 dark:bg-white/5`}>{zone.label}</span>;
                                                               }
                                                             }
                                                         } else {
@@ -1961,7 +1961,7 @@ const CalendarTab = ({
                                                              {zoneNode}
                                                            </div>
                                                            {aktualStr && (
-                                                             <div className="font-mono whitespace-nowrap text-[10px] opacity-50 leading-tight">
+                                                             <div className="font-mono whitespace-nowrap text-xs opacity-50 leading-tight">
                                                                {aktualStr}
                                                              </div>
                                                            )}
@@ -2053,7 +2053,7 @@ const CalendarTab = ({
                 }, {});
                 return Object.entries(grouped).map(([gName, progs]) => (
                   <div key={gName}>
-                    <p className={`text-[10px] font-black uppercase tracking-wider ${t.textMuted} mb-1.5 px-1`}>{gName}</p>
+                    <p className={`text-xs font-black uppercase tracking-wider ${t.textMuted} mb-1.5 px-1`}>{gName}</p>
                     <div className="space-y-1.5">
                       {progs.map(p => (
                         <button 
@@ -2188,7 +2188,7 @@ const NotificationModal = ({ t, target, defaultReminderTime, soundEnabled, remin
             </button>
           </div>
           {!reminderEnabled && (
-            <span className="text-[11px] text-rose-500 mt-1">Notifikasi global dimatikan, tapi jadwal ini tetap bisa menyala.</span>
+            <span className="text-xs text-rose-500 mt-1">Notifikasi global dimatikan, tapi jadwal ini tetap bisa menyala.</span>
           )}
         </div>
         

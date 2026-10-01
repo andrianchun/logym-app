@@ -305,13 +305,13 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
                 <div className="relative" style={{ zIndex: 60 }} ref={dropdownRef}>
                     <button 
                         onClick={() => { playSoundEffect('click', soundEnabled); setIsDropdownOpen(!isDropdownOpen); }}
-                        className={`w-[135px] relative z-[60] text-[11px] font-black py-1.5 pl-3 pr-2 flex items-center justify-between space-x-1 ${theme === 'dark' ? 'bg-zinc-900' : 'bg-white'} ${t.textMain} border ${t.border} ${isDropdownOpen ? 'rounded-t-xl border-b-transparent' : 'rounded-xl'} transition-colors`}
+                        className={`w-[135px] relative z-[60] text-xs font-black py-1.5 pl-3 pr-2 flex items-center justify-between space-x-1 ${theme === 'dark' ? 'bg-slate-900' : 'bg-white'} ${t.textMain} border ${t.border} ${isDropdownOpen ? 'rounded-t-xl border-b-transparent' : 'rounded-xl'} transition-colors`}
                     >
                         <span>{timeFilter === '1m' ? '1 Bulan Terakhir' : timeFilter === '3m' ? '3 Bulan Terakhir' : 'Keseluruhan'}</span>
                         <ChevronDown size={14} className={`transition-transform duration-200 flex-shrink-0 ${isDropdownOpen ? 'rotate-180' : ''}`} />
                     </button>
                     {isDropdownOpen && (
-                        <div className={`absolute top-full left-0 w-full -mt-1 pt-1 pb-1 rounded-b-xl border ${t.border} border-t-0 ${theme === 'dark' ? 'bg-zinc-900' : 'bg-white'} shadow-xl animate-in slide-in-from-top-2 origin-top overflow-hidden`} style={{ zIndex: 70 }}>
+                        <div className={`absolute top-full left-0 w-full -mt-1 pt-1 pb-1 rounded-b-xl border ${t.border} border-t-0 ${theme === 'dark' ? 'bg-slate-900' : 'bg-white'} shadow-xl animate-in slide-in-from-top-2 origin-top overflow-hidden`} style={{ zIndex: 70 }}>
                             {[
                                 { val: '1m', label: '1 Bulan Terakhir' },
                                 { val: '3m', label: '3 Bulan Terakhir' },
@@ -324,7 +324,7 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
                                         setTimeFilter(opt.val);
                                         setIsDropdownOpen(false);
                                     }}
-                                    className={`w-full text-left px-3 py-2 text-[11px] font-black transition-colors ${timeFilter === opt.val ? t.textAccent + ' bg-black/5 dark:bg-white/10' : t.textMuted + ' hover:' + t.textMain + ' hover:bg-black/5 dark:hover:bg-white/5'}`}
+                                    className={`w-full text-left px-3 py-2 text-xs font-black transition-colors ${timeFilter === opt.val ? t.textAccent + ' bg-black/5 dark:bg-white/10' : t.textMuted + ' hover:' + t.textMain + ' hover:bg-black/5 dark:hover:bg-white/5'}`}
                                 >
                                     {opt.label}
                                 </button>

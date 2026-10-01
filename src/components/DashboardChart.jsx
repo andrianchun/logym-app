@@ -598,7 +598,7 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
                  {chartMetricsList.filter(m => activeChartMetrics.includes(m.key)).map(metric => (
                      <div key={metric.key} className="flex items-center space-x-1.5">
                          <div className="w-2.5 h-2.5 rounded-[3px]" style={{ backgroundColor: metric.color }}></div>
-                         <span className="text-[9px] font-bold text-white/70 uppercase tracking-widest">{metric.label}</span>
+                         <span className="text-xs font-bold text-white/70 uppercase tracking-widest">{metric.label}</span>
                      </div>
                  ))}
              </div>

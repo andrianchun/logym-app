@@ -239,6 +239,10 @@ const ProgramQuestionnaireModal = ({ isOpen, onClose, onComplete, t, lang, sound
     
     try {
       const exLibStr = exerciseLibrary.map(ex => ex.name).join(', ');
+      const favExercises = (exerciseLibrary || []).filter(ex => ex.isFavorite).map(ex => ex.name);
+      const favPromptStr = favExercises.length > 0 
+        ? `Latihan Favorit Saya (WAJIB UTAMAKAN): ${favExercises.join(', ')}.` 
+        : `Latihan Favorit: Utamakan gerakan Golden Standard paling populer & efektif di gym.`;
 
       const systemPrompt = buildSystemPrompt(finalAnswers, exLibStr);
       
@@ -250,7 +254,12 @@ Hari yang saya bisa latihan: ${finalAnswers.days.length} hari per minggu (${fina
 Durasi per sesi yang saya inginkan: ${finalAnswers.duration}.
 Peralatan yang tersedia (dari Gym Profile): ${targetGym.equipment === 'all' ? 'Lengkap (Semua alat ada)' : targetGym.equipment === 'bodyweight' ? 'Hanya beban tubuh' : targetGym.equipment === 'dumbbells' ? 'Dumbbells saja' : 'Campuran'}.
 Berat badan: ${finalAnswers.weight}kg, Tinggi: ${finalAnswers.height}cm.
-Riwayat Cedera / Medis: ${finalAnswers.injuries?.length > 0 ? finalAnswers.injuries.join(', ') : 'Tidak ada'}. SANGAT PENTING: JANGAN BERIKAN latihan yang membahayakan kondisi cedera ini!
+Riwayat Cedera: ${finalAnswers.injuries?.length > 0 ? finalAnswers.injuries.join(', ') : 'Tidak ada'}. SANGAT PENTING: JANGAN BERIKAN latihan yang membahayakan kondisi cedera ini!
+${favPromptStr} SANGAT PENTING: Utamakan gerakan staple / Golden Standard (contoh: Bench Press, Incline Dumbbell Press, Lat Pulldown, Cable/Barbell Row, Overhead Press, Squat, Leg Press, Romanian Deadlift, Lateral Raise, Bicep Curl, Tricep Pushdown). JANGAN gunakan variasi aneh, canggung, atau antimainstream yang jarang dilakukan gym-goers.
+ATURAN MUTLAK JUMLAH RUTINITAS (WAJIB DIPATUHI):
+Saya memilih ${finalAnswers.days.length} HARI LATIHAN: ${finalAnswers.days.join(', ')}.
+Array "routines" WAJIB BERISI TEPAT ${finalAnswers.days.length} RUTINITAS (SATU RUTINITAS UNTUK SETIAP HARI!).
+Contoh: Untuk program 4 hari Upper/Lower, buatkan 4 rutinitas terpisah: Upper Body A (${finalAnswers.days[0]}), Lower Body A (${finalAnswers.days[1]}), Upper Body B (${finalAnswers.days[2]}), Lower Body B (${finalAnswers.days[3]}). DILARANG KERAS hanya membuat 2 rutinitas jika user memilih 4 hari!
 Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
 
       const apiMessages = [
@@ -289,8 +298,32 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
           throw new Error('AI tidak memberikan format JSON yang valid.');
       }
 
+      // Pastikan jumlah rutinitas sesuai dengan jumlah hari yang dipilih user
+      let rawRoutines = jsonPart.routines || [];
+      if (rawRoutines.length > 0 && finalAnswers.days.length > rawRoutines.length) {
+          const expanded = [];
+          finalAnswers.days.forEach((day, idx) => {
+              const baseRoutine = rawRoutines[idx % rawRoutines.length];
+              const cycle = Math.floor(idx / rawRoutines.length) + 1;
+              let suffix = '';
+              if (rawRoutines.length === 2 && finalAnswers.days.length === 4) {
+                  suffix = cycle === 1 ? 'A' : 'B';
+              } else if (cycle > 1) {
+                  suffix = `${cycle}`;
+              }
+              const cleanBaseName = (baseRoutine.name || `Sesi`).replace(/\s+[AB12]$/i, '');
+              const newName = suffix ? `${cleanBaseName} ${suffix}` : baseRoutine.name;
+              expanded.push({
+                  ...baseRoutine,
+                  name: newName,
+                  assignedDays: [day]
+              });
+          });
+          rawRoutines = expanded;
+      }
+
       // Format exercises properly matching local DB
-      const routines = (jsonPart.routines || []).map((r, i) => {
+      const routines = rawRoutines.map((r, i) => {
           const exercises = (r.exercises || []).map(ex => {
               const matchedEx = exerciseLibrary.find(e => e.name.toLowerCase() === ex.name.toLowerCase()) || exerciseLibrary[0];
               return {
@@ -305,11 +338,15 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
                   ytVideo: matchedEx.ytVideo || ''
               };
           });
+          const assigned = (Array.isArray(r.assignedDays) && r.assignedDays.length > 0)
+              ? r.assignedDays
+              : (finalAnswers.days[i] ? [finalAnswers.days[i]] : []);
           return {
               // Nama hari dibuang dari nama sesi — harinya jadi badge di kartu program.
               name: rapikanNamaSesi(r.name, `Sesi ${i+1}`),
               exercises: exercises,
-              restTime: 90
+              restTime: 90,
+              assignedDays: assigned
           };
       });
 
@@ -544,7 +581,7 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
           <div className="w-10"></div>
           
           <div className="flex-1 text-center">
-            <p className={`text-[14px] ${!isDark ? 'text-black font-medium' : `${t.textMain} font-medium`} mt-2 leading-snug max-w-[280px] mx-auto`}>
+            <p className={`text-sm ${!isDark ? 'text-black font-medium' : `${t.textMain} font-medium`} mt-2 leading-snug max-w-[280px] mx-auto`}>
               Halo, <span className="font-black">Coach Logy</span> di sini. Aku siap bantu kamu menuju badan impian yang sehat dan kuat!
             </p>
           </div>
@@ -651,9 +688,9 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
                           className={`w-full p-4 rounded-xl border-2 font-bold ${answers.dob ? (isValidAge(answers.dob) ? t.borderAccent : 'border-rose-500 text-rose-500') : 'border-transparent'} ${t.inputBg} ${answers.dob && !isValidAge(answers.dob) ? '' : t.textMain}`}
                       />
                       {answers.dob && !isValidAge(answers.dob) ? (
-                          <p className={`text-[11px] mt-2 text-center font-bold text-rose-500 animate-in fade-in slide-in-from-top-1`}>Usia kamu harus di atas 13 tahun untuk menggunakan LOGYM.</p>
+                          <p className={`text-xs mt-2 text-center font-bold text-rose-500 animate-in fade-in slide-in-from-top-1`}>Usia kamu harus di atas 13 tahun untuk menggunakan LOGYM.</p>
                       ) : (
-                          <p className={`text-[10px] mt-1 text-center font-bold ${!isDark ? 'text-black/60' : 'text-slate-400'}`}>Minimal usia 13 tahun.</p>
+                          <p className={`text-xs mt-1 text-center font-bold ${!isDark ? 'text-black/60' : 'text-slate-400'}`}>Minimal usia 13 tahun.</p>
                       )}
                   </div>
                 </div>
@@ -671,7 +708,7 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
                                           onChange={(val) => setAnswers(prev => ({...prev, heightFt: val}))} 
                                           min={3} max={8} step={1} theme={isDark ? 'dark' : 'light'} width="w-full" height={200} t={t}
                                       />
-                                      <span className={`font-bold text-[9px] sm:text-[10px] ${t.textMuted} mt-1`}>ft</span>
+                                      <span className={`font-bold text-xs ${t.textMuted} mt-1`}>ft</span>
                                   </div>
                                   <div className="flex flex-col items-center w-full">
                                       <ScrollPicker 
@@ -679,7 +716,7 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
                                           onChange={(val) => setAnswers(prev => ({...prev, heightIn: val}))} 
                                           min={0} max={11} step={1} theme={isDark ? 'dark' : 'light'} width="w-full" height={200} t={t}
                                       />
-                                      <span className={`font-bold text-[9px] sm:text-[10px] ${t.textMuted} mt-1`}>in</span>
+                                      <span className={`font-bold text-xs ${t.textMuted} mt-1`}>in</span>
                                   </div>
                               </div>
                           ) : (
@@ -737,14 +774,14 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
                       return (
                           <div className={`mt-4 p-3 rounded-2xl ${isDark ? 'bg-white/5 border-white/10' : 'bg-black/5 border-black/10'} border flex justify-between items-center text-sm`}>
                               <div className="flex flex-col">
-                                <span className={`text-[10px] ${!isDark ? 'text-black/60' : 'text-slate-400'}`}>BMI Kamu</span>
+                                <span className={`text-xs font-semibold ${!isDark ? 'text-black/60' : 'text-slate-400'}`}>BMI Kamu</span>
                                 <span className={`font-bold ${!isDark ? 'text-black' : t.textMain}`}>{currentBmi}</span>
                               </div>
                               <div className="flex flex-col items-center px-2">
-                                <span className={`font-bold ${t.textAccent} text-[11px] bg-black/5 dark:bg-white/10 px-2 py-1 rounded-full whitespace-nowrap`}>{insightText}</span>
+                                <span className={`font-bold ${t.textAccent} text-xs bg-black/5 dark:bg-white/10 px-2.5 py-1 rounded-full whitespace-nowrap`}>{insightText}</span>
                               </div>
                               <div className="flex flex-col text-right">
-                                <span className={`text-[10px] ${!isDark ? 'text-black/60' : 'text-slate-400'}`}>Target BMI</span>
+                                <span className={`text-xs font-semibold ${!isDark ? 'text-black/60' : 'text-slate-400'}`}>Target BMI</span>
                                 <span className={`font-bold ${!isDark ? 'text-black' : t.textMain}`}>{targetBmi}</span>
                               </div>
                           </div>
@@ -783,33 +820,6 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
                                                 const arr = prev.injuries || [];
                                                 if (arr.includes(fullCond)) return { ...prev, injuries: arr.filter(c => c !== fullCond) };
                                                 return { ...prev, injuries: [...arr, fullCond] };
-                                            });
-                                        }}
-                                        className={`px-3 py-1.5 rounded-full border text-sm transition-all ${isSelected ? `${t.bgAccent} ${t.borderAccent} text-white` : `${isDark ? 'bg-white/5 border-white/10' : 'bg-black/5 border-black/10'} ${!isDark ? 'text-black/70' : 'text-slate-400'}`}`}>
-                                        {cond}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-                    
-                    <div className="mt-2">
-                        <p className={`text-xs font-medium mb-3 ${!isDark ? 'text-black/60' : 'text-slate-400'}`}>Diagnosis Medis (opsional):</p>
-                        <div className="flex flex-wrap gap-2">
-                            {[
-                                'Asma',
-                                'Hipertensi',
-                                'Diabetes',
-                                'Penyakit Jantung'
-                            ].map(cond => {
-                                const isSelected = (answers.injuries || []).includes(cond);
-                                return (
-                                    <button key={cond}
-                                        onClick={() => {
-                                            setAnswers(prev => {
-                                                const arr = prev.injuries || [];
-                                                if (arr.includes(cond)) return { ...prev, injuries: arr.filter(c => c !== cond) };
-                                                return { ...prev, injuries: [...arr, cond] };
                                             });
                                         }}
                                         className={`px-3 py-1.5 rounded-full border text-sm transition-all ${isSelected ? `${t.bgAccent} ${t.borderAccent} text-white` : `${isDark ? 'bg-white/5 border-white/10' : 'bg-black/5 border-black/10'} ${!isDark ? 'text-black/70' : 'text-slate-400'}`}`}>
@@ -939,22 +949,27 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
                 </p>
 
                 <div className="space-y-2 relative z-10 max-h-[35vh] sm:max-h-[40vh] overflow-y-auto pr-1 pb-2 scrollbar-thin scrollbar-thumb-white/20">
-                  {recommendedPlan.routines.map((routine, idx) => (
-                    <div key={idx} className={`p-3 rounded-2xl bg-black/40 backdrop-blur-md shadow-sm border border-white/10`}>
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="text-left">
-                          <p className={`text-[10px] font-black text-sky-400 uppercase`}>{answers.days[idx] || `Hari ${idx + 1}`}</p>
-                          <p className={`text-sm font-black text-white truncate max-w-[150px] sm:max-w-[200px]`}>{routine.name.replace(/\s*\([^)]*\)/g, '')}</p>
+                  {recommendedPlan.routines.map((routine, idx) => {
+                    const dayLabel = (Array.isArray(routine.assignedDays) && routine.assignedDays.length > 0)
+                      ? routine.assignedDays.join(', ')
+                      : (answers.days[idx] || `Hari ${idx + 1}`);
+                    return (
+                      <div key={idx} className={`p-3 rounded-2xl bg-black/40 backdrop-blur-md shadow-sm border border-white/10`}>
+                        <div className="flex items-center justify-between mb-1.5 gap-2">
+                          <div className="text-left">
+                            <span className="inline-block text-xs font-black text-sky-400 uppercase tracking-wider mb-0.5">{dayLabel}</span>
+                            <p className="text-sm font-black text-white truncate max-w-[180px] sm:max-w-[240px]">{routine.name.replace(/\s*\([^)]*\)/g, '')}</p>
+                          </div>
+                          <div className="text-right whitespace-nowrap">
+                            <span className="text-xs font-bold text-white/80 uppercase bg-white/10 px-2.5 py-1 rounded-xl">{routine.exercises?.length || 0} Gerakan</span>
+                          </div>
                         </div>
-                        <div className="text-right whitespace-nowrap">
-                          <p className={`text-[9px] font-bold text-white/70 uppercase bg-white/10 px-2 py-0.5 rounded-md`}>{routine.exercises?.length || 0} Gerakan</p>
-                        </div>
+                        <p className="text-xs text-white/80 leading-relaxed font-medium">
+                          {routine.exercises?.map(ex => ex.name).join(' • ')}
+                        </p>
                       </div>
-                      <p className={`text-[10px] text-white/70 leading-tight font-medium`}>
-                        {routine.exercises?.map(ex => ex.name).join(' • ')}
-                      </p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
               </div>

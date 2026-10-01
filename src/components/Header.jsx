@@ -23,7 +23,7 @@ const Header = ({ t, theme, user, showSettings, setShowSettings, setShowProfileM
 
   return (
     <header
-      className={`sticky top-0 z-40 ${t?.navBg || 'bg-white'} border-b ${t?.border || 'border-gray-200'} px-4 flex justify-between items-center transition-colors duration-300 relative`}
+      className={`sticky top-0 z-40 ${t?.navBg || 'bg-white'} border-b ${t?.border || 'border-slate-200'} px-4 flex justify-between items-center transition-colors duration-300 relative`}
       style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))', paddingBottom: '0.75rem' }}
     >
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-sky-400/40 to-transparent" />
@@ -58,12 +58,12 @@ const Header = ({ t, theme, user, showSettings, setShowSettings, setShowProfileM
         {user && (
           <button
             onClick={() => { if(playSoundEffect) playSoundEffect('click', soundEnabled); setShowNotifications(true); }}
-            className={`relative flex items-center justify-center w-10 h-10 rounded-full transition-all active:scale-95 ${t?.btnBg || 'bg-gray-100'} ${t?.textMuted || 'text-gray-500'} hover:${t?.textAccent || 'text-sky-400'}`}
+            className={`relative flex items-center justify-center w-10 h-10 rounded-full transition-all active:scale-95 ${t?.btnBg || 'bg-slate-100'} ${t?.textMuted || 'text-slate-500'} hover:${t?.textAccent || 'text-sky-400'}`}
             title="Notifikasi"
           >
             <Bell size={22} strokeWidth={2} />
             {unreadCount > 0 && (
-              <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border border-white">
+              <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center border border-white">
                 {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}
@@ -73,7 +73,7 @@ const Header = ({ t, theme, user, showSettings, setShowSettings, setShowProfileM
         {/* Tombol Settings */}
         <button
           onClick={() => { if(playSoundEffect) playSoundEffect('click', soundEnabled); setShowSettings(true); }}
-          className={`flex items-center justify-center w-10 h-10 rounded-full transition-all active:scale-95 ${t?.btnBg || 'bg-gray-100'} ${t?.textMuted || 'text-gray-500'} hover:${t?.textAccent || 'text-sky-400'}`}
+          className={`flex items-center justify-center w-10 h-10 rounded-full transition-all active:scale-95 ${t?.btnBg || 'bg-slate-100'} ${t?.textMuted || 'text-slate-500'} hover:${t?.textAccent || 'text-sky-400'}`}
           title="Pengaturan Aplikasi"
         >
           <Settings size={22} strokeWidth={2} />
@@ -89,11 +89,11 @@ const Header = ({ t, theme, user, showSettings, setShowSettings, setShowProfileM
                 src={user.photoURL} 
                 alt="Profil" 
                 referrerPolicy="no-referrer"
-                className={`w-10 h-10 rounded-full object-cover border-2 ${t?.border || 'border-gray-200'}`} 
+                className={`w-10 h-10 rounded-full object-cover border-2 ${t?.border || 'border-slate-200'}`} 
               />
           ) : (
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${t?.btnBg || 'bg-gray-100'} border-2 ${t?.border || 'border-gray-200'}`}>
-                  <User size={20} className={t?.textMain || 'text-gray-700'} />
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${t?.btnBg || 'bg-slate-100'} border-2 ${t?.border || 'border-slate-200'}`}>
+                  <User size={20} className={t?.textMain || 'text-slate-700'} />
               </div>
           )}
         </button>

@@ -265,7 +265,7 @@ const AuthPage = ({ t, theme, soundEnabled, onLogin }) => {
 
             <div className="flex items-center mb-6">
                 <div className={`flex-grow border-t border-dashed ${t.border}`}></div>
-                <span className={`px-4 text-[10px] font-black uppercase ${t.textMuted}`}>ATAU EMAIL</span>
+                <span className={`px-4 text-xs font-black uppercase ${t.textMuted}`}>ATAU EMAIL</span>
                 <div className={`flex-grow border-t border-dashed ${t.border}`}></div>
             </div>
 

@@ -84,27 +84,27 @@ export default function BugReportModal({ showModal, setShowModal, user }) {
 
     return (
         <div className="fixed inset-0 z-[1000] flex flex-col bg-black/90 sm:bg-black/60 sm:items-center sm:justify-center animate-in fade-in duration-200 overscroll-contain touch-none">
-            <div className="w-full h-full sm:h-auto sm:max-h-[85vh] sm:max-w-md bg-neutral-900 sm:rounded-3xl shadow-2xl flex flex-col relative overflow-hidden">
+            <div className="w-full h-full sm:h-auto sm:max-h-[85vh] sm:max-w-md bg-slate-900 sm:rounded-3xl shadow-2xl flex flex-col relative overflow-hidden">
                 {/* Header with Safe Area Top Padding */}
                 <div 
                     className="p-4 border-b border-white/10 flex items-center justify-between shrink-0 bg-black/40 backdrop-blur-md relative z-10"
                     style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 24px))' }}
                 >
                     <h2 className="text-xl font-black text-white tracking-tight">Laporkan Bug</h2>
-                    <button onClick={() => setShowModal(false)} className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-neutral-300 transition-colors" data-close-modal="true">
+                    <button onClick={() => setShowModal(false)} className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-slate-300 transition-colors" data-close-modal="true">
                         <X size={20} />
                     </button>
                 </div>
 
                 {/* Body */}
                 <div className="flex-1 overflow-y-auto p-5 space-y-6 relative z-10">
-                    <p className="text-sm text-neutral-400">
+                    <p className="text-sm text-slate-400">
                         Menemukan error, tampilan yang aneh, atau fitur yang tidak berfungsi? 
                         Laporkan kepada kami agar Logym menjadi lebih baik!
                     </p>
 
                     <div className="space-y-2">
-                        <label className="text-sm font-bold text-neutral-300">Deskripsi Masalah</label>
+                        <label className="text-sm font-bold text-slate-300">Deskripsi Masalah</label>
                         <textarea
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
@@ -114,8 +114,8 @@ export default function BugReportModal({ showModal, setShowModal, user }) {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-sm font-bold text-neutral-300 flex justify-between items-center">
-                            <span>Screenshot <span className="text-neutral-500 font-normal">(Opsional)</span></span>
+                        <label className="text-sm font-bold text-slate-300 flex justify-between items-center">
+                            <span>Screenshot <span className="text-slate-500 font-normal">(Opsional)</span></span>
                             {selectedFile && (
                                 <button onClick={() => { setSelectedFile(null); setPreviewUrl(null); }} className="text-rose-400 text-xs hover:underline">
                                     Hapus
@@ -126,11 +126,11 @@ export default function BugReportModal({ showModal, setShowModal, user }) {
                         {!previewUrl ? (
                             <div 
                                 onClick={() => fileInputRef.current?.click()}
-                                className="w-full h-32 border-2 border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center text-neutral-500 hover:text-neutral-300 hover:border-white/30 hover:bg-white/5 transition-colors cursor-pointer"
+                                className="w-full h-32 border-2 border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center text-slate-500 hover:text-slate-300 hover:border-white/30 hover:bg-white/5 transition-colors cursor-pointer"
                             >
                                 <ImageIcon size={24} className="mb-2" />
                                 <span className="text-xs font-medium">Klik untuk upload gambar</span>
-                                <span className="text-[10px] opacity-70 mt-1">Maks. 5MB</span>
+                                <span className="text-xs opacity-70 mt-1">Maks. 5MB</span>
                             </div>
                         ) : (
                             <div className="relative w-full rounded-xl overflow-hidden border border-white/10 bg-black/50 group">

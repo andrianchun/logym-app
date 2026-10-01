@@ -64,7 +64,7 @@ const SortableExerciseItem = ({ ex, prevEx, idx, routineId, t, lang, soundEnable
       {/* Badge menumpuk tepat di garis batas antar kartu — celah yang memang kosong. */}
       {lanjutanSuperset && (
         <div className="absolute -top-[9px] right-3 z-20 pointer-events-none">
-          <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${t.bgAccent} text-white shadow-md`}>
+          <span className={`px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-widest ${t.bgAccent} text-white shadow-md`}>
             Superset
           </span>
         </div>
@@ -77,7 +77,7 @@ const SortableExerciseItem = ({ ex, prevEx, idx, routineId, t, lang, soundEnable
             <span className={`text-base font-bold ${t.textAccent}`}>{idx + 1}.</span>
             <div className="flex-1 min-w-0 flex flex-col items-start mt-0.5">
               <p className={`text-base font-bold ${t.textMain} truncate w-full leading-tight mb-1`}>{ex.name}</p>
-              <p className={`text-[10px] font-bold ${t.textMuted} uppercase tracking-wider truncate w-full leading-snug`}>
+              <p className={`text-xs font-bold ${t.textMuted} uppercase tracking-wider truncate w-full leading-snug`}>
                 {ex.equipment || 'BODYWEIGHT'} &bull; {formatTarget(ex.target, lang?.id)}
               </p>
             </div>
@@ -87,21 +87,21 @@ const SortableExerciseItem = ({ ex, prevEx, idx, routineId, t, lang, soundEnable
           <div className="flex items-center gap-1.5 pl-[22px]">
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5">
-                <span className={`text-[11px] font-bold ${t.textMuted} uppercase`}>Sets</span>
+                <span className={`text-xs font-bold ${t.textMuted} uppercase`}>Sets</span>
                 <div className={`w-12 h-8 rounded-xl ${t.inputBg} ${t.textMain} font-bold text-base focus-within:ring-2 focus-within:${t.ringAccent} transition-all overflow-hidden`}>
                   <input type="number" min="0" value={ex.sets === 0 ? '' : ex.sets} onChange={(e) => handleUpdateExercise(routineId, ex.id, 'sets', parseInt(e.target.value) || 0)} placeholder="0" className="w-full h-full bg-transparent outline-none border-none text-center" />
                 </div>
               </div>
               {isTime ? (
                 <div className="flex items-center gap-1.5">
-                  <span className={`text-[11px] font-bold ${t.textMuted} uppercase`}>Min</span>
+                  <span className={`text-xs font-bold ${t.textMuted} uppercase`}>Min</span>
                   <div className={`w-12 h-8 rounded-xl ${t.inputBg} ${t.textMain} font-bold text-base focus-within:ring-2 focus-within:${t.ringAccent} transition-all overflow-hidden`}>
                     <input type="number" min="0" value={ex.duration === 0 ? '' : ex.duration} onChange={(e) => handleUpdateExercise(routineId, ex.id, 'duration', parseInt(e.target.value) || 0)} placeholder="0" className="w-full h-full bg-transparent outline-none border-none text-center" />
                   </div>
                 </div>
               ) : (
                 <div className="flex items-center gap-1.5">
-                  <span className={`text-[11px] font-bold ${t.textMuted} uppercase`}>Reps</span>
+                  <span className={`text-xs font-bold ${t.textMuted} uppercase`}>Reps</span>
                   <div className={`w-12 h-8 rounded-xl ${t.inputBg} ${t.textMain} font-bold text-base focus-within:ring-2 focus-within:${t.ringAccent} transition-all overflow-hidden`}>
                     <input type="number" min="0" value={ex.reps === 0 ? '' : ex.reps} onChange={(e) => handleUpdateExercise(routineId, ex.id, 'reps', parseInt(e.target.value) || 0)} placeholder="0" className="w-full h-full bg-transparent outline-none border-none text-center" />
                   </div>
@@ -116,7 +116,7 @@ const SortableExerciseItem = ({ ex, prevEx, idx, routineId, t, lang, soundEnable
           <div className="flex gap-1 justify-end">
             <button onClick={() => handleRemoveExercise(routineId, ex.id)} className="p-2 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 transition-colors"><X size={16} /></button>
             {idx > 0 && (
-              <button onClick={() => handleToggleSupersetInline(routineId, idx)} className={`p-2 rounded-xl transition-colors ${isSuperset ? `${t.bgAccentSoft} ${t.textAccent} hover:opacity-80` : 'bg-black/5 dark:bg-white/5 text-gray-400 hover:text-white'}`} title="Gabung Superset dengan latihan di atasnya">
+              <button onClick={() => handleToggleSupersetInline(routineId, idx)} className={`p-2 rounded-xl transition-colors ${isSuperset ? `${t.bgAccentSoft} ${t.textAccent} hover:opacity-80` : 'bg-black/5 dark:bg-white/5 text-slate-400 hover:text-white'}`} title="Gabung Superset dengan latihan di atasnya">
                 <LinkIcon size={16} />
               </button>
             )}
@@ -125,12 +125,12 @@ const SortableExerciseItem = ({ ex, prevEx, idx, routineId, t, lang, soundEnable
             <div 
               {...attributes} 
               {...listeners}
-              className={`cursor-grab active:cursor-grabbing p-2 rounded-xl bg-black/5 dark:bg-white/5 text-gray-400 hover:text-white transition-colors touch-none flex items-center justify-center`} 
+              className={`cursor-grab active:cursor-grabbing p-2 rounded-xl bg-black/5 dark:bg-white/5 text-slate-400 hover:text-white transition-colors touch-none flex items-center justify-center`} 
               title="Tahan dan geser untuk mengurutkan"
             >
               <GripVertical size={16} />
             </div>
-            <button onClick={() => onReplaceClick(ex, routineId)} className={`p-2 rounded-xl transition-colors bg-black/5 dark:bg-white/5 text-gray-400 hover:text-amber-500`} title="Ganti Latihan Alternatif">
+            <button onClick={() => onReplaceClick(ex, routineId)} className={`p-2 rounded-xl transition-colors bg-black/5 dark:bg-white/5 text-slate-400 hover:text-amber-500`} title="Ganti Latihan Alternatif">
               <ArrowLeftRight size={16} />
             </button>
           </div>
@@ -497,12 +497,15 @@ const ProgramTab = ({
   const getEquipmentColor = (eq) => {
     const colors = {
       'Dumbbell': 'bg-blue-500/15 text-blue-600 dark:text-blue-400',
-      'Barbell': 'bg-purple-500/15 text-purple-600 dark:text-purple-400',
-      'Smith Machine': 'bg-orange-500/15 text-orange-600 dark:text-orange-400',
+      'Barbell': 'bg-violet-500/15 text-violet-600 dark:text-violet-400',
+      'Smith Machine': 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
+      'Cable': 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
+      'Machine': 'bg-teal-500/15 text-teal-600 dark:text-teal-400',
       'Cable/Machine': 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
       'Bodyweight': 'bg-pink-500/15 text-pink-600 dark:text-pink-400',
+      'Body Weight': 'bg-pink-500/15 text-pink-600 dark:text-pink-400',
     };
-    return colors[eq] || 'bg-gray-500/15 text-gray-600 dark:text-gray-400';
+    return colors[eq] || 'bg-slate-500/15 text-slate-600 dark:text-slate-400';
   };
 
     const groupedPrograms = programs.reduce((acc, prog) => {
@@ -579,7 +582,7 @@ const ProgramTab = ({
           <div className="flex items-center gap-2 mb-3">
             <h4 className={`font-bold text-sm ${t.textMain}`}>Jadwal Hari</h4>
             {(!routine.assignedDays || routine.assignedDays.length === 0) && (
-                <span className="text-[10px] font-black uppercase text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded-md">Wajib Diisi</span>
+                <span className="text-xs font-black uppercase text-rose-500 bg-rose-500/10 px-2.5 py-1 rounded-lg">Wajib Diisi</span>
             )}
           </div>
           <div className="flex justify-between w-full gap-1 sm:gap-2">
@@ -602,26 +605,41 @@ const ProgramTab = ({
           </div>
         </div>
 
-        <div className="mb-2">
-          <div className="flex items-center justify-between mb-4">
+        <div>
+          <div className="flex items-center justify-between">
             <h4 className={`font-bold text-sm ${t.textMain}`}>Waktu Istirahat Antarset</h4>
-            <div className="w-[120px]">
-                <SwipeInput 
-                    value={routine.restTime || 120} 
-                    onChange={(val) => handleRestTimeChange(routine.id, val)}
-                    className="w-full bg-black/20 text-blue-400 font-black text-center py-2 rounded-xl outline-none border border-transparent focus:border-blue-500/50 transition-colors"
-                    min={0}
-                    max={600}
-                    step={10}
-                    formatValue={(v) => {
-                       if (v >= 60) {
-                           const m = Math.floor(v / 60);
-                           const s = v % 60;
-                           return s > 0 ? `${m}m ${s}s` : `${m}m`;
-                       }
-                       return `${v}s`;
-                    }}
+            <div className="flex items-center gap-1.5">
+              <div className="flex items-center bg-black/20 rounded-xl px-2.5 py-1 border border-white/5 focus-within:border-blue-500/50">
+                <input
+                  type="number"
+                  min="0"
+                  max="15"
+                  value={Math.floor((routine.restTime ?? 120) / 60)}
+                  onChange={(e) => {
+                    const m = Math.max(0, parseInt(e.target.value) || 0);
+                    const s = (routine.restTime ?? 120) % 60;
+                    handleRestTimeChange(routine.id, m * 60 + s);
+                  }}
+                  className="w-8 bg-transparent text-blue-400 font-black text-center text-sm outline-none"
                 />
+                <span className="text-xs font-bold text-slate-400">mnt</span>
+              </div>
+              <div className="flex items-center bg-black/20 rounded-xl px-2.5 py-1 border border-white/5 focus-within:border-blue-500/50">
+                <input
+                  type="number"
+                  min="0"
+                  max="59"
+                  step="5"
+                  value={(routine.restTime ?? 120) % 60}
+                  onChange={(e) => {
+                    const m = Math.floor((routine.restTime ?? 120) / 60);
+                    const s = Math.max(0, Math.min(59, parseInt(e.target.value) || 0));
+                    handleRestTimeChange(routine.id, m * 60 + s);
+                  }}
+                  className="w-8 bg-transparent text-blue-400 font-black text-center text-sm outline-none"
+                />
+                <span className="text-xs font-bold text-slate-400">dtk</span>
+              </div>
             </div>
           </div>
         </div>
@@ -629,10 +647,10 @@ const ProgramTab = ({
         {/* Exercises */}
         <div>
           <div className="flex items-center gap-2 mb-4">
-            <h4 className={`font-bold text-sm ${t.textMain}`}>Latihan ({routine.exercises.length})</h4>
+            <h4 className={`font-bold text-sm ${t.textMain}`}>Latihan ({(routine.exercises || []).length})</h4>
           </div>
 
-          {routine.exercises.length === 0 ? (
+          {(routine.exercises || []).length === 0 ? (
              <button onClick={() => handleAddExercise(routine.id)} className="w-full py-4 mt-2 mb-2 border-2 border-dashed border-white/10 text-blue-400 hover:text-blue-300 hover:bg-blue-400/5 hover:border-blue-400/20 font-bold rounded-[100px] transition-all active:scale-95 flex items-center justify-center gap-2">
                  <Plus size={20} /> Latihan
              </button>
@@ -643,12 +661,12 @@ const ProgramTab = ({
                 collisionDetection={closestCenter}
                 onDragEnd={(e) => handleDragEndDnd(e, routine.id)}
               >
-                <SortableContext items={routine.exercises.map(ex => ex.id)} strategy={verticalListSortingStrategy}>
-                  {routine.exercises.map((ex, idx) => (
+                <SortableContext items={(routine.exercises || []).map(ex => ex.id)} strategy={verticalListSortingStrategy}>
+                  {(routine.exercises || []).map((ex, idx) => (
                     <SortableExerciseItem
                       key={ex.id}
                       ex={ex}
-                      prevEx={idx > 0 ? routine.exercises[idx - 1] : null}
+                      prevEx={idx > 0 ? (routine.exercises || [])[idx - 1] : null}
                       idx={idx}
                       routineId={routine.id}
                       t={t}
@@ -669,7 +687,7 @@ const ProgramTab = ({
             </div>
           )}
 
-          {routine.exercises.length > 0 && (
+          {(routine.exercises || []).length > 0 && (
             <div className="flex gap-2 mt-3">
               <button onClick={() => handleAddExercise(routine.id)} className={`flex-1 py-3 border-2 border-dashed ${t.borderAccentSoft} hover:${t.borderAccent} hover:${t.bgAccentSoft} rounded-full ${t.textAccent} font-bold text-sm flex justify-center items-center transition-all duration-200 active:scale-[0.98]`}>
                 <Plus size={16} className="mr-1.5" /> Latihan
@@ -714,24 +732,26 @@ const ProgramTab = ({
         {/* Split Header (Left empty, Right glassmorphism) */}
         <div className="flex-none flex flex-row relative z-10 w-full min-h-[350px]">
           
-          {/* HEADER BACKGROUND IMAGE (Restricted to header) */}
+          {/* HEADER BACKGROUND IMAGE (Restricted to header, masked to left hero area) */}
           <div className="absolute inset-0 z-0 pointer-events-none">
-            {/* Base Layer for Glassmorphism */}
+            {/* Base Layer for Glassmorphism - Masked to left side to prevent bleeding behind text */}
             <div 
-              className={`absolute inset-0 opacity-60`}
+              className={`absolute inset-0 opacity-40`}
               style={{
                 backgroundImage: `url('${bgConfig.url}')`,
                 backgroundSize: bgConfig.bgSize || 'cover',
                 backgroundPosition: bgConfig.position || 'center',
                 backgroundRepeat: 'no-repeat',
+                WebkitMaskImage: 'linear-gradient(to right, black 35%, transparent 65%)',
+                maskImage: 'linear-gradient(to right, black 35%, transparent 65%)'
               }}
             />
             {/* Focal Layer for Left Panel */}
             <div 
               className={`absolute top-0 -bottom-12 left-0 w-[55%] opacity-100`}
               style={{
-                WebkitMaskImage: 'linear-gradient(to right, black 80%, transparent 100%)',
-                maskImage: 'linear-gradient(to right, black 80%, transparent 100%)'
+                WebkitMaskImage: 'linear-gradient(to right, black 75%, transparent 100%)',
+                maskImage: 'linear-gradient(to right, black 75%, transparent 100%)'
               }}
             >
               <div 
@@ -753,8 +773,8 @@ const ProgramTab = ({
              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-[#05070d]/70 z-10" />
           </div>
           
-          {/* Right Side: Content */}
-          <div className="w-[55%] flex flex-col p-4 sm:p-5 border-l bg-black/80 border-white/10 shadow-[-10px_0_30px_rgba(0,0,0,0.3)]">
+          {/* Right Side: Content with solid contrast surface */}
+          <div className="w-[55%] flex flex-col p-4 sm:p-5 border-l bg-[#090e1a]/95 backdrop-blur-2xl border-white/10 shadow-[-12px_0_30px_rgba(0,0,0,0.5)]">
             
             {/* PLAN HEADER */}
             <div className="flex items-start justify-between gap-2 mb-3">
@@ -777,7 +797,7 @@ const ProgramTab = ({
                 </div>
                 <div className="flex flex-wrap gap-1.5 items-center mt-1">
                   {activityTargets?.nutritionGoal && activityTargets.nutritionGoal !== 'custom' && group.planGoal && group.planGoal !== 'maintenance' && group.planGoal !== activityTargets.nutritionGoal && (
-                    <div className="flex items-center gap-1.5 bg-rose-500/20 text-rose-200 border border-rose-500/30 px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wide backdrop-blur-md">
+                    <div className="flex items-center gap-1.5 bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wide backdrop-blur-md">
                       ⚠️ {group.planGoal.replace('_', ' ')}
                     </div>
                   )}
@@ -790,7 +810,7 @@ const ProgramTab = ({
 
                     if (isAiPlan) {
                       return (
-                        <span className="px-2 py-0.5 text-[9px] font-black uppercase rounded-md bg-blue-500/30 text-blue-100 backdrop-blur-md border border-blue-400/40 shadow-sm shadow-blue-500/20">
+                        <span className="px-2.5 py-1 text-xs font-black uppercase rounded-lg bg-blue-500/25 text-sky-300 backdrop-blur-md border border-blue-400/30 shadow-sm shadow-blue-500/20">
                           Coach Logy
                         </span>
                       );
@@ -812,7 +832,7 @@ const ProgramTab = ({
                               userPhoto: authorUserPhoto
                             });
                           }}
-                          className="px-2.5 py-0.5 text-[10px] font-bold rounded-lg bg-sky-500/20 text-sky-300 border border-sky-400/30 backdrop-blur-md hover:bg-sky-500/30 hover:scale-105 active:scale-95 transition-all cursor-pointer inline-flex items-center gap-1 shadow-sm"
+                          className="px-2.5 py-1 text-xs font-bold rounded-lg bg-sky-500/20 text-sky-300 border border-sky-400/30 backdrop-blur-md hover:bg-sky-500/30 hover:scale-105 active:scale-95 transition-all cursor-pointer inline-flex items-center gap-1 shadow-sm"
                           title={`Lihat profil @${cleanUser.toLowerCase()}`}
                         >
                           @{cleanUser.toLowerCase()}
@@ -820,7 +840,7 @@ const ProgramTab = ({
                       );
                     } else if (isCustomPlan) {
                       return (
-                        <span className="px-2 py-0.5 text-[9px] font-black uppercase rounded-md bg-white/10 text-white/70 backdrop-blur-md border border-white/15">
+                        <span className="px-2.5 py-1 text-xs font-bold uppercase rounded-lg bg-white/10 text-white backdrop-blur-md border border-white/15">
                           Custom
                         </span>
                       );
@@ -834,7 +854,7 @@ const ProgramTab = ({
 
             {/* SCHEDULE LIST — badge hari + chevron buka/tutup rincian set x reps x kg. */}
             <div className="flex-1 overflow-y-auto mb-3 border-t border-white/10 pt-3">
-                 <div className="flex flex-col gap-1.5">
+                 <div className="flex flex-col gap-2">
                      {group.routines.map(r => {
                          const isOpen = openRoutineId === r.id;
                          const hari = (r.assignedDays || []);
@@ -843,37 +863,29 @@ const ProgramTab = ({
                              <button
                                 type="button"
                                 onClick={(e) => { e.stopPropagation(); playSoundEffect('click', soundEnabled); setOpenRoutineId(prev => (prev === r.id ? null : r.id)); }}
-                                className="flex items-start gap-1.5 text-left w-full active:opacity-70 transition-opacity"
+                                className="flex items-start gap-2 text-left w-full active:opacity-75 transition-opacity py-0.5"
                              >
-                                 <ChevronRight size={12} className={`shrink-0 mt-0.5 text-white/60 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`} />
+                                 <ChevronRight size={14} className={`shrink-0 text-sky-400 transition-transform duration-200 mt-0.5 ${isOpen ? 'rotate-90' : ''}`} />
                                  {hari.length > 0 && (
-                                     <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-white/15 border border-white/10 text-[8px] font-black uppercase tracking-wide text-white/80 leading-none mt-[1px]">
+                                     <span className="shrink-0 px-2 py-0.5 rounded-md bg-sky-500/20 border border-sky-400/30 text-xs font-black uppercase tracking-wide text-sky-300 leading-none">
                                          {hari.join('/')}
                                      </span>
                                  )}
-                                 <span className="text-[11px] font-bold text-white/90 drop-shadow-sm leading-tight line-clamp-2 flex-1">{r.name}</span>
+                                 <span className="text-xs font-bold text-white drop-shadow-sm leading-snug break-words flex-1">{r.name}</span>
                              </button>
                              {isOpen && (
-                                 <div className="pl-[18px] pt-1 pb-1.5 flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
+                                 <div className="pl-3.5 pt-1.5 pb-2 flex flex-col gap-1.5 border-l-2 border-sky-500/30 ml-1.5 mt-1" onClick={(e) => e.stopPropagation()}>
                                      {(r.exercises || []).length === 0 && (
-                                         <span className="text-[9px] text-white/40 font-bold">Belum ada latihan</span>
+                                         <span className="text-xs text-slate-400 italic">Belum ada latihan</span>
                                      )}
-                                     {(r.exercises || []).map(ex => {
-                                         const libEx = exerciseLibrary?.find(e => e.id === ex.id || e.name?.toLowerCase() === ex.name?.toLowerCase());
-                                         const activeGym = activeGymId || gymProfiles?.[0]?.id;
-                                         const eqConf = getEquipmentConfig(gymProfiles, activeGym, ex || libEx, userProfile);
-                                         const step = gymStepFor(gymProfiles, activeGym, ex.equipment || libEx?.equipment);
-                                         const kg = (ex.type || libEx?.type) === 'time' ? 0 : defaultSetWeight(libEx, ex, step, eqConf);
-                                         const takaran = (ex.type || libEx?.type) === 'time'
-                                             ? `${ex.sets || 1} × ${ex.duration || 0} mnt`
-                                             : `${ex.sets || 0} × ${ex.reps || 0}${kg > 0 ? ` × ${kg} kg` : ''}`;
-                                         return (
-                                             <div key={ex.id} className="flex items-start justify-between gap-2">
-                                                 <span className="text-[9.5px] text-white/70 font-semibold leading-tight line-clamp-1 flex-1">{ex.name}</span>
-                                                 <span className="text-[9.5px] text-white/90 font-black shrink-0 tabular-nums">{takaran}</span>
-                                             </div>
-                                         );
-                                     })}
+                                     {(r.exercises || []).map((ex, exIdx) => (
+                                         <div key={ex.id || exIdx} className="flex items-start gap-2 py-0.5">
+                                             <span className="w-1.5 h-1.5 rounded-full bg-sky-400 shrink-0 mt-1.5" />
+                                             <span className="text-xs text-slate-200 font-semibold leading-tight break-words flex-1" title={ex.name}>
+                                                 {ex.name}
+                                             </span>
+                                         </div>
+                                     ))}
                                  </div>
                              )}
                          </div>
@@ -931,10 +943,10 @@ const ProgramTab = ({
   return (
     <div className="flex flex-col pb-6 max-w-4xl mx-auto w-full space-y-3 sm:space-y-4">
       {editingPlanId && groupedPrograms[editingPlanId] && (
-        <div className="fixed inset-0 z-[100] bg-neutral-950 overflow-y-auto overflow-x-hidden flex flex-col animate-in slide-in-from-bottom-10 fade-in duration-300 w-full h-full pb-20 no-swipe overscroll-contain touch-pan-y">
+        <div className="fixed inset-0 z-[100] bg-slate-950 overflow-y-auto overflow-x-hidden flex flex-col animate-in slide-in-from-bottom-10 fade-in duration-300 w-full h-full pb-20 no-swipe overscroll-contain touch-pan-y">
             {/* DEDICATED VIEW HEADER */}
             <div 
-              className="sticky top-0 bg-neutral-950/90 backdrop-blur-xl z-[60] border-b border-white/5 shadow-2xl"
+              className="sticky top-0 bg-slate-950/90 backdrop-blur-xl z-[60] border-b border-white/5 shadow-2xl"
               style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 24px))' }}
             >
                 <div className="flex items-center justify-between px-4 py-3 max-w-4xl mx-auto w-full gap-3">
@@ -949,7 +961,7 @@ const ProgramTab = ({
                         }
                         closeEditAndScrollToPlan(editingPlanId);
                       }}
-                      className="p-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-neutral-300 hover:text-white transition-all active:scale-95 flex items-center justify-center shrink-0"
+                      className="p-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-all active:scale-95 flex items-center justify-center shrink-0"
                       title="Tutup / Batal"
                     >
                       <X size={20} />
@@ -978,34 +990,46 @@ const ProgramTab = ({
             {/* ROUTINES LIST */}
             <div className="px-4 py-6 flex flex-col gap-6 max-w-4xl mx-auto w-full">
                 {groupedPrograms[editingPlanId].routines.map((routine) => {
-                    const estDuration = Math.round(routine.exercises.reduce((acc, ex) => acc + (parseInt(ex.sets) || 3), 0) * (45 + (parseInt(routine.restTime) || 90)) / 60);
+                    const estDuration = Math.round((routine.exercises || []).reduce((acc, ex) => acc + (parseInt(ex.sets) || 3), 0) * (45 + (parseInt(routine.restTime) || 90)) / 60);
                     return (
-                        <div id={`routine-${routine.id}`} key={routine.id} className="bg-neutral-900 border border-white/5 rounded-3xl overflow-hidden shadow-xl">
-                            <div className="p-5 border-b border-white/5 bg-black/20 flex flex-col gap-3">
-                                <div className="flex items-start justify-between gap-3">
-                                    <div className="flex-1 min-w-0">
-                                        <input
-                                            type="text"
-                                            value={routine.name}
-                                            onChange={(e) => handleRenameRoutine(routine.id, e.target.value)}
-                                            className="w-full bg-transparent font-black text-xl text-white outline-none focus:border-blue-500/50 border-b-2 border-transparent transition-colors pb-1"
-                                            placeholder="Nama Rutinitas..."
-                                            maxLength={25}
-                                        />
-                                        <p className="text-xs text-neutral-400 mt-1">
-                                            {routine.assignedDays && routine.assignedDays.length > 0 && (
-                                                <span className="font-bold text-blue-400 uppercase">{routine.assignedDays.join(', ')} &bull; </span>
-                                            )}
-                                            {routine.exercises.length} Latihan &bull; ~{estDuration} mnt
-                                        </p>
-                                    </div>
+                        <div id={`routine-${routine.id}`} key={routine.id} className="bg-slate-900 border border-white/5 rounded-3xl overflow-hidden shadow-xl">
+                            <div className="p-5 border-b border-white/5 bg-black/20 flex flex-col gap-2.5">
+                                {/* Row 1: Routine Name Input + Action Buttons */}
+                                <div className="flex items-center justify-between gap-3">
+                                    <input
+                                        type="text"
+                                        value={routine.name}
+                                        onChange={(e) => handleRenameRoutine(routine.id, e.target.value)}
+                                        className="flex-1 min-w-0 bg-transparent font-black text-xl text-white outline-none focus:border-blue-500/50 border-b-2 border-transparent transition-colors pb-1"
+                                        placeholder="Nama Rutinitas..."
+                                        maxLength={25}
+                                    />
                                     <div className="flex items-center gap-1 shrink-0">
-                                        <button onClick={() => handleDuplicateRoutine(routine)} className="p-2 rounded-xl text-neutral-400 hover:text-white hover:bg-white/10 transition-colors"><Copy size={18} /></button>
-                                        <button onClick={() => handleDeleteRoutine(routine.id, routine.name)} className="p-2 rounded-xl text-rose-500/70 hover:text-rose-500 hover:bg-rose-500/20 transition-colors"><X size={20} /></button>
-                                        <button onClick={() => handleToggleRoutineAccordion(routine.id)} className={`p-2 rounded-xl transition-colors ${expandedRoutineId === routine.id ? 'text-blue-400' : 'text-neutral-400'} hover:bg-white/10`}>
+                                        <button onClick={() => handleDuplicateRoutine(routine)} className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors" title="Duplikasi Rutinitas"><Copy size={18} /></button>
+                                        <button onClick={() => handleDeleteRoutine(routine.id, routine.name)} className="p-2 rounded-xl text-rose-500/70 hover:text-rose-500 hover:bg-rose-500/20 transition-colors" title="Hapus Rutinitas"><X size={20} /></button>
+                                        <button onClick={() => handleToggleRoutineAccordion(routine.id)} className={`p-2 rounded-xl transition-colors ${expandedRoutineId === routine.id ? 'text-blue-400' : 'text-slate-400'} hover:bg-white/10`} title="Buka/Tutup Rutinitas">
                                             {expandedRoutineId === routine.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                                         </button>
                                     </div>
+                                </div>
+
+                                {/* Row 2: Metadata Info (Full Width) */}
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-400 w-full">
+                                    {routine.assignedDays && routine.assignedDays.length > 0 && (
+                                        <>
+                                            <span className="font-bold text-sky-400 uppercase tracking-wide">
+                                                {routine.assignedDays.join(', ')}
+                                            </span>
+                                            <span className="text-slate-500">&bull;</span>
+                                        </>
+                                    )}
+                                    <span className="font-medium text-slate-300">
+                                        {(routine.exercises || []).length} Latihan
+                                    </span>
+                                    <span className="text-slate-500">&bull;</span>
+                                    <span className="font-medium text-slate-300">
+                                        ~{estDuration} mnt
+                                    </span>
                                 </div>
                             </div>
                             
@@ -1028,7 +1052,7 @@ const ProgramTab = ({
                 )}
                 
                 {groupedPrograms[editingPlanId].routines.length === 0 && (
-                    <div className="flex flex-col items-center justify-center p-10 border-2 border-dashed border-white/10 rounded-3xl text-neutral-500">
+                    <div className="flex flex-col items-center justify-center p-10 border-2 border-dashed border-white/10 rounded-3xl text-slate-500">
                         <Dumbbell size={32} className="mb-3 opacity-50" />
                         <p className="text-sm font-medium">Belum ada rutinitas di program ini.</p>
                         <button 
@@ -1042,7 +1066,7 @@ const ProgramTab = ({
             </div>
 
             {/* FIXED FOOTER FOR DEDICATED VIEW */}
-            <div className="fixed bottom-0 left-0 right-0 p-4 bg-neutral-950/90 backdrop-blur-md border-t border-white/5 z-[60] flex gap-3 pb-8 md:pb-4 justify-center">
+            <div className="fixed bottom-0 left-0 right-0 p-4 bg-slate-950/90 backdrop-blur-md border-t border-white/5 z-[60] flex gap-3 pb-8 md:pb-4 justify-center">
                 <div className="w-full max-w-4xl flex gap-3">
                     <button 
                         onClick={() => {
@@ -1054,14 +1078,14 @@ const ProgramTab = ({
                           }
                           closeEditAndScrollToPlan(editingPlanId);
                         }}
-                        className="flex-1 py-3.5 rounded-2xl font-bold bg-neutral-800 hover:bg-neutral-700 text-white transition-colors"
+                        className="flex-1 py-3.5 rounded-2xl font-bold bg-slate-800 hover:bg-slate-700 text-white transition-colors"
                     >
                         Batal
                     </button>
                     <button 
                         onClick={() => {
                             const invalidRoutine = groupedPrograms[editingPlanId].routines.find(r => !r.assignedDays || r.assignedDays.length === 0);
-                            const emptyRoutine = groupedPrograms[editingPlanId].routines.find(r => r.exercises.length === 0);
+                            const emptyRoutine = groupedPrograms[editingPlanId].routines.find(r => (r.exercises || []).length === 0);
                             
                             if (invalidRoutine) {
                                 showAlert(`Rutinitas "${invalidRoutine.name}" belum memiliki jadwal hari. Silakan pilih minimal 1 hari.`, { type: 'error' });

@@ -485,7 +485,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
                 {post.userName}
               </button>
               {post.sourceApp && (
-                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                <span className={`px-2 py-0.5 rounded-full text-xs font-black uppercase tracking-wider ${
                   String(post.sourceApp).toLowerCase() === 'lomeal'
                     ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                     : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
@@ -494,10 +494,10 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
                 </span>
               )}
             </div>
-            <div className={`flex items-center gap-1.5 text-[11px] font-medium ${t.textMuted}`}>
+            <div className={`flex items-center gap-1.5 text-xs font-medium ${t.textMuted}`}>
               <span>{formatTimeAgo(post.timestamp)}</span>
               {post.editedAt && (
-                <span className="text-[10px] text-zinc-400 font-medium italic">(Diedit)</span>
+                <span className="text-xs text-slate-400 font-medium italic">(Diedit)</span>
               )}
               {post.type === 'repost' && (
                 <>
@@ -557,7 +557,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
                         <Edit3 size={16} /> Edit
                       </button>
                     ) : (
-                      <div className="px-4 py-2 text-[11px] font-medium text-zinc-500 border-b border-white/5 flex items-center gap-1.5">
+                      <div className="px-4 py-2 text-xs font-medium text-slate-500 border-b border-white/5 flex items-center gap-1.5">
                         <Clock size={12} /> Batas edit (30 mnt) lewat
                       </div>
                     )}
@@ -618,7 +618,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
                       {post.originalText && <p className={`text-xs text-white/80 leading-relaxed`}>{post.originalText}</p>}
                       
                       {post.originalType === 'template' && (
-                        <div className={`mt-2 p-2 rounded-xl text-[11px] font-bold bg-black/40 text-white flex items-center gap-2`}>
+                        <div className={`mt-2 p-2 rounded-xl text-xs font-bold bg-black/40 text-white flex items-center gap-2`}>
                            <div className={`w-6 h-6 rounded-lg flex items-center justify-center bg-white/20`}>
                              <ClipboardList size={14} className="text-white" />
                            </div>
@@ -626,7 +626,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
                         </div>
                       )}
                       {(post.originalType === 'workout_log' || !post.originalType) && !post.originalImageUrls?.length && !post.originalText && (
-                        <div className={`mt-2 p-2 rounded-xl text-[11px] font-bold bg-black/40 text-white flex items-center gap-2`}>
+                        <div className={`mt-2 p-2 rounded-xl text-xs font-bold bg-black/40 text-white flex items-center gap-2`}>
                            <div className={`w-6 h-6 rounded-lg flex items-center justify-center bg-amber-500/20`}>
                              <Flame size={14} className="text-amber-500" />
                            </div>
@@ -634,7 +634,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
                         </div>
                       )}
                       {post.originalType === 'achievement' && (
-                        <div className={`mt-2 p-2 rounded-xl text-[11px] font-bold bg-amber-900/40 text-amber-400 flex items-center gap-2 border border-amber-500/20`}>
+                        <div className={`mt-2 p-2 rounded-xl text-xs font-bold bg-amber-900/40 text-amber-400 flex items-center gap-2 border border-amber-500/20`}>
                            <div className={`w-6 h-6 rounded-lg flex items-center justify-center bg-amber-500/30`}>
                              <Award size={14} className="text-amber-400" />
                            </div>
@@ -652,7 +652,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
                     {post.originalText && <p className={`text-xs ${t.textMuted} leading-relaxed`}>{post.originalText}</p>}
                     
                     {post.originalType === 'template' && (
-                      <div className={`mt-2 p-2 rounded-xl text-[11px] font-bold ${isDark ? 'bg-black/20 text-white' : 'bg-slate-100 text-black'} flex items-center gap-2`}>
+                      <div className={`mt-2 p-2 rounded-xl text-xs font-bold ${isDark ? 'bg-black/20 text-white' : 'bg-slate-100 text-black'} flex items-center gap-2`}>
                          <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${isDark ? 'bg-white/10' : 'bg-black/5'}`}>
                            <ClipboardList size={14} className={t.textMain} />
                          </div>
@@ -660,7 +660,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
                       </div>
                     )}
                     {(post.originalType === 'workout_log' || !post.originalType) && !post.originalImageUrls?.length && !post.originalText && (
-                      <div className={`mt-2 p-2 rounded-xl text-[11px] font-bold ${isDark ? 'bg-black/20 text-white' : 'bg-slate-100 text-black'} flex items-center gap-2`}>
+                      <div className={`mt-2 p-2 rounded-xl text-xs font-bold ${isDark ? 'bg-black/20 text-white' : 'bg-slate-100 text-black'} flex items-center gap-2`}>
                          <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${isDark ? 'bg-amber-500/20' : 'bg-amber-100'}`}>
                            <Flame size={14} className="text-amber-500" />
                          </div>
@@ -668,7 +668,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
                       </div>
                     )}
                     {post.originalType === 'achievement' && (
-                      <div className={`mt-2 p-2 rounded-xl text-[11px] font-bold ${isDark ? 'bg-amber-900/20 text-amber-500' : 'bg-amber-50 text-amber-600'} flex items-center gap-2`}>
+                      <div className={`mt-2 p-2 rounded-xl text-xs font-bold ${isDark ? 'bg-amber-900/20 text-amber-500' : 'bg-amber-50 text-amber-600'} flex items-center gap-2`}>
                          <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${isDark ? 'bg-amber-500/20' : 'bg-amber-100'}`}>
                            <Award size={14} className="text-amber-500" />
                          </div>
@@ -831,7 +831,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
             {post.type === 'achievement' && (
               <div className={`p-4 rounded-2xl ${isDark ? 'bg-amber-900/10' : 'bg-amber-50'} border ${isDark ? 'border-amber-500/10' : 'border-amber-500/20'} mb-3 flex items-center justify-between`}>
                 <div>
-                  <div className={`text-[10px] font-bold ${isDark ? 'text-amber-500' : 'text-amber-600'} uppercase tracking-wider mb-1 flex items-center gap-1`}>
+                  <div className={`text-xs font-bold ${isDark ? 'text-amber-500' : 'text-amber-600'} uppercase tracking-wider mb-1 flex items-center gap-1`}>
                     <Award size={12} />
                     Lencana Terbuka
                   </div>
@@ -850,7 +850,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
           {/* Like */}
           <button
             onClick={() => handleLike(post)}
-            className={`flex items-center gap-1.5 px-2 py-1.5 rounded-xl text-[11px] font-bold transition-all active:scale-90 ${
+            className={`flex items-center gap-1.5 px-2 py-1.5 rounded-xl text-xs font-bold transition-all active:scale-90 ${
               liked ? 'text-rose-500 bg-rose-500/10' : `${t.textMuted} hover:bg-rose-500/10 hover:text-rose-500`
             }`}
           >
@@ -860,7 +860,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
           {/* Comment */}
           <button
             onClick={() => handleExpandComments(post.id)}
-            className={`flex items-center gap-1.5 px-2 py-1.5 rounded-xl text-[11px] font-bold transition-all ${commentsOpen ? `${t.textAccent} ${t.bgAccentSoft}` : `${t.textMuted} hover:${t.bgAccentSoft} hover:${t.textAccent}`}`}
+            className={`flex items-center gap-1.5 px-2 py-1.5 rounded-xl text-xs font-bold transition-all ${commentsOpen ? `${t.textAccent} ${t.bgAccentSoft}` : `${t.textMuted} hover:${t.bgAccentSoft} hover:${t.textAccent}`}`}
           >
             <MessageCircle size={13} /> {post.commentCount || 0}
           </button>
@@ -868,7 +868,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
           {/* Repost */}
           <button
             onClick={() => handleRepost(post)}
-            className={`flex items-center gap-1.5 px-2 py-1.5 rounded-xl text-[11px] font-bold ${t.textMuted} hover:bg-green-500/10 hover:text-green-500 transition-all`}
+            className={`flex items-center gap-1.5 px-2 py-1.5 rounded-xl text-xs font-bold ${t.textMuted} hover:bg-green-500/10 hover:text-green-500 transition-all`}
             title="Repost"
           >
             <RefreshCw size={13} />
@@ -877,7 +877,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
           {/* Native share */}
           <button
             onClick={() => handleNativeShare(post)}
-            className={`flex items-center gap-1.5 px-2 py-1.5 rounded-xl text-[11px] font-bold ${t.textMuted} hover:bg-purple-500/10 hover:text-purple-500 transition-all`}
+            className={`flex items-center gap-1.5 px-2 py-1.5 rounded-xl text-xs font-bold ${t.textMuted} hover:bg-violet-500/10 hover:text-violet-500 transition-all`}
             title="Bagikan"
           >
             <Share2 size={13} />
@@ -909,7 +909,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
                     }}
                   />
                 ) : null}
-                <div className={`w-6 h-6 rounded-full shrink-0 mt-0.5 flex items-center justify-center text-[9px] font-black ${isDark ? 'bg-white/10 text-white/60' : 'bg-black/8 text-black/50'} ${c.userPhoto ? 'hidden' : ''}`}>
+                <div className={`w-6 h-6 rounded-full shrink-0 mt-0.5 flex items-center justify-center text-xs font-black ${isDark ? 'bg-white/10 text-white/60' : 'bg-black/8 text-black/50'} ${c.userPhoto ? 'hidden' : ''}`}>
                   {(c.userName || '?').charAt(0).toUpperCase()}
                 </div>
                 <div className={`flex-1 px-3 py-2 rounded-2xl rounded-tl-sm text-xs ${isDark ? 'bg-white/5' : 'bg-black/5'}`}>
@@ -940,7 +940,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
                   }}
                 />
               ) : null}
-              <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black ${t.bgAccentSoft} ${t.textAccent} ${user?.photoURL ? 'hidden' : ''}`}>
+              <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-xs font-black ${t.bgAccentSoft} ${t.textAccent} ${user?.photoURL ? 'hidden' : ''}`}>
                 {(user?.email || '?').charAt(0).toUpperCase()}
               </div>
               <div className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-2xl border ${isDark ? 'bg-white/5 border-white/10' : 'bg-black/4 border-black/8'}`}>
@@ -1029,7 +1029,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className={`text-xs font-bold ${t.textMain} truncate`}>{u.name}</div>
-                      <div className={`text-[10px] ${t.textMuted}`}>Level {u.level || 1} • {u.totalWorkouts || 0} Sesi</div>
+                      <div className={`text-xs ${t.textMuted}`}>Level {u.level || 1} • {u.totalWorkouts || 0} Sesi</div>
                     </div>
                   </div>
                 ))
@@ -1043,10 +1043,10 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
           <div className={`p-4 rounded-3xl ${isDark ? 'bg-gradient-to-b from-blue-950/20 to-slate-900/30' : 'bg-gradient-to-b from-blue-50/50 to-white'} border ${isDark ? 'border-blue-500/10' : 'border-blue-100'} shadow-sm`}>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <Trophy size={18} className="text-yellow-500" />
+                <Trophy size={18} className="text-amber-500" />
                 <span className={`text-xs font-black uppercase tracking-wider ${t.textMain}`}>Top Atlet Minggu Ini</span>
               </div>
-              <span className={`text-[10px] font-bold ${t.textMuted}`}>Reset Senin</span>
+              <span className={`text-xs font-bold ${t.textMuted}`}>Reset Senin</span>
             </div>
             <div 
               className="flex items-center gap-3 overflow-x-auto hide-scrollbar pt-2 pb-1 no-swipe"
@@ -1073,7 +1073,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
                           crossOrigin="anonymous"
                           decoding="async"
                           loading="lazy"
-                          className={`w-[72px] h-[72px] rounded-[24px] object-cover border-[3px] ${idx === 0 ? 'border-yellow-400' : idx === 1 ? 'border-slate-300' : idx === 2 ? 'border-amber-600' : 'border-blue-400'} shadow-md`}
+                          className={`w-[72px] h-[72px] rounded-[24px] object-cover border-[3px] ${idx === 0 ? 'border-amber-400' : idx === 1 ? 'border-slate-300' : idx === 2 ? 'border-amber-600' : 'border-blue-400'} shadow-md`}
                           onError={(e) => {
                             e.currentTarget.style.display = 'none';
                             if (e.currentTarget.nextElementSibling) {
@@ -1082,14 +1082,14 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
                           }}
                         />
                       ) : null}
-                      <div className={`w-[72px] h-[72px] rounded-[24px] bg-blue-50 text-blue-500 flex items-center justify-center font-black text-3xl border-[3px] ${idx === 0 ? 'border-yellow-400' : idx === 1 ? 'border-slate-300' : idx === 2 ? 'border-amber-600' : 'border-blue-400'} shadow-md ${lbUser.photoUrl ? 'hidden' : ''}`}>
+                      <div className={`w-[72px] h-[72px] rounded-[24px] bg-blue-50 text-blue-500 flex items-center justify-center font-black text-3xl border-[3px] ${idx === 0 ? 'border-amber-400' : idx === 1 ? 'border-slate-300' : idx === 2 ? 'border-amber-600' : 'border-blue-400'} shadow-md ${lbUser.photoUrl ? 'hidden' : ''}`}>
                         {(lbUser.name || '?').charAt(0).toUpperCase()}
                       </div>
-                      <div className={`absolute -bottom-2.5 left-1/2 -translate-x-1/2 px-2.5 py-0.5 ${idx === 0 ? 'bg-yellow-400 text-yellow-900' : idx === 1 ? 'bg-slate-300 text-slate-800' : idx === 2 ? 'bg-amber-600 text-amber-50' : 'bg-blue-500 text-white'} rounded-full flex items-center justify-center text-[11px] font-black border-2 ${isDark ? 'border-slate-900' : 'border-white'} shadow-sm`}>
+                      <div className={`absolute -bottom-2.5 left-1/2 -translate-x-1/2 px-2.5 py-0.5 ${idx === 0 ? 'bg-amber-400 text-amber-900' : idx === 1 ? 'bg-slate-300 text-slate-800' : idx === 2 ? 'bg-amber-600 text-amber-50' : 'bg-blue-500 text-white'} rounded-full flex items-center justify-center text-xs font-black border-2 ${isDark ? 'border-slate-900' : 'border-white'} shadow-sm`}>
                         #{idx + 1}
                       </div>
                     </div>
-                    <span className={`text-[11px] font-bold max-w-[68px] truncate mt-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                    <span className={`text-xs font-bold max-w-[68px] truncate mt-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
                       {lbUser.name}
                     </span>
                   </button>
@@ -1199,7 +1199,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
                   placeholder="Tulis caption atau cerita postinganmu..."
                   className={`w-full min-h-[120px] p-3 rounded-2xl resize-none outline-none text-base border ${isDark ? 'bg-white/5 border-white/10 text-white placeholder-white/40' : 'bg-black/5 border-black/10 text-black placeholder-black/40'}`}
                 />
-                <div className={`text-right text-[11px] font-bold mt-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>
+                <div className={`text-right text-xs font-bold mt-1 ${isDark ? 'text-white/40' : 'text-black/40'}`}>
                   {(editingPost.text || '').length}/500
                 </div>
               </div>
@@ -1269,7 +1269,7 @@ const CommunityTab = ({ t, theme, user, programs, setPrograms, soundEnabled, pla
                       return (
                         <div key={`file-${i}`} className="relative aspect-square rounded-2xl overflow-hidden border border-sky-500/40 group">
                           <img src={previewUrl} alt={`new-${i}`} className="w-full h-full object-cover" />
-                          <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-sky-500/80 text-[8px] font-black text-white uppercase">
+                          <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-sky-500/80 text-xs font-black text-white uppercase">
                             Baru
                           </span>
                           <button

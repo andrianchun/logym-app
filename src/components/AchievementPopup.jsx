@@ -74,7 +74,7 @@ const AchievementPopup = ({ achievements, onClose, soundEnabled, playSoundEffect
         )}
 
         <div className="p-8 flex flex-col items-center text-center relative z-10">
-          <div className="mb-2 uppercase tracking-widest text-[10px] font-black text-white/60 bg-black/20 px-3 py-1 rounded-full">
+          <div className="mb-2 uppercase tracking-widest text-xs font-black text-white/60 bg-black/20 px-3 py-1 rounded-full">
             Pencapaian Baru!
           </div>
 

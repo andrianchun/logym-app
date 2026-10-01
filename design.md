@@ -61,9 +61,10 @@ Menggunakan **1 jenis font seragam untuk seluruh aplikasi: `Inter`** (`font-sans
 | :--- | :--- | :--- | :--- | :--- |
 | **Tier 1: Display / Judul Layar** | `.h1` (`text-2xl`) | **2.0625rem** (~33px) | `font-black tracking-tight leading-tight` | • Judul Halaman Utama & Header Layar |
 | **Tier 2: Judul Kartu & Angka Metrik** | `.h2`, `.body-lg` (`text-md`) | **1.3125rem** (~21px) | `font-bold leading-snug` | • Nama Latihan, Angka Beban & Reps, Tombol Aksi Utama |
-| **Tier 3: Teks Isi, Label & Badge** | `.h3`, `.body-md`, `.caption` (`text-sm`, `text-xs`) | **1.0000rem** (~16px) | `font-bold / font-semibold leading-relaxed` | • Instruksi Latihan, Label Kolom, Badge, Status, Unit |
+| **Tier 3a: Teks Isi & Label** | `.h3`, `.body-md` (`text-sm`) | **1.0000rem** (~16px) | `font-bold / font-semibold leading-relaxed` | • Instruksi Latihan, Label Section, Deskripsi, Status, Pesan |
+| **Tier 3b: Caption & Unit** | `.caption` (`text-xs`) | **0.8125rem** (~13px) | `font-bold / font-semibold` | • Unit suffix (kg, cm, %), Badge kecil, Legend, Keterangan ringkas |
 
-> 💡 **Prinsip Utama**: Seluruh utilitas teks Tailwind (`xs`, `sm`, `base`) dipetakan ke baseline `1rem` (16px) font `Inter`. Dilarang keras memakai `text-[10px]` atau font kecil arbitrary agar tata letak tetap proporsional dan tidak pernah kerdil di APK.
+> 💡 **Prinsip Utama**: `text-xs` (13px) untuk elemen subordinat (unit suffix, caption, legend), `text-sm` (16px) untuk teks isi dan label penting. Dilarang keras memakai `text-[10px]` atau font kecil arbitrary agar tata letak tetap proporsional dan tidak pernah kerdil di APK.
 
 ---
 

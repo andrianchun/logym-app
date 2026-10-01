@@ -59,7 +59,7 @@ export default function BleDeviceCard({ t, bleManager }) {
       </p>
 
       {devices.length === 0 && (
-        <p className={`text-[10px] ${t.textMuted} leading-tight`}>
+        <p className={`text-xs ${t.textMuted} leading-tight`}>
           Belum ada alat. Nyalakan alat (misal tensimeter, timbangan) supaya muncul di
           daftar saat memasangkan.
         </p>
@@ -75,7 +75,7 @@ export default function BleDeviceCard({ t, bleManager }) {
               <Icon size={16} className={t.textMuted} />
               <div className="min-w-0 flex-1">
                 <p className={`font-bold text-sm ${t.textMain} truncate`}>{d.name}</p>
-                <p className={`text-[10px] ${t.textMuted} truncate`}>
+                <p className={`text-xs ${t.textMuted} truncate`}>
                   {KIND[d.kind]?.label || 'Belum diketahui jenisnya'}
                 </p>
               </div>
@@ -92,21 +92,21 @@ export default function BleDeviceCard({ t, bleManager }) {
             </div>
 
             {st === 'listening' && !reading && (
-              <p className={`text-[10px] ${t.textMuted} flex items-center gap-1.5`}>
+              <p className={`text-xs ${t.textMuted} flex items-center gap-1.5`}>
                 <Loader2 size={12} className="animate-spin" /> Menunggu hasil — mulai pengukuran dari alatnya.
               </p>
             )}
             {reading && (
               <p className={`text-sm font-bold ${t.textMain}`}>
-                {reading} <span className={`text-[10px] font-normal ${t.textMuted}`}>tersimpan</span>
+                {reading} <span className={`text-xs font-normal ${t.textMuted}`}>tersimpan</span>
               </p>
             )}
-            {errors[d.deviceId] && <p className="text-[10px] text-red-500 leading-tight">{errors[d.deviceId]}</p>}
+            {errors[d.deviceId] && <p className="text-xs text-red-500 leading-tight">{errors[d.deviceId]}</p>}
           </div>
         );
       })}
 
-      {warn && <p className="text-[10px] text-amber-500 leading-tight">{warn}</p>}
+      {warn && <p className="text-xs text-amber-500 leading-tight">{warn}</p>}
 
       <button
         onClick={() => pair()}
@@ -117,7 +117,7 @@ export default function BleDeviceCard({ t, bleManager }) {
       {/* Sebagian alat baru mengumumkan service-nya SETELAH tersambung, jadi tidak pernah muncul
           di daftar yang tersaring. Tanpa jalan keluar ini, alat yang sebenarnya didukung
           terlihat seperti "tidak kompatibel". */}
-      <button onClick={() => pair(true)} className={`text-[10px] ${t.textMuted} underline`}>
+      <button onClick={() => pair(true)} className={`text-xs ${t.textMuted} underline`}>
         Alat tidak muncul?
       </button>
     </div>

@@ -241,9 +241,16 @@ export default function GymAIChat({
         const uid = user?.uid || 'guest';
         const sessionsKey = `lyfit_ai_sessions_${uid}`;
         if (sessions.length > 0) {
-            localStorage.setItem(sessionsKey, JSON.stringify(sessions));
+            try {
+                // Batasi cache lokal hanya 3 sesi terakhir agar tidak memakan kuota 5MB localStorage.
+                // Firestore adalah SSOT yang menyimpan seluruh riwayat sesi chat secara lengkap.
+                const localTrimmed = sessions.slice(0, 3);
+                localStorage.setItem(sessionsKey, JSON.stringify(localTrimmed));
+            } catch (err) {
+                console.warn('[GymAIChat] Gagal menyimpan cache sesi ke localStorage (kuota penuh?):', err);
+            }
         } else {
-             localStorage.removeItem(sessionsKey);
+            try { localStorage.removeItem(sessionsKey); } catch { /* diabaikan */ }
         }
 
         if (!user?.uid) return; // guest sessions stay local-only
@@ -667,14 +674,14 @@ export default function GymAIChat({
             <div className="space-y-3">
                 {textPart && <div className="text-sm">{renderMiniMarkdown(textPart)}</div>}
                 {jsonPart && (
-                    <div className="bg-neutral-800/50 backdrop-blur-md border border-blue-500/30 rounded-xl p-4 space-y-3 mt-2 shadow-lg shadow-blue-500/10">
+                    <div className="bg-slate-800/50 backdrop-blur-md border border-blue-500/30 rounded-xl p-4 space-y-3 mt-2 shadow-lg shadow-blue-500/10">
                         <div className="flex items-center gap-2 text-blue-400">
                             <Dumbbell size={18} />
                             <h4 className="font-bold text-sm">{jsonPart.action === 'update' ? 'Update Program' : 'Usulan Program'}</h4>
                         </div>
                         <div>
                             <p className="font-bold text-white text-base">{cleanPlanName(jsonPart.planName)}</p>
-                            <p className="text-xs text-neutral-400 mt-1">{jsonPart.description}</p>
+                            <p className="text-xs text-slate-400 mt-1">{jsonPart.description}</p>
                         </div>
                         <div className="space-y-1">
                             {jsonPart.routines?.map((r, i) => {
@@ -683,25 +690,25 @@ export default function GymAIChat({
                                 const daysArr = Array.isArray(r.assignedDays) ? r.assignedDays : (typeof r.assignedDays === 'string' ? [r.assignedDays] : []);
                                 const daysLabel = daysArr.length ? daysArr.join(', ').toUpperCase() : null;
                                 return (
-                                    <div key={i} className="bg-neutral-900 rounded-lg overflow-hidden">
+                                    <div key={i} className="bg-slate-900 rounded-lg overflow-hidden">
                                         <button
                                             onClick={() => setExpandedRoutines(prev => {
                                                 const next = new Set(prev);
                                                 if (next.has(routineKey)) next.delete(routineKey); else next.add(routineKey);
                                                 return next;
                                             })}
-                                            className="w-full text-xs text-neutral-300 flex justify-between items-start gap-2 p-2 text-left"
+                                            className="w-full text-xs text-slate-300 flex justify-between items-start gap-2 p-2 text-left"
                                         >
                                             <span className="font-semibold text-blue-300">
                                                 {daysLabel ? `${daysLabel}: ` : ''}{cleanRoutineName(r.name)}
                                             </span>
-                                            <ChevronDown size={12} className={`shrink-0 mt-0.5 text-neutral-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+                                            <ChevronDown size={12} className={`shrink-0 mt-0.5 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
                                         </button>
                                         {isOpen && (
                                             <div className="px-2 pb-2 space-y-1 animate-in fade-in duration-150">
                                                 {(r.exercises || []).map((ex, j) => (
-                                                    <div key={j} className="text-[11px] text-neutral-400 flex justify-between items-center bg-black/20 px-2 py-1.5 rounded-md">
-                                                        <span className="text-neutral-200">{ex.name}</span>
+                                                    <div key={j} className="text-xs text-slate-400 flex justify-between items-center bg-black/20 px-2 py-1.5 rounded-md">
+                                                        <span className="text-slate-200">{ex.name}</span>
                                                         <span className="font-mono shrink-0 ml-2">{ex.sets}x{ex.reps}</span>
                                                     </div>
                                                 ))}
@@ -765,10 +772,10 @@ export default function GymAIChat({
                     : 'transform 0.38s cubic-bezier(0.34, 1.15, 0.64, 1), opacity 0.3s ease',
             }}
         >
-            <div className="pointer-events-auto flex flex-col w-full max-w-md h-[85vh] max-h-[800px] bg-neutral-900/60 backdrop-blur-2xl border border-white/10 rounded-[2rem] shadow-[0_0_40px_rgba(0,0,0,0.5)] overflow-hidden relative overscroll-contain">
+            <div className="pointer-events-auto flex flex-col w-full max-w-md h-[85vh] max-h-[800px] bg-slate-900/60 backdrop-blur-2xl border border-white/10 rounded-[2rem] shadow-[0_0_40px_rgba(0,0,0,0.5)] overflow-hidden relative overscroll-contain">
             {isSidebarOpen && <div className="absolute inset-0 bg-black/60 z-[110] transition-opacity cursor-pointer" onClick={() => setIsSidebarOpen(false)} />}
 
-            <div className={`absolute inset-y-0 left-0 w-64 bg-neutral-900 border-r border-white/10 z-[120] transform transition-transform duration-300 flex flex-col ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+            <div className={`absolute inset-y-0 left-0 w-64 bg-slate-900 border-r border-white/10 z-[120] transform transition-transform duration-300 flex flex-col ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                 <div className="p-4 border-b border-white/10">
                     <button onClick={handleNewChat} className="w-full bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/30 font-bold py-2 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors">
                         <Plus size={18} /> Chat Baru
@@ -784,14 +791,14 @@ export default function GymAIChat({
                                 setIsSidebarOpen(false);
                                 if (session.unread) setSessions(prev => prev.map(s => s.id === session.id ? { ...s, unread: false } : s));
                             }}
-                            className={`w-full text-left p-3 rounded-xl flex items-center justify-between group cursor-pointer transition-colors ${activeSessionId === session.id ? 'bg-white/10 text-white' : session.origin === 'logy' ? 'bg-blue-500/10 hover:bg-blue-500/15 text-blue-100' : 'hover:bg-white/5 text-neutral-400 hover:text-white'}`}
+                            className={`w-full text-left p-3 rounded-xl flex items-center justify-between group cursor-pointer transition-colors ${activeSessionId === session.id ? 'bg-white/10 text-white' : session.origin === 'logy' ? 'bg-blue-500/10 hover:bg-blue-500/15 text-blue-100' : 'hover:bg-white/5 text-slate-400 hover:text-white'}`}
                         >
                             <div className="flex items-center gap-2 truncate pr-2">
-                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${session.origin === 'logy' ? 'bg-blue-400' : 'bg-neutral-600'}`} />
+                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${session.origin === 'logy' ? 'bg-blue-400' : 'bg-slate-600'}`} />
                                 <span className="truncate text-sm font-medium">{session.title}</span>
                                 {session.unread && <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />}
                             </div>
-                            <button onClick={(e) => { e.stopPropagation(); handleDeleteChat(e, session.id); }} className="text-neutral-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" title="Hapus">
+                            <button onClick={(e) => { e.stopPropagation(); handleDeleteChat(e, session.id); }} className="text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" title="Hapus">
                                 <Trash2 size={16} />
                             </button>
                         </div>
@@ -814,18 +821,18 @@ export default function GymAIChat({
                 <div className="p-4 border-b border-white/10 flex items-center justify-between bg-black/40 backdrop-blur-md z-10">
                     <div className="flex items-center gap-3">
                         <div
-                            className="w-10 h-10 rounded-full border-2 border-blue-400 shadow-md bg-zinc-900 shrink-0"
+                            className="w-10 h-10 rounded-full border-2 border-blue-400 shadow-md bg-slate-900 shrink-0"
                             style={{ backgroundImage: 'url(/bg-program.webp)', backgroundSize: '450%', backgroundPosition: '52% 7%' }}
                         />
                         <div>
                             <h3 className="font-bold text-white leading-tight">Coach Logy</h3>
                             <div className="flex items-center gap-1 mt-1">
                                 <span className={`w-1.5 h-1.5 rounded-full animate-pulse bg-emerald-500`}></span>
-                                <span className="text-blue-400 text-[10px] font-mono">Online</span>
+                                <span className="text-blue-400 text-xs font-mono">Online</span>
                             </div>
                         </div>
                     </div>
-                    <button data-close-modal="true" onClick={onClose} className="p-2 text-neutral-400 hover:text-white rounded-full bg-white/5 hover:bg-white/10 transition-colors">
+                    <button data-close-modal="true" onClick={onClose} className="p-2 text-slate-400 hover:text-white rounded-full bg-white/5 hover:bg-white/10 transition-colors">
                         <X size={20} />
                     </button>
                 </div>
@@ -835,23 +842,23 @@ export default function GymAIChat({
                     {messages.length === 0 && (
                         <div className="flex flex-col items-center justify-center text-center space-y-4 mt-8 mb-4">
                             <div 
-                                className="w-16 h-16 rounded-full border-2 border-blue-500 shadow-lg bg-zinc-900 shrink-0"
+                                className="w-16 h-16 rounded-full border-2 border-blue-500 shadow-lg bg-slate-900 shrink-0"
                                 style={{ backgroundImage: 'url(/bg-program.webp)', backgroundSize: '450%', backgroundPosition: '52% 7%' }}
                             />
                             <div>
                                 <p className="text-white font-bold">Tanya Apapun!</p>
-                                <p className="text-xs text-neutral-400 max-w-[280px] mx-auto mt-1">Saya bisa menganalisa riwayat latihanmu dan membuat program khusus.</p>
-                                <p className="text-xs text-neutral-500 mt-3 font-medium">Atau pilih FAQ instan berikut:</p>
+                                <p className="text-xs text-slate-400 max-w-[280px] mx-auto mt-1">Saya bisa menganalisa riwayat latihanmu dan membuat program khusus.</p>
+                                <p className="text-xs text-slate-500 mt-3 font-medium">Atau pilih FAQ instan berikut:</p>
                             </div>
                             <div className="w-full space-y-2 mt-4">
                                 {FAQ_ITEMS.map((faq, i) => (
                                     <button 
                                         key={i}
                                         onClick={() => handleFaqClick(faq)}
-                                        className="w-full text-left bg-white/5 hover:bg-white/10 border border-white/10 text-neutral-300 text-sm p-3 rounded-xl transition-colors group flex items-center justify-between"
+                                        className="w-full text-left bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-sm p-3 rounded-xl transition-colors group flex items-center justify-between"
                                     >
                                         <span className="flex-1 pr-2">{faq.q}</span>
-                                        <ChevronRight size={16} className="text-neutral-600 group-hover:text-blue-400 transition-colors shrink-0" />
+                                        <ChevronRight size={16} className="text-slate-600 group-hover:text-blue-400 transition-colors shrink-0" />
                                     </button>
                                 ))}
                             </div>
@@ -872,12 +879,12 @@ export default function GymAIChat({
                                 <button
                                     onClick={() => handleSaveMemory(msg.content)}
                                     title="Simpan sebagai memori"
-                                    className={`p-1.5 rounded-full transition-colors mb-1 shrink-0 ${(logyMemory || []).includes(msg.content.trim().slice(0, 160)) ? 'text-blue-400' : 'text-neutral-600 hover:text-blue-400'}`}
+                                    className={`p-1.5 rounded-full transition-colors mb-1 shrink-0 ${(logyMemory || []).includes(msg.content.trim().slice(0, 160)) ? 'text-blue-400' : 'text-slate-600 hover:text-blue-400'}`}
                                 >
                                     <Bookmark size={14} fill={(logyMemory || []).includes(msg.content.trim().slice(0, 160)) ? 'currentColor' : 'none'} />
                                 </button>
                             )}
-                            <div className={`max-w-[85%] rounded-2xl p-4 ${msg.role === 'user' ? 'bg-gradient-to-b from-blue-500/30 to-blue-600/15 backdrop-blur-xl saturate-150 border border-blue-400/30 shadow-lg text-white rounded-tr-sm' : 'bg-gradient-to-b from-white/15 to-white/5 backdrop-blur-xl saturate-150 text-neutral-100 border border-white/15 rounded-tl-sm shadow-lg shadow-black/20'}`}>
+                            <div className={`max-w-[85%] rounded-2xl p-4 ${msg.role === 'user' ? 'bg-gradient-to-b from-blue-500/30 to-blue-600/15 backdrop-blur-xl saturate-150 border border-blue-400/30 shadow-lg text-white rounded-tr-sm' : 'bg-gradient-to-b from-white/15 to-white/5 backdrop-blur-xl saturate-150 text-slate-100 border border-white/15 rounded-tl-sm shadow-lg shadow-black/20'}`}>
                                 {isThinkingPlaceholder ? (
                                     <div className="flex items-center gap-2">
                                         <Loader2 size={16} className="text-blue-400 animate-spin shrink-0" />
@@ -886,7 +893,7 @@ export default function GymAIChat({
                                 ) : (
                                     <>
                                         {renderMessageContent(msg, idx)}
-                                        <div className={`text-[10px] mt-2 opacity-50 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
+                                        <div className={`text-xs mt-2 opacity-50 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
                                             {new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                                         </div>
                                     </>
@@ -903,7 +910,7 @@ export default function GymAIChat({
                     <div className="flex items-center gap-2">
                         <button 
                             onClick={() => setIsSidebarOpen(true)} 
-                            className="p-3 text-neutral-400 hover:text-white bg-white/5 border border-white/10 rounded-xl transition-colors shrink-0"
+                            className="p-3 text-slate-400 hover:text-white bg-white/5 border border-white/10 rounded-xl transition-colors shrink-0"
                             title="Menu Sesi Chat"
                         >
                             <Menu size={20} />

@@ -152,6 +152,9 @@ export const translateEquipment = (name, exName = '') => {
   }
 
   if (!name) return 'Lainnya';
+  if (lower === 'cable/machine' || lower === 'cable / machine') {
+    return (exNameLower.includes('cable') || exNameLower.includes('pulley') || exNameLower.includes('lat pull') || exNameLower.includes('pushdown')) ? 'Cable' : 'Machine';
+  }
   if (lower === 'body weight' || lower === 'body only') return 'Body Weight';
   if (lower === 'e-z curl bar' || lower === 'ez barbell') return 'EZ Barbell';
   if (lower === 'smith machine') return 'Smith Machine';

@@ -1,4 +1,4 @@
-import { manualFieldValue, resolveLoggedExercise, defaultEquipmentConfig } from '../data/constants.js';
+import { manualFieldValue, resolveLoggedExercise, defaultEquipmentConfig, normalizeEquipmentName } from '../data/constants.js';
 import { dayBmr } from './bmr.js';
 
 // MET (Metabolic Equivalent) untuk latihan beban/resistance training. Dipakai konsisten di
@@ -640,7 +640,7 @@ export const estimate10RM = (weightKg, reps) => {
  * Menggabungkan preset defaultEquipmentConfig dengan custom config di gymProfiles.
  */
 export const getEquipmentConfig = (gymProfiles, activeGymId, ex, userProfile = null) => {
-  const eq = ex?.equipment;
+  const eq = normalizeEquipmentName(ex?.equipment, ex?.name);
   if (!eq) {
     return {
       equipment: '',
@@ -755,8 +755,9 @@ export const roundDownToStep = (weightKg, step) => {
 export const gymStepFor = (gymProfiles, activeGymId, equipment, isImperial = false) => {
   const bawaan = isImperial ? 5 : 2.5;
   if (!gymProfiles || !activeGymId || !equipment) return bawaan;
+  const eq = normalizeEquipmentName(equipment);
   const gym = gymProfiles.find((g) => g.id === activeGymId) || gymProfiles[0];
-  return Number(gym?.config?.[equipment]?.increment) || bawaan;
+  return Number(gym?.config?.[eq]?.increment) || bawaan;
 };
 
 /**
@@ -813,9 +814,13 @@ export const buildExLookupByName = (history, ...exLists) => {
   const out = {};
   const daftarkan = (ex) => {
     const id = ex?.id;
-    const nama = String(ex?.name || '').trim().toLowerCase();
-    if (id === undefined || id === null || !nama) return;
-    const c = kanonik[nama] || (kanonik[nama] = { ...ex, id: canonicalExId(nama) });
+    if (id === undefined || id === null) return;
+    let nama = String(ex?.name || '').trim().toLowerCase();
+    if (!nama) return;
+    if ((String(id) === '104' || String(ex?.originalId) === '104') && (nama === 'cable seated lateral raise' || nama === 'seated cable lateral raise')) {
+      nama = 'standing cable lateral raise';
+    }
+    const c = kanonik[nama] || (kanonik[nama] = { ...ex, id: canonicalExId(nama), name: (nama === 'standing cable lateral raise' && String(ex?.name || '').toLowerCase().includes('seated')) ? 'Standing Cable Lateral Raise' : ex.name });
     if (!out[String(id)]) out[String(id)] = c;
   };
   exLists.forEach((list) => (list || []).forEach(daftarkan));

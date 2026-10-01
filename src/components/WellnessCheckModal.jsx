@@ -58,9 +58,9 @@ const WellnessCheckModal = ({ isOpen, onSelect, onClose, t, soundEnabled, curren
             </div>
             <div className="flex-1 min-w-0">
               <h4 className="font-bold text-sm text-emerald-400 leading-tight flex items-center gap-2">
-                Prima {currentWellness === 'prima' && <span className="text-[10px] py-0.5 px-2 rounded-full bg-emerald-500/30 text-emerald-300 font-bold">Aktif</span>}
+                Prima {currentWellness === 'prima' && <span className="text-xs py-0.5 px-2.5 rounded-full bg-emerald-500/30 text-emerald-300 font-bold">Aktif</span>}
               </h4>
-              <p className="text-xs text-zinc-400 mt-0.5 leading-snug">Target beban 100% & progresi normal</p>
+              <p className="text-xs text-slate-400 mt-0.5 leading-snug">Target beban 100% & progresi normal</p>
             </div>
           </button>
 
@@ -74,9 +74,9 @@ const WellnessCheckModal = ({ isOpen, onSelect, onClose, t, soundEnabled, curren
             </div>
             <div className="flex-1 min-w-0">
               <h4 className="font-bold text-sm text-amber-400 leading-tight flex items-center gap-2">
-                Pegal {currentWellness === 'doms' && <span className="text-[10px] py-0.5 px-2 rounded-full bg-amber-500/30 text-amber-300 font-bold">Aktif</span>}
+                Pegal {currentWellness === 'doms' && <span className="text-xs py-0.5 px-2.5 rounded-full bg-amber-500/30 text-amber-300 font-bold">Aktif</span>}
               </h4>
-              <p className="text-xs text-zinc-400 mt-0.5 leading-snug">Fokus teknik form & kontrol repetisi</p>
+              <p className="text-xs text-slate-400 mt-0.5 leading-snug">Fokus teknik form & kontrol repetisi</p>
             </div>
           </button>
 
@@ -90,9 +90,9 @@ const WellnessCheckModal = ({ isOpen, onSelect, onClose, t, soundEnabled, curren
             </div>
             <div className="flex-1 min-w-0">
               <h4 className="font-bold text-sm text-rose-400 leading-tight flex items-center gap-2">
-                Nyeri {currentWellness === 'deload' && <span className="text-[10px] py-0.5 px-2 rounded-full bg-rose-500/30 text-rose-300 font-bold">Aktif</span>}
+                Nyeri {currentWellness === 'deload' && <span className="text-xs py-0.5 px-2.5 rounded-full bg-rose-500/30 text-rose-300 font-bold">Aktif</span>}
               </h4>
-              <p className="text-xs text-zinc-400 mt-0.5 leading-snug">Pangkas beban 15–20% untuk cegah cedera</p>
+              <p className="text-xs text-slate-400 mt-0.5 leading-snug">Pangkas beban 15–20% untuk cegah cedera</p>
             </div>
           </button>
         </div>

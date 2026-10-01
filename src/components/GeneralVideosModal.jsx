@@ -155,7 +155,7 @@ const GeneralVideosModal = ({
             }}
             className={`flex-1 py-3 px-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition-all ${
               activeTab === 'warmup'
-                ? `${t.bgAccent} text-white shadow-md shadow-orange-500/20`
+                ? `${t.bgAccent} text-white shadow-md shadow-amber-500/20`
                 : `${t.bgCard} border ${t.border} ${t.textMuted} hover:bg-black/5 dark:hover:bg-white/5`
             }`}
           >
@@ -300,7 +300,7 @@ const GeneralVideosModal = ({
           <button
             type="button"
             onClick={handleSave}
-            className={`px-6 py-3 rounded-2xl font-black text-sm ${t.bgAccent} text-white hover:opacity-90 shadow-lg shadow-orange-500/20 active:scale-95 transition-all flex items-center gap-2`}
+            className={`px-6 py-3 rounded-2xl font-black text-sm ${t.bgAccent} text-white hover:opacity-90 shadow-lg shadow-amber-500/20 active:scale-95 transition-all flex items-center gap-2`}
           >
             <span>{hasSaved ? 'Tersimpan!' : 'Simpan Pengaturan Video'}</span>
           </button>

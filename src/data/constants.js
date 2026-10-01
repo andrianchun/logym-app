@@ -18,6 +18,37 @@ export const defaultEquipmentConfig = {
   'Assisted': { baseWeight: 0, ratio: 1, inputRule: 'assisted', label: 'Bantuan Pin', placeholder: 'Beban bantuan' },
 };
 
+/**
+ * Normalisasi nama alat untuk menghilangkan ambiguitas warisan ("Cable/Machine").
+ * Latihan kabel dipecah menjadi "Cable" murni agar rasio katrol & beban dasar di Gym Manager
+ * terbaca dengan benar, dan mesin isolasi dipecah menjadi "Machine" murni.
+ */
+export const normalizeEquipmentName = (equipment, exerciseName = '') => {
+  if (!equipment) return '';
+  const eqTrimmed = String(equipment).trim();
+  const eqLower = eqTrimmed.toLowerCase();
+  if (
+    eqLower === 'cable/machine' ||
+    eqLower === 'cable / machine' ||
+    eqLower === 'machine/cable' ||
+    eqLower === 'machine / cable'
+  ) {
+    const nameLower = String(exerciseName || '').toLowerCase();
+    const isCable =
+      nameLower.includes('cable') ||
+      nameLower.includes('pulley') ||
+      nameLower.includes('crossover') ||
+      nameLower.includes('rope') ||
+      nameLower.includes('pushdown') ||
+      nameLower.includes('pulldown') ||
+      nameLower.includes('face pull') ||
+      nameLower.includes('lat pull') ||
+      nameLower.includes('pull through');
+    return isCable ? 'Cable' : 'Machine';
+  }
+  return eqTrimmed;
+};
+
 export const exerciseTypeLabels = {
   weight: 'Beban & Repetisi',
   reps: 'Repetisi',
@@ -41,7 +72,7 @@ export const defaultMasterExercises = [
     "ytVideo": "https://youtu.be/VXaBbUYMfIs?si=pOB-MkazqZiMP_KX",
     "videoUrl": "/exercise-assets/edb-Smith_Machine_Incline_Bench_Press.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Incline_Bench_Press.mp4",
     "thumbnailUrl": "/exercise-assets/edb-Smith_Machine_Incline_Bench_Press.webp",
-    "gifUrl": "/exercise-assets/edb-Smith_Machine_Incline_Bench_Press.webp",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Smith_Machine_Incline_Bench_Press/0.jpg",
     "aliases": [
       "Incline Smith Machine Press",
       "Smith Machine Incline Bench Press",
@@ -72,7 +103,8 @@ export const defaultMasterExercises = [
       "After a second pause, bring the bar back to the starting position as you breathe out and push the bar using your chest muscles. Lock your arms in the contracted position, hold for a second and then start coming down slowly again. Tip: It should take at least twice as long to go down than to come up.",
       "Repeat the movement for the prescribed amount of repetitions.",
       "When you are done, place the bar back in the rack."
-    ]
+    ],
+    "exerciseId": "Smith_Machine_Incline_Bench_Press"
   },
   {
     "id": 102,
@@ -88,7 +120,7 @@ export const defaultMasterExercises = [
     "ytVideo": "https://youtu.be/qD1WZ5pSuvk?si=JbbritEwFpnqjPHz",
     "videoUrl": "/exercise-assets/edb-Seated_Cable_Rows.mp4 /exercise-assets/youtube-backup/edb-Seated_Cable_Rows.mp4",
     "thumbnailUrl": "/exercise-assets/edb-Seated_Cable_Rows.webp",
-    "gifUrl": "/exercise-assets/edb-Seated_Cable_Rows.webp",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Seated_Cable_Rows/0.jpg",
     "aliases": [
       "Cable Seated Row",
       "Cable Seated Rows",
@@ -114,7 +146,8 @@ export const defaultMasterExercises = [
       "With your arms extended pull back until your torso is at a 90-degree angle from your legs. Your back should be slightly arched and your chest should be sticking out. You should be feeling a nice stretch on your lats as you hold the bar in front of you. This is the starting position of the exercise.",
       "Keeping the torso stationary, pull the handles back towards your torso while keeping the arms close to it until you touch the abdominals. Breathe out as you perform that movement. At that point you should be squeezing your back muscles hard. Hold that contraction for a second and slowly go back to the original position while breathing in.",
       "Repeat for the recommended amount of repetitions."
-    ]
+    ],
+    "exerciseId": "Seated_Cable_Rows"
   },
   {
     "id": 103,
@@ -130,7 +163,7 @@ export const defaultMasterExercises = [
     "ytVideo": "https://youtu.be/WbCEvFA0NJs?si=n6uJrVnL8SbZLnii",
     "videoUrl": "/exercise-assets/edb-Dumbbell_Bench_Press.mp4 /exercise-assets/youtube-backup/edb-Dumbbell_Bench_Press.mp4",
     "thumbnailUrl": "/exercise-assets/edb-Dumbbell_Bench_Press.webp",
-    "gifUrl": "/exercise-assets/edb-Dumbbell_Bench_Press.webp",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Bench_Press/0.jpg",
     "aliases": [
       "Flat Dumbbell Bench Press",
       "Dumbbell Flat Bench Press",
@@ -157,7 +190,8 @@ export const defaultMasterExercises = [
       "Once at shoulder width, rotate your wrists forward so that the palms of your hands are facing away from you. The dumbbells should be just to the sides of your chest, with your upper arm and forearm creating a 90 degree angle. Be sure to maintain full control of the dumbbells at all times. This will be your starting position.",
       "Then, as you breathe out, use your chest to push the dumbbells up. Lock your arms at the top of the lift and squeeze your chest, hold for a second and then begin coming down slowly. Tip: Ideally, lowering the weight should take about twice as long as raising it.",
       "Repeat the movement for the prescribed amount of repetitions of your training program."
-    ]
+    ],
+    "exerciseId": "Dumbbell_Bench_Press"
   },
   {
     "id": 104,
@@ -172,7 +206,7 @@ export const defaultMasterExercises = [
     "ytVideo": "https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA",
     "videoUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.mp4",
     "thumbnailUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.webp",
-    "gifUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.webp",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Standing_Cable_Lateral_Raise/0.jpg",
     "aliases": [
       "Cable Lateral Raise",
       "Cable Lateral Raises",
@@ -198,7 +232,8 @@ export const defaultMasterExercises = [
       "Raise your arm out to the side until it is parallel to the floor and at shoulder level. Exhale and hold the contraction at the top.",
       "Slowly lower the cable back down to the starting position under control as you inhale.",
       "Repeat for the recommended amount of reps, then switch to the other arm."
-    ]
+    ],
+    "exerciseId": "Standing_Cable_Lateral_Raise"
   },
   {
     "id": 105,
@@ -213,7 +248,7 @@ export const defaultMasterExercises = [
     "ytVideo": "https://youtu.be/1FjkhpZsaxc?si=UF5-0LJTCd_pEhy3 https://youtu.be/u36jNfqh8_U?si=AEMeWXqnBvpOWNOj https://youtu.be/9qupVR7pKtk?si=FtLIHZmKuqXcK0ne",
     "videoUrl": "/exercise-assets/edb-Triceps_Pushdown.mp4 /exercise-assets/youtube-backup/edb-Triceps_Pushdown.mp4",
     "thumbnailUrl": "/exercise-assets/edb-Triceps_Pushdown.webp",
-    "gifUrl": "/exercise-assets/edb-Triceps_Pushdown.webp",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Triceps_Pushdown/0.jpg",
     "aliases": [
       "Cable Triceps Pushdown",
       "Tricep Pushdown",
@@ -239,7 +274,8 @@ export const defaultMasterExercises = [
       "Using the triceps, bring the bar down until it touches the front of your thighs and the arms are fully extended perpendicular to the floor. The upper arms should always remain stationary next to your torso and only the forearms should move. Exhale as you perform this movement.",
       "After a second hold at the contracted position, bring the bar slowly up to the starting point. Breathe in as you perform this step.",
       "Repeat for the recommended amount of repetitions."
-    ]
+    ],
+    "exerciseId": "Triceps_Pushdown"
   },
   {
     "id": 106,
@@ -254,7 +290,7 @@ export const defaultMasterExercises = [
     "ytVideo": "https://youtu.be/MKWBV29S6c0?si=JV1BM77vAR6VuQYG https://youtu.be/_aoad2yuP5w?si=PRXDFoozz45AB_VO",
     "videoUrl": "/exercise-assets/edb-Dumbbell_Alternate_Bicep_Curl.mp4 /exercise-assets/youtube-backup/edb-Dumbbell_Alternate_Bicep_Curl.mp4",
     "thumbnailUrl": "/exercise-assets/edb-Dumbbell_Alternate_Bicep_Curl.webp",
-    "gifUrl": "/exercise-assets/edb-Dumbbell_Alternate_Bicep_Curl.webp",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Alternate_Bicep_Curl/0.jpg",
     "aliases": [
       "Dumbbell Biceps Curl",
       "Dumbbell Bicep Curl",
@@ -283,7 +319,8 @@ export const defaultMasterExercises = [
       "Slowly begin to bring the dumbbell back to the starting position as your breathe in. Tip: Remember to twist the palms back to the starting position (facing your thighs) as you come down.",
       "Repeat the movement with the left hand. This equals one repetition.",
       "Continue alternating in this manner for the recommended amount of repetitions."
-    ]
+    ],
+    "exerciseId": "Dumbbell_Alternate_Bicep_Curl"
   },
   {
     "id": 107,
@@ -334,7 +371,7 @@ export const defaultMasterExercises = [
     "ytVideo": "https://youtu.be/iKCJCydYYrE?si=ICtqLU9ov9eFaHfL https://youtu.be/LwsG-1xgP2E?si=Ptr7dUVcsJFKMLYC",
     "videoUrl": "/exercise-assets/edb-Smith_Machine_Squat.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Squat.mp4",
     "thumbnailUrl": "/exercise-assets/edb-Smith_Machine_Squat.webp",
-    "gifUrl": "/exercise-assets/edb-Smith_Machine_Squat.webp",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Smith_Machine_Squat/0.jpg",
     "aliases": [
       "Smith Squat",
       "Smith Machine Squats",
@@ -365,7 +402,8 @@ export const defaultMasterExercises = [
       "Begin to slowly lower the bar by bending the knees as you maintain a straight posture with the head up. Continue down until the angle between the upper leg and the calves becomes slightly less than 90-degrees (which is the point in which the upper legs are below parallel to the floor). Inhale as you perform this portion of the movement. Tip: If you performed the exercise correctly, the front of the knees should make an imaginary straight line with the toes that is perpendicular to the front. If your knees are past that imaginary line (if they are past your toes) then you are placing undue stress on the knee and the exercise has been performed incorrectly.",
       "Begin to raise the bar as you exhale by pushing the floor with the heel of your foot as you straighten the legs again and go back to the starting position.",
       "Repeat for the recommended amount of repetitions."
-    ]
+    ],
+    "exerciseId": "Smith_Machine_Squat"
   },
   {
     "id": 109,
@@ -381,7 +419,7 @@ export const defaultMasterExercises = [
     "ytVideo": "https://youtu.be/xY8BywOKkLQ?si=B1A9ulZ-Cz67GNw6",
     "videoUrl": "/exercise-assets/edb-Romanian_Deadlift.mp4 /exercise-assets/youtube-backup/edb-Romanian_Deadlift.mp4",
     "thumbnailUrl": "/exercise-assets/edb-Romanian_Deadlift.webp",
-    "gifUrl": "/exercise-assets/edb-Romanian_Deadlift.webp",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Romanian_Deadlift/0.jpg",
     "aliases": [
       "Romanian Deadlift (RDL)",
       "RDL",
@@ -409,7 +447,8 @@ export const defaultMasterExercises = [
       "Keeping your back and arms completely straight at all times, use your hips to lift the bar as you exhale. Tip: The movement should not be fast but steady and under control.",
       "Once you are standing completely straight up, lower the bar by pushing the hips back, only slightly bending the knees, unlike when squatting. Tip: Take a deep breath at the start of the movement and keep your chest up. Hold your breath as you lower and exhale as you complete the movement.",
       "Repeat for the recommended amount of repetitions."
-    ]
+    ],
+    "exerciseId": "Romanian_Deadlift"
   },
   {
     "id": 110,
@@ -451,7 +490,8 @@ export const defaultMasterExercises = [
       "Step forward with your right leg around 2 feet or so from the foot being left stationary behind and lower your upper body down, while keeping the torso upright and maintaining balance. Inhale as you go down. Note: As in the other exercises, do not allow your knee to go forward beyond your toes as you come down, as this will put undue stress on the knee joint. Make sure that you keep your front shin perpendicular to the ground.",
       "Using mainly the heel of your foot, push up and go back to the starting position as you exhale.",
       "Repeat the movement for the recommended amount of repetitions and then perform with the left leg."
-    ]
+    ],
+    "exerciseId": "Dumbbell_Lunges"
   },
   {
     "id": 111,
@@ -501,7 +541,8 @@ export const defaultMasterExercises = [
       "Now lift your toes by contracting the tibia muscles in the front of the calves as you breathe out.",
       "Hold for a second and bring them back down as you breathe in.",
       "Repeat for the recommended amount of repetitions."
-    ]
+    ],
+    "exerciseId": "Rocking_Standing_Calf_Raise"
   },
   {
     "id": 112,
@@ -540,7 +581,8 @@ export const defaultMasterExercises = [
       "With the hips stationary, flex the waist as you contract the abs so that the elbows travel towards the middle of the thighs. Exhale as you perform this portion of the movement and hold the contraction for a second.",
       "Slowly return to the starting position as you inhale. Tip: Make sure that you keep constant tension on the abs throughout the movement. Also, do not choose a weight so heavy that the lower back handles the brunt of the work.",
       "Repeat for the recommended amount of repetitions."
-    ]
+    ],
+    "exerciseId": "Cable_Crunch"
   },
   {
     "id": 113,
@@ -551,12 +593,12 @@ export const defaultMasterExercises = [
     ],
     "type": "weight",
     "defaultWeight": 40,
-    "equipment": "Machine",
+    "equipment": "Cable",
     "level": "beginner",
     "ytVideo": "https://youtu.be/bNmvKpJSWKM?si=E7zZ3a3qeG4Ij7bb https://youtu.be/7Cjc_aXoQ_I?si=ZqhPV5iSMoTOLSIf",
     "videoUrl": "/exercise-assets/edb-Wide-Grip_Lat_Pulldown.mp4 /exercise-assets/youtube-backup/edb-Wide-Grip_Lat_Pulldown.mp4",
     "thumbnailUrl": "/exercise-assets/edb-Wide-Grip_Lat_Pulldown.webp",
-    "gifUrl": "/exercise-assets/edb-Wide-Grip_Lat_Pulldown.webp",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Wide-Grip_Lat_Pulldown/0.jpg",
     "aliases": [
       "Lat Pulldown",
       "Wide Grip Lat Pulldown",
@@ -585,7 +627,8 @@ export const defaultMasterExercises = [
       "As you breathe out, bring the bar down until it touches your upper chest by drawing the shoulders and the upper arms down and back. Tip: Concentrate on squeezing the back muscles once you reach the full contracted position. The upper torso should remain stationary and only the arms should move. The forearms should do no other work except for holding the bar; therefore do not try to pull down the bar using the forearms.",
       "After a second at the contracted position squeezing your shoulder blades together, slowly raise the bar back to the starting position when your arms are fully extended and the lats are fully stretched. Inhale during this portion of the movement.",
       "Repeat this motion for the prescribed amount of repetitions."
-    ]
+    ],
+    "exerciseId": "Wide-Grip_Lat_Pulldown"
   },
   {
     "id": 114,
@@ -601,7 +644,7 @@ export const defaultMasterExercises = [
     "ytVideo": "https://youtu.be/k6tzKisR3NY?si=g67rT52vc6oWjiFC https://youtu.be/E7ngsffMPR0?si=FJGsgUxb7aoAZ_ub",
     "videoUrl": "/exercise-assets/edb-Dumbbell_Shoulder_Press.mp4 /exercise-assets/youtube-backup/edb-Dumbbell_Shoulder_Press.mp4",
     "thumbnailUrl": "/exercise-assets/edb-Dumbbell_Shoulder_Press.webp",
-    "gifUrl": "/exercise-assets/edb-Dumbbell_Shoulder_Press.webp",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Dumbbell_Shoulder_Press/0.jpg",
     "aliases": [
       "DB Shoulder Press",
       "Seated Dumbbell Shoulder Press",
@@ -631,7 +674,8 @@ export const defaultMasterExercises = [
       "Now, exhale and push the dumbbells upward until they touch at the top.",
       "Then, after a brief pause at the top contracted position, slowly lower the weights back down to the starting position while inhaling.",
       "Repeat for the recommended amount of repetitions."
-    ]
+    ],
+    "exerciseId": "Dumbbell_Shoulder_Press"
   },
   {
     "id": 124,
@@ -670,7 +714,8 @@ export const defaultMasterExercises = [
       "Lift the dumbbells by elevating the shoulders as high as possible while you exhale. Hold the contraction at the top for a second. Tip: The arms should remain extended at all times. Refrain from using the biceps to help lift the dumbbells. Only the shoulders should be moving up and down.",
       "Lower the dumbbells back to the original position.",
       "Repeat for the recommended amount of repetitions."
-    ]
+    ],
+    "exerciseId": "Dumbbell_Shrug"
   },
   {
     "id": 115,
@@ -686,7 +731,7 @@ export const defaultMasterExercises = [
     "ytVideo": "https://youtu.be/gQ3afio08V8?si=DfCKjmSAhUMXjMl_",
     "videoUrl": "/exercise-assets/edb-Smith_Machine_Bench_Press.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Bench_Press.mp4",
     "thumbnailUrl": "/exercise-assets/edb-Smith_Machine_Bench_Press.webp",
-    "gifUrl": "/exercise-assets/edb-Smith_Machine_Bench_Press.webp",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Smith_Machine_Bench_Press/0.jpg",
     "aliases": [
       "SM Flat Bench Press",
       "SM Bench Press",
@@ -714,7 +759,8 @@ export const defaultMasterExercises = [
       "After a second pause, bring the bar back to the starting position as you breathe out and push the bar using your chest muscles. Lock your arms in the contracted position, hold for a second and then start coming down slowly again. Tip: It should take at least twice as long to go down than to come up.",
       "Repeat the movement for the prescribed amount of repetitions.",
       "When you are done, lock the bar back in the rack."
-    ]
+    ],
+    "exerciseId": "Smith_Machine_Bench_Press"
   },
   {
     "id": 116,
@@ -729,7 +775,7 @@ export const defaultMasterExercises = [
     "ytVideo": "https://youtu.be/cGXBVOc5xIk?si=ve9zzcNdiyNqYF5I",
     "videoUrl": "/exercise-assets/edb-Cable_Rear_Delt_Fly_1.mp4 /exercise-assets/edb-Cable_Rear_Delt_Fly_2.mp4 /exercise-assets/youtube-backup/edb-Cable_Rear_Delt_Fly_1.mp4",
     "thumbnailUrl": "/exercise-assets/edb-Cable_Rear_Delt_Fly.webp",
-    "gifUrl": "/exercise-assets/edb-Cable_Rear_Delt_Fly.webp",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Rear_Delt_Fly/0.jpg",
     "aliases": [
       "Cross Cable Rear Delt",
       "Cross Cable Rear Delt Fly",
@@ -752,7 +798,8 @@ export const defaultMasterExercises = [
       "Grab the left pulley with your right hand and the right pulley with your left hand, crossing them in front of you. This will be your starting position.",
       "Initiate the movement by moving your arms back and outward, keeping your arms straight as you execute the movement.",
       "Pause at the end of the motion before returning the handles to the start position."
-    ]
+    ],
+    "exerciseId": "Cable_Rear_Delt_Fly"
   },
   {
     "id": 117,
@@ -767,7 +814,7 @@ export const defaultMasterExercises = [
     "ytVideo": "https://youtu.be/9Ark9S11uXw?si=pEAe5tf66v5yUToU https://youtu.be/NTk0Igxqcsk?si=zX7dHQL0VyHURoC_",
     "videoUrl": "/exercise-assets/edb-Cable_Rope_Overhead_Triceps_Extension.mp4 /exercise-assets/youtube-backup/edb-Cable_Rope_Overhead_Triceps_Extension.mp4",
     "thumbnailUrl": "/exercise-assets/edb-Cable_Rope_Overhead_Triceps_Extension.webp",
-    "gifUrl": "/exercise-assets/edb-Cable_Rope_Overhead_Triceps_Extension.webp",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Rope_Overhead_Triceps_Extension/0.jpg",
     "aliases": [
       "Overhead Cable Triceps Extension",
       "Cable Overhead Triceps Extension"
@@ -792,7 +839,8 @@ export const defaultMasterExercises = [
       "Slowly lower the rope behind your head as you hold the upper arms stationary. Inhale as you perform this movement and pause when your triceps are fully stretched.",
       "Return to the starting position by flexing your triceps as you breathe out.",
       "Repeat for the recommended amount of repetitions."
-    ]
+    ],
+    "exerciseId": "Cable_Rope_Overhead_Triceps_Extension"
   },
   {
     "id": 118,
@@ -833,7 +881,8 @@ export const defaultMasterExercises = [
       "While holding the upper arms stationary, curl the weights while contracting the biceps as you breathe out. Only the forearms should move. Continue the movement until your biceps are fully contracted and the bar is at shoulder level. Hold the contracted position for a second as you squeeze the muscle.",
       "Slowly begin to bring the curl bar back to starting position as your breathe in.",
       "Repeat for the recommended amount of repetitions."
-    ]
+    ],
+    "exerciseId": "Standing_Biceps_Cable_Curl"
   },
   {
     "id": 119,
@@ -850,7 +899,7 @@ export const defaultMasterExercises = [
     "ytVideo": "https://youtu.be/or1frhkjBDc?si=FR7v-hKp_QP4-Rpn",
     "videoUrl": "/exercise-assets/edb-Split_Squat_with_Dumbbells.mp4 /exercise-assets/youtube-backup/edb-Split_Squat_with_Dumbbells.mp4",
     "thumbnailUrl": "/exercise-assets/edb-Split_Squat_with_Dumbbells.webp",
-    "gifUrl": "/exercise-assets/edb-Split_Squat_with_Dumbbells.webp",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Split_Squat_with_Dumbbells/0.jpg",
     "aliases": [
       "DB Bulgarian Split Squat",
       "Bulgarian Split Squat",
@@ -873,7 +922,8 @@ export const defaultMasterExercises = [
       "Hold a dumbbell in each hand, letting them hang at the sides. This will be your starting position.",
       "Begin by descending, flexing your knee and hip to lower your body down. Maintain good posture througout the movement. Keep the front knee in line with the foot as you perform the exercise.",
       "At the bottom of the movement, drive through the heel to extend the knee and hip to return to the starting position."
-    ]
+    ],
+    "exerciseId": "Split_Squat_with_Dumbbells"
   },
   {
     "id": 120,
@@ -889,7 +939,7 @@ export const defaultMasterExercises = [
     "ytVideo": "https://youtu.be/xWnlfJaQZ3k?si=z0FRk3rh4UO7JdUC",
     "videoUrl": "/exercise-assets/edb-Smith_Machine_Stiff-Legged_Deadlift.mp4 /exercise-assets/youtube-backup/edb-Smith_Machine_Romanian_Deadlift.mp4",
     "thumbnailUrl": "/exercise-assets/edb-Smith_Machine_Stiff-Legged_Deadlift.webp",
-    "gifUrl": "/exercise-assets/edb-Smith_Machine_Stiff-Legged_Deadlift.webp",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Smith_Machine_Stiff-Legged_Deadlift/0.jpg",
     "aliases": [
       "SM Romanian Deadlift (RDL)",
       "Smith Machine Romanian Deadlift (RDL)",
@@ -919,7 +969,8 @@ export const defaultMasterExercises = [
       "Keeping the knees stationary, lower the barbell to over the top of your feet by bending at the waist while keeping your back straight. Keep moving forward as if you were going to pick something from the floor until you feel a stretch on the hamstrings. Exhale as you perform this movement",
       "Start bringing your torso up straight again as soon as you feel the hamstrings stretch by extending your hips and waist until you are back at the starting position. Inhale as you perform this movement.",
       "Repeat for the recommended amount of repetitions."
-    ]
+    ],
+    "exerciseId": "Smith_Machine_Stiff-Legged_Deadlift"
   },
   {
     "id": 121,
@@ -934,7 +985,7 @@ export const defaultMasterExercises = [
     "ytVideo": "",
     "videoUrl": "",
     "thumbnailUrl": "",
-    "gifUrl": "",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Hip_Abduction/0.jpg",
     "instructions": [
       "Pasang ankle strap pada katrol kabel bawah (low cable pulley), lalu kaitkan pada pergelangan kaki luar Anda.",
       "Berdiri menyamping dari mesin kabel dengan jarak sekitar satu langkah, pegang tiang mesin dengan satu tangan untuk keseimbangan tubuh.",
@@ -955,7 +1006,8 @@ export const defaultMasterExercises = [
       "Keep your torso upright and your supporting leg slightly bent. Abduct your active leg out to the side away from your body as high as comfortably possible.",
       "Pause and squeeze your glutes at the top for a second, then slowly return to the starting position.",
       "Repeat for the recommended repetitions, then switch legs."
-    ]
+    ],
+    "exerciseId": "Cable_Hip_Abduction"
   },
   {
     "id": 122,
@@ -998,7 +1050,8 @@ export const defaultMasterExercises = [
       "Slowly lower your heels by bending at the ankles until the calves are fully stretched. Inhale as you perform this movement.",
       "Raise the heels by extending the ankles as high as possible as you contract the calves and breathe out. Hold the top contraction for a second.",
       "Repeat for the recommended amount of repetitions."
-    ]
+    ],
+    "exerciseId": "Seated_Calf_Raise"
   },
   {
     "id": 123,
@@ -1026,7 +1079,8 @@ export const defaultMasterExercises = [
     "instructions_en": [
       "Get into a prone position on the floor, supporting your weight on your toes and your forearms. Your arms are bent and directly below the shoulder.",
       "Keep your body straight at all times, and hold this position as long as possible. To increase difficulty, an arm or leg can be raised."
-    ]
+    ],
+    "exerciseId": "Plank"
   },
   {
     "id": 125,
@@ -1073,7 +1127,8 @@ export const defaultMasterExercises = [
       "Slowly lower your wrists back down to the starting position while inhaling. Make sure to inhale during this part of the exercise.",
       "Your forearms should be stationary as your wrist is the only movement needed to perform this exercise.",
       "Repeat for the recommended amount of repetitions."
-    ]
+    ],
+    "exerciseId": "Palms-Up_Dumbbell_Wrist_Curl_Over_A_Bench"
   },
   {
     "id": 126,
@@ -1330,7 +1385,9 @@ export const defaultMasterExercises = [
     "instructions_en": [
       "To begin, step onto the elliptical and select the desired option from the menu. Most ellipticals have a manual setting, or you can select a program to run. Typically, you can enter your age and weight to estimate the amount of calories burned during exercise. Elevation can be adjusted to change the intensity of the workout.",
       "The handles can be used to monitor your heart rate to help you stay at an appropriate intensity."
-    ]
+    ],
+    "exerciseId": "Elliptical_Trainer",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Elliptical_Trainer/0.jpg"
   },
   {
     "id": 133,
@@ -1396,7 +1453,9 @@ export const defaultMasterExercises = [
       "Stand holding a light kettlebell by the horns close to your chest. This will be your starting position.",
       "Squat down between your legs until your hamstrings are on your calves. Keep your chest and head up and your back straight.",
       "At the bottom position, pause and use your elbows to push your knees out. Return to the starting position, and repeat for 10-20 repetitions."
-    ]
+    ],
+    "exerciseId": "Goblet_Squat",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Goblet_Squat/0.jpg"
   },
   {
     "id": 135,
@@ -1437,7 +1496,9 @@ export const defaultMasterExercises = [
       "After a brief pause, push the bar back to the starting position as you breathe out. Focus on pushing the bar using your chest muscles. Lock your arms and squeeze your chest in the contracted position at the top of the motion, hold for a second and then start coming down slowly again. Tip: Ideally, lowering the weight should take about twice as long as raising it.",
       "Repeat the movement for the prescribed amount of repetitions.",
       "When you are done, place the bar back in the rack."
-    ]
+    ],
+    "exerciseId": "Barbell_Bench_Press_-_Medium_Grip",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Bench_Press_-_Medium_Grip/0.jpg"
   },
   {
     "id": 136,
@@ -1627,7 +1688,8 @@ export const defaultMasterExercises = [
     "instructions_en": [
       "Begin standing a few feet in front of a low pulley with a rope or handle attached. Face away from the machine, straddling the cable, with your feet set wide apart.",
       "Begin the movement by reaching through your legs as far as possible, bending at the hips. Keep your knees slightly bent. Keeping your arms straight, extend through the hip to stand straight up. Avoid pulling upward through the shoulders; all of the motion should originate through the hips."
-    ]
+    ],
+    "exerciseId": "Pull_Through"
   },
   {
     "id": 141,
@@ -1657,7 +1719,9 @@ export const defaultMasterExercises = [
     "instructions_en": [
       "Running or hiking on trails will get the blood pumping and heart beating almost immediately. Make sure you have good shoes. While you use the muscles in your calves and buttocks to pull yourself up a hill, the knees, joints and ankles absorb the bulk of the pounding coming back down. Take smaller steps as you walk downhill, keep your knees bent to reduce the impact and slow down to avoid falling.",
       "A 150 lb person can burn over 200 calories for 30 minutes walking uphill, compared to 175 on a flat surface. If running the trail, a 150 lb person can burn well over 500 calories in 30 minutes."
-    ]
+    ],
+    "exerciseId": "Trail_Running_Walking",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Trail_Running_Walking/0.jpg"
   },
   {
     "id": 142,
@@ -1700,7 +1764,8 @@ export const defaultMasterExercises = [
       "After a second pause, bring the bar back to the starting position as you breathe out and push the bar using your chest muscles. Lock your arms in the contracted position, squeeze your chest, hold for a second and then start coming down slowly again. Tip: it should take at least twice as long to go down than to come up.",
       "Repeat the movement for the prescribed amount of repetitions.",
       "When you are done, place the bar back in the rack."
-    ]
+    ],
+    "exerciseId": "Barbell_Incline_Bench_Press_-_Medium_Grip"
   },
   {
     "id": 143,
@@ -1741,7 +1806,8 @@ export const defaultMasterExercises = [
       "While maintaining the torso in a stationary position (no swinging), lift the dumbbells to your side with a slight bend on the elbow and the hands slightly tilted forward as if pouring water in a glass. Continue to go up until you arms are parallel to the floor. Exhale as you execute this movement and pause for a second at the top.",
       "Lower the dumbbells back down slowly to the starting position as you inhale.",
       "Repeat for the recommended amount of repetitions."
-    ]
+    ],
+    "exerciseId": "Side_Lateral_Raise"
   }
 ];
 
@@ -2059,7 +2125,11 @@ export const canonicalizeExercise = (ex) => {
   } else if (locName === 'standing cable lateral raise' || locName === 'standing cable lateral raises' || locName === 'cable lateral raise' || locName === 'cable lateral raises' || locName === 'cable side lateral raise' || locName === 'cable side lateral raises') {
     name = 'Standing Cable Lateral Raise';
   } else if (locName === 'cable seated lateral raise' || locName === 'seated cable lateral raise' || locName === 'seated cable lateral raises') {
-    name = 'Cable Seated Lateral Raise';
+    if (ex.id === 104 || ex.originalId === 104 || (masterMatch && masterMatch.id === 104)) {
+      name = 'Standing Cable Lateral Raise';
+    } else {
+      name = 'Cable Seated Lateral Raise';
+    }
   } else if (locName === 'seated side lateral raise' || locName === 'seated dumbbell lateral raise' || locName === 'seated dumbbell lateral raises' || locName === 'seated lateral raise' || locName === 'seated lateral raises') {
     name = 'Seated Side Lateral Raise';
   } else if (locName === 'side lateral raise' || locName === 'side lateral raises' || locName === 'dumbbell lateral raise' || locName === 'dumbbell lateral raises' || locName === 'dumbbell side lateral raise' || locName === 'dumbbell side lateral raises' || locName === 'lateral raise' || locName === 'lateral raises') {
@@ -2098,21 +2168,38 @@ export const canonicalizeExercise = (ex) => {
       ? masterMatch.instructions_en
       : ex.instructions || masterMatch?.instructions;
 
+  const rawEq = (masterMatch ? (ex.equipment || masterMatch.equipment) : ex.equipment) || '';
+  const resolvedEq = normalizeEquipmentName(rawEq, name || ex.name);
+
+  const rawId = String(ex.originalId || ex.id || '');
+  const aliasTarget = (exerciseAliasMap && exerciseAliasMap[rawId]) || (masterMatch && exerciseAliasMap && exerciseAliasMap[String(masterMatch.id)]);
+  const resolvedExId = ex.exerciseId || masterMatch?.exerciseId || (aliasTarget ? aliasTarget.replace(/^edb-/, '') : '');
+
+  let resolvedGifUrl = ex.gifUrl || masterMatch?.gifUrl || '';
+  if (resolvedExId && !resolvedExId.match(/^(107|128|129|130|131|133|136|137|138)$/)) {
+    resolvedGifUrl = `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/${resolvedExId}/0.jpg`;
+  }
+
+  const finalThumbnail = masterMatch?.thumbnailUrl || ex.thumbnailUrl || (resolvedGifUrl ? resolvedGifUrl : '');
+
   return {
     ...ex,
     name,
+    exerciseId: resolvedExId || ex.exerciseId,
     videoUrl: masterMatch?.videoUrl || ex.videoUrl || '',
-    thumbnailUrl: masterMatch?.thumbnailUrl || ex.thumbnailUrl || masterMatch?.gifUrl || ex.gifUrl || '',
-    gifUrl: masterMatch?.gifUrl || ex.gifUrl || '',
+    thumbnailUrl: finalThumbnail,
+    gifUrl: resolvedGifUrl || masterMatch?.gifUrl || ex.gifUrl || '',
     ytVideo: masterMatch?.ytVideo || ex.ytVideo || '',
     instructions: instId || instEn,
     instructions_id: instId,
     instructions_en: instEn,
     ...(masterMatch ? {
       target: (ex.target && ex.target.length > 0) ? ex.target : masterMatch.target,
-      equipment: ex.equipment || masterMatch.equipment,
+      equipment: resolvedEq || masterMatch.equipment,
       type: ex.type || masterMatch.type,
-    } : {})
+    } : {
+      ...(resolvedEq ? { equipment: resolvedEq } : {})
+    })
   };
 };
 
@@ -2336,7 +2423,7 @@ export const defaultPrograms = [
         ],
         "type": "weight",
         "defaultWeight": 40,
-        "equipment": "Machine",
+        "equipment": "Cable",
         "ytVideo": "https://youtu.be/bNmvKpJSWKM?si=E7zZ3a3qeG4Ij7bb https://youtu.be/7Cjc_aXoQ_I?si=ZqhPV5iSMoTOLSIf",
         "videoUrl": "/exercise-assets/youtube-backup/edb-Wide-Grip_Lat_Pulldown.mp4"
       },
@@ -2712,6 +2799,40 @@ export const exerciseAliasMap = {
   '143': 'edb-Side_Lateral_Raise'
 };
 
+/**
+ * Resolves the ExerciseDB exerciseId for any exercise.
+ * Maps master IDs, aliases, custom exercise copies, and standard exercise names to ExerciseDB IDs.
+ */
+export const resolveExerciseDbId = (exercise) => {
+  if (!exercise) return null;
+  const rawExId = exercise.exerciseId;
+  if (rawExId && !String(rawExId).startsWith('edb-') && !String(rawExId).match(/^(107|128|129|130|131|133|136|137|138)$/)) {
+    return String(rawExId);
+  }
+  const rawId = String(exercise.originalId || exercise.id || '');
+  if (rawId.startsWith('edb-')) {
+    const target = rawId.replace(/^edb-/, '');
+    if (!target.match(/^(107|128|129|130|131|133|136|137|138)$/)) return target;
+  }
+  if (exerciseAliasMap && exerciseAliasMap[rawId]) {
+    const target = exerciseAliasMap[rawId].replace(/^edb-/, '');
+    if (!target.match(/^(107|128|129|130|131|133|136|137|138)$/)) return target;
+  }
+  const rawGif = exercise.gifUrl || '';
+  const match = rawGif.match(/exercises\/([^/]+)\/[01]\.jpg/);
+  if (match) return match[1];
+
+  const master = findMatchingMasterExercise(exercise, defaultMasterExercises);
+  if (master) {
+    if (master.exerciseId && !String(master.exerciseId).startsWith('edb-')) return String(master.exerciseId);
+    if (exerciseAliasMap && exerciseAliasMap[String(master.id)]) {
+      const target = exerciseAliasMap[String(master.id)].replace(/^edb-/, '');
+      if (!target.match(/^(107|128|129|130|131|133|136|137|138)$/)) return target;
+    }
+  }
+  return null;
+};
+
 export const resolveLoggedExercise = (logKey, exLookup) => {
   if (logKey === null || logKey === undefined || !exLookup) return undefined;
   const key = String(logKey);
@@ -2983,7 +3104,7 @@ export const filterByGymEquipment = (list, activeGym) => {
   if (alat === 'all' || !Array.isArray(alat)) return list || [];
   const dikenal = new Set(equipmentOptions);
   return (list || []).filter((ex) => {
-    const eq = ex?.equipment;
+    const eq = normalizeEquipmentName(ex?.equipment, ex?.name);
     if (eq === 'Body Weight') return true;
     if (!dikenal.has(eq)) return true;
     return alat.includes(eq);

@@ -371,14 +371,14 @@ export default function ProfileModal({
 
                 {/* Upload Status Toast (Success) */}
                 {uploadStatus.show && uploadStatus.success && (
-                    <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] bg-emerald-500/90 text-white text-[12px] font-bold px-5 py-3 rounded-2xl md:rounded-full shadow-2xl border border-emerald-400/50 animate-in zoom-in-95 fade-in duration-300 text-center max-w-[80vw] backdrop-blur-sm">
+                    <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] bg-emerald-500/90 text-white text-xs font-bold px-5 py-3 rounded-2xl md:rounded-full shadow-2xl border border-emerald-400/50 animate-in zoom-in-95 fade-in duration-300 text-center max-w-[80vw] backdrop-blur-sm">
                         Foto diperbarui
                     </div>
                 )}
 
                 {/* Upload Status Toast (Error) */}
                 {uploadStatus.show && !uploadStatus.success && (
-                    <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] bg-rose-500/90 text-white text-[12px] font-bold px-5 py-3 rounded-2xl md:rounded-full shadow-2xl border border-rose-400/50 animate-in zoom-in-95 fade-in duration-300 text-center max-w-[80vw] backdrop-blur-sm">
+                    <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] bg-rose-500/90 text-white text-xs font-bold px-5 py-3 rounded-2xl md:rounded-full shadow-2xl border border-rose-400/50 animate-in zoom-in-95 fade-in duration-300 text-center max-w-[80vw] backdrop-blur-sm">
                         {uploadStatus.message}
                     </div>
                 )}
@@ -659,7 +659,7 @@ export default function ProfileModal({
                                     className={`w-full pl-8 pr-4 py-3 rounded-xl border-2 font-bold text-sm border-transparent ${t.inputBg} ${t.textMain} focus:outline-none focus:border-blue-500 ${isUsernameLocked ? 'opacity-60 cursor-not-allowed' : ''}`}
                                 />
                             </div>
-                            <p className={`text-[10px] mt-1 font-medium ${t.textMuted}`}>
+                            <p className={`text-xs mt-1 font-medium ${t.textMuted}`}>
                                 {isUsernameLocked ? 'Username cuma bisa disetel sekali dan tidak bisa diubah lagi.' : 'Hanya huruf kecil, angka, dan garis bawah (_). Tidak bisa diubah lagi setelah disimpan.'}
                             </p>
                         </div>
@@ -684,7 +684,7 @@ export default function ProfileModal({
                                 className={`w-full px-4 py-3 rounded-xl border-2 font-bold text-sm ${editDob ? (isValidAge(editDob) ? 'border-transparent focus:border-blue-500' : 'border-rose-500 text-rose-500') : 'border-transparent focus:border-blue-500'} ${t.inputBg} ${editDob && !isValidAge(editDob) ? '' : t.textMain} focus:outline-none`}
                             />
                             {editDob && !isValidAge(editDob) ? (
-                                <p className={`text-[10px] mt-1.5 font-bold text-rose-500 animate-in fade-in`}>Usia harus di atas 13 tahun.</p>
+                                <p className={`text-xs mt-1.5 font-bold text-rose-500 animate-in fade-in`}>Usia harus di atas 13 tahun.</p>
                             ) : null}
                         </div>
 
@@ -699,7 +699,7 @@ export default function ProfileModal({
                                 placeholder="Misal: Nyeri lutut kanan, riwayat asma..."
                                 className={`w-full px-4 py-3 rounded-xl border-2 font-bold text-sm border-transparent ${t.inputBg} ${t.textMain} focus:outline-none focus:border-blue-500`}
                             />
-                            <p className={`text-[10px] mt-1 font-medium ${t.textMuted}`}>AI akan mempertimbangkan ini saat menyusun program latihan.</p>
+                            <p className={`text-xs mt-1 font-medium ${t.textMuted}`}>AI akan mempertimbangkan ini saat menyusun program latihan.</p>
                         </div>
                     </div>
                     
@@ -814,7 +814,7 @@ export default function ProfileModal({
                         
                         <h3 className={`text-xl font-black mb-1 ${isDark ? 'text-white' : 'text-black'}`}>{selectedAchievement.title}</h3>
                         
-                        <div className={`text-[10px] font-black tracking-wider uppercase px-3 py-1 rounded-full mb-4 ${userAchievements?.includes(selectedAchievement.id) ? 'bg-emerald-500/20 text-emerald-500' : 'bg-slate-500/20 text-slate-500'}`}>
+                        <div className={`text-xs font-black tracking-wider uppercase px-3 py-1 rounded-full mb-4 ${userAchievements?.includes(selectedAchievement.id) ? 'bg-emerald-500/20 text-emerald-500' : 'bg-slate-500/20 text-slate-500'}`}>
                             {userAchievements?.includes(selectedAchievement.id) ? '🏆 Tercapai' : '🔒 Terkunci'}
                         </div>
 

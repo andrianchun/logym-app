@@ -84,7 +84,7 @@ export default function PwaInstallPrompt({
           />
         </div>
         <h3 className="text-lg font-black mb-2 text-white">Install {appName} App</h3>
-        <p className="text-xs text-gray-400 mb-6 leading-relaxed">{description}</p>
+        <p className="text-xs text-slate-400 mb-6 leading-relaxed">{description}</p>
         <div className="flex flex-col w-full gap-2.5">
           <button 
             className={`w-full py-3 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-md active:scale-98 transition-transform ${accentColor}`}
@@ -93,7 +93,7 @@ export default function PwaInstallPrompt({
             <Download size={18} /> Instal Sekarang
           </button>
           <button 
-            className="w-full py-2.5 rounded-2xl font-bold text-gray-400 hover:text-white bg-transparent border border-transparent transition-colors text-xs"
+            className="w-full py-2.5 rounded-2xl font-bold text-slate-400 hover:text-white bg-transparent border border-transparent transition-colors text-xs"
             onClick={handleDismiss}
             data-close-modal="true"
           >

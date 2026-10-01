@@ -83,30 +83,10 @@ import { Loader2, Download, X } from 'lucide-react';
 // masih sama dengan baseline (tidak ada perubahan lokal yang belum terkirim); kalau berbeda,
 // pertahankan yang lokal.
 
-// Baca cache localStorage yang MUNGKIN RUSAK. Kalau JSON-nya tidak utuh (tulisan terpotong
-// saat kuota habis), `JSON.parse` melempar — dan karena semua pemanggilnya ada di badan
-// komponen, lemparannya terjadi SAAT RENDER: ErrorBoundary layar merah tiap boot, tanpa jalan
-// keluar selain uninstall, padahal datanya aman di Firestore. Di sini kunci yang rusak dibuang
-// dan app boot dengan nilai default — snapshot server mengisinya kembali beberapa detik lagi.
-const readCache = (key, fallback) => {
-  try {
-    const raw = localStorage.getItem(key);
-    if (raw === null) return fallback;
-    const val = JSON.parse(raw);
-    return val === null || val === undefined ? fallback : val;
-  } catch {
-    console.warn(`[Cache] ${key} rusak — dibuang, akan diisi ulang dari server.`);
-    try { localStorage.removeItem(key); } catch { /* diabaikan */ }
-    return fallback;
-  }
-};
+import { readCache, writeCache, freeLocalStorageSpace, pruneHistoryForLocalCache } from './utils/storageCache.js';
 
-// Tulis cache. WAJIB dibungkus: setItem melempar QuotaExceededError saat penyimpanan penuh,
-// dan karena pemanggilnya useEffect, lemparannya menjatuhkan seluruh app. Cache itu percepatan
-const writeCache = (key, value) => {
-  try { localStorage.setItem(key, JSON.stringify(value)); return true; }
-  catch { console.warn(`[Cache] gagal menulis ${key} (kuota penuh?)`); return false; }
-};
+// Jalankan pembersihan awal saat boot untuk memastikan tersisa ruang lega untuk Firestore
+freeLocalStorageSpace();
 
 export default function App() {
   // --- STATE AUTH & LOADING ---
@@ -325,7 +305,7 @@ export default function App() {
   }, [apkError, showOtaAlert]);
   const [language, setLanguage] = useState(() => readCache('__CACHED_LANGUAGE', 'ID'));
   const [soundEnabled, setSoundEnabled] = useState(() => readCache('__CACHED_SOUND_ENABLED', true));
-  const [healthConnectEnabled, setHealthConnectEnabled] = useState(false);
+  const [healthConnectEnabled, setHealthConnectEnabled] = useState(() => readCache('__CACHED_HEALTH_CONNECT_ENABLED', false));
   const [defaultRestTime, setDefaultRestTime] = useState(() => readCache('__CACHED_DEFAULT_REST_TIME', 120));
   const [warmupVideos, _setWarmupVideos] = useState(defaultWarmupVideos);
   const setWarmupVideos = _setWarmupVideos;
@@ -383,6 +363,7 @@ export default function App() {
   useEffect(() => { writeCache('__CACHED_UNITS', units); }, [units]);
   useEffect(() => { writeCache('__CACHED_ACTIVITY_TARGETS', activityTargets); }, [activityTargets]);
   useEffect(() => { writeCache('__CACHED_LOGY_PERSONA', logyPersona); }, [logyPersona]);
+  useEffect(() => { writeCache('__CACHED_HEALTH_CONNECT_ENABLED', healthConnectEnabled); }, [healthConnectEnabled]);
 
   useEffect(() => {
     if (!isDataLoaded) return;
@@ -410,6 +391,9 @@ export default function App() {
       if (ex.id === 121 && (ex.name === 'Pull Through' || ex.name === 'Cable Pull Through')) {
         return canonicalizeExercise({ ...ex, name: 'Cable Hip Abduction', target: ['Glutes'] });
       }
+      if ((ex.id === 104 || ex.originalId === 104) && (ex.name || '').toLowerCase().includes('seated')) {
+        return canonicalizeExercise({ ...ex, name: 'Standing Cable Lateral Raise' });
+      }
       return canonicalizeExercise(ex);
     });
   });
@@ -425,6 +409,9 @@ export default function App() {
         if (ex.id === 121 && (ex.name === 'Pull Through' || ex.name === 'Cable Pull Through')) {
           return canonicalizeExercise({ ...ex, name: 'Cable Hip Abduction', target: ['Glutes'] });
         }
+        if ((ex.id === 104 || ex.originalId === 104) && (ex.name || '').toLowerCase().includes('seated')) {
+          return canonicalizeExercise({ ...ex, name: 'Standing Cable Lateral Raise' });
+        }
         return canonicalizeExercise(ex);
       })
     }));
@@ -439,7 +426,8 @@ export default function App() {
   historyMirror.current = history;
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (!writeCache('__CACHED_HISTORY', history)) {
+      const cachedCompact = pruneHistoryForLocalCache(history, 90);
+      if (!writeCache('__CACHED_HISTORY', cachedCompact)) {
         setCloudSaveError('Penyimpanan lokal penuh — cache latihan tidak bisa ditulis. Kosongkan ruang penyimpanan; sampai itu beres, data antar perangkat bisa tidak sinkron.');
       }
     }, 400);
@@ -450,7 +438,8 @@ export default function App() {
   // Flush pending history cache write saat aplikasi ditutup/berpindah latar belakang
   useEffect(() => {
     const flushCache = () => {
-      writeCache('__CACHED_HISTORY', historyMirror.current);
+      const cachedCompact = pruneHistoryForLocalCache(historyMirror.current, 90);
+      writeCache('__CACHED_HISTORY', cachedCompact);
     };
     window.addEventListener('beforeunload', flushCache);
     window.addEventListener('pagehide', flushCache);
@@ -1501,7 +1490,9 @@ export default function App() {
         planName: uniqueName,
         planLevel: userExperience,
         planGoal: plan.calculatedTargets?.nutritionGoal || 'maintenance',
-        assignedDays: routine.day ? [routine.day] : [] 
+        assignedDays: (Array.isArray(routine.assignedDays) && routine.assignedDays.length > 0)
+          ? routine.assignedDays 
+          : (routine.day ? [routine.day] : [])
       };
     });
     
@@ -1898,6 +1889,9 @@ export default function App() {
                   if (ex.id === 121 && (ex.name === 'Pull Through' || ex.name === 'Cable Pull Through')) {
                     return canonicalizeExercise({ ...ex, name: 'Cable Hip Abduction', target: ['Glutes'] });
                   }
+                  if ((ex.id === 104 || ex.originalId === 104) && (ex.name || '').toLowerCase().includes('seated')) {
+                    return canonicalizeExercise({ ...ex, name: 'Standing Cable Lateral Raise' });
+                  }
                   return canonicalizeExercise(ex);
                 }) : []
               }));
@@ -1908,6 +1902,9 @@ export default function App() {
               const migratedLib = parsedLib.map(ex => {
                 if (ex.id === 121 && (ex.name === 'Pull Through' || ex.name === 'Cable Pull Through')) {
                   return canonicalizeExercise({ ...ex, name: 'Cable Hip Abduction', target: ['Glutes'] });
+                }
+                if ((ex.id === 104 || ex.originalId === 104) && (ex.name || '').toLowerCase().includes('seated')) {
+                  return canonicalizeExercise({ ...ex, name: 'Standing Cable Lateral Raise' });
                 }
                 return canonicalizeExercise(ex);
               });
@@ -4286,44 +4283,63 @@ export default function App() {
 
   const addExerciseTarget = (ex) => {
     if (!activeAddModalTarget) return;
-    playSoundEffect('click', soundEnabled);
-    saveStateToHistory(); 
-    
-    let defaultSets = 3; let defaultReps = 10; let defaultDuration = 10;
-    if (ex.type === 'time') { defaultSets = 1; defaultReps = 0; defaultDuration = ex.duration || 15; }
-    else if (ex.type === 'reps') { defaultSets = 3; defaultReps = ex.reps || 15; defaultDuration = 0; }
+    try {
+      playSoundEffect('click', soundEnabled);
+      saveStateToHistory(); 
+      
+      let defaultSets = 3; let defaultReps = 10; let defaultDuration = 10;
+      if (ex.type === 'time') { defaultSets = 1; defaultReps = 0; defaultDuration = ex.duration || 15; }
+      else if (ex.type === 'reps') { defaultSets = 3; defaultReps = ex.reps || 15; defaultDuration = 0; }
 
-    if (activeAddModalTarget.type === 'program') {
-      const progId = activeAddModalTarget.progId;
-      setPrograms(prev => prev.map(p => p.id === progId ? { ...p, exercises: [...p.exercises, { ...ex, id: crypto.randomUUID(), sets: defaultSets, reps: defaultReps, duration: defaultDuration }] } : p));
-    } else if (activeAddModalTarget.type === 'adhoc') { 
-      setExtraExercises(prev => {
-        const cleanTargetName = (ex.name || '').toLowerCase().trim();
-        const baseTargetId = String(ex.originalId || ex.id || '').split('-')[0];
-        const isDuplicate = prev.some(existing => {
-          const cleanExistingName = (existing.name || '').toLowerCase().trim();
-          const baseExistingId = String(existing.originalId || existing.id || '').split('-')[0];
-          return (baseTargetId && baseExistingId === baseTargetId) || (cleanTargetName && cleanExistingName === cleanTargetName);
-        });
-        if (isDuplicate) return prev;
-        return [...prev, { ...ex, id: `${ex.id}-${Date.now()}`, sets: defaultSets, reps: defaultReps, duration: defaultDuration }];
-      }); 
-      setLastActionTime(Date.now()); 
-    } else if (activeAddModalTarget.type === 'replace') {
-      const exToReplaceId = activeAddModalTarget.id;
-      setPrograms(programs.map(p => {
-        const hasEx = p.exercises?.some(e => e.id === exToReplaceId);
-        if (hasEx) {
-           return {
-             ...p,
-             exercises: p.exercises.map(e => e.id === exToReplaceId ? { ...ex, id: crypto.randomUUID(), sets: e.sets || defaultSets, reps: e.reps || defaultReps, duration: e.duration || defaultDuration } : e)
-           }
-        }
-        return p;
-      }));
-      setLastActionTime(Date.now());
+      const generateId = () => (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+        ? crypto.randomUUID()
+        : `ex-${Date.now()}-${Math.random().toString(36).substr(2, 7)}`;
+
+      if (activeAddModalTarget.type === 'program') {
+        const progId = activeAddModalTarget.progId;
+        setPrograms(prev => (prev || []).map(p => {
+          if (p.id !== progId) return p;
+          const curExercises = Array.isArray(p.exercises) ? p.exercises : [];
+          return {
+            ...p,
+            exercises: [
+              ...curExercises,
+              { ...ex, id: generateId(), sets: defaultSets, reps: defaultReps, duration: defaultDuration }
+            ]
+          };
+        }));
+      } else if (activeAddModalTarget.type === 'adhoc') { 
+        setExtraExercises(prev => {
+          const cleanTargetName = (ex.name || '').toLowerCase().trim();
+          const baseTargetId = String(ex.originalId || ex.id || '').split('-')[0];
+          const isDuplicate = prev.some(existing => {
+            const cleanExistingName = (existing.name || '').toLowerCase().trim();
+            const baseExistingId = String(existing.originalId || existing.id || '').split('-')[0];
+            return (baseTargetId && baseExistingId === baseTargetId) || (cleanTargetName && cleanExistingName === cleanTargetName);
+          });
+          if (isDuplicate) return prev;
+          return [...prev, { ...ex, id: `${ex.id}-${Date.now()}`, sets: defaultSets, reps: defaultReps, duration: defaultDuration }];
+        }); 
+        setLastActionTime(Date.now()); 
+      } else if (activeAddModalTarget.type === 'replace') {
+        const exToReplaceId = activeAddModalTarget.id;
+        setPrograms(prev => (prev || []).map(p => {
+          const hasEx = (p.exercises || []).some(e => e.id === exToReplaceId);
+          if (hasEx) {
+             return {
+               ...p,
+               exercises: (p.exercises || []).map(e => e.id === exToReplaceId ? { ...ex, id: generateId(), sets: e.sets || defaultSets, reps: e.reps || defaultReps, duration: e.duration || defaultDuration } : e)
+             };
+          }
+          return p;
+        }));
+        setLastActionTime(Date.now());
+      }
+    } catch (err) {
+      console.error('Error adding exercise target:', err);
+    } finally {
+      setActiveAddModalTarget(null); 
     }
-    setActiveAddModalTarget(null); 
   };
 
   const handleCreateCustomExercise = (form) => {
@@ -4410,9 +4426,9 @@ export default function App() {
          
          {isSlowLoading && user && (!isDataLoaded || !isHistoryLoaded) && (
            <div className="absolute bottom-12 left-0 right-0 px-8 flex flex-col items-center justify-center text-center animate-in fade-in slide-in-from-bottom-4 duration-700">
-             <Loader2 className="w-5 h-5 animate-spin mb-3 text-zinc-500" />
-             <p className="text-sm font-medium text-zinc-400">Mengambil data dari server...</p>
-             <p className="text-[10px] mt-1.5 leading-relaxed max-w-[250px] mx-auto text-zinc-500">Koneksi mungkin sedang lambat, mohon tunggu sebentar agar data tersinkronisasi.</p>
+             <Loader2 className="w-5 h-5 animate-spin mb-3 text-slate-500" />
+             <p className="text-sm font-medium text-slate-400">Mengambil data dari server...</p>
+             <p className="text-xs mt-1.5 leading-relaxed max-w-[250px] mx-auto text-slate-500">Koneksi mungkin sedang lambat, mohon tunggu sebentar agar data tersinkronisasi.</p>
            </div>
          )}
       </div>
@@ -4466,7 +4482,7 @@ export default function App() {
             <p className="text-xs font-black mb-0.5">
               {hasParseError ? 'Perubahan TIDAK tersimpan' : 'Gagal menyimpan ke cloud'}
             </p>
-            <p className="text-[11px] leading-snug text-white/85 break-words">
+            <p className="text-xs leading-snug text-white/85 break-words">
               {hasParseError
                 ? 'Data dari server tidak terbaca, jadi penyimpanan otomatis dimatikan supaya data lamamu tidak tertimpa. Tutup dan buka ulang app. Jangan latihan dulu sebelum pesan ini hilang.'
                 : cloudSaveError}
@@ -4792,7 +4808,7 @@ export default function App() {
       {/* Toast "Tekan Back Sekali Lagi" */}
       {showExitToast && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <div className={`px-5 py-2.5 rounded-full shadow-lg text-sm font-medium ${theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-800 text-white'}`}>
+          <div className={`px-5 py-2.5 rounded-full shadow-lg text-sm font-medium ${theme === 'dark' ? 'bg-slate-700 text-white' : 'bg-slate-800 text-white'}`}>
             Tekan sekali lagi untuk keluar
           </div>
         </div>

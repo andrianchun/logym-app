@@ -173,7 +173,7 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
             padahal di gym sungguhan tumpukan cable, rangka mesin, dan pegangan dumbbell punya
             berat bawaan sendiri — sering 2,5 sampai 5 kg. */}
         <div>
-          <label className={`text-[10px] uppercase font-bold tracking-wider ${t.textMuted} block mb-1`}>
+          <label className={`text-xs uppercase font-bold tracking-wider ${t.textMuted} block mb-1`}>
             {isBarbellBased ? 'Berat Bar/Alat (kg)' : isDumbbell ? 'Berat Pegangan (kg)' : 'Beban Dasar Alat (kg)'}
           </label>
           <SwipeInput language={language} 
@@ -192,7 +192,7 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
 
         {isCableOrMachine && (
           <div>
-            <label className={`text-[10px] uppercase font-bold tracking-wider ${t.textMuted} block mb-1`}>Rasio Katrol</label>
+            <label className={`text-xs uppercase font-bold tracking-wider ${t.textMuted} block mb-1`}>Rasio Katrol</label>
             <div className="flex gap-1.5 pt-1">
               <button 
                 type="button"
@@ -213,7 +213,7 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
         )}
 
         <div>
-          <label className={`text-[10px] uppercase font-bold tracking-wider ${t.textMuted} block mb-1`}>Kenaikan Beban (kg)</label>
+          <label className={`text-xs uppercase font-bold tracking-wider ${t.textMuted} block mb-1`}>Kenaikan Beban (kg)</label>
           <SwipeInput language={language} 
             value={conf.increment || (isBarbellBased ? 2.5 : 5)}
             onChange={val => updateConfig(eqName, 'increment', val)}
@@ -259,13 +259,13 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
               <div className="flex gap-2">
                 <button 
                   onClick={() => setEditingGym({...editingGym, equipment: [...equipmentOptions]})}
-                  className={`px-2.5 py-1 ${t.bgAccentSoft || 'bg-sky-500/10'} ${t.textAccent || 'text-sky-500'} rounded-lg text-[10px] uppercase font-black hover:opacity-80 transition-all`}
+                  className={`px-2.5 py-1 ${t.bgAccentSoft || 'bg-sky-500/10'} ${t.textAccent || 'text-sky-500'} rounded-lg text-xs uppercase font-black hover:opacity-80 transition-all`}
                 >
                   Pilih Semua
                 </button>
                 <button 
                   onClick={() => setEditingGym({...editingGym, equipment: []})}
-                  className="px-2.5 py-1 bg-rose-500/10 text-rose-500 rounded-lg text-[10px] uppercase font-black hover:bg-rose-500/20 transition-all"
+                  className="px-2.5 py-1 bg-rose-500/10 text-rose-500 rounded-lg text-xs uppercase font-black hover:bg-rose-500/20 transition-all"
                 >
                   Hapus Semua
                 </button>

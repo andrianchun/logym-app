@@ -51,7 +51,7 @@ function DownloadProgress({ progress, t }) {
       <div className="w-full flex flex-col items-center justify-center p-4">
         <Loader2 className={`animate-spin ${t.textAccent} mb-3`} size={32} />
         <span className={`text-sm font-bold ${t.textMain}`}>Mempersiapkan Unduhan...</span>
-        <p className={`text-[10px] ${t.textMuted} mt-2 leading-tight text-center`}>
+        <p className={`text-xs ${t.textMuted} mt-2 leading-tight text-center`}>
           Tunggu sebentar, file APK sedang diproses oleh browser.
         </p>
       </div>
@@ -80,7 +80,7 @@ function DownloadProgress({ progress, t }) {
           <div className="absolute inset-0 bg-white/30 animate-pulse rounded-full" />
         )}
       </div>
-      <p className={`text-[10px] ${t.textMuted} mt-2 leading-tight`}>
+      <p className={`text-xs ${t.textMuted} mt-2 leading-tight`}>
         {isExtracting
           ? 'Memasang berkas baru ke aplikasi. LOGYM akan segera dimuat ulang…'
           : 'Jangan tutup aplikasi. LOGYM akan otomatis dimuat ulang setelah selesai.'}

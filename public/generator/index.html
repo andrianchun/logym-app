@@ -420,14 +420,17 @@
           });
 
           exerciseRegistry = freshData;
-          localStorage.setItem('logym_exercise_registry_v3', JSON.stringify(exerciseRegistry));
+          try {
+            sessionStorage.setItem('logym_exercise_registry_v3', JSON.stringify(exerciseRegistry));
+            localStorage.removeItem('logym_exercise_registry_v3');
+          } catch (e) {}
         } else {
-          const cachedRegistry = localStorage.getItem('logym_exercise_registry_v3');
+          const cachedRegistry = sessionStorage.getItem('logym_exercise_registry_v3') || localStorage.getItem('logym_exercise_registry_v3');
           if (cachedRegistry) exerciseRegistry = JSON.parse(cachedRegistry);
         }
       } catch (e) {
         console.error('Failed loading registry:', e);
-        const cachedRegistry = localStorage.getItem('logym_exercise_registry_v3');
+        const cachedRegistry = sessionStorage.getItem('logym_exercise_registry_v3') || localStorage.getItem('logym_exercise_registry_v3');
         if (cachedRegistry) exerciseRegistry = JSON.parse(cachedRegistry);
       }
 
@@ -435,7 +438,12 @@
     }
 
     function saveRegistryState() {
-      localStorage.setItem('logym_exercise_registry_v3', JSON.stringify(exerciseRegistry));
+      try {
+        sessionStorage.setItem('logym_exercise_registry_v3', JSON.stringify(exerciseRegistry));
+        localStorage.removeItem('logym_exercise_registry_v3');
+      } catch (e) {
+        console.warn('Gagal menyimpan registry ke sessionStorage:', e);
+      }
       updateCountsAndRender();
     }
 

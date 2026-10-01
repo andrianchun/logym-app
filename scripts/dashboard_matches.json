@@ -1,0 +1,434 @@
+[
+  {
+    "line": 26,
+    "text": "<span className={`text-[10px] font-bold ${t.textMuted} uppercase tracking-wider`}>{label}</span>"
+  },
+  {
+    "line": 30,
+    "text": "<span className={`text-[10px] font-bold ${t.textMuted}`}>{unit}</span>"
+  },
+  {
+    "line": 39,
+    "text": "manual:  { bar: 'bg-zinc-400 dark:bg-zinc-500', dot: 'bg-zinc-400 dark:bg-zinc-500' },"
+  },
+  {
+    "line": 47,
+    "text": "kardio:  { bar: 'bg-zinc-400 dark:bg-zinc-500', dot: 'bg-zinc-400 dark:bg-zinc-500' },"
+  },
+  {
+    "line": 87,
+    "text": "<span key={p.key} className=\"flex items-center gap-1 whitespace-nowrap text-[9px] text-zinc-500 dark:text-zinc-400\">"
+  },
+  {
+    "line": 101,
+    "text": "<span className={`text-[9px] font-bold ${t.textMuted} mt-1 uppercase tracking-wider`}>{label}</span>"
+  },
+  {
+    "line": 126,
+    "text": "if (!bf || bf <= 0) return 'text-zinc-500';"
+  },
+  {
+    "line": 1067,
+    "text": "<span className={`text-[10px] ${t.textMuted}`}>•</span>"
+  },
+  {
+    "line": 1070,
+    "text": "<span className=\"body-md font-bold text-[13px]\">{gymProfiles?.find(g => g.id === activeGymId)?.name || 'Logym'}</span>"
+  },
+  {
+    "line": 1073,
+    "text": "<span className={`text-[10px] ${t.textMuted}`}>•</span>"
+  },
+  {
+    "line": 1100,
+    "text": "<div className=\"w-7 h-7 rounded-full overflow-hidden bg-zinc-900 border border-blue-400 shrink-0\" style={{backgroundImage: \"url('/bg-program.webp')\", backgroundSize: '450%', backgroundPosition: '52% 7%'}}></div>"
+  },
+  {
+    "line": 1101,
+    "text": "<span className=\"text-[8px] font-black tracking-wide uppercase whitespace-nowrap leading-none pb-0.5\">Konsul</span>"
+  },
+  {
+    "line": 1160,
+    "text": "<span className={`text-[10px] ${t.textMuted} mb-0.5 font-bold`}>Fisik</span>"
+  },
+  {
+    "line": 1162,
+    "text": "<span onClick={(e) => { e.stopPropagation(); handleOpenBioDetails('weight'); }} className={`text-lg font-black ${t.textMain} leading-none cursor-pointer hover:underline`} title={isID ? 'Buka Analisis Berat' : 'Open Weight Analysis'}>{isImp && bioData.weight ? Number((bioData.weight * 2.20462).toFixed(1)) : bioData.weight || '-'} <span className=\"text-[9px] font-normal text-zinc-500 dark:text-zinc-400\">{isImp ? 'lbs' : 'kg'}</span></span>"
+  },
+  {
+    "line": 1163,
+    "text": "<span className=\"text-zinc-300 dark:text-zinc-600 text-[10px]\">|</span>"
+  },
+  {
+    "line": 1164,
+    "text": "<span onClick={(e) => { e.stopPropagation(); handleOpenBioDetails('height'); }} className={`text-lg font-black ${t.textMain} leading-none cursor-pointer hover:underline`} title={isID ? 'Buka Analisis Tinggi' : 'Open Height Analysis'}>{isImp && bioData.height ? Number((bioData.height * 0.393701).toFixed(1)) : bioData.height || '-'} <span className=\"text-[9px] font-normal text-zinc-500 dark:text-zinc-400\">{isImp ? 'in' : 'cm'}</span></span>"
+  },
+  {
+    "line": 1174,
+    "text": "<span className={`text-[10px] ${t.textMuted} mb-0.5 font-bold`}>BMI ({biometricStandard === 'western' ? 'Western' : 'Asia'})</span>"
+  },
+  {
+    "line": 1177,
+    "text": "<span className={`text-[10px] font-bold ${bioData.bmiStatus === 'Normal' ? 'text-emerald-500' : bioData.bmiStatus === 'Overweight' ? 'text-amber-400' : 'text-rose-500'}`}>{resolveBmiStatus(bioData.bmiStatus, isID)}</span>"
+  },
+  {
+    "line": 1187,
+    "text": "<span className={`text-[10px] ${t.textMuted} mb-0.5 font-bold`}>BMR</span>"
+  },
+  {
+    "line": 1189,
+    "text": "<span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.bmr, language) || '-'} <span className=\"text-[9px] font-normal text-zinc-500 dark:text-zinc-400\">kcal</span></span>"
+  },
+  {
+    "line": 1199,
+    "text": "<span className={`text-[10px] ${t.textMuted} mb-0.5 font-bold`}>{isID ? 'Kadar Lemak' : 'Body Fat'}</span>"
+  },
+  {
+    "line": 1201,
+    "text": "<span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.bodyFat, language) || '-'} <span className=\"text-[9px] font-normal text-zinc-500 dark:text-zinc-400\">%</span></span>"
+  },
+  {
+    "line": 1202,
+    "text": "<span className={`text-[10px] font-bold ${resolveBfColor(bioData.bodyFat, userProfile?.gender === 'female')}`}>{resolveBfStatus(bioData.bodyFat, userProfile?.gender === 'female', isID)}</span>"
+  },
+  {
+    "line": 1223,
+    "text": "<span className={`text-[10px] mt-0.5 font-bold leading-tight ${t.textMuted}`}>SCORE</span>"
+  },
+  {
+    "line": 1233,
+    "text": "<span className=\"text-[9px] font-bold text-sky-400 leading-none mt-0.5\">{mainFfmi !== '-' ? 'index' : '-'}</span>"
+  },
+  {
+    "line": 1234,
+    "text": "<span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>FFMI</span>"
+  },
+  {
+    "line": 1239,
+    "text": "<span className={`body-lg font-black ${t.textMain} leading-tight`}>{dispMainMuscle} <span className=\"text-[9px] font-normal text-zinc-500 dark:text-zinc-400\">{isImp ? 'lbs' : 'kg'}</span></span>"
+  },
+  {
+    "line": 1240,
+    "text": "<span className=\"text-[9px] font-bold text-sky-400 leading-none mt-0.5\">{bioData.musclePercent ? `${formatNumber(bioData.musclePercent, language)}%` : '-'}</span>"
+  },
+  {
+    "line": 1241,
+    "text": "<span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>{isID ? 'Otot' : 'Muscle'}</span>"
+  },
+  {
+    "line": 1246,
+    "text": "<span className={`body-lg font-black ${t.textMain} leading-tight`}>{formatNumber(bioData.proteinPercent, language) || '-'} <span className=\"text-[9px] font-normal text-zinc-500 dark:text-zinc-400\">%</span></span>"
+  },
+  {
+    "line": 1247,
+    "text": "<span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Protein</span>"
+  },
+  {
+    "line": 1252,
+    "text": "<span className={`body-lg font-black ${t.textMain} leading-tight`}>{formatNumber(bioData.waterPercent, language) || '-'} <span className=\"text-[9px] font-normal text-zinc-500 dark:text-zinc-400\">%</span></span>"
+  },
+  {
+    "line": 1253,
+    "text": "<span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Air</span>"
+  },
+  {
+    "line": 1259,
+    "text": "<span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Lemak<br/>Visceral</span>"
+  },
+  {
+    "line": 1264,
+    "text": "<span className={`body-lg font-black ${t.textMain} leading-tight`}>{dispMainWaist} <span className=\"text-[9px] font-normal text-zinc-500 dark:text-zinc-400\">{isImp ? 'in' : 'cm'}</span></span>"
+  },
+  {
+    "line": 1265,
+    "text": "<span className=\"text-[9px] font-bold text-sky-400 leading-none mt-0.5\">{mainWthr !== '-' ? `${mainWthr} WTHR` : '-'}</span>"
+  },
+  {
+    "line": 1266,
+    "text": "<span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>{isID ? 'Perut' : 'Waist'}</span>"
+  },
+  {
+    "line": 1271,
+    "text": "<span className={`body-lg font-black ${t.textMain} leading-tight`}>{formatNumber(bioData.boneMass, language) || '-'} <span className=\"text-[9px] font-normal text-zinc-500 dark:text-zinc-400\">%</span></span>"
+  },
+  {
+    "line": 1272,
+    "text": "<span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Mineral<br/>Tulang</span>"
+  },
+  {
+    "line": 1277,
+    "text": "<span className={`body-lg font-black ${t.textMain} leading-tight`}>{formatNumber(bioData.bodyAge, language) || '-'} <span className=\"text-[9px] font-normal text-zinc-500 dark:text-zinc-400\">th</span></span>"
+  },
+  {
+    "line": 1278,
+    "text": "<span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Usia<br/>Tubuh</span>"
+  },
+  {
+    "line": 1377,
+    "text": "<span className=\"text-[10px] text-zinc-500 dark:text-zinc-400 font-bold whitespace-nowrap\">/ {formatNumber(activityTargets?.steps || 10000, language)}</span>"
+  },
+  {
+    "line": 1400,
+    "text": "<span className=\"text-[10px] text-zinc-500 dark:text-zinc-400 font-bold whitespace-nowrap\">mnt</span>"
+  },
+  {
+    "line": 1402,
+    "text": "<div className=\"text-[9px] text-zinc-500 dark:text-zinc-400 font-semibold mt-0.5\">"
+  },
+  {
+    "line": 1428,
+    "text": "<span className=\"text-[10px] text-zinc-500 dark:text-zinc-400 font-bold whitespace-nowrap\">/ {formatNumber(foodTarget, language)} kkal</span>"
+  },
+  {
+    "line": 1438,
+    "text": "<span className=\"px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-500 text-[8px] uppercase font-bold tracking-wider\">LOMEAL</span>"
+  },
+  {
+    "line": 1473,
+    "text": "<div className=\"flex items-center space-x-1 mb-1 text-blue-400\"><Activity size={12}/> <span className={`text-[10px] ${t.textMuted}`}>Tensi</span></div>"
+  },
+  {
+    "line": 1479,
+    "text": "<div className=\"flex items-center space-x-1 mb-1 text-blue-400\"><HeartPulse size={12}/> <span className={`text-[10px] ${t.textMuted}`}>Nadi</span></div>"
+  },
+  {
+    "line": 1480,
+    "text": "<span className={`text-lg font-black ${t.textMain} leading-none`}>{bioData.heartRate > 0 ? <>{formatNumber(bioData.heartRate, language)} <span className=\"text-[9px] font-normal text-zinc-500 dark:text-zinc-400\">bpm</span></> : '-'}</span>"
+  },
+  {
+    "line": 1481,
+    "text": "<span className=\"text-[8px] text-zinc-500 dark:text-zinc-400 whitespace-nowrap mt-0.5\">Min {bioData.minHeartRate > 0 ? formatNumber(bioData.minHeartRate, language) : '-'} &bull; Max {bioData.maxHeartRate > 0 ? formatNumber(bioData.maxHeartRate, language) : '-'}</span>"
+  },
+  {
+    "line": 1486,
+    "text": "<div className=\"flex items-center space-x-1 mb-1 text-blue-400\"><span className={`text-[10px] ${t.textMuted}`}>SpO2</span> <Wind size={12}/></div>"
+  },
+  {
+    "line": 1487,
+    "text": "<span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.oxygenSaturation, language) || '-'} <span className=\"text-[9px] font-normal text-zinc-500 dark:text-zinc-400\">%</span></span>"
+  },
+  {
+    "line": 1651,
+    "text": "<span className={`text-[10px] font-bold ${t.textMuted}`}>{sleepDateLabel}</span>"
+  },
+  {
+    "line": 1749,
+    "text": "return <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider ${color} border shadow-sm`}>{text}</span>;"
+  },
+  {
+    "line": 1770,
+    "text": "<span className={`text-[10px] font-bold uppercase tracking-widest ${t.textMuted}`}>Skor Kesiapan</span>"
+  },
+  {
+    "line": 1793,
+    "text": "return <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider ${color} border shadow-sm`}>{text}</span>;"
+  },
+  {
+    "line": 1798,
+    "text": "<p className={`text-[10px] leading-snug mt-1.5 ${t.textMuted}`}>{sleepReadiness.message}</p>"
+  },
+  {
+    "line": 1866,
+    "text": "<span className={`text-[9px] mt-1 opacity-70 ${t.textMuted}`}>Hubungkan dengan smartwatch/Health Connect atau input manual untuk melihat analisis mendalam.</span>"
+  },
+  {
+    "line": 1885,
+    "text": "<span className={`text-[10px] font-bold ${t.textMuted}`}>{label}</span>"
+  },
+  {
+    "line": 1886,
+    "text": "<span className={`text-xs font-black ${t.textMain}`}>{durStr} <span className=\"text-[9px] font-normal opacity-60\">({Math.round(pct)}%)</span></span>"
+  },
+  {
+    "line": 1891,
+    "text": "<div className=\"absolute -top-1 -bottom-1 w-px bg-zinc-400/50\" style={{ left: `${targetLeft}%` }}></div>"
+  },
+  {
+    "line": 1892,
+    "text": "<div className=\"absolute -top-1 -bottom-1 w-px bg-zinc-400/50\" style={{ left: `${maxTargetPct}%` }}></div>"
+  },
+  {
+    "line": 1906,
+    "text": "<div className=\"flex flex-col mt-4 pt-4 border-t border-dashed border-zinc-500/20 relative\">"
+  },
+  {
+    "line": 1908,
+    "text": "<span className={`text-[10px] font-bold ${t.textMuted}`}>HRV (Heart Rate Variability)</span>"
+  },
+  {
+    "line": 1909,
+    "text": "<span className={`text-xs font-black text-rose-500`}>{val} <span className=\"text-[9px] font-normal opacity-60\">ms</span></span>"
+  },
+  {
+    "line": 1914,
+    "text": "<div className=\"absolute -top-1 -bottom-1 w-px bg-zinc-400/50\" style={{ left: '30%' }}></div>"
+  },
+  {
+    "line": 1925,
+    "text": "<div className=\"flex flex-col mt-4 pt-4 border-t border-dashed border-zinc-500/20 relative\">"
+  },
+  {
+    "line": 1927,
+    "text": "<span className={`text-[10px] font-bold ${t.textMuted}`}>SpO2 (Oksigen Darah)</span>"
+  },
+  {
+    "line": 1928,
+    "text": "<span className={`text-xs font-black text-sky-400`}>{val} <span className=\"text-[9px] font-normal opacity-60\">%</span></span>"
+  },
+  {
+    "line": 1933,
+    "text": "<div className=\"absolute -top-1 -bottom-1 w-px bg-zinc-400/50\" style={{ left: '95%' }}></div>"
+  },
+  {
+    "line": 1945,
+    "text": "<div className=\"flex flex-col mt-4 pt-4 border-t border-dashed border-zinc-500/20 relative\">"
+  },
+  {
+    "line": 1947,
+    "text": "<span className={`text-[10px] font-bold ${t.textMuted}`}>RHR (Nadi Istirahat)</span>"
+  },
+  {
+    "line": 1948,
+    "text": "<span className={`text-xs font-black text-rose-500`}>{val} <span className=\"text-[9px] font-normal opacity-60\">bpm</span></span>"
+  },
+  {
+    "line": 1953,
+    "text": "<div className=\"absolute -top-1 -bottom-1 w-px bg-zinc-400/50\" style={{ left: '25%' }}></div>"
+  },
+  {
+    "line": 1954,
+    "text": "<div className=\"absolute -top-1 -bottom-1 w-px bg-zinc-400/50\" style={{ left: '50%' }}></div>"
+  },
+  {
+    "line": 1965,
+    "text": "{renderSleepBar('Awake (Tidur Ayam)', sAwake, 5, 10, 'bg-zinc-400')}"
+  },
+  {
+    "line": 1986,
+    "text": "<div className=\"flex flex-wrap items-center gap-1.5 mt-6 pt-4 border-t border-dashed border-zinc-500/20\">"
+  },
+  {
+    "line": 1987,
+    "text": "<div className=\"flex items-center space-x-1.5\"><div className=\"w-3 h-3 bg-black/10 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-sm\"></div><span className={`text-[9px] font-bold ${t.textMuted}`}>Rentang Normal</span></div>"
+  },
+  {
+    "line": 1988,
+    "text": "<span className=\"text-[9px] text-zinc-500\">(Berdasarkan usia rata-rata)</span>"
+  },
+  {
+    "line": 1996,
+    "text": "<div className=\"absolute left-0 top-1 bottom-10 w-12 flex flex-col justify-between text-[9px] font-bold text-zinc-400 py-1 z-10 pointer-events-none\">"
+  },
+  {
+    "line": 2074,
+    "text": "<span className={`text-[9px] mt-1 opacity-70 ${t.textMuted}`}>Sinkronkan dengan Health Connect untuk melihat grafik.</span>"
+  },
+  {
+    "line": 2119,
+    "text": "<div className=\"flex flex-wrap gap-x-4 gap-y-2 mt-6 pt-4 border-t border-dashed border-zinc-500/20\">"
+  },
+  {
+    "line": 2120,
+    "text": "<div className=\"flex items-center space-x-1.5\"><div className=\"w-2.5 h-2.5 rounded-sm bg-zinc-400\"></div><span className={`text-[10px] font-bold ${t.textMuted}`}>Awake</span></div>"
+  },
+  {
+    "line": 2121,
+    "text": "<div className=\"flex items-center space-x-1.5\"><div className=\"w-2.5 h-2.5 rounded-sm bg-sky-400\"></div><span className={`text-[10px] font-bold ${t.textMuted}`}>REM</span></div>"
+  },
+  {
+    "line": 2122,
+    "text": "<div className=\"flex items-center space-x-1.5\"><div className=\"w-2.5 h-2.5 rounded-sm bg-indigo-400\"></div><span className={`text-[10px] font-bold ${t.textMuted}`}>Light</span></div>"
+  },
+  {
+    "line": 2123,
+    "text": "<div className=\"flex items-center space-x-1.5\"><div className=\"w-2.5 h-2.5 rounded-sm bg-violet-600\"></div><span className={`text-[10px] font-bold ${t.textMuted}`}>Deep</span></div>"
+  },
+  {
+    "line": 2130,
+    "text": "<span className={`text-[9px] mt-1 opacity-70 ${t.textMuted}`}>Hubungkan aplikasi dengan Health Connect/Smartwatch untuk melihat visualisasi siklus tidur mendetail.</span>"
+  },
+  {
+    "line": 2227,
+    "text": "if (!val || val <= 0) return 'text-zinc-500';"
+  },
+  {
+    "line": 2233,
+    "text": "return 'text-purple-400';"
+  },
+  {
+    "line": 2244,
+    "text": "if (!val || val <= 0) return 'text-zinc-500';"
+  },
+  {
+    "line": 2321,
+    "text": "sColor: !displayBioData.bmr ? 'text-zinc-500' : (displayBioData.bmr >= (userProfile?.gender === 'female' ? 1100 : 1300) && displayBioData.bmr <= (userProfile?.gender === 'female' ? 1400 : 1600)) ? 'text-emerald-500' : 'text-amber-500'"
+  },
+  {
+    "line": 2341,
+    "text": "c: ['bg-sky-500', 'bg-emerald-500', 'bg-blue-500', 'bg-amber-500', 'bg-purple-500'],"
+  },
+  {
+    "line": 2388,
+    "text": "sColor: !displayBioData.waterPercent ? 'text-zinc-500' : (displayBioData.waterPercent >= 45 && displayBioData.waterPercent <= 65) ? 'text-emerald-500' : 'text-amber-500'"
+  },
+  {
+    "line": 2399,
+    "text": "sColor: !displayBioData.visceralFat ? 'text-zinc-500' : displayBioData.visceralFat < 10 ? 'text-emerald-500' : displayBioData.visceralFat < 15 ? 'text-amber-500' : 'text-rose-500'"
+  },
+  {
+    "line": 2410,
+    "text": "sColor: !displayBioData.waist ? 'text-zinc-500' : displayBioData.waist < (userProfile?.gender === 'female' ? 80 : 90) ? 'text-emerald-500' : 'text-rose-500'"
+  },
+  {
+    "line": 2432,
+    "text": "sColor: !displayBioData.boneMass ? 'text-zinc-500' : displayBioData.boneMass >= 2.0 ? 'text-emerald-500' : 'text-amber-500'"
+  },
+  {
+    "line": 2443,
+    "text": "sColor: !displayBioData.bodyAge ? 'text-zinc-500' : userAge ? (displayBioData.bodyAge <= userAge ? 'text-emerald-500' : 'text-amber-500') : 'text-emerald-500'"
+  },
+  {
+    "line": 2549,
+    "text": "<div className=\"mb-5 pb-4 border-b border-dashed border-zinc-500/20\">"
+  },
+  {
+    "line": 2592,
+    "text": "<span className={`text-[10px] font-bold uppercase tracking-wider ${t.textMuted} block mb-2`}>"
+  },
+  {
+    "line": 2617,
+    "text": "<div className=\"flex items-center gap-3 pt-3 border-t border-dashed border-zinc-500/20\">"
+  },
+  {
+    "line": 2668,
+    "text": "<div className=\"mb-5 pb-4 border-b border-dashed border-zinc-500/20\">"
+  },
+  {
+    "line": 2723,
+    "text": "<span className={`text-[10px] font-bold uppercase tracking-wider ${t.textMuted} block mb-2`}>"
+  },
+  {
+    "line": 2758,
+    "text": "<p className={`text-[10px] leading-relaxed ${t.textMuted} opacity-75 mb-6`}>"
+  },
+  {
+    "line": 2763,
+    "text": "<div className=\"flex items-center gap-3 pt-3 border-t border-dashed border-zinc-500/20\">"
+  },
+  {
+    "line": 2973,
+    "text": "<div className=\"body-md font-bold text-zinc-300 flex items-center gap-1.5\">"
+  },
+  {
+    "line": 2974,
+    "text": "<span className=\"w-2 h-2 rounded-full bg-zinc-400 shrink-0\" />"
+  },
+  {
+    "line": 3053,
+    "text": "<p className=\"text-[10px] text-emerald-400 font-semibold mt-1\">✔ Target mingguan tercapai!</p>"
+  },
+  {
+    "line": 3095,
+    "text": "<p className=\"text-[10px] text-slate-500 mt-2 leading-snug\">"
+  }
+]

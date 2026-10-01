@@ -1,4 +1,5 @@
 import React, { useState, useDeferredValue, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Search, Filter } from 'lucide-react';
 import { formatTarget, normalizeMuscleKey, muscleOptions, equipmentOptions, levelOptions, exerciseAliasMap } from '../data/constants';
 import { fetchExercisesFromApi, getCachedExercises } from '../utils/exerciseDbApi';
@@ -130,9 +131,11 @@ const AddExerciseModal = ({
 
   if (!activeAddModalTarget) return null;
 
-  return (
+  return createPortal(
     <div 
-      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex flex-col justify-center p-4 animate-in fade-in overscroll-contain touch-none no-swipe"
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-[150] bg-black/70 backdrop-blur-sm flex flex-col justify-center p-4 animate-in fade-in overscroll-contain touch-none no-swipe"
       onClick={() => setActiveAddModalTarget(null)}
     >
       <div 
@@ -207,7 +210,7 @@ const AddExerciseModal = ({
                     {(muscleFilter.length > 0 || equipFilter.length > 0 || levelFilter.length > 0) && (
                       <button
                         onClick={() => { setMuscleFilter([]); setEquipFilter([]); setLevelFilter([]); }}
-                        className="text-[10px] font-black text-rose-500 hover:opacity-80"
+                        className="text-xs font-black text-rose-500 hover:opacity-80"
                       >
                         Reset Filter
                       </button>
@@ -223,10 +226,16 @@ const AddExerciseModal = ({
                   key={ex.id || `${ex.name}-${idx}`}
                   t={t} lang={lang} ex={ex}
                   actionButton={
-                    <button onClick={() => {
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
                         const exToAdd = ex.source === 'exercisedb' ? { ...ex, id: Date.now() + Math.floor(Math.random() * 1000) } : ex;
                         onAddExerciseTarget(exToAdd);
-                    }} className={`px-4 py-2.5 rounded-xl ${t.bgAccent} font-bold body-md text-white opacity-90 hover:opacity-100 transition-opacity`}>Tambah</button>
+                      }} 
+                      className={`px-4 py-2.5 rounded-xl ${t.bgAccent} font-bold body-md text-white opacity-90 hover:opacity-100 transition-opacity active:scale-95`}
+                    >
+                      Tambah
+                    </button>
                   }
                   onOpenDetail={() => {
                         const exToAdd = ex.source === 'exercisedb' ? { ...ex, id: Date.now() + Math.floor(Math.random() * 1000) } : ex;
@@ -234,7 +243,7 @@ const AddExerciseModal = ({
                   }}
                 />
               ))}
-              {filteredLib.length === 0 && <div className="text-center py-6 font-bold text-zinc-500">Tidak ada latihan yang cocok.</div>}
+              {filteredLib.length === 0 && <div className="text-center py-6 font-bold text-slate-500">Tidak ada latihan yang cocok.</div>}
               <div className="mt-6 px-2 pb-6">
                   <button onClick={() => {
                       setActiveAddModalTarget(null);
@@ -244,7 +253,8 @@ const AddExerciseModal = ({
             </div>
           </>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

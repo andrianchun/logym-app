@@ -316,7 +316,7 @@ export default function SharedProfileView({
                   posts.length
                 )}
               </span>
-              <span className={`text-[10px] font-bold mt-0.5 uppercase tracking-wider ${isDark ? 'text-white/50' : 'text-slate-500'}`}>Postingan</span>
+              <span className={`text-xs font-bold mt-0.5 uppercase tracking-wider ${isDark ? 'text-white/50' : 'text-slate-500'}`}>Postingan</span>
             </div>
             <div className="flex flex-col items-center flex-1">
               <UserCheck size={22} className={`mb-2 ${isDark ? 'text-white/70' : 'text-slate-700'}`} />
@@ -327,7 +327,7 @@ export default function SharedProfileView({
                   followerCount
                 )}
               </span>
-              <span className={`text-[10px] font-bold mt-0.5 uppercase tracking-wider ${isDark ? 'text-white/50' : 'text-slate-500'}`}>Pengikut</span>
+              <span className={`text-xs font-bold mt-0.5 uppercase tracking-wider ${isDark ? 'text-white/50' : 'text-slate-500'}`}>Pengikut</span>
             </div>
             <div className="flex flex-col items-center flex-1">
               <UserPlus size={22} className={`mb-2 ${isDark ? 'text-white/70' : 'text-slate-700'}`} />
@@ -338,7 +338,7 @@ export default function SharedProfileView({
                   followingCount
                 )}
               </span>
-              <span className={`text-[10px] font-bold mt-0.5 uppercase tracking-wider ${isDark ? 'text-white/50' : 'text-slate-500'}`}>Mengikuti</span>
+              <span className={`text-xs font-bold mt-0.5 uppercase tracking-wider ${isDark ? 'text-white/50' : 'text-slate-500'}`}>Mengikuti</span>
             </div>
           </div>
         </div>
@@ -351,7 +351,7 @@ export default function SharedProfileView({
                 Rekor Latihan
               </h3>
               {prData.totalWorkouts > 0 && (
-                <span className={`text-[11px] font-bold ${isDark ? 'text-white/40' : 'text-slate-400'}`}>
+                <span className={`text-xs font-bold ${isDark ? 'text-white/40' : 'text-slate-400'}`}>
                   {prData.totalWorkouts} Sesi Selesai
                 </span>
               )}
@@ -365,7 +365,7 @@ export default function SharedProfileView({
               >
                 <div className="w-full">
                   <div className="flex items-center justify-between w-full">
-                    <span className={`text-[10px] font-black uppercase tracking-wider ${isDark ? 'text-white/40' : 'text-slate-400'}`}>
+                    <span className={`text-xs font-black uppercase tracking-wider ${isDark ? 'text-white/40' : 'text-slate-400'}`}>
                       Big 3 Total
                     </span>
                   </div>
@@ -373,10 +373,10 @@ export default function SharedProfileView({
                     <span className={`text-2xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
                       {prData.big3.total > 0 ? prData.big3.total : '-'}
                     </span>
-                    {prData.big3.total > 0 && <span className={`text-[10px] font-bold ${isDark ? 'text-white/50' : 'text-slate-400'}`}>kg</span>}
+                    {prData.big3.total > 0 && <span className={`text-xs font-bold ${isDark ? 'text-white/50' : 'text-slate-400'}`}>kg</span>}
                   </div>
                 </div>
-                <div className={`mt-2.5 pt-2 border-t text-[10px] font-semibold leading-tight w-full truncate ${isDark ? 'border-white/5 text-white/50' : 'border-slate-200 text-slate-500'}`}>
+                <div className={`mt-2.5 pt-2 border-t text-xs font-semibold leading-tight w-full truncate ${isDark ? 'border-white/5 text-white/50' : 'border-slate-200 text-slate-500'}`}>
                   Bench {prData.big3.bench.weight1RM || '-'} • Squat {prData.big3.squat.weight1RM || '-'} • Deadlift {prData.big3.deadlift.weight1RM || '-'}
                 </div>
               </button>
@@ -388,7 +388,7 @@ export default function SharedProfileView({
               >
                 <div className="w-full">
                   <div className="flex items-center justify-between w-full">
-                    <span className={`text-[10px] font-black uppercase tracking-wider ${isDark ? 'text-white/40' : 'text-slate-400'}`}>
+                    <span className={`text-xs font-black uppercase tracking-wider ${isDark ? 'text-white/40' : 'text-slate-400'}`}>
                       Max Tonase Sesi
                     </span>
                   </div>
@@ -399,13 +399,13 @@ export default function SharedProfileView({
                         : (prData.maxSessionVolume.volumeKg > 0 ? prData.maxSessionVolume.volumeKg : '-')}
                     </span>
                     {prData.maxSessionVolume.volumeKg > 0 && (
-                      <span className={`text-[10px] font-bold ${isDark ? 'text-white/50' : 'text-slate-400'}`}>
+                      <span className={`text-xs font-bold ${isDark ? 'text-white/50' : 'text-slate-400'}`}>
                         {prData.maxSessionVolume.volumeKg >= 1000 ? 'Ton' : 'kg'}
                       </span>
                     )}
                   </div>
                 </div>
-                <div className={`mt-2.5 pt-2 border-t text-[10px] font-semibold truncate w-full ${isDark ? 'border-white/5 text-amber-300/80' : 'border-slate-200 text-amber-600'}`}>
+                <div className={`mt-2.5 pt-2 border-t text-xs font-semibold truncate w-full ${isDark ? 'border-white/5 text-amber-300/80' : 'border-slate-200 text-amber-600'}`}>
                   {prData.maxSessionVolume.volumeKg > 0 ? `~${prData.maxSessionVolume.analogy}` : 'Belum ada sesi'}
                 </div>
               </button>
@@ -417,7 +417,7 @@ export default function SharedProfileView({
               >
                 <div className="w-full">
                   <div className="flex items-center justify-between w-full">
-                    <span className={`text-[10px] font-black uppercase tracking-wider ${isDark ? 'text-white/40' : 'text-slate-400'}`}>
+                    <span className={`text-xs font-black uppercase tracking-wider ${isDark ? 'text-white/40' : 'text-slate-400'}`}>
                       Konsistensi Terbaik
                     </span>
                   </div>
@@ -425,10 +425,10 @@ export default function SharedProfileView({
                     <span className={`text-2xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
                       {prData.longestWeeklyStreak > 0 ? prData.longestWeeklyStreak : '-'}
                     </span>
-                    {prData.longestWeeklyStreak > 0 && <span className={`text-[10px] font-bold ${isDark ? 'text-white/50' : 'text-slate-400'}`}>Minggu</span>}
+                    {prData.longestWeeklyStreak > 0 && <span className={`text-xs font-bold ${isDark ? 'text-white/50' : 'text-slate-400'}`}>Minggu</span>}
                   </div>
                 </div>
-                <div className={`mt-2.5 pt-2 border-t text-[10px] font-semibold w-full truncate ${isDark ? 'border-white/5 text-emerald-300/80' : 'border-slate-200 text-emerald-600'}`}>
+                <div className={`mt-2.5 pt-2 border-t text-xs font-semibold w-full truncate ${isDark ? 'border-white/5 text-emerald-300/80' : 'border-slate-200 text-emerald-600'}`}>
                   {prData.longestWeeklyStreak > 0 ? 'Disiplin mingguan' : 'Target program'}
                 </div>
               </button>
@@ -436,11 +436,11 @@ export default function SharedProfileView({
               {/* TOTAL TONASE */}
               <button
                 onClick={() => setActivePrModal('lifetime')}
-                className={`p-4 rounded-2xl flex flex-col justify-between text-left transition-all active:scale-95 ${isDark ? 'bg-white/5 border border-white/10 hover:border-purple-500/40' : 'bg-slate-50 border border-slate-200/80 hover:border-purple-500/40'}`}
+                className={`p-4 rounded-2xl flex flex-col justify-between text-left transition-all active:scale-95 ${isDark ? 'bg-white/5 border border-white/10 hover:border-violet-500/40' : 'bg-slate-50 border border-slate-200/80 hover:border-violet-500/40'}`}
               >
                 <div className="w-full">
                   <div className="flex items-center justify-between w-full">
-                    <span className={`text-[10px] font-black uppercase tracking-wider ${isDark ? 'text-white/40' : 'text-slate-400'}`}>
+                    <span className={`text-xs font-black uppercase tracking-wider ${isDark ? 'text-white/40' : 'text-slate-400'}`}>
                       Total Tonase
                     </span>
                   </div>
@@ -451,13 +451,13 @@ export default function SharedProfileView({
                         : (prData.lifetimeVolumeKg > 0 ? prData.lifetimeVolumeKg : '-')}
                     </span>
                     {prData.lifetimeVolumeKg > 0 && (
-                      <span className={`text-[10px] font-bold ${isDark ? 'text-white/50' : 'text-slate-400'}`}>
+                      <span className={`text-xs font-bold ${isDark ? 'text-white/50' : 'text-slate-400'}`}>
                         {prData.lifetimeVolumeKg >= 1000 ? 'Ton' : 'kg'}
                       </span>
                     )}
                   </div>
                 </div>
-                <div className={`mt-2.5 pt-2 border-t text-[10px] font-semibold w-full truncate ${isDark ? 'border-white/5 text-purple-300/80' : 'border-slate-200 text-purple-600'}`}>
+                <div className={`mt-2.5 pt-2 border-t text-xs font-semibold w-full truncate ${isDark ? 'border-white/5 text-violet-300/80' : 'border-slate-200 text-violet-600'}`}>
                   {prData.lifetimeVolumeKg > 0 ? `~${prData.lifetimeAnalogy}` : 'Akumulasi beban'}
                 </div>
               </button>
@@ -497,7 +497,7 @@ export default function SharedProfileView({
                     <div className="p-3.5 rounded-2xl bg-white/[0.05] backdrop-blur-md border border-white/10 flex items-center justify-between">
                       <div className="min-w-0 flex-1 pr-2">
                         <p className="text-xs font-bold text-white">Bench Press (Dada)</p>
-                        <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                        <p className="text-xs text-slate-400 truncate mt-0.5">
                           {prData.big3.bench.name || 'Flat Bench Press'}
                           {prData.big3.bench.date && ` • ${new Date(prData.big3.bench.date + 'T12:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}`}
                         </p>
@@ -510,7 +510,7 @@ export default function SharedProfileView({
                     <div className="p-3.5 rounded-2xl bg-white/[0.05] backdrop-blur-md border border-white/10 flex items-center justify-between">
                       <div className="min-w-0 flex-1 pr-2">
                         <p className="text-xs font-bold text-white">Squat (Paha & Kaki)</p>
-                        <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                        <p className="text-xs text-slate-400 truncate mt-0.5">
                           {prData.big3.squat.name || 'Barbell Squat'}
                           {prData.big3.squat.date && ` • ${new Date(prData.big3.squat.date + 'T12:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}`}
                         </p>
@@ -523,7 +523,7 @@ export default function SharedProfileView({
                     <div className="p-3.5 rounded-2xl bg-white/[0.05] backdrop-blur-md border border-white/10 flex items-center justify-between">
                       <div className="min-w-0 flex-1 pr-2">
                         <p className="text-xs font-bold text-white">Deadlift (Punggung Bawah & Posterior)</p>
-                        <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                        <p className="text-xs text-slate-400 truncate mt-0.5">
                           {prData.big3.deadlift.name || 'Deadlift'}
                           {prData.big3.deadlift.date && ` • ${new Date(prData.big3.deadlift.date + 'T12:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}`}
                         </p>
@@ -534,7 +534,7 @@ export default function SharedProfileView({
                     </div>
                   </div>
 
-                  <p className="text-[11px] leading-relaxed text-slate-400 mt-3 pt-2 border-t border-white/10">
+                  <p className="text-xs leading-relaxed text-slate-400 mt-3 pt-2 border-t border-white/10">
                     * 1RM (One-Rep Max): Estimasi beban maksimal 1 repetisi berdasarkan set terberat Anda (rumus Epley).
                   </p>
                 </div>
@@ -571,7 +571,7 @@ export default function SharedProfileView({
                     )}
                   </div>
 
-                  <div className="p-3.5 rounded-2xl bg-white/[0.03] backdrop-blur-md border border-white/5 text-[11px] leading-relaxed text-slate-400">
+                  <div className="p-3.5 rounded-2xl bg-white/[0.03] backdrop-blur-md border border-white/5 text-xs leading-relaxed text-slate-400">
                     <p>
                       <b className="text-slate-200">Tonase</b> adalah akumulasi total (beban × repetisi) dari seluruh set dalam 1 sesi untuk mengukur kapasitas kerja (<i className="text-slate-300">work capacity</i>) otot Anda.
                     </p>
@@ -591,7 +591,7 @@ export default function SharedProfileView({
                     </p>
                   </div>
 
-                  <div className="p-3.5 rounded-2xl bg-white/[0.03] backdrop-blur-md border border-white/5 text-[11px] leading-relaxed text-slate-400">
+                  <div className="p-3.5 rounded-2xl bg-white/[0.03] backdrop-blur-md border border-white/5 text-xs leading-relaxed text-slate-400">
                     <p>
                       <b className="text-slate-200">Konsistensi Mingguan</b> mengukur kepatuhan jadwal tanpa risiko <i>overtraining</i>. Hari istirahat (<i>Rest Day</i>) tetap menjaga rangkaian streak aktif.
                     </p>
@@ -615,7 +615,7 @@ export default function SharedProfileView({
                     )}
                   </div>
 
-                  <div className="p-3.5 rounded-2xl bg-white/[0.03] backdrop-blur-md border border-white/5 text-[11px] leading-relaxed text-slate-400">
+                  <div className="p-3.5 rounded-2xl bg-white/[0.03] backdrop-blur-md border border-white/5 text-xs leading-relaxed text-slate-400">
                     <p>
                       <b className="text-slate-200">Total Tonase</b> adalah akumulasi seluruh beban yang pernah Anda angkat sejak hari pertama latihan di Logym.
                     </p>
@@ -635,7 +635,7 @@ export default function SharedProfileView({
               {ACHIEVEMENTS.length > 6 && (
                 <button 
                   onClick={() => setShowAllBadges(!showAllBadges)} 
-                  className={`text-[10px] font-black uppercase tracking-wider px-3 py-1.5 rounded-full ${isDark ? 'bg-white/10 text-white/70 hover:text-white' : 'bg-slate-200 text-slate-600 hover:text-slate-900'} transition-all`}
+                  className={`text-xs font-black uppercase tracking-wider px-3 py-1.5 rounded-full ${isDark ? 'bg-white/10 text-white/70 hover:text-white' : 'bg-slate-200 text-slate-600 hover:text-slate-900'} transition-all`}
                 >
                   {showAllBadges ? 'Sembunyikan' : 'Lihat Semua'}
                 </button>
@@ -761,7 +761,7 @@ export default function SharedProfileView({
                           {post.type === 'workout_log' ? post.workoutName || 'Sesi Latihan' : 'Update Status'}
                         </h4>
                         {post.timestamp && (
-                          <span className={`text-[10px] font-bold shrink-0 ${isDark ? 'text-white/40' : 'text-slate-400'}`}>
+                          <span className={`text-xs font-bold shrink-0 ${isDark ? 'text-white/40' : 'text-slate-400'}`}>
                             {post.timestamp?.toDate ? post.timestamp.toDate().toLocaleDateString('id-ID', {day: 'numeric', month: 'short'}) : ''}
                           </span>
                         )}
@@ -770,7 +770,7 @@ export default function SharedProfileView({
                       {post.text && <p className={`text-xs mt-1 font-medium ${isDark ? 'text-white/70' : 'text-slate-600'} line-clamp-2`}>{post.text}</p>}
                       
                       {post.type === 'workout_log' && post.totalVolume > 0 && (
-                        <div className={`text-[10px] font-bold mt-2 flex items-center gap-1 w-fit px-2 py-0.5 rounded-md ${isDark ? 'bg-white/5 text-white/60' : 'bg-black/5 text-slate-500'}`}>
+                        <div className={`text-xs font-bold mt-2 flex items-center gap-1 w-fit px-2 py-0.5 rounded-md ${isDark ? 'bg-white/5 text-white/60' : 'bg-black/5 text-slate-500'}`}>
                           🔥 {post.totalVolume} kg volume
                         </div>
                       )}
@@ -778,11 +778,11 @@ export default function SharedProfileView({
                       <div className={`flex items-center gap-4 mt-3 pt-3 border-t ${isDark ? 'border-white/5' : 'border-slate-200'}`}>
                          <div className="flex items-center gap-1.5">
                             <Heart size={14} className={isDark ? 'text-white/40' : 'text-slate-400'} />
-                            <span className={`text-[10px] font-bold ${isDark ? 'text-white/40' : 'text-slate-400'}`}>{post.likes?.length || 0}</span>
+                            <span className={`text-xs font-bold ${isDark ? 'text-white/40' : 'text-slate-400'}`}>{post.likes?.length || 0}</span>
                          </div>
                          <div className="flex items-center gap-1.5">
                             <MessageSquare size={14} className={isDark ? 'text-white/40' : 'text-slate-400'} />
-                            <span className={`text-[10px] font-bold ${isDark ? 'text-white/40' : 'text-slate-400'}`}>{post.comments?.length || 0}</span>
+                            <span className={`text-xs font-bold ${isDark ? 'text-white/40' : 'text-slate-400'}`}>{post.comments?.length || 0}</span>
                          </div>
                       </div>
                     </div>
@@ -840,7 +840,7 @@ export default function SharedProfileView({
                   <div className={`w-full h-2.5 rounded-full ${isDark ? 'bg-white/10' : 'bg-black/10'} overflow-hidden`}>
                     <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, Math.max(0, ((selectedBadgeInfo.progress || 0) / selectedBadgeInfo.target) * 100))}%` }} />
                   </div>
-                  <div className={`text-[10px] font-black text-center mt-3 uppercase tracking-widest ${isDark ? 'text-white/50' : 'text-slate-500'}`}>
+                  <div className={`text-xs font-black text-center mt-3 uppercase tracking-widest ${isDark ? 'text-white/50' : 'text-slate-500'}`}>
                     Progress: {selectedBadgeInfo.progress || 0} / {selectedBadgeInfo.target} {selectedBadgeInfo.metric}
                   </div>
                 </div>

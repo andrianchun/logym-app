@@ -134,7 +134,7 @@ const LibManagerModal = ({ showLibManager, setShowLibManager, t, exerciseLibrary
                     <div key={ex.id} className={`flex justify-between items-center p-4 mb-2 rounded-xl ${t.bgApp} border border-transparent hover:${t.borderAccentSoft} transition-colors group`}>
                         <div className="flex flex-col">
                             <span className="font-bold body-lg">{ex.name}</span>
-                            <span className="text-[10px] uppercase font-bold text-amber-500">{formatTarget(ex.target, lang?.id)} &middot; {ex.equipment || 'Lainnya'}</span>
+                            <span className="text-xs uppercase font-bold text-amber-500">{formatTarget(ex.target, lang?.id)} &middot; {ex.equipment || 'Lainnya'}</span>
                         </div>
                         <div className="flex space-x-1">
                             <button onClick={() => openForm(ex)} className={`p-2 ${t.btnBg} hover:${t.textAccent} rounded-lg transition-colors`}><Edit2 size={16}/></button>
@@ -142,7 +142,7 @@ const LibManagerModal = ({ showLibManager, setShowLibManager, t, exerciseLibrary
                         </div>
                     </div>
                 ))}
-                {filteredLib.length === 0 && <div className="text-center py-6 font-bold text-zinc-500">Tidak ada latihan yang cocok.</div>}
+                {filteredLib.length === 0 && <div className="text-center py-6 font-bold text-slate-500">Tidak ada latihan yang cocok.</div>}
                 <div className="mt-4 px-2 pb-6">
                     <button onClick={() => openForm()} className={`w-full py-4 border-2 border-dashed ${t.border} hover:${t.borderAccentSoft} rounded-2xl ${t.textAccent} font-bold flex justify-center items-center hover:${t.bgAccentSoft} transition-all`}><Plus size={18} className="mr-2"/> Tambah Master Latihan</button>
                 </div>

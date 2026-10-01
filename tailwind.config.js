@@ -15,8 +15,8 @@ export default {
       // Semua utility Tailwind dipetakan ke 3 nilai rem ini agar tidak ada teks kerdil
       // dan teks otomatis membesar mengikuti setelan aksesibilitas HP/APK.
       fontSize: {
-        'xs': ['1rem', '1.4'],        // 16px (1rem) — teks isi, label, meta, badge
-        'sm': ['1rem', '1.4'],
+        'xs': ['0.8125rem', '1.4'],   // 13px — unit suffix, caption compact, label kecil
+        'sm': ['1rem', '1.4'],         // 16px — teks isi, label, meta, badge
         'base': ['1rem', '1.4'],
         'md': ['1.3125rem', '1.4'],   // 21px (1.3125rem) — judul kartu, angka, tombol utama
         'lg': ['1.3125rem', '1.4'],

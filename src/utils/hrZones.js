@@ -27,10 +27,10 @@ export const getHRZone = (avgHr, age) => {
     const maxHr = 220 - age;
     const percent = (avgHr / maxHr) * 100;
 
-    if (percent < 50) return { zone: 0, label: '< Z1', color: 'text-zinc-500' };
+    if (percent < 50) return { zone: 0, label: '< Z1', color: 'text-slate-500' };
     if (percent < 60) return { zone: 1, label: 'Z1 (Warm Up)', color: 'text-sky-500' };
     if (percent < 70) return { zone: 2, label: 'Z2 (Fat Burn)', color: 'text-emerald-500' };
     if (percent < 80) return { zone: 3, label: 'Z3 (Aerobic)', color: 'text-amber-500' };
-    if (percent < 90) return { zone: 4, label: 'Z4 (Anaerobic)', color: 'text-orange-500' };
+    if (percent < 90) return { zone: 4, label: 'Z4 (Anaerobic)', color: 'text-amber-500' };
     return { zone: 5, label: 'Z5 (Max)', color: 'text-rose-500' };
 };

@@ -352,7 +352,7 @@ export default function SettingsModal({
                 <div className="flex flex-col">
                   <span className={`font-bold text-sm ${t.textMain}`}>LOGYM v{currentVer}</span>
                   {otaAvailable && (
-                    <span className="text-[10px] font-bold text-rose-500">
+                    <span className="text-xs font-bold text-rose-500">
                       Versi {otaState.version} Tersedia!
                     </span>
                   )}
@@ -420,7 +420,7 @@ export default function SettingsModal({
                   {hcConnecting ? 'Menghubungkan...' : (healthConnectEnabled ? 'Terhubung' : 'Hubungkan')}
                 </button>
               </div>
-              <p className={`text-[10px] ${t.textMuted} leading-tight`}>
+              <p className={`text-xs ${t.textMuted} leading-tight`}>
                 Langkah, tidur, detak jantung, berat, SpO2, dan tensi.
                 {!healthAvailable && ' Aktif di aplikasi Android — belum tersedia di browser web.'}
               </p>
@@ -429,7 +429,7 @@ export default function SettingsModal({
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                      <span className="text-[11px] font-bold text-emerald-500">Sinkron Otomatis Aktif</span>
+                      <span className="text-xs font-bold text-emerald-500">Sinkron Otomatis Aktif</span>
                     </div>
                     <button
                       disabled={hcBackfilling}
@@ -437,14 +437,14 @@ export default function SettingsModal({
                         setHcBackfilling(true);
                         try { await onHcBackfill(30); } finally { setHcBackfilling(false); }
                       }}
-                      className={`text-[11px] font-semibold text-zinc-400 hover:${t.textAccent} transition-colors flex items-center gap-1.5 disabled:opacity-50 active:scale-95`}
+                      className={`text-xs font-semibold text-slate-400 hover:${t.textAccent} transition-colors flex items-center gap-1.5 disabled:opacity-50 active:scale-95`}
                       title="Sinkronkan ulang histori 30 hari secara manual"
                     >
                       <RefreshCw size={12} className={hcBackfilling ? 'animate-spin' : ''} />
                       <span>{hcBackfilling ? 'Menyinkronkan...' : 'Sinkron Ulang'}</span>
                     </button>
                   </div>
-                  <p className={`text-[10px] ${t.textMuted} leading-tight`}>
+                  <p className={`text-xs ${t.textMuted} leading-tight`}>
                     Data otomatis diperbarui saat aplikasi dibuka dan saat sesi latihan selesai.
                   </p>
                 </div>
@@ -497,21 +497,21 @@ export default function SettingsModal({
                             <Plus size={16} /> Tambah API Key
                         </button>
                     </div>
-                    <p className={`text-[10px] ${t.textMuted} leading-tight mt-2`}>
+                    <p className={`text-xs ${t.textMuted} leading-tight mt-2`}>
                         Silakan diisi untuk berjaga-jaga jika layanan AI dari aplikasi sedang bermasalah.
                     </p>
                     <div className="grid grid-cols-3 gap-2 pt-1">
                         <a href="https://aistudio.google.com" target="_blank" rel="noreferrer" className={`flex flex-col items-center gap-1.5 py-3 rounded-xl ${t.btnBg} hover:opacity-80 transition-opacity`}>
                             <svg width="22" height="22" viewBox="0 0 24 24"><defs><linearGradient id="gemini-grad" x1="0" y1="0" x2="24" y2="24"><stop offset="0%" stopColor="#4C8DF6"/><stop offset="100%" stopColor="#B06AF5"/></linearGradient></defs><path d="M12 2C12 2 12.6 8.8 15.3 11.5C18 14.2 22 14.8 22 14.8C22 14.8 18 15.4 15.3 18.1C12.6 20.8 12 22 12 22C12 22 11.4 20.8 8.7 18.1C6 15.4 2 14.8 2 14.8C2 14.8 6 14.2 8.7 11.5C11.4 8.8 12 2 12 2Z" fill="url(#gemini-grad)"/></svg>
-                            <span className={`text-[10px] font-bold ${t.textMain}`}>Gemini</span>
+                            <span className={`text-xs font-bold ${t.textMain}`}>Gemini</span>
                         </a>
                         <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" className={`flex flex-col items-center gap-1.5 py-3 rounded-xl ${t.btnBg} hover:opacity-80 transition-opacity`}>
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={t.textMain}><path d="M9.5 3.5C7 2 4.5 3.5 4 6C2.5 6.8 1.8 9 2.5 11C1.5 13 2.3 15.5 4.3 16.7C4.3 19.2 6.4 21 8.8 20.7C10.3 22 12.7 22 14.2 20.7C16.7 21 18.8 19.2 18.8 16.7C20.8 15.5 21.5 13 20.5 11C21.2 9 20.5 6.8 19 6C18.5 3.5 16 2 13.5 3.5C11.9 2.5 10.1 2.5 9.5 3.5Z"/><circle cx="9" cy="10" r="1"/><circle cx="15" cy="10" r="1"/><circle cx="9" cy="15" r="1"/><circle cx="15" cy="15" r="1"/></svg>
-                            <span className={`text-[10px] font-bold ${t.textMain}`}>ChatGPT</span>
+                            <span className={`text-xs font-bold ${t.textMain}`}>ChatGPT</span>
                         </a>
                         <a href="https://console.anthropic.com/" target="_blank" rel="noreferrer" className={`flex flex-col items-center gap-1.5 py-3 rounded-xl ${t.btnBg} hover:opacity-80 transition-opacity`}>
                             <svg width="22" height="22" viewBox="0 0 24 24"><path d="M6.5 4L2 20H5.5L6.6 16H11.9L13 20H16.5L12 4H6.5ZM7.5 13L9.25 7L11 13H7.5Z" fill="#D97757"/><path d="M15.5 4L20 20H16.5L15.4 16H14.5L15.7 12H16.4L15.1 7.4L15.5 4Z" fill="#D97757" opacity="0.55"/></svg>
-                            <span className={`text-[10px] font-bold ${t.textMain}`}>Claude</span>
+                            <span className={`text-xs font-bold ${t.textMain}`}>Claude</span>
                         </a>
                     </div>
                 </div>
@@ -556,7 +556,7 @@ export default function SettingsModal({
                                 <p className={`flex-1 text-xs ${t.textMain} leading-relaxed`}>{m}</p>
                                 <button
                                     onClick={() => setLogyMemory(logyMemory.filter((_, idx) => idx !== i))}
-                                    className="p-1 rounded-full text-neutral-500 hover:text-rose-500 transition-colors shrink-0"
+                                    className="p-1 rounded-full text-slate-500 hover:text-rose-500 transition-colors shrink-0"
                                 >
                                     <Trash2 size={14} />
                                 </button>
@@ -641,7 +641,7 @@ export default function SettingsModal({
                    Zona Berbahaya
                 </p>
                 <div className="space-y-2">
-                   <p className={`text-[10px] ${t.textMuted} leading-tight`}>
+                   <p className={`text-xs ${t.textMuted} leading-tight`}>
                      Tindakan ini tidak bisa dibatalkan. Semua data riwayat latihan, program, dan pengaturan Anda akan dihapus secara permanen dari server.
                    </p>
                    <button 
@@ -671,8 +671,8 @@ export default function SettingsModal({
         
         {/* APP VERSION */}
         <div className="py-6 text-center">
-            <p className={`text-[10px] font-bold ${t.textMuted} uppercase tracking-widest`}>LOGYM App v1.2.0</p>
-            <p className={`text-[9px] opacity-40 mt-1 ${t.textMuted}`}>Dibangun dengan ♥️ oleh Andrian Chun &copy; 2026</p>
+            <p className={`text-xs font-bold ${t.textMuted} uppercase tracking-widest`}>LOGYM App v1.2.0</p>
+            <p className={`text-xs opacity-40 mt-1 ${t.textMuted}`}>Dibangun dengan ♥️ oleh Andrian Chun &copy; 2026</p>
         </div>
       </div>
       

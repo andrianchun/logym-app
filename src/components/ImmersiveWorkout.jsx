@@ -43,12 +43,12 @@ const LiveWorkoutStats = ({ workoutStartTime, userProfile, validExercises, exerc
 
   return (
     <div className="flex flex-col">
-      <span className={`text-[10px] font-black uppercase ${t.textMuted} tracking-widest`}>
+      <span className={`text-xs font-black uppercase ${t.textMuted} tracking-widest`}>
         Durasi Latihan
       </span>
       <span className={`h2 ${t.textAccent} flex items-baseline gap-1.5`}>
         <span className="tabular-nums tracking-tight">{formatTime(workoutSeconds)}</span>
-        {caloriesBurned > 0 && <span className="opacity-80 text-[11px] font-semibold flex items-center gap-0.5"><Flame size={12} className={`${t.textAccent}`} strokeWidth={2.5} /> {caloriesBurned} kcal</span>}
+        {caloriesBurned > 0 && <span className="opacity-80 text-xs font-semibold flex items-center gap-0.5"><Flame size={12} className={`${t.textAccent}`} strokeWidth={2.5} /> {caloriesBurned} kcal</span>}
       </span>
     </div>
   );
@@ -118,7 +118,7 @@ const LiveRestStats = ({ restTargetTime, setRestTargetTime, isAllDone, theme, t,
          <Clock size={16} className={t.textMuted} />
       </div>
       <div className="flex flex-col">
-        <span className="text-[10px] font-black uppercase tracking-wider opacity-50">
+        <span className="text-xs font-black uppercase tracking-wider opacity-50">
           Istirahat
         </span>
         <span className={`text-lg font-black ${restTimer === 0 ? 'text-green-500' : t.text}`}>
@@ -988,12 +988,12 @@ const ImmersiveWorkout = ({
 
         <div className="absolute bottom-0 left-0 w-full p-6 bg-gradient-to-t from-black via-black/80 to-transparent flex items-end justify-between">
           <div className="flex-1 pr-4">
-            <div className="flex flex-wrap items-center gap-2 mb-1 font-bold text-white/70 tracking-widest text-[10px] drop-shadow-md">
+            <div className="flex flex-wrap items-center gap-2 mb-1 font-bold text-white/70 tracking-widest text-xs drop-shadow-md">
               <p className="shrink-0 uppercase">
                 EXERCISE {currentIndex + 1} OF {validExercises.length}
               </p>
               {ex.supersetId && (
-                <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${t.bgAccent} text-white shadow-[0_0_12px_rgba(255,255,255,0.3)] border border-white/20 shrink-0`}>
+                <span className={`px-2 py-0.5 rounded-md text-xs font-black uppercase tracking-wider ${t.bgAccent} text-white shadow-[0_0_12px_rgba(255,255,255,0.3)] border border-white/20 shrink-0`}>
                   SUPERSET
                 </span>
               )}
@@ -1028,7 +1028,7 @@ const ImmersiveWorkout = ({
                             type="button"
                             data-close-modal="true"
                             onClick={() => setShowHint(false)}
-                            className="absolute top-4 right-4 z-30 p-2 rounded-full bg-white/10 hover:bg-white/20 text-zinc-300 hover:text-white transition-colors"
+                            className="absolute top-4 right-4 z-30 p-2 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-colors"
                             title="Tutup"
                           >
                             <X size={16} />
@@ -1059,7 +1059,7 @@ const ImmersiveWorkout = ({
                                 {(hint.targetWeightNumber !== undefined || hint.target || hint.benchmark) && (
                                   <div className="flex flex-col items-center mb-2.5">
                                     {hint.weightLabel && (
-                                      <span className="text-[10px] font-bold uppercase tracking-widest text-sky-400/90 mb-1 px-2.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20">
+                                      <span className="text-xs font-bold uppercase tracking-widest text-sky-400/90 mb-1 px-2.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20">
                                         Beban {hint.weightLabel}
                                       </span>
                                     )}
@@ -1069,18 +1069,18 @@ const ImmersiveWorkout = ({
                                         <span className="text-4xl sm:text-5xl font-black text-white tracking-tight">
                                           {hint.targetWeightNumber}
                                         </span>
-                                        <span className="text-xs sm:text-sm font-semibold text-zinc-400 mr-1.5">
+                                        <span className="text-xs sm:text-sm font-semibold text-slate-400 mr-1.5">
                                           {hint.weightUnit || 'kg'}
                                         </span>
                                         {hint.targetRepsNumber && (
                                           <>
-                                            <span className="text-2xl sm:text-3xl font-light text-zinc-500 mx-1">
+                                            <span className="text-2xl sm:text-3xl font-light text-slate-500 mx-1">
                                               ×
                                             </span>
                                             <span className="text-4xl sm:text-5xl font-black text-white tracking-tight">
                                               {hint.targetRepsNumber}
                                             </span>
-                                            <span className="text-xs sm:text-sm font-semibold text-zinc-400 ml-0.5">
+                                            <span className="text-xs sm:text-sm font-semibold text-slate-400 ml-0.5">
                                               reps
                                             </span>
                                           </>
@@ -1093,7 +1093,7 @@ const ImmersiveWorkout = ({
                                     )}
 
                                     {hint.targetDetail && (
-                                      <div className="mt-1.5 text-[11px] font-semibold text-emerald-300/90 px-3 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 max-w-full text-center">
+                                      <div className="mt-1.5 text-xs font-semibold text-emerald-300/90 px-3 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 max-w-full text-center">
                                         {hint.targetDetail}
                                       </div>
                                     )}
@@ -1104,14 +1104,14 @@ const ImmersiveWorkout = ({
                                 {(hint.lastSession || hint.rm10) && (
                                   <div className="flex items-center justify-center flex-wrap gap-1.5 mb-3.5">
                                     {hint.lastSession && (
-                                      <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] font-medium text-zinc-300 backdrop-blur-sm">
-                                        <span className="text-zinc-500">Sesi Lalu:</span>
-                                        <span className="text-zinc-200 font-semibold">{hint.lastSession}</span>
+                                      <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-slate-300 backdrop-blur-sm">
+                                        <span className="text-slate-500">Sesi Lalu:</span>
+                                        <span className="text-slate-200 font-semibold">{hint.lastSession}</span>
                                       </div>
                                     )}
                                     {hint.rm10 && (
-                                      <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] font-medium text-zinc-300 backdrop-blur-sm">
-                                        <span className="text-zinc-500">10RM:</span>
+                                      <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-slate-300 backdrop-blur-sm">
+                                        <span className="text-slate-500">10RM:</span>
                                         <span className="text-sky-300 font-bold">{hint.rm10}</span>
                                       </div>
                                     )}
@@ -1119,7 +1119,7 @@ const ImmersiveWorkout = ({
                                 )}
 
                                 {/* Pesan Arahan Coach */}
-                                <p className="text-zinc-200 text-xs sm:text-sm font-medium leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)] max-w-[280px]">
+                                <p className="text-slate-200 text-xs sm:text-sm font-medium leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)] max-w-[280px]">
                                   {hint.message || hint.text}
                                 </p>
                               </>
@@ -1128,7 +1128,7 @@ const ImmersiveWorkout = ({
                                 <h3 className="font-black text-xs sm:text-sm text-sky-300/90 tracking-widest uppercase mb-2 drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]">
                                   TARGET HARI INI
                                 </h3>
-                                <p className="text-zinc-200 text-xs sm:text-sm font-medium leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)] max-w-[280px]">
+                                <p className="text-slate-200 text-xs sm:text-sm font-medium leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)] max-w-[280px]">
                                   Belum ada rekor 10RM. Gunakan beban yang menantang tapi sanggup diangkat 10 repetisi dengan form sempurna (RPE 8).
                                 </p>
                               </>
@@ -1181,7 +1181,7 @@ const ImmersiveWorkout = ({
                                <button 
                                  type="button"
                                  onClick={(e) => { e.stopPropagation(); setShowWeightInfo(prev => !prev); }}
-                                 className={`p-0.5 rounded-full transition-all ${showWeightInfo ? 'text-sky-400 scale-110' : 'text-zinc-400 hover:text-sky-400'}`}
+                                 className={`p-0.5 rounded-full transition-all ${showWeightInfo ? 'text-sky-400 scale-110' : 'text-slate-400 hover:text-sky-400'}`}
                                  title="Info Beban Total"
                                >
                                  <Info size={14} strokeWidth={2.2} />
@@ -1207,7 +1207,7 @@ const ImmersiveWorkout = ({
                                         `Input ${eqConf.label}`}
                                      </div>
                                      {(eqConf.baseWeight > 0 || eqConf.ratio !== 1) && (
-                                       <div className="flex items-center gap-2 mt-0.5 text-[11px] text-zinc-300 font-medium">
+                                       <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-300 font-medium">
                                          {eqConf.baseWeight > 0 && <span>Bar {eqConf.baseWeight} kg</span>}
                                          {eqConf.ratio !== 1 && <span>Katrol {eqConf.ratio}:1</span>}
                                        </div>
@@ -1224,7 +1224,7 @@ const ImmersiveWorkout = ({
                           />
                           {hasWeightDiff && (
                             <div className="h-5 mt-1 flex items-center justify-center">
-                              <span className="text-[11px] text-sky-400 font-bold">
+                              <span className="text-xs text-sky-400 font-bold">
                                 Total: {isImp ? Number((actW * 2.20462).toFixed(1)) + ' lbs' : actW + ' kg'}
                               </span>
                             </div>
@@ -1293,7 +1293,7 @@ const ImmersiveWorkout = ({
                                ) : (
                                  <div className="w-full h-[120px] flex flex-col items-center justify-center opacity-80 pointer-events-none">
                                    <span className={`text-3xl font-black ${t.textMain}`}>{paceStr}</span>
-                                   <span className={`text-[10px] font-bold uppercase tracking-widest ${t.textMuted}`}>mnt/km</span>
+                                   <span className={`text-xs font-bold uppercase tracking-widest ${t.textMuted}`}>mnt/km</span>
                                  </div>
                                )}
                              </div>
@@ -1364,7 +1364,7 @@ const ImmersiveWorkout = ({
                 key={i} 
                 style={{ flex: i === activeSetIdx ? 3 : (s.done || s.skipped ? 2 : 1) }}
                 className={`h-2 rounded-full transition-all duration-300 ${
-                  s.type === 'warmup' ? `bg-yellow-500` :
+                  s.type === 'warmup' ? `bg-amber-500` :
                   s.skipped ? `bg-rose-500` :
                   s.done ? `bg-emerald-500` : 
                   i === activeSetIdx ? `${t.bgAccent} shadow-[0_0_10px_rgba(255,255,255,0.3)]` : 
@@ -1497,7 +1497,7 @@ const ImmersiveWorkout = ({
             {activeSetDetail.isCardio ? (
               <div className="flex flex-col gap-5 w-full">
                 <div className="flex flex-col">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Detak Jantung (BPM)</span>
+                  <span className="text-xs font-black uppercase tracking-widest text-slate-500 mb-2">Detak Jantung (BPM)</span>
                   <input 
                     type="number"
                     value={activeSetDetail.heartRate}
@@ -1509,7 +1509,7 @@ const ImmersiveWorkout = ({
                 <div className="flex w-full">
                   {isTreadmillMode ? (
                     <div className="flex flex-col flex-1">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2 text-center">Incline (%)</span>
+                      <span className="text-xs font-black uppercase tracking-widest text-slate-500 mb-2 text-center">Incline (%)</span>
                       <input 
                         type="number"
                         value={activeSetDetail.incline}
@@ -1520,7 +1520,7 @@ const ImmersiveWorkout = ({
                     </div>
                   ) : (
                     <div className="flex flex-col flex-1">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2 text-center">Elevasi (m)</span>
+                      <span className="text-xs font-black uppercase tracking-widest text-slate-500 mb-2 text-center">Elevasi (m)</span>
                       <input 
                         type="number"
                         value={activeSetDetail.elevation}
@@ -1560,7 +1560,7 @@ const ImmersiveWorkout = ({
                       {[
                         { label: 'Terlalu Ringan', rpe: 4, rir: 6, color: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
                         { label: 'Cukup Menantang', rpe: 7, rir: 3, color: 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20' },
-                        { label: 'Berat Banget', rpe: 9, rir: 1, color: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20' },
+                        { label: 'Berat Banget', rpe: 9, rir: 1, color: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' },
                         { label: 'Gagal Angkat (Failure)', rpe: 10, rir: 0, color: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20' }
                       ].map(tag => (
                         <button
@@ -1578,7 +1578,7 @@ const ImmersiveWorkout = ({
                           className={`px-4 py-3 rounded-2xl text-sm font-bold border ${activeSetDetail.notes === tag.label ? tag.color + ' ring-2 ring-current' : 'bg-black/5 dark:bg-white/5 border-transparent hover:bg-black/10 dark:hover:bg-white/10'} text-left transition-all flex items-center justify-between`}
                         >
                           <span>{tag.label}</span>
-                          <span className="text-[10px] uppercase tracking-widest opacity-60">{rpeMode ? 'RPE ' + tag.rpe : 'RIR ' + tag.rir}</span>
+                          <span className="text-xs uppercase tracking-widest opacity-60">{rpeMode ? 'RPE ' + tag.rpe : 'RIR ' + tag.rir}</span>
                         </button>
                       ))}
                     </div>
@@ -1591,10 +1591,10 @@ const ImmersiveWorkout = ({
                       const newMode = !rpeMode;
                       setRpeMode(newMode);
                       localStorage.setItem('logym_rpe_mode', newMode);
-                    }} className="text-[10px] font-black tracking-widest uppercase text-zinc-500 hover:text-blue-500 flex items-center gap-0.5 transition-colors">
+                    }} className="text-xs font-black tracking-widest uppercase text-slate-500 hover:text-blue-500 flex items-center gap-0.5 transition-colors">
                       {rpeMode ? 'RPE' : 'RIR'} <ArrowLeftRight size={10} />
                     </button>
-                    <button onClick={() => setShowIntensityInfo(!showIntensityInfo)} className="text-zinc-400 hover:text-blue-500 transition-colors"><Info size={12} /></button>
+                    <button onClick={() => setShowIntensityInfo(!showIntensityInfo)} className="text-slate-400 hover:text-blue-500 transition-colors"><Info size={12} /></button>
                   </div>
 
                   {/* POPUP INFO */}
@@ -1602,7 +1602,7 @@ const ImmersiveWorkout = ({
                     <>
                       <div className="fixed inset-0 z-40 overscroll-contain touch-none" onClick={(e) => { e.stopPropagation(); setShowIntensityInfo(false); }} />
                       <div className="absolute bottom-full right-0 mb-4 w-64 p-4 rounded-3xl bg-white/95 dark:bg-[#121a2f]/95 backdrop-blur-2xl shadow-2xl border border-black/10 dark:border-white/10 animate-in slide-in-from-bottom-2 z-50 pointer-events-none">
-                        <div className="text-xs text-zinc-600 dark:text-zinc-300 space-y-2">
+                        <div className="text-xs text-slate-600 dark:text-slate-300 space-y-2">
                           {rpeMode ? (
                             <>
                               <p><strong>RPE (Perceived Exertion):</strong> Skala 1-10 seberapa berat usaha latihan.</p>
@@ -1649,7 +1649,7 @@ const ImmersiveWorkout = ({
 
                               setActiveSetDetail({...activeSetDetail, rpe, rir, notes});
                             }}
-                            className={`flex-1 min-h-[26px] flex items-center justify-center rounded-full text-xs font-bold transition-all ${isSelected ? t.bgAccent + ' text-white shadow-md scale-110' : 'text-zinc-500 hover:bg-black/10 dark:hover:bg-white/10'} `}
+                            className={`flex-1 min-h-[26px] flex items-center justify-center rounded-full text-xs font-bold transition-all ${isSelected ? t.bgAccent + ' text-white shadow-md scale-110' : 'text-slate-500 hover:bg-black/10 dark:hover:bg-white/10'} `}
                           >
                             {val}
                           </button>

@@ -77,14 +77,14 @@ const UnifiedExerciseCard = React.memo(({ t, lang, ex, onEdit, onDelete, onToggl
           </h4>
         <div className="flex flex-col gap-1.5 mt-1">
           <div className="flex gap-1.5 flex-wrap items-center">
-             <span className={`text-[10px] font-black uppercase tracking-wider ${t.textAccent}`}>{ex.equipment || 'Lainnya'}</span>
-             <span className={`text-[10px] font-bold ${t.textMuted}`}>•</span>
-             <span className={`text-[10px] font-bold uppercase tracking-wider ${t.textMuted}`}>{exerciseTypeLabels[ex.type] || ex.type}</span>
+             <span className={`text-xs font-black uppercase tracking-wider ${t.textAccent}`}>{ex.equipment || 'Lainnya'}</span>
+             <span className={`text-xs font-bold ${t.textMuted}`}>•</span>
+             <span className={`text-xs font-bold uppercase tracking-wider ${t.textMuted}`}>{exerciseTypeLabels[ex.type] || ex.type}</span>
           </div>
           <div className="flex gap-1 flex-wrap items-center -ml-1.5">{Array.isArray(ex.target) ? ex.target.map(m => (
-              <span key={m} className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold ${t.inputBg} ${t.textMuted} border ${t.border}`}>{formatTarget(m, lang?.id)}</span>
+              <span key={m} className={`px-1.5 py-0.5 rounded-md text-xs font-bold ${t.inputBg} ${t.textMuted} border ${t.border}`}>{formatTarget(m, lang?.id)}</span>
             )) : ex.target && (
-              <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold ${t.inputBg} ${t.textMuted} border ${t.border}`}>{formatTarget(ex.target, lang?.id)}</span>
+              <span className={`px-1.5 py-0.5 rounded-md text-xs font-bold ${t.inputBg} ${t.textMuted} border ${t.border}`}>{formatTarget(ex.target, lang?.id)}</span>
             )}</div>
         </div>
       </div>
@@ -119,7 +119,7 @@ const UnifiedExerciseCard = React.memo(({ t, lang, ex, onEdit, onDelete, onToggl
           </>
         )}
         {isCustom && (
-          <div className={`absolute bottom-2.5 left-1/2 -translate-x-1/2 ml-1 ${t.bgAccent} text-white px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest leading-none shadow-sm pointer-events-none`}>
+          <div className={`absolute bottom-2.5 left-1/2 -translate-x-1/2 ml-1 ${t.bgAccent} text-white px-2.5 py-1 rounded-md text-xs font-black uppercase tracking-widest leading-none shadow-sm pointer-events-none`}>
             CUSTOM
           </div>
         )}

@@ -170,7 +170,7 @@ export default function CreatePostModal({ user, onClose, theme, t, initialFiles 
                 {postDataOverrides.originalUserPhoto ? (
                   <img src={postDataOverrides.originalUserPhoto} alt="avatar" className="w-6 h-6 rounded-full object-cover" />
                 ) : (
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${isDark ? 'bg-white/10 text-white' : 'bg-black/5 text-black'}`}>
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${isDark ? 'bg-white/10 text-white' : 'bg-black/5 text-black'}`}>
                     {postDataOverrides.originalUserName?.charAt(0).toUpperCase()}
                   </div>
                 )}
@@ -199,7 +199,7 @@ export default function CreatePostModal({ user, onClose, theme, t, initialFiles 
                   >
                     <X size={16} />
                   </button>
-                  <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-white text-[10px] font-bold shadow-sm pointer-events-none select-none">
+                  <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-white text-xs font-bold shadow-sm pointer-events-none select-none">
                     {i + 1}
                   </div>
                 </div>

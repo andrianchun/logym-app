@@ -23,11 +23,11 @@ const MetricBox = ({ label, value, unit, icon, color, t, theme }) => (
             <div className={`w-6 h-6 rounded-full flex items-center justify-center bg-${color}-500/20 text-${color}-500`}>
                 {icon}
             </div>
-            <span className={`text-[10px] font-bold ${t.textMuted} uppercase tracking-wider`}>{label}</span>
+            <span className={`text-xs font-bold ${t.textMuted} uppercase tracking-wider`}>{label}</span>
         </div>
         <div className="flex items-baseline space-x-1 justify-end mt-2">
             <span className={`h1 ${t.textMain}`}>{value || '-'}</span>
-            <span className={`text-[10px] font-bold ${t.textMuted}`}>{unit}</span>
+            <span className={`text-xs font-bold ${t.textMuted}`}>{unit}</span>
         </div>
     </div>
 );
@@ -36,7 +36,7 @@ const MetricBox = ({ label, value, unit, icon, color, t, theme }) => (
 // "biru itu langkah" berlaku di kedua bar, tidak perlu dihafal dua kali.
 const PART_COLORS = {
     bmr:     { bar: 'bg-blue-500', dot: 'bg-blue-500' },
-    manual:  { bar: 'bg-zinc-400 dark:bg-zinc-500', dot: 'bg-zinc-400 dark:bg-zinc-500' },
+    manual:  { bar: 'bg-slate-400 dark:bg-slate-500', dot: 'bg-slate-400 dark:bg-slate-500' },
     neat:    { bar: 'bg-indigo-400 dark:bg-indigo-400', dot: 'bg-indigo-400 dark:bg-indigo-400' },
     langkah: { bar: 'bg-indigo-400 dark:bg-indigo-400', dot: 'bg-indigo-400 dark:bg-indigo-400' },
     eat:     { bar: 'bg-sky-400 dark:bg-sky-400', dot: 'bg-sky-400 dark:bg-sky-400' },
@@ -44,7 +44,7 @@ const PART_COLORS = {
     tef:     { bar: 'bg-emerald-400 dark:bg-emerald-400', dot: 'bg-emerald-400 dark:bg-emerald-400' },
     // Warna kardio/beban disamakan dengan grafik subcard (ActivityChart) supaya satu warna
     // berarti satu hal di seluruh dasbor.
-    kardio:  { bar: 'bg-zinc-400 dark:bg-zinc-500', dot: 'bg-zinc-400 dark:bg-zinc-500' },
+    kardio:  { bar: 'bg-slate-400 dark:bg-slate-500', dot: 'bg-slate-400 dark:bg-slate-500' },
     beban:   { bar: 'bg-sky-400 dark:bg-sky-400', dot: 'bg-sky-400 dark:bg-sky-400' },
 };
 
@@ -84,7 +84,7 @@ const StackedBar = ({ parts, basis, language, align = 'left', showLegend = true 
             {showLegend && (
                 <div className={`flex flex-wrap gap-x-2 ${LEGEND_ROW} ${align === 'right' ? 'justify-end' : ''}`}>
                     {shown.map(p => (
-                        <span key={p.key} className="flex items-center gap-1 whitespace-nowrap text-[9px] text-zinc-500 dark:text-zinc-400">
+                        <span key={p.key} className="flex items-center gap-1 whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
                             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${PART_COLORS[p.key].dot}`} />
                             {p.label} {formatNumber(p.value, language)}
                         </span>
@@ -98,7 +98,7 @@ const StackedBar = ({ parts, basis, language, align = 'left', showLegend = true 
 const MiniBox = ({ label, value, unit, t, theme }) => (
     <div className={`p-3 rounded-xl flex flex-col items-center justify-center text-center ${t.bgCardSoft} border ${t.border} transition-transform duration-300 active:scale-[0.98]`}>
         <span className={`h2 ${t.textMain}`}>{value || '-'}</span>
-        <span className={`text-[9px] font-bold ${t.textMuted} mt-1 uppercase tracking-wider`}>{label}</span>
+        <span className={`text-xs font-bold ${t.textMuted} mt-1 uppercase tracking-wider`}>{label}</span>
     </div>
 );
 
@@ -123,7 +123,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
   };
   const resolveBfColor = (bfVal, isFemaleUser) => {
     const bf = Number(bfVal);
-    if (!bf || bf <= 0) return 'text-zinc-500';
+    if (!bf || bf <= 0) return 'text-slate-500';
     const limitNorm = isFemaleUser ? 28 : 20;
     const limitLow = isFemaleUser ? 18 : 10;
     const limitHigh = isFemaleUser ? 33 : 25;
@@ -1064,13 +1064,13 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
             <p className={`body-base font-medium ${t.textMuted} mt-1 leading-snug`}>{t.greetingText}</p>
             <div className="flex items-center space-x-2 mt-1">
                <p className={`body-md ${t.textMuted}`}>{new Date().toLocaleDateString(lang.workout === 'Latihan' ? 'id-ID' : 'en-US', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
-               <span className={`text-[10px] ${t.textMuted}`}>•</span>
+               <span className={`text-xs ${t.textMuted}`}>•</span>
                <div className={`flex items-center gap-1 ${t.textMuted}`}>
                  <Dumbbell size={12} />
-                 <span className="body-md font-bold text-[13px]">{gymProfiles?.find(g => g.id === activeGymId)?.name || 'Logym'}</span>
+                 <span className="body-md font-bold text-xs">{gymProfiles?.find(g => g.id === activeGymId)?.name || 'Logym'}</span>
                </div>
 
-               <span className={`text-[10px] ${t.textMuted}`}>•</span>
+               <span className={`text-xs ${t.textMuted}`}>•</span>
                <button onClick={() => {
                    playSoundEffect('click', soundEnabled);
                    const msg = syncStatus === 'synced' ? 'Semua data Anda sudah aman tersimpan di cloud.' :
@@ -1097,8 +1097,8 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
          <div className="flex items-center gap-2 relative z-20 h-10 -mr-1">
             {isLogyHidden && (
                <button onClick={() => { playSoundEffect('click', soundEnabled); window.dispatchEvent(new CustomEvent('toggle-logy-float', { detail: { action: 'showAndOpen' } })); }} className={`flex flex-col items-center justify-center gap-0.5 bg-blue-500/10 text-blue-500 border border-blue-500/20 rounded-2xl p-1.5 hover:bg-blue-500/20 transition-all shadow-sm animate-in zoom-in-90 duration-300 min-w-[48px]`}>
-                  <div className="w-7 h-7 rounded-full overflow-hidden bg-zinc-900 border border-blue-400 shrink-0" style={{backgroundImage: "url('/bg-program.webp')", backgroundSize: '450%', backgroundPosition: '52% 7%'}}></div>
-                  <span className="text-[8px] font-black tracking-wide uppercase whitespace-nowrap leading-none pb-0.5">Konsul</span>
+                  <div className="w-7 h-7 rounded-full overflow-hidden bg-slate-900 border border-blue-400 shrink-0" style={{backgroundImage: "url('/bg-program.webp')", backgroundSize: '450%', backgroundPosition: '52% 7%'}}></div>
+                  <span className="text-xs font-black tracking-wide uppercase whitespace-nowrap leading-none pb-0.5">Konsul</span>
                </button>
             )}
          </div>
@@ -1133,7 +1133,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                      {isBleBusy && <Bluetooth className="w-4 h-4 text-blue-500 animate-pulse ml-2" />}
                    </h3>
                    {bioDataDate && (
-                       <p className={`caption ${t.textMuted} mt-0.5`} style={{fontSize: '0.65rem'}}>{bioDataDate === activeDate ? 'Hari ini: ' : 'Data dari: '}{new Date(bioDataDate).toLocaleDateString(language==='ID'?'id-ID':'en-US', { day: 'numeric', month: 'short' })}</p>
+                       <p className={`caption ${t.textMuted} mt-0.5`} >{bioDataDate === activeDate ? 'Hari ini: ' : 'Data dari: '}{new Date(bioDataDate).toLocaleDateString(language==='ID'?'id-ID':'en-US', { day: 'numeric', month: 'short' })}</p>
                    )}
                </div>
                <div className="flex items-center space-x-2">
@@ -1157,11 +1157,11 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                        className="flex flex-col p-1 -m-1 rounded-lg hover:bg-white/10 active:bg-white/20 transition-colors cursor-pointer"
                        title={isID ? 'Buka Analisis Berat & Tinggi' : 'Open Weight & Height Analysis'}
                    >
-                       <span className={`text-[10px] ${t.textMuted} mb-0.5 font-bold`}>Fisik</span>
+                       <span className={`text-sm ${t.textMuted} mb-0.5 font-bold`}>Fisik</span>
                         <div className="flex items-baseline space-x-1.5">
-                            <span onClick={(e) => { e.stopPropagation(); handleOpenBioDetails('weight'); }} className={`text-lg font-black ${t.textMain} leading-none cursor-pointer hover:underline`} title={isID ? 'Buka Analisis Berat' : 'Open Weight Analysis'}>{isImp && bioData.weight ? Number((bioData.weight * 2.20462).toFixed(1)) : bioData.weight || '-'} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">{isImp ? 'lbs' : 'kg'}</span></span>
-                            <span className="text-zinc-300 dark:text-zinc-600 text-[10px]">|</span>
-                            <span onClick={(e) => { e.stopPropagation(); handleOpenBioDetails('height'); }} className={`text-lg font-black ${t.textMain} leading-none cursor-pointer hover:underline`} title={isID ? 'Buka Analisis Tinggi' : 'Open Height Analysis'}>{isImp && bioData.height ? Number((bioData.height * 0.393701).toFixed(1)) : bioData.height || '-'} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">{isImp ? 'in' : 'cm'}</span></span>
+                            <span onClick={(e) => { e.stopPropagation(); handleOpenBioDetails('weight'); }} className={`text-lg font-black ${t.textMain} leading-none cursor-pointer hover:underline`} title={isID ? 'Buka Analisis Berat' : 'Open Weight Analysis'}>{isImp && bioData.weight ? Number((bioData.weight * 2.20462).toFixed(1)) : bioData.weight || '-'} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">{isImp ? 'lbs' : 'kg'}</span></span>
+                            <span className="text-slate-300 dark:text-slate-600 text-xs">|</span>
+                            <span onClick={(e) => { e.stopPropagation(); handleOpenBioDetails('height'); }} className={`text-lg font-black ${t.textMain} leading-none cursor-pointer hover:underline`} title={isID ? 'Buka Analisis Tinggi' : 'Open Height Analysis'}>{isImp && bioData.height ? Number((bioData.height * 0.393701).toFixed(1)) : bioData.height || '-'} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">{isImp ? 'in' : 'cm'}</span></span>
                         </div>
                    </div>
 
@@ -1171,10 +1171,10 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                        className="flex flex-col p-1 -m-1 rounded-lg hover:bg-white/10 active:bg-white/20 transition-colors cursor-pointer"
                        title={isID ? 'Buka Analisis BMI' : 'Open BMI Analysis'}
                    >
-                       <span className={`text-[10px] ${t.textMuted} mb-0.5 font-bold`}>BMI ({biometricStandard === 'western' ? 'Western' : 'Asia'})</span>
+                       <span className={`text-sm ${t.textMuted} mb-0.5 font-bold`}>BMI ({biometricStandard === 'western' ? 'Western' : 'Asia'})</span>
                        <div className="flex items-baseline space-x-1.5">
                            <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.bmi, language) || '-'}</span>
-                           <span className={`text-[10px] font-bold ${bioData.bmiStatus === 'Normal' ? 'text-emerald-500' : bioData.bmiStatus === 'Overweight' ? 'text-amber-400' : 'text-rose-500'}`}>{resolveBmiStatus(bioData.bmiStatus, isID)}</span>
+                           <span className={`text-xs font-bold ${bioData.bmiStatus === 'Normal' ? 'text-emerald-500' : bioData.bmiStatus === 'Overweight' ? 'text-amber-400' : 'text-rose-500'}`}>{resolveBmiStatus(bioData.bmiStatus, isID)}</span>
                        </div>
                    </div>
 
@@ -1184,9 +1184,9 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                        className="flex flex-col p-1 -m-1 rounded-lg hover:bg-white/10 active:bg-white/20 transition-colors cursor-pointer"
                        title={isID ? 'Buka Analisis BMR' : 'Open BMR Analysis'}
                    >
-                       <span className={`text-[10px] ${t.textMuted} mb-0.5 font-bold`}>BMR</span>
+                       <span className={`text-sm ${t.textMuted} mb-0.5 font-bold`}>BMR</span>
                        <div>
-                           <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.bmr, language) || '-'} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">kcal</span></span>
+                           <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.bmr, language) || '-'} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">kcal</span></span>
                        </div>
                    </div>
 
@@ -1196,10 +1196,10 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                        className="flex flex-col p-1 -m-1 rounded-lg hover:bg-white/10 active:bg-white/20 transition-colors cursor-pointer"
                        title={isID ? 'Buka Analisis Kadar Lemak' : 'Open Body Fat Analysis'}
                    >
-                       <span className={`text-[10px] ${t.textMuted} mb-0.5 font-bold`}>{isID ? 'Kadar Lemak' : 'Body Fat'}</span>
+                       <span className={`text-sm ${t.textMuted} mb-0.5 font-bold`}>{isID ? 'Kadar Lemak' : 'Body Fat'}</span>
                        <div className="flex items-baseline space-x-1.5">
-                           <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.bodyFat, language) || '-'} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span>
-                           <span className={`text-[10px] font-bold ${resolveBfColor(bioData.bodyFat, userProfile?.gender === 'female')}`}>{resolveBfStatus(bioData.bodyFat, userProfile?.gender === 'female', isID)}</span>
+                           <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.bodyFat, language) || '-'} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">%</span></span>
+                           <span className={`text-xs font-bold ${resolveBfColor(bioData.bodyFat, userProfile?.gender === 'female')}`}>{resolveBfStatus(bioData.bodyFat, userProfile?.gender === 'female', isID)}</span>
                        </div>
                    </div>
                 </div>
@@ -1220,7 +1220,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                        </svg>
                        <div className="flex flex-col items-center justify-center relative z-10">
                           <span className="text-3xl font-black leading-none" style={{ color: scoreArcColor }}>{formatNumber(bioData.bodyScore, language) || '-'}</span>
-                          <span className={`text-[10px] mt-0.5 font-bold leading-tight ${t.textMuted}`}>SCORE</span>
+                          <span className={`text-xs mt-0.5 font-bold leading-tight ${t.textMuted}`}>SCORE</span>
                        </div>
                     </div>
                 </div>
@@ -1230,52 +1230,52 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                  {/* 1. FFMI */}
                  <div onClick={() => handleOpenBioDetails('ffmi')} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenBioDetails('ffmi'); } }} className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center min-h-[72px] cursor-pointer active:scale-95 hover:bg-blue-500/15 dark:hover:bg-blue-500/25 transition-all select-none`} title={isID ? 'Buka Analisis FFMI' : 'Open FFMI Analysis'}>
                      <span className={`body-lg font-black ${t.textMain} leading-tight`}>{mainFfmi}</span>
-                     <span className="text-[9px] font-bold text-sky-400 leading-none mt-0.5">{mainFfmi !== '-' ? 'index' : '-'}</span>
-                     <span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>FFMI</span>
+                     <span className="text-xs font-bold text-sky-400 leading-none mt-0.5">{mainFfmi !== '-' ? 'index' : '-'}</span>
+                     <span className={`text-xs font-bold ${t.textMuted} mt-0.5 leading-tight`}>FFMI</span>
                  </div>
 
                  {/* 2. Otot (+ Kadar Otot) */}
                  <div onClick={() => handleOpenBioDetails('muscleMass')} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenBioDetails('muscleMass'); } }} className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center min-h-[72px] cursor-pointer active:scale-95 hover:bg-blue-500/15 dark:hover:bg-blue-500/25 transition-all select-none`} title={isID ? 'Buka Analisis Otot' : 'Open Muscle Analysis'}>
-                     <span className={`body-lg font-black ${t.textMain} leading-tight`}>{dispMainMuscle} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">{isImp ? 'lbs' : 'kg'}</span></span>
-                     <span className="text-[9px] font-bold text-sky-400 leading-none mt-0.5">{bioData.musclePercent ? `${formatNumber(bioData.musclePercent, language)}%` : '-'}</span>
-                     <span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>{isID ? 'Otot' : 'Muscle'}</span>
+                     <span className={`body-lg font-black ${t.textMain} leading-tight`}>{dispMainMuscle} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">{isImp ? 'lbs' : 'kg'}</span></span>
+                     <span className="text-xs font-bold text-sky-400 leading-none mt-0.5">{bioData.musclePercent ? `${formatNumber(bioData.musclePercent, language)}%` : '-'}</span>
+                     <span className={`text-xs font-bold ${t.textMuted} mt-0.5 leading-tight`}>{isID ? 'Otot' : 'Muscle'}</span>
                  </div>
 
                  {/* 3. Kadar Protein */}
                  <div onClick={() => handleOpenBioDetails('proteinPercent')} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenBioDetails('proteinPercent'); } }} className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center min-h-[72px] cursor-pointer active:scale-95 hover:bg-blue-500/15 dark:hover:bg-blue-500/25 transition-all select-none`} title={isID ? 'Buka Analisis Kadar Protein' : 'Open Protein Analysis'}>
-                     <span className={`body-lg font-black ${t.textMain} leading-tight`}>{formatNumber(bioData.proteinPercent, language) || '-'} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span>
-                     <span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Protein</span>
+                     <span className={`body-lg font-black ${t.textMain} leading-tight`}>{formatNumber(bioData.proteinPercent, language) || '-'} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">%</span></span>
+                     <span className={`text-xs font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Protein</span>
                  </div>
 
                  {/* 4. Kadar Air */}
                  <div onClick={() => handleOpenBioDetails('waterPercent')} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenBioDetails('waterPercent'); } }} className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center min-h-[72px] cursor-pointer active:scale-95 hover:bg-blue-500/15 dark:hover:bg-blue-500/25 transition-all select-none`} title={isID ? 'Buka Analisis Kadar Air' : 'Open Water Analysis'}>
-                     <span className={`body-lg font-black ${t.textMain} leading-tight`}>{formatNumber(bioData.waterPercent, language) || '-'} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span>
-                     <span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Air</span>
+                     <span className={`body-lg font-black ${t.textMain} leading-tight`}>{formatNumber(bioData.waterPercent, language) || '-'} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">%</span></span>
+                     <span className={`text-xs font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Air</span>
                  </div>
                  
                  {/* 5. Lemak Visceral */}
                  <div onClick={() => handleOpenBioDetails('visceralFat')} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenBioDetails('visceralFat'); } }} className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center min-h-[72px] cursor-pointer active:scale-95 hover:bg-blue-500/15 dark:hover:bg-blue-500/25 transition-all select-none`} title={isID ? 'Buka Analisis Lemak Visceral' : 'Open Visceral Fat Analysis'}>
                      <span className={`body-lg font-black ${t.textMain} leading-tight`}>{formatNumber(bioData.visceralFat, language) || '-'}</span>
-                     <span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Lemak<br/>Visceral</span>
+                     <span className={`text-xs font-bold ${t.textMuted} mt-0.5 leading-tight`}>Lemak<br/>Visceral</span>
                  </div>
 
                  {/* 6. Lingkar Perut (+ WtHR) */}
                  <div onClick={() => handleOpenBioDetails('waist')} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenBioDetails('waist'); } }} className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center min-h-[72px] cursor-pointer active:scale-95 hover:bg-blue-500/15 dark:hover:bg-blue-500/25 transition-all select-none`} title={isID ? 'Buka Analisis Perut & WTHR' : 'Open Waist & WTHR Analysis'}>
-                     <span className={`body-lg font-black ${t.textMain} leading-tight`}>{dispMainWaist} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">{isImp ? 'in' : 'cm'}</span></span>
-                     <span className="text-[9px] font-bold text-sky-400 leading-none mt-0.5">{mainWthr !== '-' ? `${mainWthr} WTHR` : '-'}</span>
-                     <span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>{isID ? 'Perut' : 'Waist'}</span>
+                     <span className={`body-lg font-black ${t.textMain} leading-tight`}>{dispMainWaist} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">{isImp ? 'in' : 'cm'}</span></span>
+                     <span className="text-xs font-bold text-sky-400 leading-none mt-0.5">{mainWthr !== '-' ? `${mainWthr} WTHR` : '-'}</span>
+                     <span className={`text-xs font-bold ${t.textMuted} mt-0.5 leading-tight`}>{isID ? 'Perut' : 'Waist'}</span>
                  </div>
 
                  {/* 7. Mineral Tulang */}
                  <div onClick={() => handleOpenBioDetails('boneMass')} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenBioDetails('boneMass'); } }} className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center min-h-[72px] cursor-pointer active:scale-95 hover:bg-blue-500/15 dark:hover:bg-blue-500/25 transition-all select-none`} title={isID ? 'Buka Analisis Mineral Tulang' : 'Open Bone Mass Analysis'}>
-                     <span className={`body-lg font-black ${t.textMain} leading-tight`}>{formatNumber(bioData.boneMass, language) || '-'} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span>
-                     <span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Mineral<br/>Tulang</span>
+                     <span className={`body-lg font-black ${t.textMain} leading-tight`}>{formatNumber(bioData.boneMass, language) || '-'} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">%</span></span>
+                     <span className={`text-xs font-bold ${t.textMuted} mt-0.5 leading-tight`}>Mineral<br/>Tulang</span>
                  </div>
 
                  {/* 8. Usia Tubuh */}
                  <div onClick={() => handleOpenBioDetails('bodyAge')} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenBioDetails('bodyAge'); } }} className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center min-h-[72px] cursor-pointer active:scale-95 hover:bg-blue-500/15 dark:hover:bg-blue-500/25 transition-all select-none`} title={isID ? 'Buka Analisis Usia Tubuh' : 'Open Body Age Analysis'}>
-                     <span className={`body-lg font-black ${t.textMain} leading-tight`}>{formatNumber(bioData.bodyAge, language) || '-'} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">th</span></span>
-                     <span className={`text-[10px] font-bold ${t.textMuted} mt-0.5 leading-tight`}>Usia<br/>Tubuh</span>
+                     <span className={`body-lg font-black ${t.textMain} leading-tight`}>{formatNumber(bioData.bodyAge, language) || '-'} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">th</span></span>
+                     <span className={`text-xs font-bold ${t.textMuted} mt-0.5 leading-tight`}>Usia<br/>Tubuh</span>
                  </div>
             </div>
            
@@ -1348,7 +1348,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                        Aktivitas Harian
                        {isBleBusy && <Bluetooth className="w-4 h-4 text-blue-500 animate-pulse ml-2" />}
                      </h3>
-                     <p className={`caption ${t.textMuted} mt-0.5`} style={{fontSize: '0.65rem'}}>Hari ini: {new Date(activeDate).toLocaleDateString(language==='ID'?'id-ID':'en-US', { day: 'numeric', month: 'short' })}</p>
+                     <p className={`caption ${t.textMuted} mt-0.5`} >Hari ini: {new Date(activeDate).toLocaleDateString(language==='ID'?'id-ID':'en-US', { day: 'numeric', month: 'short' })}</p>
                  </div>
                  <div className="flex space-x-2">
 
@@ -1374,7 +1374,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                      <div className="flex flex-col flex-1">
                          <div className={`flex items-baseline space-x-1 ${NUM_ROW}`}>
                              <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{bioData.steps > 0 ? formatNumber(bioData.steps, language) : '-'}</span>
-                             <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold whitespace-nowrap">/ {formatNumber(activityTargets?.steps || 10000, language)}</span>
+                             <span className="text-xs text-slate-500 dark:text-slate-400 font-bold whitespace-nowrap">/ {formatNumber(activityTargets?.steps || 10000, language)}</span>
                          </div>
                          <div className={`w-full ${BAR_ROW} bg-black/10 dark:bg-white/10 rounded-full overflow-hidden shrink-0`}>
                              <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Number(bioData.steps || 0) / (activityTargets?.steps || 10000)) * 100)}%` }}></div>
@@ -1397,9 +1397,9 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                               <div className="flex flex-col flex-1 w-full">
                                   <div className={`flex items-baseline justify-end space-x-1 ${NUM_ROW}`}>
                                       <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{todayDur > 0 ? formatNumber(todayDur, language) : '-'}</span>
-                                      <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold whitespace-nowrap">mnt</span>
+                                      <span className="text-xs text-slate-500 dark:text-slate-400 font-bold whitespace-nowrap">mnt</span>
                                   </div>
-                                  <div className="text-[9px] text-zinc-500 dark:text-zinc-400 font-semibold mt-0.5">
+                                  <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold mt-0.5">
                                       {formatNumber(weeklyDur, language)}/{weeklyTarget} mnt minggu ini
                                   </div>
                                   <StackedBar parts={mergedDurationParts} basis={weeklyTarget} language={language} align="right" showLegend={false} />
@@ -1425,7 +1425,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                          <div className="flex flex-col flex-1">
                              <div className={`flex items-baseline space-x-1 ${NUM_ROW}`}>
                                  <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{formatNumber(nutritionCalories, language) || '-'}</span>
-                                 <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold whitespace-nowrap">/ {formatNumber(foodTarget, language)} kkal</span>
+                                 <span className="text-xs text-slate-500 dark:text-slate-400 font-bold whitespace-nowrap">/ {formatNumber(foodTarget, language)} kkal</span>
                              </div>
                              {/* Bar progres ke target makan — targetnya (`foodTarget`) sudah ada di sini
                                  sejak dulu tapi belum pernah dipakai. Sekalian menyamakan tinggi kotak
@@ -1434,8 +1434,8 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                                  <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Number(nutritionCalories || 0) / foodTarget) * 100)}%` }}></div>
                              </div>
                              {lomealFresh && (
-                               <div className="mt-1 flex items-center gap-1.5 font-medium" style={{fontSize: '0.65rem'}}>
-                                 <span className="px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-500 text-[8px] uppercase font-bold tracking-wider">LOMEAL</span>
+                               <div className="mt-1 flex items-center gap-1.5 font-medium" >
+                                 <span className="px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-500 text-xs uppercase font-bold tracking-wider">LOMEAL</span>
                                  <span className={t.textMuted}>{lomealFresh.mealsCount || 0} konsumsi</span>
                                </div>
                              )}
@@ -1470,21 +1470,21 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                  <div className={`grid grid-cols-3 gap-x-3 pt-4 border-t border-dashed ${t.borderDashed}`}>
                      {/* Tekanan Darah */}
                      <div className="flex flex-col h-full">
-                         <div className="flex items-center space-x-1 mb-1 text-blue-400"><Activity size={12}/> <span className={`text-[10px] ${t.textMuted}`}>Tensi</span></div>
+                         <div className="flex items-center space-x-1 mb-1 text-blue-400"><Activity size={12}/> <span className={`text-sm ${t.textMuted}`}>Tensi</span></div>
                          <span className={`text-lg font-black ${t.textMain} leading-none`}>{bioData.bloodPressure || '-'}</span>
                      </div>
 
                      {/* Detak Jantung */}
                      <div className="flex flex-col h-full items-center text-center">
-                         <div className="flex items-center space-x-1 mb-1 text-blue-400"><HeartPulse size={12}/> <span className={`text-[10px] ${t.textMuted}`}>Nadi</span></div>
-                         <span className={`text-lg font-black ${t.textMain} leading-none`}>{bioData.heartRate > 0 ? <>{formatNumber(bioData.heartRate, language)} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">bpm</span></> : '-'}</span>
-                         <span className="text-[8px] text-zinc-500 dark:text-zinc-400 whitespace-nowrap mt-0.5">Min {bioData.minHeartRate > 0 ? formatNumber(bioData.minHeartRate, language) : '-'} &bull; Max {bioData.maxHeartRate > 0 ? formatNumber(bioData.maxHeartRate, language) : '-'}</span>
+                         <div className="flex items-center space-x-1 mb-1 text-blue-400"><HeartPulse size={12}/> <span className={`text-sm ${t.textMuted}`}>Nadi</span></div>
+                         <span className={`text-lg font-black ${t.textMain} leading-none`}>{bioData.heartRate > 0 ? <>{formatNumber(bioData.heartRate, language)} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">bpm</span></> : '-'}</span>
+                         <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap mt-0.5">Min {bioData.minHeartRate > 0 ? formatNumber(bioData.minHeartRate, language) : '-'} &bull; Max {bioData.maxHeartRate > 0 ? formatNumber(bioData.maxHeartRate, language) : '-'}</span>
                      </div>
 
                      {/* SpO2 */}
                      <div className="flex flex-col h-full items-end text-right">
-                         <div className="flex items-center space-x-1 mb-1 text-blue-400"><span className={`text-[10px] ${t.textMuted}`}>SpO2</span> <Wind size={12}/></div>
-                         <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.oxygenSaturation, language) || '-'} <span className="text-[9px] font-normal text-zinc-500 dark:text-zinc-400">%</span></span>
+                         <div className="flex items-center space-x-1 mb-1 text-blue-400"><span className={`text-sm ${t.textMuted}`}>SpO2</span> <Wind size={12}/></div>
+                         <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.oxygenSaturation, language) || '-'} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">%</span></span>
                      </div>
                  </div>
                  </div>
@@ -1648,7 +1648,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
              <div className="flex items-center justify-between mb-4">
                  <div>
                      <h3 className={`h2 ${t.textMain}`}>Pemulihan</h3>
-                     <span className={`text-[10px] font-bold ${t.textMuted}`}>{sleepDateLabel}</span>
+                     <span className={`text-xs font-bold ${t.textMuted}`}>{sleepDateLabel}</span>
                  </div>
                  <div className="flex items-center gap-2">
                      {/* Mundur dibatasi 30 hari — sejauh backfill Health Connect mengisi. */}
@@ -1692,15 +1692,9 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                              className="cursor-pointer group active:opacity-85 transition-opacity"
                              title="Klik untuk menentukan target durasi tidur"
                          >
-                             <div className="flex items-center justify-between mb-1">
-                                 <div className="flex items-center space-x-1.5">
-                                     <Moon size={12} className="text-indigo-400" />
-                                     <span className={`text-[10px] font-bold uppercase tracking-widest ${t.textMuted} group-hover:text-indigo-400 transition-colors`}>Kualitas & Durasi Tidur</span>
-                                 </div>
-                                 <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${t.btnBg} border ${t.border} ${t.textMuted} group-hover:${t.textMain} transition-colors flex items-center gap-1`}>
-                                     <Target size={10} className="text-indigo-400" />
-                                     <span>Target: {targetSleepLabel}</span>
-                                 </span>
+                             <div className="flex items-center space-x-1.5 mb-1">
+                                 <Moon size={14} className="text-indigo-400" />
+                                 <span className={`text-sm font-bold uppercase tracking-widest ${t.textMuted} group-hover:text-indigo-400 transition-colors`}>Kualitas & Durasi Tidur</span>
                              </div>
                              <div className="flex items-baseline space-x-3 mt-1">
                                  <div className="flex items-baseline space-x-1">
@@ -1732,7 +1726,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                                              </>
                                          );
                                      })()}
-                                     <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold whitespace-nowrap ml-1">/ {targetSleepLabel}</span>
+                                     <span className="text-xs text-slate-400 font-semibold whitespace-nowrap ml-1">/ {targetSleepLabel}</span>
                                  </div>
                                  {(() => {
                                      if (sleepHrs <= 0) return null;
@@ -1752,7 +1746,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                                          text = 'Kurang';
                                          color = 'bg-amber-500/90 text-white border-amber-500/20';
                                      }
-                                     return <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider ${color} border shadow-sm`}>{text}</span>;
+                                     return <span className={`px-2 py-0.5 rounded-full text-xs uppercase font-bold tracking-wider ${color} border shadow-sm`}>{text}</span>;
                                  })()}
                              </div>
                              {sleepHrs > 0 && (
@@ -1773,7 +1767,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                      mengekspornya ke Health Connect — praktisnya selalu kosong. */}
                  <div className="pb-1">
                      <div className="flex items-center space-x-2">
-                         <span className={`text-[10px] font-bold uppercase tracking-widest ${t.textMuted}`}>Skor Kesiapan</span>
+                         <span className={`text-sm font-bold uppercase tracking-widest ${t.textMuted}`}>Skor Kesiapan</span>
                      </div>
                      <div className="flex items-baseline space-x-3 mt-1">
                          <div className="flex items-baseline space-x-1">
@@ -1796,12 +1790,12 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                                  text = 'Cukup';
                                  color = 'bg-amber-500/90 text-white border-amber-500/20';
                              }
-                             return <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider ${color} border shadow-sm`}>{text}</span>;
+                             return <span className={`px-2 py-0.5 rounded-full text-xs uppercase font-bold tracking-wider ${color} border shadow-sm`}>{text}</span>;
                          })()}
                      </div>
                      {/* Alasannya ikut ditulis. Skor tanpa sebab itu kotak hitam — persis keluhan
                          yang bikin Skor Energi Samsung tidak berguna di sini. */}
-                     <p className={`text-[10px] leading-snug mt-1.5 ${t.textMuted}`}>{sleepReadiness.message}</p>
+                     <p className={`text-sm leading-snug mt-1.5 ${t.textMuted}`}>{sleepReadiness.message}</p>
                  </div>
              </div>
 
@@ -1868,8 +1862,8 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                         return (
                             <div className="py-8 flex flex-col items-center justify-center text-center">
                                 <Moon size={24} className={`mb-3 opacity-20 ${t.textMain}`} />
-                                <span className={`text-xs font-bold ${t.textMuted}`}>Detail tahap tidur tidak tersedia</span>
-                                <span className={`text-[9px] mt-1 opacity-70 ${t.textMuted}`}>Hubungkan dengan smartwatch/Health Connect atau input manual untuk melihat analisis mendalam.</span>
+                                <span className={`text-sm font-bold ${t.textMuted}`}>Detail tahap tidur tidak tersedia</span>
+                                <span className={`text-sm mt-1 opacity-70 ${t.textMuted}`}>Hubungkan dengan smartwatch/Health Connect atau input manual untuk melihat analisis mendalam.</span>
                             </div>
                         );
                     }
@@ -1888,14 +1882,14 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                         return (
                             <div className="flex flex-col mb-4 last:mb-0 relative">
                                 <div className="flex justify-between items-end mb-1">
-                                    <span className={`text-[10px] font-bold ${t.textMuted}`}>{label}</span>
-                                    <span className={`text-xs font-black ${t.textMain}`}>{durStr} <span className="text-[9px] font-normal opacity-60">({Math.round(pct)}%)</span></span>
+                                    <span className={`text-xs font-bold ${t.textMuted}`}>{label}</span>
+                                    <span className={`text-xs font-black ${t.textMain}`}>{durStr} <span className="text-xs font-normal opacity-60">({Math.round(pct)}%)</span></span>
                                 </div>
                                 <div className="relative w-full h-2 rounded-full bg-black/10 dark:bg-white/10 overflow-visible">
                                     <div className="absolute top-0 bottom-0 bg-black/10 dark:bg-white/10 border-x border-black/20 dark:border-white/20" style={{ left: `${targetLeft}%`, width: `${targetWidth}%` }}></div>
                                     <div className={`absolute top-0 bottom-0 left-0 rounded-full ${colorClass} transition-all duration-700`} style={{ width: `${Math.min(100, pct)}%` }}></div>
-                                    <div className="absolute -top-1 -bottom-1 w-px bg-zinc-400/50" style={{ left: `${targetLeft}%` }}></div>
-                                    <div className="absolute -top-1 -bottom-1 w-px bg-zinc-400/50" style={{ left: `${maxTargetPct}%` }}></div>
+                                    <div className="absolute -top-1 -bottom-1 w-px bg-slate-400/50" style={{ left: `${targetLeft}%` }}></div>
+                                    <div className="absolute -top-1 -bottom-1 w-px bg-slate-400/50" style={{ left: `${maxTargetPct}%` }}></div>
                                 </div>
                             </div>
                         );
@@ -1909,15 +1903,15 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                         if (pct < 0) pct = 0; if (pct > 100) pct = 100;
                         
                         return (
-                            <div className="flex flex-col mt-4 pt-4 border-t border-dashed border-zinc-500/20 relative">
+                            <div className="flex flex-col mt-4 pt-4 border-t border-dashed border-slate-500/20 relative">
                                 <div className="flex justify-between items-end mb-1">
-                                    <span className={`text-[10px] font-bold ${t.textMuted}`}>HRV (Heart Rate Variability)</span>
-                                    <span className={`text-xs font-black text-rose-500`}>{val} <span className="text-[9px] font-normal opacity-60">ms</span></span>
+                                    <span className={`text-sm font-bold ${t.textMuted}`}>HRV (Heart Rate Variability)</span>
+                                    <span className={`text-xs font-black text-rose-500`}>{val} <span className="text-xs font-normal opacity-60">ms</span></span>
                                 </div>
                                 <div className="relative w-full h-2 rounded-full bg-black/10 dark:bg-white/10 overflow-visible">
                                     <div className="absolute top-0 bottom-0 bg-black/10 dark:bg-white/10 border-x border-black/20 dark:border-white/20" style={{ left: '30%', width: '70%' }}></div>
                                     <div className={`absolute top-0 bottom-0 left-0 rounded-full bg-rose-500 transition-all duration-700`} style={{ width: `${pct}%` }}></div>
-                                    <div className="absolute -top-1 -bottom-1 w-px bg-zinc-400/50" style={{ left: '30%' }}></div>
+                                    <div className="absolute -top-1 -bottom-1 w-px bg-slate-400/50" style={{ left: '30%' }}></div>
                                 </div>
                             </div>
                         );
@@ -1928,15 +1922,15 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                         let pct = val;
                         if (pct < 0) pct = 0; if (pct > 100) pct = 100;
                         return (
-                            <div className="flex flex-col mt-4 pt-4 border-t border-dashed border-zinc-500/20 relative">
+                            <div className="flex flex-col mt-4 pt-4 border-t border-dashed border-slate-500/20 relative">
                                 <div className="flex justify-between items-end mb-1">
-                                    <span className={`text-[10px] font-bold ${t.textMuted}`}>SpO2 (Oksigen Darah)</span>
-                                    <span className={`text-xs font-black text-sky-400`}>{val} <span className="text-[9px] font-normal opacity-60">%</span></span>
+                                    <span className={`text-sm font-bold ${t.textMuted}`}>SpO2 (Oksigen Darah)</span>
+                                    <span className={`text-xs font-black text-sky-400`}>{val} <span className="text-xs font-normal opacity-60">%</span></span>
                                 </div>
                                 <div className="relative w-full h-2 rounded-full bg-black/10 dark:bg-white/10 overflow-visible">
                                     <div className="absolute top-0 bottom-0 bg-black/10 dark:bg-white/10 border-x border-black/20 dark:border-white/20" style={{ left: '95%', width: '5%' }}></div>
                                     <div className={`absolute top-0 bottom-0 left-0 rounded-full bg-sky-400 transition-all duration-700`} style={{ width: `${pct}%` }}></div>
-                                    <div className="absolute -top-1 -bottom-1 w-px bg-zinc-400/50" style={{ left: '95%' }}></div>
+                                    <div className="absolute -top-1 -bottom-1 w-px bg-slate-400/50" style={{ left: '95%' }}></div>
                                 </div>
                             </div>
                         );
@@ -1948,16 +1942,16 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                         let pct = ((val - min) / (max - min)) * 100;
                         if (pct < 0) pct = 0; if (pct > 100) pct = 100;
                         return (
-                            <div className="flex flex-col mt-4 pt-4 border-t border-dashed border-zinc-500/20 relative">
+                            <div className="flex flex-col mt-4 pt-4 border-t border-dashed border-slate-500/20 relative">
                                 <div className="flex justify-between items-end mb-1">
-                                    <span className={`text-[10px] font-bold ${t.textMuted}`}>RHR (Nadi Istirahat)</span>
-                                    <span className={`text-xs font-black text-rose-500`}>{val} <span className="text-[9px] font-normal opacity-60">bpm</span></span>
+                                    <span className={`text-sm font-bold ${t.textMuted}`}>RHR (Nadi Istirahat)</span>
+                                    <span className={`text-xs font-black text-rose-500`}>{val} <span className="text-xs font-normal opacity-60">bpm</span></span>
                                 </div>
                                 <div className="relative w-full h-2 rounded-full bg-black/10 dark:bg-white/10 overflow-visible">
                                     <div className="absolute top-0 bottom-0 bg-black/10 dark:bg-white/10 border-x border-black/20 dark:border-white/20" style={{ left: '25%', width: '25%' }}></div>
                                     <div className={`absolute top-0 bottom-0 left-0 rounded-full bg-rose-500 transition-all duration-700`} style={{ width: `${pct}%` }}></div>
-                                    <div className="absolute -top-1 -bottom-1 w-px bg-zinc-400/50" style={{ left: '25%' }}></div>
-                                    <div className="absolute -top-1 -bottom-1 w-px bg-zinc-400/50" style={{ left: '50%' }}></div>
+                                    <div className="absolute -top-1 -bottom-1 w-px bg-slate-400/50" style={{ left: '25%' }}></div>
+                                    <div className="absolute -top-1 -bottom-1 w-px bg-slate-400/50" style={{ left: '50%' }}></div>
                                 </div>
                             </div>
                         );
@@ -1968,7 +1962,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                             {sleepSubTab === 'detail' ? (
                                 <>
                                     {/* Awake: 5-10% */}
-                                    {renderSleepBar('Awake (Tidur Ayam)', sAwake, 5, 10, 'bg-zinc-400')}
+                                    {renderSleepBar('Awake (Tidur Ayam)', sAwake, 5, 10, 'bg-slate-400')}
                                     {/* REM: 20-25% */}
                                     {renderSleepBar('REM (Mimpi)', sRem, 20, 25, 'bg-sky-400')}
                                     {/* Light: 50-60% */}
@@ -1989,9 +1983,9 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                                     {renderSpo2Bar(parseFloat(sleepBio.oxygenSaturation))}
                                     {renderRhrBar(parseFloat(sleepBio.restingHeartRate))}
                                     
-                                    <div className="flex flex-wrap items-center gap-1.5 mt-6 pt-4 border-t border-dashed border-zinc-500/20">
-                                       <div className="flex items-center space-x-1.5"><div className="w-3 h-3 bg-black/10 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-sm"></div><span className={`text-[9px] font-bold ${t.textMuted}`}>Rentang Normal</span></div>
-                                       <span className="text-[9px] text-zinc-500">(Berdasarkan usia rata-rata)</span>
+                                    <div className="flex flex-wrap items-center gap-1.5 mt-6 pt-4 border-t border-dashed border-slate-500/20">
+                                       <div className="flex items-center space-x-1.5"><div className="w-3 h-3 bg-black/10 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-sm"></div><span className={`text-xs font-bold ${t.textMuted}`}>Rentang Normal</span></div>
+                                       <span className="text-xs text-slate-500">(Berdasarkan usia rata-rata)</span>
                                     </div>
                                 </>
                             ) : (
@@ -1999,7 +1993,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                                     {true ? (
                                         <>
                                             <div className="relative h-52 flex flex-col justify-between mt-4 mb-4">
-                                                <div className="absolute left-0 top-1 bottom-10 w-12 flex flex-col justify-between text-[9px] font-bold text-zinc-400 py-1 z-10 pointer-events-none">
+                                                <div className="absolute left-0 top-1 bottom-10 w-12 flex flex-col justify-between text-xs font-bold text-slate-400 py-1 z-10 pointer-events-none">
                                                     <span>Awake</span>
                                                     <span>REM</span>
                                                     <span>Light</span>
@@ -2076,8 +2070,8 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                                                       if (!processedSleepData || processedSleepData.length === 0) {
                                                           return (
                                                               <div className="w-full h-full flex flex-col items-center justify-center text-center">
-                                                                  <span className={`text-xs font-bold ${t.textMuted}`}>Tidak Cukup Data Tahap Tidur</span>
-                                                                  <span className={`text-[9px] mt-1 opacity-70 ${t.textMuted}`}>Sinkronkan dengan Health Connect untuk melihat grafik.</span>
+                                                                  <span className={`text-sm font-bold ${t.textMuted}`}>Tidak Cukup Data Tahap Tidur</span>
+                                                                  <span className={`text-sm mt-1 opacity-70 ${t.textMuted}`}>Sinkronkan dengan Health Connect untuk melihat grafik.</span>
                                                               </div>
                                                           );
                                                       }
@@ -2122,18 +2116,18 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                                                   })()}
                                                 </div>
                                             </div>
-                                            <div className="flex flex-wrap gap-x-4 gap-y-2 mt-6 pt-4 border-t border-dashed border-zinc-500/20">
-                                                <div className="flex items-center space-x-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-zinc-400"></div><span className={`text-[10px] font-bold ${t.textMuted}`}>Awake</span></div>
-                                                <div className="flex items-center space-x-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-sky-400"></div><span className={`text-[10px] font-bold ${t.textMuted}`}>REM</span></div>
-                                                <div className="flex items-center space-x-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-indigo-400"></div><span className={`text-[10px] font-bold ${t.textMuted}`}>Light</span></div>
-                                                <div className="flex items-center space-x-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-violet-600"></div><span className={`text-[10px] font-bold ${t.textMuted}`}>Deep</span></div>
+                                            <div className="flex flex-wrap gap-x-4 gap-y-2 mt-6 pt-4 border-t border-dashed border-slate-500/20">
+                                                <div className="flex items-center space-x-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-slate-400"></div><span className={`text-xs font-bold ${t.textMuted}`}>Awake</span></div>
+                                                <div className="flex items-center space-x-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-sky-400"></div><span className={`text-xs font-bold ${t.textMuted}`}>REM</span></div>
+                                                <div className="flex items-center space-x-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-indigo-400"></div><span className={`text-xs font-bold ${t.textMuted}`}>Light</span></div>
+                                                <div className="flex items-center space-x-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-violet-600"></div><span className={`text-xs font-bold ${t.textMuted}`}>Deep</span></div>
                                             </div>
                                         </>
                                     ) : (
                                         <div className="py-12 flex flex-col items-center justify-center text-center">
                                             <Moon size={24} className={`mb-3 opacity-20 ${t.textMain}`} />
-                                            <span className={`text-xs font-bold ${t.textMuted}`}>Grafik Hipnogram tidak tersedia</span>
-                                            <span className={`text-[9px] mt-1 opacity-70 ${t.textMuted}`}>Hubungkan aplikasi dengan Health Connect/Smartwatch untuk melihat visualisasi siklus tidur mendetail.</span>
+                                            <span className={`text-sm font-bold ${t.textMuted}`}>Grafik Hipnogram tidak tersedia</span>
+                                            <span className={`text-sm mt-1 opacity-70 ${t.textMuted}`}>Hubungkan aplikasi dengan Health Connect/Smartwatch untuk melihat visualisasi siklus tidur mendetail.</span>
                                         </div>
                                     )}
                                 </div>
@@ -2230,13 +2224,13 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                        }
                    };
                    const getFfmiColor = (val) => {
-                       if (!val || val <= 0) return 'text-zinc-500';
+                       if (!val || val <= 0) return 'text-slate-500';
                        const lim = isFemale ? [14.5, 16.5, 18.5, 21.0] : [18.0, 20.0, 22.0, 25.0];
                        if (val < lim[0]) return 'text-sky-500';
                        if (val <= lim[1]) return 'text-emerald-500';
                        if (val <= lim[2]) return 'text-blue-400';
                        if (val <= lim[3]) return 'text-amber-400';
-                       return 'text-purple-400';
+                       return 'text-violet-400';
                    };
 
                    const getWthrStatus = (val) => {
@@ -2247,7 +2241,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                        return isID ? 'Tinggi' : 'High';
                    };
                    const getWthrColor = (val) => {
-                       if (!val || val <= 0) return 'text-zinc-500';
+                       if (!val || val <= 0) return 'text-slate-500';
                        if (val < 0.40) return 'text-sky-500';
                        if (val <= 0.49) return 'text-emerald-500';
                        if (val <= 0.59) return 'text-amber-500';
@@ -2324,7 +2318,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                                              c: ['bg-sky-500', 'bg-emerald-500', 'bg-amber-500'], 
                                              labels: isID ? ['Rendah', 'Standar', 'Tinggi'] : ['Low', 'Standard', 'High'], 
                                              status: !displayBioData.bmr ? '-' : displayBioData.bmr < (userProfile?.gender === 'female' ? 1100 : 1300) ? (isID ? 'Rendah' : 'Low') : displayBioData.bmr <= (userProfile?.gender === 'female' ? 1400 : 1600) ? (isID ? 'Standar' : 'Standard') : (isID ? 'Tinggi' : 'High'), 
-                                             sColor: !displayBioData.bmr ? 'text-zinc-500' : (displayBioData.bmr >= (userProfile?.gender === 'female' ? 1100 : 1300) && displayBioData.bmr <= (userProfile?.gender === 'female' ? 1400 : 1600)) ? 'text-emerald-500' : 'text-amber-500' 
+                                             sColor: !displayBioData.bmr ? 'text-slate-500' : (displayBioData.bmr >= (userProfile?.gender === 'female' ? 1100 : 1300) && displayBioData.bmr <= (userProfile?.gender === 'female' ? 1400 : 1600)) ? 'text-emerald-500' : 'text-amber-500' 
                                          },
                                           { 
                                              id: 'bodyFat',
@@ -2344,7 +2338,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                                              val: ffmiVal > 0 ? ffmiVal : '-', 
                                              unit: '', 
                                              t: ffmiThresholds, 
-                                             c: ['bg-sky-500', 'bg-emerald-500', 'bg-blue-500', 'bg-amber-500', 'bg-purple-500'], 
+                                             c: ['bg-sky-500', 'bg-emerald-500', 'bg-blue-500', 'bg-amber-500', 'bg-violet-500'], 
                                              labels: isID ? ['Kurus', 'Standar', 'Atletis', 'Lanjutan', 'Elit'] : ['Low', 'Average', 'Athletic', 'Advanced', 'Elite'], 
                                              status: getFfmiStatus(ffmiVal), 
                                              sColor: getFfmiColor(ffmiVal) 
@@ -2391,7 +2385,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                                              c: ['bg-sky-500', 'bg-emerald-500', 'bg-amber-500'], 
                                              labels: isID ? ['Rendah', 'Standar', 'Tinggi'] : ['Low', 'Standard', 'High'], 
                                              status: !displayBioData.waterPercent ? '-' : displayBioData.waterPercent < 45 ? (isID ? 'Rendah' : 'Low') : displayBioData.waterPercent <= 65 ? (isID ? 'Standar' : 'Standard') : (isID ? 'Tinggi' : 'High'), 
-                                             sColor: !displayBioData.waterPercent ? 'text-zinc-500' : (displayBioData.waterPercent >= 45 && displayBioData.waterPercent <= 65) ? 'text-emerald-500' : 'text-amber-500' 
+                                             sColor: !displayBioData.waterPercent ? 'text-slate-500' : (displayBioData.waterPercent >= 45 && displayBioData.waterPercent <= 65) ? 'text-emerald-500' : 'text-amber-500' 
                                          },
                                           { 
                                              id: 'visceralFat',
@@ -2402,7 +2396,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                                              c: ['bg-emerald-500', 'bg-amber-500', 'bg-rose-500'], 
                                              labels: isID ? ['Standar', 'Tinggi', 'Sangat Tinggi'] : ['Standard', 'High', 'Very High'], 
                                              status: !displayBioData.visceralFat ? '-' : displayBioData.visceralFat < 10 ? (isID ? 'Standar' : 'Standard') : displayBioData.visceralFat < 15 ? (isID ? 'Tinggi' : 'High') : (isID ? 'Sangat Tinggi' : 'Very High'), 
-                                             sColor: !displayBioData.visceralFat ? 'text-zinc-500' : displayBioData.visceralFat < 10 ? 'text-emerald-500' : displayBioData.visceralFat < 15 ? 'text-amber-500' : 'text-rose-500' 
+                                             sColor: !displayBioData.visceralFat ? 'text-slate-500' : displayBioData.visceralFat < 10 ? 'text-emerald-500' : displayBioData.visceralFat < 15 ? 'text-amber-500' : 'text-rose-500' 
                                          },
                                           { 
                                              id: 'waist',
@@ -2413,7 +2407,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                                              c: ['bg-emerald-500', 'bg-rose-500'], 
                                              labels: isID ? ['Standar', 'Berlebih'] : ['Standard', 'Over'], 
                                              status: !displayBioData.waist ? '-' : displayBioData.waist < (userProfile?.gender === 'female' ? 80 : 90) ? (isID ? 'Standar' : 'Standard') : (isID ? 'Berlebih' : 'Over'), 
-                                             sColor: !displayBioData.waist ? 'text-zinc-500' : displayBioData.waist < (userProfile?.gender === 'female' ? 80 : 90) ? 'text-emerald-500' : 'text-rose-500' 
+                                             sColor: !displayBioData.waist ? 'text-slate-500' : displayBioData.waist < (userProfile?.gender === 'female' ? 80 : 90) ? 'text-emerald-500' : 'text-rose-500' 
                                          },
                                           { 
                                              id: 'wthr',
@@ -2435,7 +2429,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                                              c: ['bg-sky-500', 'bg-emerald-500', 'bg-amber-500'], 
                                              labels: isID ? ['Kurang', 'Standar', 'Cukup'] : ['Under', 'Standard', 'Good'], 
                                              status: !displayBioData.boneMass ? '-' : displayBioData.boneMass < 2.0 ? (isID ? 'Kurang' : 'Under') : displayBioData.boneMass <= 3.2 ? (isID ? 'Standar' : 'Standard') : (isID ? 'Cukup' : 'Good'), 
-                                             sColor: !displayBioData.boneMass ? 'text-zinc-500' : displayBioData.boneMass >= 2.0 ? 'text-emerald-500' : 'text-amber-500' 
+                                             sColor: !displayBioData.boneMass ? 'text-slate-500' : displayBioData.boneMass >= 2.0 ? 'text-emerald-500' : 'text-amber-500' 
                                          },
                                           { 
                                              id: 'bodyAge',
@@ -2446,7 +2440,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                                              c: ['bg-emerald-500', 'bg-sky-500', 'bg-amber-500'], 
                                              labels: isID ? ['Muda', 'Sesuai', 'Tua'] : ['Young', 'Matching', 'Older'], 
                                              status: !displayBioData.bodyAge ? '-' : userAge ? (displayBioData.bodyAge < userAge - 2 ? (isID ? 'Lebih Muda' : 'Younger') : displayBioData.bodyAge <= userAge + 2 ? (isID ? 'Sesuai' : 'Matching') : (isID ? 'Lebih Tua' : 'Older')) : (isID ? 'Standar' : 'Standard'), 
-                                             sColor: !displayBioData.bodyAge ? 'text-zinc-500' : userAge ? (displayBioData.bodyAge <= userAge ? 'text-emerald-500' : 'text-amber-500') : 'text-emerald-500' 
+                                             sColor: !displayBioData.bodyAge ? 'text-slate-500' : userAge ? (displayBioData.bodyAge <= userAge ? 'text-emerald-500' : 'text-amber-500') : 'text-emerald-500' 
                                          }
                                     ].map((item, idx) => {
                            const v = Number(item.val) || 0;
@@ -2552,7 +2546,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                   </div>
 
                   {/* Capaian Hari Ini (Clean status row, no nested box) */}
-                  <div className="mb-5 pb-4 border-b border-dashed border-zinc-500/20">
+                  <div className="mb-5 pb-4 border-b border-dashed border-slate-500/20">
                       <div className="flex items-baseline justify-between mb-2">
                           <span className={`caption font-semibold ${t.textMuted}`}>Capaian Hari Ini</span>
                           <div className="flex items-baseline gap-1">
@@ -2595,7 +2589,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
 
                   {/* Quick Presets */}
                   <div className="mb-6">
-                      <span className={`text-[10px] font-bold uppercase tracking-wider ${t.textMuted} block mb-2`}>
+                      <span className={`text-xs font-bold uppercase tracking-wider ${t.textMuted} block mb-2`}>
                           Pilihan Cepat
                       </span>
                       <div className="grid grid-cols-5 gap-1.5">
@@ -2620,7 +2614,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-3 pt-3 border-t border-dashed border-zinc-500/20">
+                  <div className="flex items-center gap-3 pt-3 border-t border-dashed border-slate-500/20">
                       <button 
                           data-close-modal="true"
                           onClick={() => { playSoundEffect('click', soundEnabled); setShowStepsModal(false); }}
@@ -2671,7 +2665,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                   </div>
 
                   {/* Target Terpilih (Clean status row, no nested box) */}
-                  <div className="mb-5 pb-4 border-b border-dashed border-zinc-500/20">
+                  <div className="mb-5 pb-4 border-b border-dashed border-slate-500/20">
                       <div className="flex items-baseline justify-between">
                           <span className={`caption font-semibold ${t.textMuted}`}>Target Terpilih</span>
                           <div className="flex items-baseline gap-1">
@@ -2726,7 +2720,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
 
                   {/* Quick Presets */}
                   <div className="mb-4">
-                      <span className={`text-[10px] font-bold uppercase tracking-wider ${t.textMuted} block mb-2`}>
+                      <span className={`text-xs font-bold uppercase tracking-wider ${t.textMuted} block mb-2`}>
                           Rekomendasi Cepat
                       </span>
                       <div className="grid grid-cols-3 gap-2">
@@ -2761,12 +2755,12 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                       </div>
                   </div>
 
-                  <p className={`text-[10px] leading-relaxed ${t.textMuted} opacity-75 mb-6`}>
+                  <p className={`text-sm leading-relaxed ${t.textMuted} opacity-75 mb-6`}>
                       *National Sleep Foundation merekomendasikan 7–9 jam tidur untuk orang dewasa guna pemulihan optimal.
                   </p>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-3 pt-3 border-t border-dashed border-zinc-500/20">
+                  <div className="flex items-center gap-3 pt-3 border-t border-dashed border-slate-500/20">
                       <button 
                           data-close-modal="true"
                           onClick={() => { playSoundEffect('click', soundEnabled); setShowSleepTargetModal(false); }}
@@ -2976,8 +2970,8 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
               {/* 2. Latihan Kardio */}
               <div className="py-3 flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                  <div className="body-md font-bold text-zinc-300 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-zinc-400 shrink-0" />
+                  <div className="body-md font-bold text-slate-300 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-slate-400 shrink-0" />
                     Latihan Kardio
                   </div>
                   <p className="caption text-slate-300 mt-0.5 leading-snug">
@@ -3044,7 +3038,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
               {/* Weekly Progress Bar */}
               <div className="mb-3">
                 <div className="flex items-baseline justify-between mb-1.5">
-                  <span className="text-xs text-slate-400">Progres minggu ini</span>
+                  <span className="text-sm text-slate-400">Progres minggu ini</span>
                   <span className="text-xs font-bold text-white">
                     {formatNumber(mergedWeeklyActiveMinutes || 0, language)} <span className="text-slate-400 font-normal">/ {editWeeklyDuration} mnt</span>
                   </span>
@@ -3056,7 +3050,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                   />
                 </div>
                 {(mergedWeeklyActiveMinutes || 0) >= editWeeklyDuration && (
-                  <p className="text-[10px] text-emerald-400 font-semibold mt-1">✔ Target mingguan tercapai!</p>
+                  <p className="text-xs text-emerald-400 font-semibold mt-1">✔ Target mingguan tercapai!</p>
                 )}
               </div>
 
@@ -3098,7 +3092,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                   </button>
                 ))}
               </div>
-              <p className="text-[10px] text-slate-500 mt-2 leading-snug">
+              <p className="text-sm text-slate-500 mt-2 leading-snug">
                 WHO merekomendasikan minimal 150 menit aktivitas aerobik intensitas sedang per minggu.
               </p>
             </div>

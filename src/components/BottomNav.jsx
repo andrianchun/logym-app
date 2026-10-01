@@ -34,7 +34,7 @@ const BottomNav = ({ t, lang, activeTab, setActiveTab, setIsEditingMode }) => {
               <span className={`flex items-center justify-center min-w-0 ${isActive ? t.navIconActive : t.navIconInactive + ' group-hover:' + t.textMuted}`}>
                 <tab.icon size={22} strokeWidth={isActive ? 2.5 : 2} className="shrink-0" />
                 {isActive && (
-                  <span className="font-black text-[10px] sm:text-[11px] uppercase tracking-wider whitespace-nowrap ml-1.5 animate-in fade-in duration-100">
+                  <span className="font-black text-xs sm:text-xs uppercase tracking-wider whitespace-nowrap ml-1.5 animate-in fade-in duration-100">
                     {tab.label}
                   </span>
                 )}

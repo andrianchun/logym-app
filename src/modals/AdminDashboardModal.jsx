@@ -117,9 +117,9 @@ export default function AdminDashboardModal({ showModal, setShowModal, user }) {
     if (!showModal || !isAdmin) return null;
 
     return (
-        <div className="fixed inset-0 z-[9999] bg-neutral-950 flex flex-col overscroll-contain touch-none no-swipe animate-in slide-in-from-bottom-full duration-300">
+        <div className="fixed inset-0 z-[9999] bg-slate-950 flex flex-col overscroll-contain touch-none no-swipe animate-in slide-in-from-bottom-full duration-300">
             {/* Header */}
-            <div className="px-4 pt-4 pb-4 border-b border-white/10 shrink-0 bg-neutral-900 flex items-center justify-between" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 24px))' }}>
+            <div className="px-4 pt-4 pb-4 border-b border-white/10 shrink-0 bg-slate-900 flex items-center justify-between" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 24px))' }}>
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-red-500/20 rounded-xl text-red-500">
                         <ShieldAlert size={24} />
@@ -129,37 +129,37 @@ export default function AdminDashboardModal({ showModal, setShowModal, user }) {
                         <p className="text-xs text-red-400 font-mono">Top Secret Area • Authorized Only</p>
                     </div>
                 </div>
-                <button onClick={() => setShowModal(false)} className="p-2 bg-white/5 hover:bg-white/10 rounded-full text-neutral-300 transition-colors" data-close-modal="true">
+                <button onClick={() => setShowModal(false)} className="p-2 bg-white/5 hover:bg-white/10 rounded-full text-slate-300 transition-colors" data-close-modal="true">
                     <X size={20} />
                 </button>
             </div>
 
             {/* Tabs */}
-            <div className="flex px-4 pt-4 bg-neutral-900 border-b border-white/10 shrink-0 overflow-x-auto hide-scrollbar gap-4 no-swipe">
+            <div className="flex px-4 pt-4 bg-slate-900 border-b border-white/10 shrink-0 overflow-x-auto hide-scrollbar gap-4 no-swipe">
                 <button 
                     onClick={() => setActiveTab('ai_inbox')}
-                    className={`pb-3 font-bold text-sm whitespace-nowrap transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'ai_inbox' ? 'border-red-500 text-red-500' : 'border-transparent text-neutral-500 hover:text-white'}`}
+                    className={`pb-3 font-bold text-sm whitespace-nowrap transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'ai_inbox' ? 'border-red-500 text-red-500' : 'border-transparent text-slate-500 hover:text-white'}`}
                 >
                     <MessageSquare size={16} /> Kotak Masuk AI
                 </button>
                 <button 
                     onClick={() => setActiveTab('banned')}
-                    className={`pb-3 font-bold text-sm whitespace-nowrap transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'banned' ? 'border-red-500 text-red-500' : 'border-transparent text-neutral-500 hover:text-white'}`}
+                    className={`pb-3 font-bold text-sm whitespace-nowrap transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'banned' ? 'border-red-500 text-red-500' : 'border-transparent text-slate-500 hover:text-white'}`}
                 >
                     <ShieldAlert size={16} /> Daftar Banned
                 </button>
                 <button 
                     onClick={() => setActiveTab('bugs')}
-                    className={`pb-3 font-bold text-sm whitespace-nowrap transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'bugs' ? 'border-red-500 text-red-500' : 'border-transparent text-neutral-500 hover:text-white'}`}
+                    className={`pb-3 font-bold text-sm whitespace-nowrap transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'bugs' ? 'border-red-500 text-red-500' : 'border-transparent text-slate-500 hover:text-white'}`}
                 >
                     <Bug size={16} /> Laporan Bug
                 </button>
             </div>
 
             {/* Content List */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 overscroll-contain touch-pan-y hide-scrollbar bg-neutral-950">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 overscroll-contain touch-pan-y hide-scrollbar bg-slate-950">
                 {isLoading ? (
-                    <div className="flex flex-col items-center justify-center h-40 text-neutral-500">
+                    <div className="flex flex-col items-center justify-center h-40 text-slate-500">
                         <Loader2 size={32} className="animate-spin mb-4" />
                         <p className="text-sm font-medium">Mengambil data intelijen...</p>
                     </div>
@@ -168,19 +168,19 @@ export default function AdminDashboardModal({ showModal, setShowModal, user }) {
                         {activeTab === 'ai_inbox' && (
                             <div className="space-y-3">
                                 {inboxItems.length === 0 ? (
-                                    <div className="text-center p-8 text-neutral-500 text-sm">Tidak ada pertanyaan terekam.</div>
+                                    <div className="text-center p-8 text-slate-500 text-sm">Tidak ada pertanyaan terekam.</div>
                                 ) : (
                                     inboxItems.map(item => (
-                                        <div key={item.id} className="bg-neutral-900 border border-white/5 p-4 rounded-2xl relative group">
+                                        <div key={item.id} className="bg-slate-900 border border-white/5 p-4 rounded-2xl relative group">
                                             <div className="flex justify-between items-start gap-4">
                                                 <div className="flex-1">
                                                     <p className="text-white text-sm font-medium mb-1">"{item.question}"</p>
-                                                    <div className="flex gap-3 text-[10px] text-neutral-500">
+                                                    <div className="flex gap-3 text-xs text-slate-500">
                                                         <span>By: {item.email}</span>
                                                         <span>{item.timestamp ? new Date(item.timestamp.toDate()).toLocaleString() : 'Baru saja'}</span>
                                                     </div>
                                                 </div>
-                                                <button onClick={() => handleDeleteInbox(item.id)} className="text-neutral-600 hover:text-rose-500 p-2">
+                                                <button onClick={() => handleDeleteInbox(item.id)} className="text-slate-600 hover:text-rose-500 p-2">
                                                     <Trash2 size={16} />
                                                 </button>
                                             </div>
@@ -193,20 +193,20 @@ export default function AdminDashboardModal({ showModal, setShowModal, user }) {
                         {activeTab === 'banned' && (
                             <div className="space-y-3">
                                 {bannedUsers.length === 0 ? (
-                                    <div className="text-center p-8 text-neutral-500 text-sm">Belum ada akun yang di-ban. Dunia aman!</div>
+                                    <div className="text-center p-8 text-slate-500 text-sm">Belum ada akun yang di-ban. Dunia aman!</div>
                                 ) : (
                                     bannedUsers.map(u => (
-                                        <div key={u.id} className="bg-neutral-900 border border-rose-500/20 p-4 rounded-2xl flex items-center justify-between">
+                                        <div key={u.id} className="bg-slate-900 border border-rose-500/20 p-4 rounded-2xl flex items-center justify-between">
                                             <div>
                                                 <p className="text-white font-bold">{u.username || 'Tanpa Nama'}</p>
-                                                <p className="text-xs text-neutral-500">{u.email}</p>
-                                                <p className="text-[10px] text-rose-500/70 mt-1">
+                                                <p className="text-xs text-slate-500">{u.email}</p>
+                                                <p className="text-xs text-rose-500/70 mt-1">
                                                     Banned: {u.bannedAt ? new Date(u.bannedAt.toDate()).toLocaleDateString() : 'Unknown'}
                                                 </p>
                                             </div>
                                             <button 
                                                 onClick={() => handleUnban(u.id)}
-                                                className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-bold rounded-xl transition-colors"
+                                                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl transition-colors"
                                             >
                                                 Unban
                                             </button>
@@ -219,30 +219,30 @@ export default function AdminDashboardModal({ showModal, setShowModal, user }) {
                         {activeTab === 'bugs' && (
                             <div className="space-y-4">
                                 {bugReports.length === 0 ? (
-                                    <div className="text-center p-8 text-neutral-500 text-sm">Tidak ada laporan bug. Aplikasi sempurna!</div>
+                                    <div className="text-center p-8 text-slate-500 text-sm">Tidak ada laporan bug. Aplikasi sempurna!</div>
                                 ) : (
                                     bugReports.map(bug => (
-                                        <div key={bug.id} className={`bg-neutral-900 border ${bug.status === 'resolved' ? 'border-emerald-500/20 opacity-60' : 'border-rose-500/20'} p-4 rounded-2xl flex flex-col sm:flex-row gap-4`}>
+                                        <div key={bug.id} className={`bg-slate-900 border ${bug.status === 'resolved' ? 'border-emerald-500/20 opacity-60' : 'border-rose-500/20'} p-4 rounded-2xl flex flex-col sm:flex-row gap-4`}>
                                             <div className="flex-1">
                                                 <div className="flex items-center gap-2 mb-2">
                                                     {bug.status === 'resolved' ? (
-                                                        <span className="bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-md">RESOLVED</span>
+                                                        <span className="bg-emerald-500/20 text-emerald-400 text-xs font-bold px-2 py-0.5 rounded-md">RESOLVED</span>
                                                     ) : (
-                                                        <span className="bg-rose-500/20 text-rose-400 text-[10px] font-bold px-2 py-0.5 rounded-md">OPEN</span>
+                                                        <span className="bg-rose-500/20 text-rose-400 text-xs font-bold px-2 py-0.5 rounded-md">OPEN</span>
                                                     )}
-                                                    <span className="text-[10px] text-neutral-500">{bug.timestamp ? new Date(bug.timestamp.toDate()).toLocaleString() : 'Baru'}</span>
+                                                    <span className="text-xs text-slate-500">{bug.timestamp ? new Date(bug.timestamp.toDate()).toLocaleString() : 'Baru'}</span>
                                                 </div>
                                                 <p className="text-white text-sm mb-2">{bug.description}</p>
-                                                <p className="text-[10px] text-neutral-500 font-mono mb-3 line-clamp-1 truncate" title={bug.deviceInfo}>{bug.deviceInfo}</p>
+                                                <p className="text-xs text-slate-500 font-mono mb-3 line-clamp-1 truncate" title={bug.deviceInfo}>{bug.deviceInfo}</p>
                                                 
                                                 <div className="flex gap-2">
                                                     <button 
                                                         onClick={() => handleMarkBugResolved(bug.id, bug.status)}
-                                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${bug.status === 'resolved' ? 'bg-neutral-800 hover:bg-neutral-700 text-neutral-400' : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500'}`}
+                                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${bug.status === 'resolved' ? 'bg-slate-800 hover:bg-slate-700 text-slate-400' : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500'}`}
                                                     >
                                                         {bug.status === 'resolved' ? 'Tandai Open' : 'Tandai Selesai'}
                                                     </button>
-                                                    <button onClick={() => handleDeleteBug(bug.id)} className="p-1.5 rounded-lg bg-neutral-800 hover:bg-rose-500/20 text-neutral-500 hover:text-rose-500 transition-colors">
+                                                    <button onClick={() => handleDeleteBug(bug.id)} className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-500/20 text-slate-500 hover:text-rose-500 transition-colors">
                                                         <Trash2 size={16} />
                                                     </button>
                                                 </div>

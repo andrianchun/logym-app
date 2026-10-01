@@ -182,8 +182,8 @@ export default function ModerationPanel({ isDark, t, onClose, onNavigateToPost, 
                     Pelanggaran {report.type === 'post' ? 'Postingan' : 'Pengguna'}
                   </div>
                   
-                  <p className="text-sm mb-1"><span className="opacity-50">Pelapor UID:</span> <code className="text-[10px]">{report.reporterId}</code></p>
-                  <p className="text-sm mb-1"><span className="opacity-50">Target ID:</span> <code className="text-[10px]">{report.targetId}</code></p>
+                  <p className="text-sm mb-1"><span className="opacity-50">Pelapor UID:</span> <code className="text-xs">{report.reporterId}</code></p>
+                  <p className="text-sm mb-1"><span className="opacity-50">Target ID:</span> <code className="text-xs">{report.targetId}</code></p>
                   <div className="mt-3 mb-4 p-3 rounded-xl bg-black/5 dark:bg-white/5 text-sm font-medium border-l-2 border-rose-500">
                     "{report.reason}"
                   </div>
@@ -240,13 +240,13 @@ export default function ModerationPanel({ isDark, t, onClose, onNavigateToPost, 
                       <div className="flex items-center gap-2">
                         <p className="font-bold text-sm truncate">{user.name || 'Pengguna'}</p>
                         {user.isBanned ? (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">DIBANNED</span>
+                          <span className="px-1.5 py-0.5 rounded text-xs font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">DIBANNED</span>
                         ) : (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">AKTIF</span>
+                          <span className="px-1.5 py-0.5 rounded text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">AKTIF</span>
                         )}
                       </div>
-                      <p className="text-[10px] text-white/50 truncate">{user.email}</p>
-                      <p className="text-[10px] text-rose-400 mt-0.5">UID: {user.id}</p>
+                      <p className="text-xs text-white/50 truncate">{user.email}</p>
+                      <p className="text-xs text-rose-400 mt-0.5">UID: {user.id}</p>
                     </div>
                   </div>
                   {user.isBanned ? (

@@ -14,6 +14,7 @@ import ExerciseDetailModal from '../components/ExerciseDetailModal';
 import AlternativeExerciseModal from '../components/AlternativeExerciseModal';
 import EmptyWorkoutState from '../components/EmptyWorkoutState';
 import WellnessCheckModal from '../components/WellnessCheckModal';
+import { calculateReadiness, restingHrBaseline, readinessToWellness } from '../utils/readinessEngine';
 import useDialog from '../hooks/useDialog';
 
 const WorkoutTab = ({
@@ -908,8 +909,16 @@ const WorkoutTab = ({
     }
   };
 
+  const autoWellnessFromReadiness = useMemo(() => {
+    const todayBio = history?.[selectedDate]?.bioData;
+    if (!todayBio) return 'prima';
+    const baseline = restingHrBaseline(history, selectedDate);
+    const r = calculateReadiness(todayBio, baseline);
+    return readinessToWellness(r);
+  }, [history, selectedDate]);
+
   const currentWellness = history?.[selectedDate]?.wellness 
-    || (history?.[selectedDate]?.isDeloadWeek ? 'deload' : 'prima');
+    || (history?.[selectedDate]?.isDeloadWeek ? 'deload' : autoWellnessFromReadiness);
 
   const wellnessConfig = useMemo(() => {
     const map = {
@@ -1390,7 +1399,7 @@ const WorkoutTab = ({
                             playSoundEffect('click', soundEnabled);
                             (displayExtraExercises || []).forEach(ex => onRemoveExtra(ex.id));
                           }}
-                          className="text-[10px] text-rose-400 hover:text-rose-500 font-bold px-2 py-0.5 rounded-md bg-rose-500/10 hover:bg-rose-500/20 transition-colors"
+                          className="text-xs text-rose-400 hover:text-rose-500 font-bold px-2 py-0.5 rounded-md bg-rose-500/10 hover:bg-rose-500/20 transition-colors"
                           title="Bersihkan latihan ekstra"
                         >
                           Bersihkan

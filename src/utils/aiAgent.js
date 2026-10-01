@@ -251,6 +251,19 @@ The JSON must exactly match this schema:
 Rules for "update": include ALL routines the plan should have after the edit (this is a full replace of that plan's routines, not a merge) — so copy over unchanged routines exactly as they are in [Active Programs] and only change what the user asked for. Keep the EXACT planName and the EXACT routine names from [Active Programs] unless the user explicitly asked to rename them: those names may have been renamed by the user, and silently restoring your own naming is treated as a bug (the app will override you anyway).
 Rules for "create": always use action "create" with no targetPlanId when the user wants a separate new program rather than editing one that exists.
 
+[Routine Count & Day Distribution Rule]
+- The "routines" array MUST contain EXACTLY as many routine objects as the user's selected days count (daysPerWeek)!
+- Every day selected by the user must have its own dedicated routine in the array.
+  * If user selects 4 days (e.g. Sen, Sel, Kam, Jum), you MUST output EXACTLY 4 routines (e.g. Upper Body A on Sen, Lower Body A on Sel, Upper Body B on Kam, Lower Body B on Jum). NEVER output only 2 routines for a 4-day plan!
+  * If user selects 3 days, output EXACTLY 3 routines (e.g. Push, Pull, Legs or Full Body A, B, C).
+  * If user selects 5 days, output EXACTLY 5 routines (e.g. Bro split or Upper A, Lower A, Push, Pull, Legs).
+  * If user selects 6 days, output EXACTLY 6 routines (e.g. PPL x 2 or PPLUL + Arms).
+
+[Exercise Selection & Priority Rules]
+1. ALWAYS prioritize the user's favorite exercises (if specified or marked favorite in their library).
+2. ALWAYS prioritize "Golden Standard" gym staples that are proven, popular, and effective (e.g. Barbell/Dumbbell Bench Press, Incline Dumbbell Press, Lat Pulldown, Cable/Barbell Row, Overhead Press, Barbell Squat, Leg Press, Romanian Deadlift, Lateral Raise, Tricep Pushdown, Dumbbell/Barbell Curl).
+3. NEVER pick obscure, bizarre, or anti-mainstream circus exercises. Gym-goers want foundational, high-yield hypertrophy and strength movements.
+
 Available Exercise Library — already in the user's app (format: name (muscles, equipment)). Prefer these, and match the names exactly:
 ${exerciseLibraryStr}
 ${extraCatalogStr ? `
@@ -1029,24 +1042,60 @@ export const generateDeterministicProgram = (answers, userProfile, exerciseLibra
         const basePlan = matchingPlans[0] || programPlans.find(p => p.daysPerWeek === daysCount) || programPlans[0];
         if (!basePlan) return null;
 
-        // Substitute unsafe exercises in each day with safe alternatives
-        const days = (basePlan.days || []).map(day => ({
-            ...day,
-            exercises: (day.exercises || []).map(ex => {
+        const selectedDays = answers.days || [];
+        let sourceRoutines = (basePlan.routines || basePlan.days || []).map(r => ({ ...r }));
+
+        // Expand if routines count is less than selected days count
+        if (sourceRoutines.length > 0 && selectedDays.length > sourceRoutines.length) {
+            const expanded = [];
+            selectedDays.forEach((day, idx) => {
+                const baseRoutine = sourceRoutines[idx % sourceRoutines.length];
+                const cycle = Math.floor(idx / sourceRoutines.length) + 1;
+                let suffixStr = '';
+                if (sourceRoutines.length === 2 && selectedDays.length === 4) {
+                    suffixStr = cycle === 1 ? 'A' : 'B';
+                } else if (cycle > 1) {
+                    suffixStr = `${cycle}`;
+                }
+                const cleanBaseName = (baseRoutine.name || `Sesi`).replace(/\s+[AB12]$/i, '');
+                const newName = suffixStr ? `${cleanBaseName} ${suffixStr}` : baseRoutine.name;
+                expanded.push({
+                    ...baseRoutine,
+                    name: newName,
+                    assignedDays: [day]
+                });
+            });
+            sourceRoutines = expanded;
+        }
+
+        // Substitute unsafe exercises in each routine with safe alternatives
+        const routines = sourceRoutines.map((routine, idx) => {
+            const assigned = (Array.isArray(routine.assignedDays) && routine.assignedDays.length > 0)
+                ? routine.assignedDays
+                : (selectedDays[idx] ? [selectedDays[idx]] : []);
+
+            const exercises = (routine.exercises || []).map(ex => {
                 if (!isInjured(ex.name, injuries) && equipCheck(ex.name)) return ex;
                 // Find a safe substitute from the library in the same muscle group
                 const sub = safeExercises.find(s =>
-                    s.muscle === ex.muscle && !day.exercises.some(e => e.name === s.name)
+                    s.muscle === ex.muscle && !routine.exercises.some(e => e.name === s.name)
                 );
                 return sub ? { ...ex, name: sub.name, id: sub.id } : null;
-            }).filter(Boolean),
-        }));
+            }).filter(Boolean);
+
+            return {
+                ...routine,
+                assignedDays: assigned,
+                exercises
+            };
+        });
 
         const suffix = injuries.length > 0 ? ' (Cedera-Aman)' : '';
         return {
             ...basePlan,
             name: `${basePlan.name}${suffix}`,
-            days,
+            routines,
+            days: routines,
             isAI: false,
             generatedBy: 'deterministic',
         };

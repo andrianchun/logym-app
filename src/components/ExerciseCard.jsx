@@ -231,7 +231,7 @@ const ExerciseCard = ({
     <div className={`mb-6 mx-0 sm:mx-4 ${ex.supersetId ? 'rounded-l-3xl rounded-r-none sm:rounded-[2.5rem]' : 'rounded-3xl sm:rounded-[2.5rem]'} bg-white/90 dark:bg-black/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.4)] border-y sm:border border-white/40 dark:border-white/10 overflow-hidden transition-all duration-300 ${isSkip ? 'opacity-50 grayscale scale-95' : 'opacity-100'}`}>
       
       {/* HEADER IMAGE / GIF FULL WIDTH */}
-      <div className="relative w-full h-[280px] sm:h-[320px] bg-zinc-100 dark:bg-zinc-800">
+      <div className="relative w-full h-[280px] sm:h-[320px] bg-slate-100 dark:bg-slate-800">
          {(() => {
             const canonical = canonicalizeExercise(ex);
             const masterMatch = findMatchingMasterExercise(canonical, defaultMasterExercises);
@@ -280,18 +280,18 @@ const ExerciseCard = ({
             {/* Top Container */}
             <div className="absolute top-5 left-5 right-5 flex justify-between items-start z-10">
                <div className="flex gap-1.5 flex-wrap max-w-[65%]">
-                 <span className="px-2.5 py-1 rounded-xl bg-white/20 border border-white/30 text-white text-[9px] font-black uppercase tracking-wider shadow-sm">
+                 <span className="px-2.5 py-1 rounded-xl bg-white/20 border border-white/30 text-white text-xs font-black uppercase tracking-wider shadow-sm">
                    {ex.equipment || 'Lainnya'}
                  </span>
 
                  {isCustom && (
-                   <span className="px-2.5 py-1 rounded-xl bg-emerald-500/80 border border-emerald-400/50 text-white text-[9px] font-black uppercase tracking-wider shadow-sm">
+                   <span className="px-2.5 py-1 rounded-xl bg-emerald-500/80 border border-emerald-400/50 text-white text-xs font-black uppercase tracking-wider shadow-sm">
                      CUSTOM
                    </span>
                  )}
 
                  {exType !== 'weight' && isSkip && (
-                     <span className="px-2.5 py-1 rounded-xl bg-rose-500/90 border border-rose-500/50 text-white text-[9px] font-black uppercase tracking-wider shadow-sm">
+                     <span className="px-2.5 py-1 rounded-xl bg-rose-500/90 border border-rose-500/50 text-white text-xs font-black uppercase tracking-wider shadow-sm">
                          SKIPPED
                      </span>
                  )}
@@ -332,12 +332,12 @@ const ExerciseCard = ({
                {/* MUSCLE TARGETS */}
                <div className="flex gap-1.5 flex-wrap">
                   {Array.isArray(ex.target) ? ex.target.map(m => (
-                    <span key={m} className="px-2 py-0.5 rounded-lg bg-black/40 border border-white/10 text-white/90 text-[9px] font-bold tracking-wider">{formatTarget(m, lang?.id)}</span>
+                    <span key={m} className="px-2 py-0.5 rounded-lg bg-black/40 border border-white/10 text-white/90 text-xs font-bold tracking-wider">{formatTarget(m, lang?.id)}</span>
                   )) : ex.target && (
-                    <span className="px-2 py-0.5 rounded-lg bg-black/40 border border-white/10 text-white/90 text-[9px] font-bold tracking-wider">{formatTarget(ex.target, lang?.id)}</span>
+                    <span className="px-2 py-0.5 rounded-lg bg-black/40 border border-white/10 text-white/90 text-xs font-bold tracking-wider">{formatTarget(ex.target, lang?.id)}</span>
                   )}
                   {ex.supersetId && (
-                     <span className={`px-2 py-0.5 rounded-lg ${t.bgAccent} border border-white/20 text-white shadow-lg text-[9px] font-black tracking-widest`}>SUPERSET</span>
+                     <span className={`px-2 py-0.5 rounded-lg ${t.bgAccent} border border-white/20 text-white shadow-lg text-xs font-black tracking-widest`}>SUPERSET</span>
                   )}
                </div>
                <h3 className="text-2xl sm:text-3xl font-black text-white leading-[1.1] drop-shadow-md pr-4 mt-2">
@@ -360,11 +360,11 @@ const ExerciseCard = ({
            <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
                {/* Kiri: Skip Button & Badge */}
                <div className="flex items-center gap-2">
-                   <button onClick={() => { playSoundEffect('click', soundEnabled); onToggleSkip(ex.id); }} className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${isSkip ? 'bg-rose-500 text-white shadow-md' : 'bg-black/5 dark:bg-white/5 text-zinc-500 hover:bg-rose-500/10 hover:text-rose-500'}`} title={isSkip ? 'Batal Skip' : 'Skip'}>
+                   <button onClick={() => { playSoundEffect('click', soundEnabled); onToggleSkip(ex.id); }} className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${isSkip ? 'bg-rose-500 text-white shadow-md' : 'bg-black/5 dark:bg-white/5 text-slate-500 hover:bg-rose-500/10 hover:text-rose-500'}`} title={isSkip ? 'Batal Skip' : 'Skip'}>
                        <SkipForward size={18} className={isSkip ? "text-white" : ""} />
                    </button>
                    {isSkip && (
-                       <span className="px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 dark:text-rose-400 text-[10px] font-black uppercase tracking-wider shadow-sm">
+                       <span className="px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 dark:text-rose-400 text-xs font-black uppercase tracking-wider shadow-sm">
                            SKIPPED
                        </span>
                    )}
@@ -373,7 +373,7 @@ const ExerciseCard = ({
                {/* Kanan: Warmup & Coach Buttons */}
                <div className="flex items-center gap-2">
                    {onAddWarmupSets && exType === 'weight' && !isSkip && (
-                        <button onClick={() => { playSoundEffect('click', soundEnabled); onAddWarmupSets(ex.id); }} className={`w-10 h-10 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 hover:bg-orange-500/20 transition-colors flex items-center justify-center`} title="Buat Set Pemanasan Otomatis">
+                        <button onClick={() => { playSoundEffect('click', soundEnabled); onAddWarmupSets(ex.id); }} className={`w-10 h-10 rounded-full bg-amber-500/10 text-amber-500 dark:text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors flex items-center justify-center`} title="Buat Set Pemanasan Otomatis">
                             <Flame size={18} />
                         </button>
                    )}
@@ -396,7 +396,7 @@ const ExerciseCard = ({
                                 type="button"
                                 data-close-modal="true"
                                 onClick={() => { if (canCloseHint || !overloadHint?.isNewRecord) setShowHint(false); }}
-                                className="absolute top-4 right-4 z-30 p-2 rounded-full bg-white/10 hover:bg-white/20 text-zinc-300 hover:text-white transition-colors"
+                                className="absolute top-4 right-4 z-30 p-2 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-colors"
                                 title="Tutup"
                               >
                                 <X size={16} />
@@ -427,7 +427,7 @@ const ExerciseCard = ({
                                     {(overloadHint.targetWeightNumber !== undefined || overloadHint.target || overloadHint.benchmark) && (
                                       <div className="flex flex-col items-center mb-2.5">
                                         {overloadHint.weightLabel && (
-                                          <span className="text-[10px] font-bold uppercase tracking-widest text-sky-400/90 mb-1 px-2.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20">
+                                          <span className="text-xs font-bold uppercase tracking-widest text-sky-400/90 mb-1 px-2.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20">
                                             Beban {overloadHint.weightLabel}
                                           </span>
                                         )}
@@ -437,18 +437,18 @@ const ExerciseCard = ({
                                             <span className="text-4xl sm:text-5xl font-black text-white tracking-tight">
                                               {overloadHint.targetWeightNumber}
                                             </span>
-                                            <span className="text-xs sm:text-sm font-semibold text-zinc-400 mr-1.5">
+                                            <span className="text-xs sm:text-sm font-semibold text-slate-400 mr-1.5">
                                               {overloadHint.weightUnit || 'kg'}
                                             </span>
                                             {overloadHint.targetRepsNumber && (
                                               <>
-                                                <span className="text-2xl sm:text-3xl font-light text-zinc-500 mx-1">
+                                                <span className="text-2xl sm:text-3xl font-light text-slate-500 mx-1">
                                                   ×
                                                 </span>
                                                 <span className="text-4xl sm:text-5xl font-black text-white tracking-tight">
                                                   {overloadHint.targetRepsNumber}
                                                 </span>
-                                                <span className="text-xs sm:text-sm font-semibold text-zinc-400 ml-0.5">
+                                                <span className="text-xs sm:text-sm font-semibold text-slate-400 ml-0.5">
                                                   reps
                                                 </span>
                                               </>
@@ -461,7 +461,7 @@ const ExerciseCard = ({
                                         )}
 
                                         {overloadHint.targetDetail && (
-                                          <div className="mt-1.5 text-[11px] font-semibold text-emerald-300/90 px-3 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 max-w-full text-center">
+                                          <div className="mt-1.5 text-xs font-semibold text-emerald-300/90 px-3 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 max-w-full text-center">
                                             {overloadHint.targetDetail}
                                           </div>
                                         )}
@@ -472,14 +472,14 @@ const ExerciseCard = ({
                                     {(overloadHint.lastSession || overloadHint.rm10) && (
                                       <div className="flex items-center justify-center flex-wrap gap-1.5 mb-3.5">
                                         {overloadHint.lastSession && (
-                                          <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] font-medium text-zinc-300 backdrop-blur-sm">
-                                            <span className="text-zinc-500">Sesi Lalu:</span>
-                                            <span className="text-zinc-200 font-semibold">{overloadHint.lastSession}</span>
+                                          <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-slate-300 backdrop-blur-sm">
+                                            <span className="text-slate-500">Sesi Lalu:</span>
+                                            <span className="text-slate-200 font-semibold">{overloadHint.lastSession}</span>
                                           </div>
                                         )}
                                         {overloadHint.rm10 && (
-                                          <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] font-medium text-zinc-300 backdrop-blur-sm">
-                                            <span className="text-zinc-500">10RM:</span>
+                                          <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-slate-300 backdrop-blur-sm">
+                                            <span className="text-slate-500">10RM:</span>
                                             <span className="text-sky-300 font-bold">{overloadHint.rm10}</span>
                                           </div>
                                         )}
@@ -487,7 +487,7 @@ const ExerciseCard = ({
                                     )}
 
                                     {/* Pesan Arahan Coach */}
-                                    <p className="text-zinc-200 text-xs sm:text-sm font-medium leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)] max-w-[280px]">
+                                    <p className="text-slate-200 text-xs sm:text-sm font-medium leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)] max-w-[280px]">
                                       {overloadHint.message || overloadHint.text}
                                     </p>
                                   </>
@@ -496,7 +496,7 @@ const ExerciseCard = ({
                                     <h3 className="font-black text-xs sm:text-sm text-sky-300/90 tracking-widest uppercase mb-2 drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]">
                                       TARGET HARI INI
                                     </h3>
-                                    <p className="text-zinc-200 text-xs sm:text-sm font-medium leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)] max-w-[280px]">
+                                    <p className="text-slate-200 text-xs sm:text-sm font-medium leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)] max-w-[280px]">
                                       Belum ada rekor 10RM. Gunakan beban yang menantang tapi sanggup diangkat 10 repetisi dengan form sempurna (RPE 8).
                                     </p>
                                   </>
@@ -519,15 +519,15 @@ const ExerciseCard = ({
              {exType === 'cardio' ? (
                  <>
                      {/* HEADER KOLOM KARDIO */}
-                     <div className={`grid grid-cols-[40px_1fr_2.1fr_1fr_44px] gap-1 mb-2 text-[9px] font-black text-zinc-400 uppercase tracking-widest text-center items-center`}>
+                     <div className={`grid grid-cols-[40px_1fr_2.1fr_1fr_44px] gap-1 mb-2 text-xs font-black text-slate-400 uppercase tracking-wider text-center items-center`}>
                         <div></div>
-                        <div>Jarak <br /><span className="normal-case text-[8px] tracking-normal font-bold">(km)</span></div>
-                        <div>Waktu <br /><span className="normal-case text-[8px] tracking-normal font-bold">(mnt)</span></div>
+                        <div>Jarak <br /><span className="normal-case text-xs tracking-normal font-bold text-slate-500">(km)</span></div>
+                        <div>Waktu <br /><span className="normal-case text-xs tracking-normal font-bold text-slate-500">(mnt)</span></div>
                         <div className="flex items-center justify-center">
-                           <div className="text-center">{isTreadmillMode ? 'Kec.' : 'Pace'} <br /><span className="normal-case text-[8px] tracking-normal font-bold">({isTreadmillMode ? 'km/j' : 'mnt/km'})</span></div>
+                           <div className="text-center">{isTreadmillMode ? 'Kec.' : 'Pace'} <br /><span className="normal-case text-xs tracking-normal font-bold text-slate-500">({isTreadmillMode ? 'km/j' : 'mnt/km'})</span></div>
                         </div>
                         <div className="flex justify-center items-center">
-                           <button onClick={() => setIsTreadmillMode(!isTreadmillMode)} className={`p-1 flex items-center justify-center rounded-full text-zinc-400 hover:${t.textAccent} hover:bg-black/10 dark:hover:bg-white/10`} title="Ganti Mode (Treadmill / Lari)">
+                           <button onClick={() => setIsTreadmillMode(!isTreadmillMode)} className={`p-1 flex items-center justify-center rounded-full text-slate-400 hover:${t.textAccent} hover:bg-black/10 dark:hover:bg-white/10`} title="Ganti Mode (Treadmill / Lari)">
                               <ArrowLeftRight size={14} />
                            </button>
                         </div>
@@ -563,7 +563,7 @@ const ExerciseCard = ({
                                              }
                                            }}
                                            onBlur={() => setDeletingSetIdx(null)}
-                                           className={`w-10 h-10 rounded-full flex items-center justify-center transition-all font-black text-sm ${deletingSetIdx === setIdx ? 'bg-rose-500 text-white shadow-lg scale-110' : (s.type === 'warmup' ? 'bg-orange-500/10 text-orange-500' : 'bg-black/5 dark:bg-white/5 text-zinc-500 dark:text-zinc-400')}`}
+                                           className={`w-10 h-10 rounded-full flex items-center justify-center transition-all font-black text-sm ${deletingSetIdx === setIdx ? 'bg-rose-500 text-white shadow-lg scale-110' : (s.type === 'warmup' ? 'bg-amber-500/10 text-amber-500' : 'bg-black/5 dark:bg-white/5 text-slate-500 dark:text-slate-400')}`}
                                          >
                                            {deletingSetIdx === setIdx ? <X size={16}/> : (s.type === 'warmup' ? <Flame size={16} className="opacity-80"/> : getWorkingSetNumber(setIdx))}
                                          </button>
@@ -620,7 +620,7 @@ const ExerciseCard = ({
                                         <div className="flex justify-center mt-0 mb-0 relative z-10">
                                           <button 
                                             onClick={() => { playSoundEffect('click', soundEnabled); setShowCardioExtras(prev => ({...prev, [setIdx]: !prev[setIdx]})); }}
-                                            className={`px-4 py-0.5 flex justify-center items-center rounded-full transition-all text-xs gap-1 ${(s.heartRate || s.elevation || s.incline) ? `${t.bgAccent} text-white shadow-md` : `text-zinc-400 bg-black/5 dark:bg-white/5 hover:${t.textAccent} hover:bg-black/10 dark:hover:bg-white/10`}`}
+                                            className={`px-4 py-0.5 flex justify-center items-center rounded-full transition-all text-xs gap-1 ${(s.heartRate || s.elevation || s.incline) ? `${t.bgAccent} text-white shadow-md` : `text-slate-400 bg-black/5 dark:bg-white/5 hover:${t.textAccent} hover:bg-black/10 dark:hover:bg-white/10`}`}
                                             title="Detak Jantung & Elevasi"
                                           >
                                             {showCardioExtras[setIdx] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -633,12 +633,12 @@ const ExerciseCard = ({
                                         <div className="flex gap-2 pl-[44px] pr-[48px] pt-1 pb-2 animate-in slide-in-from-top-2 fade-in duration-200 items-end">
                                             {/* HR */}
                                             <div className="relative flex-1">
-                                               <div className={`absolute -top-3 inset-x-0 text-[8px] font-black uppercase tracking-widest text-center ${t.textMuted}`}>HR (BPM)</div>
+                                               <div className={`absolute -top-3.5 inset-x-0 text-xs font-black uppercase tracking-wider text-center ${t.textMuted}`}>HR (BPM)</div>
                                                <SwipeInput language={lang?.id || 'ID'} value={s.heartRate || ''} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'heartRate', val)} disabled={s.done} step={1} min={0} soundEnabled={soundEnabled} className={`w-full bg-black/5 dark:bg-white/5 h-10 rounded-xl text-center font-black ${t.textMain} no-spinners transition-colors text-sm focus:bg-black/10 dark:focus:bg-white/10`} />
                                             </div>
                                             {/* Elevasi / Incline */}
                                             <div className="relative flex-1">
-                                               <div className={`absolute -top-3 inset-x-0 text-[8px] font-black uppercase tracking-widest text-center ${t.textMuted}`}>{isTreadmillMode ? 'Incline (%)' : 'Elev (m)'}</div>
+                                               <div className={`absolute -top-3.5 inset-x-0 text-xs font-black uppercase tracking-wider text-center ${t.textMuted}`}>{isTreadmillMode ? 'Incline (%)' : 'Elev (m)'}</div>
                                                <SwipeInput language={lang?.id || 'ID'} value={isTreadmillMode ? s.incline || '' : s.elevation || ''} onChange={(val)=>onUpdateSet(ex.id, setIdx, isTreadmillMode ? 'incline' : 'elevation', val)} disabled={s.done} step={isTreadmillMode ? 0.5 : 1} min={0} soundEnabled={soundEnabled} className={`w-full bg-black/5 dark:bg-white/5 h-10 rounded-xl text-center font-black ${t.textMain} no-spinners transition-colors text-sm focus:bg-black/10 dark:focus:bg-white/10`} />
                                             </div>
                                         </div>
@@ -650,7 +650,7 @@ const ExerciseCard = ({
                  </>
              ) : (
                  <>
-                     <div className={`grid ${exType==='weight' ? 'grid-cols-[1fr_2fr_2fr_1fr_1fr]' : 'grid-cols-[1fr_3fr_1fr_1fr]'} gap-2 mb-3 text-[10px] font-black text-zinc-400 uppercase tracking-widest text-center items-center`}>
+                     <div className={`grid ${exType==='weight' ? 'grid-cols-[1fr_2fr_2fr_1fr_1fr]' : 'grid-cols-[1fr_3fr_1fr_1fr]'} gap-2 mb-3 text-xs font-black text-slate-400 uppercase tracking-wider text-center items-center`}>
                         <div>Set</div>
                           {exType === 'weight' && (
                             <div className="flex items-center justify-center gap-1 relative z-20">
@@ -659,7 +659,7 @@ const ExerciseCard = ({
                                 <button 
                                   type="button"
                                   onClick={(e) => { e.stopPropagation(); setShowWeightInfo(prev => !prev); }}
-                                  className={`p-0.5 rounded-full transition-all ${showWeightInfo ? 'text-sky-400 scale-110' : 'text-zinc-400 hover:text-sky-400'}`}
+                                  className={`p-0.5 rounded-full transition-all ${showWeightInfo ? 'text-sky-400 scale-110' : 'text-slate-400 hover:text-sky-400'}`}
                                   title="Info Aturan Input & Total Beban"
                                 >
                                   <Info size={13} strokeWidth={2.2} />
@@ -685,7 +685,7 @@ const ExerciseCard = ({
                                          `Input ${eqConfig.label}`}
                                       </div>
                                       {(eqConfig.baseWeight > 0 || eqConfig.ratio !== 1) && (
-                                        <div className="flex items-center gap-2 mt-0.5 text-[11px] text-zinc-300 font-medium">
+                                        <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-300 font-medium">
                                           {eqConfig.baseWeight > 0 && <span>Bar {eqConfig.baseWeight} kg</span>}
                                           {eqConfig.ratio !== 1 && <span>Katrol {eqConfig.ratio}:1</span>}
                                         </div>
@@ -726,7 +726,7 @@ const ExerciseCard = ({
                           }
                         }}
                         onBlur={() => setDeletingSetIdx(null)}
-                        className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all font-black text-sm ${deletingSetIdx === setIdx ? 'bg-rose-500 text-white shadow-lg scale-110' : (s.type === 'warmup' ? 'bg-orange-500/10 text-orange-500' : 'bg-black/5 dark:bg-white/5 text-zinc-500 dark:text-zinc-400')}`}
+                        className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all font-black text-sm ${deletingSetIdx === setIdx ? 'bg-rose-500 text-white shadow-lg scale-110' : (s.type === 'warmup' ? 'bg-amber-500/10 text-amber-500' : 'bg-black/5 dark:bg-white/5 text-slate-500 dark:text-slate-400')}`}
                       >
                         {deletingSetIdx === setIdx ? <X size={16}/> : (s.type === 'warmup' ? <Flame size={16} className="opacity-80"/> : getWorkingSetNumber(setIdx))}
                       </button>
@@ -765,7 +765,7 @@ const ExerciseCard = ({
                                   />
                                   {hasWeightDiff && (
                                     <div className="h-3.5 mt-1 flex items-center justify-center">
-                                      <span className="text-[9px] text-sky-400 font-bold tracking-tight whitespace-nowrap">
+                                      <span className="text-xs text-sky-400 font-bold tracking-tight whitespace-nowrap">
                                         Total: {isImp ? Number((actW * 2.20462).toFixed(1)) + ' lbs' : actW + ' kg'}
                                       </span>
                                     </div>
@@ -806,7 +806,7 @@ const ExerciseCard = ({
                     <div className="flex flex-col items-center justify-center">
                       <button 
                         onClick={() => { playSoundEffect('click', soundEnabled); setActiveSetDetail({ setIdx, rir: s.rir !== undefined ? s.rir : '', rpe: s.rpe !== undefined ? s.rpe : '', notes: s.notes || '' }); }}
-                        className={`w-11 h-11 flex justify-center items-center rounded-2xl transition-all ${(s.notes || s.rir || s.rpe) ? `${t.bgAccent} text-white shadow-md` : `text-zinc-400 bg-black/5 dark:bg-white/5 hover:${t.textAccent} hover:bg-black/10 dark:hover:bg-white/10`}`}
+                        className={`w-11 h-11 flex justify-center items-center rounded-2xl transition-all ${(s.notes || s.rir || s.rpe) ? `${t.bgAccent} text-white shadow-md` : `text-slate-400 bg-black/5 dark:bg-white/5 hover:${t.textAccent} hover:bg-black/10 dark:hover:bg-white/10`}`}
                       >
                         <ClipboardEdit size={16} />
                       </button>
@@ -877,7 +877,7 @@ const ExerciseCard = ({
                       {[
                         { label: 'Terlalu Ringan', rpe: 4, rir: 6, color: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
                         { label: 'Cukup Menantang', rpe: 7, rir: 3, color: 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20' },
-                        { label: 'Berat Banget', rpe: 9, rir: 1, color: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20' },
+                        { label: 'Berat Banget', rpe: 9, rir: 1, color: 'bg-amber-500/10 text-amber-500 dark:text-amber-400 border-amber-500/20' },
                         { label: 'Gagal Angkat (Failure)', rpe: 10, rir: 0, color: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20' }
                       ].map(tag => (
                         <button
@@ -895,7 +895,7 @@ const ExerciseCard = ({
                           className={`px-4 py-3 rounded-2xl text-sm font-bold border ${activeSetDetail.notes === tag.label ? tag.color + ' ring-2 ring-current' : 'bg-black/5 dark:bg-white/5 border-transparent hover:bg-black/10 dark:hover:bg-white/10'} text-left transition-all flex items-center justify-between`}
                         >
                           <span>{tag.label}</span>
-                          <span className="text-[10px] uppercase tracking-widest opacity-60">{rpeMode ? 'RPE ' + tag.rpe : 'RIR ' + tag.rir}</span>
+                          <span className="text-xs uppercase tracking-wider opacity-75">{rpeMode ? 'RPE ' + tag.rpe : 'RIR ' + tag.rir}</span>
                         </button>
                       ))}
                     </div>
@@ -908,10 +908,10 @@ const ExerciseCard = ({
                       const newMode = !rpeMode;
                       setRpeMode(newMode);
                       localStorage.setItem('logym_rpe_mode', newMode);
-                    }} className="text-[10px] font-black tracking-widest uppercase text-zinc-500 hover:text-blue-500 flex items-center gap-0.5 transition-colors">
+                    }} className="text-xs font-black tracking-wider uppercase text-slate-500 hover:text-sky-400 flex items-center gap-0.5 transition-colors">
                       {rpeMode ? 'RPE' : 'RIR'} <ArrowLeftRight size={10} />
                     </button>
-                    <button onClick={() => setShowIntensityInfo(!showIntensityInfo)} className="text-zinc-400 hover:text-blue-500 transition-colors"><Info size={12} /></button>
+                    <button onClick={() => setShowIntensityInfo(!showIntensityInfo)} className="text-slate-400 hover:text-sky-400 transition-colors"><Info size={12} /></button>
                   </div>
                   
                   {/* POPUP INFO */}
@@ -919,7 +919,7 @@ const ExerciseCard = ({
                     <>
                       <div className="fixed inset-0 z-40 overscroll-contain touch-none" onClick={(e) => { e.stopPropagation(); setShowIntensityInfo(false); }} />
                       <div className="absolute bottom-full right-0 mb-4 w-64 p-4 rounded-3xl bg-white/98 dark:bg-[#121a2f]/98 shadow-2xl border border-black/10 dark:border-white/10 animate-in slide-in-from-bottom-2 z-50 pointer-events-none">
-                        <div className="text-xs text-zinc-600 dark:text-zinc-300 space-y-2">
+                        <div className="text-xs text-slate-600 dark:text-slate-300 space-y-2">
                           {rpeMode ? (
                             <>
                               <p><strong>RPE (Perceived Exertion):</strong> Skala 1-10 seberapa berat usaha latihan.</p>
@@ -966,7 +966,7 @@ const ExerciseCard = ({
 
                               setActiveSetDetail({...activeSetDetail, rpe, rir, notes});
                             }}
-                            className={`flex-1 min-h-[26px] flex items-center justify-center rounded-full text-xs font-bold transition-all ${isSelected ? t.bgAccent + ' text-white shadow-md scale-110' : 'text-zinc-500 hover:bg-black/10 dark:hover:bg-white/10'} `}
+                            className={`flex-1 min-h-[26px] flex items-center justify-center rounded-full text-xs font-bold transition-all ${isSelected ? t.bgAccent + ' text-white shadow-md scale-110' : 'text-slate-500 hover:bg-black/10 dark:hover:bg-white/10'} `}
                           >
                             {val}
                           </button>

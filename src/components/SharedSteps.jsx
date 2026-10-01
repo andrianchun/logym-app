@@ -76,7 +76,7 @@ export const SharedStepRenderer = ({
               <div className="flex-1">
                 <p className={`text-sm font-bold leading-tight mb-1 ${t.textMain} flex items-center gap-2 flex-wrap`}>
                   Riset Anonim
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${isDark ? 'bg-white/10' : 'bg-black/10'} ${t.textMuted}`}>Opsional</span>
+                  <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md ${isDark ? 'bg-white/10' : 'bg-black/10'} ${t.textMuted}`}>Opsional</span>
                 </p>
                 <p className={`text-xs leading-relaxed ${t.textMuted}`}>Data saya yang SUDAH DIANONIMKAN (tanpa nama, tanpa identitas) boleh dipakai pengembang untuk riset internal demi meningkatkan kualitas aplikasi.</p>
               </div>
@@ -177,9 +177,9 @@ export const SharedStepRenderer = ({
             className={`w-full p-4 rounded-xl border-2 font-bold ${answers.dob ? (isValidAge(answers.dob) ? t.borderAccent : 'border-rose-500 text-rose-500') : 'border-transparent'} ${t.inputBg} ${answers.dob && !isValidAge(answers.dob) ? '' : t.textMain} outline-none transition-all`}
           />
           {answers.dob && !isValidAge(answers.dob) ? (
-            <p className={`text-[11px] mt-2 text-center font-bold text-rose-500 animate-in fade-in slide-in-from-top-1`}>Usia kamu harus di atas 13 tahun untuk menggunakan Logym.</p>
+            <p className={`text-xs mt-2 text-center font-bold text-rose-500 animate-in fade-in slide-in-from-top-1`}>Usia kamu harus di atas 13 tahun untuk menggunakan Logym.</p>
           ) : (
-            <p className={`text-[11px] mt-2 text-center font-bold ${t.textMuted}`}>Minimal usia 13 tahun.</p>
+            <p className={`text-xs mt-2 text-center font-bold ${t.textMuted}`}>Minimal usia 13 tahun.</p>
           )}
         </div>
       </div>
@@ -241,14 +241,14 @@ export const SharedStepRenderer = ({
           return (
             <div className={`mt-4 p-3 rounded-2xl ${isDark ? 'bg-white/5 border-white/10' : 'bg-black/5 border-black/10'} border flex justify-between items-center text-sm`}>
               <div className="flex flex-col">
-                <span className={`text-[10px] ${!isDark ? 'text-black/60' : 'text-slate-400'}`}>BMI Kamu</span>
+                <span className={`text-xs ${!isDark ? 'text-black/60' : 'text-slate-400'}`}>BMI Kamu</span>
                 <span className={`font-bold ${!isDark ? 'text-black' : t.textMain}`}>{currentBmi}</span>
               </div>
               <div className="flex flex-col items-center px-2">
-                <span className={`font-bold ${t.textAccent} text-[11px] bg-black/5 dark:bg-white/10 px-2 py-1 rounded-full whitespace-nowrap`}>{insightText}</span>
+                <span className={`font-bold ${t.textAccent} text-xs bg-black/5 dark:bg-white/10 px-2 py-1 rounded-full whitespace-nowrap`}>{insightText}</span>
               </div>
               <div className="flex flex-col text-right">
-                <span className={`text-[10px] ${!isDark ? 'text-black/60' : 'text-slate-400'}`}>Target BMI</span>
+                <span className={`text-xs ${!isDark ? 'text-black/60' : 'text-slate-400'}`}>Target BMI</span>
                 <span className={`font-bold ${!isDark ? 'text-black' : t.textMain}`}>{targetBmi}</span>
               </div>
             </div>

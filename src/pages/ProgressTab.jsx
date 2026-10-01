@@ -753,12 +753,12 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
               onClick={() => { playSoundEffect('click', soundEnabled); setActivePrModal('big3'); }}
               className="p-3 rounded-2xl flex flex-col justify-center text-left transition-all active:scale-95 bg-black/40 dark:bg-black/45 backdrop-blur-md shadow-sm"
             >
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-300">Big 3</span>
+              <span className="text-xs font-black uppercase tracking-wider text-slate-300">Big 3</span>
               <div className="mt-1 flex items-baseline gap-1">
                 <span className="text-lg font-black text-white">
                   {prData.big3.total > 0 ? prData.big3.total : '-'}
                 </span>
-                {prData.big3.total > 0 && <span className="text-[10px] font-bold text-slate-300">kg</span>}
+                {prData.big3.total > 0 && <span className="text-xs font-bold text-slate-300">kg</span>}
               </div>
             </button>
 
@@ -767,7 +767,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
               onClick={() => { playSoundEffect('click', soundEnabled); setActivePrModal('volume'); }}
               className="p-3 rounded-2xl flex flex-col justify-center text-left transition-all active:scale-95 bg-black/40 dark:bg-black/45 backdrop-blur-md shadow-sm"
             >
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-300">Max Sesi</span>
+              <span className="text-xs font-black uppercase tracking-wider text-slate-300">Max Sesi</span>
               <div className="mt-1 flex items-baseline gap-1">
                 <span className="text-lg font-black text-white">
                   {prData.maxSessionVolume.volumeKg >= 1000 
@@ -775,7 +775,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                     : (prData.maxSessionVolume.volumeKg > 0 ? prData.maxSessionVolume.volumeKg : '-')}
                 </span>
                 {prData.maxSessionVolume.volumeKg > 0 && (
-                  <span className="text-[10px] font-bold text-slate-300">
+                  <span className="text-xs font-bold text-slate-300">
                     {prData.maxSessionVolume.volumeKg >= 1000 ? 'Ton' : 'kg'}
                   </span>
                 )}
@@ -787,12 +787,12 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
               onClick={() => { playSoundEffect('click', soundEnabled); setActivePrModal('streak'); }}
               className="p-3 rounded-2xl flex flex-col justify-center text-left transition-all active:scale-95 bg-black/40 dark:bg-black/45 backdrop-blur-md shadow-sm"
             >
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-300">Konsistensi</span>
+              <span className="text-xs font-black uppercase tracking-wider text-slate-300">Konsistensi</span>
               <div className="mt-1 flex items-baseline gap-1">
                 <span className="text-lg font-black text-white">
                   {prData.longestWeeklyStreak > 0 ? prData.longestWeeklyStreak : '-'}
                 </span>
-                {prData.longestWeeklyStreak > 0 && <span className="text-[10px] font-bold text-slate-300">Minggu</span>}
+                {prData.longestWeeklyStreak > 0 && <span className="text-xs font-bold text-slate-300">Minggu</span>}
               </div>
             </button>
           </div>
@@ -829,7 +829,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                     <div className="p-3.5 rounded-2xl bg-white/[0.05] backdrop-blur-md border border-white/10 flex items-center justify-between">
                       <div className="min-w-0 flex-1 pr-2">
                         <p className="text-xs font-bold text-white">Bench Press (Dada)</p>
-                        <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                        <p className="text-xs text-slate-400 truncate mt-0.5">
                           {prData.big3.bench.name || 'Flat Bench Press'}
                           {prData.big3.bench.date && ` • ${new Date(prData.big3.bench.date + 'T12:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}`}
                         </p>
@@ -842,7 +842,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                     <div className="p-3.5 rounded-2xl bg-white/[0.05] backdrop-blur-md border border-white/10 flex items-center justify-between">
                       <div className="min-w-0 flex-1 pr-2">
                         <p className="text-xs font-bold text-white">Squat (Paha & Kaki)</p>
-                        <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                        <p className="text-xs text-slate-400 truncate mt-0.5">
                           {prData.big3.squat.name || 'Barbell Squat'}
                           {prData.big3.squat.date && ` • ${new Date(prData.big3.squat.date + 'T12:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}`}
                         </p>
@@ -855,7 +855,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                     <div className="p-3.5 rounded-2xl bg-white/[0.05] backdrop-blur-md border border-white/10 flex items-center justify-between">
                       <div className="min-w-0 flex-1 pr-2">
                         <p className="text-xs font-bold text-white">Deadlift (Punggung Bawah & Posterior)</p>
-                        <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                        <p className="text-xs text-slate-400 truncate mt-0.5">
                           {prData.big3.deadlift.name || 'Deadlift'}
                           {prData.big3.deadlift.date && ` • ${new Date(prData.big3.deadlift.date + 'T12:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}`}
                         </p>
@@ -866,7 +866,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                     </div>
                   </div>
 
-                  <p className="text-[11px] leading-relaxed text-slate-400 mt-3 pt-2 border-t border-white/10">
+                  <p className="text-xs leading-relaxed text-slate-400 mt-3 pt-2 border-t border-white/10">
                     * 1RM (One-Rep Max): Estimasi beban maksimal 1 repetisi berdasarkan set terberat Anda (rumus Epley).
                   </p>
                 </div>
@@ -903,7 +903,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                     )}
                   </div>
 
-                  <div className="p-3.5 rounded-2xl bg-white/[0.03] backdrop-blur-md border border-white/5 text-[11px] leading-relaxed text-slate-400">
+                  <div className="p-3.5 rounded-2xl bg-white/[0.03] backdrop-blur-md border border-white/5 text-xs leading-relaxed text-slate-400">
                     <p>
                       <b className="text-slate-200">Tonase</b> adalah akumulasi total (beban × repetisi) dari seluruh set dalam 1 sesi untuk mengukur kapasitas kerja (<i className="text-slate-300">work capacity</i>) otot Anda.
                     </p>
@@ -923,7 +923,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                     </p>
                   </div>
 
-                  <div className="p-3.5 rounded-2xl bg-white/[0.03] backdrop-blur-md border border-white/5 text-[11px] leading-relaxed text-slate-400">
+                  <div className="p-3.5 rounded-2xl bg-white/[0.03] backdrop-blur-md border border-white/5 text-xs leading-relaxed text-slate-400">
                     <p>
                       <b className="text-slate-200">Konsistensi Mingguan</b> mengukur kepatuhan jadwal tanpa risiko <i>overtraining</i>. Hari istirahat (<i>Rest Day</i>) tetap menjaga rangkaian streak aktif.
                     </p>
@@ -1034,7 +1034,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                  {allDisplayItems.filter(item => effectiveActiveLines.includes(item)).map((item, idx) => (
                      <div key={item} className="flex items-center space-x-1.5">
                          <div className="w-2.5 h-2.5 rounded-[3px]" style={{ backgroundColor: chartColors[allDisplayItems.indexOf(item) % chartColors.length] }}></div>
-                         <span className="text-[9px] font-bold text-white/70 uppercase tracking-widest">{chartType === 'muscle' ? formatTarget(item, lang?.id) : item}</span>
+                         <span className="text-xs font-bold text-white/70 uppercase tracking-widest">{chartType === 'muscle' ? formatTarget(item, lang?.id) : item}</span>
                      </div>
                  ))}
              </div>
@@ -1042,7 +1042,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
             <div className="no-swipe">
             {/* Tinggi selalu dicadangkan (toggle lewat opacity, bukan conditional render) biar
                 ukuran kartu gak goyang pas hint muncul/hilang. */}
-            <div className={`text-[10px] font-bold mb-1.5 h-3.5 leading-none ${t.textMuted} transition-opacity duration-200 ${limitHintVisible ? 'opacity-100' : 'opacity-0'}`}>
+            <div className={`text-xs font-bold mb-1.5 h-3.5 leading-none ${t.textMuted} transition-opacity duration-200 ${limitHintVisible ? 'opacity-100' : 'opacity-0'}`}>
                 Maksimal pilih 6 item — matikan salah satu dulu.
             </div>
             <div key={chartType} className="grid grid-rows-2 grid-flow-col gap-2 overflow-x-auto pb-2 hide-scrollbar auto-cols-max" style={{ WebkitOverflowScrolling: 'touch' }} onTouchStart={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
@@ -1079,7 +1079,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
             </div>
             
             {/* Keterangan miring di bawah toggle2 */}
-            <p className={`mt-2 text-[10.5px] italic font-medium ${t.textMuted}`}>
+            <p className={`mt-2 text-xs italic font-medium ${t.textMuted}`}>
               {chartType === 'exercise' 
                 ? '* Berdasarkan estimasi 10RM dan repetisi.' 
                 : '* Berdasarkan total volume beban (kg × reps).'}

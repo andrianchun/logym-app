@@ -109,3 +109,17 @@ export const calculateReadiness = (bio, baselineRhr = null) => {
   }
   return { score, status: terberat.status, parts, message: terberat.msg };
 };
+
+/**
+ * Konversi status readiness ke kategori wellness harian (prima | doms | deload).
+ * Dipakai sebagai nilai awal otomatis di WorkoutTab, namun user tetap bebas mengubahnya manual.
+ * @param {{score:number, status:string}|null} readiness
+ * @returns {'prima'|'doms'|'deload'}
+ */
+export const readinessToWellness = (readiness) => {
+  if (!readiness || readiness.status === 'unknown') return 'prima';
+  if (readiness.status === 'critical' || readiness.score < 60) return 'deload';
+  if (readiness.status === 'warning' || readiness.score < 80) return 'doms';
+  return 'prima';
+};
+

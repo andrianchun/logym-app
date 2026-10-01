@@ -119,20 +119,20 @@ export default function ProgramCard({ post, isDark = true, t = {}, onRemove = nu
         <div className="flex items-start justify-between gap-3 mb-2.5">
           <div className="flex-1 min-w-0 pr-6">
             <div className="flex items-center gap-2 flex-wrap mb-1">
-              <span className="text-[9px] font-black uppercase tracking-widest text-sky-400">
+              <span className="text-xs font-black uppercase tracking-widest text-sky-400">
                 Program Latihan
               </span>
               
               {/* Origin Badge */}
               {badgeType === 'ai' ? (
-                <span className="px-2 py-0.5 text-[9px] font-black uppercase rounded-md bg-blue-500/30 text-blue-200 border border-blue-400/40 backdrop-blur-md shadow-sm">
+                <span className="px-2.5 py-1 text-xs font-black uppercase rounded-lg bg-blue-500/25 text-sky-300 border border-blue-400/30 backdrop-blur-md shadow-sm">
                   Coach Logy
                 </span>
               ) : badgeType === 'user' ? (
                 <button
                   type="button"
                   onClick={handleBadgeClick}
-                  className={`px-2 py-0.5 text-[10px] font-bold rounded-lg bg-sky-500/20 text-sky-300 border border-sky-400/30 backdrop-blur-md transition-all ${
+                  className={`px-2.5 py-1 text-xs font-bold rounded-lg bg-sky-500/20 text-sky-300 border border-sky-400/30 backdrop-blur-md transition-all ${
                     onOpenProfile ? 'hover:bg-sky-500/30 hover:scale-105 active:scale-95 cursor-pointer' : 'cursor-default'
                   }`}
                   title={onOpenProfile ? `Lihat profil ${badgeLabel}` : undefined}
@@ -140,7 +140,7 @@ export default function ProgramCard({ post, isDark = true, t = {}, onRemove = nu
                   {badgeLabel}
                 </button>
               ) : (
-                <span className="px-2 py-0.5 text-[9px] font-black uppercase rounded-md bg-white/10 text-white/70 border border-white/15">
+                <span className="px-2.5 py-1 text-xs font-bold uppercase rounded-lg bg-white/10 text-white border border-white/15">
                   Custom
                 </span>
               )}
@@ -152,7 +152,7 @@ export default function ProgramCard({ post, isDark = true, t = {}, onRemove = nu
           </div>
 
           <div className="shrink-0 text-right">
-            <span className="inline-block px-2.5 py-1 rounded-xl bg-white/10 border border-white/10 text-[10px] font-black text-white/90 uppercase tracking-wider backdrop-blur-md">
+            <span className="inline-block px-2.5 py-1 rounded-xl bg-white/10 border border-white/10 text-xs font-black text-white uppercase tracking-wider backdrop-blur-md">
               {hasRoutines ? `${routines.length} Rutinitas` : `${exercises.length} Latihan`}
             </span>
           </div>
@@ -167,28 +167,28 @@ export default function ProgramCard({ post, isDark = true, t = {}, onRemove = nu
               const routineExercises = routine.exercises || [];
 
               return (
-                <div key={ri} className="rounded-2xl bg-black/40 border border-white/10 overflow-hidden backdrop-blur-md transition-all">
+                <div key={ri} className="rounded-2xl bg-[#090e1a]/85 border border-white/10 overflow-hidden backdrop-blur-xl transition-all">
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); setOpenRoutineIdx(isOpen ? null : ri); }}
-                    className="w-full flex items-center justify-between p-2.5 px-3 hover:bg-white/5 active:bg-white/10 transition-colors text-left"
+                    className="w-full flex items-start justify-between p-2.5 px-3 hover:bg-white/5 active:bg-white/10 transition-colors text-left gap-2"
                   >
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <div className="flex items-start gap-2 min-w-0 flex-1">
                       <ChevronRight 
                         size={14} 
-                        className={`text-sky-400 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`} 
+                        className={`text-sky-400 shrink-0 transition-transform duration-200 mt-0.5 ${isOpen ? 'rotate-90' : ''}`} 
                       />
                       {days.length > 0 && (
-                        <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-sky-500/20 border border-sky-400/30 text-[8px] font-black uppercase text-sky-300">
+                        <span className="shrink-0 px-2 py-0.5 rounded-md bg-sky-500/20 border border-sky-400/30 text-xs font-black uppercase text-sky-300 leading-none">
                           {days.join('/')}
                         </span>
                       )}
-                      <span className="text-xs font-bold text-white/95 truncate">
+                      <span className="text-xs font-bold text-white break-words flex-1 leading-snug">
                         {routine.name || `Hari ${ri + 1}`}
                       </span>
                     </div>
 
-                    <span className="text-[10px] font-medium text-white/60 shrink-0 ml-2">
+                    <span className="text-xs font-bold text-slate-300 shrink-0 ml-2">
                       {routineExercises.length} Latihan
                     </span>
                   </button>
@@ -197,25 +197,16 @@ export default function ProgramCard({ post, isDark = true, t = {}, onRemove = nu
                   {isOpen && (
                     <div className="px-3 pb-3 pt-1 border-t border-white/5 flex flex-col gap-1.5 animate-in fade-in duration-200">
                       {routineExercises.length === 0 ? (
-                        <span className="text-[10px] text-white/40 italic">Belum ada latihan</span>
+                        <span className="text-xs text-slate-400 italic">Belum ada latihan</span>
                       ) : (
-                        routineExercises.map((ex, ei) => {
-                          const isTime = ex.type === 'time';
-                          const dose = isTime 
-                            ? `${ex.sets || 1} × ${ex.duration || 0} dtk`
-                            : `${ex.sets || 3} × ${ex.reps || 10}${ex.defaultWeight ? ` × ${ex.defaultWeight}kg` : ''}`;
-
-                          return (
-                            <div key={ei} className="flex items-center justify-between gap-2 text-[10px] text-white/80 py-0.5">
-                              <span className="font-semibold text-white/90 truncate flex-1">
-                                {ex.name}
-                              </span>
-                              <span className="font-mono font-bold text-sky-300 shrink-0 tabular-nums">
-                                {dose}
-                              </span>
-                            </div>
-                          );
-                        })
+                        routineExercises.map((ex, ei) => (
+                          <div key={ex.id || ei} className="flex items-start gap-2 py-0.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-sky-400 shrink-0 mt-1.5" />
+                            <span className="font-semibold text-slate-200 break-words flex-1 text-xs leading-tight" title={ex.name}>
+                              {ex.name}
+                            </span>
+                          </div>
+                        ))
                       )}
                     </div>
                   )}
@@ -232,13 +223,13 @@ export default function ProgramCard({ post, isDark = true, t = {}, onRemove = nu
               {exercises.slice(0, 8).map((ex, i) => (
                 <span
                   key={i}
-                  className="text-[10px] font-semibold px-2.5 py-1 rounded-xl bg-white/10 border border-white/10 text-white/85 backdrop-blur-md"
+                  className="text-xs font-semibold px-2.5 py-1 rounded-xl bg-white/10 border border-white/10 text-slate-100 backdrop-blur-md"
                 >
                   {ex.name}
                 </span>
               ))}
               {exercises.length > 8 && (
-                <span className="text-[10px] font-bold px-2 py-1 text-white/50">
+                <span className="text-xs font-bold px-2 py-1 text-slate-300">
                   +{exercises.length - 8} lagi
                 </span>
               )}

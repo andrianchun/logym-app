@@ -32,7 +32,7 @@ export const ACHIEVEMENTS = [
     description: 'Menyelesaikan total 50 sesi latihan.',
     imageUrl: '/badges/badge_kesatria.webp',
     fallbackIcon: (props) => <Shield {...props} />,
-    color: 'text-purple-500', bg: 'bg-purple-500/10', borderColor: 'border-purple-500/30',
+    color: 'text-violet-500', bg: 'bg-violet-500/10', borderColor: 'border-violet-500/30',
     target: 50, metric: 'Sesi',
     action: { label: 'Mulai Latihan', tab: 'workout' },
     calculateProgress: (ctx) => ctx.totalWorkouts || 0
@@ -76,7 +76,7 @@ export const ACHIEVEMENTS = [
     description: 'Menyelesaikan total 2.500 sesi latihan.',
     imageUrl: '/badges/badge_raja.webp',
     fallbackIcon: (props) => <Crown {...props} />,
-    color: 'text-yellow-400', bg: 'bg-yellow-400/10', borderColor: 'border-yellow-400/30',
+    color: 'text-amber-400', bg: 'bg-amber-400/10', borderColor: 'border-amber-400/30',
     target: 2500, metric: 'Sesi',
     action: { label: 'Mulai Latihan', tab: 'workout' },
     calculateProgress: (ctx) => ctx.totalWorkouts || 0
@@ -100,7 +100,7 @@ export const ACHIEVEMENTS = [
     description: 'Menyelesaikan latihan selama 3 hari berturut-turut.',
     imageUrl: '/badges/badge_streak.webp',
     fallbackIcon: (props) => <Flame {...props} />,
-    color: 'text-orange-500', bg: 'bg-orange-500/10', borderColor: 'border-orange-500/30',
+    color: 'text-amber-500', bg: 'bg-amber-500/10', borderColor: 'border-amber-500/30',
     target: 3, metric: 'Hari',
     action: { label: 'Pertahankan Streak!', tab: 'workout' },
     calculateProgress: (ctx) => ctx.maxStreak || 0
@@ -122,7 +122,7 @@ export const ACHIEVEMENTS = [
     description: 'Menyelesaikan latihan selama 14 hari berturut-turut.',
     imageUrl: '/badges/badge_streak.webp',
     fallbackIcon: (props) => <Flame {...props} />,
-    color: 'text-purple-500', bg: 'bg-purple-500/10', borderColor: 'border-purple-500/30',
+    color: 'text-violet-500', bg: 'bg-violet-500/10', borderColor: 'border-violet-500/30',
     target: 14, metric: 'Hari',
     action: { label: 'Lanjutkan Streak!', tab: 'workout' },
     calculateProgress: (ctx) => ctx.maxStreak || 0
@@ -146,7 +146,7 @@ export const ACHIEVEMENTS = [
     description: 'Mengangkat total volume 5.000 kg dalam satu sesi.',
     imageUrl: '/badges/badge_volume.webp',
     fallbackIcon: (props) => <Zap {...props} />,
-    color: 'text-yellow-500', bg: 'bg-yellow-500/10', borderColor: 'border-yellow-500/30',
+    color: 'text-amber-500', bg: 'bg-amber-500/10', borderColor: 'border-amber-500/30',
     target: 5000, metric: 'Kg',
     action: { label: 'Push The Limit', tab: 'workout' },
     calculateProgress: (ctx) => ctx.maxVolume || 0
@@ -157,7 +157,7 @@ export const ACHIEVEMENTS = [
     description: 'Mengangkat total volume 10.000 kg dalam satu sesi.',
     imageUrl: '/badges/badge_volume.webp',
     fallbackIcon: (props) => <Zap {...props} />,
-    color: 'text-orange-500', bg: 'bg-orange-500/10', borderColor: 'border-orange-500/30',
+    color: 'text-amber-500', bg: 'bg-amber-500/10', borderColor: 'border-amber-500/30',
     target: 10000, metric: 'Kg',
     action: { label: 'Push The Limit', tab: 'workout' },
     calculateProgress: (ctx) => ctx.maxVolume || 0
@@ -203,7 +203,7 @@ export const ACHIEVEMENTS = [
     description: 'Menyelesaikan latihan di atas jam 12 malam.',
     imageUrl: '/badges/badge_time.webp',
     fallbackIcon: (props) => <Star {...props} />,
-    color: 'text-purple-600', bg: 'bg-purple-600/10', borderColor: 'border-purple-600/30',
+    color: 'text-violet-600', bg: 'bg-violet-600/10', borderColor: 'border-violet-600/30',
     target: 1, metric: 'Sesi Tengah Malam',
     action: { label: 'Latihan Midnight', tab: 'workout' },
     calculateProgress: (ctx) => ctx.midnightCount || 0
@@ -330,7 +330,7 @@ export const ACHIEVEMENTS = [
     description: 'Telah bergabung dengan Logym selama 1 Tahun.',
     imageUrl: '/badges/badge_feature.webp',
     fallbackIcon: (props) => <Calendar {...props} />,
-    color: 'text-yellow-600', bg: 'bg-yellow-600/10', borderColor: 'border-yellow-600/30',
+    color: 'text-amber-600', bg: 'bg-amber-600/10', borderColor: 'border-amber-600/30',
     target: 365, metric: 'Hari',
     action: { label: 'Lanjutkan!', tab: 'progress' },
     calculateProgress: (ctx) => ctx.accountAgeDays || 0

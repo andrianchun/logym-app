@@ -25,7 +25,7 @@ export default function UnifiedBadge({ achievementId, achievementTitle, isUnlock
           {ach.fallbackIcon({ size: 28, strokeWidth: isUnlocked ? 2 : 1.5 })}
         </div>
       </div>
-      <span className={`text-[10px] font-bold ${t ? t.textMain : (isDark ? 'text-white' : 'text-black')} text-center leading-tight mb-1`}>{ach.title}</span>
+      <span className={`text-xs font-bold ${t ? t.textMain : (isDark ? 'text-white' : 'text-black')} text-center leading-tight mb-1`}>{ach.title}</span>
       
       {!isUnlocked && target > 0 && (
         <div className="w-full mt-1">
@@ -35,7 +35,7 @@ export default function UnifiedBadge({ achievementId, achievementTitle, isUnlock
               style={{ width: `${Math.min(100, Math.max(0, ((currentProgress || 0) / target) * 100))}%` }}
             />
           </div>
-          <div className={`text-[8px] font-black text-center mt-1 uppercase tracking-wider ${isDark ? 'text-white/40' : 'text-black/40'}`}>
+          <div className={`text-xs font-black text-center mt-1 uppercase tracking-wider ${isDark ? 'text-white/40' : 'text-black/40'}`}>
             {currentProgress || 0} / {target}
           </div>
         </div>

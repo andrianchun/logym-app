@@ -139,7 +139,7 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
       const targetBurn = activityTargets?.activityCalories || null;
 
       bioEntries.forEach(entry => {
-          const d = new Date(entry.dateStr);
+          const d = new Date(entry.dateStr.includes('T') ? entry.dateStr : entry.dateStr + 'T12:00:00');
           const histBio = entry.bioData;
 
           const isFreshToday = entry.dateStr === todayStr && lomealFresh;
@@ -707,6 +707,17 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
         scrollToLatest();
      }
   }, [multiChartData.length, scrollToLatest, storageKey, clientW]);
+
+  const prevContentWidthRef = useRef(contentWidth);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const isAtEnd = el.scrollLeft + el.clientWidth >= (prevContentWidthRef.current - slotWidth * 2);
+    prevContentWidthRef.current = contentWidth;
+    if (isAtEnd) {
+      scrollToLatest();
+    }
+  }, [contentWidth, chartData.length, scrollToLatest, slotWidth]);
 
   const scrollTarget = useRef(null);
   const pointWidthRef = useRef(pointWidth);

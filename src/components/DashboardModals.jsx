@@ -282,16 +282,16 @@ const DashboardModals = ({
                      <button
                          type="button"
                          onClick={handleBleFetch}
-                         className={`p-2 rounded-full ${bleManager?.isBleBusy ? 'bg-zinc-500/20 text-zinc-500' : `${t.btnBg} ${t.textAccent} hover:brightness-110`} transition-all cursor-pointer shadow-sm relative z-10`} 
+                         className={`p-2 rounded-full ${bleManager?.isBleBusy ? 'bg-slate-500/20 text-slate-500' : `${t.btnBg} ${t.textAccent} hover:brightness-110`} transition-all cursor-pointer shadow-sm relative z-10`} 
                          title="Tarik Data Bluetooth"
                      >
                          {bleManager?.isBleBusy ? <Loader2 size={16} className="animate-spin" /> : <Bluetooth size={16} />}
                      </button>
-                     <label className={`p-2 rounded-full ${isScanning ? 'bg-zinc-500/20 text-zinc-500' : scanSuccess ? 'bg-green-500/20 text-green-500' : `${t.btnBg} ${t.textAccent} hover:brightness-110`} transition-all cursor-pointer shadow-sm relative z-10`} title="Kamera">
+                     <label className={`p-2 rounded-full ${isScanning ? 'bg-slate-500/20 text-slate-500' : scanSuccess ? 'bg-green-500/20 text-green-500' : `${t.btnBg} ${t.textAccent} hover:brightness-110`} transition-all cursor-pointer shadow-sm relative z-10`} title="Kamera">
                          {isScanning ? <Loader2 size={16} className="animate-spin" /> : scanSuccess ? <Check size={16} /> : <Camera size={16} />}
                          <input type="file" accept="image/*" capture="environment" onChange={handleAIScan} className="hidden" disabled={isScanning || scanSuccess} />
                      </label>
-                     <label className={`p-2 rounded-full ${isScanning ? 'bg-zinc-500/20 text-zinc-500' : scanSuccess ? 'bg-green-500/20 text-green-500' : `${t.btnBg} ${t.textAccent} hover:brightness-110`} transition-all cursor-pointer shadow-sm relative z-10`} title="Galeri">
+                     <label className={`p-2 rounded-full ${isScanning ? 'bg-slate-500/20 text-slate-500' : scanSuccess ? 'bg-green-500/20 text-green-500' : `${t.btnBg} ${t.textAccent} hover:brightness-110`} transition-all cursor-pointer shadow-sm relative z-10`} title="Galeri">
                          {isScanning ? <Loader2 size={16} className="animate-spin" /> : scanSuccess ? <Check size={16} /> : <ImageIcon size={16} />}
                          <input type="file" accept="image/*" onChange={handleAIScan} className="hidden" disabled={isScanning || scanSuccess} />
                      </label>
@@ -363,11 +363,11 @@ const DashboardModals = ({
                                  <div className="grid grid-cols-2 gap-1.5">
                                      <div className="relative">
                                          <SwipeInput language={lang?.id || 'ID'} value={!formBio.height ? '' : Math.floor(formBio.height / 30.48)} onChange={(val) => { const currentInches = !formBio.height ? 0 : Math.round((formBio.height / 2.54) % 12); const newHeight = Number((val * 30.48 + currentInches * 2.54).toFixed(2)); const newBmi = (formBio.weight > 0 && newHeight > 0) ? Number((formBio.weight / Math.pow(newHeight / 100, 2)).toFixed(1)) : formBio.bmi; setFormBio({...formBio, height: newHeight, bmi: newBmi}); }} step={1} min={0} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center pr-4`} placeholder="5" />
-                                         <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-zinc-500 font-bold pointer-events-none">ft</span>
+                                         <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-bold pointer-events-none">ft</span>
                                      </div>
                                      <div className="relative">
                                          <SwipeInput language={lang?.id || 'ID'} value={!formBio.height ? '' : Math.round((formBio.height / 2.54) % 12)} onChange={(val) => { const currentFeet = !formBio.height ? 0 : Math.floor(formBio.height / 30.48); const newHeight = Number((currentFeet * 30.48 + val * 2.54).toFixed(2)); const newBmi = (formBio.weight > 0 && newHeight > 0) ? Number((formBio.weight / Math.pow(newHeight / 100, 2)).toFixed(1)) : formBio.bmi; setFormBio({...formBio, height: newHeight, bmi: newBmi}); }} step={1} min={0} max={11} soundEnabled={soundEnabled} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center pr-4`} placeholder="7" />
-                                         <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-zinc-500 font-bold pointer-events-none">in</span>
+                                         <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-bold pointer-events-none">in</span>
                                      </div>
                                  </div>
                              </div>
@@ -414,7 +414,7 @@ const DashboardModals = ({
                                     yang Lomeal tidak punya tetap bisa diisi tangan (jalur untuk sumber
                                     lain, mis. MyFitnessPal lewat Health Connect). */}
                                 {lomealLocked && (
-                                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-500 text-[9px] uppercase font-bold tracking-wider flex items-center gap-1">
+                                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-500 text-xs uppercase font-bold tracking-wider flex items-center gap-1">
                                         <Check size={10} /> LOMEAL
                                     </span>
                                 )}
@@ -440,7 +440,7 @@ const DashboardModals = ({
                             <div className="flex items-center justify-between mb-3">
                                 <h4 className={`text-sm font-black ${t.textMain}`}>Kesehatan & Aktivitas</h4>
                                 {connectedApps?.healthConnect && isToday && (
-                                    <span className="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-500 text-[9px] uppercase font-bold tracking-wider flex items-center gap-1">
+                                    <span className="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-500 text-xs uppercase font-bold tracking-wider flex items-center gap-1">
                                         <Check size={10} /> Health Connect
                                     </span>
                                 )}
@@ -468,11 +468,11 @@ const DashboardModals = ({
                                 <div className="grid grid-cols-2 gap-2">
                                     <div className="relative">
                                         <SwipeInput language={lang?.id || 'ID'} value={sleepH || ''} onChange={handleSleepH} step={1} min={0} soundEnabled={soundEnabled} disabled={hcLocked('sleep')} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center pr-4 ${lockCls('sleep')}`} placeholder={ph(lastSleepH, "7")} />
-                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-zinc-500 font-bold pointer-events-none">h</span>
+                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-bold pointer-events-none">h</span>
                                     </div>
                                     <div className="relative">
                                         <SwipeInput language={lang?.id || 'ID'} value={sleepM || ''} onChange={handleSleepM} step={5} min={0} soundEnabled={soundEnabled} disabled={hcLocked('sleep')} className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-lg outline-none font-bold text-sm text-center pr-4 ${lockCls('sleep')}`} placeholder={ph(lastSleepM, "0")} />
-                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-zinc-500 font-bold pointer-events-none">m</span>
+                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-bold pointer-events-none">m</span>
                                     </div>
                                 </div>
                             </div>

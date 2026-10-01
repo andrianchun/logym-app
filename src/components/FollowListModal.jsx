@@ -240,7 +240,7 @@ export default function FollowListModal({ currentUser, type, isDark, t, onClose,
                 <>
                   <div className={`px-4 py-2 flex items-center gap-2 border-t ${isDark ? 'border-white/10' : 'border-black/8'} mt-1`}>
                     <Shield size={12} className="text-amber-500" />
-                    <span className={`text-[10px] font-black uppercase tracking-wider ${isDark ? 'text-white/30' : 'text-black/30'}`}>Diblokir</span>
+                    <span className={`text-xs font-black uppercase tracking-wider ${isDark ? 'text-white/30' : 'text-black/30'}`}>Diblokir</span>
                   </div>
                   {list.filter(u => blockedSet.has(u.uid)).map(u => renderRow(u))}
                 </>

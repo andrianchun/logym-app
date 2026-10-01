@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Dumbbell, History, Calculator, Replace, Video, Info, ChevronLeft, ChevronRight, Loader2, Play } from 'lucide-react';
-import { formatTarget, resolveProjectedProgramId, defaultMasterExercises, findMatchingMasterExercise, cleanExerciseNameForMatching, canonicalizeExercise, exerciseAliasMap } from '../data/constants';
+import { formatTarget, resolveProjectedProgramId, defaultMasterExercises, findMatchingMasterExercise, cleanExerciseNameForMatching, canonicalizeExercise, exerciseAliasMap, resolveExerciseDbId } from '../data/constants';
 import { getCachedExercises, fetchExercisesFromApi } from '../utils/exerciseDbApi';
 import { resolveExerciseKind, estimate10RM, estimate1RM, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from '../utils/workoutCalc';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
@@ -262,15 +262,21 @@ const ExerciseDetailModal = ({
         ? instEn
         : canonical.instructions || masterMatch?.instructions || cachedMatch?.instructions || [];
 
+    const exerciseId = canonical.exerciseId || masterMatch?.exerciseId || cachedMatch?.exerciseId || resolveExerciseDbId(canonical) || resolveExerciseDbId(masterMatch);
+    const gifUrl = (masterMatch?.gifUrl && !masterMatch.gifUrl.endsWith('.webp')) ? masterMatch.gifUrl
+      : (canonical.gifUrl && !canonical.gifUrl.endsWith('.webp')) ? canonical.gifUrl
+      : cachedMatch?.gifUrl || (exerciseId ? `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/${exerciseId}/0.jpg` : '');
+
     return {
       ...masterMatch,
       ...canonical,
+      exerciseId: exerciseId || masterMatch?.exerciseId || canonical.exerciseId,
       instructions,
       instructions_id: instId || instructions,
       instructions_en: instEn || instructions,
       videoUrl: masterMatch?.videoUrl || canonical.videoUrl || cachedMatch?.videoUrl || '',
-      thumbnailUrl: masterMatch?.thumbnailUrl || canonical.thumbnailUrl || masterMatch?.gifUrl || canonical.gifUrl || cachedMatch?.thumbnailUrl || cachedMatch?.gifUrl || '',
-      gifUrl: masterMatch?.gifUrl || canonical.gifUrl || cachedMatch?.gifUrl || '',
+      thumbnailUrl: masterMatch?.thumbnailUrl || canonical.thumbnailUrl || cachedMatch?.thumbnailUrl || '',
+      gifUrl: gifUrl || masterMatch?.gifUrl || canonical.gifUrl || cachedMatch?.gifUrl || '',
       ytVideo: masterMatch?.ytVideo || canonical.ytVideo || cachedMatch?.ytVideo || '',
     };
   };
@@ -294,12 +300,13 @@ const ExerciseDetailModal = ({
          if (onlineMatch) {
            setEx(prev => ({ 
              ...prev, 
+             exerciseId: prev?.exerciseId || onlineMatch.exerciseId || onlineMatch.id,
              instructions: (onlineMatch.instructions_id && onlineMatch.instructions_id.length > 0) ? onlineMatch.instructions_id : (onlineMatch.instructions || prev?.instructions),
              instructions_id: (onlineMatch.instructions_id && onlineMatch.instructions_id.length > 0) ? onlineMatch.instructions_id : (onlineMatch.instructions || prev?.instructions_id),
              instructions_en: (onlineMatch.instructions_en && onlineMatch.instructions_en.length > 0) ? onlineMatch.instructions_en : (onlineMatch.instructions || prev?.instructions_en),
              videoUrl: prev?.videoUrl || onlineMatch.videoUrl,
-             thumbnailUrl: prev?.thumbnailUrl || onlineMatch.thumbnailUrl || onlineMatch.gifUrl,
-             gifUrl: prev?.gifUrl || onlineMatch.gifUrl,
+             thumbnailUrl: prev?.thumbnailUrl || onlineMatch.thumbnailUrl || (onlineMatch.gifUrl?.endsWith('.webp') ? onlineMatch.gifUrl : prev?.thumbnailUrl),
+             gifUrl: (onlineMatch.gifUrl && !onlineMatch.gifUrl.endsWith('.webp')) ? onlineMatch.gifUrl : prev?.gifUrl,
              equipment: prev?.equipment || onlineMatch.equipment
            }));
          }
@@ -323,6 +330,8 @@ const ExerciseDetailModal = ({
   const parseMedia = (exercise) => {
     let items = [];
     if (!exercise) return items;
+
+    // 1. Video AI / HTML5 Video (MP4 / WebM)
     if (exercise.videoUrl) {
       const urls = exercise.videoUrl.split(/(?:,|\s)+/).filter(v => v.trim());
       urls.forEach(u => {
@@ -331,39 +340,45 @@ const ExerciseDetailModal = ({
         }
       });
     }
-    if (exercise.thumbnailUrl && !exercise.thumbnailUrl.match(/\.(mp4|webm)$/i)) {
-      if (!items.some(it => it.url === exercise.thumbnailUrl)) {
-        items.push({ type: 'image', url: exercise.thumbnailUrl });
+
+    if (exercise.gifUrl && exercise.gifUrl.match(/\.(mp4|webm)$/i)) {
+      if (!items.some(it => it.url === exercise.gifUrl)) {
+        items.push({ type: 'video', url: exercise.gifUrl });
       }
     }
-    if (exercise.gifUrl) {
-      const urls = exercise.gifUrl.split(/(?:,|\s)+/).filter(v => v.trim());
-      urls.forEach(u => {
-        if (u.match(/\.(mp4|webm)$/i)) {
-          if (!items.some(it => it.url === u)) items.push({ type: 'video', url: u });
-        } else if (!items.some(it => it.url === u)) {
-          items.push({ type: 'image', url: u });
-        }
-      });
-    }
 
-    // Lini 3 (Backup): Looping 2-frame ExerciseDB Motion
-    const exId = exercise.exerciseId || (exercise.id && String(exercise.id).startsWith('edb-') ? String(exercise.id).replace(/^edb-/, '') : null);
+    // 2. ExerciseDB Animated GIF / Motion Loop (selalu ditaruh di akhir jika ada video)
+    const exId = exercise.exerciseId || resolveExerciseDbId(exercise) || (exercise.id && String(exercise.id).startsWith('edb-') ? String(exercise.id).replace(/^edb-/, '') : null);
     const rawGif = exercise.gifUrl || '';
     let loopExId = exId;
     let loopGif = null;
 
-    if (rawGif.includes('/0.jpg') || rawGif.includes('/1.jpg')) {
-      loopGif = rawGif;
-      const match = rawGif.match(/exercises\/([^/]+)\/[01]\.jpg/);
-      if (match) loopExId = match[1];
-    } else if (loopExId) {
-      loopGif = `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/${loopExId}/0.jpg`;
+    if (rawGif.endsWith('.gif')) {
+      if (!items.some(it => it.url === rawGif)) {
+        items.push({ type: 'image', url: rawGif });
+      }
+    } else {
+      if (rawGif.includes('/0.jpg') || rawGif.includes('/1.jpg')) {
+        loopGif = rawGif;
+        const match = rawGif.match(/exercises\/([^/]+)\/[01]\.jpg/);
+        if (match) loopExId = match[1];
+      } else if (loopExId) {
+        loopGif = `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/${loopExId}/0.jpg`;
+      }
+
+      if (loopExId || loopGif) {
+        if (!items.some(it => it.type === 'motion-loop')) {
+          items.push({ type: 'motion-loop', exerciseId: loopExId, gifUrl: loopGif, url: loopGif });
+        }
+      }
     }
 
-    if (loopExId || loopGif) {
-      if (!items.some(it => it.type === 'motion-loop')) {
-        items.push({ type: 'motion-loop', exerciseId: loopExId, gifUrl: loopGif, url: loopGif });
+    // 3. Fallback: Thumbnail diam HANYA jika tidak ada video maupun motion loop
+    // Sesuai permintaan user: "ketika dibuka detail latihan, mending thumbnail yg diam itu gausah, langsung saja dikasih gif yang gerak2 itu aja."
+    if (items.length === 0) {
+      const fallbackImg = exercise.thumbnailUrl || exercise.gifUrl;
+      if (fallbackImg && !fallbackImg.match(/\.(mp4|webm)$/i)) {
+        items.push({ type: 'image', url: fallbackImg });
       }
     }
 
@@ -612,6 +627,7 @@ const ExerciseDetailModal = ({
                         exerciseId={media.exerciseId} 
                         gifUrl={media.gifUrl} 
                         name={ex?.name} 
+                        fallbackUrl={ex?.thumbnailUrl}
                       />
                     ) : (
                       <div className="relative w-full h-full flex items-center justify-center">
@@ -660,7 +676,7 @@ const ExerciseDetailModal = ({
                 <h2 className="text-white h1 leading-tight drop-shadow-md">{ex.name}</h2>
                 <div className="flex gap-1.5 mt-1.5 overflow-x-auto hide-scrollbar w-full pb-1 -mx-1 px-1">
                   {ex.target?.map(m => (
-                    <span key={m} className={`shrink-0 whitespace-nowrap px-2.5 py-1 rounded-md text-[10px] font-bold bg-black/40 text-slate-200 border border-white/10 backdrop-blur-md`}>
+                    <span key={m} className={`shrink-0 whitespace-nowrap px-2.5 py-1 rounded-md text-xs font-bold bg-black/40 text-slate-200 border border-white/10 backdrop-blur-md`}>
                       {formatTarget(m, lang?.id)}
                     </span>
                   ))}
@@ -792,7 +808,7 @@ const ExerciseDetailModal = ({
                              </div>
                            </div>
                            <div className={`w-full overflow-hidden rounded-md bg-black/5 dark:bg-white/5`}>
-                             <table className="w-full text-[10px] table-fixed">
+                             <table className="w-full text-xs table-fixed">
                                <thead className={`bg-black/10 dark:bg-white/10 ${t.textMuted}`}>
                                  <tr>
                                    {initialExType === 'cardio' ? (
@@ -832,8 +848,8 @@ const ExerciseDetailModal = ({
                                         return (
                                           <tr key={idx} className={`border-t border-black/5 dark:border-white/5 ${t.textMain}`}>
                                             <td className="py-1.5 text-center font-bold opacity-70">{idx + 1}</td>
-                                            <td className={`py-1.5 text-center font-bold ${t.textAccent}`}>{s.distance} <span className="text-[8px]">km</span></td>
-                                            <td className="py-1.5 text-center font-bold">{s.duration} <span className="text-[8px]">mnt</span></td>
+                                            <td className={`py-1.5 text-center font-bold ${t.textAccent}`}>{s.distance} <span className="text-xs">km</span></td>
+                                            <td className="py-1.5 text-center font-bold">{s.duration} <span className="text-xs">mnt</span></td>
                                             <td className="py-1.5 text-center font-bold">{paceStr}</td>
                                             <td className={`py-1.5 px-2 text-left italic truncate ${s.notes ? '' : 'opacity-30'}`} title={s.notes}>{s.notes || '-'}</td>
                                           </tr>
@@ -842,12 +858,12 @@ const ExerciseDetailModal = ({
                                     return (
                                       <tr key={idx} className={`border-t border-black/5 dark:border-white/5 ${t.textMain}`}>
                                         <td className="py-1.5 text-center font-bold opacity-70">{idx + 1}</td>
-                                        <td className={`py-1.5 text-center font-bold ${t.textAccent}`}>{isImp ? Number((s.w * 2.20462).toFixed(1)) : s.w} <span className="text-[8px]">{isImp ? 'lbs' : 'kg'}</span></td>
+                                        <td className={`py-1.5 text-center font-bold ${t.textAccent}`}>{isImp ? Number((s.w * 2.20462).toFixed(1)) : s.w} <span className="text-xs">{isImp ? 'lbs' : 'kg'}</span></td>
                                         {/* Diredupkan kalau sama dengan beban yang diketik — alat tanpa beban dasar
                                             dan tanpa katrol memang menghasilkan angka yang sama, dan mengulangnya
                                             dengan penekanan yang sama cuma bikin mata bekerja dua kali. */}
                                         <td className={`py-1.5 text-center font-bold ${Number(s.total_w) !== Number(s.w) ? '' : 'opacity-30'}`}>
-                                          {isImp ? Number((Number(s.total_w || s.w) * 2.20462).toFixed(1)) : Number(s.total_w || s.w)} <span className="text-[8px]">{isImp ? 'lbs' : 'kg'}</span>
+                                          {isImp ? Number((Number(s.total_w || s.w) * 2.20462).toFixed(1)) : Number(s.total_w || s.w)} <span className="text-xs">{isImp ? 'lbs' : 'kg'}</span>
                                         </td>
                                         <td className="py-1.5 text-center font-bold">{s.r}</td>
                                         <td className={`py-1.5 text-center border-l border-black/5 dark:border-white/5 ${s.rpe ? '' : 'opacity-30'}`}>{s.rpe || '-'}</td>
@@ -921,11 +937,11 @@ const ExerciseDetailModal = ({
                           <div className={`p-5 rounded-2xl bg-gradient-to-br ${t.gradientBg} shadow-xl border border-white/10`}>
                             <div className="flex justify-between items-center mb-3 border-b border-white/20 pb-3">
                               <div>
-                                <p className="text-white/80 text-[10px] uppercase tracking-wider mb-0.5">Estimasi 1RM</p>
+                                <p className="text-white/80 text-xs uppercase tracking-wider mb-0.5">Estimasi 1RM</p>
                                 <p className="text-white h3">{oneRM} <span className="body-md">{isImp ? 'lbs' : 'kg'}</span></p>
                               </div>
                               <div className="text-right">
-                                <p className="text-white/80 text-[10px] uppercase tracking-wider mb-0.5">Estimasi 10RM</p>
+                                <p className="text-white/80 text-xs uppercase tracking-wider mb-0.5">Estimasi 10RM</p>
                                 <p className="text-white h3">{calculated10RM} <span className="body-md">{isImp ? 'lbs' : 'kg'}</span></p>
                               </div>
                             </div>
@@ -933,7 +949,7 @@ const ExerciseDetailModal = ({
                             <button 
                               onClick={handleSave10RM}
                               disabled={isRmSaved || calculated10RM === stored10RM || calculated10RM === best10RM}
-                              className={`w-full py-2.5 font-black body-lg rounded-xl shadow-md transition-all ${isRmSaved ? t.bgAccent : (calculated10RM === stored10RM || calculated10RM === best10RM ? 'bg-white/20 text-white/50 cursor-not-allowed' : 'bg-white text-black hover:bg-zinc-100 active:scale-95')}`}
+                              className={`w-full py-2.5 font-black body-lg rounded-xl shadow-md transition-all ${isRmSaved ? t.bgAccent : (calculated10RM === stored10RM || calculated10RM === best10RM ? 'bg-white/20 text-white/50 cursor-not-allowed' : 'bg-white text-black hover:bg-slate-100 active:scale-95')}`}
                             >
                               {isRmSaved ? 'Tersimpan ✓' : (calculated10RM === best10RM ? 'Otomatis Tersimpan' : 'Simpan Acuan Baru')}
                             </button>
@@ -942,7 +958,7 @@ const ExerciseDetailModal = ({
                      )}
                   </div>  </div>
             ) : (
-              <div className="p-6 h-full text-center text-zinc-500 italic flex flex-col items-center justify-center gap-3">
+              <div className="p-6 h-full text-center text-slate-500 italic flex flex-col items-center justify-center gap-3">
                 <Video size={48} className="opacity-20" />
                 Tonton video di atas untuk panduan gerakan.
               </div>

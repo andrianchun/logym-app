@@ -189,12 +189,12 @@ const FloatingTimer = ({
         onClick={handleClick}
       >
       <div className="flex flex-col">
-        <span className="text-[10px] font-black uppercase text-white/70 tracking-widest truncate max-w-[45vw]">
+        <span className="text-xs font-black uppercase text-white/70 tracking-widest truncate max-w-[45vw]">
            {activeExerciseName || 'Workout Berjalan'}
         </span>
         <span className="h2 text-white leading-tight flex items-baseline gap-1.5">
            <span className="tabular-nums tracking-tight">{formatTime(workoutSeconds)}</span>
-           {caloriesBurned > 0 && <span className="text-white/80 text-[11px] font-semibold flex items-center gap-0.5"><Flame size={12} className="text-white/80" strokeWidth={2.5} /> {caloriesBurned} kcal</span>}
+           {caloriesBurned > 0 && <span className="text-white/80 text-xs font-semibold flex items-center gap-0.5"><Flame size={12} className="text-white/80" strokeWidth={2.5} /> {caloriesBurned} kcal</span>}
         </span>
       </div>
 
@@ -208,7 +208,7 @@ const FloatingTimer = ({
               displayRest <= 0 ? 'bg-amber-500 text-white' :
               'bg-black/20 text-white'
             }`}>
-              <span className="text-[10px] font-black uppercase text-white/80 tracking-widest mr-0.5">
+              <span className="text-xs font-black uppercase text-white/80 tracking-widest mr-0.5">
                  REST
               </span>
               <Clock size={15} className="animate-pulse text-white" />
@@ -219,7 +219,7 @@ const FloatingTimer = ({
           );
         })() : activeSetTimerInfo && activeSetTimerInfo.currentSeconds !== undefined ? (
           <div className="flex items-center rounded-full shadow-inner px-3.5 py-1.5 min-w-[85px] justify-center gap-1.5 bg-rose-500 text-white animate-pulse">
-            <span className="text-[10px] font-black uppercase text-white/90 tracking-widest mr-0.5">
+            <span className="text-xs font-black uppercase text-white/90 tracking-widest mr-0.5">
                SET
             </span>
             <Clock size={15} className="text-white" />

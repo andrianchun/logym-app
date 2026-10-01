@@ -244,3 +244,74 @@ console.log('✅ All Actual Weight & 10RM unit tests PASSED successfully!');
 
   console.log('repairActualWeights OK');
 }
+
+// ---- Standarisasi & Resolusi Konflik Cable vs Machine ----
+{
+  const { normalizeEquipmentName, canonicalizeExercise, filterByGymEquipment } = await import('../data/constants.js');
+
+  // 1. normalizeEquipmentName memecah Cable/Machine secara akurat berdasarkan nama gerakan
+  assert.equal(normalizeEquipmentName('Cable/Machine', 'Cable Crossover'), 'Cable');
+  assert.equal(normalizeEquipmentName('Cable / Machine', 'Wide-Grip Lat Pulldown'), 'Cable');
+  assert.equal(normalizeEquipmentName('Cable/Machine', 'Triceps Pushdown'), 'Cable');
+  assert.equal(normalizeEquipmentName('Cable/Machine', 'Cable Rope Overhead Extension'), 'Cable');
+  assert.equal(normalizeEquipmentName('Cable/Machine', 'Face Pull'), 'Cable');
+  assert.equal(normalizeEquipmentName('Cable/Machine', 'Leg Extension'), 'Machine');
+  assert.equal(normalizeEquipmentName('Cable/Machine', 'Pec Deck Fly Machine'), 'Machine');
+  assert.equal(normalizeEquipmentName('Cable/Machine', 'Seated Calf Raise'), 'Machine');
+  assert.equal(normalizeEquipmentName('Cable', 'Apapun'), 'Cable');
+  assert.equal(normalizeEquipmentName('Machine', 'Apapun'), 'Machine');
+
+  // 2. getEquipmentConfig membaca konfigurasi gym untuk latihan berlabel legacy 'Cable/Machine'
+  const gymCustom = [
+    {
+      id: 'g_cable',
+      name: 'Gym Pulley 2:1',
+      equipment: ['Cable', 'Machine'],
+      config: {
+        Cable: { baseWeight: 2.5, ratio: 0.5, increment: 2.5 },
+        Machine: { baseWeight: 0, ratio: 1, increment: 5 }
+      }
+    }
+  ];
+
+  // Latihan kabel lama berlabel Cable/Machine HARUS mengambil config Cable gym (rasio 0.5, base 2.5)
+  const legacyCableEx = { name: 'Cable Lateral Raise', equipment: 'Cable/Machine' };
+  const confCable = getEquipmentConfig(gymCustom, 'g_cable', legacyCableEx);
+  assert.equal(confCable.equipment, 'Cable');
+  assert.equal(confCable.ratio, 0.5, 'Rasio katrol 2:1 (0.5x) dari gym harus terbaca');
+  assert.equal(confCable.baseWeight, 2.5, 'Beban dasar kabel 2.5 kg harus terbaca');
+  assert.equal(confCable.increment, 2.5);
+
+  // Pin 40 kg di katrol 2:1 dengan beban dasar 2.5 kg -> Beban aktual riil = (40 * 0.5) + 2.5 = 22.5 kg
+  const actW = calculateActualWeight(40, confCable);
+  assert.equal(actW, 22.5, '40 kg pin di katrol 2:1 + 2.5 kg dasar harus menghasilkan 22.5 kg aktual');
+
+  // Konversi balik beban aktual ke saran pin (defaultSetWeight)
+  const suggestedPin = defaultSetWeight({ rm10: 22.5 }, legacyCableEx, 2.5, confCable);
+  assert.equal(suggestedPin, 40, '10RM 22.5 kg harus menyarankan pin 40 kg kembali ke pengguna');
+
+  // Latihan mesin berlabel Cable/Machine HARUS mengambil config Machine gym
+  const legacyMachineEx = { name: 'Leg Extension', equipment: 'Cable/Machine' };
+  const confMachine = getEquipmentConfig(gymCustom, 'g_cable', legacyMachineEx);
+  assert.equal(confMachine.equipment, 'Machine');
+  assert.equal(confMachine.ratio, 1);
+  assert.equal(confMachine.increment, 5);
+
+  // 3. canonicalizeExercise otomatis memecah Cable/Machine menjadi Cable atau Machine
+  const canonicalCable = canonicalizeExercise({ name: 'Cable Crossover', equipment: 'Cable/Machine' });
+  assert.equal(canonicalCable.equipment, 'Cable');
+  const canonicalMachine = canonicalizeExercise({ name: 'Leg Extension Machine', equipment: 'Cable/Machine' });
+  assert.equal(canonicalMachine.equipment, 'Machine');
+
+  // 4. filterByGymEquipment menyaring latihan legacy Cable/Machine secara presisi
+  const gymCumaCable = { equipment: ['Cable'] };
+  const listLatihan = [
+    { name: 'Cable Triceps Pushdown', equipment: 'Cable/Machine' },
+    { name: 'Leg Extension', equipment: 'Cable/Machine' }
+  ];
+  const filtered = filterByGymEquipment(listLatihan, gymCumaCable);
+  assert.equal(filtered.length, 1);
+  assert.equal(filtered[0].name, 'Cable Triceps Pushdown');
+
+  console.log('standarisasi Cable vs Machine OK');
+}

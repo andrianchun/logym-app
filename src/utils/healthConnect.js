@@ -275,8 +275,8 @@ export const hcWriteHeartRate = (bpm, at = new Date()) => hcSaveSample('heartRat
 // slice(0,10) di ISO string ngasih tanggal UTC, bukan tanggal lokal — buat user WIB (UTC+7),
 // sample yang jam lokalnya dini hari (00:00-07:00) masih "kemarin" di UTC, jadi kesplit ke
 // hari yang salah (tidur semalam kepotong, sebagian nyasar ke tanggal sebelumnya).
-const ymdOf = (isoStr) => {
-  const d = new Date(isoStr);
+export const ymdOf = (dOrIso) => {
+  const d = dOrIso instanceof Date ? dOrIso : new Date(dOrIso);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
@@ -427,7 +427,7 @@ export const capIntradayLog = (list) => {
 // Samsung Health/Fitbit menampilkannya, dan sesuai akal sehat: pagi ini kita lihat tidur
 // semalam. Dulu dikelompokkan dari tanggal MULAI, akibatnya dasbor hari ini selalu kosong
 // karena tidur semalam tercatat di tanggal kemarin.
-const sleepPerDay = (samples) => {
+export const sleepPerDay = (samples) => {
   const byDay = {};
   for (const s of samples) {
     // Tanggal BANGUN = tanggal lokal endDate. Dulu di sini dipakai `startDate - 12 jam`, yang
@@ -438,7 +438,7 @@ const sleepPerDay = (samples) => {
     
     let currentEpoch = new Date(s.startDate).getTime();
     
-    if (s.hasStageData && s.stages?.length) {
+    if ((s.stages && s.stages.length > 0) || (s.hasStageData && s.stages?.length)) {
       s.stages.forEach((stage) => {
         byDay[ymd].totalMinutes += stage.durationMinutes;
         if (stage.stage in byDay[ymd]) byDay[ymd][stage.stage] += stage.durationMinutes;
@@ -748,8 +748,8 @@ export const hcBackfillHistory = async (days, hasOtherSource, onDayResult) => {
   const end = new Date();
   const start = new Date();
   start.setDate(start.getDate() - days);
-  const startYmd = start.toISOString().slice(0, 10);
-  const endYmd = end.toISOString().slice(0, 10);
+  const startYmd = ymdOf(start);
+  const endYmd = ymdOf(end);
   const byDay = await hcReadRange(startYmd, endYmd);
   Object.entries(byDay).forEach(([ymd, summary]) => {
     if (hasOtherSource(ymd)) return;

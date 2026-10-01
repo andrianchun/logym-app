@@ -106,7 +106,7 @@ export default function NotificationPanel({ user, isDark, t, onClose, onNotifCli
                       <span className={`font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{notif.fromUserName || 'Seseorang'}</span>
                       {' '}{cfg.label}
                     </p>
-                    <p className={`text-[10px] font-medium mt-0.5 ${accent}`}>{formatTime(notif.createdAt)}</p>
+                    <p className={`text-xs font-medium mt-0.5 ${accent}`}>{formatTime(notif.createdAt)}</p>
                   </div>
                   {!notif.read && <div className={`w-2 h-2 rounded-full bg-[#3b82f6] shrink-0`} />}
                 </div>

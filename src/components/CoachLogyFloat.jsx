@@ -248,7 +248,7 @@ export default function CoachLogyFloat({
             className={`fixed w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 z-[60] pointer-events-none ${showDragDrop ? 'opacity-100' : 'opacity-0 scale-75'} ${isHoveringDrop ? 'bg-rose-500/80 border-rose-500 scale-125 shadow-lg shadow-rose-500/50' : 'bg-black/30 dark:bg-white/20 border-white/30'} border-2`}
             style={{ left: dropTarget.x, top: dropTarget.y }}
         >
-            <X size={28} className={`${isHoveringDrop ? 'text-white' : 'text-zinc-400'} transition-colors duration-200`} />
+            <X size={28} className={`${isHoveringDrop ? 'text-white' : 'text-slate-400'} transition-colors duration-200`} />
         </div>
 
         {/* no-swipe → global swipe handler akan skip element ini */}
@@ -269,7 +269,7 @@ export default function CoachLogyFloat({
             {showInsight && (topInsight || hasReadiness) && !isDismissed && (
                 <div
                     className="pointer-events-auto absolute w-[250px]
-                        bg-neutral-900/97 backdrop-blur-xl border border-blue-500/40
+                        bg-slate-900/97 backdrop-blur-xl border border-blue-500/40
                         rounded-2xl p-3.5 shadow-2xl shadow-blue-500/20"
                     style={{
                         ...(snappedToRight ? { right: SIZE + 10 } : { left: SIZE + 10 }),
@@ -282,13 +282,13 @@ export default function CoachLogyFloat({
                 >
                     <button
                         onClick={handleDismiss}
-                        className="absolute top-2 right-2 text-neutral-500 hover:text-neutral-300 transition-colors"
+                        className="absolute top-2 right-2 text-slate-500 hover:text-slate-300 transition-colors"
                     >
                         <X size={13} />
                     </button>
                     {topInsight && (
                         <div className="flex items-center gap-1.5 mb-2 pr-4">
-                            <span className="text-blue-400 text-[10px] font-black uppercase tracking-widest">
+                            <span className="text-blue-400 text-xs font-black uppercase tracking-widest">
                                 🧠 Coach Insight
                             </span>
                         </div>
@@ -309,7 +309,7 @@ export default function CoachLogyFloat({
             {/* ── AVATAR ────────────────────────────────────────────────── */}
             {/* Identik dengan header GymAIChat: bg-program.webp 450% 52%/7% */}
             <div
-                className="w-14 h-14 rounded-full border-2 border-blue-400 bg-zinc-900
+                className="w-14 h-14 rounded-full border-2 border-blue-400 bg-slate-900
                     shadow-xl shadow-blue-500/30 overflow-hidden relative
                     cursor-grab active:cursor-grabbing"
                 style={{

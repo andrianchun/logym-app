@@ -350,7 +350,7 @@ const AlternativeExerciseModal = ({
               {/* Sort + Clear */}
               <div className={`flex items-center justify-between pt-3 mt-1 border-t ${t.border}`}>
                 <div className="flex items-center gap-2">
-                  <span className={`text-[10px] font-black uppercase tracking-wider ${t.textMuted}`}>
+                  <span className={`text-xs font-black uppercase tracking-wider ${t.textMuted}`}>
                     {lang?.sortBy || 'Urutkan'}
                   </span>
                   <div className="relative">
@@ -376,7 +376,7 @@ const AlternativeExerciseModal = ({
                       setSortOrder('recommendation');
                       playSoundEffect('click', soundEnabled);
                     }}
-                    className="text-[11px] font-bold text-rose-500 hover:text-rose-400 transition-colors uppercase tracking-wider"
+                    className="text-xs font-bold text-rose-500 hover:text-rose-400 transition-colors uppercase tracking-wider"
                   >
                     Reset Filter
                   </button>
@@ -421,7 +421,7 @@ const AlternativeExerciseModal = ({
                              return <EquipmentIcon equipment={ex.equipment} size={20} className={t.textMuted} />;
                           }
                        })()}
-                       {isCustom && <div className="absolute bottom-0 inset-x-0 bg-slate-900/90 backdrop-blur text-emerald-400 text-[6.5px] font-black uppercase tracking-widest text-center py-0.5 leading-none">CUSTOM</div>}
+                       {isCustom && <div className="absolute bottom-0 inset-x-0 bg-slate-900/90 backdrop-blur text-emerald-400 text-xs font-black uppercase tracking-widest text-center py-0.5 leading-none">CUSTOM</div>}
                     </div>
                     {/* Recommendation Badge */}
                     {ex.score >= 50 && (
@@ -435,11 +435,11 @@ const AlternativeExerciseModal = ({
                     </h4>
                     <div className="flex flex-col gap-1 mt-1">
                       <div className="flex gap-1.5 flex-wrap items-center">
-                         {ex.score >= 50 && <span className="text-[9px] font-black text-amber-500 uppercase tracking-wider mr-1">Disarankan</span>}
-                         <span className={`text-[10px] font-black uppercase tracking-wider ${t.textAccent}`}>{ex.equipment || 'Lainnya'}</span>
+                         {ex.score >= 50 && <span className="text-xs font-black text-amber-500 uppercase tracking-wider mr-1">Disarankan</span>}
+                         <span className={`text-xs font-black uppercase tracking-wider ${t.textAccent}`}>{ex.equipment || 'Lainnya'}</span>
                       </div>
                       <div className="flex gap-1 flex-wrap items-center -ml-1.5">{ex.target?.map(m => (
-                          <span key={m} className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold ${t.inputBg} ${t.textMuted} border ${t.border}`}>{formatTarget(m, lang?.id)}</span>
+                          <span key={m} className={`px-1.5 py-0.5 rounded-md text-xs font-bold ${t.inputBg} ${t.textMuted} border ${t.border}`}>{formatTarget(m, lang?.id)}</span>
                         ))}</div>
                     </div>
                   </div>

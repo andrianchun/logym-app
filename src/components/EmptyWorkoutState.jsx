@@ -30,7 +30,7 @@ const EmptyWorkoutState = ({
       {/* Bottom Sheet Card */}
       <div className={`relative z-10 w-full px-6 pt-8 pb-[calc(100px+env(safe-area-inset-bottom))] rounded-t-[2.5rem] ${t.bgBox} border-t ${t.border} shadow-[0_-10px_50px_rgba(0,0,0,0.5)] backdrop-blur-2xl`}>
         {/* Grab Handle */}
-        <div className="w-12 h-1.5 bg-zinc-300 dark:bg-zinc-600 rounded-full mx-auto mb-6"></div>
+        <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto mb-6"></div>
         
         {(!activePlanIds || activePlanIds.length === 0) ? (
           <>
@@ -39,7 +39,7 @@ const EmptyWorkoutState = ({
             <div className="flex items-center space-x-3">
               <button 
                 onClick={() => { playSoundEffect('click', soundEnabled); setActiveTab('program'); }} 
-                className={`flex-1 py-4 rounded-full body-lg font-bold bg-white text-black hover:bg-zinc-200 transition-colors shadow-lg flex items-center justify-between px-6`}
+                className={`flex-1 py-4 rounded-full body-lg font-bold bg-white text-black hover:bg-slate-200 transition-colors shadow-lg flex items-center justify-between px-6`}
               >
                 <span>Buka Program</span>
                 <div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center">
@@ -56,7 +56,7 @@ const EmptyWorkoutState = ({
             <div className="flex items-center space-x-3 mb-3">
               <button 
                 onClick={() => { playSoundEffect('click', soundEnabled); setActiveTab('calendar'); }} 
-                className={`flex-1 py-4 rounded-full body-lg font-bold bg-white text-black hover:bg-zinc-200 transition-colors shadow-lg flex items-center justify-between px-6`}
+                className={`flex-1 py-4 rounded-full body-lg font-bold bg-white text-black hover:bg-slate-200 transition-colors shadow-lg flex items-center justify-between px-6`}
               >
                 <span>Atur di Kalender</span>
                 <div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center">
@@ -68,13 +68,13 @@ const EmptyWorkoutState = ({
             <div className="grid grid-cols-2 gap-3">
               <button 
                 onClick={() => { playSoundEffect('click', soundEnabled); setActiveTab('program'); }} 
-                className={`py-3.5 rounded-full body-base font-bold bg-zinc-200/50 dark:bg-zinc-800/50 ${t.textMain} border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors`}
+                className={`py-3.5 rounded-full body-base font-bold bg-slate-200/50 dark:bg-slate-800/50 ${t.textMain} border border-slate-300 dark:border-slate-700 hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors`}
               >
                 Pilih Program
               </button>
               <button 
                 onClick={handleAddAdhocSession} 
-                className={`py-3.5 rounded-full body-base font-bold bg-zinc-200/50 dark:bg-zinc-800/50 ${t.textMain} border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors`}
+                className={`py-3.5 rounded-full body-base font-bold bg-slate-200/50 dark:bg-slate-800/50 ${t.textMain} border border-slate-300 dark:border-slate-700 hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors`}
               >
                 Latihan Ekstra
               </button>

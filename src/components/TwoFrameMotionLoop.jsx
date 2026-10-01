@@ -6,7 +6,7 @@ import React, { useState, useEffect, useMemo } from 'react';
  * dari Free Exercise DB GitHub untuk menampilkan gerak repetisi latihan jika video MP4
  * atau YouTube belum tersedia.
  */
-export default function TwoFrameMotionLoop({ exerciseId, gifUrl, name, className = '', intervalMs = 850 }) {
+export default function TwoFrameMotionLoop({ exerciseId, gifUrl, name, fallbackUrl, className = '', intervalMs = 850 }) {
   const [frame, setFrame] = useState(0);
   const [hasError, setHasError] = useState(false);
 
@@ -48,7 +48,16 @@ export default function TwoFrameMotionLoop({ exerciseId, gifUrl, name, className
     return () => clearInterval(timer);
   }, [frames, intervalMs]);
 
-  if (!frames || hasError) return null;
+  if (!frames || hasError) {
+    if (fallbackUrl) {
+      return (
+        <div className={`relative w-full h-full flex items-center justify-center bg-black ${className}`}>
+          <img src={fallbackUrl} alt={name || ''} className="w-full h-full object-contain pb-6" />
+        </div>
+      );
+    }
+    return null;
+  }
 
   return (
     <div className={`relative w-full h-full overflow-hidden bg-[#0a0f1d] flex items-center justify-center select-none ${className}`}>
