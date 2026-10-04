@@ -28416,7 +28416,17 @@
       "Tahan sejenak di puncak gerakan untuk merasakan kontraksi, lalu turunkan beban secara perlahan ke posisi awal sambil menarik napas.",
       "Ulangi gerakan sesuai repetisi yang dianjurkan.",
       "Ganti ke tangan kanan dan ulangi latihan."
-    ]
+    ],
+    "aliases": [
+      "Standing Cable Lateral Raise",
+      "Standing Cable Lateral Raises",
+      "Cable Lateral Raise",
+      "Cable Lateral Raises",
+      "Cable Side Lateral Raise"
+    ],
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.mp4",
+    "thumbnailUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.webp",
+    "ytVideo": "https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA"
   },
   {
     "exerciseId": "Standing_Low-Pulley_One-Arm_Triceps_Extension",
@@ -32720,7 +32730,7 @@
   {
     "exerciseId": "Standing_Cable_Lateral_Raise",
     "name": "Standing Cable Lateral Raise",
-    "gifUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.webp",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Standing_Low-Pulley_Deltoid_Raise/0.jpg",
     "thumbnailUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.webp",
     "bodyParts": [
       "strength"

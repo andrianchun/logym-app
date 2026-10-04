@@ -66,9 +66,12 @@ assert.equal(matchSideLat.id, 143);
 const matchSeatedDumbbell = findMatchingMasterExercise({ name: 'Seated Side Lateral Raise', equipment: 'Dumbbell' }, defaultMasterExercises);
 assert.notEqual(matchSeatedDumbbell?.id, 104, 'Seated Dumbbell Lateral Raise tidak boleh mencocokkan ID 104 Cable');
 
-// 4d. Cable Seated Lateral Raise TIDAK boleh mencocokkan Standing Cable Lateral Raise (ID 104)
+// 4d. Cable Seated Lateral Raise harus menemukan master exercise ID 144 dan TIDAK boleh mencocokkan Standing Cable Lateral Raise (ID 104)
 const matchCableSeated = findMatchingMasterExercise({ name: 'Cable Seated Lateral Raise', equipment: 'Cable' }, defaultMasterExercises);
-assert.notEqual(matchCableSeated?.id, 104, 'Cable Seated Lateral Raise tidak boleh mencocokkan Standing Cable ID 104');
+assert.ok(matchCableSeated, 'Cable Seated Lateral Raise harus menemukan master exercise');
+assert.equal(matchCableSeated.id, 144);
+assert.equal(matchCableSeated.name, 'Cable Seated Lateral Raise');
+assert.notEqual(matchCableSeated.id, 104, 'Cable Seated Lateral Raise tidak boleh mencocokkan Standing Cable ID 104');
 
 // 5. Cable Triceps Pushdown -> Triceps Pushdown
 const matchTriceps = findMatchingMasterExercise({ name: 'Cable Triceps Pushdown' }, defaultMasterExercises);
@@ -196,8 +199,8 @@ for (const [legacyName, expectedId] of legacyTestCases) {
   assert.equal(match.id, expectedId, `Legacy exercise "${legacyName}" harus cocok dengan ID ${expectedId}`);
 }
 
-// 19. Integritas Instruksi defaultMasterExercises (Semua 43 item wajib memiliki instruksi ID & EN yang valid)
-assert.equal(defaultMasterExercises.length, 43, 'Harus ada tepat 43 master exercises');
+// 19. Integritas Instruksi defaultMasterExercises (Semua 44 item wajib memiliki instruksi ID & EN yang valid)
+assert.equal(defaultMasterExercises.length, 44, 'Harus ada tepat 44 master exercises');
 for (const ex of defaultMasterExercises) {
   assert.ok(Array.isArray(ex.instructions_id) && ex.instructions_id.length > 0, `Master exercise "${ex.name}" (ID ${ex.id}) wajib memiliki instructions_id`);
   assert.ok(Array.isArray(ex.instructions_en) && ex.instructions_en.length > 0, `Master exercise "${ex.name}" (ID ${ex.id}) wajib memiliki instructions_en`);
@@ -253,6 +256,9 @@ assert.equal(findMatchingMasterExercise({ name: 'DB Shoulder Press' })?.id, 114)
 assert.equal(findMatchingMasterExercise({ name: 'DB Shrug' })?.id, 124);
 assert.equal(findMatchingMasterExercise({ name: 'BB Bench Press' })?.id, 135);
 assert.equal(findMatchingMasterExercise({ name: 'BB Incline Bench Press' })?.id, 142);
+assert.equal(findMatchingMasterExercise({ name: 'Standing Low-Pulley Deltoid Raise' })?.id, 104);
+assert.equal(exerciseAliasMap['104'], 'edb-Standing_Low-Pulley_Deltoid_Raise');
 assert.equal(exerciseAliasMap['143'], 'edb-Side_Lateral_Raise');
+assert.equal(exerciseAliasMap['144'], 'edb-Cable_Seated_Lateral_Raise');
 
 console.log('exerciseMatching OK');

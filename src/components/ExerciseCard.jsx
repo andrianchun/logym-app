@@ -331,11 +331,17 @@ const ExerciseCard = ({
             <div className="absolute bottom-5 left-5 right-5 flex flex-col gap-1.5 z-10">
                {/* MUSCLE TARGETS */}
                <div className="flex gap-1.5 flex-wrap">
-                  {Array.isArray(ex.target) ? ex.target.map(m => (
-                    <span key={m} className="px-2 py-0.5 rounded-lg bg-black/40 border border-white/10 text-white/90 text-xs font-bold tracking-wider">{formatTarget(m, lang?.id)}</span>
-                  )) : ex.target && (
-                    <span className="px-2 py-0.5 rounded-lg bg-black/40 border border-white/10 text-white/90 text-xs font-bold tracking-wider">{formatTarget(ex.target, lang?.id)}</span>
-                  )}
+                  {(() => {
+                     const effectiveTargets = canonicalizeExercise(ex)?.target || ex.target;
+                     if (Array.isArray(effectiveTargets)) {
+                       return effectiveTargets.map(m => (
+                         <span key={m} className="px-2 py-0.5 rounded-lg bg-black/40 border border-white/10 text-white/90 text-xs font-bold tracking-wider">{formatTarget(m, lang?.id)}</span>
+                       ));
+                     }
+                     return effectiveTargets ? (
+                       <span className="px-2 py-0.5 rounded-lg bg-black/40 border border-white/10 text-white/90 text-xs font-bold tracking-wider">{formatTarget(effectiveTargets, lang?.id)}</span>
+                     ) : null;
+                   })()}
                   {ex.supersetId && (
                      <span className={`px-2 py-0.5 rounded-lg ${t.bgAccent} border border-white/20 text-white shadow-lg text-xs font-black tracking-widest`}>SUPERSET</span>
                   )}
@@ -749,7 +755,6 @@ const ExerciseCard = ({
                                 if (activeGym && ex.equipment && activeGym.config && activeGym.config[ex.equipment]) {
                                   const conf = activeGym.config[ex.equipment];
                                   if (conf.increment) customStep = conf.increment;
-                                  if (conf.barWeight) customMin = conf.barWeight;
                                 }
                               }
                               return (

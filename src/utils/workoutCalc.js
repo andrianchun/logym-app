@@ -774,15 +774,22 @@ export const gymStepFor = (gymProfiles, activeGymId, equipment, isImperial = fal
  * kembali ke beban plat (calculateInputWeight) sebelum dibulatkan ke kelipatan terdekat (step).
  */
 export const defaultSetWeight = (libEx, ex, step, eqConf = null) => {
-  const rm10 = Number(libEx?.rm10) || 0;
-  if (rm10 > 0) {
-    const rawPlateWeight = eqConf ? calculateInputWeight(rm10, eqConf) : rm10;
-    const bulat = roundDownToStep(rawPlateWeight, step);
-    if (bulat > 0) return bulat;
+  if (libEx?.targetInputWeight !== undefined && Number(libEx.targetInputWeight) >= 0) {
+    return roundDownToStep(Number(libEx.targetInputWeight), step);
+  }
+  if (libEx?.targetWeight !== undefined && Number(libEx.targetWeight) > 0) {
+    const rawPlateWeight = eqConf ? calculateInputWeight(Number(libEx.targetWeight), eqConf) : Number(libEx.targetWeight);
+    return roundDownToStep(rawPlateWeight, step);
   }
   const lastW = Number(libEx?.lastWeight) || 0;
   if (lastW > 0) {
     const rawPlateWeight = eqConf ? calculateInputWeight(lastW, eqConf) : lastW;
+    const bulat = roundDownToStep(rawPlateWeight, step);
+    if (bulat > 0) return bulat;
+  }
+  const rm10 = Number(libEx?.rm10) || 0;
+  if (rm10 > 0) {
+    const rawPlateWeight = eqConf ? calculateInputWeight(rm10, eqConf) : rm10;
     const bulat = roundDownToStep(rawPlateWeight, step);
     if (bulat > 0) return bulat;
   }
@@ -1050,7 +1057,19 @@ export const dailyActiveMinutes = (bioData, workouts, dayExerciseLogs = null) =>
   let workoutMinutes = 0;
   let cardioMinutes = 0;
   list.forEach(w => {
-    const mins = parseWorkoutDurationMinutes(w.duration);
+    let mins = parseWorkoutDurationMinutes(w.duration);
+    if (mins <= 0) {
+      // Invariant SSOT: Sesi selesai tidak boleh menghasilkan 0 menit jika ada log/set selesai
+      const exs = w.overriddenExercises || w.exercises || [];
+      const logs = (w.log && Object.keys(w.log).length > 0) ? w.log : dayExerciseLogs;
+      const spanSecs = sessionSpanSeconds(exs, logs);
+      if (spanSecs > 0) {
+        mins = Math.round(spanSecs / 60);
+      } else {
+        const totalDoneSets = Object.values(logs || {}).reduce((n, sets) => n + (Array.isArray(sets) ? sets : Object.values(sets || {})).filter(s => s?.done).length, 0);
+        if (totalDoneSets > 0) mins = Math.max(1, Math.round((totalDoneSets * 90) / 60));
+      }
+    }
     workoutMinutes += mins;
     // Menit kardio diambil dari DURASI SET yang benar-benar tercatat, bukan dari jenis sesinya.
     // Dulu penggolongannya all-or-nothing lewat guessWorkoutType: sesi beban yang ditutup
@@ -1067,7 +1086,8 @@ export const dailyActiveMinutes = (bioData, workouts, dayExerciseLogs = null) =>
     }
   });
 
-  const rawStepMinutes = Math.round(Number(bio.stepMinutes)) || 0;
+  // Fallback langkah: jika stepMinutes dari Health Connect belum ada, gunakan standar WHO (100 langkah/menit)
+  const rawStepMinutes = Math.round(Number(bio.stepMinutes)) || (Number(bio.steps) > 0 ? Math.round(Number(bio.steps) / 100) : 0);
   // Tidak pernah negatif: kalau sesi kardio lebih panjang dari menit-langkah hari itu, yang benar
   // adalah nol menit jalan terpisah, bukan mengurangi durasi latihan.
   const stepMinutes = Math.max(0, rawStepMinutes - Math.min(rawStepMinutes, cardioMinutes));
@@ -1620,5 +1640,202 @@ export const calculateProgressiveOverloadTarget = ({
     message: `Fokus tambah repetisi dengan beban yang sama (${lastSessionWeight} ${uStr}) sampai menembus target ${targetReps} reps!`
   };
 };
+
+/**
+ * Single Source of Truth (SSOT) untuk Target Progresif Latihan & Rekomendasi Input Awal.
+ * Menggabungkan riwayat sesi lalu (rm10Series), profil gym (step/alat), wellness (deload/doms),
+ * dan algoritma Dynamic Double Progression agar target Coach dan nilai pre-fill set selalu 100% sinkron.
+ */
+export const resolveExerciseProgressiveTarget = ({
+  ex,
+  history = {},
+  exerciseLibrary = [],
+  programs = [],
+  extraExercises = [],
+  gymProfiles = [],
+  activeGymId = null,
+  userProfile = null,
+  isImperial = false,
+  wellness = null,
+  exLookup = null,
+}) => {
+  if (!ex) {
+    return {
+      targetWeight: 0,
+      inputWeight: 0,
+      targetReps: 10,
+      totalWeight: 0,
+      lastSessionWeight: 0,
+      lastSessionReps: 0,
+      last10RM: 0,
+      best10RM: 0,
+      true10RM: 0,
+      hasHistory: false,
+      mode: 'default',
+      isDeload: false,
+      isDoms: false,
+      isWeightJump: false,
+      eqConf: null,
+      step: isImperial ? 5 : 2.5,
+      title: 'Target Hari Ini',
+      message: 'Mulai latihan dengan form yang bersih dan terkontrol.',
+    };
+  }
+
+  const eqConf = getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile);
+  const step = Number(eqConf?.increment) || gymStepFor(gymProfiles, activeGymId, ex?.equipment, isImperial) || (isImperial ? 5 : 2.5);
+
+  const lookup = exLookup || buildExLookupByName(history, [ex], exerciseLibrary, extraExercises, ...(programs || []).map(p => p?.exercises));
+  const canonicalId = canonicalExId(ex?.name);
+  const series = rm10Series(history, canonicalId, lookup);
+  const lastPoint = series[series.length - 1];
+  const histBest = series.reduce((m, p) => Math.max(m, p.rm10), 0);
+
+  const libMatch = (exerciseLibrary || []).find(e =>
+    e.id === ex?.originalId || e.id === ex?.id || e.name?.toLowerCase() === ex?.name?.toLowerCase()
+  );
+  const libBest = Number(libMatch?.rm10Best) || 0;
+  const libLastW = Number(libMatch?.lastWeight) || 0;
+  const libRm10 = Number(libMatch?.rm10) || 0;
+
+  const best10RM = Math.max(histBest, libBest);
+  const last10RM = lastPoint?.rm10 || libRm10;
+  const lastSessionWeight = (lastPoint?.weight !== undefined && lastPoint?.weight > 0) ? lastPoint.weight : libLastW;
+  const lastSessionReps = (lastPoint?.reps !== undefined && lastPoint?.reps > 0) ? lastPoint.reps : (lastPoint ? 10 : (libLastW > 0 ? 10 : 0));
+  const hasLastSession = lastSessionWeight > 0 && lastSessionReps > 0;
+
+  const isDeload = wellness === 'deload';
+  const isDoms = wellness === 'doms';
+
+  if (hasLastSession) {
+    if (isDeload) {
+      const deloadWeight = Math.max(0, Math.round(lastSessionWeight * 0.825 * 2) / 2);
+      const targetReps = ex?.reps || lastSessionReps || 10;
+      const rawInput = calculateInputWeight(deloadWeight, eqConf);
+      const inputWeight = roundDownToStep(rawInput, step);
+      const totalWeight = calculateActualWeight(inputWeight, eqConf);
+      return {
+        targetWeight: totalWeight,
+        inputWeight,
+        targetReps,
+        totalWeight,
+        lastSessionWeight,
+        lastSessionReps,
+        last10RM,
+        best10RM,
+        true10RM: last10RM > 0 ? last10RM : best10RM,
+        hasHistory: true,
+        mode: 'deload',
+        isDeload: true,
+        isDoms: false,
+        isWeightJump: false,
+        eqConf,
+        step,
+        title: 'Mode Deload',
+        message: 'Beban dipangkas ~17.5% untuk pemulihan sendi dan sistem saraf. Fokus pada kontrol tempo dan kesempurnaan form gerakan.',
+      };
+    }
+
+    if (isDoms) {
+      const targetActualWeight = lastSessionWeight;
+      const targetReps = ex?.reps || lastSessionReps || 10;
+      const rawInput = calculateInputWeight(targetActualWeight, eqConf);
+      const inputWeight = roundDownToStep(rawInput, step);
+      const totalWeight = calculateActualWeight(inputWeight, eqConf);
+      return {
+        targetWeight: totalWeight,
+        inputWeight,
+        targetReps,
+        totalWeight,
+        lastSessionWeight,
+        lastSessionReps,
+        last10RM,
+        best10RM,
+        true10RM: last10RM > 0 ? last10RM : best10RM,
+        hasHistory: true,
+        mode: 'doms',
+        isDeload: false,
+        isDoms: true,
+        isWeightJump: false,
+        eqConf,
+        step,
+        title: 'Mode Pegal / Fokus Form',
+        message: 'Kondisi otot sedang lelah/pegal. Beban dipertahankan di angka sesi lalu tanpa kenaikan beban progresif. Prioritaskan tempo repetisi lambat dan form yang bersih.',
+      };
+    }
+
+    const baseTargetReps = ex?.reps || 10;
+    const goal = userProfile?.goal || 'muscle_gain';
+    const exp = userProfile?.experience || 'beginner';
+
+    const overloadPlan = calculateProgressiveOverloadTarget({
+      lastSessionWeight,
+      lastSessionReps,
+      targetReps: baseTargetReps,
+      equipStep: step,
+      ratio: eqConf?.ratio || 1,
+      goal,
+      experience: exp,
+      isImperial,
+    });
+
+    const targetActualWeight = overloadPlan.targetWeight;
+    const targetReps = overloadPlan.targetReps;
+    const rawInput = calculateInputWeight(targetActualWeight, eqConf);
+    const inputWeight = roundDownToStep(rawInput, step);
+    const totalWeight = calculateActualWeight(inputWeight, eqConf);
+
+    return {
+      targetWeight: totalWeight,
+      inputWeight,
+      targetReps,
+      totalWeight,
+      lastSessionWeight,
+      lastSessionReps,
+      last10RM,
+      best10RM,
+      true10RM: last10RM > 0 ? last10RM : best10RM,
+      hasHistory: true,
+      mode: overloadPlan.mode,
+      isWeightJump: overloadPlan.isWeightJump,
+      isDeload: false,
+      isDoms: false,
+      overloadPlan,
+      eqConf,
+      step,
+      title: 'Target Hari Ini',
+      message: overloadPlan.message,
+    };
+  }
+
+  // Fallback tanpa riwayat sesi lalu:
+  const defInput = Number(ex?.defaultWeight) || 0;
+  const inputWeight = roundDownToStep(defInput, step);
+  const totalWeight = calculateActualWeight(inputWeight, eqConf);
+  const targetReps = ex?.reps || 10;
+
+  return {
+    targetWeight: totalWeight,
+    inputWeight,
+    targetReps,
+    totalWeight,
+    lastSessionWeight: 0,
+    lastSessionReps: 0,
+    last10RM: 0,
+    best10RM,
+    true10RM: best10RM,
+    hasHistory: false,
+    mode: 'default',
+    isDeload: false,
+    isDoms: false,
+    isWeightJump: false,
+    overloadPlan: null,
+    eqConf,
+    step,
+    title: 'Target Hari Ini',
+    message: 'Belum ada riwayat sesi lalu. Awali dengan beban default yang aman dan fokus pada teknik gerakan.',
+  };
+};
+
 
 

@@ -17,6 +17,7 @@ class WorkoutTimerPlugin : Plugin() {
         val exerciseName = call.getString("exerciseName", "")
         val isResting = call.getBoolean("isResting", false) ?: false
         val targetTime = call.getLong("targetTime", 0L) ?: 0L
+        val calories = call.getString("calories", "0")
         
         val intent = Intent(context, WorkoutTimerService::class.java).apply {
             action = "START"

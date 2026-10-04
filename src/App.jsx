@@ -53,7 +53,7 @@ import { fetchExercisesFromApi } from './utils/exerciseDbApi';
 import { AI_MODELS, detectPlateaus, getLogyNotification } from './utils/aiAgent';
 import { calculateReadiness, restingHrBaseline } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
-import { calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, deduplicateWorkouts, recomputeStrengthRecords, buildExLookupByName, canonicalExId, sessionSpanSeconds, repairActualWeights, buildHcSessionDetail, estimate10RM, defaultSetWeight, gymStepFor, mergeRm10, getEquipmentConfig, calculateActualWeight, calculateInputWeight, getSetActualWeight } from './utils/workoutCalc';
+import { calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, deduplicateWorkouts, recomputeStrengthRecords, buildExLookupByName, canonicalExId, sessionSpanSeconds, repairActualWeights, buildHcSessionDetail, estimate10RM, defaultSetWeight, gymStepFor, mergeRm10, getEquipmentConfig, calculateActualWeight, calculateInputWeight, getSetActualWeight, resolveExerciseProgressiveTarget } from './utils/workoutCalc';
 import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcReadHeartRateWindow, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission, capIntradayLog, HC_FIELDS, fillOnlyPatch, hcDroppedTypes } from './utils/healthConnect';
 import { bumpExercisePopularity } from './utils/exercisePopularity';
 import { rapikanNamaProgram, rapikanNamaSesi, pertahankanNamaSesi } from './utils/programNaming';
@@ -387,15 +387,26 @@ export default function App() {
 
   const [exerciseLibrary, _setExerciseLibrary] = useState(() => {
     const raw = __previewUser ? defaultMasterExercises : readCache('__CACHED_EXERCISE_LIBRARY', defaultMasterExercises);
-    return (raw || []).map(ex => {
+    const mapped = (raw || []).map(ex => {
       if (ex.id === 121 && (ex.name === 'Pull Through' || ex.name === 'Cable Pull Through')) {
         return canonicalizeExercise({ ...ex, name: 'Cable Hip Abduction', target: ['Glutes'] });
       }
       if ((ex.id === 104 || ex.originalId === 104) && (ex.name || '').toLowerCase().includes('seated')) {
         return canonicalizeExercise({ ...ex, name: 'Standing Cable Lateral Raise' });
       }
+      const master = defaultMasterExercises.find(m => m.id === ex.id);
+      if (master && master.videoUrl === '' && ex.videoUrl) {
+        return canonicalizeExercise({ ...ex, videoUrl: '', ytVideo: master.ytVideo || '' });
+      }
       return canonicalizeExercise(ex);
     });
+    // Pastikan seluruh defaultMasterExercises (termasuk 143 Side Lateral Raise, 144 Cable Seated Lateral Raise) ada di library
+    defaultMasterExercises.forEach(master => {
+      if (!mapped.some(ex => ex.id === master.id)) {
+        mapped.push(canonicalizeExercise(master));
+      }
+    });
+    return mapped;
   });
   useEffect(() => {
     writeCache('__CACHED_EXERCISE_LIBRARY', exerciseLibrary);
@@ -411,6 +422,10 @@ export default function App() {
         }
         if ((ex.id === 104 || ex.originalId === 104) && (ex.name || '').toLowerCase().includes('seated')) {
           return canonicalizeExercise({ ...ex, name: 'Standing Cable Lateral Raise' });
+        }
+        const master = defaultMasterExercises.find(m => m.id === ex.id);
+        if (master && master.videoUrl === '' && ex.videoUrl) {
+          return canonicalizeExercise({ ...ex, videoUrl: '', ytVideo: master.ytVideo || '' });
         }
         return canonicalizeExercise(ex);
       })
@@ -1576,6 +1591,13 @@ export default function App() {
     if (timeRemainingMs <= 0) return;
 
     const timeout = setTimeout(() => {
+      // Invariant: Jika timer sudah lewat lebih dari 1500ms saat timeout ini dipanggil,
+      // artinya JS sempat beku/tidur di background saat app di-minimize.
+      // Service native Android sudah membunyikannya tepat waktu saat itu.
+      // JANGAN membunyikan ulang alarm kadaluarsa saat app dibuka kembali!
+      const elapsedSinceTarget = Date.now() - restTargetTime;
+      if (elapsedSinceTarget > 1500) return;
+
       // Kalau aplikasi sedang tidak terlihat, service native SUDAH membunyikan berkas yang sama
       // di stream ALARM (WorkoutTimerService.kt, gerbang !isAppActive) berikut getarannya. Ikut
       // membunyikannya di sini berarti dua kali: satu lantang lewat alarm, satu pelan lewat media.
@@ -3313,20 +3335,22 @@ export default function App() {
       }
     }
     
-    // originalId ikut dicocokkan: latihan program adalah salinan beku ber-UUID, jadi tanpa klausa
-    // ini pencocokan cuma jalan lewat nama — dan dua salinan lain dari fungsi yang sama
-    // (WorkoutTab, ImmersiveWorkout) sudah punya klausa itu sejak dulu.
-    const libMatch = exerciseLibrary.find(e => e.id === ex?.originalId || e.id === ex?.id || e.name?.toLowerCase() === ex?.name?.toLowerCase());
-    const step = gymStepFor(gymProfiles, activeGymId, ex?.equipment, units?.weight === 'lbs');
-    const eqConf = getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile);
-    let suggestedWeight = defaultSetWeight(libMatch, ex, step, eqConf);
-    
-    const isDeload = history?.[selectedDate]?.wellness === 'deload' || history?.[selectedDate]?.isDeloadWeek;
-    if (isDeload && suggestedWeight > 0) {
-      suggestedWeight = Math.max(0, Math.round((suggestedWeight * 0.825) / step) * step);
-    }
-
-    const total_w = calculateActualWeight(suggestedWeight, eqConf);
+    const targetPlan = resolveExerciseProgressiveTarget({
+      ex,
+      history,
+      exerciseLibrary,
+      programs,
+      extraExercises,
+      gymProfiles,
+      activeGymId,
+      userProfile,
+      isImperial: units?.weight === 'lbs',
+      wellness: history?.[selectedDate]?.wellness,
+    });
+    const suggestedWeight = targetPlan.inputWeight;
+    const suggestedReps = targetPlan.targetReps;
+    const eqConf = targetPlan.eqConf || getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile);
+    const total_w = targetPlan.totalWeight;
 
     return Array.from({length: ex?.sets || 3}).map(() => ({ 
       w: suggestedWeight, 
@@ -3334,7 +3358,7 @@ export default function App() {
       base_w: eqConf.baseWeight,
       ratio: eqConf.ratio,
       total_w: total_w,
-      r: ex?.reps || 10, 
+      r: suggestedReps, 
       d: ex?.duration || 10, 
       done: false,
       skipped: false

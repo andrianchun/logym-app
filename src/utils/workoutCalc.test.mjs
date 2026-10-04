@@ -449,3 +449,86 @@ console.log('workoutCalc OK', { cardioKcal, plankKcal, liftKcal });
   });
 }
 
+// ---- resolveExerciseProgressiveTarget: SSOT Engine Test ----
+{
+  const { resolveExerciseProgressiveTarget, defaultSetWeight } = await import('./workoutCalc.js');
+
+  // Test 1: Seated Cable Rows (User Bug Case)
+  // Sesi lalu: 60 kg x 15 reps. Alat kelipatan 5 kg.
+  // Dulu bug: defaultSetWeight pre-fill 67.5 kg (karena ambil raw 10RM), padahal Coach target 65 kg.
+  // Sekarang: SSOT Engine menjamin keduanya menghasilkan 65 kg x 10 reps.
+  const historyCable = {
+    '2026-08-01': {
+      workouts: [{
+        id: 'w1',
+        status: 'completed',
+        log: {
+          'ex-cable-row': [{ w: 60, total_w: 60, r: 15, done: true }]
+        }
+      }]
+    }
+  };
+  const exCable = { id: 'ex-cable-row', name: 'Seated Cable Rows', equipment: 'Cable', reps: 10 };
+  const gymProfiles = [{ id: 'gym1', config: { Cable: { increment: 5, baseWeight: 0, ratio: 1 } } }];
+
+  const targetCable = resolveExerciseProgressiveTarget({
+    ex: exCable,
+    history: historyCable,
+    gymProfiles,
+    activeGymId: 'gym1',
+  });
+  assert.equal(targetCable.targetWeight, 65, 'Target total weight harus 65 kg (lompat +5 kg)');
+  assert.equal(targetCable.inputWeight, 65, 'Target input weight harus 65 kg');
+  assert.equal(targetCable.targetReps, 10, 'Target reps harus 10 reps');
+  assert.equal(targetCable.lastSessionWeight, 60);
+  assert.equal(targetCable.lastSessionReps, 15);
+
+  // Test 2: Split Squat with Dumbbells (User Bug Case)
+  // Sesi lalu: 10 kg x 12 reps.
+  // Dulu bug: defaultSetWeight prefill 30 kg (katalog defaultWeight) dan 10 reps karena libMatch kosong.
+  // Sekarang: SSOT Engine memindai history, menemukan 10 kg x 12 reps, dan menghasilkan 10 kg x 13 reps.
+  const historySplitSquat = {
+    '2026-08-01': {
+      workouts: [{
+        id: 'w1',
+        status: 'completed',
+        exercises: [{ id: 'split-squat-uuid', name: 'Split Squat with Dumbbells' }],
+        log: {
+          'split-squat-uuid': [{ w: 10, total_w: 10, r: 12, done: true }]
+        }
+      }]
+    }
+  };
+  const exSplitSquat = { id: 'split-squat-new-uuid', name: 'Split Squat with Dumbbells', equipment: 'Dumbbell', reps: 10, defaultWeight: 10 };
+  const targetSplitSquat = resolveExerciseProgressiveTarget({
+    ex: exSplitSquat,
+    history: historySplitSquat,
+  });
+  assert.equal(targetSplitSquat.targetWeight, 10, 'Split squat harus tetap di 10 kg');
+  assert.equal(targetSplitSquat.inputWeight, 10, 'Input weight split squat harus 10 kg, bukan 30 kg!');
+  assert.equal(targetSplitSquat.targetReps, 13, 'Target reps harus 13 reps (reps_first Double Progression)');
+  assert.equal(targetSplitSquat.lastSessionWeight, 10);
+  assert.equal(targetSplitSquat.lastSessionReps, 12);
+
+  // Test 3: Romanian Deadlift (Olympic Barbell 20 kg, default 5 kg plat)
+  const exRDL = { id: 'rdl-1', name: 'Romanian Deadlift', equipment: 'Olympic Barbell', reps: 12, defaultWeight: 5 };
+  const targetRDL = resolveExerciseProgressiveTarget({
+    ex: exRDL,
+    history: {}, // Tanpa riwayat
+  });
+  assert.equal(targetRDL.inputWeight, 5, 'Input plat harus 5 kg');
+  assert.equal(targetRDL.targetWeight, 25, 'Total beban aktual harus 25 kg (5 kg plat + 20 kg bar)');
+  assert.equal(targetRDL.targetReps, 12, 'Target reps harus 12 reps');
+
+  // Test 4: defaultSetWeight mendukung targetInputWeight dan memprioritaskan lastWeight atas raw rm10
+  assert.equal(defaultSetWeight({ targetInputWeight: 65 }, exCable, 5), 65);
+  assert.equal(defaultSetWeight({ lastWeight: 60, rm10: 67.5 }, exCable, 5), 60);
+
+  console.log('resolveExerciseProgressiveTarget OK', {
+    cableTarget: `${targetCable.inputWeight} kg x ${targetCable.targetReps} reps`,
+    splitSquatTarget: `${targetSplitSquat.inputWeight} kg x ${targetSplitSquat.targetReps} reps`,
+    rdlTarget: `plat ${targetRDL.inputWeight} kg (total ${targetRDL.targetWeight} kg) x ${targetRDL.targetReps} reps`,
+  });
+}
+
+

@@ -272,6 +272,12 @@ const VitalsChart = ({ t, theme, history, language, activeMetric }) => {
     touchState.current.initialDist = 0;
   };
 
+  const scrollToLatest = useCallback(() => {
+    if (!scrollRef.current || touchState.current.initialDist > 0) return;
+    const el = scrollRef.current;
+    el.scrollLeft = Math.max(0, el.scrollWidth - el.clientWidth);
+  }, []);
+
   useEffect(() => {
     if (scrollTarget.current !== null && scrollRef.current) {
       scrollRef.current.scrollLeft = scrollTarget.current;
@@ -279,14 +285,18 @@ const VitalsChart = ({ t, theme, history, language, activeMetric }) => {
     }
   }, [pointWidth, chartData]);
 
-  // Auto scroll ke ujung kanan (data terbaru) saat ganti metrik atau data masuk
+  // Auto scroll ke ujung kanan (data terbaru) saat mount atau data masuk
   useEffect(() => {
-     if (scrollRef.current && chartData.length > 0) {
-        const clientW = scrollRef.current.clientWidth || (window.innerWidth - 64);
-        const nextChartWidth = Math.max(chartData.length * pointWidth, clientW);
-        scrollTarget.current = nextChartWidth - clientW;
-     }
-  }, [chartData.length]);
+    if (chartData.length === 0) return;
+    const raf = requestAnimationFrame(scrollToLatest);
+    const timer = setTimeout(scrollToLatest, 50);
+    const timer2 = setTimeout(scrollToLatest, 250);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
+      clearTimeout(timer2);
+    };
+  }, [chartData.length, pointWidth, scrollToLatest]);
 
   const chartWidth = Math.max(chartData.length * pointWidth, window.innerWidth - 64);
 

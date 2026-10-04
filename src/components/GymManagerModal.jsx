@@ -33,7 +33,11 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
 
   const handleEditGym = (gym) => {
     playSoundEffect('click', soundEnabled);
-    setEditingGym({ ...gym, equipment: gym.equipment === 'all' ? [...equipmentOptions] : [...gym.equipment] });
+    setEditingGym({
+      ...gym,
+      equipment: gym.equipment === 'all' ? [...equipmentOptions] : [...(gym.equipment || [])],
+      config: gym.config || {}
+    });
   };
 
   const handleDeleteGym = (gym) => {
@@ -132,7 +136,8 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
   const toggleEquipment = (eqName) => {
     playSoundEffect('click', soundEnabled);
     setEditingGym(prev => {
-      let newEq = [...prev.equipment];
+      if (!prev) return prev;
+      let newEq = Array.isArray(prev.equipment) ? [...prev.equipment] : [...equipmentOptions];
       if (newEq.includes(eqName)) {
         newEq = newEq.filter(e => e !== eqName);
       } else {
@@ -144,7 +149,8 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
 
   const updateConfig = (eqName, key, val) => {
     setEditingGym(prev => {
-      const config = { ...prev.config };
+      if (!prev) return prev;
+      const config = { ...(prev.config || {}) };
       if (!config[eqName]) config[eqName] = { barWeight: 0, increment: 0 };
       config[eqName] = { ...config[eqName], [key]: parseFloat(val) || 0 };
       return { ...prev, config };
@@ -158,7 +164,8 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
     
     if (!isBarbellBased && !isCableOrMachine && !isDumbbell) return null;
 
-    const conf = editingGym.config[eqName] || { 
+    const gymConfig = editingGym?.config || {};
+    const conf = gymConfig[eqName] || { 
       baseWeight: isBarbellBased ? (eqName.includes('Sled') ? 45 : (eqName.includes('Smith') ? 15 : 20)) : 0, 
       ratio: isCableOrMachine ? 1 : 1,
       increment: isBarbellBased ? 2.5 : 5 

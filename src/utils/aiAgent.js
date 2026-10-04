@@ -390,7 +390,7 @@ export const summarizeHealthAndRecovery = (historyObj, userProfile, lomealToday 
         nutParts.push(`Net: ${delta > 0 ? '+' : ''}${delta} kcal (${delta < -100 ? 'Deficit' : delta > 100 ? 'Surplus' : 'Maintenance'})`);
     }
 
-    const calTarget = lomealTargets?.calories || activityTargets?.activityCalories || activityTargets?.tdee;
+    const calTarget = lomealTargets?.kcal || lomealTargets?.calories || todayBio?.targetCalories || activityTargets?.tdee || activityTargets?.activityCalories;
     if (calTarget) nutParts.push(`Target: ${calTarget} kcal`);
 
     if (Number(todayBio.waterIntake) > 0) {

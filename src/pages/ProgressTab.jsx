@@ -121,12 +121,16 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
           if (ex && sets) {
               const exName = ex.name;
               const exType = ex.type || 'weight';
-              let exTargets = Array.isArray(ex.target) ? ex.target : (ex.target ? [ex.target] : ['Lainnya']);
+              let exTargets = Array.isArray(ex.target) ? [...ex.target] : (ex.target ? [ex.target] : ['Lainnya']);
               if (exTargets.length === 1 && exTargets[0] === 'Lainnya') {
                  const libEx = exerciseLibrary?.find(e => e.id === ex.id || e.id === ex.originalId || e.name?.toLowerCase() === ex.name?.toLowerCase()) || defaultMasterExercises.find(e => e.id === ex.id || e.name?.toLowerCase() === ex.name?.toLowerCase());
                  if (libEx?.target) {
-                    exTargets = Array.isArray(libEx.target) ? libEx.target : [libEx.target];
+                    exTargets = Array.isArray(libEx.target) ? [...libEx.target] : [libEx.target];
                  }
+              }
+              const exNameLower = (exName || '').toLowerCase();
+              if ((exNameLower.includes('deadlift') || exNameLower.includes('rdl')) && !exTargets.some(t => normalizeMuscleKey(t) === 'lower_back')) {
+                 exTargets.push('Punggung Bawah');
               }
               const isImp = units?.weight === 'lbs';
               
@@ -211,7 +215,11 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                        const ex = exLookup[exObj.id] || exObj;
                        if (ex) {
                           if (isMusc) {
-                             const exTargets = Array.isArray(ex.target) ? ex.target : [ex.target || 'Lainnya'];
+                             let exTargets = Array.isArray(ex.target) ? [...ex.target] : [ex.target || 'Lainnya'];
+                             const exNameLower = (ex.name || '').toLowerCase();
+                             if ((exNameLower.includes('deadlift') || exNameLower.includes('rdl')) && !exTargets.some(t => normalizeMuscleKey(t) === 'lower_back')) {
+                                exTargets.push('Punggung Bawah');
+                             }
                              exTargets.forEach(t => recentItems.add(normalizeMuscleKey(t)));
                           } else {
                              if (ex.name) recentItems.add(ex.name);

@@ -2,9 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Play, ChevronRight, ChevronLeft, Dumbbell, Check, Info, Clock, Minimize2, SkipForward, ClipboardEdit, Brain, Flame, Activity, ArrowLeftRight, Square, Zap } from 'lucide-react';
 import ScrollPicker from './ScrollPicker';
-import { exerciseTypeLabels, defaultMasterExercises, findMatchingMasterExercise, canonicalizeExercise } from '../data/constants';
+import { exerciseTypeLabels, defaultMasterExercises, findMatchingMasterExercise, canonicalizeExercise, resolveExerciseDbId } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
-import { calculateWorkoutCalories, calculateLiveWorkoutCalories, resolveExerciseKind, defaultSetWeight, gymStepFor, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from '../utils/workoutCalc';
+import { calculateWorkoutCalories, calculateLiveWorkoutCalories, resolveExerciseKind, defaultSetWeight, gymStepFor, getEquipmentConfig, calculateActualWeight, getSetActualWeight, resolveExerciseProgressiveTarget } from '../utils/workoutCalc';
 import { getCachedExercises } from '../utils/exerciseDbApi';
 import { WorkoutTimerPlugin } from '../App';
 import TwoFrameMotionLoop from './TwoFrameMotionLoop';
@@ -67,7 +67,10 @@ const LiveSetTimer = ({ timer, onTimerEnd, formatTime, soundEnabled, playSoundEf
       if (timer.mode === 'down') {
         const remaining = Math.ceil((timer.targetTime - Date.now()) / 1000);
         if (remaining <= 0) {
-          playSoundEffect('timerEnd', soundEnabled);
+          const expiredLongAgo = timer.targetTime && (Date.now() - timer.targetTime > 2000);
+          if (!expiredLongAgo) {
+            playSoundEffect('timerEnd', soundEnabled);
+          }
           onTimerEnd();
         } else if (prevTimeLeftRef.current !== remaining) {
           prevTimeLeftRef.current = remaining;
@@ -218,6 +221,8 @@ const ImmersiveWorkout = ({
   activeGymId,
   showSupersetToast,
   getOverloadHint,
+  getSetLogs,
+  history,
   userProfile,
   activeExerciseId,
   onActiveExercise,
@@ -235,24 +240,38 @@ const ImmersiveWorkout = ({
   // Helper tunggal untuk membaca log latihan dengan dukungan format compound key, originalId, dan fallback template
   const getLogsForEx = (exItem) => {
     if (!exItem) return [];
+    if (getSetLogs) {
+      const sets = getSetLogs(exItem);
+      if (sets && sets.length > 0) return sets;
+    }
     if (exerciseLogs[exItem.id]) return exerciseLogs[exItem.id];
     if (exItem.originalId && exerciseLogs[exItem.originalId]) return exerciseLogs[exItem.originalId];
     if (exItem.workoutId) {
       const key = `${exItem.originalId || exItem.id}-${exItem.workoutId}`;
       if (exerciseLogs[key]) return exerciseLogs[key];
     }
-    const libMatch = exerciseLibrary?.find(e => e.id === exItem.originalId || e.id === exItem.id || e.name?.toLowerCase() === exItem.name?.toLowerCase());
-    const step = gymStepFor(gymProfiles, activeGymId, exItem.equipment, units?.weight === 'lbs');
-    const eqConf = getEquipmentConfig(gymProfiles, activeGymId, exItem, userProfile);
-    let suggestedWeight = defaultSetWeight(libMatch, exItem, step, eqConf);
-    const total_w = calculateActualWeight(suggestedWeight, eqConf);
+    const targetPlan = resolveExerciseProgressiveTarget({
+      ex: exItem,
+      history,
+      exerciseLibrary,
+      programs,
+      extraExercises,
+      gymProfiles,
+      activeGymId,
+      userProfile,
+      isImperial: units?.weight === 'lbs',
+    });
+    const suggestedWeight = targetPlan.inputWeight;
+    const suggestedReps = targetPlan.targetReps;
+    const eqConf = targetPlan.eqConf || getEquipmentConfig(gymProfiles, activeGymId, exItem, userProfile);
+    const total_w = targetPlan.totalWeight;
     return Array.from({length: exItem.sets || 3}).map(() => ({
       w: suggestedWeight,
       input_w: suggestedWeight,
       base_w: eqConf.baseWeight,
       ratio: eqConf.ratio,
       total_w: total_w,
-      r: exItem.reps || 10,
+      r: suggestedReps,
       d: exItem.duration || 10,
       done: false
     }));
@@ -453,16 +472,18 @@ const ImmersiveWorkout = ({
       ...apiMatch,
       ...masterMatch,
       ...canonical,
-      videoUrl: masterMatch?.videoUrl || canonical.videoUrl || apiMatch?.videoUrl || '',
-      thumbnailUrl: masterMatch?.thumbnailUrl || canonical.thumbnailUrl || masterMatch?.gifUrl || apiMatch?.thumbnailUrl || apiMatch?.gifUrl || '',
+      videoUrl: (masterMatch && masterMatch.videoUrl !== undefined) ? masterMatch.videoUrl : (canonical.videoUrl || apiMatch?.videoUrl || ''),
+      thumbnailUrl: (masterMatch && masterMatch.thumbnailUrl !== undefined) ? masterMatch.thumbnailUrl : (canonical.thumbnailUrl || masterMatch?.gifUrl || apiMatch?.thumbnailUrl || apiMatch?.gifUrl || ''),
       gifUrl: masterMatch?.gifUrl || canonical.gifUrl || apiMatch?.gifUrl || '',
-      ytVideo: masterMatch?.ytVideo || canonical.ytVideo || apiMatch?.ytVideo || '',
+      ytVideo: (masterMatch && masterMatch.ytVideo !== undefined) ? masterMatch.ytVideo : (canonical.ytVideo || apiMatch?.ytVideo || ''),
     };
   }, [ex]);
 
   const parseMedia = (exercise) => {
     if (!exercise) return [];
     let items = [];
+
+    // 1. Video AI / HTML5 Video (MP4 / WebM)
     if (exercise.videoUrl) {
       const urls = exercise.videoUrl.split(/(?:,|\s)+/).filter(v => v.trim());
       urls.forEach(u => {
@@ -471,39 +492,44 @@ const ImmersiveWorkout = ({
         }
       });
     }
-    if (exercise.thumbnailUrl && !exercise.thumbnailUrl.match(/\.(mp4|webm)$/i)) {
-      if (!items.some(it => it.url === exercise.thumbnailUrl)) {
-        items.push({ type: 'image', url: exercise.thumbnailUrl });
+
+    if (exercise.gifUrl && exercise.gifUrl.match(/\.(mp4|webm)$/i)) {
+      if (!items.some(it => it.url === exercise.gifUrl)) {
+        items.push({ type: 'video', url: exercise.gifUrl });
       }
     }
-    if (exercise.gifUrl) {
-      const urls = exercise.gifUrl.split(/(?:,|\s)+/).filter(v => v.trim());
-      urls.forEach(u => {
-        if (u.match(/\.(mp4|webm)$/i)) {
-          if (!items.some(it => it.url === u)) items.push({ type: 'video', url: u });
-        } else if (!items.some(it => it.url === u)) {
-          items.push({ type: 'image', url: u });
-        }
-      });
-    }
 
-    // Lini 3 (Backup): Looping 2-frame ExerciseDB Motion
-    const exId = exercise.exerciseId || (exercise.id && String(exercise.id).startsWith('edb-') ? String(exercise.id).replace(/^edb-/, '') : null);
+    // 2. ExerciseDB Animated GIF / Motion Loop (selalu ditaruh di akhir jika ada video)
+    const exId = exercise.exerciseId || resolveExerciseDbId(exercise) || (exercise.id && String(exercise.id).startsWith('edb-') ? String(exercise.id).replace(/^edb-/, '') : null);
     const rawGif = exercise.gifUrl || '';
-    let loopExId = exId;
+    let loopExId = exId ? String(exId).replace(/^edb-/, '').trim() : null;
     let loopGif = null;
 
-    if (rawGif.includes('/0.jpg') || rawGif.includes('/1.jpg')) {
-      loopGif = rawGif;
-      const match = rawGif.match(/exercises\/([^/]+)\/[01]\.jpg/);
-      if (match) loopExId = match[1];
-    } else if (loopExId) {
-      loopGif = `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/${loopExId}/0.jpg`;
+    if (rawGif.endsWith('.gif')) {
+      if (!items.some(it => it.url === rawGif)) {
+        items.push({ type: 'image', url: rawGif });
+      }
+    } else {
+      if (rawGif.includes('/0.jpg') || rawGif.includes('/1.jpg')) {
+        loopGif = rawGif;
+        const match = rawGif.match(/exercises\/([^/]+)\/[01]\.jpg/);
+        if (match) loopExId = match[1];
+      } else if (loopExId && !loopExId.match(/^\d+$/)) {
+        loopGif = `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/${loopExId}/0.jpg`;
+      }
+
+      if (loopExId || loopGif) {
+        if (!items.some(it => it.type === 'motion-loop')) {
+          items.push({ type: 'motion-loop', exerciseId: loopExId, gifUrl: loopGif, url: loopGif });
+        }
+      }
     }
 
-    if (loopExId || loopGif) {
-      if (!items.some(it => it.type === 'motion-loop')) {
-        items.push({ type: 'motion-loop', exerciseId: loopExId, gifUrl: loopGif, url: loopGif });
+    // 3. Fallback: Thumbnail diam HANYA jika tidak ada video maupun motion loop
+    if (items.length === 0) {
+      const fallbackImg = exercise.thumbnailUrl || exercise.gifUrl;
+      if (fallbackImg && !fallbackImg.match(/\.(mp4|webm)$/i)) {
+        items.push({ type: 'image', url: fallbackImg });
       }
     }
 
@@ -903,29 +929,57 @@ const ImmersiveWorkout = ({
             </div>
           ) : (
             mediaItems.map((media, idx) => (
-              <div key={idx} className="h-full flex items-center justify-center shrink-0 relative overflow-hidden bg-black" style={{ width: `${100 / mediaItems.length}%` }}>
+              <div key={idx} className="h-full flex items-center justify-center shrink-0 relative overflow-hidden bg-[#0a0f1d]" style={{ width: `${100 / mediaItems.length}%` }}>
                 {media.type === 'video' ? (
-                  <video 
-                    src={media.url} 
-                    poster={resolvedEx?.thumbnailUrl || resolvedEx?.gifUrl || ''} 
-                    autoPlay={idx === activeMediaIndex} 
-                    loop 
-                    muted 
-                    playsInline 
-                    preload="auto" 
-                    disablePictureInPicture 
-                    controlsList="nodownload nofullscreen noremoteplayback" 
-                    className="immersive-video-html5 w-full h-full object-cover opacity-90 pointer-events-none scale-[1.10] bg-black" 
-                  />
+                  <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+                    {(resolvedEx?.thumbnailUrl || resolvedEx?.gifUrl) && (
+                      <img 
+                        src={resolvedEx.thumbnailUrl || resolvedEx.gifUrl} 
+                        alt="" 
+                        aria-hidden="true" 
+                        className="absolute inset-0 w-full h-full object-cover opacity-25 blur-2xl scale-125 pointer-events-none" 
+                      />
+                    )}
+                    <video 
+                      src={media.url} 
+                      poster={resolvedEx?.thumbnailUrl || resolvedEx?.gifUrl || ''} 
+                      autoPlay={idx === activeMediaIndex} 
+                      loop 
+                      muted 
+                      playsInline 
+                      preload="auto" 
+                      disablePictureInPicture 
+                      controlsList="nodownload nofullscreen noremoteplayback" 
+                      onError={() => {
+                        if (mediaItems.length > 1) {
+                          const loopIdx = mediaItems.findIndex(m => m.type === 'motion-loop');
+                          if (loopIdx !== -1 && activeMediaIndex === idx) setActiveMediaIndex(loopIdx);
+                        }
+                      }}
+                      className="immersive-video-html5 relative z-10 w-full h-full object-contain pointer-events-none drop-shadow-2xl" 
+                    />
+                  </div>
                 ) : media.type === 'motion-loop' ? (
                   <TwoFrameMotionLoop 
                     exerciseId={media.exerciseId} 
                     gifUrl={media.gifUrl} 
                     name={resolvedEx?.name || ex.name} 
-                    className="opacity-90 scale-[1.10]" 
+                    className="w-full h-full" 
                   />
                 ) : (
-                  <img src={media.url} alt={ex.name} className="w-full h-full object-cover opacity-90 pointer-events-none scale-[1.10]" />
+                  <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+                    <img 
+                      src={media.url} 
+                      alt="" 
+                      aria-hidden="true" 
+                      className="absolute inset-0 w-full h-full object-cover opacity-25 blur-2xl scale-125 pointer-events-none" 
+                    />
+                    <img 
+                      src={media.url} 
+                      alt={resolvedEx?.name || ex.name} 
+                      className="relative z-10 w-full h-full object-contain pointer-events-none drop-shadow-2xl" 
+                    />
+                  </div>
                 )}
               </div>
             ))

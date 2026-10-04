@@ -23,7 +23,8 @@ const muscleMapping = {
     'chest_mid': ['chest'],
     'chest_upper': ['chest'],
     'chest_lower': ['chest'],
-    'lats': ['lower-back'],
+    'lats': ['upper-back'],
+    'lower_back': ['lower-back'],
     'forearm': ['forearm'],
     'adductors': ['adductor', 'abductors'],
     'abductors': ['adductor', 'abductors']
@@ -123,7 +124,7 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
         "gluteal": { EN: "Glutes", ID: "Bokong" },
         "calves": { EN: "Calves", ID: "Betis" },
         "upper-back": { EN: "Upper Back", ID: "Punggung Atas" },
-        "lower-back": { EN: "Lats", ID: "Punggung Bwh" },
+        "lower-back": { EN: "Lower Back", ID: "Punggung Bawah" },
         "trapezius": { EN: "Traps", ID: "Traps" },
         "neck": { EN: "Neck", ID: "Leher" },
         "head": { EN: "Head", ID: "Kepala" },
@@ -184,12 +185,18 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
                     const ex = resolveLoggedExercise(exIdStr, exLookup);
                     if (ex && sets) {
                         const exType = ex.type || 'weight';
-                        let exTargets = Array.isArray(ex.target) ? ex.target : (ex.target ? [ex.target] : ['Lainnya']);
+                        let exTargets = Array.isArray(ex.target) ? [...ex.target] : (ex.target ? [ex.target] : ['Lainnya']);
                         if (exTargets.length === 1 && exTargets[0] === 'Lainnya') {
                            const libEx = exerciseLibrary?.find(e => e.id === ex.id || e.id === ex.originalId || e.name?.toLowerCase() === ex.name?.toLowerCase()) || defaultMasterExercises.find(e => e.id === ex.id || e.name?.toLowerCase() === ex.name?.toLowerCase());
                            if (libEx?.target) {
-                              exTargets = Array.isArray(libEx.target) ? libEx.target : [libEx.target];
+                              exTargets = Array.isArray(libEx.target) ? [...libEx.target] : [libEx.target];
                            }
+                        }
+
+                        // Semua variasi RDL dan Deadlift wajib mengalirkan stimulus ke Punggung Bawah (Erector Spinae)
+                        const exNameLower = (ex.name || '').toLowerCase();
+                        if ((exNameLower.includes('deadlift') || exNameLower.includes('rdl')) && !exTargets.some(t => normalizeMuscleKey(t) === 'lower_back')) {
+                           exTargets.push('Punggung Bawah');
                         }
                         
                         let totalVolume = 0;

@@ -141,6 +141,26 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
     if (s.includes('obese') || s.includes('tinggi') || s.includes('obesitas')) return isIndo ? 'Obesitas' : 'Obese';
     return status;
   };
+  const resolveBfDotBg = (bfVal, isFemaleUser) => {
+    const bf = Number(bfVal);
+    if (!bf || bf <= 0) return '';
+    const limitNorm = isFemaleUser ? 28 : 20;
+    const limitLow = isFemaleUser ? 18 : 10;
+    const limitHigh = isFemaleUser ? 33 : 25;
+    if (bf < limitLow) return 'bg-sky-400';
+    if (bf <= limitNorm) return 'bg-emerald-500';
+    if (bf <= limitHigh) return 'bg-amber-400';
+    return 'bg-rose-500';
+  };
+  const resolveBmiDotBg = (status) => {
+    if (!status || status === '-') return '';
+    const s = String(status).toLowerCase();
+    if (s.includes('under') || s.includes('kurang')) return 'bg-sky-400';
+    if (s.includes('normal') || s.includes('standar')) return 'bg-emerald-500';
+    if (s.includes('over') || s.includes('lebih')) return 'bg-amber-400';
+    if (s.includes('obese') || s.includes('tinggi') || s.includes('obesitas')) return 'bg-rose-500';
+    return 'bg-emerald-500';
+  };
 
   // ==========================================
   // STATE KONEKSI & SINKRONISASI
@@ -741,8 +761,8 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
   const isImp = units?.weight === 'lbs';
   const dispMainWeight = isImp && bioData.weight ? Number((bioData.weight * 2.20462).toFixed(1)) : bioData.weight || '-';
   const dispMainHeight = isImp && bioData.height ? Number((bioData.height * 0.393701).toFixed(1)) : bioData.height || '-';
-  const dispMainMuscle = isImp && bioData.muscleMass ? Number((bioData.muscleMass * 2.20462).toFixed(1)) : bioData.muscleMass || '-';
-  const dispMainWaist = units?.height === 'ft' && bioData.waist ? Number((bioData.waist * 0.393701).toFixed(1)) : bioData.waist || '-';
+  const dispMainMuscle = bioData.muscleMass ? Number(isImp ? (bioData.muscleMass * 2.20462) : bioData.muscleMass).toFixed(1) : '-';
+  const dispMainWaist = bioData.waist ? Number(units?.height === 'ft' ? (bioData.waist * 0.393701) : bioData.waist).toFixed(units?.height === 'ft' ? 1 : 0) : '-';
   const mainFfmi = useMemo(() => {
     const hCm = Number(bioData.height || userProfile?.height || 0);
     const wKg = Number(bioData.weight || 0);
@@ -1158,7 +1178,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                        title={isID ? 'Buka Analisis Berat & Tinggi' : 'Open Weight & Height Analysis'}
                    >
                        <span className={`text-sm ${t.textMuted} mb-0.5 font-bold`}>Fisik</span>
-                        <div className="flex items-baseline space-x-1.5">
+                        <div className="flex items-baseline space-x-1.5 whitespace-nowrap">
                             <span onClick={(e) => { e.stopPropagation(); handleOpenBioDetails('weight'); }} className={`text-lg font-black ${t.textMain} leading-none cursor-pointer hover:underline`} title={isID ? 'Buka Analisis Berat' : 'Open Weight Analysis'}>{isImp && bioData.weight ? Number((bioData.weight * 2.20462).toFixed(1)) : bioData.weight || '-'} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">{isImp ? 'lbs' : 'kg'}</span></span>
                             <span className="text-slate-300 dark:text-slate-600 text-xs">|</span>
                             <span onClick={(e) => { e.stopPropagation(); handleOpenBioDetails('height'); }} className={`text-lg font-black ${t.textMain} leading-none cursor-pointer hover:underline`} title={isID ? 'Buka Analisis Tinggi' : 'Open Height Analysis'}>{isImp && bioData.height ? Number((bioData.height * 0.393701).toFixed(1)) : bioData.height || '-'} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">{isImp ? 'in' : 'cm'}</span></span>
@@ -1172,9 +1192,11 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                        title={isID ? 'Buka Analisis BMI' : 'Open BMI Analysis'}
                    >
                        <span className={`text-sm ${t.textMuted} mb-0.5 font-bold`}>BMI ({biometricStandard === 'western' ? 'Western' : 'Asia'})</span>
-                       <div className="flex items-baseline space-x-1.5">
-                           <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.bmi, language) || '-'}</span>
-                           <span className={`text-xs font-bold ${bioData.bmiStatus === 'Normal' ? 'text-emerald-500' : bioData.bmiStatus === 'Overweight' ? 'text-amber-400' : 'text-rose-500'}`}>{resolveBmiStatus(bioData.bmiStatus, isID)}</span>
+                       <div className="flex items-center space-x-2">
+                           <span className={`text-lg font-black ${t.textMain} leading-none whitespace-nowrap`}>{formatNumber(bioData.bmi, language) || '-'}</span>
+                           {resolveBmiDotBg(bioData.bmiStatus) && (
+                               <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${resolveBmiDotBg(bioData.bmiStatus)} shadow-sm ring-2 ring-white/10`} title={resolveBmiStatus(bioData.bmiStatus, isID)} />
+                           )}
                        </div>
                    </div>
 
@@ -1186,7 +1208,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                    >
                        <span className={`text-sm ${t.textMuted} mb-0.5 font-bold`}>BMR</span>
                        <div>
-                           <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.bmr, language) || '-'} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">kcal</span></span>
+                           <span className={`text-lg font-black ${t.textMain} leading-none whitespace-nowrap inline-flex items-baseline gap-1`}>{formatNumber(bioData.bmr, language) || '-'} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">kcal</span></span>
                        </div>
                    </div>
 
@@ -1197,9 +1219,11 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                        title={isID ? 'Buka Analisis Kadar Lemak' : 'Open Body Fat Analysis'}
                    >
                        <span className={`text-sm ${t.textMuted} mb-0.5 font-bold`}>{isID ? 'Kadar Lemak' : 'Body Fat'}</span>
-                       <div className="flex items-baseline space-x-1.5">
-                           <span className={`text-lg font-black ${t.textMain} leading-none`}>{formatNumber(bioData.bodyFat, language) || '-'} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">%</span></span>
-                           <span className={`text-xs font-bold ${resolveBfColor(bioData.bodyFat, userProfile?.gender === 'female')}`}>{resolveBfStatus(bioData.bodyFat, userProfile?.gender === 'female', isID)}</span>
+                       <div className="flex items-center space-x-2">
+                           <span className={`text-lg font-black ${t.textMain} leading-none whitespace-nowrap inline-flex items-baseline gap-1`}>{formatNumber(bioData.bodyFat, language) || '-'} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">%</span></span>
+                           {resolveBfDotBg(bioData.bodyFat, userProfile?.gender === 'female') && (
+                               <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${resolveBfDotBg(bioData.bodyFat, userProfile?.gender === 'female')} shadow-sm ring-2 ring-white/10`} title={resolveBfStatus(bioData.bodyFat, userProfile?.gender === 'female', isID)} />
+                           )}
                        </div>
                    </div>
                 </div>
@@ -1229,52 +1253,52 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
             <div className={`grid grid-cols-4 gap-2 relative z-10 mt-1`}>
                  {/* 1. FFMI */}
                  <div onClick={() => handleOpenBioDetails('ffmi')} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenBioDetails('ffmi'); } }} className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center min-h-[72px] cursor-pointer active:scale-95 hover:bg-blue-500/15 dark:hover:bg-blue-500/25 transition-all select-none`} title={isID ? 'Buka Analisis FFMI' : 'Open FFMI Analysis'}>
-                     <span className={`body-lg font-black ${t.textMain} leading-tight`}>{mainFfmi}</span>
+                     <span className={`body-lg font-black ${t.textMain} leading-tight whitespace-nowrap`}>{mainFfmi}</span>
                      <span className="text-xs font-bold text-sky-400 leading-none mt-0.5">{mainFfmi !== '-' ? 'index' : '-'}</span>
                      <span className={`text-xs font-bold ${t.textMuted} mt-0.5 leading-tight`}>FFMI</span>
                  </div>
 
                  {/* 2. Otot (+ Kadar Otot) */}
                  <div onClick={() => handleOpenBioDetails('muscleMass')} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenBioDetails('muscleMass'); } }} className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center min-h-[72px] cursor-pointer active:scale-95 hover:bg-blue-500/15 dark:hover:bg-blue-500/25 transition-all select-none`} title={isID ? 'Buka Analisis Otot' : 'Open Muscle Analysis'}>
-                     <span className={`body-lg font-black ${t.textMain} leading-tight`}>{dispMainMuscle} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">{isImp ? 'lbs' : 'kg'}</span></span>
+                     <span className={`body-lg font-black ${t.textMain} leading-tight whitespace-nowrap inline-flex items-baseline justify-center gap-0.5`}>{dispMainMuscle !== '-' ? formatNumber(dispMainMuscle, language) : '-'} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">{isImp ? 'lbs' : 'kg'}</span></span>
                      <span className="text-xs font-bold text-sky-400 leading-none mt-0.5">{bioData.musclePercent ? `${formatNumber(bioData.musclePercent, language)}%` : '-'}</span>
                      <span className={`text-xs font-bold ${t.textMuted} mt-0.5 leading-tight`}>{isID ? 'Otot' : 'Muscle'}</span>
                  </div>
 
                  {/* 3. Kadar Protein */}
                  <div onClick={() => handleOpenBioDetails('proteinPercent')} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenBioDetails('proteinPercent'); } }} className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center min-h-[72px] cursor-pointer active:scale-95 hover:bg-blue-500/15 dark:hover:bg-blue-500/25 transition-all select-none`} title={isID ? 'Buka Analisis Kadar Protein' : 'Open Protein Analysis'}>
-                     <span className={`body-lg font-black ${t.textMain} leading-tight`}>{formatNumber(bioData.proteinPercent, language) || '-'} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">%</span></span>
+                     <span className={`body-lg font-black ${t.textMain} leading-tight whitespace-nowrap inline-flex items-baseline justify-center gap-0.5`}>{formatNumber(bioData.proteinPercent, language) || '-'} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">%</span></span>
                      <span className={`text-xs font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Protein</span>
                  </div>
 
                  {/* 4. Kadar Air */}
                  <div onClick={() => handleOpenBioDetails('waterPercent')} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenBioDetails('waterPercent'); } }} className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center min-h-[72px] cursor-pointer active:scale-95 hover:bg-blue-500/15 dark:hover:bg-blue-500/25 transition-all select-none`} title={isID ? 'Buka Analisis Kadar Air' : 'Open Water Analysis'}>
-                     <span className={`body-lg font-black ${t.textMain} leading-tight`}>{formatNumber(bioData.waterPercent, language) || '-'} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">%</span></span>
+                     <span className={`body-lg font-black ${t.textMain} leading-tight whitespace-nowrap inline-flex items-baseline justify-center gap-0.5`}>{formatNumber(bioData.waterPercent, language) || '-'} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">%</span></span>
                      <span className={`text-xs font-bold ${t.textMuted} mt-0.5 leading-tight`}>Kadar<br/>Air</span>
                  </div>
                  
                  {/* 5. Lemak Visceral */}
                  <div onClick={() => handleOpenBioDetails('visceralFat')} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenBioDetails('visceralFat'); } }} className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center min-h-[72px] cursor-pointer active:scale-95 hover:bg-blue-500/15 dark:hover:bg-blue-500/25 transition-all select-none`} title={isID ? 'Buka Analisis Lemak Visceral' : 'Open Visceral Fat Analysis'}>
-                     <span className={`body-lg font-black ${t.textMain} leading-tight`}>{formatNumber(bioData.visceralFat, language) || '-'}</span>
+                     <span className={`body-lg font-black ${t.textMain} leading-tight whitespace-nowrap`}>{formatNumber(bioData.visceralFat, language) || '-'}</span>
                      <span className={`text-xs font-bold ${t.textMuted} mt-0.5 leading-tight`}>Lemak<br/>Visceral</span>
                  </div>
 
                  {/* 6. Lingkar Perut (+ WtHR) */}
                  <div onClick={() => handleOpenBioDetails('waist')} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenBioDetails('waist'); } }} className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center min-h-[72px] cursor-pointer active:scale-95 hover:bg-blue-500/15 dark:hover:bg-blue-500/25 transition-all select-none`} title={isID ? 'Buka Analisis Perut & WTHR' : 'Open Waist & WTHR Analysis'}>
-                     <span className={`body-lg font-black ${t.textMain} leading-tight`}>{dispMainWaist} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">{isImp ? 'in' : 'cm'}</span></span>
-                     <span className="text-xs font-bold text-sky-400 leading-none mt-0.5">{mainWthr !== '-' ? `${mainWthr} WTHR` : '-'}</span>
-                     <span className={`text-xs font-bold ${t.textMuted} mt-0.5 leading-tight`}>{isID ? 'Perut' : 'Waist'}</span>
+                     <span className={`body-lg font-black ${t.textMain} leading-tight whitespace-nowrap inline-flex items-baseline justify-center gap-0.5`}>{dispMainWaist !== '-' ? formatNumber(dispMainWaist, language) : '-'} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">{isImp ? 'in' : 'cm'}</span></span>
+                     <span className="text-xs font-bold text-sky-400 leading-none mt-0.5">{mainWthr !== '-' ? formatNumber(mainWthr, language) : '-'}</span>
+                     <span className={`text-xs font-bold ${t.textMuted} mt-0.5 leading-tight`}>WTHR</span>
                  </div>
 
                  {/* 7. Mineral Tulang */}
                  <div onClick={() => handleOpenBioDetails('boneMass')} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenBioDetails('boneMass'); } }} className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center min-h-[72px] cursor-pointer active:scale-95 hover:bg-blue-500/15 dark:hover:bg-blue-500/25 transition-all select-none`} title={isID ? 'Buka Analisis Mineral Tulang' : 'Open Bone Mass Analysis'}>
-                     <span className={`body-lg font-black ${t.textMain} leading-tight`}>{formatNumber(bioData.boneMass, language) || '-'} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">%</span></span>
+                     <span className={`body-lg font-black ${t.textMain} leading-tight whitespace-nowrap inline-flex items-baseline justify-center gap-0.5`}>{formatNumber(bioData.boneMass, language) || '-'} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">%</span></span>
                      <span className={`text-xs font-bold ${t.textMuted} mt-0.5 leading-tight`}>Mineral<br/>Tulang</span>
                  </div>
 
                  {/* 8. Usia Tubuh */}
                  <div onClick={() => handleOpenBioDetails('bodyAge')} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenBioDetails('bodyAge'); } }} className={`p-1.5 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex flex-col items-center justify-center text-center min-h-[72px] cursor-pointer active:scale-95 hover:bg-blue-500/15 dark:hover:bg-blue-500/25 transition-all select-none`} title={isID ? 'Buka Analisis Usia Tubuh' : 'Open Body Age Analysis'}>
-                     <span className={`body-lg font-black ${t.textMain} leading-tight`}>{formatNumber(bioData.bodyAge, language) || '-'} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">th</span></span>
+                     <span className={`body-lg font-black ${t.textMain} leading-tight whitespace-nowrap inline-flex items-baseline justify-center gap-0.5`}>{formatNumber(bioData.bodyAge, language) || '-'} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">th</span></span>
                      <span className={`text-xs font-bold ${t.textMuted} mt-0.5 leading-tight`}>Usia<br/>Tubuh</span>
                  </div>
             </div>
@@ -1399,10 +1423,15 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                                       <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{todayDur > 0 ? formatNumber(todayDur, language) : '-'}</span>
                                       <span className="text-xs text-slate-500 dark:text-slate-400 font-bold whitespace-nowrap">mnt</span>
                                   </div>
-                                  <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold mt-0.5">
+                                  <div className={`w-full ${BAR_ROW} bg-black/10 dark:bg-white/10 rounded-full overflow-hidden shrink-0`}>
+                                      <div 
+                                          className={`h-full rounded-full transition-all duration-500 ${weeklyDur >= weeklyTarget ? 'bg-emerald-500' : 'bg-sky-500'}`}
+                                          style={{ width: `${Math.min(100, (weeklyDur / Math.max(1, weeklyTarget)) * 100)}%` }}
+                                      />
+                                  </div>
+                                  <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold">
                                       {formatNumber(weeklyDur, language)}/{weeklyTarget} mnt minggu ini
                                   </div>
-                                  <StackedBar parts={mergedDurationParts} basis={weeklyTarget} language={language} align="right" showLegend={false} />
                               </div>
                           </div>
                       );
@@ -1414,7 +1443,6 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                      <div className="grid grid-cols-2 gap-x-5 gap-y-5 h-full content-between">
                          {/* Kalori Dimakan */}
                          <div className="flex flex-col h-full">
-                     <div className="flex items-center space-x-1.5 mb-1"><span className="w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-500 flex items-center justify-center shrink-0"><Utensils size={11}/></span> <span className={`caption ${t.textMuted} capitalize`}>Kalori Dimakan</span></div>
                      {(() => {
                        // lomealSync.today bisa basi (push dari Lomeal telat/gagal, silent-catch) —
                        // cuma dipercaya kalau ymd-nya beneran hari ini, biar gak nampilin angka kemarin.
@@ -1422,24 +1450,24 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                        const nutritionCalories = lomealFresh?.kcal ?? bioData.nutritionCalories;
                        const foodTarget = lomealTargets?.kcal || 2000;
                        return (
-                         <div className="flex flex-col flex-1">
-                             <div className={`flex items-baseline space-x-1 ${NUM_ROW}`}>
-                                 <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{formatNumber(nutritionCalories, language) || '-'}</span>
-                                 <span className="text-xs text-slate-500 dark:text-slate-400 font-bold whitespace-nowrap">/ {formatNumber(foodTarget, language)} kkal</span>
-                             </div>
-                             {/* Bar progres ke target makan — targetnya (`foodTarget`) sudah ada di sini
-                                 sejak dulu tapi belum pernah dipakai. Sekalian menyamakan tinggi kotak
-                                 ini dengan Kalori Dibakar di sebelahnya, biar angkanya sebaris. */}
-                             <div className={`w-full ${BAR_ROW} bg-black/10 dark:bg-white/10 rounded-full overflow-hidden shrink-0`}>
-                                 <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Number(nutritionCalories || 0) / foodTarget) * 100)}%` }}></div>
-                             </div>
-                             {lomealFresh && (
-                               <div className="mt-1 flex items-center gap-1.5 font-medium" >
-                                 <span className="px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-500 text-xs uppercase font-bold tracking-wider">LOMEAL</span>
-                                 <span className={t.textMuted}>{lomealFresh.mealsCount || 0} konsumsi</span>
+                         <>
+                           <div className="flex items-center space-x-1.5 mb-1">
+                             <span className="w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-500 flex items-center justify-center shrink-0"><Utensils size={11}/></span>
+                             <span className={`caption ${t.textMuted} capitalize`}>Kalori Dimakan</span>
+                           </div>
+                           <div className="flex flex-col flex-1" title={lomealFresh ? `Tersinkronisasi dari Lomeal (${lomealFresh.mealsCount || 0} konsumsi)` : undefined}>
+                               <div className={`flex items-baseline space-x-1 ${NUM_ROW}`}>
+                                   <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{formatNumber(nutritionCalories, language) || '-'}</span>
+                                   <span className="text-xs text-slate-500 dark:text-slate-400 font-bold whitespace-nowrap">/ {formatNumber(foodTarget, language)} kkal</span>
                                </div>
-                             )}
-                         </div>
+                               {/* Bar progres ke target makan — targetnya (`foodTarget`) sudah ada di sini
+                                   sejak dulu tapi belum pernah dipakai. Sekalian menyamakan tinggi kotak
+                                   ini dengan Kalori Dibakar di sebelahnya, biar angkanya sebaris. */}
+                               <div className={`w-full ${BAR_ROW} bg-black/10 dark:bg-white/10 rounded-full overflow-hidden shrink-0`}>
+                                   <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (Number(nutritionCalories || 0) / foodTarget) * 100)}%` }}></div>
+                               </div>
+                           </div>
+                         </>
                        );
                      })()}
                  </div>
@@ -1563,7 +1591,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                  maskImage: 'linear-gradient(to bottom, black 75%, transparent 100%)',
                  WebkitMaskImage: 'linear-gradient(to bottom, black 75%, transparent 100%)'
              }}>
-                 <img src="/bg-progress.webp" alt="" className="absolute -right-12 -top-20 sm:-top-24 w-[33rem] max-w-[120%] h-auto drop-shadow-xl transition-transform duration-500 ease-out" />
+                 <img src="/bg-progress.webp" alt="" className="absolute -right-6 sm:-right-10 top-0 sm:top-2 w-[28rem] sm:w-[32rem] max-w-[120%] h-auto drop-shadow-xl transition-transform duration-500 ease-out" />
              </div>
           </div>
 
@@ -1694,7 +1722,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                          >
                              <div className="flex items-center space-x-1.5 mb-1">
                                  <Moon size={14} className="text-indigo-400" />
-                                 <span className={`text-sm font-bold uppercase tracking-widest ${t.textMuted} group-hover:text-indigo-400 transition-colors`}>Kualitas & Durasi Tidur</span>
+                                 <span className={`text-sm font-bold uppercase tracking-widest ${t.textMuted} group-hover:text-indigo-400 transition-colors`}>Durasi Tidur</span>
                              </div>
                              <div className="flex items-baseline space-x-3 mt-1">
                                  <div className="flex items-baseline space-x-1">

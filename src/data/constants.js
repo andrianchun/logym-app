@@ -206,11 +206,15 @@ export const defaultMasterExercises = [
     "ytVideo": "https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA",
     "videoUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.mp4",
     "thumbnailUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.webp",
-    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Standing_Cable_Lateral_Raise/0.jpg",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Standing_Low-Pulley_Deltoid_Raise/0.jpg",
     "aliases": [
       "Cable Lateral Raise",
       "Cable Lateral Raises",
-      "Standing Cable Lateral Raises"
+      "Standing Cable Lateral Raises",
+      "Standing Low-Pulley Deltoid Raise",
+      "Standing Low Pulley Deltoid Raise",
+      "Low-Pulley Deltoid Raise",
+      "Low Pulley Deltoid Raise"
     ],
     "instructions": [
       "Pasang single handle (d-handle) pada katrol kabel di posisi paling bawah (low pulley). Berdirilah tegak di samping mesin katrol.",
@@ -233,7 +237,7 @@ export const defaultMasterExercises = [
       "Slowly lower the cable back down to the starting position under control as you inhale.",
       "Repeat for the recommended amount of reps, then switch to the other arm."
     ],
-    "exerciseId": "Standing_Cable_Lateral_Raise"
+    "exerciseId": "Standing_Low-Pulley_Deltoid_Raise"
   },
   {
     "id": 105,
@@ -410,7 +414,8 @@ export const defaultMasterExercises = [
     "name": "Romanian Deadlift",
     "target": [
       "Hams",
-      "Glutes"
+      "Glutes",
+      "Punggung Bawah"
     ],
     "type": "weight",
     "defaultWeight": 5,
@@ -893,7 +898,7 @@ export const defaultMasterExercises = [
       "Glutes"
     ],
     "type": "weight",
-    "defaultWeight": 30,
+    "defaultWeight": 10,
     "equipment": "Dumbbell",
     "level": "advanced",
     "ytVideo": "https://youtu.be/or1frhkjBDc?si=FR7v-hKp_QP4-Rpn",
@@ -930,7 +935,8 @@ export const defaultMasterExercises = [
     "name": "Smith Machine Romanian Deadlift",
     "target": [
       "Hams",
-      "Glutes"
+      "Glutes",
+      "Punggung Bawah"
     ],
     "type": "weight",
     "defaultWeight": 20,
@@ -1808,6 +1814,55 @@ export const defaultMasterExercises = [
       "Repeat for the recommended amount of repetitions."
     ],
     "exerciseId": "Side_Lateral_Raise"
+  },
+  {
+    "id": 144,
+    "name": "Cable Seated Lateral Raise",
+    "target": [
+      "Deltoid Samping"
+    ],
+    "type": "weight",
+    "defaultWeight": 10,
+    "equipment": "Cable",
+    "level": "beginner",
+    "ytVideo": "",
+    "videoUrl": "",
+    "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Seated_Lateral_Raise/0.jpg",
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Seated_Lateral_Raise/0.jpg",
+    "aliases": [
+      "Cable Seated Lateral Raise",
+      "Cable Seated Lateral Raises",
+      "Seated Cable Lateral Raise",
+      "Seated Cable Lateral Raises"
+    ],
+    "instructions": [
+      "Berdirilah di tengah-tengah dua katrol bawah yang saling berhadapan dan letakkan bangku datar tepat di belakang Anda secara tegak lurus (ujung pendek bangku berada tepat di belakang Anda). Atur beban yang akan digunakan pada masing-masing katrol.",
+      "Duduklah di ujung bangku datar tersebut dengan posisi kaki berada di depan lutut.",
+      "Bungkukkan badan ke depan dengan punggung tetap rata, lalu tempelkan dada/torso Anda pada paha.",
+      "Pegang handel dari katrol kiri menggunakan tangan kanan, dan katrol kanan menggunakan tangan kiri (menyilang). Kabel katrol harus melintas di bawah lutut Anda, dengan lengan lurus ke bawah, telapak tangan saling berhadapan, dan siku sedikit menekuk. Ini adalah posisi awal Anda.",
+      "Sambil mempertahankan sudut siku, angkat lengan atas ke samping hingga sejajar dengan lantai dan setinggi bahu. Hembuskan napas saat melakukan gerakan ini dan tahan kontraksi otot selama satu detik.",
+      "Turunkan kembali lengan secara perlahan ke posisi awal sambil menarik napas.",
+      "Ulangi gerakan ini sesuai jumlah repetisi yang dianjurkan. Tips: Jaga agar lengan atas tetap tegak lurus dengan torso dan pertahankan sudut siku yang konstan (sudut 10 hingga 30 derajat) sepanjang latihan."
+    ],
+    "instructions_id": [
+      "Berdirilah di tengah-tengah dua katrol bawah yang saling berhadapan dan letakkan bangku datar tepat di belakang Anda secara tegak lurus (ujung pendek bangku berada tepat di belakang Anda). Atur beban yang akan digunakan pada masing-masing katrol.",
+      "Duduklah di ujung bangku datar tersebut dengan posisi kaki berada di depan lutut.",
+      "Bungkukkan badan ke depan dengan punggung tetap rata, lalu tempelkan dada/torso Anda pada paha.",
+      "Pegang handel dari katrol kiri menggunakan tangan kanan, dan katrol kanan menggunakan tangan kiri (menyilang). Kabel katrol harus melintas di bawah lutut Anda, dengan lengan lurus ke bawah, telapak tangan saling berhadapan, dan siku sedikit menekuk. Ini adalah posisi awal Anda.",
+      "Sambil mempertahankan sudut siku, angkat lengan atas ke samping hingga sejajar dengan lantai dan setinggi bahu. Hembuskan napas saat melakukan gerakan ini dan tahan kontraksi otot selama satu detik.",
+      "Turunkan kembali lengan secara perlahan ke posisi awal sambil menarik napas.",
+      "Ulangi gerakan ini sesuai jumlah repetisi yang dianjurkan. Tips: Jaga agar lengan atas tetap tegak lurus dengan torso dan pertahankan sudut siku yang konstan (sudut 10 hingga 30 derajat) sepanjang latihan."
+    ],
+    "instructions_en": [
+      "Stand in the middle of two low pulleys that are opposite to each other and place a flat bench right behind you (in perpendicular fashion to you; the narrow edge of the bench should be the one behind you). Select the weight to be used on each pulley.",
+      "Now sit at the edge of the flat bench behind you with your feet placed in front of your knees.",
+      "Bend forward while keeping your back flat and rest your torso on the thighs.",
+      "Have someone give you the single handles attached to the pulleys. Grasp the left pulley with the right hand and the right pulley with the left after you select your weight. The pulleys should run under your knees and your arms will be extended with palms facing each other and a slight bend at the elbows. This will be the starting position.",
+      "While keeping the arms stationary, raise the upper arms to the sides until they are parallel to the floor and at shoulder height. Exhale during the execution of this movement and hold the contraction for a second.",
+      "Slowly lower your arms to the starting position as you inhale.",
+      "Repeat for the recommended amount of repetitions. Tip: Maintain upper arms perpendicular to torso and a fixed elbow position (10 degree to 30 degree angle) throughout exercise."
+    ],
+    "exerciseId": "Cable_Seated_Lateral_Raise"
   }
 ];
 
@@ -1949,6 +2004,14 @@ export const findMatchingMasterExercise = (targetEx, masterList = defaultMasterE
     'cable lateral raises': 'Standing Cable Lateral Raise',
     'cable side lateral raise': 'Standing Cable Lateral Raise',
     'cable side lateral raises': 'Standing Cable Lateral Raise',
+    'standing low pulley deltoid raise': 'Standing Cable Lateral Raise',
+    'standing low-pulley deltoid raise': 'Standing Cable Lateral Raise',
+    'low pulley deltoid raise': 'Standing Cable Lateral Raise',
+    'low-pulley deltoid raise': 'Standing Cable Lateral Raise',
+    'cable seated lateral raise': 'Cable Seated Lateral Raise',
+    'cable seated lateral raises': 'Cable Seated Lateral Raise',
+    'seated cable lateral raise': 'Cable Seated Lateral Raise',
+    'seated cable lateral raises': 'Cable Seated Lateral Raise',
     'side lateral raise': 'Side Lateral Raise',
     'side lateral raises': 'Side Lateral Raise',
     'dumbbell lateral raise': 'Side Lateral Raise',
@@ -2122,10 +2185,21 @@ export const canonicalizeExercise = (ex) => {
     name = 'Cable Hip Abduction';
   } else if (locName === 'cable pull through' || locName === 'cable pull thru' || locName === 'pull through') {
     name = 'Pull Through';
-  } else if (locName === 'standing cable lateral raise' || locName === 'standing cable lateral raises' || locName === 'cable lateral raise' || locName === 'cable lateral raises' || locName === 'cable side lateral raise' || locName === 'cable side lateral raises') {
+  } else if (
+    locName === 'standing cable lateral raise' ||
+    locName === 'standing cable lateral raises' ||
+    locName === 'cable lateral raise' ||
+    locName === 'cable lateral raises' ||
+    locName === 'cable side lateral raise' ||
+    locName === 'cable side lateral raises' ||
+    locName === 'standing low pulley deltoid raise' ||
+    locName === 'standing low-pulley deltoid raise' ||
+    locName === 'low pulley deltoid raise' ||
+    locName === 'low-pulley deltoid raise'
+  ) {
     name = 'Standing Cable Lateral Raise';
   } else if (locName === 'cable seated lateral raise' || locName === 'seated cable lateral raise' || locName === 'seated cable lateral raises') {
-    if (ex.id === 104 || ex.originalId === 104 || (masterMatch && masterMatch.id === 104)) {
+    if (ex.id === 104 || ex.originalId === 104) {
       name = 'Standing Cable Lateral Raise';
     } else {
       name = 'Cable Seated Lateral Raise';
@@ -2182,9 +2256,22 @@ export const canonicalizeExercise = (ex) => {
 
   const finalThumbnail = masterMatch?.thumbnailUrl || ex.thumbnailUrl || (resolvedGifUrl ? resolvedGifUrl : '');
 
+  let effectiveTarget = (ex.target && ex.target.length > 0) ? ex.target : (masterMatch?.target || []);
+  if (!Array.isArray(effectiveTarget)) effectiveTarget = [effectiveTarget];
+  else effectiveTarget = [...effectiveTarget];
+
+  // Pastikan seluruh variasi Deadlift / Romanian Deadlift (RDL) selalu mencakup Punggung Bawah
+  const lowerName = (name || ex.name || '').toLowerCase();
+  if (lowerName.includes('deadlift') || lowerName.includes('rdl')) {
+    if (!effectiveTarget.some(t => normalizeMuscleKey(t) === 'lower_back')) {
+      effectiveTarget.push('Punggung Bawah');
+    }
+  }
+
   return {
     ...ex,
     name,
+    target: effectiveTarget.length > 0 ? effectiveTarget : ex.target,
     exerciseId: resolvedExId || ex.exerciseId,
     videoUrl: masterMatch?.videoUrl || ex.videoUrl || '',
     thumbnailUrl: finalThumbnail,
@@ -2194,7 +2281,6 @@ export const canonicalizeExercise = (ex) => {
     instructions_id: instId,
     instructions_en: instEn,
     ...(masterMatch ? {
-      target: (ex.target && ex.target.length > 0) ? ex.target : masterMatch.target,
       equipment: resolvedEq || masterMatch.equipment,
       type: ex.type || masterMatch.type,
     } : {
@@ -2349,7 +2435,8 @@ export const defaultPrograms = [
         "reps": 12,
         "target": [
           "Hams",
-          "Glutes"
+          "Glutes",
+          "Punggung Bawah"
         ],
         "type": "weight",
         "defaultWeight": 5,
@@ -2564,7 +2651,8 @@ export const defaultPrograms = [
         "reps": 12,
         "target": [
           "Hams",
-          "Glutes"
+          "Glutes",
+          "Punggung Bawah"
         ],
         "type": "weight",
         "defaultWeight": 20,
@@ -2627,7 +2715,8 @@ export const muscleDictionary = {
   'chest_mid': { EN: 'Mid Chest', ID: 'Dada Tengah' },
   'chest_lower': { EN: 'Lower Chest', ID: 'Dada Bwh' },
   'back_upper': { EN: 'Upper Back', ID: 'Punggung Atas' },
-  'lats': { EN: 'Lats', ID: 'Punggung Bwh' },
+  'lats': { EN: 'Lats', ID: 'Sayap / Lats' },
+  'lower_back': { EN: 'Lower Back', ID: 'Punggung Bawah' },
   'deltoid_front': { EN: 'Front Delt', ID: 'Bahu Dpn' },
   'deltoid_lateral': { EN: 'Lateral Delt', ID: 'Bahu Samping' },
   'deltoid_rear': { EN: 'Rear Delt', ID: 'Bahu Blk' },
@@ -2658,7 +2747,8 @@ export const normalizeMuscleKey = (str) => {
   if (s.includes('dada tengah') || s.includes('mid chest')) return 'chest_mid';
   if (s.includes('dada bawah') || s.includes('lower chest')) return 'chest_lower';
   if (s.includes('punggung atas') || s.includes('upper back') || s.includes('mid back') || s.includes('middle back') || s.includes('punggung tengah')) return 'back_upper';
-  if (s.includes('lats') || s.includes('sayap') || s.includes('lower back') || s.includes('punggung bawah')) return 'lats';
+  if (s.includes('lower back') || s.includes('punggung bawah') || s.includes('erector')) return 'lower_back';
+  if (s.includes('lats') || s.includes('sayap') || s.includes('latissimus')) return 'lats';
   if (s.includes('forearm') || s.includes('lengan bawah')) return 'forearm';
   if (s.includes('deltoid depan') || s.includes('front delt')) return 'deltoid_front';
   if (s.includes('deltoid samping') || s.includes('lateral delt') || s === 'lateral') return 'deltoid_lateral';
@@ -2757,7 +2847,8 @@ export const exerciseAliasMap = {
   '101': 'edb-Smith_Machine_Incline_Bench_Press',
   '102': 'edb-Seated_Cable_Rows',
   '103': 'edb-Dumbbell_Bench_Press',
-  '104': 'edb-Standing_Cable_Lateral_Raise',
+  '104': 'edb-Standing_Low-Pulley_Deltoid_Raise',
+  'edb-Standing_Cable_Lateral_Raise': 'edb-Standing_Low-Pulley_Deltoid_Raise',
   '105': 'edb-Triceps_Pushdown',
   '106': 'edb-Dumbbell_Alternate_Bicep_Curl',
   '107': 'edb-107',
@@ -2796,7 +2887,8 @@ export const exerciseAliasMap = {
   '140': 'edb-Pull_Through',
   '141': 'edb-Trail_Running_Walking',
   '142': 'edb-Barbell_Incline_Bench_Press_-_Medium_Grip',
-  '143': 'edb-Side_Lateral_Raise'
+  '143': 'edb-Side_Lateral_Raise',
+  '144': 'edb-Cable_Seated_Lateral_Raise'
 };
 
 /**

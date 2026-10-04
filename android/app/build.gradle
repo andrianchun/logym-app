@@ -9,7 +9,7 @@ android {
     // Dulu 17, tapi begitu modul app punya kode Kotlin sendiri (ExerciseWriterPlugin.kt),
     // build gagal: "Inconsistent JVM-target ... 'compileDebugJavaWithJavac' (21) dan
     // 'compileDebugKotlin' (17)". Javac di modul ini nyatanya jalan di 21 (setelan 17 di sini
-    // kalah sama toolchain AGP), jadi Kotlin-nya yang disamakan ke 21 — bukan sebaliknya.
+    // kalah sama toolchain AGP), jadi Kotlin-nya yang disamakan ke 21 â€” bukan sebaliknya.
     // Modul ':app' juga dikecualikan dari paksaan jvmTarget 17 di android/build.gradle.
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_21
@@ -24,8 +24,8 @@ android {
         applicationId "com.andrianchun.logym"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 8
-        versionName "1.1.26"
+        versionCode 9
+        versionName "1.1.86"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

@@ -4,7 +4,7 @@ import { Plus, Snowflake, Play, CalendarDays, X, CheckCircle, ChevronDown, Chevr
 import { fetchExercisesFromApi } from '../utils/exerciseDbApi';
 import { shareWorkoutToFeed } from '../utils/communityApi';
 import { normalizeMuscleKey, resolveProjectedProgramId, getDayWorkouts, defaultMasterExercises, findMatchingMasterExercise, canonicalizeExercise } from '../data/constants';
-import { estimate10RM, defaultSetWeight, gymStepFor, getEquipmentConfig, calculateActualWeight, calculateInputWeight, getSetActualWeight, rm10Series, buildExLookupByName, canonicalExId, calculateProgressiveOverloadTarget } from '../utils/workoutCalc';
+import { estimate10RM, defaultSetWeight, gymStepFor, getEquipmentConfig, calculateActualWeight, calculateInputWeight, getSetActualWeight, rm10Series, buildExLookupByName, canonicalExId, calculateProgressiveOverloadTarget, resolveExerciseProgressiveTarget } from '../utils/workoutCalc';
 
 // Import Komponen Pecahan
 import WorkoutHeader from '../components/WorkoutHeader';
@@ -423,11 +423,11 @@ const WorkoutTab = ({
          if (!mergedEx.instructions || mergedEx.instructions.length === 0) mergedEx.instructions = fullEx.instructions;
          if (!mergedEx.instructions_id || mergedEx.instructions_id.length === 0) mergedEx.instructions_id = fullEx.instructions_id || fullEx.instructions;
          if (!mergedEx.instructions_en || mergedEx.instructions_en.length === 0) mergedEx.instructions_en = fullEx.instructions_en || fullEx.instructions;
-         if (!mergedEx.ytVideo) mergedEx.ytVideo = fullEx.ytVideo;
-         if (!mergedEx.videoUrl) mergedEx.videoUrl = fullEx.videoUrl;
-         if (!mergedEx.thumbnailUrl) mergedEx.thumbnailUrl = fullEx.thumbnailUrl;
-         if (!mergedEx.gifUrl) mergedEx.gifUrl = fullEx.gifUrl;
-         if (!mergedEx.equipment) mergedEx.equipment = fullEx.equipment;
+         if (fullEx.videoUrl !== undefined) mergedEx.videoUrl = fullEx.videoUrl;
+         if (fullEx.ytVideo !== undefined) mergedEx.ytVideo = fullEx.ytVideo;
+         if (fullEx.thumbnailUrl !== undefined) mergedEx.thumbnailUrl = fullEx.thumbnailUrl;
+         if (fullEx.gifUrl !== undefined) mergedEx.gifUrl = fullEx.gifUrl;
+         if (fullEx.equipment) mergedEx.equipment = fullEx.equipment;
      }
 
      setDetailExercise(mergedEx);
@@ -436,29 +436,30 @@ const WorkoutTab = ({
   const handleSelectAlternative = (newEx) => {
      if (!detailExercise) return;
      const workoutId = detailExercise.workoutId;
-     const originalExId = detailExercise.originalId;
+     const originalExId = detailExercise.originalId || detailExercise.id;
 
      if (workoutId) {
        setHistory(prev => {
-          const dayData = prev[selectedDate];
-          if (!dayData) return prev;
+          const dayData = prev[selectedDate] || { workouts: [] };
+          const currentWorkouts = Array.isArray(dayData.workouts) ? dayData.workouts : [];
 
-          let wIdx = (dayData.workouts || []).findIndex(w => w.id === workoutId);
+          let wIdx = currentWorkouts.findIndex(w => w.id === workoutId);
           let w;
           
           if (wIdx === -1) {
              const pWorkout = activeProgramsList.find(p => p.workoutId === workoutId);
              if (!pWorkout) return prev;
-             wIdx = dayData.workouts ? dayData.workouts.length : 0;
+             wIdx = currentWorkouts.length;
              w = {
                id: workoutId,
                programId: pWorkout.id === 'adhoc' ? 'adhoc' : pWorkout.id,
                programName: pWorkout.name,
                status: 'planned',
-               log: {}
+               log: {},
+               exercises: pWorkout.exercises || []
              };
           } else {
-             w = dayData.workouts[wIdx];
+             w = currentWorkouts[wIdx];
           }
 
           // Update secara immutable — jangan mutasi objek di dalam state React.
@@ -478,27 +479,40 @@ const WorkoutTab = ({
           };
           let newW = w;
 
+          const matchesTarget = (e) => {
+            if (!e) return false;
+            if (originalExId && (e.id === originalExId || String(e.id) === String(originalExId))) return true;
+            if (detailExercise?.id && (e.id === detailExercise.id || String(e.id) === String(detailExercise.id))) return true;
+            const eBase = String(e.id || '').split('-')[0];
+            const origBase = String(originalExId || detailExercise?.id || '').split('-')[0];
+            if (eBase && origBase && eBase === origBase) return true;
+            return false;
+          };
+
           if (w.programId === 'adhoc') {
-             const exIdx = (w.exercises || []).findIndex(e => e.id === originalExId);
+             const exIdx = (w.exercises || []).findIndex(matchesTarget);
              if (exIdx > -1) {
-                const newExercises = [...w.exercises];
+                const newExercises = [...(w.exercises || [])];
                 newExercises[exIdx] = replacement;
                 newW = { ...w, exercises: newExercises };
              }
           } else {
-             const p = programs.find(p => p.id === w.programId);
-             if (p) {
-                const overridden = w.overriddenExercises ? [...w.overriddenExercises] : JSON.parse(JSON.stringify(p.exercises));
-                const exIdx = overridden.findIndex(e => e.id === originalExId);
-                if (exIdx > -1) {
-                   overridden[exIdx] = replacement;
-                }
-                newW = { ...w, overriddenExercises: overridden };
+             const resolvedProgId = resolveProjectedProgramId(w.programId);
+             const p = programs.find(p => p.id === w.programId || p.id === resolvedProgId);
+             const baseExercises = w.overriddenExercises 
+               ? [...w.overriddenExercises] 
+               : (p?.exercises ? JSON.parse(JSON.stringify(p.exercises)) : (w.exercises ? [...w.exercises] : []));
+             const exIdx = baseExercises.findIndex(matchesTarget);
+             if (exIdx > -1) {
+                baseExercises[exIdx] = replacement;
+             } else {
+                baseExercises.push(replacement);
              }
+             newW = { ...w, overriddenExercises: baseExercises };
           }
 
           if (newW === w) return prev;
-          const newWorkouts = [...dayData.workouts];
+          const newWorkouts = [...currentWorkouts];
           newWorkouts[wIdx] = newW;
           return { ...prev, [selectedDate]: { ...dayData, workouts: newWorkouts } };
        });
@@ -507,6 +521,14 @@ const WorkoutTab = ({
      setShowAlternativeModal(false);
      setDetailExercise(null);
   };
+
+  // Riwayat 10RM dicari lewat NAMA latihan, bukan id. Latihan yang sama punya id berbeda di
+  // setiap program (dan UUID baru tiap kali ditambah/diganti), jadi pencocokan per-id hanya
+  // menemukan sesi dari program yang sedang dibuka — sisanya tampil "10RM terakhir: -" padahal
+  // riwayatnya ada. Modal detail sudah lama mencocokkan nama; ini menyamakannya.
+  const rmLookup = React.useMemo(
+    () => buildExLookupByName(history, exerciseLibrary, extraExercises, ...(programs || []).map(p => p.exercises)),
+    [history, exerciseLibrary, extraExercises, programs]);
 
   // Fungsi untuk memanggil log per set dari App.jsx
   const getSetLogs = (ex) => {
@@ -548,18 +570,25 @@ const WorkoutTab = ({
       }
     }
 
-    // 3. Default: empty template
-    const libMatch = exerciseLibrary?.find(e => e.id === ex?.originalId || e.id === ex?.id || e.name?.toLowerCase() === ex?.name?.toLowerCase());
-    const step = gymStepFor(gymProfiles, activeGymId, ex?.equipment, units?.weight === 'lbs');
-    const eqConf = getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile);
-    let suggestedWeight = defaultSetWeight(libMatch, ex, step, eqConf);
-    
-    const isDeload = history?.[selectedDate]?.wellness === 'deload' || history?.[selectedDate]?.isDeloadWeek;
-    if (isDeload && suggestedWeight > 0) {
-      suggestedWeight = Math.max(0, Math.round((suggestedWeight * 0.825) / step) * step);
-    }
+    // 3. Default: empty template dari Single Source of Truth (SSOT Engine)
+    const targetPlan = resolveExerciseProgressiveTarget({
+      ex,
+      history,
+      exerciseLibrary,
+      programs,
+      extraExercises,
+      gymProfiles,
+      activeGymId,
+      userProfile,
+      isImperial: units?.weight === 'lbs',
+      wellness: history?.[selectedDate]?.wellness,
+      exLookup: rmLookup,
+    });
 
-    const total_w = calculateActualWeight(suggestedWeight, eqConf);
+    const suggestedWeight = targetPlan.inputWeight;
+    const suggestedReps = targetPlan.targetReps;
+    const eqConf = targetPlan.eqConf || getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile);
+    const total_w = targetPlan.totalWeight;
 
     return Array.from({length: ex.sets || 3}).map(() => ({
         w: suggestedWeight,
@@ -567,309 +596,264 @@ const WorkoutTab = ({
         base_w: eqConf.baseWeight,
         ratio: eqConf.ratio,
         total_w: total_w,
-        r: ex.reps || 10,
+        r: suggestedReps,
         d: ex.duration || 10,
         done: false,
         skipped: false
     }));
   };
 
+  const historicalStatsRef = React.useRef({});
 
+  React.useEffect(() => {
+    historicalStatsRef.current = {};
+  }, [history]);
 
-    const historicalStatsRef = React.useRef({});
+  const getOverloadHint = (exItem) => {
+    if (!exItem || !exerciseLibrary || exItem.type === 'time' || exItem.type === 'cardio' || exItem.target?.includes('Cardio')) return null;
 
-    React.useEffect(() => {
-      historicalStatsRef.current = {};
-    }, [history]);
+    const targetPlan = resolveExerciseProgressiveTarget({
+      ex: exItem,
+      history,
+      exerciseLibrary,
+      programs,
+      extraExercises,
+      gymProfiles,
+      activeGymId,
+      userProfile,
+      isImperial: units?.weight === 'lbs',
+      wellness: history?.[selectedDate]?.wellness,
+      exLookup: rmLookup,
+    });
 
-    // Riwayat 10RM dicari lewat NAMA latihan, bukan id. Latihan yang sama punya id berbeda di
-    // setiap program (dan UUID baru tiap kali ditambah/diganti), jadi pencocokan per-id hanya
-    // menemukan sesi dari program yang sedang dibuka — sisanya tampil "10RM terakhir: -" padahal
-    // riwayatnya ada. Modal detail sudah lama mencocokkan nama; ini menyamakannya.
-    const rmLookup = React.useMemo(
-      () => buildExLookupByName(history, exerciseLibrary, extraExercises, ...(programs || []).map(p => p.exercises)),
-      [history, exerciseLibrary, extraExercises, programs]);
+    const { best10RM, last10RM, lastSessionWeight, lastSessionReps, eqConf: eqConfNow } = targetPlan;
 
-    const getOverloadHint = (exItem) => {
-      if (!exItem || !exerciseLibrary || exItem.type === 'time' || exItem.type === 'cardio' || exItem.target?.includes('Cardio')) return null;
-
-      if (!historicalStatsRef.current[exItem.id]) {
-        // DUA angka, bukan satu. `best10RM` = rekor sepanjang masa sebelum sesi ini dimulai
-        // (acuan "rekor baru dipecahkan"), `last10RM` = 10RM sesi TERAKHIR (acuan beban hari ini).
-        const seri = rm10Series(history, canonicalExId(exItem.name), rmLookup);
-        const terakhir = seri[seri.length - 1];
-        const histBest = seri.reduce((m, p) => Math.max(m, p.rm10), 0);
-        const libMatch = exerciseLibrary?.find(e => e.id === exItem.originalId || e.id === exItem.id
-          || e.name?.toLowerCase() === exItem.name?.toLowerCase());
-        const libBest = Number(libMatch?.rm10Best) || 0;
-        historicalStatsRef.current[exItem.id] = {
-          best10RM: Math.max(histBest, libBest),
-          last10RM: terakhir?.rm10 || 0,
-          lastSessionWeight: terakhir?.weight || 0,
-          lastSessionReps: terakhir?.reps || 0,
-        };
-      }
-
-      let { best10RM, last10RM, lastSessionWeight, lastSessionReps } = historicalStatsRef.current[exItem.id];
-
-
-      // 2. Scan current session — pakai beban AKTUAL. Abaikan set pemanasan (warmup)
-      // agar tidak prematur memicu acuan 10RM pada beban ringan.
-      let currentMax10RM = 0;
-      let currentMaxWeight = 0;
-      let currentMaxReps = 0;
-      const eqConfNow = getEquipmentConfig(gymProfiles, activeGymId, exItem, userProfile);
-      const currentLogs = getSetLogs(exItem) || exerciseLogs[exItem.id] || [];
-      currentLogs.forEach(s => {
-        if (s.done && !s.skipped && s.type !== 'warmup' && (Number(s.w) > 0 || Number(s.total_w) > 0) && s.r > 0) {
-          const actW = getSetActualWeight(s, eqConfNow);
-          const c10RM = estimate10RM(actW, s.r);
-          if (c10RM > currentMax10RM) {
-            currentMax10RM = c10RM;
-            currentMaxWeight = actW;
-            currentMaxReps = Number(s.r);
-          }
+    // 2. Scan current session — pakai beban AKTUAL. Abaikan set pemanasan (warmup)
+    // agar tidak prematur memicu acuan 10RM pada beban ringan.
+    let currentMax10RM = 0;
+    let currentMaxWeight = 0;
+    let currentMaxReps = 0;
+    const currentLogs = getSetLogs(exItem) || exerciseLogs[exItem.id] || [];
+    currentLogs.forEach(s => {
+      if (s.done && !s.skipped && s.type !== 'warmup' && (Number(s.w) > 0 || Number(s.total_w) > 0) && s.r > 0) {
+        const actW = getSetActualWeight(s, eqConfNow);
+        const c10RM = estimate10RM(actW, s.r);
+        if (c10RM > currentMax10RM) {
+          currentMax10RM = c10RM;
+          currentMaxWeight = actW;
+          currentMaxReps = Number(s.r);
         }
-      });
-
-      // rm10 dibaca dari PUSTAKA, bukan dari exItem. exItem adalah salinan beku yang dibuat saat
-      // latihan ditambahkan ke program — dengan id UUID baru.
-      const libEx = exerciseLibrary?.find(e => e.id === exItem.originalId || e.id === exItem.id
-        || e.name?.toLowerCase() === exItem.name?.toLowerCase());
-      const stored10RM = Number(libEx?.rm10 ?? exItem.rm10) || 0;
-
-      // Acuan REKOR = best10RM yang dibekukan dari sebelum sesi dimulai (tidak bermutasi di tengah sesi)
-      const record10RM = best10RM;
-      const true10RM = last10RM > 0 ? last10RM : (stored10RM > 0 ? stored10RM : currentMax10RM);
-      const isNewRecord = currentMax10RM > record10RM && record10RM > 0;
-      const isFirstRecord = currentMax10RM > 0 && record10RM === 0;
-
-      const isImp = units?.weight === 'lbs';
-      const uStr = isImp ? 'lbs' : 'kg';
-
-      const hasWeightDiff = Boolean(eqConfNow && (eqConfNow.baseWeight > 0 || (eqConfNow.ratio !== undefined && eqConfNow.ratio !== 1)));
-
-      const inputLabel = eqConfNow?.isBodyweightPlus 
-        ? 'Beban' 
-        : (eqConfNow?.inputRule === 'pin' || (eqConfNow?.ratio !== 1 && (!eqConfNow?.baseWeight || eqConfNow?.baseWeight <= 0))
-            ? 'Pin' 
-            : 'Plat');
-
-      const formatHeroTarget = (actWeight, reps) => {
-        if (!actWeight || actWeight <= 0) return null;
-        if (hasWeightDiff) {
-          const inputW = calculateInputWeight(actWeight, eqConfNow);
-          return `${inputLabel} ${inputW} ${uStr} × ${reps} reps`;
-        }
-        return `${actWeight} ${uStr} × ${reps} reps`;
-      };
-
-      const formatSubTotal = (actWeight) => {
-        if (!hasWeightDiff || !actWeight || actWeight <= 0) return null;
-        if (eqConfNow.baseWeight > 0) {
-          const baseName = eqConfNow.isBodyweightPlus 
-            ? 'BB' 
-            : (eqConfNow.equipment?.includes('Sled') ? 'Sled' : 'Bar');
-          return `Total Beban: ${actWeight} ${uStr} (${baseName} ${eqConfNow.baseWeight} ${uStr})`;
-        } else if (eqConfNow.ratio !== 1) {
-          return `Beban Efektif: ${actWeight} ${uStr} (Katrol ${eqConfNow.ratio}:1)`;
-        }
-        return `Total Beban: ${actWeight} ${uStr}`;
-      };
-
-      const formatRefWeight = (actWeight, reps = null) => {
-        if (!actWeight || actWeight <= 0) return null;
-        if (hasWeightDiff) {
-          const inputW = calculateInputWeight(actWeight, eqConfNow);
-          return reps ? `${inputLabel} ${inputW} ${uStr} × ${reps} reps` : `${inputLabel} ${inputW} ${uStr}`;
-        }
-        return reps ? `${actWeight} ${uStr} × ${reps} reps` : `${actWeight} ${uStr}`;
-      };
-
-      if (isNewRecord) {
-        return {
-          title: "Rekor Baru!",
-          targetWeightNumber: hasWeightDiff ? calculateInputWeight(currentMaxWeight, eqConfNow) : currentMaxWeight,
-          targetRepsNumber: currentMaxReps,
-          weightUnit: uStr,
-          weightLabel: hasWeightDiff ? inputLabel : null,
-          target: formatHeroTarget(currentMaxWeight, currentMaxReps),
-          targetDetail: formatSubTotal(currentMaxWeight),
-          lastSession: lastSessionWeight > 0 ? formatRefWeight(lastSessionWeight, lastSessionReps) : null,
-          message: `Luar biasa! Kamu berhasil memecahkan rekor 10RM baru. Terus pertahankan progres luar biasa ini!`,
-          rm10: `${currentMax10RM} ${uStr}`,
-          rm10Number: currentMax10RM,
-          rm10Detail: formatSubTotal(currentMax10RM),
-          hasWeightDiff,
-          mode: 'praise',
-          isNewRecord: true,
-          benchmark: formatHeroTarget(currentMaxWeight, currentMaxReps),
-          benchmarkDetail: formatSubTotal(currentMaxWeight),
-          text: `Mantap! Kamu baru saja buat rekor 10RM baru: ${currentMax10RM} ${uStr} (${currentMaxWeight} ${uStr} x ${currentMaxReps} Reps)!\n\nLanjutkan kerja kerasnya!`
-        };
       }
+    });
 
-      if (isFirstRecord) {
-        const alreadyCelebrated = (typeof window !== 'undefined' && window.logymCelebrated10RM?.[exItem.id]) || 0;
-        const isProgressRecord = alreadyCelebrated > 0 && currentMax10RM > alreadyCelebrated;
-        const titleText = isProgressRecord ? "Rekor Baru!" : "10RM Pertama Tercatat";
-        const messageText = isProgressRecord
-          ? `Luar biasa! Kamu berhasil memecahkan rekor 10RM baru. Terus pertahankan progres luar biasa ini!`
-          : `Keren! 10RM acuan pertamamu berhasil tercatat. Angka ini otomatis menjadi target acuan progresifmu untuk sesi latihan berikutnya.`;
+    const record10RM = best10RM;
+    const true10RM = targetPlan.true10RM;
+    const isNewRecord = currentMax10RM > record10RM && record10RM > 0;
+    const isFirstRecord = currentMax10RM > 0 && record10RM === 0;
 
-        return {
-          title: titleText,
-          targetWeightNumber: hasWeightDiff ? calculateInputWeight(currentMaxWeight, eqConfNow) : currentMaxWeight,
-          targetRepsNumber: currentMaxReps,
-          weightUnit: uStr,
-          weightLabel: hasWeightDiff ? inputLabel : null,
-          target: formatHeroTarget(currentMaxWeight, currentMaxReps),
-          targetDetail: formatSubTotal(currentMaxWeight),
-          lastSession: null,
-          message: messageText,
-          rm10: `${currentMax10RM} ${uStr}`,
-          rm10Number: currentMax10RM,
-          rm10Detail: formatSubTotal(currentMax10RM),
-          hasWeightDiff,
-          mode: 'praise',
-          isNewRecord: true,
-          benchmark: formatHeroTarget(currentMaxWeight, currentMaxReps),
-          benchmarkDetail: formatSubTotal(currentMaxWeight),
-          text: isProgressRecord
-            ? `Mantap! Kamu baru saja buat rekor 10RM baru: ${currentMax10RM} ${uStr} (${currentMaxWeight} ${uStr} x ${currentMaxReps} Reps)!\n\nLanjutkan kerja kerasnya!`
-            : `Keren! 10RM acuan pertamamu berhasil tercatat: ${currentMax10RM} ${uStr} (${currentMaxWeight} ${uStr} x ${currentMaxReps} Reps).\n\nAngka ini otomatis menjadi target acuan progresifmu untuk sesi latihan berikutnya!`
-        };
+    const isImp = units?.weight === 'lbs';
+    const uStr = isImp ? 'lbs' : 'kg';
+
+    const hasWeightDiff = Boolean(eqConfNow && (eqConfNow.baseWeight > 0 || (eqConfNow.ratio !== undefined && eqConfNow.ratio !== 1)));
+
+    const inputLabel = eqConfNow?.isBodyweightPlus 
+      ? 'Beban' 
+      : (eqConfNow?.inputRule === 'pin' || (eqConfNow?.ratio !== 1 && (!eqConfNow?.baseWeight || eqConfNow?.baseWeight <= 0))
+          ? 'Pin' 
+          : 'Plat');
+
+    const formatHeroTarget = (actWeight, reps) => {
+      if (!actWeight || actWeight <= 0) return null;
+      if (hasWeightDiff) {
+        const inputW = calculateInputWeight(actWeight, eqConfNow);
+        return `${inputLabel} ${inputW} ${uStr} × ${reps} reps`;
       }
-      
-      const hasLastSession = lastSessionWeight > 0;
-      const isDeload = history?.[selectedDate]?.wellness === 'deload' || history?.[selectedDate]?.isDeloadWeek;
-      const isDoms = history?.[selectedDate]?.wellness === 'doms';
-
-      if (isDeload && hasLastSession) {
-        const deloadWeight = Math.max(0, Math.round(lastSessionWeight * 0.825 * 2) / 2);
-        const deloadReps = exItem.reps || lastSessionReps;
-        return {
-          title: "Mode Deload",
-          targetWeightNumber: hasWeightDiff ? calculateInputWeight(deloadWeight, eqConfNow) : deloadWeight,
-          targetRepsNumber: deloadReps,
-          weightUnit: uStr,
-          weightLabel: hasWeightDiff ? inputLabel : null,
-          target: formatHeroTarget(deloadWeight, deloadReps),
-          targetDetail: formatSubTotal(deloadWeight),
-          lastSession: formatRefWeight(lastSessionWeight, lastSessionReps),
-          message: `Beban dipangkas ~17.5% untuk pemulihan sendi dan sistem saraf. Fokus pada kontrol tempo dan kesempurnaan form gerakan.`,
-          rm10: true10RM > 0 ? `${true10RM} ${uStr}` : null,
-          rm10Detail: formatSubTotal(true10RM),
-          hasWeightDiff,
-          mode: 'push',
-          isDeload: true,
-          benchmark: formatHeroTarget(deloadWeight, deloadReps),
-          benchmarkDetail: formatSubTotal(deloadWeight),
-          text: `Target beban dipangkas ~17.5% untuk pemulihan sendi & sistem saraf:\n(${deloadWeight} ${uStr} x ${deloadReps} Reps)\n\nFokus pada kontrol gerakan dan tempo yang sempurna. Jangan memaksakan beban berat!`
-        };
-      }
-
-      if (isDoms && hasLastSession) {
-        const targetReps = exItem.reps || lastSessionReps;
-        return {
-          title: "Mode Pegal / Fokus Form",
-          targetWeightNumber: hasWeightDiff ? calculateInputWeight(lastSessionWeight, eqConfNow) : lastSessionWeight,
-          targetRepsNumber: targetReps,
-          weightUnit: uStr,
-          weightLabel: hasWeightDiff ? inputLabel : null,
-          target: formatHeroTarget(lastSessionWeight, targetReps),
-          targetDetail: formatSubTotal(lastSessionWeight),
-          lastSession: formatRefWeight(lastSessionWeight, lastSessionReps),
-          message: `Kondisi otot sedang lelah/pegal. Beban dipertahankan di angka sesi lalu tanpa kenaikan beban progresif. Prioritaskan tempo repetisi lambat dan form yang bersih.`,
-          rm10: true10RM > 0 ? `${true10RM} ${uStr}` : null,
-          rm10Detail: formatSubTotal(true10RM),
-          hasWeightDiff,
-          mode: 'push',
-          benchmark: formatHeroTarget(lastSessionWeight, targetReps),
-          benchmarkDetail: formatSubTotal(lastSessionWeight),
-          text: `Beban dipertahankan di sesi lalu (${lastSessionWeight} ${uStr} x ${targetReps} Reps).\n\nOtot sedang pegal/lelah, jangan memaksakan naik beban hari ini. Prioritaskan kontrol repetisi dan kesempurnaan form gerakan!`
-        };
-      }
-
-      if (hasLastSession) {
-        const targetReps = exItem.reps || 10;
-        const equipStep = Number(eqConfNow?.increment) || gymStepFor(gymProfiles, activeGymId, exItem?.equipment, isImp) || (isImp ? 5 : 2.5);
-        const goal = userProfile?.goal || 'muscle_gain';
-        const exp = userProfile?.experience || 'beginner';
-
-        const overloadPlan = calculateProgressiveOverloadTarget({
-          lastSessionWeight,
-          lastSessionReps,
-          targetReps,
-          equipStep,
-          ratio: eqConfNow?.ratio || 1,
-          goal,
-          experience: exp,
-          isImperial: isImp,
-        });
-
-        const targetWeight = overloadPlan.targetWeight;
-        const displayTargetReps = overloadPlan.targetReps;
-        const missionText = overloadPlan.message;
-        
-        return {
-          title: "Target Hari Ini",
-          targetWeightNumber: hasWeightDiff ? calculateInputWeight(targetWeight, eqConfNow) : targetWeight,
-          targetRepsNumber: displayTargetReps,
-          weightUnit: uStr,
-          weightLabel: hasWeightDiff ? inputLabel : null,
-          target: formatHeroTarget(targetWeight, displayTargetReps),
-          targetDetail: formatSubTotal(targetWeight),
-          lastSession: formatRefWeight(lastSessionWeight, lastSessionReps),
-          message: missionText,
-          rm10: true10RM > 0 ? `${true10RM} ${uStr}` : null,
-          rm10Detail: formatSubTotal(true10RM),
-          hasWeightDiff,
-          mode: 'push',
-          benchmark: formatHeroTarget(targetWeight, displayTargetReps),
-          benchmarkDetail: formatSubTotal(targetWeight),
-          text: `Target: ${targetWeight} ${uStr} x ${displayTargetReps} Reps (Sesi Lalu: ${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\n${missionText}\n\n10RM acuan: ${true10RM} ${uStr}`
-        };
-      } else if (currentMax10RM > 0) {
-        return {
-          title: "Target Hari Ini",
-          targetWeightNumber: hasWeightDiff ? calculateInputWeight(currentMaxWeight, eqConfNow) : currentMaxWeight,
-          targetRepsNumber: currentMaxReps,
-          weightUnit: uStr,
-          weightLabel: hasWeightDiff ? inputLabel : null,
-          target: formatHeroTarget(currentMaxWeight, currentMaxReps),
-          targetDetail: formatSubTotal(currentMaxWeight),
-          lastSession: null,
-          message: `Fokus tuntaskan sisa set dengan form dan kontrol gerakan yang rapi!`,
-          rm10: `${currentMax10RM} ${uStr}`,
-          rm10Detail: formatSubTotal(currentMax10RM),
-          hasWeightDiff,
-          mode: 'push',
-          benchmark: formatHeroTarget(currentMaxWeight, currentMaxReps),
-          benchmarkDetail: formatSubTotal(currentMaxWeight),
-          text: `Beban terbaik sesi ini:\n${currentMaxWeight} ${uStr} x ${currentMaxReps} Reps\n\n10RM acuan saat ini: ${currentMax10RM} ${uStr}.\nFokus tuntaskan sisa set dengan form dan kontrol yang rapi!`
-        };
-      } else {
-        return {
-          title: "Target Hari Ini",
-          targetWeightNumber: null,
-          targetRepsNumber: null,
-          weightUnit: uStr,
-          weightLabel: null,
-          target: null,
-          targetDetail: null,
-          lastSession: null,
-          message: `Atur beban yang cukup menantang untuk diangkat 10 repetisi dengan form sempurna (RPE 8).`,
-          rm10: true10RM > 0 ? `${true10RM} ${uStr}` : null,
-          rm10Detail: formatSubTotal(true10RM),
-          hasWeightDiff,
-          mode: 'push',
-          benchmark: null,
-          benchmarkDetail: null,
-          text: `Atur beban yang cukup menantang untuk diangkat 10 repetisi dengan form benar (RPE 8).\n\n10RM acuan: ${true10RM > 0 ? true10RM + ' ' + uStr : '-'}`
-        };
-      }
+      return `${actWeight} ${uStr} × ${reps} reps`;
     };
+
+    const formatSubTotal = (actWeight) => {
+      if (!hasWeightDiff || !actWeight || actWeight <= 0) return null;
+      if (eqConfNow.baseWeight > 0) {
+        const baseName = eqConfNow.isBodyweightPlus 
+          ? 'BB' 
+          : (eqConfNow.equipment?.includes('Sled') ? 'Sled' : 'Bar');
+        return `Total Beban: ${actWeight} ${uStr} (${baseName} ${eqConfNow.baseWeight} ${uStr})`;
+      } else if (eqConfNow.ratio !== 1) {
+        return `Beban Efektif: ${actWeight} ${uStr} (Katrol ${eqConfNow.ratio}:1)`;
+      }
+      return `Total Beban: ${actWeight} ${uStr}`;
+    };
+
+    const formatRefWeight = (actWeight, reps = null) => {
+      if (!actWeight || actWeight <= 0) return null;
+      if (hasWeightDiff) {
+        const inputW = calculateInputWeight(actWeight, eqConfNow);
+        return reps ? `${inputLabel} ${inputW} ${uStr} × ${reps} reps` : `${inputLabel} ${inputW} ${uStr}`;
+      }
+      return reps ? `${actWeight} ${uStr} × ${reps} reps` : `${actWeight} ${uStr}`;
+    };
+
+    if (isNewRecord) {
+      return {
+        title: "Rekor Baru!",
+        targetWeightNumber: hasWeightDiff ? calculateInputWeight(currentMaxWeight, eqConfNow) : currentMaxWeight,
+        targetRepsNumber: currentMaxReps,
+        weightUnit: uStr,
+        weightLabel: hasWeightDiff ? inputLabel : null,
+        target: formatHeroTarget(currentMaxWeight, currentMaxReps),
+        targetDetail: formatSubTotal(currentMaxWeight),
+        lastSession: lastSessionWeight > 0 ? formatRefWeight(lastSessionWeight, lastSessionReps) : null,
+        message: `Luar biasa! Kamu berhasil memecahkan rekor 10RM baru. Terus pertahankan progres luar biasa ini!`,
+        rm10: `${currentMax10RM} ${uStr}`,
+        rm10Number: currentMax10RM,
+        rm10Detail: formatSubTotal(currentMax10RM),
+        hasWeightDiff,
+        mode: 'praise',
+        isNewRecord: true,
+        benchmark: formatHeroTarget(currentMaxWeight, currentMaxReps),
+        benchmarkDetail: formatSubTotal(currentMaxWeight),
+        text: `Mantap! Kamu baru saja buat rekor 10RM baru: ${currentMax10RM} ${uStr} (${currentMaxWeight} ${uStr} x ${currentMaxReps} Reps)!\n\nLanjutkan kerja kerasnya!`
+      };
+    }
+
+    if (isFirstRecord) {
+      const alreadyCelebrated = (typeof window !== 'undefined' && window.logymCelebrated10RM?.[exItem.id]) || 0;
+      const isProgressRecord = alreadyCelebrated > 0 && currentMax10RM > alreadyCelebrated;
+      const titleText = isProgressRecord ? "Rekor Baru!" : "10RM Pertama Tercatat";
+      const messageText = isProgressRecord
+        ? `Luar biasa! Kamu berhasil memecahkan rekor 10RM baru. Terus pertahankan progres luar biasa ini!`
+        : `Keren! 10RM acuan pertamamu berhasil tercatat. Angka ini otomatis menjadi target acuan progresifmu untuk sesi latihan berikutnya.`;
+
+      return {
+        title: titleText,
+        targetWeightNumber: hasWeightDiff ? calculateInputWeight(currentMaxWeight, eqConfNow) : currentMaxWeight,
+        targetRepsNumber: currentMaxReps,
+        weightUnit: uStr,
+        weightLabel: hasWeightDiff ? inputLabel : null,
+        target: formatHeroTarget(currentMaxWeight, currentMaxReps),
+        targetDetail: formatSubTotal(currentMaxWeight),
+        lastSession: null,
+        message: messageText,
+        rm10: `${currentMax10RM} ${uStr}`,
+        rm10Number: currentMax10RM,
+        rm10Detail: formatSubTotal(currentMax10RM),
+        hasWeightDiff,
+        mode: 'praise',
+        isNewRecord: true,
+        benchmark: formatHeroTarget(currentMaxWeight, currentMaxReps),
+        benchmarkDetail: formatSubTotal(currentMaxWeight),
+        text: isProgressRecord
+          ? `Mantap! Kamu baru saja buat rekor 10RM baru: ${currentMax10RM} ${uStr} (${currentMaxWeight} ${uStr} x ${currentMaxReps} Reps)!\n\nLanjutkan kerja kerasnya!`
+          : `Keren! 10RM acuan pertamamu berhasil tercatat: ${currentMax10RM} ${uStr} (${currentMaxWeight} ${uStr} x ${currentMaxReps} Reps).\n\nAngka ini otomatis menjadi target acuan progresifmu untuk sesi latihan berikutnya!`
+      };
+    }
+
+    const targetActualWeight = targetPlan.targetWeight;
+    const targetInputWeight = targetPlan.inputWeight;
+    const displayTargetReps = targetPlan.targetReps;
+
+    if (targetPlan.isDeload && targetPlan.hasHistory) {
+      return {
+        title: "Mode Deload",
+        targetWeightNumber: targetInputWeight,
+        targetRepsNumber: displayTargetReps,
+        weightUnit: uStr,
+        weightLabel: hasWeightDiff ? inputLabel : null,
+        target: formatHeroTarget(targetActualWeight, displayTargetReps),
+        targetDetail: formatSubTotal(targetActualWeight),
+        lastSession: formatRefWeight(lastSessionWeight, lastSessionReps),
+        message: targetPlan.message,
+        rm10: true10RM > 0 ? `${true10RM} ${uStr}` : null,
+        rm10Detail: formatSubTotal(true10RM),
+        hasWeightDiff,
+        mode: 'push',
+        isDeload: true,
+        benchmark: formatHeroTarget(targetActualWeight, displayTargetReps),
+        benchmarkDetail: formatSubTotal(targetActualWeight),
+        text: `Target beban dipangkas ~17.5% untuk pemulihan sendi & sistem saraf:\n(${targetActualWeight} ${uStr} x ${displayTargetReps} Reps)\n\nFokus pada kontrol gerakan dan tempo yang sempurna. Jangan memaksakan beban berat!`
+      };
+    }
+
+    if (targetPlan.isDoms && targetPlan.hasHistory) {
+      return {
+        title: "Mode Pegal / Fokus Form",
+        targetWeightNumber: targetInputWeight,
+        targetRepsNumber: displayTargetReps,
+        weightUnit: uStr,
+        weightLabel: hasWeightDiff ? inputLabel : null,
+        target: formatHeroTarget(targetActualWeight, displayTargetReps),
+        targetDetail: formatSubTotal(targetActualWeight),
+        lastSession: formatRefWeight(lastSessionWeight, lastSessionReps),
+        message: targetPlan.message,
+        rm10: true10RM > 0 ? `${true10RM} ${uStr}` : null,
+        rm10Detail: formatSubTotal(true10RM),
+        hasWeightDiff,
+        mode: 'push',
+        benchmark: formatHeroTarget(targetActualWeight, displayTargetReps),
+        benchmarkDetail: formatSubTotal(targetActualWeight),
+        text: `Beban dipertahankan di sesi lalu (${targetActualWeight} ${uStr} x ${displayTargetReps} Reps).\n\nOtot sedang pegal/lelah, jangan memaksakan naik beban hari ini. Prioritaskan kontrol repetisi dan kesempurnaan form gerakan!`
+      };
+    }
+
+    if (targetPlan.hasHistory) {
+      return {
+        title: targetPlan.title || "Target Hari Ini",
+        targetWeightNumber: targetInputWeight,
+        targetRepsNumber: displayTargetReps,
+        weightUnit: uStr,
+        weightLabel: hasWeightDiff ? inputLabel : null,
+        target: formatHeroTarget(targetActualWeight, displayTargetReps),
+        targetDetail: formatSubTotal(targetActualWeight),
+        lastSession: formatRefWeight(lastSessionWeight, lastSessionReps),
+        message: targetPlan.message,
+        rm10: true10RM > 0 ? `${true10RM} ${uStr}` : null,
+        rm10Detail: formatSubTotal(true10RM),
+        hasWeightDiff,
+        mode: 'push',
+        benchmark: formatHeroTarget(targetActualWeight, displayTargetReps),
+        benchmarkDetail: formatSubTotal(targetActualWeight),
+        text: `Target: ${targetActualWeight} ${uStr} x ${displayTargetReps} Reps (Sesi Lalu: ${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\n${targetPlan.message}\n\n10RM acuan: ${true10RM} ${uStr}`
+      };
+    } else if (currentMax10RM > 0) {
+      return {
+        title: "Target Hari Ini",
+        targetWeightNumber: hasWeightDiff ? calculateInputWeight(currentMaxWeight, eqConfNow) : currentMaxWeight,
+        targetRepsNumber: currentMaxReps,
+        weightUnit: uStr,
+        weightLabel: hasWeightDiff ? inputLabel : null,
+        target: formatHeroTarget(currentMaxWeight, currentMaxReps),
+        targetDetail: formatSubTotal(currentMaxWeight),
+        lastSession: null,
+        message: `Fokus tuntaskan sisa set dengan form dan kontrol gerakan yang rapi!`,
+        rm10: `${currentMax10RM} ${uStr}`,
+        rm10Detail: formatSubTotal(currentMax10RM),
+        hasWeightDiff,
+        mode: 'push',
+        benchmark: formatHeroTarget(currentMaxWeight, currentMaxReps),
+        benchmarkDetail: formatSubTotal(currentMaxWeight),
+        text: `Beban terbaik sesi ini:\n${currentMaxWeight} ${uStr} x ${currentMaxReps} Reps\n\n10RM acuan saat ini: ${currentMax10RM} ${uStr}.\nFokus tuntaskan sisa set dengan form dan kontrol yang rapi!`
+      };
+    } else {
+      return {
+        title: "Target Hari Ini",
+        targetWeightNumber: targetInputWeight,
+        targetRepsNumber: displayTargetReps,
+        weightUnit: uStr,
+        weightLabel: hasWeightDiff ? inputLabel : null,
+        target: formatHeroTarget(targetActualWeight, displayTargetReps),
+        targetDetail: formatSubTotal(targetActualWeight),
+        lastSession: null,
+        message: targetPlan.message,
+        rm10: null,
+        rm10Detail: null,
+        hasWeightDiff,
+        mode: 'push',
+        benchmark: formatHeroTarget(targetActualWeight, displayTargetReps),
+        benchmarkDetail: formatSubTotal(targetActualWeight),
+        text: `Target: ${targetActualWeight} ${uStr} x ${displayTargetReps} Reps\n\n${targetPlan.message}`
+      };
+    }
+  };
 
   // Rekor 10RM baru ditampilkan secara elegan lewat Coach Praise di kartu/immersive tanpa popup badge yang mengganggu.
   React.useEffect(() => {
@@ -1166,6 +1150,8 @@ const WorkoutTab = ({
           setRestTargetTime={setRestTargetTime}
           showSupersetToast={showSupersetToast}
           getOverloadHint={getOverloadHint}
+          getSetLogs={getSetLogs}
+          history={history}
         />
       )}
 
@@ -1177,7 +1163,7 @@ const WorkoutTab = ({
             onClose={() => setDetailExercise(null)} 
             t={t} lang={lang} soundEnabled={soundEnabled} 
             fullHistory={history}
-            onReplace={(ex) => setShowAlternativeModal(true)}
+            onReplace={(ex) => { if (ex) setDetailExercise(ex); setShowAlternativeModal(true); }}
             units={units}
             exerciseLibrary={exerciseLibrary}
             setExerciseLibrary={setExerciseLibrary}
@@ -1367,7 +1353,6 @@ const WorkoutTab = ({
                                     onRemoveSet(exId, setIdx);
                                   }
                                 }}
-                                onReplaceExercise={() => { setDetailExercise(ex); setShowAlternativeModal(true); }}
                               />
                             </div>
                             ))}
@@ -1513,7 +1498,7 @@ const WorkoutTab = ({
                                   onRemoveSet(exId, setIdx);
                                 }
                               }}
-                              onReplaceExercise={() => { setDetailExercise(ex); setShowAlternativeModal(true); }}
+                              onReplaceClick={() => { setDetailExercise(ex); setShowAlternativeModal(true); }}
                               />
                             </div>
                           ))}

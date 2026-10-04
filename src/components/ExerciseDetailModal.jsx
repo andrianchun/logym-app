@@ -267,6 +267,20 @@ const ExerciseDetailModal = ({
       : (canonical.gifUrl && !canonical.gifUrl.endsWith('.webp')) ? canonical.gifUrl
       : cachedMatch?.gifUrl || (exerciseId ? `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/${exerciseId}/0.jpg` : '');
 
+    // Single Source of Truth (SSOT): Jika masterMatch mendefinisikan videoUrl (termasuk empty string ''),
+    // maka gunakan nilai masterMatch agar tidak menghidupkan kembali link video usang dari canonical.
+    const resolvedVideoUrl = (masterMatch && masterMatch.videoUrl !== undefined)
+      ? masterMatch.videoUrl
+      : (canonical.videoUrl || cachedMatch?.videoUrl || '');
+
+    const resolvedThumbnailUrl = (masterMatch && masterMatch.thumbnailUrl !== undefined)
+      ? masterMatch.thumbnailUrl
+      : (canonical.thumbnailUrl || cachedMatch?.thumbnailUrl || '');
+
+    const resolvedYtVideo = (masterMatch && masterMatch.ytVideo !== undefined)
+      ? masterMatch.ytVideo
+      : (canonical.ytVideo || cachedMatch?.ytVideo || '');
+
     return {
       ...masterMatch,
       ...canonical,
@@ -274,10 +288,10 @@ const ExerciseDetailModal = ({
       instructions,
       instructions_id: instId || instructions,
       instructions_en: instEn || instructions,
-      videoUrl: masterMatch?.videoUrl || canonical.videoUrl || cachedMatch?.videoUrl || '',
-      thumbnailUrl: masterMatch?.thumbnailUrl || canonical.thumbnailUrl || cachedMatch?.thumbnailUrl || '',
+      videoUrl: resolvedVideoUrl,
+      thumbnailUrl: resolvedThumbnailUrl,
       gifUrl: gifUrl || masterMatch?.gifUrl || canonical.gifUrl || cachedMatch?.gifUrl || '',
-      ytVideo: masterMatch?.ytVideo || canonical.ytVideo || cachedMatch?.ytVideo || '',
+      ytVideo: resolvedYtVideo,
     };
   };
 
@@ -298,13 +312,14 @@ const ExerciseDetailModal = ({
            onlineMatch = findMatchingMasterExercise(resolved || initialEx, onlineDb);
          }
          if (onlineMatch) {
+           const masterMatch = findMatchingMasterExercise(resolved || initialEx);
            setEx(prev => ({ 
              ...prev, 
              exerciseId: prev?.exerciseId || onlineMatch.exerciseId || onlineMatch.id,
              instructions: (onlineMatch.instructions_id && onlineMatch.instructions_id.length > 0) ? onlineMatch.instructions_id : (onlineMatch.instructions || prev?.instructions),
              instructions_id: (onlineMatch.instructions_id && onlineMatch.instructions_id.length > 0) ? onlineMatch.instructions_id : (onlineMatch.instructions || prev?.instructions_id),
              instructions_en: (onlineMatch.instructions_en && onlineMatch.instructions_en.length > 0) ? onlineMatch.instructions_en : (onlineMatch.instructions || prev?.instructions_en),
-             videoUrl: prev?.videoUrl || onlineMatch.videoUrl,
+             videoUrl: (masterMatch && masterMatch.videoUrl !== undefined) ? masterMatch.videoUrl : (prev?.videoUrl || onlineMatch.videoUrl || ''),
              thumbnailUrl: prev?.thumbnailUrl || onlineMatch.thumbnailUrl || (onlineMatch.gifUrl?.endsWith('.webp') ? onlineMatch.gifUrl : prev?.thumbnailUrl),
              gifUrl: (onlineMatch.gifUrl && !onlineMatch.gifUrl.endsWith('.webp')) ? onlineMatch.gifUrl : prev?.gifUrl,
              equipment: prev?.equipment || onlineMatch.equipment
@@ -350,7 +365,7 @@ const ExerciseDetailModal = ({
     // 2. ExerciseDB Animated GIF / Motion Loop (selalu ditaruh di akhir jika ada video)
     const exId = exercise.exerciseId || resolveExerciseDbId(exercise) || (exercise.id && String(exercise.id).startsWith('edb-') ? String(exercise.id).replace(/^edb-/, '') : null);
     const rawGif = exercise.gifUrl || '';
-    let loopExId = exId;
+    let loopExId = exId ? String(exId).replace(/^edb-/, '').trim() : null;
     let loopGif = null;
 
     if (rawGif.endsWith('.gif')) {
@@ -362,7 +377,7 @@ const ExerciseDetailModal = ({
         loopGif = rawGif;
         const match = rawGif.match(/exercises\/([^/]+)\/[01]\.jpg/);
         if (match) loopExId = match[1];
-      } else if (loopExId) {
+      } else if (loopExId && !loopExId.match(/^\d+$/)) {
         loopGif = `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/${loopExId}/0.jpg`;
       }
 
@@ -610,29 +625,46 @@ const ExerciseDetailModal = ({
                 </div>
               ) : (
                 mediaItems.map((media, idx) => (
-                  <div key={idx} className="relative h-full flex items-center justify-center shrink-0 overflow-hidden bg-black" style={{ width: `${100 / mediaItems.length}%` }}>
+                  <div key={idx} className="relative h-full flex items-center justify-center shrink-0 overflow-hidden bg-[#0a0f1d]" style={{ width: `${100 / mediaItems.length}%` }}>
                     {media.type === 'video' ? (
-                      <video 
-                        src={media.url} 
-                        poster={ex?.thumbnailUrl || ex?.gifUrl || ''} 
-                        autoPlay={idx === activeMediaIndex} 
-                        loop 
-                        muted 
-                        playsInline 
-                        preload="auto" 
-                        className="exercise-video-html5 w-full h-full object-cover opacity-100 shadow-xl transition-all duration-300 bg-black" 
-                      />
+                      <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+                        {(ex?.thumbnailUrl || ex?.gifUrl) && (
+                          <img 
+                            src={ex.thumbnailUrl || ex.gifUrl} 
+                            alt="" 
+                            aria-hidden="true" 
+                            className="absolute inset-0 w-full h-full object-cover opacity-25 blur-2xl scale-125 pointer-events-none" 
+                          />
+                        )}
+                        <video 
+                          src={media.url} 
+                          poster={ex?.thumbnailUrl || ex?.gifUrl || ''} 
+                          autoPlay={idx === activeMediaIndex} 
+                          loop 
+                          muted 
+                          playsInline 
+                          preload="auto" 
+                          onError={() => {
+                            if (mediaItems.length > 1) {
+                              const loopIdx = mediaItems.findIndex(m => m.type === 'motion-loop');
+                              if (loopIdx !== -1 && activeMediaIndex === idx) setActiveMediaIndex(loopIdx);
+                            }
+                          }}
+                          className="exercise-video-html5 relative z-10 w-full h-full object-contain pointer-events-none drop-shadow-2xl transition-all duration-300" 
+                        />
+                      </div>
                     ) : media.type === 'motion-loop' ? (
                       <TwoFrameMotionLoop 
                         exerciseId={media.exerciseId} 
                         gifUrl={media.gifUrl} 
                         name={ex?.name} 
                         fallbackUrl={ex?.thumbnailUrl}
+                        className="w-full h-full"
                       />
                     ) : (
-                      <div className="relative w-full h-full flex items-center justify-center">
-                        <img src={media.url} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30 blur-2xl scale-125 pointer-events-none" />
-                        <img src={media.url} alt={ex.name} className="relative z-10 w-full h-full object-contain pb-6 pointer-events-none drop-shadow-2xl" />
+                      <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+                        <img src={media.url} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover opacity-25 blur-2xl scale-125 pointer-events-none" />
+                        <img src={media.url} alt={ex.name} className="relative z-10 w-full h-full object-contain pointer-events-none drop-shadow-2xl" />
                       </div>
                     )}
                   </div>
@@ -666,6 +698,19 @@ const ExerciseDetailModal = ({
 
             {/* Top gradient for obscuring iframe remnants and better button visibility */}
             <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-black/80 via-black/40 to-transparent z-10 pointer-events-none"></div>
+
+            {onReplace && (
+              <button 
+                type="button"
+                onClick={() => onReplace(ex)} 
+                aria-label="Ganti Alternatif"
+                className="absolute top-4 right-14 bg-black/60 text-white/90 px-3 py-1.5 rounded-full hover:bg-black/80 border border-white/10 backdrop-blur-md transition-all flex items-center gap-1.5 text-xs font-bold shadow-lg z-20 active:scale-95"
+                title="Ganti Latihan Alternatif"
+              >
+                <Replace size={13} className="text-amber-400" />
+                <span>Ganti</span>
+              </button>
+            )}
 
             <button data-close-modal="true" onClick={onClose} aria-label="Tutup" className="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 backdrop-blur-sm transition-all sm:hidden z-20">
               <X size={20} />
@@ -710,6 +755,19 @@ const ExerciseDetailModal = ({
 
         {/* Kolom Kanan: Action Tabs & Tab Content */}
         <div className="w-full sm:w-[55%] flex flex-col bg-transparent overflow-hidden h-full relative">
+          {onReplace && (
+            <button 
+              type="button"
+              onClick={() => onReplace(ex)} 
+              aria-label="Ganti Alternatif"
+              className="hidden sm:flex absolute top-3 right-14 bg-black/5 hover:bg-amber-500 hover:text-white dark:bg-white/5 dark:hover:bg-amber-500 text-slate-500 dark:text-slate-300 px-3 py-1.5 rounded-full transition-all text-xs font-bold items-center gap-1.5 z-20 active:scale-95"
+              title="Ganti Latihan Alternatif"
+            >
+              <Replace size={14} className="text-amber-500 group-hover:text-white" />
+              <span>Ganti</span>
+            </button>
+          )}
+
           {/* Desktop Close Button */}
           <button data-close-modal="true" onClick={onClose} aria-label="Tutup" className="hidden sm:flex absolute top-3 right-3 bg-black/5 hover:bg-rose-500 hover:text-white dark:bg-white/5 dark:hover:bg-rose-500 text-slate-500 dark:text-slate-300 p-2 rounded-full transition-all z-20">
             <X size={20} />

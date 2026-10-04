@@ -251,11 +251,6 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
               targetSleep: histBio?.targetSleep || targetSleepH,
               targetCalories: (() => {
                   if (lomealTargets?.kcal) {
-                      const baseTdee = Number(lomealTargets.tdee) || Number(lomealTargets.kcal) || 0;
-                      const programDelta = Number(lomealTargets.kcal || 0) - baseTdee;
-                      if (actCals > baseTdee) {
-                          return Math.round(actCals + programDelta);
-                      }
                       return lomealTargets.kcal;
                   }
                   return histBio?.targetCalories || targetBurn || null;

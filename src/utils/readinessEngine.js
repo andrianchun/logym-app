@@ -67,13 +67,13 @@ export const calculateReadiness = (bio, baselineRhr = null) => {
   if (sleep > 0) {
     parts.sleep = sleep;
     if (sleep < 5) alasan.push({ potong: 35, status: 'critical', msg: `Cuma ${sleep} jam tidur semalam. Kurangi volume latihan hari ini (deload) supaya tidak mengundang cedera.` });
-    else if (sleep < 6) alasan.push({ potong: 20, status: 'warning', msg: `Tidurmu ${sleep} jam — di bawah kebutuhan. Turunkan beban, jangan kejar PR hari ini.` });
+    else if (sleep < 6) alasan.push({ potong: 20, status: 'warning', msg: `Tidurmu ${sleep} jam, di bawah kebutuhan. Turunkan beban dan jangan kejar PR hari ini.` });
     else if (sleep < 7) alasan.push({ potong: 10, status: 'warning', msg: `Tidur ${sleep} jam, sedikit kurang. Pemanasan ekstra sebelum set berat.` });
   } else {
     score = 80;
     return {
       score, status: 'unknown', parts,
-      message: 'Bagaimana tidurmu semalam? Catat dulu durasinya — tanpa itu skor kesiapan cuma tebakan.',
+      message: 'Bagaimana tidurmu semalam? Catat dulu durasinya untuk hitung skor kesiapan.',
     };
   }
 
@@ -83,7 +83,7 @@ export const calculateReadiness = (bio, baselineRhr = null) => {
   if (totalStage > 0) {
     const pulih = (deep + rem) / totalStage;
     parts.restorativePct = Math.round(pulih * 100);
-    if (pulih < 0.30) alasan.push({ potong: 15, status: 'warning', msg: `Tidurmu ${sleep} jam tapi cuma ${Math.round(pulih * 100)}% nyenyak (deep+REM). Durasinya cukup, kualitasnya belum — jangan paksakan set maksimal.` });
+    if (pulih < 0.30) alasan.push({ potong: 15, status: 'warning', msg: `Tidurmu ${sleep} jam tapi cuma ${Math.round(pulih * 100)}% nyenyak (deep+REM). Jangan paksakan set maksimal.` });
     else if (pulih < 0.40) alasan.push({ potong: 5, status: 'optimal', msg: '' });
   }
 
@@ -95,8 +95,8 @@ export const calculateReadiness = (bio, baselineRhr = null) => {
     parts.rhrBaseline = Math.round(baselineRhr);
     parts.rhrDelta = Math.round(delta);
     const naik = Math.round(delta);
-    if (delta >= 10) alasan.push({ potong: 40, status: 'critical', msg: `Nadi istirahatmu ${rhr} bpm, ${naik} di atas kebiasaanmu (${Math.round(baselineRhr)}). Lonjakan sebesar ini biasanya berarti belum pulih atau mau sakit — hari ini istirahat.` });
-    else if (delta >= 6) alasan.push({ potong: 25, status: 'critical', msg: `Nadi istirahat ${rhr} bpm, ${naik} di atas kebiasaanmu. Tubuhmu masih memulihkan diri — pilih sesi ringan.` });
+    if (delta >= 10) alasan.push({ potong: 40, status: 'critical', msg: `Nadi istirahatmu ${rhr} bpm, naik +${naik} dari kebiasaan (${Math.round(baselineRhr)}). Tubuh belum pulih, sebaiknya istirahat hari ini.` });
+    else if (delta >= 6) alasan.push({ potong: 25, status: 'critical', msg: `Nadi istirahat ${rhr} bpm, naik +${naik} dari kebiasaan. Tubuh masih memulihkan diri, pilih sesi ringan.` });
     else if (delta >= 3) alasan.push({ potong: 10, status: 'warning', msg: `Nadi istirahat sedikit di atas kebiasaan (+${naik} bpm). Boleh latihan, tapi dengarkan tubuhmu.` });
   }
 
@@ -105,7 +105,7 @@ export const calculateReadiness = (bio, baselineRhr = null) => {
 
   const terberat = alasan.filter((a) => a.msg).sort((a, b) => b.potong - a.potong)[0];
   if (!terberat) {
-    return { score, status: 'optimal', parts, message: 'Kondisi prima — tidur cukup dan nadi istirahatmu normal. Hajar PR baru hari ini!' };
+    return { score, status: 'optimal', parts, message: 'Kondisi prima. Tidur cukup dan nadi istirahat normal, siap hajar PR hari ini!' };
   }
   return { score, status: terberat.status, parts, message: terberat.msg };
 };

@@ -3,10 +3,11 @@ import { Plus, GripVertical, ArrowUp, ArrowDown, Clock, Link as LinkIcon, X, Dum
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { formatTarget } from '../data/constants';
+import { formatTarget, getVideoId } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
 import SwipeInput from '../components/SwipeInput';
 import AlternativeExerciseModal from '../components/AlternativeExerciseModal';
+import ExerciseDetailModal from '../components/ExerciseDetailModal';
 import CreatePostModal from '../components/CreatePostModal';
 import useDialog from '../hooks/useDialog';
 import { getPlanBgConfig } from '../utils/planBg';
@@ -30,7 +31,11 @@ const PlanNameInput = ({ initialValue, onSave, className, placeholder }) => {
   );
 };
 
-const SortableExerciseItem = ({ ex, prevEx, idx, routineId, t, lang, soundEnabled, handleUpdateExercise, handleRemoveExercise, handleToggleSupersetInline, onReplaceClick, getEquipmentColor }) => {
+const SortableExerciseItem = ({
+  ex, prevEx, idx, routineId, t, lang, soundEnabled,
+  handleUpdateExercise, handleRemoveExercise, handleToggleSupersetInline,
+  onReplaceClick, getEquipmentColor, exerciseLibrary, onOpenDetail
+}) => {
   const {
     attributes,
     listeners,
@@ -50,18 +55,23 @@ const SortableExerciseItem = ({ ex, prevEx, idx, routineId, t, lang, soundEnable
   const isTime = ex.type === 'time';
   const isSuperset = !!ex.supersetId;
   const isNewSupersetGroup = isSuperset && prevEx && prevEx.supersetId && prevEx.supersetId !== ex.supersetId;
-  // Latihan ini SATU superset dengan yang di atasnya. Dulu petunjuknya cuma ikon rantai dan
-  // garis aksen di tepi kanan — tidak ada tulisan apa pun, jadi tidak ada yang tahu artinya.
   const lanjutanSuperset = isSuperset && prevEx?.supersetId === ex.supersetId;
+
+  // Resolusi data visual latihan dari library jika kartu belum menyimpannya
+  const matchedLibEx = exerciseLibrary?.find(e => e.id === ex.id || e.id === ex.originalId || e.name?.toLowerCase() === ex.name?.toLowerCase());
+  const resolvedEx = { ...matchedLibEx, ...ex };
+  const thumbSrc = resolvedEx.thumbnailUrl || resolvedEx.gifUrl;
+  const ytId = getVideoId(resolvedEx.ytVideo || resolvedEx.videoUrl);
+  const fallbackThumb = ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : null;
 
   return (
     <div 
       ref={setNodeRef} 
       style={style} 
-      className={`relative pl-5 pr-5 py-5 border-b last:border-b-0 ${t.border} transition-colors duration-300 ${isDragging ? 'shadow-2xl ring-2 ' + t.ringAccent + ' scale-[1.02] opacity-100 ' + t.bgCard : 'hover:bg-black/5 dark:hover:bg-white/5'} ${isNewSupersetGroup ? 'mt-4' : ''}`}
+      className={`relative pl-4 sm:pl-5 pr-4 sm:pr-5 py-4 border-b last:border-b-0 ${t.border} transition-colors duration-300 ${isDragging ? 'shadow-2xl ring-2 ' + t.ringAccent + ' scale-[1.02] opacity-100 ' + t.bgCard : 'hover:bg-black/5 dark:hover:bg-white/5'} ${isNewSupersetGroup ? 'mt-4' : ''}`}
     >
       {isSuperset && <div className={`absolute top-0 bottom-0 right-0 w-[6px] ${t.bgAccent}`}></div>}
-      {/* Badge menumpuk tepat di garis batas antar kartu — celah yang memang kosong. */}
+      {/* Badge menumpuk tepat di garis batas antar kartu */}
       {lanjutanSuperset && (
         <div className="absolute -top-[9px] right-3 z-20 pointer-events-none">
           <span className={`px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-widest ${t.bgAccent} text-white shadow-md`}>
@@ -69,40 +79,74 @@ const SortableExerciseItem = ({ ex, prevEx, idx, routineId, t, lang, soundEnable
           </span>
         </div>
       )}
-      <div className="flex items-start justify-between gap-1">
+      <div className="flex items-center justify-between gap-2.5">
         
-        {/* Left Column: Title and Sets/Reps */}
-        <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-          <div className="flex items-start gap-1.5">
-            <span className={`text-base font-bold ${t.textAccent}`}>{idx + 1}.</span>
-            <div className="flex-1 min-w-0 flex flex-col items-start mt-0.5">
-              <p className={`text-base font-bold ${t.textMain} truncate w-full leading-tight mb-1`}>{ex.name}</p>
-              <p className={`text-xs font-bold ${t.textMuted} uppercase tracking-wider truncate w-full leading-snug`}>
-                {ex.equipment || 'BODYWEIGHT'} &bull; {formatTarget(ex.target, lang?.id)}
-              </p>
+        {/* Left Column: Number, Thumbnail, Title and Sets/Reps */}
+        <div className="flex-1 min-w-0 flex items-center gap-2.5">
+          {/* Index & Thumbnail */}
+          <div className="flex items-center gap-2 shrink-0">
+            <span className={`text-sm font-bold ${t.textAccent} w-4 text-right`}>{idx + 1}.</span>
+            <div 
+              onClick={() => onOpenDetail && onOpenDetail(resolvedEx)}
+              className="w-14 h-14 rounded-xl overflow-hidden bg-black/5 dark:bg-white/10 shrink-0 border border-black/10 dark:border-white/10 relative cursor-pointer group/thumb flex items-center justify-center shadow-sm"
+              title="Lihat detail latihan"
+            >
+              {thumbSrc ? (
+                <img 
+                  src={thumbSrc} 
+                  alt={ex.name} 
+                  loading="lazy" 
+                  className="w-full h-full object-cover object-center group-hover/thumb:scale-110 transition-transform duration-200"
+                  onError={(e) => {
+                    if (fallbackThumb && e.target.src !== fallbackThumb) {
+                      e.target.src = fallbackThumb;
+                    }
+                  }}
+                />
+              ) : fallbackThumb ? (
+                <img 
+                  src={fallbackThumb} 
+                  alt={ex.name} 
+                  loading="lazy" 
+                  className="w-full h-full object-cover object-center group-hover/thumb:scale-110 transition-transform duration-200" 
+                />
+              ) : (
+                <Dumbbell size={20} className="text-slate-400" />
+              )}
             </div>
           </div>
 
-          {/* Sets Reps */}
-          <div className="flex items-center gap-1.5 pl-[22px]">
-            <div className="flex items-center gap-3">
+          {/* Details & Sets/Reps */}
+          <div className="flex-1 min-w-0 flex flex-col gap-1">
+            <div 
+              onClick={() => onOpenDetail && onOpenDetail(resolvedEx)}
+              className="cursor-pointer group/title"
+            >
+              <p className={`text-sm sm:text-base font-bold ${t.textMain} truncate w-full leading-tight group-hover/title:${t.textAccent} transition-colors`}>{ex.name}</p>
+              <p className={`text-[11px] font-bold ${t.textMuted} uppercase tracking-wider truncate w-full leading-snug mt-0.5`}>
+                {ex.equipment || 'BODYWEIGHT'} &bull; {formatTarget(ex.target, lang?.id)}
+              </p>
+            </div>
+
+            {/* Sets Reps */}
+            <div className="flex items-center gap-3 mt-0.5">
               <div className="flex items-center gap-1.5">
-                <span className={`text-xs font-bold ${t.textMuted} uppercase`}>Sets</span>
-                <div className={`w-12 h-8 rounded-xl ${t.inputBg} ${t.textMain} font-bold text-base focus-within:ring-2 focus-within:${t.ringAccent} transition-all overflow-hidden`}>
+                <span className={`text-[11px] font-bold ${t.textMuted} uppercase`}>Sets</span>
+                <div className={`w-11 h-7 rounded-lg ${t.inputBg} ${t.textMain} font-bold text-sm focus-within:ring-2 focus-within:${t.ringAccent} transition-all overflow-hidden`}>
                   <input type="number" min="0" value={ex.sets === 0 ? '' : ex.sets} onChange={(e) => handleUpdateExercise(routineId, ex.id, 'sets', parseInt(e.target.value) || 0)} placeholder="0" className="w-full h-full bg-transparent outline-none border-none text-center" />
                 </div>
               </div>
               {isTime ? (
                 <div className="flex items-center gap-1.5">
-                  <span className={`text-xs font-bold ${t.textMuted} uppercase`}>Min</span>
-                  <div className={`w-12 h-8 rounded-xl ${t.inputBg} ${t.textMain} font-bold text-base focus-within:ring-2 focus-within:${t.ringAccent} transition-all overflow-hidden`}>
+                  <span className={`text-[11px] font-bold ${t.textMuted} uppercase`}>Min</span>
+                  <div className={`w-11 h-7 rounded-lg ${t.inputBg} ${t.textMain} font-bold text-sm focus-within:ring-2 focus-within:${t.ringAccent} transition-all overflow-hidden`}>
                     <input type="number" min="0" value={ex.duration === 0 ? '' : ex.duration} onChange={(e) => handleUpdateExercise(routineId, ex.id, 'duration', parseInt(e.target.value) || 0)} placeholder="0" className="w-full h-full bg-transparent outline-none border-none text-center" />
                   </div>
                 </div>
               ) : (
                 <div className="flex items-center gap-1.5">
-                  <span className={`text-xs font-bold ${t.textMuted} uppercase`}>Reps</span>
-                  <div className={`w-12 h-8 rounded-xl ${t.inputBg} ${t.textMain} font-bold text-base focus-within:ring-2 focus-within:${t.ringAccent} transition-all overflow-hidden`}>
+                  <span className={`text-[11px] font-bold ${t.textMuted} uppercase`}>Reps</span>
+                  <div className={`w-11 h-7 rounded-lg ${t.inputBg} ${t.textMain} font-bold text-sm focus-within:ring-2 focus-within:${t.ringAccent} transition-all overflow-hidden`}>
                     <input type="number" min="0" value={ex.reps === 0 ? '' : ex.reps} onChange={(e) => handleUpdateExercise(routineId, ex.id, 'reps', parseInt(e.target.value) || 0)} placeholder="0" className="w-full h-full bg-transparent outline-none border-none text-center" />
                   </div>
                 </div>
@@ -195,6 +239,7 @@ const ProgramTab = ({
   const [dragOverExId, setDragOverExId] = useState(null);
   const [showAlternativeModal, setShowAlternativeModal] = useState(false);
   const [detailExercise, setDetailExercise] = useState(null);
+  const [selectedDetailExercise, setSelectedDetailExercise] = useState(null);
   const [routineIdForAlt, setRoutineIdForAlt] = useState(null);
   const [pendingShareProgram, setPendingShareProgram] = useState(null);
 
@@ -205,8 +250,8 @@ const ProgramTab = ({
       if (p.id !== routineIdForAlt) return p;
       return {
         ...p,
-        exercises: p.exercises.map(e => {
-          if (e.id === detailExercise.id) {
+        exercises: (p.exercises || []).map(e => {
+          if (e.id === detailExercise?.id || (detailExercise?.originalId && e.id === detailExercise.originalId)) {
             return {
               ...e,
               ...newEx,
@@ -675,6 +720,8 @@ const ProgramTab = ({
                       handleUpdateExercise={handleUpdateExercise}
                       handleRemoveExercise={handleRemoveExercise}
                       handleToggleSupersetInline={handleToggleSupersetInline}
+                      exerciseLibrary={exerciseLibrary}
+                      onOpenDetail={(targetEx) => setSelectedDetailExercise(targetEx)}
                       onReplaceClick={(ex, rId) => {
                         setDetailExercise(ex);
                         setRoutineIdForAlt(rId);
@@ -878,14 +925,31 @@ const ProgramTab = ({
                                      {(r.exercises || []).length === 0 && (
                                          <span className="text-xs text-slate-400 italic">Belum ada latihan</span>
                                      )}
-                                     {(r.exercises || []).map((ex, exIdx) => (
-                                         <div key={ex.id || exIdx} className="flex items-start gap-2 py-0.5">
-                                             <span className="w-1.5 h-1.5 rounded-full bg-sky-400 shrink-0 mt-1.5" />
+                                     {(r.exercises || []).map((ex, exIdx) => {
+                                         const matchedLibEx = exerciseLibrary?.find(e => e.id === ex.id || e.id === ex.originalId || e.name?.toLowerCase() === ex.name?.toLowerCase());
+                                         const resolvedEx = { ...matchedLibEx, ...ex };
+                                         const thumb = resolvedEx.thumbnailUrl || resolvedEx.gifUrl;
+                                         return (
+                                           <div 
+                                             key={ex.id || exIdx} 
+                                             className="flex items-center gap-2.5 py-1 cursor-pointer hover:opacity-80 transition-opacity"
+                                             onClick={(e) => { e.stopPropagation(); setSelectedDetailExercise(resolvedEx); }}
+                                             title="Klik untuk melihat detail latihan"
+                                           >
+                                             {thumb ? (
+                                               <img src={thumb} alt={ex.name} className="w-7 h-7 rounded-lg object-cover border border-white/10 shrink-0 bg-white/5" loading="lazy" />
+                                             ) : (
+                                               <span className="w-2 h-2 rounded-full bg-sky-400 shrink-0 mx-1" />
+                                             )}
                                              <span className="text-xs text-slate-200 font-semibold leading-tight break-words flex-1" title={ex.name}>
-                                                 {ex.name}
+                                               {ex.name}
                                              </span>
-                                         </div>
-                                     ))}
+                                             <span className="text-[11px] text-slate-400 font-bold shrink-0">
+                                               {ex.sets || 3} &times; {ex.reps || (ex.duration ? String(ex.duration) + 'm' : 10)}
+                                             </span>
+                                           </div>
+                                         );
+                                     })}
                                  </div>
                              )}
                          </div>
@@ -1272,6 +1336,18 @@ const ProgramTab = ({
             setViewingProfile(null);
             if (setHighlightPostId) setHighlightPostId(postId);
           }}
+        />
+      )}
+
+      {selectedDetailExercise && (
+        <ExerciseDetailModal
+          ex={selectedDetailExercise}
+          onClose={() => setSelectedDetailExercise(null)}
+          t={t}
+          lang={lang}
+          units={userProfile?.units}
+          exerciseLibrary={exerciseLibrary}
+          programs={programs}
         />
       )}
 

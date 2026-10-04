@@ -21,12 +21,6 @@ const FloatingTimer = ({
   const prevRestRef = React.useRef(0);
 
   useEffect(() => {
-    if (isWorkoutActive && Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
-      WorkoutTimerPlugin.requestOverlayPermission().catch(() => {});
-    }
-  }, [isWorkoutActive]);
-
-  useEffect(() => {
     let interval;
     if (restTargetTime !== null) {
       const initialRemaining = Math.ceil((restTargetTime - Date.now()) / 1000);

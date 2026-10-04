@@ -355,46 +355,7 @@ const DatabaseTab = ({ isActive = true, t, lang, exerciseLibrary, setExerciseLib
   // ── Tab State ────────────────────────────────────────────────────
   const [viewMode, setViewMode] = useState('all'); // 'all' | 'custom'
 
-  // --- Swipe Logic for Tab Switch ---
-  const touchStartX = useRef(null);
-  const touchEndX = useRef(null);
-  const minSwipeDistance = 50;
 
-  const onTouchStart = (e) => {
-    touchEndX.current = null;
-    touchStartX.current = e.targetTouches[0].clientX;
-  };
-
-  const onTouchMove = (e) => {
-    touchEndX.current = e.targetTouches[0].clientX;
-  };
-
-  const onTouchEnd = (e) => {
-    if (!touchStartX.current || !touchEndX.current) {
-      touchStartX.current = null;
-      touchEndX.current = null;
-      return;
-    }
-    const distance = touchStartX.current - touchEndX.current;
-    const isLeftSwipe = distance > minSwipeDistance;
-    const isRightSwipe = distance < -minSwipeDistance;
-    
-    // Tanpa suara, sama alasannya dengan MuscleProgress: geser di sini terasa sama dengan
-    // geser pindah tab, dan pindah tab sengaja senyap.
-    if (isLeftSwipe && viewMode === 'all') {
-      setViewMode('custom');
-      e.stopPropagation(); // Prevent global swipe
-    } else if (isRightSwipe && viewMode === 'custom') {
-      setViewMode('all');
-      e.stopPropagation(); // Prevent global swipe
-    }
-    touchStartX.current = null;
-    touchEndX.current = null;
-
-    if (window.scrollX !== 0) {
-      window.scrollTo(0, window.scrollY);
-    }
-  };
 
   // 🟢 Form State 🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢
   const [editingId, setEditingId] = useState(null);
@@ -1037,9 +998,6 @@ const DatabaseTab = ({ isActive = true, t, lang, exerciseLibrary, setExerciseLib
         <div 
           key={viewMode}
           className="w-full pt-4 pb-6 animate-in fade-in duration-200 overflow-x-hidden"
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
         >
           {displayedList.length === 0 ? (
             <div className={`flex flex-col items-center justify-center py-16 rounded-2xl border border-dashed ${t.border}`}>

@@ -57,7 +57,7 @@ export const muscleNameMap = {
   'upper chest': 'Dada Atas',
   'back': 'Punggung Atas',
   'middle back': 'Punggung Atas',
-  'lower back': 'Lats',
+  'lower back': 'Punggung Bawah',
   'shoulders': 'Deltoid Depan',
   'upper arms': 'Biceps',
   'lower arms': 'Biceps',
@@ -81,8 +81,8 @@ export const muscleNameMap = {
   'upper back': 'Punggung Atas',
   'rhomboids': 'Punggung Atas',
   'levator scapulae': 'Traps',
-  'spine': 'Lats',
-  'erector spinae': 'Lats',
+  'spine': 'Punggung Bawah',
+  'erector spinae': 'Punggung Bawah',
   'biceps': 'Biceps',
   'triceps': 'Triceps',
   'forearms': 'Forearm',
@@ -169,10 +169,10 @@ export const mapToLyFitFormat = (apiEx) => {
   // Gabungkan target muscles & secondary muscles, deduplikasi setelah translate
   const allMuscles = [
     ...(apiEx.targetMuscles || []),
-    ...(apiEx.secondaryMuscles || []).slice(0, 2), // Ambil max 2 secondary
+    ...(apiEx.secondaryMuscles || []),
   ];
 
-  let translatedTargets = [...new Set(allMuscles.map(m => translateMuscle(m)))];
+  let translatedTargets = [...new Set(allMuscles.map(m => translateMuscle(m)))].filter(Boolean);
   
   const exNameLower = (apiEx.name || '').toLowerCase();
   

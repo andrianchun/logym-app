@@ -153,14 +153,22 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
       Object.keys(history).forEach(dateStr => {
           if (history[dateStr]?.bioData && dateStr <= todayStr) {
               const b = history[dateStr].bioData;
-              bioEntries.push({ dateStr, bioData: b });
               if (!fallbackHeight && b.height) fallbackHeight = b.height;
+              // Hanya masukkan tanggal yang benar-benar memiliki data komposisi tubuh
+              // (agar hari yang hanya punya langkah/tidur tanpa timbangan tidak menjadi titik kosong hantu di kanan grafik)
+              const hasComp = [
+                'weight', 'bodyFat', 'musclePercent', 'muscleMass', 'boneMass',
+                'visceralFat', 'waterPercent', 'proteinPercent', 'bodyAge', 'bmr', 'waist', 'impedance'
+              ].some(k => Number(b[k]) > 0);
+              if (hasComp) {
+                  bioEntries.push({ dateStr, bioData: b });
+              }
           }
       });
       bioEntries.sort((a, b) => a.dateStr.localeCompare(b.dateStr));
 
       bioEntries.forEach(entry => {
-          const d = new Date(entry.dateStr);
+          const d = new Date(entry.dateStr.includes('T') ? entry.dateStr : entry.dateStr + 'T12:00:00');
           const histBio = enrichBioWithImpedance(entry.bioData, userProfile, fallbackHeight, entry.dateStr);
 
           const uH = Number(histBio?.height || fallbackHeight || userProfile?.height || 0);
@@ -199,7 +207,7 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
           });
       });
       return data;
-  }, [history, isImp, userProfile]);
+  }, [history, isImp, userProfile, language]);
 
   // 2. Data agregasi rata-rata per bulan
   const monthlyPoints = useMemo(() => {
@@ -462,6 +470,12 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
       touchState.current.initialDist = 0;
   };
 
+  const scrollToLatest = useCallback(() => {
+      if (!scrollRef.current || touchState.current.initialDist > 0) return;
+      const el = scrollRef.current;
+      el.scrollLeft = Math.max(0, el.scrollWidth - el.clientWidth);
+  }, []);
+
   useEffect(() => {
       if (scrollTarget.current !== null && scrollRef.current) {
           scrollRef.current.scrollLeft = scrollTarget.current;
@@ -469,14 +483,18 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
       }
   }, [pointWidth, chartData]);
 
-  // Auto scroll ke ujung kanan (data terbaru) saat ganti metrik atau data masuk
+  // Auto scroll ke ujung kanan (data terbaru) saat mount, ganti metrik, atau data masuk
   useEffect(() => {
-      if (scrollRef.current && chartData.length > 0) {
-          const clientW = scrollRef.current.clientWidth || (window.innerWidth - 64);
-          const nextChartWidth = Math.max(chartData.length * pointWidth, clientW);
-          scrollTarget.current = nextChartWidth - clientW;
-      }
-  }, [chartData.length, activeChartMetrics]);
+      if (chartData.length === 0) return;
+      const raf = requestAnimationFrame(scrollToLatest);
+      const timer = setTimeout(scrollToLatest, 50);
+      const timer2 = setTimeout(scrollToLatest, 260);
+      return () => {
+          cancelAnimationFrame(raf);
+          clearTimeout(timer);
+          clearTimeout(timer2);
+      };
+  }, [chartData.length, activeChartMetrics, resolution, scrollToLatest]);
 
   const currentPW = resolution === 'day' ? pointWidth : effectivePointWidth;
   const chartWidth = Math.max(chartData.length * currentPW, typeof window !== 'undefined' ? window.innerWidth - 64 : 320);
@@ -502,7 +520,6 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
                <div style={{
                  width: `${chartWidth}px`,
                  height: '224px',
-                 marginLeft: (chartData.length * currentPW) < (typeof window !== 'undefined' ? window.innerWidth - 64 : 320) ? 'auto' : '0'
                }} className="cursor-crosshair relative shrink-0 transition-all duration-200 ease-out">
                  {/* Gimmick Grid Lines */}
                  <svg className="absolute inset-0 w-full h-full pointer-events-none z-0" style={{ padding: '10px 0 30px 0' }}>
@@ -515,7 +532,7 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
                     width={chartWidth}
                     height={224}
                     data={chartData} 
-                    margin={{ top: 5, right: 10, left: 0, bottom: 0 }}
+                    margin={{ top: 8, right: 16, left: 16, bottom: 0 }}
                     style={{ outline: 'none' }}
                     onClick={(e) => {
                         if(e && e.activePayload && e.activePayload.length > 0) {
@@ -571,7 +588,7 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
                        fontSize={9} 
                        tickLine={false} 
                        axisLine={false} 
-                       interval={Math.max(0, Math.ceil(50 / effectivePointWidth) - 1)} 
+                       interval={chartData.length <= 8 ? 0 : 'preserveStartEnd'} 
                     />
                     {chartMetricsList.map(metric => {
                         if (!activeChartMetrics.includes(metric.key)) return null;
@@ -582,7 +599,7 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
                     })}
                     {chartMetricsList.map(metric => (
                         activeChartMetrics.includes(metric.key) && 
-                        <Line key={metric.key} yAxisId={metric.key} type="monotone" name={metric.label} dataKey={metric.key} stroke={metric.color} strokeWidth={1.5} dot={false} activeDot={{ r: 5, strokeWidth: 0, fill: metric.color }} connectNulls={true} isAnimationActive={false} />
+                        <Line key={metric.key} yAxisId={metric.key} type="monotone" name={metric.label} dataKey={metric.key} stroke={metric.color} strokeWidth={1.5} dot={chartData.length <= 1 ? { r: 5, fill: metric.color, strokeWidth: 0 } : false} activeDot={{ r: 5, strokeWidth: 0, fill: metric.color }} connectNulls={true} isAnimationActive={false} />
                     ))}
                  </LineChart>
                </div>

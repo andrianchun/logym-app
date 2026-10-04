@@ -5826,7 +5826,7 @@
     ],
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Cable_Seated_Lateral_Raise/0.jpg",
     "ytVideo": "",
-    "status": "pending",
+    "status": "approved",
     "isFavorite": true,
     "popularityRank": 4,
     "thumbnailUrl": "",
@@ -34829,7 +34829,7 @@
   "edb-Standing_Low-Pulley_Deltoid_Raise": {
     "id": "edb-Standing_Low-Pulley_Deltoid_Raise",
     "exerciseId": "Standing_Low-Pulley_Deltoid_Raise",
-    "name": "Standing Low-Pulley Deltoid Raise",
+    "name": "Standing Cable Lateral Raise",
     "bodyParts": [
       "strength"
     ],
@@ -34859,12 +34859,12 @@
       "Switch arms and repeat the exercise."
     ],
     "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Standing_Low-Pulley_Deltoid_Raise/0.jpg",
-    "ytVideo": "",
-    "status": "pending",
-    "isFavorite": false,
+    "ytVideo": "https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA",
+    "status": "approved",
+    "isFavorite": true,
     "popularityRank": 1769,
-    "thumbnailUrl": "",
-    "videoUrl": "",
+    "thumbnailUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.webp",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.mp4",
     "prompt_id": "",
     "approvedAt": null,
     "instructions": [
@@ -34874,6 +34874,13 @@
       "Tahan sejenak di puncak gerakan untuk merasakan kontraksi, lalu turunkan beban secara perlahan ke posisi awal sambil menarik napas.",
       "Ulangi gerakan sesuai repetisi yang dianjurkan.",
       "Ganti ke tangan kanan dan ulangi latihan."
+    ],
+    "aliases": [
+      "Standing Low-Pulley Deltoid Raise",
+      "Standing Cable Lateral Raises",
+      "Cable Lateral Raise",
+      "Cable Lateral Raises",
+      "Cable Side Lateral Raise"
     ]
   },
   "edb-Standing_Low-Pulley_One-Arm_Triceps_Extension": {
@@ -39926,5 +39933,62 @@
     "videoUrl": "",
     "prompt_id": "",
     "approvedAt": null
+  },
+  "edb-Standing_Cable_Lateral_Raise": {
+    "id": "edb-Standing_Cable_Lateral_Raise",
+    "exerciseId": "Standing_Low-Pulley_Deltoid_Raise",
+    "name": "Standing Cable Lateral Raise",
+    "bodyParts": [
+      "strength"
+    ],
+    "equipments": [
+      "cable"
+    ],
+    "targetMuscles": [
+      "shoulders"
+    ],
+    "secondaryMuscles": [
+      "forearms"
+    ],
+    "instructions_id": [
+      "Berdirilah di sisi kanan mesin kabel rendah. Pegang handle dengan tangan kiri secara menyilang di depan tubuh menggunakan genggaman pronasi (telapak menghadap ke bawah). Tangan kanan memegang tiang mesin untuk keseimbangan.",
+      "Pastikan punggung tegak dan kaki dibuka selebar bahu. Ini adalah posisi awal.",
+      "Angkat lengan kiri ke samping hingga mencapai ketinggian bahu sambil mengembuskan napas.",
+      "Tahan sejenak di puncak gerakan untuk merasakan kontraksi, lalu turunkan beban secara perlahan ke posisi awal sambil menarik napas.",
+      "Ulangi gerakan sesuai repetisi yang dianjurkan.",
+      "Ganti ke tangan kanan dan ulangi latihan."
+    ],
+    "instructions_en": [
+      "Start by standing to the right side of a low pulley row. Use your left hand to come across the body and grab a single handle attached to the low pulley with a pronated grip (palms facing down). Rest your arm in front of you. Your right hand should grab the machine for better support and balance.",
+      "Make sure that your back is erect and your feet are shoulder width apart from each other. This is the starting position.",
+      "Begin to use the left hand and come across your body out until it is elevated to shoulder height while exhaling.",
+      "Feel the contraction at the top for a second and begin to slowly lower the handle back down to the original starting position while inhaling.",
+      "Repeat for the recommended amount of repetitions.",
+      "Switch arms and repeat the exercise."
+    ],
+    "gifUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Standing_Low-Pulley_Deltoid_Raise/0.jpg",
+    "ytVideo": "https://youtu.be/9ilIKuy6B0g?si=d4LHAcUC86am2QQA",
+    "status": "approved",
+    "isFavorite": true,
+    "popularityRank": 1769,
+    "thumbnailUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.webp",
+    "videoUrl": "/exercise-assets/youtube-backup/edb-Standing_Cable_Lateral_Raise.mp4",
+    "prompt_id": "",
+    "approvedAt": null,
+    "instructions": [
+      "Berdirilah di sisi kanan mesin kabel rendah. Pegang handle dengan tangan kiri secara menyilang di depan tubuh menggunakan genggaman pronasi (telapak menghadap ke bawah). Tangan kanan memegang tiang mesin untuk keseimbangan.",
+      "Pastikan punggung tegak dan kaki dibuka selebar bahu. Ini adalah posisi awal.",
+      "Angkat lengan kiri ke samping hingga mencapai ketinggian bahu sambil mengembuskan napas.",
+      "Tahan sejenak di puncak gerakan untuk merasakan kontraksi, lalu turunkan beban secara perlahan ke posisi awal sambil menarik napas.",
+      "Ulangi gerakan sesuai repetisi yang dianjurkan.",
+      "Ganti ke tangan kanan dan ulangi latihan."
+    ],
+    "aliases": [
+      "Standing Low-Pulley Deltoid Raise",
+      "Standing Cable Lateral Raises",
+      "Cable Lateral Raise",
+      "Cable Lateral Raises",
+      "Cable Side Lateral Raise"
+    ]
   }
 }

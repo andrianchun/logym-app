@@ -391,6 +391,8 @@ class WorkoutTimerService : Service() {
         
         if (isResting) {
             val restLeft = kotlin.math.ceil((restTargetTime - System.currentTimeMillis()) / 1000.0).toLong()
+            // Nilai mutlak: tanda "-" untuk waktu lewat ditambahkan sendiri di bawah.
+            val formattedRest = formatTime(kotlin.math.abs(restLeft))
             restContainer?.visibility = android.view.View.VISIBLE
             if (restLeft > 0) {
                 tvRestTime?.text = formattedRest
