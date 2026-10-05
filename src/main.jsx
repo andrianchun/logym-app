@@ -31,15 +31,12 @@ class ErrorBoundary extends React.Component {
     // (lihat checkOta di App.jsx), jadi user macet gak bisa keluar dari layar merah ini.
     // Coba SEKALI: unregister semua SW + hapus cache Workbox, baru hard-reload — biar reload
     // itu benar-benar ambil ulang index.html + bundle terbaru dari server, bukan dari cache.
-    // Guard sessionStorage biar gak reload berulang kalau bundle terbarunya sendiri yang crash.
-    if (error && !sessionStorage.getItem('app-updated-reload')) {
-      sessionStorage.setItem('app-updated-reload', 'true');
+    // Guard 15 detik biar gak reload berulang/looping kalau bundle terbarunya sendiri yang crash.
+    const lastReload = Number(sessionStorage.getItem('app-updated-reload') || 0);
+    const now = Date.now();
+    if (error && (!lastReload || now - lastReload > 15000)) {
+      sessionStorage.setItem('app-updated-reload', String(now));
       (async () => {
-        // DI APK, BERSIH-BERSIH SERVICE WORKER TIDAK ADA GUNANYA. JS-nya dibaca dari bundle OTA di
-        // penyimpanan perangkat (https://localhost/assets/...), bukan dari jaringan — reload
-        // sesudah menghapus cache cuma memuat ulang bundle rusak yang sama. Yang benar: kembalikan
-        // ke bundle bawaan APK lewat reset(), lalu pengecekan OTA bisa jalan lagi dan menarik versi
-        // perbaikannya. Tanpa ini, satu crash saat render mengunci APK permanen.
         try {
           if (Capacitor.isNativePlatform()) {
             await CapacitorUpdater.reset();
@@ -56,12 +53,6 @@ class ErrorBoundary extends React.Component {
     return { hasError: true, error };
   }
 
-  componentDidMount() {
-    setTimeout(() => {
-      sessionStorage.removeItem('app-updated-reload');
-    }, 1000);
-  }
-
   componentDidCatch(error, errorInfo) {
     this.setState({ errorInfo });
     console.error("React Error:", error, errorInfo);
@@ -70,9 +61,29 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ padding: '20px', backgroundColor: 'black', color: 'red', minHeight: '100vh', fontFamily: 'monospace' }}>
-          <h2>Something went wrong.</h2>
-          <details style={{ whiteSpace: 'pre-wrap' }}>
+        <div style={{ padding: '24px', backgroundColor: '#090e1a', color: '#f87171', minHeight: '100vh', fontFamily: 'monospace' }}>
+          <h2 style={{ color: '#fff', fontSize: '1.25rem', marginBottom: '12px', fontWeight: 'bold' }}>Terjadi Masalah pada Aplikasi</h2>
+          <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '16px' }}>
+            Aplikasi mengalami kendala saat memuat antarmuka. Anda dapat mencoba memuat ulang aplikasi di bawah ini.
+          </p>
+          <button 
+            type="button"
+            onClick={() => window.location.reload()} 
+            style={{ 
+              padding: '10px 18px', 
+              backgroundColor: '#38bdf8', 
+              color: '#000', 
+              border: 'none', 
+              borderRadius: '10px', 
+              fontWeight: 'bold', 
+              cursor: 'pointer',
+              marginBottom: '20px'
+            }}
+          >
+            Muat Ulang Aplikasi
+          </button>
+          <details style={{ whiteSpace: 'pre-wrap', color: '#f87171', fontSize: '0.8rem', backgroundColor: 'rgba(0,0,0,0.4)', padding: '12px', borderRadius: '8px' }}>
+            <summary style={{ cursor: 'pointer', color: '#cbd5e1', marginBottom: '8px' }}>Detail Teknis</summary>
             {this.state.error && this.state.error.toString()}
             <br />
             {this.state.errorInfo && this.state.errorInfo.componentStack}

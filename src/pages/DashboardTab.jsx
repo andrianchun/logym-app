@@ -3053,18 +3053,57 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
             </div>
 
             {/* Target Durasi Mingguan (WHO) */}
-            <div className="mt-4 pt-4 border-t border-white/10">
-              <div className="flex items-center justify-between mb-3">
-                <label className="caption text-slate-300 font-semibold uppercase tracking-wider">
+            <div className="mt-4 pt-4 border-t border-white/10 space-y-3">
+              <div>
+                <label className="caption text-slate-300 font-semibold uppercase tracking-wider block mb-2">
                   Target Durasi Mingguan
                 </label>
-                <span className="caption font-bold text-sky-400">
-                  {editWeeklyDuration} mnt / minggu
-                </span>
+
+                {/* Target Duration Controls (Input & Chips dikumpulkan berdekatan) */}
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="relative flex-1">
+                    <SwipeInput 
+                      value={editWeeklyDuration || ''} 
+                      onChange={(v) => {
+                        const val = Number(v) || 0;
+                        setEditWeeklyDuration(val);
+                        handleSaveWeeklyDurationTarget(val);
+                      }} 
+                      min={30} max={600} step={15} 
+                      placeholder="150"
+                      language={language}
+                      className="w-full bg-black/40 border border-white/15 text-white p-2.5 rounded-xl outline-none font-black text-center text-lg pr-12 focus:border-sky-400 transition-colors"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 caption font-bold text-slate-400">mnt</span>
+                  </div>
+                </div>
+                <div className="flex gap-1.5">
+                  {[75, 150, 200, 300].map((mins) => (
+                    <button
+                      key={mins}
+                      type="button"
+                      onClick={() => {
+                        playSoundEffect('click', soundEnabled);
+                        setEditWeeklyDuration(mins);
+                        handleSaveWeeklyDurationTarget(mins);
+                      }}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        editWeeklyDuration === mins
+                          ? 'bg-sky-500 text-white shadow-sm'
+                          : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'
+                      }`}
+                    >
+                      {mins}m
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-500 mt-2 leading-snug">
+                  WHO merekomendasikan minimal 150 menit aktivitas aerobik intensitas sedang per minggu.
+                </p>
               </div>
 
-              {/* Weekly Progress Bar */}
-              <div className="mb-3">
+              {/* Weekly Progress Bar diletakkan di bawah setelah target durasi */}
+              <div className="pt-2 border-t border-white/5">
                 <div className="flex items-baseline justify-between mb-1.5">
                   <span className="text-sm text-slate-400">Progres minggu ini</span>
                   <span className="text-xs font-bold text-white">
@@ -3074,55 +3113,13 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                 <div className="w-full h-2.5 bg-white/10 rounded-full overflow-hidden">
                   <div 
                     className={`h-full rounded-full transition-all duration-500 ${(mergedWeeklyActiveMinutes || 0) >= editWeeklyDuration ? 'bg-emerald-400' : 'bg-sky-400'}`}
-                    style={{ width: `${Math.min(100, ((mergedWeeklyActiveMinutes || 0) / editWeeklyDuration) * 100)}%` }}
+                    style={{ width: `${Math.min(100, ((mergedWeeklyActiveMinutes || 0) / (editWeeklyDuration || 1)) * 100)}%` }}
                   />
                 </div>
                 {(mergedWeeklyActiveMinutes || 0) >= editWeeklyDuration && (
                   <p className="text-xs text-emerald-400 font-semibold mt-1">✔ Target mingguan tercapai!</p>
                 )}
               </div>
-
-              {/* SwipeInput */}
-              <div className="flex items-center gap-2 mb-2">
-                <div className="relative flex-1">
-                  <SwipeInput 
-                    value={editWeeklyDuration || ''} 
-                    onChange={(v) => {
-                      const val = Number(v) || 0;
-                      setEditWeeklyDuration(val);
-                      handleSaveWeeklyDurationTarget(val);
-                    }} 
-                    min={30} max={600} step={15} 
-                    placeholder="150"
-                    language={language}
-                    className="w-full bg-black/40 border border-white/15 text-white p-2.5 rounded-xl outline-none font-black text-center text-lg pr-12 focus:border-sky-400 transition-colors"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 caption font-bold text-slate-400">mnt</span>
-                </div>
-              </div>
-              <div className="flex gap-1.5">
-                {[75, 150, 200, 300].map((mins) => (
-                  <button
-                    key={mins}
-                    type="button"
-                    onClick={() => {
-                      playSoundEffect('click', soundEnabled);
-                      setEditWeeklyDuration(mins);
-                      handleSaveWeeklyDurationTarget(mins);
-                    }}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      editWeeklyDuration === mins
-                        ? 'bg-sky-500 text-white shadow-sm'
-                        : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'
-                    }`}
-                  >
-                    {mins}m
-                  </button>
-                ))}
-              </div>
-              <p className="text-sm text-slate-500 mt-2 leading-snug">
-                WHO merekomendasikan minimal 150 menit aktivitas aerobik intensitas sedang per minggu.
-              </p>
             </div>
           </div>
         </div>,

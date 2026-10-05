@@ -220,7 +220,7 @@ const AddExerciseModal = ({
               )}
             </div>
             
-            <div className="p-3 overflow-y-auto flex-1 hide-scrollbar">
+            <div className="p-3 overflow-y-auto flex-1 hide-scrollbar space-y-2.5">
               {filteredLib.map((ex, idx) => (
                 <UnifiedExerciseCard
                   key={ex.id || `${ex.name}-${idx}`}

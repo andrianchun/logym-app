@@ -12,6 +12,8 @@
 import { db } from '../firebase';
 import { doc, setDoc, getDocs, query, collection, orderBy, limit, increment } from 'firebase/firestore';
 
+import { exerciseSlug } from './exerciseSearch.js';
+
 const COLL = 'logym_exercise_stats';
 const CACHE_KEY = 'lyfit_exercise_popularity';
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -19,7 +21,7 @@ const TOP_N = 500;
 
 // Nama latihan -> id dokumen. Firestore melarang '/' di id dan menolak id kosong; sisanya
 // dinormalkan supaya "Bench Press", "bench press ", dan "Bench  Press" jadi satu baris.
-export { exerciseSlug } from './exerciseSearch.js';
+export { exerciseSlug };
 
 /**
  * Tambah hitungan pemakaian untuk latihan-latihan sebuah sesi yang baru selesai.

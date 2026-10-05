@@ -4335,11 +4335,15 @@ export default function App() {
       } else if (activeAddModalTarget.type === 'adhoc') { 
         setExtraExercises(prev => {
           const cleanTargetName = (ex.name || '').toLowerCase().trim();
-          const baseTargetId = String(ex.originalId || ex.id || '').split('-')[0];
+          const targetId = String(ex.id || '');
+          const targetOrigId = String(ex.originalId || '');
           const isDuplicate = prev.some(existing => {
             const cleanExistingName = (existing.name || '').toLowerCase().trim();
-            const baseExistingId = String(existing.originalId || existing.id || '').split('-')[0];
-            return (baseTargetId && baseExistingId === baseTargetId) || (cleanTargetName && cleanExistingName === cleanTargetName);
+            const existingId = String(existing.id || '');
+            const existingOrigId = String(existing.originalId || '');
+            const isSameName = cleanTargetName && cleanExistingName === cleanTargetName;
+            const isSameId = (targetId && existingId === targetId) || (targetOrigId && existingOrigId === targetOrigId);
+            return isSameName || isSameId;
           });
           if (isDuplicate) return prev;
           return [...prev, { ...ex, id: `${ex.id}-${Date.now()}`, sets: defaultSets, reps: defaultReps, duration: defaultDuration }];
@@ -4730,6 +4734,7 @@ export default function App() {
                  <ProgramTab setConfirmModal={setConfirmModal} 
                    isActive={contentTab === 'program'}
                    onPostCreated={handlePostCreated}
+                   weekStartDay={weekStartDay}
                    t={t} theme={theme} lang={lang} programs={programs} setPrograms={setPrograms} 
                    user={user} exerciseLibrary={exerciseLibrary} soundEnabled={soundEnabled}
                    setActiveAddModalTarget={setActiveAddModalTarget}

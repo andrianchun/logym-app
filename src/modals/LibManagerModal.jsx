@@ -5,19 +5,18 @@ import { X, Search, Edit2, Plus, Filter, Link as LinkIcon, Dumbbell, ChevronDown
 import { formatTarget, normalizeMuscleKey, muscleOptions, equipmentOptions } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
 
-const LibManagerModal = ({ showLibManager, setShowLibManager, t, exerciseLibrary, setExerciseLibrary, soundEnabled, setConfirmModal }) => {
+const LibManagerModal = ({ showLibManager, setShowLibManager, t, lang = { id: 'ID' }, exerciseLibrary, setExerciseLibrary, soundEnabled, setConfirmModal }) => {
   const [viewMode, setViewMode] = useState('list');
   const [editForm, setEditForm] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMuscle, setFilterMuscle] = useState('All');
   const [filterEquip, setFilterEquip] = useState('All');
   const [sortBy, setSortBy] = useState('new');
-
-  if (!showLibManager) return null;
   const [openDropdown, setOpenDropdown] = useState(null);
   const dropdownRef = React.useRef(null);
   
   React.useEffect(() => {
+    if (!showLibManager) return;
     const origBody = document.body.style.overflow;
     const origHtml = document.documentElement.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -26,17 +25,20 @@ const LibManagerModal = ({ showLibManager, setShowLibManager, t, exerciseLibrary
       document.body.style.overflow = origBody;
       document.documentElement.style.overflow = origHtml;
     };
-  }, []);
+  }, [showLibManager]);
 
   React.useEffect(() => {
-      const handleClickOutside = (e) => {
-          if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-              setOpenDropdown(null);
-          }
-      };
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    if (!showLibManager) return;
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setOpenDropdown(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showLibManager]);
+
+  if (!showLibManager) return null;
 
   let filteredLib = exerciseLibrary.filter(ex => ex.name.toLowerCase().includes(searchQuery.toLowerCase()));
   
@@ -227,7 +229,13 @@ const LibManagerModal = ({ showLibManager, setShowLibManager, t, exerciseLibrary
                           <input 
                              type="number" 
                              value={editForm.defaultWeight === 0 ? '' : editForm.defaultWeight} 
-                             onChange={(e) => setEditForm({...editForm, defaultWeight: e.target.value === '' ? '' : Number(e.target.value)})} 
+                             onFocus={(e) => e.target.select()}
+                             onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault(); }}
+                             onChange={(e) => {
+                               const clean = e.target.value.replace(/^0+(?=\d)/, '');
+                               if (e.target.value !== clean) e.target.value = clean;
+                               setEditForm({...editForm, defaultWeight: clean === '' ? '' : Number(clean)});
+                             }} 
                              className={`w-full ${t.inputBg} ${t.textMain} px-2 py-3.5 rounded-xl outline-none text-center font-bold body-lg`} 
                              placeholder="0"
                           />

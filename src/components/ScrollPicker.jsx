@@ -121,7 +121,11 @@ const ScrollPicker = ({ value, onChange, min = 0, max = 200, step = 1, width = '
           type="text"
           inputMode="decimal"
           value={draftValue}
-          onChange={(e) => setDraftValue(e.target.value)}
+          onFocus={(e) => e.target.select()}
+          onChange={(e) => {
+            const clean = e.target.value.replace(/^0+(?=\d)/, '');
+            setDraftValue(clean);
+          }}
           onBlur={commitEdit}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.target.blur(); } }}
           className={`w-full text-center font-black text-2xl bg-transparent outline-none ${textAccentClass}`}

@@ -5,8 +5,9 @@ import { playSoundEffect } from '../utils/audio';
 const EditModeTab = ({ t, lang, programs, setPrograms, setIsEditingMode, setActiveAddModalTarget, soundEnabled, setConfirmModal }) => {
 
   const handleUpdateEx = (progId, exId, field, val) => {
-    // Membiarkan string kosong ('') saat sedang diketik
-    const numVal = val === '' ? '' : Number(val);
+    // Membiarkan string kosong ('') saat sedang diketik, hilangkan leading zero
+    const cleanStr = typeof val === 'string' ? val.replace(/^0+(?=\d)/, '') : val;
+    const numVal = cleanStr === '' ? '' : Number(cleanStr);
     setPrograms(programs.map(p => p.id === progId ? {
       ...p,
       exercises: p.exercises.map(ex => ex.id === exId ? { ...ex, [field]: numVal } : ex)
@@ -90,7 +91,13 @@ const EditModeTab = ({ t, lang, programs, setPrograms, setIsEditingMode, setActi
                             <input 
                                type="number" 
                                value={ex.sets === 0 ? '' : ex.sets} 
-                               onChange={(e) => handleUpdateEx(prog.id, ex.id, 'sets', e.target.value)} 
+                               onFocus={(e) => e.target.select()}
+                               onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault(); }}
+                               onChange={(e) => {
+                                  const clean = e.target.value.replace(/^0+(?=\d)/, '');
+                                  if (e.target.value !== clean) e.target.value = clean;
+                                  handleUpdateEx(prog.id, ex.id, 'sets', clean);
+                               }} 
                                placeholder="0" 
                                className={`w-16 p-2 rounded-lg ${t.inputBg} ${t.textMain} text-center font-black outline-none`} 
                             />
@@ -101,7 +108,13 @@ const EditModeTab = ({ t, lang, programs, setPrograms, setIsEditingMode, setActi
                               <input 
                                  type="number" 
                                  value={ex.duration === 0 ? '' : ex.duration} 
-                                 onChange={(e) => handleUpdateEx(prog.id, ex.id, 'duration', e.target.value)} 
+                                 onFocus={(e) => e.target.select()}
+                                 onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault(); }}
+                                 onChange={(e) => {
+                                    const clean = e.target.value.replace(/^0+(?=\d)/, '');
+                                    if (e.target.value !== clean) e.target.value = clean;
+                                    handleUpdateEx(prog.id, ex.id, 'duration', clean);
+                                 }} 
                                  placeholder="0" 
                                  className={`w-16 p-2 rounded-lg ${t.inputBg} ${t.textMain} text-center font-black outline-none`} 
                               />
@@ -112,7 +125,13 @@ const EditModeTab = ({ t, lang, programs, setPrograms, setIsEditingMode, setActi
                               <input 
                                  type="number" 
                                  value={ex.reps === 0 ? '' : ex.reps} 
-                                 onChange={(e) => handleUpdateEx(prog.id, ex.id, 'reps', e.target.value)} 
+                                 onFocus={(e) => e.target.select()}
+                                 onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault(); }}
+                                 onChange={(e) => {
+                                    const clean = e.target.value.replace(/^0+(?=\d)/, '');
+                                    if (e.target.value !== clean) e.target.value = clean;
+                                    handleUpdateEx(prog.id, ex.id, 'reps', clean);
+                                 }} 
                                  placeholder="0" 
                                  className={`w-16 p-2 rounded-lg ${t.inputBg} ${t.textMain} text-center font-black outline-none`} 
                               />

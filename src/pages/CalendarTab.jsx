@@ -56,6 +56,18 @@ const CalendarTab = ({
   }, [isWorkoutActive, workoutStartTime, exerciseLogs, userProfile?.weight, tickBerjalan]);
 
   const isImp = unitSystem === 'imperial';
+  const isID = (lang?.id || (typeof lang === 'string' ? lang : 'ID')).toUpperCase() === 'ID';
+
+  const dayHeaders = useMemo(() => {
+    if (isID) {
+      return weekStartDay === 1
+        ? ['S', 'S', 'R', 'K', 'J', 'S', 'M']
+        : ['M', 'S', 'S', 'R', 'K', 'J', 'S'];
+    }
+    return weekStartDay === 1
+      ? ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+      : ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  }, [isID, weekStartDay]);
   const [calendarSelectedDate, setCalendarSelectedDate] = useState(() => selectedDate || getLocalYMD(new Date()));
 
   // Ketika selectedDate dari luar berubah secara eksplisit (misal navigasi program atau login), sinkronkan kalender
@@ -549,7 +561,7 @@ const CalendarTab = ({
         setCalendarDate(new Date(sel));
       }
     }
-  }, [calendarSelectedDate, calendarMode]);
+  }, [calendarSelectedDate, calendarMode, weekStartDay]);
 
   const dayWorkoutsCache = useMemo(() => new Map(), [history, programs, activePlanIds]);
   const getDayWorkouts = useCallback((dateStr) => {
@@ -987,7 +999,7 @@ const CalendarTab = ({
   };
 
   const getCalendarLabel = (baseDate) => {
-    return baseDate.toLocaleString(lang === 'id' ? 'id-ID' : 'en-US', { month: 'long', year: 'numeric' });
+    return baseDate.toLocaleString(isID ? 'id-ID' : 'en-US', { month: 'long', year: 'numeric' });
   };
 
   const getAdjacentCalendarDate = (baseDate, direction) => {
@@ -1080,14 +1092,14 @@ const CalendarTab = ({
   // supaya di list scroll vertikal, beberapa bulan sekaligus kelihatan alih-alih 1 bulan = 1 layar.
   const renderMonthPanel = (panelDate) => {
     const cells = getGridCellsForDate(panelDate);
-    const panelMonthName = panelDate.toLocaleString(lang === 'id' ? 'id-ID' : 'en-US', { month: 'long' });
+    const panelMonthName = panelDate.toLocaleString(isID ? 'id-ID' : 'en-US', { month: 'long' });
     const panelYear = panelDate.getFullYear();
 
     return (
       <div className="flex flex-col px-2">
         <h2 className={`text-2xl font-black mb-2 px-1 shrink-0 ${t.textMain} tracking-tight`}>{panelMonthName} {panelYear}</h2>
         <div className="grid grid-cols-7 gap-1 mb-2 px-1 shrink-0">
-          {(weekStartDay === 1 ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'] : ['S', 'M', 'T', 'W', 'T', 'F', 'S']).map((day, i) => (
+          {dayHeaders.map((day, i) => (
             <div key={i} className="text-center text-xs font-bold uppercase text-slate-500 tracking-widest opacity-80">{day}</div>
           ))}
         </div>
@@ -1248,7 +1260,7 @@ const CalendarTab = ({
                   }}
                   className={`text-xs font-bold px-3 py-1.5 rounded-full ${t.bgAccent} text-white hover:opacity-80 transition-opacity shadow-sm`}
                 >
-                  Hari Ini
+                  {isID ? 'Hari Ini' : 'Today'}
                 </button>
               )}
             </div>
@@ -1287,7 +1299,7 @@ const CalendarTab = ({
           </div>
         ) : calendarMode === 'monthPicker' ? (
           <div className="grid grid-cols-3 gap-2 px-1 py-1 animate-in fade-in zoom-in-95 duration-300 ease-out">
-            {(lang === 'id' 
+            {(isID 
               ? ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
               : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
             ).map((m, i) => (
@@ -1306,7 +1318,7 @@ const CalendarTab = ({
                 Tailwind yang dirakit dinamis tidak terbaca pemindainya. */}
             <div className="grid gap-1 mb-1 px-2 py-1" style={{ gridTemplateColumns: `repeat(${7 * mingguStrip}, minmax(0, 1fr))` }}>
               {Array.from({ length: mingguStrip }).flatMap((_, m) =>
-                (weekStartDay === 1 ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'] : ['S', 'M', 'T', 'W', 'T', 'F', 'S']).map((day, i) => (
+                dayHeaders.map((day, i) => (
                   <div key={`${m}-${i}`} className={`text-center text-xs font-medium uppercase text-slate-500 tracking-wider`}>{day}</div>
                 ))
               )}

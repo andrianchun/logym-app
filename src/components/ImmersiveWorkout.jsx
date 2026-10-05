@@ -1555,7 +1555,13 @@ const ImmersiveWorkout = ({
                   <input 
                     type="number"
                     value={activeSetDetail.heartRate}
-                    onChange={e => setActiveSetDetail({...activeSetDetail, heartRate: e.target.value})}
+                    onFocus={(e) => e.target.select()}
+                    onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault(); }}
+                    onChange={e => {
+                      const clean = e.target.value.replace(/^0+(?=\d)/, '');
+                      if (e.target.value !== clean) e.target.value = clean;
+                      setActiveSetDetail({...activeSetDetail, heartRate: clean});
+                    }}
                     placeholder="Contoh: 140"
                     className={`w-full p-4 rounded-3xl bg-black/5 dark:bg-white/5 ${t.textMain} placeholder-black/30 dark:placeholder-white/30 text-base outline-none focus:ring-2 focus:${t.ringAccent} text-center font-black`}
                   />
@@ -1567,7 +1573,13 @@ const ImmersiveWorkout = ({
                       <input 
                         type="number"
                         value={activeSetDetail.incline}
-                        onChange={e => setActiveSetDetail({...activeSetDetail, incline: e.target.value})}
+                        onFocus={(e) => e.target.select()}
+                        onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault(); }}
+                        onChange={e => {
+                          const clean = e.target.value.replace(/^0+(?=\d)/, '');
+                          if (e.target.value !== clean) e.target.value = clean;
+                          setActiveSetDetail({...activeSetDetail, incline: clean});
+                        }}
                         placeholder="Contoh: 2.5"
                         className={`w-full p-4 rounded-3xl bg-black/5 dark:bg-white/5 ${t.textMain} placeholder-black/30 dark:placeholder-white/30 text-base outline-none focus:ring-2 focus:${t.ringAccent} text-center font-black`}
                       />
@@ -1578,7 +1590,13 @@ const ImmersiveWorkout = ({
                       <input 
                         type="number"
                         value={activeSetDetail.elevation}
-                        onChange={e => setActiveSetDetail({...activeSetDetail, elevation: e.target.value})}
+                        onFocus={(e) => e.target.select()}
+                        onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault(); }}
+                        onChange={e => {
+                          const clean = e.target.value.replace(/^0+(?=\d)/, '');
+                          if (e.target.value !== clean) e.target.value = clean;
+                          setActiveSetDetail({...activeSetDetail, elevation: clean});
+                        }}
                         placeholder="Contoh: 50"
                         className={`w-full p-4 rounded-3xl bg-black/5 dark:bg-white/5 ${t.textMain} placeholder-black/30 dark:placeholder-white/30 text-base outline-none focus:ring-2 focus:${t.ringAccent} text-center font-black`}
                       />

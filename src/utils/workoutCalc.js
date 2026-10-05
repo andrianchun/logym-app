@@ -1166,7 +1166,7 @@ export const dailyBurnCalories = (bioData, workouts, fallbackWeightKg, dayExerci
   //    - Karbohidrat TEF ~7.5% (4 kcal/g x 7.5% = 0.3 kcal/g)
   //    - Lemak TEF ~2% (9 kcal/g x 2% = 0.18 kcal/g)
   // 2. Jika hanya ada total kalori makanan: 10% x kalori makanan (standar mixed diet).
-  // 3. Jika belum ada catatan makanan: 10% x BMR (basal fallback).
+  // 3. Jika belum ada catatan makanan: TEF = 0 (tidak ada makanan → tidak ada energi cerna).
   const proteinG = Number(bio.protein ?? bio.nutritionProtein) || 0;
   const carbsG = Number(bio.carbs ?? bio.nutritionCarbs) || 0;
   const fatG = Number(bio.fat ?? bio.nutritionFat) || 0;
@@ -1181,9 +1181,8 @@ export const dailyBurnCalories = (bioData, workouts, fallbackWeightKg, dayExerci
     tef = Math.round(tefP + tefC + tefF);
   } else if (nutritionKcal > 0) {
     tef = Math.round(nutritionKcal * 0.10);
-  } else {
-    tef = Math.round(bmr * 0.10);
   }
+  // else: tef tetap 0 — belum ada makanan, belum ada energi pencernaan
 
   const floor = bmr + steps + workout + tef;
 

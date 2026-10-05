@@ -364,11 +364,11 @@ console.log('workoutCalc OK', { cardioKcal, plankKcal, liftKcal });
   assert.equal(burnFood.steps, 200, `5000 langkah x 0.04 = 200 kcal, dapat ${burnFood.steps}`);
   assert.equal(burnFood.total, burnFood.bmr + burnFood.steps + burnFood.tef + burnFood.workout);
 
-  // 2. Without logged nutrition: Fallback TEF = 10% of BMR
+  // 2. Without logged nutrition: TEF = 0 (tidak ada makanan → tidak ada energi pencernaan)
   const bioEmpty = { weight: 70, steps: 0 };
   const burnEmpty = dailyBurnCalories(bioEmpty, [], 70, {}, { weight: 70, height: 175, age: 25, gender: 'male' });
-  assert.equal(burnEmpty.tef, Math.round(burnEmpty.bmr * 0.1), `Fallback TEF harus 10% BMR, dapat ${burnEmpty.tef}`);
-  assert.equal(burnEmpty.total, burnEmpty.bmr + burnEmpty.tef);
+  assert.equal(burnEmpty.tef, 0, `TEF tanpa makanan harus 0, dapat ${burnEmpty.tef}`);
+  assert.equal(burnEmpty.total, burnEmpty.bmr);
 
   // 3. With explicit macronutrients (Protein 150g, Carbs 200g, Fat 50g)
   // TEF = (150*4*0.25) + (200*4*0.075) + (50*9*0.02) = 150 + 60 + 9 = 219 kcal

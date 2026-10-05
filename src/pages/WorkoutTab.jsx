@@ -174,8 +174,11 @@ const WorkoutTab = ({
     activeProgramsList.forEach(p => {
       (p.exercises || []).forEach(e => {
         if (e.name) set.add(e.name.toLowerCase().trim());
-        if (e.id) set.add(String(e.id).split('-')[0]);
-        if (e.originalId) set.add(String(e.originalId).split('-')[0]);
+        if (e.id) set.add(String(e.id));
+        if (e.originalId) set.add(String(e.originalId));
+        if (p.workoutId && String(e.id).endsWith(`-${p.workoutId}`)) {
+          set.add(String(e.id).slice(0, -(String(p.workoutId).length + 1)));
+        }
       });
     });
     return set;
@@ -185,8 +188,11 @@ const WorkoutTab = ({
     return (extraExercises || []).filter(ex => {
       if (!ex) return false;
       const name = (ex.name || '').toLowerCase().trim();
-      const baseId = String(ex.originalId || ex.id || '').split('-')[0];
-      return !activeProgramExIds.has(name) && (!baseId || !activeProgramExIds.has(baseId));
+      const exIdStr = String(ex.id || '');
+      const origIdStr = String(ex.originalId || '');
+      const isNameInActive = name && activeProgramExIds.has(name);
+      const isIdInActive = (exIdStr && activeProgramExIds.has(exIdStr)) || (origIdStr && activeProgramExIds.has(origIdStr));
+      return !isNameInActive && !isIdInActive;
     });
   }, [extraExercises, activeProgramExIds]);
 
@@ -462,6 +468,12 @@ const WorkoutTab = ({
              w = currentWorkouts[wIdx];
           }
 
+          // Buang properti sementara pencarian & scoring sebelum masuk ke state workout
+          const {
+            _nameNorm, _nameColl, _targetNorm, _allText, _allColl, _slug, score, _searchScore,
+            ...cleanEx
+          } = newEx;
+
           // Update secara immutable — jangan mutasi objek di dalam state React.
           //
           // supersetId WAJIB ikut. Tanpa itu latihan pengganti keluar dari supersetnya: siblingIds
@@ -470,22 +482,45 @@ const WorkoutTab = ({
           // groupExercises (yang mengelompokkan berdasar kedekatan) memecah kartunya jadi dua.
           // Versi di ProgramTab.jsx sudah mempertahankannya sejak dulu.
           const replacement = {
-            ...newEx,
+            ...cleanEx,
             sets: detailExercise.sets || 3,
             reps: detailExercise.reps || 10,
             duration: detailExercise.duration || 10,
-            id: newEx.id,
+            defaultWeight: detailExercise.defaultWeight ?? cleanEx.defaultWeight,
+            id: cleanEx.id || `ex-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
             ...(detailExercise.supersetId ? { supersetId: detailExercise.supersetId } : {})
           };
           let newW = w;
 
           const matchesTarget = (e) => {
             if (!e) return false;
-            if (originalExId && (e.id === originalExId || String(e.id) === String(originalExId))) return true;
-            if (detailExercise?.id && (e.id === detailExercise.id || String(e.id) === String(detailExercise.id))) return true;
-            const eBase = String(e.id || '').split('-')[0];
-            const origBase = String(originalExId || detailExercise?.id || '').split('-')[0];
-            if (eBase && origBase && eBase === origBase) return true;
+            const eIdStr = String(e.id ?? '');
+            const origIdStr = String(originalExId ?? '');
+            const detailIdStr = String(detailExercise?.id ?? '');
+
+            // 1. Direct ID match
+            if (origIdStr && eIdStr === origIdStr) return true;
+            if (detailIdStr && eIdStr === detailIdStr) return true;
+
+            // 2. Compound ID match (${e.id}-${workoutId})
+            if (workoutId) {
+              if (detailIdStr === `${eIdStr}-${workoutId}`) return true;
+              if (detailIdStr.endsWith(`-${workoutId}`)) {
+                const stripped = detailIdStr.slice(0, -(String(workoutId).length + 1));
+                if (stripped === eIdStr) return true;
+              }
+              if (origIdStr.endsWith(`-${workoutId}`)) {
+                const stripped = origIdStr.slice(0, -(String(workoutId).length + 1));
+                if (stripped === eIdStr) return true;
+              }
+            }
+
+            // 3. Original ID property match
+            if (e.originalId && (String(e.originalId) === origIdStr || String(e.originalId) === detailIdStr)) return true;
+
+            // 4. Exact name fallback jika ID tidak cocok tapi nama sama
+            if (detailExercise?.name && e.name && e.name.toLowerCase().trim() === detailExercise.name.toLowerCase().trim()) return true;
+
             return false;
           };
 

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Plus, GripVertical, ArrowUp, ArrowDown, Clock, Link as LinkIcon, X, Dumbbell, ChevronRight, ChevronDown, ChevronUp, Copy, Sparkles, FolderOpen, Trash2, CheckCircle2, Calendar, Edit2, ArrowLeftRight, Share2, Check, Brain } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -24,7 +24,7 @@ const PlanNameInput = ({ initialValue, onSave, className, placeholder }) => {
       value={val}
       onChange={(e) => setVal(e.target.value)}
       onBlur={() => onSave(val)}
-      onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
+      onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') e.target.blur(); }}
       className={className}
       placeholder={placeholder}
     />
@@ -81,39 +81,36 @@ const SortableExerciseItem = ({
       )}
       <div className="flex items-center justify-between gap-2.5">
         
-        {/* Left Column: Number, Thumbnail, Title and Sets/Reps */}
-        <div className="flex-1 min-w-0 flex items-center gap-2.5">
-          {/* Index & Thumbnail */}
-          <div className="flex items-center gap-2 shrink-0">
-            <span className={`text-sm font-bold ${t.textAccent} w-4 text-right`}>{idx + 1}.</span>
-            <div 
-              onClick={() => onOpenDetail && onOpenDetail(resolvedEx)}
-              className="w-14 h-14 rounded-xl overflow-hidden bg-black/5 dark:bg-white/10 shrink-0 border border-black/10 dark:border-white/10 relative cursor-pointer group/thumb flex items-center justify-center shadow-sm"
-              title="Lihat detail latihan"
-            >
-              {thumbSrc ? (
-                <img 
-                  src={thumbSrc} 
-                  alt={ex.name} 
-                  loading="lazy" 
-                  className="w-full h-full object-cover object-center group-hover/thumb:scale-110 transition-transform duration-200"
-                  onError={(e) => {
-                    if (fallbackThumb && e.target.src !== fallbackThumb) {
-                      e.target.src = fallbackThumb;
-                    }
-                  }}
-                />
-              ) : fallbackThumb ? (
-                <img 
-                  src={fallbackThumb} 
-                  alt={ex.name} 
-                  loading="lazy" 
-                  className="w-full h-full object-cover object-center group-hover/thumb:scale-110 transition-transform duration-200" 
-                />
-              ) : (
-                <Dumbbell size={20} className="text-slate-400" />
-              )}
-            </div>
+        {/* Left Column: Thumbnail Langsung di Kiri, Judul, dan Target Sets/Reps */}
+        <div className="flex-1 min-w-0 flex items-center gap-2.5 sm:gap-3">
+          {/* Thumbnail langsung di sisi kiri tanpa nomor indeks agar ruang lapang */}
+          <div 
+            onClick={() => onOpenDetail && onOpenDetail(resolvedEx)}
+            className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden bg-black/5 dark:bg-white/10 shrink-0 border border-black/10 dark:border-white/10 relative cursor-pointer group/thumb flex items-center justify-center shadow-sm"
+            title="Lihat detail latihan"
+          >
+            {thumbSrc ? (
+              <img 
+                src={thumbSrc} 
+                alt={ex.name} 
+                loading="lazy" 
+                className="w-full h-full object-cover object-center group-hover/thumb:scale-110 transition-transform duration-200"
+                onError={(e) => {
+                  if (fallbackThumb && e.target.src !== fallbackThumb) {
+                    e.target.src = fallbackThumb;
+                  }
+                }}
+              />
+            ) : fallbackThumb ? (
+              <img 
+                src={fallbackThumb} 
+                alt={ex.name} 
+                loading="lazy" 
+                className="w-full h-full object-cover object-center group-hover/thumb:scale-110 transition-transform duration-200" 
+              />
+            ) : (
+              <Dumbbell size={20} className="text-slate-400" />
+            )}
           </div>
 
           {/* Details & Sets/Reps */}
@@ -129,25 +126,64 @@ const SortableExerciseItem = ({
             </div>
 
             {/* Sets Reps */}
-            <div className="flex items-center gap-3 mt-0.5">
+            <div className="flex items-center gap-2 sm:gap-2.5 mt-0.5">
               <div className="flex items-center gap-1.5">
-                <span className={`text-[11px] font-bold ${t.textMuted} uppercase`}>Sets</span>
-                <div className={`w-11 h-7 rounded-lg ${t.inputBg} ${t.textMain} font-bold text-sm focus-within:ring-2 focus-within:${t.ringAccent} transition-all overflow-hidden`}>
-                  <input type="number" min="0" value={ex.sets === 0 ? '' : ex.sets} onChange={(e) => handleUpdateExercise(routineId, ex.id, 'sets', parseInt(e.target.value) || 0)} placeholder="0" className="w-full h-full bg-transparent outline-none border-none text-center" />
+                <span className={`text-[10px] sm:text-[11px] font-bold ${t.textMuted} uppercase`}>Sets</span>
+                <div className={`w-10 sm:w-11 h-7 rounded-lg ${t.inputBg} ${t.textMain} font-bold text-sm focus-within:ring-2 focus-within:${t.ringAccent} transition-all overflow-hidden`}>
+                  <input
+                    type="number"
+                    min="0"
+                    value={ex.sets === 0 ? '' : ex.sets}
+                    onFocus={(e) => e.target.select()}
+                    onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault(); }}
+                    onChange={(e) => {
+                      const clean = e.target.value.replace(/^0+(?=\d)/, '');
+                      if (e.target.value !== clean) e.target.value = clean;
+                      handleUpdateExercise(routineId, ex.id, 'sets', clean === '' ? 0 : parseInt(clean, 10) || 0);
+                    }}
+                    placeholder="0"
+                    className="w-full h-full bg-transparent outline-none border-none text-center"
+                  />
                 </div>
               </div>
               {isTime ? (
                 <div className="flex items-center gap-1.5">
-                  <span className={`text-[11px] font-bold ${t.textMuted} uppercase`}>Min</span>
-                  <div className={`w-11 h-7 rounded-lg ${t.inputBg} ${t.textMain} font-bold text-sm focus-within:ring-2 focus-within:${t.ringAccent} transition-all overflow-hidden`}>
-                    <input type="number" min="0" value={ex.duration === 0 ? '' : ex.duration} onChange={(e) => handleUpdateExercise(routineId, ex.id, 'duration', parseInt(e.target.value) || 0)} placeholder="0" className="w-full h-full bg-transparent outline-none border-none text-center" />
+                  <span className={`text-[10px] sm:text-[11px] font-bold ${t.textMuted} uppercase`}>Min</span>
+                  <div className={`w-10 sm:w-11 h-7 rounded-lg ${t.inputBg} ${t.textMain} font-bold text-sm focus-within:ring-2 focus-within:${t.ringAccent} transition-all overflow-hidden`}>
+                    <input
+                      type="number"
+                      min="0"
+                      value={ex.duration === 0 ? '' : ex.duration}
+                      onFocus={(e) => e.target.select()}
+                      onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault(); }}
+                      onChange={(e) => {
+                        const clean = e.target.value.replace(/^0+(?=\d)/, '');
+                        if (e.target.value !== clean) e.target.value = clean;
+                        handleUpdateExercise(routineId, ex.id, 'duration', clean === '' ? 0 : parseInt(clean, 10) || 0);
+                      }}
+                      placeholder="0"
+                      className="w-full h-full bg-transparent outline-none border-none text-center"
+                    />
                   </div>
                 </div>
               ) : (
                 <div className="flex items-center gap-1.5">
-                  <span className={`text-[11px] font-bold ${t.textMuted} uppercase`}>Reps</span>
-                  <div className={`w-11 h-7 rounded-lg ${t.inputBg} ${t.textMain} font-bold text-sm focus-within:ring-2 focus-within:${t.ringAccent} transition-all overflow-hidden`}>
-                    <input type="number" min="0" value={ex.reps === 0 ? '' : ex.reps} onChange={(e) => handleUpdateExercise(routineId, ex.id, 'reps', parseInt(e.target.value) || 0)} placeholder="0" className="w-full h-full bg-transparent outline-none border-none text-center" />
+                  <span className={`text-[10px] sm:text-[11px] font-bold ${t.textMuted} uppercase`}>Reps</span>
+                  <div className={`w-10 sm:w-11 h-7 rounded-lg ${t.inputBg} ${t.textMain} font-bold text-sm focus-within:ring-2 focus-within:${t.ringAccent} transition-all overflow-hidden`}>
+                    <input
+                      type="number"
+                      min="0"
+                      value={ex.reps === 0 ? '' : ex.reps}
+                      onFocus={(e) => e.target.select()}
+                      onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault(); }}
+                      onChange={(e) => {
+                        const clean = e.target.value.replace(/^0+(?=\d)/, '');
+                        if (e.target.value !== clean) e.target.value = clean;
+                        handleUpdateExercise(routineId, ex.id, 'reps', clean === '' ? 0 : parseInt(clean, 10) || 0);
+                      }}
+                      placeholder="0"
+                      className="w-full h-full bg-transparent outline-none border-none text-center"
+                    />
                   </div>
                 </div>
               )}
@@ -156,26 +192,26 @@ const SortableExerciseItem = ({
         </div>
 
         {/* Right Column: 2x2 Buttons */}
-        <div className="flex flex-col gap-1 flex-shrink-0 ml-1">
-          <div className="flex gap-1 justify-end">
-            <button onClick={() => handleRemoveExercise(routineId, ex.id)} className="p-2 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 transition-colors"><X size={16} /></button>
+        <div className="flex flex-col gap-1.5 flex-shrink-0 ml-2">
+          <div className="flex gap-1.5 justify-end">
+            <button onClick={() => handleRemoveExercise(routineId, ex.id)} className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 transition-colors flex items-center justify-center shrink-0" title="Hapus Latihan"><X size={15} /></button>
             {idx > 0 && (
-              <button onClick={() => handleToggleSupersetInline(routineId, idx)} className={`p-2 rounded-xl transition-colors ${isSuperset ? `${t.bgAccentSoft} ${t.textAccent} hover:opacity-80` : 'bg-black/5 dark:bg-white/5 text-slate-400 hover:text-white'}`} title="Gabung Superset dengan latihan di atasnya">
-                <LinkIcon size={16} />
+              <button onClick={() => handleToggleSupersetInline(routineId, idx)} className={`w-8 h-8 rounded-xl transition-colors flex items-center justify-center shrink-0 ${isSuperset ? `${t.bgAccentSoft} ${t.textAccent} hover:opacity-80` : 'bg-black/5 dark:bg-white/5 text-slate-400 hover:text-white'}`} title="Gabung Superset dengan latihan di atasnya">
+                <LinkIcon size={15} />
               </button>
             )}
           </div>
-          <div className="flex gap-1 justify-end">
+          <div className="flex gap-1.5 justify-end">
             <div 
               {...attributes} 
               {...listeners}
-              className={`cursor-grab active:cursor-grabbing p-2 rounded-xl bg-black/5 dark:bg-white/5 text-slate-400 hover:text-white transition-colors touch-none flex items-center justify-center`} 
+              className={`cursor-grab active:cursor-grabbing w-8 h-8 rounded-xl bg-black/5 dark:bg-white/5 text-slate-400 hover:text-white transition-colors touch-none flex items-center justify-center shrink-0`} 
               title="Tahan dan geser untuk mengurutkan"
             >
-              <GripVertical size={16} />
+              <GripVertical size={15} />
             </div>
-            <button onClick={() => onReplaceClick(ex, routineId)} className={`p-2 rounded-xl transition-colors bg-black/5 dark:bg-white/5 text-slate-400 hover:text-amber-500`} title="Ganti Latihan Alternatif">
-              <ArrowLeftRight size={16} />
+            <button onClick={() => onReplaceClick(ex, routineId, idx)} className={`w-8 h-8 rounded-xl transition-colors bg-black/5 dark:bg-white/5 text-slate-400 hover:text-amber-500 flex items-center justify-center shrink-0`} title="Ganti Latihan Alternatif">
+              <ArrowLeftRight size={15} />
             </button>
           </div>
         </div>
@@ -192,10 +228,34 @@ const ProgramTab = ({
   focusRoutineId, setFocusRoutineId, setConfirmModal, activityTargets,
   userApiKeys, userProfile, history,
   keyStatuses, setKeyStatuses, setShowSettings,
-  setHighlightPostId, setShowProfileModal, setProfileForceTab, onPostCreated
+  setHighlightPostId, setShowProfileModal, setProfileForceTab, onPostCreated,
+  weekStartDay = 1
 }) => {
   
   const isDark = theme === 'dark' || (t?.bgApp?.includes('dark') ?? true);
+  const isID = (lang?.id || (typeof lang === 'string' ? lang : 'ID')).toUpperCase() === 'ID';
+
+  const scheduleDays = useMemo(() => {
+    const allDays = [
+      { key: 'Sen', idLabel: 'Sen', enLabel: 'Mon', idShort: 'S', enShort: 'M' },
+      { key: 'Sel', idLabel: 'Sel', enLabel: 'Tue', idShort: 'S', enShort: 'T' },
+      { key: 'Rab', idLabel: 'Rab', enLabel: 'Wed', idShort: 'R', enShort: 'W' },
+      { key: 'Kam', idLabel: 'Kam', enLabel: 'Thu', idShort: 'K', enShort: 'T' },
+      { key: 'Jum', idLabel: 'Jum', enLabel: 'Fri', idShort: 'J', enShort: 'F' },
+      { key: 'Sab', idLabel: 'Sab', enLabel: 'Sat', idShort: 'S', enShort: 'S' },
+      { key: 'Min', idLabel: 'Min', enLabel: 'Sun', idShort: 'M', enShort: 'S' },
+    ];
+    const ordered = weekStartDay === 0
+      ? [allDays[6], ...allDays.slice(0, 6)]
+      : allDays;
+
+    return ordered.map(d => ({
+      key: d.key,
+      full: isID ? d.idLabel : d.enLabel,
+      short: isID ? d.idShort : d.enShort
+    }));
+  }, [isID, weekStartDay]);
+
   const { dialog, showAlert } = useDialog(isDark);
   const [expandedRoutineId, setExpandedRoutineId] = useState(null);
   // Rincian sesi yang sedang dibuka di KARTU program (bukan di editor). SATU id saja — membuka
@@ -241,36 +301,77 @@ const ProgramTab = ({
   const [detailExercise, setDetailExercise] = useState(null);
   const [selectedDetailExercise, setSelectedDetailExercise] = useState(null);
   const [routineIdForAlt, setRoutineIdForAlt] = useState(null);
+  const [targetIndexForAlt, setTargetIndexForAlt] = useState(null);
   const [pendingShareProgram, setPendingShareProgram] = useState(null);
 
   const handleSelectAlternative = (newEx) => {
+    if (!newEx) return;
     playSoundEffect('success', soundEnabled);
     saveStateToHistory();
-    const updatedPrograms = programs.map(p => {
+
+    // Buang properti sementara pencarian & scoring sebelum masuk ke state program
+    const {
+      _nameNorm, _nameColl, _targetNorm, _allText, _allColl, _slug, score, _searchScore,
+      ...cleanEx
+    } = newEx;
+
+    const targetIdStr = detailExercise?.id !== undefined ? String(detailExercise.id) : null;
+
+    setPrograms(prevPrograms => (prevPrograms || []).map(p => {
       if (p.id !== routineIdForAlt) return p;
+      const curExercises = Array.isArray(p.exercises) ? p.exercises : [];
+      
+      // Cari posisi index exercise yang ingin diganti secara deterministik:
+      // 1. Cek index yang diklik
+      let replaceIdx = -1;
+      if (typeof targetIndexForAlt === 'number' && targetIndexForAlt >= 0 && targetIndexForAlt < curExercises.length) {
+        if (!targetIdStr || String(curExercises[targetIndexForAlt]?.id) === targetIdStr) {
+          replaceIdx = targetIndexForAlt;
+        }
+      }
+
+      // 2. Fallback pencocokan id tepat
+      if (replaceIdx === -1 && targetIdStr) {
+        replaceIdx = curExercises.findIndex(e => String(e.id) === targetIdStr);
+      }
+
+      // 3. Fallback nama latihan jika id tidak ketemu
+      if (replaceIdx === -1 && detailExercise?.name) {
+        const dName = detailExercise.name.toLowerCase().trim();
+        replaceIdx = curExercises.findIndex(e => (e.name || '').toLowerCase().trim() === dName);
+      }
+
+      if (replaceIdx === -1) return p;
+
+      const oldEx = curExercises[replaceIdx];
+      const newId = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+        ? crypto.randomUUID()
+        : `ex-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+
+      const replacement = {
+        ...cleanEx,
+        id: newId,
+        sets: oldEx.sets ?? cleanEx.sets ?? 3,
+        reps: oldEx.reps ?? cleanEx.reps ?? 10,
+        duration: oldEx.duration ?? cleanEx.duration ?? 0,
+        defaultWeight: oldEx.defaultWeight ?? cleanEx.defaultWeight ?? 0,
+        supersetId: oldEx.supersetId ?? null
+      };
+
+      const nextExercises = [...curExercises];
+      nextExercises[replaceIdx] = replacement;
+
       return {
         ...p,
-        exercises: (p.exercises || []).map(e => {
-          if (e.id === detailExercise?.id || (detailExercise?.originalId && e.id === detailExercise.originalId)) {
-            return {
-              ...e,
-              ...newEx,
-              id: 'ex-' + Date.now() + Math.random().toString(36).substr(2, 5),
-              sets: e.sets,
-              reps: e.reps,
-              duration: e.duration,
-              supersetId: e.supersetId
-            };
-          }
-          return e;
-        })
+        exercises: nextExercises
       };
-    });
-    setPrograms(updatedPrograms);
+    }));
+
     setShowAlternativeModal(false);
-      setDetailExercise(null);
-      setRoutineIdForAlt(null);
-    };
+    setDetailExercise(null);
+    setRoutineIdForAlt(null);
+    setTargetIndexForAlt(null);
+  };
     const handleCreateRoutine = (targetPlanId, targetPlanName) => {
       playSoundEffect('click', soundEnabled);
       const newProg = {
@@ -598,14 +699,26 @@ const ProgramTab = ({
       }, 100);
     };
 
+    // Ubah nama saat mengetik (onChange) — JANGAN panggil .trim() agar spasi tidak tertelan
     const handleRenamePlan = (planId, newName) => {
-      let baseName = newName.trim() || 'Program Tanpa Nama';
-      let uniqueName = baseName;
+      setPrograms(prev => (prev || []).map(p => {
+        const pId = p.planId || 'custom';
+        if (pId === planId) {
+          return { ...p, planName: newName };
+        }
+        return p;
+      }));
+    };
+
+    // Finalisasi nama program saat selesai mengetik (onBlur)
+    const handleFinalizePlanName = (planId, rawName) => {
+      const trimmed = (rawName || '').trim() || 'Program Tanpa Nama';
+      let uniqueName = trimmed;
       let counter = 2;
       
       // Pastikan nama baru belum dipakai oleh program/plan LAIN
-      while (programs.some(p => (p.planId || 'custom') !== planId && (p.planName || 'Program Default') === uniqueName)) {
-        uniqueName = `${baseName} (${counter})`;
+      while (programs.some(p => (p.planId || 'custom') !== planId && (p.planName || 'Program Default').toLowerCase() === uniqueName.toLowerCase())) {
+        uniqueName = `${trimmed} (${counter})`;
         counter++;
       }
 
@@ -631,19 +744,17 @@ const ProgramTab = ({
             )}
           </div>
           <div className="flex justify-between w-full gap-1 sm:gap-2">
-            {[
-              { f: 'Sen', s: 'S' }, { f: 'Sel', s: 'S' }, { f: 'Rab', s: 'R' }, { f: 'Kam', s: 'K' }, 
-              { f: 'Jum', s: 'J' }, { f: 'Sab', s: 'S' }, { f: 'Min', s: 'M' }
-            ].map(dayObj => {
-              const day = dayObj.f;
+            {scheduleDays.map(dayObj => {
+              const day = dayObj.key;
               const isSelected = (routine.assignedDays || []).includes(day);
               return (
                 <button 
                   key={day}
+                  title={dayObj.full}
                   onClick={() => { playSoundEffect('click', soundEnabled); handleToggleAssignedDay(routine.id, day); }}
                   className={`flex-1 py-1.5 rounded-xl text-xs sm:text-sm font-black transition-all duration-150 ${isSelected ? `${t.bgAccent} text-white shadow-md scale-105` : `${t.inputBg} ${t.textMuted} hover:${t.textMain}`}`}
                 >
-                  {dayObj.s}
+                  {dayObj.short}
                 </button>
               );
             })}
@@ -659,13 +770,18 @@ const ProgramTab = ({
                   type="number"
                   min="0"
                   max="15"
-                  value={Math.floor((routine.restTime ?? 120) / 60)}
+                  value={Math.floor((routine.restTime ?? 120) / 60) === 0 ? '' : Math.floor((routine.restTime ?? 120) / 60)}
+                  placeholder="0"
+                  onFocus={(e) => e.target.select()}
+                  onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault(); }}
                   onChange={(e) => {
-                    const m = Math.max(0, parseInt(e.target.value) || 0);
+                    const raw = e.target.value.replace(/^0+(?=\d)/, '');
+                    if (e.target.value !== raw) e.target.value = raw;
+                    const m = raw === '' ? 0 : Math.max(0, parseInt(raw, 10) || 0);
                     const s = (routine.restTime ?? 120) % 60;
                     handleRestTimeChange(routine.id, m * 60 + s);
                   }}
-                  className="w-8 bg-transparent text-blue-400 font-black text-center text-sm outline-none"
+                  className="w-8 bg-transparent text-blue-400 placeholder:text-blue-400 font-black text-center text-sm outline-none"
                 />
                 <span className="text-xs font-bold text-slate-400">mnt</span>
               </div>
@@ -675,13 +791,18 @@ const ProgramTab = ({
                   min="0"
                   max="59"
                   step="5"
-                  value={(routine.restTime ?? 120) % 60}
+                  value={(routine.restTime ?? 120) % 60 === 0 ? '' : (routine.restTime ?? 120) % 60}
+                  placeholder="0"
+                  onFocus={(e) => e.target.select()}
+                  onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault(); }}
                   onChange={(e) => {
+                    const raw = e.target.value.replace(/^0+(?=\d)/, '');
+                    if (e.target.value !== raw) e.target.value = raw;
                     const m = Math.floor((routine.restTime ?? 120) / 60);
-                    const s = Math.max(0, Math.min(59, parseInt(e.target.value) || 0));
+                    const s = raw === '' ? 0 : Math.max(0, Math.min(59, parseInt(raw, 10) || 0));
                     handleRestTimeChange(routine.id, m * 60 + s);
                   }}
-                  className="w-8 bg-transparent text-blue-400 font-black text-center text-sm outline-none"
+                  className="w-8 bg-transparent text-blue-400 placeholder:text-blue-400 font-black text-center text-sm outline-none"
                 />
                 <span className="text-xs font-bold text-slate-400">dtk</span>
               </div>
@@ -722,9 +843,10 @@ const ProgramTab = ({
                       handleToggleSupersetInline={handleToggleSupersetInline}
                       exerciseLibrary={exerciseLibrary}
                       onOpenDetail={(targetEx) => setSelectedDetailExercise(targetEx)}
-                      onReplaceClick={(ex, rId) => {
+                      onReplaceClick={(ex, rId, replaceIdx) => {
                         setDetailExercise(ex);
                         setRoutineIdForAlt(rId);
+                        setTargetIndexForAlt(typeof replaceIdx === 'number' ? replaceIdx : idx);
                         setShowAlternativeModal(true);
                       }}
                     />
@@ -831,7 +953,7 @@ const ProgramTab = ({
                     <div className={`relative group inline-block w-full flex-1`} onClick={(e) => e.stopPropagation()}>
                       <PlanNameInput
                         initialValue={group.planName}
-                        onSave={(newName) => handleRenamePlan(planId, newName)}
+                        onSave={(newName) => handleFinalizePlanName(planId, newName)}
                         className="w-full bg-transparent font-black text-lg text-white outline-none border-b-2 border-transparent focus:border-white/50 transition-colors pr-2"
                         placeholder="Nama Program..."
                       />
@@ -915,7 +1037,7 @@ const ProgramTab = ({
                                  <ChevronRight size={14} className={`shrink-0 text-sky-400 transition-transform duration-200 mt-0.5 ${isOpen ? 'rotate-90' : ''}`} />
                                  {hari.length > 0 && (
                                      <span className="shrink-0 px-2 py-0.5 rounded-md bg-sky-500/20 border border-sky-400/30 text-xs font-black uppercase tracking-wide text-sky-300 leading-none">
-                                         {hari.join('/')}
+                                         {hari.map(d => scheduleDays.find(sd => sd.key === d)?.full || d).join('/')}
                                      </span>
                                  )}
                                  <span className="text-xs font-bold text-white drop-shadow-sm leading-snug break-words flex-1">{r.name}</span>
@@ -932,21 +1054,23 @@ const ProgramTab = ({
                                          return (
                                            <div 
                                              key={ex.id || exIdx} 
-                                             className="flex items-center gap-2.5 py-1 cursor-pointer hover:opacity-80 transition-opacity"
+                                             className="flex items-start gap-2.5 py-1.5 cursor-pointer hover:opacity-80 transition-opacity"
                                              onClick={(e) => { e.stopPropagation(); setSelectedDetailExercise(resolvedEx); }}
                                              title="Klik untuk melihat detail latihan"
                                            >
                                              {thumb ? (
-                                               <img src={thumb} alt={ex.name} className="w-7 h-7 rounded-lg object-cover border border-white/10 shrink-0 bg-white/5" loading="lazy" />
+                                               <img src={thumb} alt={ex.name} className="w-8 h-8 rounded-lg object-cover border border-white/10 shrink-0 bg-white/5 mt-0.5" loading="lazy" />
                                              ) : (
-                                               <span className="w-2 h-2 rounded-full bg-sky-400 shrink-0 mx-1" />
+                                               <span className="w-2 h-2 rounded-full bg-sky-400 shrink-0 mx-1 mt-1.5" />
                                              )}
-                                             <span className="text-xs text-slate-200 font-semibold leading-tight break-words flex-1" title={ex.name}>
-                                               {ex.name}
-                                             </span>
-                                             <span className="text-[11px] text-slate-400 font-bold shrink-0">
-                                               {ex.sets || 3} &times; {ex.reps || (ex.duration ? String(ex.duration) + 'm' : 10)}
-                                             </span>
+                                             <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                                               <span className="text-xs text-slate-200 font-semibold leading-snug break-words w-full" title={ex.name}>
+                                                 {ex.name}
+                                               </span>
+                                               <span className="text-[11px] text-slate-400 font-bold text-left">
+                                                 {ex.sets || 3} &times; {ex.reps || (ex.duration ? String(ex.duration) + 'm' : 10)}
+                                               </span>
+                                             </div>
                                            </div>
                                          );
                                      })}
@@ -1014,28 +1138,16 @@ const ProgramTab = ({
               style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 24px))' }}
             >
                 <div className="flex items-center justify-between px-4 py-3 max-w-4xl mx-auto w-full gap-3">
-                    <button 
-                      type="button"
-                      data-close-modal="true"
-                      onClick={() => {
-                        playSoundEffect('click', soundEnabled);
-                        if (programsSnapshot) {
-                          setPrograms(programsSnapshot);
-                          setProgramsSnapshot(null);
-                        }
-                        closeEditAndScrollToPlan(editingPlanId);
-                      }}
-                      className="p-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-all active:scale-95 flex items-center justify-center shrink-0"
-                      title="Tutup / Batal"
-                    >
-                      <X size={20} />
-                    </button>
+                    {/* Spacer kiri agar input judul tetap berada tepat di tengah (seimbang dengan tombol trash di kanan) */}
+                    <div className="w-10 shrink-0" aria-hidden="true" />
                     <div className="flex-1 min-w-0 flex justify-center">
                       <input
                           type="text"
-                          value={groupedPrograms[editingPlanId].planName}
+                          value={groupedPrograms[editingPlanId]?.planName || ''}
                           onChange={(e) => handleRenamePlan(editingPlanId, e.target.value)}
-                          maxLength={25}
+                          onBlur={(e) => handleFinalizePlanName(editingPlanId, e.target.value)}
+                          onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') e.target.blur(); }}
+                          maxLength={35}
                           className="text-xl font-black text-white bg-transparent outline-none text-center border-b-2 border-white/20 focus:border-blue-500 transition-colors pb-0.5 w-full max-w-xs"
                           placeholder="Nama Program..."
                       />
@@ -1064,9 +1176,11 @@ const ProgramTab = ({
                                         type="text"
                                         value={routine.name}
                                         onChange={(e) => handleRenameRoutine(routine.id, e.target.value)}
+                                        onBlur={(e) => { const trimmed = e.target.value.trim() || 'Rutinitas'; handleRenameRoutine(routine.id, trimmed); }}
+                                        onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') e.target.blur(); }}
                                         className="flex-1 min-w-0 bg-transparent font-black text-xl text-white outline-none focus:border-blue-500/50 border-b-2 border-transparent transition-colors pb-1"
                                         placeholder="Nama Rutinitas..."
-                                        maxLength={25}
+                                        maxLength={35}
                                     />
                                     <div className="flex items-center gap-1 shrink-0">
                                         <button onClick={() => handleDuplicateRoutine(routine)} className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors" title="Duplikasi Rutinitas"><Copy size={18} /></button>
@@ -1082,7 +1196,7 @@ const ProgramTab = ({
                                     {routine.assignedDays && routine.assignedDays.length > 0 && (
                                         <>
                                             <span className="font-bold text-sky-400 uppercase tracking-wide">
-                                                {routine.assignedDays.join(', ')}
+                                                {routine.assignedDays.map(d => scheduleDays.find(sd => sd.key === d)?.full || d).join(', ')}
                                             </span>
                                             <span className="text-slate-500">&bull;</span>
                                         </>

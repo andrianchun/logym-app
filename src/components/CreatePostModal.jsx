@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { X, ImagePlus, Loader2 } from 'lucide-react';
 import { uploadImageToFirebase } from '../utils/storage';
 import { createCommunityPost } from '../utils/communityApi';

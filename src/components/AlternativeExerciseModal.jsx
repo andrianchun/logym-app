@@ -1,6 +1,6 @@
-import React, { useState, useMemo, useCallback, useRef, useDeferredValue } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Search, Filter, Dumbbell, Heart, ChevronDown } from 'lucide-react';
+import { X, Search, Filter, Dumbbell, Heart, ChevronDown, Clock } from 'lucide-react';
 import { formatTarget, getVideoId, muscleOptions, equipmentOptions, normalizeMuscleKey, filterByGymEquipment, exerciseAliasMap, cleanExerciseNameForMatching, canonicalizeExercise } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
 import { fetchExercisesFromApi } from '../utils/exerciseDbApi';
@@ -48,7 +48,15 @@ const AlternativeExerciseModal = ({
   history
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const deferredSearch = useDeferredValue(searchTerm);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [recentSearches, setRecentSearches] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('logym_alt_recent_searches') || '[]');
+    } catch {
+      return [];
+    }
+  });
+
   const [showFilters, setShowFilters] = useState(false);
   const [muscleFilter, setMuscleFilter] = useState([]);
   const [equipFilter, setEquipFilter] = useState([]);
@@ -58,11 +66,45 @@ const AlternativeExerciseModal = ({
   const [visibleCount, setVisibleCount] = useState(30);
   const listRef = useRef(null);
 
+  // Debounce search agar pengetikan 100% responsif tanpa frame drop di library 1300+ item
+  React.useEffect(() => {
+    if (!searchTerm.trim()) {
+      setDebouncedSearch('');
+      return;
+    }
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 220);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const saveRecentSearch = useCallback((term) => {
+    const clean = (term || '').trim();
+    if (!clean || clean.length < 2) return;
+    try {
+      const existing = JSON.parse(localStorage.getItem('logym_alt_recent_searches') || '[]');
+      const updated = [clean, ...existing.filter(x => x.toLowerCase() !== clean.toLowerCase())].slice(0, 6);
+      localStorage.setItem('logym_alt_recent_searches', JSON.stringify(updated));
+      setRecentSearches(updated);
+    } catch (err) {
+      console.warn('Failed to save recent search:', err);
+    }
+  }, []);
+
+  const clearRecentSearches = useCallback(() => {
+    try {
+      localStorage.removeItem('logym_alt_recent_searches');
+      setRecentSearches([]);
+    } catch (err) {
+      console.warn('Failed to clear recent searches:', err);
+    }
+  }, []);
+
   // Reset visible count ketika filter/search berubah
   React.useEffect(() => {
     setVisibleCount(30);
     if (listRef.current) listRef.current.scrollTop = 0;
-  }, [deferredSearch, muscleFilter, equipFilter, showFavoritesOnly, sortOrder]);
+  }, [debouncedSearch, muscleFilter, equipFilter, showFavoritesOnly, sortOrder]);
 
   // Infinite scroll handler
   const handleScroll = useCallback((e) => {
@@ -192,7 +234,7 @@ const AlternativeExerciseModal = ({
       filtered = filtered.filter(ex => ex.isFavorite);
     }
 
-    const isSearching = Boolean(deferredSearch && deferredSearch.trim());
+    const isSearching = Boolean(debouncedSearch && debouncedSearch.trim());
     const origWords = (originalEx.name || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 2);
 
     filtered = filtered.map(ex => {
@@ -201,7 +243,7 @@ const AlternativeExerciseModal = ({
 
       // Jika ada kata pencarian: gunakan algoritma smart search & bobot riwayat user
       if (isSearching) {
-        score = scoreExerciseMatch(ex, deferredSearch, usage);
+        score = scoreExerciseMatch(ex, debouncedSearch, usage);
         return { ...ex, score };
       }
 
@@ -262,7 +304,7 @@ const AlternativeExerciseModal = ({
     }
 
     return filtered.slice(0, 500); // Capped at 500; infinite scroll menampilkan 30 per batch
-  }, [indexedLibrary, originalEx, deferredSearch, muscleFilter, equipFilter, showFavoritesOnly, sortOrder, lang, ownScores]);
+  }, [indexedLibrary, originalEx, debouncedSearch, muscleFilter, equipFilter, showFavoritesOnly, sortOrder, lang, ownScores]);
 
   if (!isOpen || !originalEx) return null;
 
@@ -296,16 +338,27 @@ const AlternativeExerciseModal = ({
                 placeholder="Cari alternatif..." 
                 value={searchTerm} 
                 onChange={(e) => setSearchTerm(e.target.value)} 
-                className={`w-full bg-transparent text-sm font-semibold ${t.textMain} outline-none placeholder:${t.textMuted}`}
+                className={`w-full min-w-0 bg-transparent text-sm font-semibold ${t.textMain} outline-none placeholder:${t.textMuted}`}
               />
               {searchTerm && (
-                <button onClick={() => setSearchTerm('')} className={`shrink-0 ${t.textMuted} hover:opacity-70`}>
-                  <X size={14} />
+                <button 
+                  type="button"
+                  aria-label="Hapus teks pencarian"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setDebouncedSearch('');
+                    playSoundEffect('click', soundEnabled);
+                  }} 
+                  className={`shrink-0 p-1.5 -mr-1 rounded-full text-slate-400 hover:text-white hover:bg-black/10 dark:hover:bg-white/10 active:scale-90 transition-all flex items-center justify-center cursor-pointer`}
+                  title="Hapus pencarian"
+                >
+                  <X size={15} />
                 </button>
               )}
             </div>
             
             <button
+              type="button"
               onClick={() => { setShowFavoritesOnly(!showFavoritesOnly); playSoundEffect('click', soundEnabled); }}
               className={`shrink-0 p-3 rounded-xl transition-all ${
                 showFavoritesOnly 
@@ -317,6 +370,7 @@ const AlternativeExerciseModal = ({
             </button>
 
             <button
+              type="button"
               onClick={() => { playSoundEffect('click', soundEnabled); setShowFilters(!showFilters); }}
               className={`shrink-0 p-3 rounded-xl transition-all flex items-center justify-center ${
                 showFilters || muscleFilter.length > 0 || equipFilter.length > 0 || sortOrder !== 'recommendation'
@@ -327,6 +381,38 @@ const AlternativeExerciseModal = ({
               <Filter size={18} />
             </button>
           </div>
+
+          {/* Recent Searches Chips ("Terakhir Dicari") */}
+          {!searchTerm && recentSearches.length > 0 && (
+            <div className="flex items-center gap-1.5 pt-1 overflow-x-auto no-scrollbar py-0.5">
+              <div className="flex items-center gap-1 text-[11px] font-bold text-slate-400 shrink-0 mr-0.5">
+                <Clock size={12} className="text-slate-400" />
+                <span>Terakhir:</span>
+              </div>
+              {recentSearches.map((term, i) => (
+                <button
+                  key={`${term}-${i}`}
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm(term);
+                    setDebouncedSearch(term);
+                    playSoundEffect('click', soundEnabled);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all border shrink-0 ${t.border} ${t.inputBg} ${t.textMain} hover:border-amber-500/50 hover:text-amber-400 active:scale-95`}
+                >
+                  {term}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={clearRecentSearches}
+                className="text-[10px] font-bold text-slate-500 hover:text-rose-400 px-1 py-0.5 whitespace-nowrap transition-colors"
+                title="Hapus riwayat pencarian"
+              >
+                Hapus
+              </button>
+            </div>
+          )}
 
           {/* Expanded Filters */}
           {showFilters && (
@@ -403,6 +489,9 @@ const AlternativeExerciseModal = ({
                   key={ex.id}
                   onClick={() => {
                     playSoundEffect('click', soundEnabled);
+                    if (debouncedSearch || searchTerm) {
+                      saveRecentSearch(debouncedSearch || searchTerm);
+                    }
                     const exToAdd = ex.source === 'exercisedb' ? { ...ex, id: Date.now() + Math.floor(Math.random() * 1000) } : ex;
                     onSelectAlternative(exToAdd);
                   }}
