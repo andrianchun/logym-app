@@ -943,18 +943,18 @@ const WorkoutTab = ({
     const map = {
       prima: {
         label: 'Prima',
-        icon: <Zap size={20} strokeWidth={2} className="text-emerald-400" />,
-        btnStyle: 'bg-emerald-500/15 border-emerald-500/30 hover:bg-emerald-500/25 text-emerald-400 shadow-emerald-950/20'
+        icon: <Zap size={20} strokeWidth={2.2} className="text-emerald-500 dark:text-emerald-400" />,
+        btnStyle: 'bg-emerald-500/15 border-emerald-500/30 hover:bg-emerald-500/25 text-emerald-500 dark:text-emerald-400 shadow-emerald-950/10'
       },
       doms: {
         label: 'Pegal',
-        icon: <Activity size={20} strokeWidth={2} className="text-amber-400" />,
-        btnStyle: 'bg-amber-500/15 border-amber-500/30 hover:bg-amber-500/25 text-amber-400 shadow-amber-950/20'
+        icon: <Activity size={20} strokeWidth={2.2} className="text-amber-500 dark:text-amber-400" />,
+        btnStyle: 'bg-amber-500/15 border-amber-500/30 hover:bg-amber-500/25 text-amber-500 dark:text-amber-400 shadow-amber-950/10'
       },
       deload: {
         label: 'Nyeri (Deload)',
-        icon: <ShieldAlert size={20} strokeWidth={2} className="text-rose-400" />,
-        btnStyle: 'bg-rose-500/15 border-rose-500/30 hover:bg-rose-500/25 text-rose-400 shadow-rose-950/20'
+        icon: <ShieldAlert size={20} strokeWidth={2.2} className="text-rose-500 dark:text-rose-400" />,
+        btnStyle: 'bg-rose-500/15 border-rose-500/30 hover:bg-rose-500/25 text-rose-500 dark:text-rose-400 shadow-rose-950/10'
       }
     };
     return map[currentWellness] || map.prima;
@@ -1254,7 +1254,7 @@ const WorkoutTab = ({
               onOpenWellness={() => setShowWellnessModal(true)}
             />
 
-            <div className="space-y-4 mt-4">
+            <div className="space-y-4">
                   {/* LATIHAN DARI PROGRAM ASLI */}
                   {activeProgramsList.map((prog, pIdx) => {
                     const isExpanded = !!(expandedSessions || {})[prog.workoutId];
@@ -1545,20 +1545,20 @@ const WorkoutTab = ({
               )}
 
               {/* TOMBOL TAMBAH LATIHAN EKSTRA + PENDINGINAN (global, sejajar) */}
-              <div className="flex items-center gap-3 mt-8">
+              <div className="flex items-center gap-3 mt-6">
                 <button
                   onClick={() => { playSoundEffect('click', soundEnabled); onAddExtraClick(); }}
-                  className={`flex-1 py-5 rounded-[2rem] border-2 border-dashed ${t.borderAccentSoft} ${t.textAccent} font-black hover:${t.bgAccentSoft} transition-colors flex items-center justify-center gap-2`}
+                  className={`flex-1 py-4 sm:py-5 rounded-[2rem] border-2 border-dashed ${t.borderAccentSoft} ${t.textAccent} font-black hover:${t.bgAccentSoft} transition-colors flex items-center justify-center gap-2`}
                 >
-                  <Plus size={24} /> <span className="text-sm tracking-widest uppercase">{lang.addExtra || 'Tambah Latihan Ekstra'}</span>
+                  <Plus size={22} /> <span className="text-xs sm:text-sm tracking-widest uppercase">{lang.addExtra || 'Tambah Latihan Ekstra'}</span>
                 </button>
                 {cooldownVideos && (
                   <button
                     onClick={() => { playSoundEffect('click', soundEnabled); setDetailExercise({ name: 'Pendinginan', ytVideo: cooldownVideos, type: 'cooldown' }); }}
-                    className={`shrink-0 flex items-center justify-center w-16 h-16 rounded-[2rem] transition-all active:scale-95 ${t.btnBg} ${t.textMuted} hover:${t.textAccent}`}
-                    title="Pendinginan"
+                    className="shrink-0 flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-[2rem] transition-all active:scale-95 bg-cyan-500/15 border border-cyan-500/30 hover:bg-cyan-500/25 text-cyan-500 dark:text-cyan-400 shadow-sm shadow-cyan-950/10"
+                    title="Pendinginan (Cooldown)"
                   >
-                    <Snowflake size={24} strokeWidth={2} />
+                    <Snowflake size={24} strokeWidth={2.2} />
                   </button>
                 )}
               </div>

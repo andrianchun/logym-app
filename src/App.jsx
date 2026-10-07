@@ -62,7 +62,7 @@ import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import UpdaterAlert from './components/UpdaterAlert';
 import PwaInstallPrompt from './components/PwaInstallPrompt';
 import { getLocalYMD, resolveProjectedProgramId, isLomealOwned, resolveLoggedExercise, splitSessionLogs, buildLogymSyncPayload, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos, getDayWorkouts, countMissedScheduledDays, canonicalizeExercise } from './data/constants';
-import { serializeDay, dayFingerprint, migrateBaseline, reconcileHistory, workoutsToMap, workoutIdsFromBaseline, diffFields, cleanFirestoreData, stableStringify, mergeBackupIntoHistory, sessionsPendingSave } from './utils/historySync';
+import { serializeDay, dayFingerprint, migrateBaseline, reconcileHistory, workoutsToMap, workoutIdsFromBaseline, diffFields, cleanFirestoreData, stableStringify, mergeBackupIntoHistory, sessionsPendingSave, compactDayBioData } from './utils/historySync';
 import { useBleManager } from './hooks/useBleManager';
 import { bolehSync, gabungAntrean } from './utils/hcSchedule';
 import { Loader2, Download, X } from 'lucide-react';
@@ -2247,7 +2247,7 @@ export default function App() {
                         deleteField()
                      )
                   } : {}),
-                  ...(dayData.bioData ? { bioData: stripLomealOwned(dayData.bioData) } : {}),
+                  ...(dayData.bioData ? { bioData: compactDayBioData(stripLomealOwned(dayData.bioData), dateStr) } : {}),
                   _activeSession: deleteField()
                };
            } else {

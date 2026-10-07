@@ -463,3 +463,78 @@ console.log('historySync OK');
 
   console.log('sessionsPendingSave OK');
 }
+
+// ---- compactDayBioData: pemadatan bioData, sanitasi rekursi _manualFlags & pemangkasan log lama ----
+{
+  const { compactDayBioData } = await import('./historySync.js');
+
+  const refDate = new Date('2026-10-07T12:00:00Z');
+
+  // 1. Rekursi _manualFlags bersarang (bug DashboardTab lama) harus diratakan ke skalar bersih
+  const nestedBio = {
+    steps: 7500,
+    heartRate: 72,
+    visceralFat: null,
+    musclePercent: null,
+    _manualFlags: {
+      steps: 7500,
+      sleepLog: [{ time: '23:00', stage: 1 }], // array tidak boleh masuk manualFlags
+      _manualFlags: {
+        heartRate: 72,
+        _manualFlags: {
+          weight: 65.5,
+          targetSnapshot: { bmr: 1500 }
+        }
+      }
+    }
+  };
+  const compactedNested = compactDayBioData(nestedBio, '2026-10-06', { referenceDate: refDate });
+  assert.equal(compactedNested.steps, 7500, 'ringkasan steps harus utuh');
+  assert.equal(compactedNested.heartRate, 72, 'ringkasan heartRate harus utuh');
+  assert.equal('visceralFat' in compactedNested, false, 'field null harus dibuang');
+  assert.equal('musclePercent' in compactedNested, false, 'field null harus dibuang');
+  assert.deepEqual(compactedNested._manualFlags, {
+    steps: 7500,
+    heartRate: 72,
+    weight: 65.5
+  }, '_manualFlags harus menjadi flat dan hanya berisi nilai skalar');
+
+  // 2. Pemangkasan log intraday untuk tanggal lampau (> 30 hari)
+  const oldBio = {
+    steps: 10000,
+    sleep: 480,
+    sleepDeep: 90,
+    heartRate: 68,
+    restingHeartRate: 60,
+    sleepLog: Array(100).fill({ time: '01:00', stage: 2 }),
+    heartRateLog: Array(96).fill({ time: '01:00', value: 65 }),
+    bloodPressureLog: [{ ts: 12345, sys: 120, dia: 80 }]
+  };
+  const compactedOld = compactDayBioData(oldBio, '2026-08-01', { referenceDate: refDate });
+  assert.equal(compactedOld.steps, 10000, 'steps hari lama harus utuh');
+  assert.equal(compactedOld.sleep, 480, 'ringkasan tidur hari lama harus utuh');
+  assert.equal(compactedOld.sleepDeep, 90, 'ringkasan sleepDeep hari lama harus utuh');
+  assert.equal(compactedOld.heartRate, 68, 'ringkasan nadi hari lama harus utuh');
+  assert.equal(compactedOld.restingHeartRate, 60, 'restingHeartRate hari lama harus utuh');
+  assert.equal(compactedOld.sleepLog, undefined, 'sleepLog hari lama (>30 hari) harus dipangkas');
+  assert.equal(compactedOld.heartRateLog, undefined, 'heartRateLog hari lama (>30 hari) harus dipangkas');
+  assert.equal(compactedOld.bloodPressureLog, undefined, 'bloodPressureLog hari lama (>30 hari) harus dipangkas');
+
+  // 3. Log intraday untuk tanggal terkini (<= 30 hari) HARUS tetap dipertahankan untuk grafik/hypnogram
+  const recentBio = {
+    steps: 8200,
+    sleep: 450,
+    sleepLog: [{ time: '23:30', stage: 1 }],
+    heartRateLog: [{ time: '08:00', value: 70 }]
+  };
+  const compactedRecent = compactDayBioData(recentBio, '2026-10-05', { referenceDate: refDate });
+  assert.equal(compactedRecent.sleepLog.length, 1, 'sleepLog tanggal baru harus tetap ada');
+  assert.equal(compactedRecent.heartRateLog.length, 1, 'heartRateLog tanggal baru harus tetap ada');
+
+  // 4. Input kosong atau bukan objek ditangani dengan aman
+  assert.equal(compactDayBioData(null), null);
+  assert.equal(compactDayBioData(undefined), undefined);
+  assert.deepEqual(compactDayBioData({}), {});
+
+  console.log('compactDayBioData OK');
+}

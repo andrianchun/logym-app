@@ -20,6 +20,7 @@ const sendBackgroundNotification = async (title, body) => {
                         body: body ? (body.length > 120 ? body.slice(0, 117) + '...' : body) : 'Jawaban analisismu sudah siap!',
                         schedule: { at: new Date(Date.now() + 100) },
                         sound: 'beep.wav',
+                        smallIcon: 'ic_stat_logym',
                         extra: { type: 'logy_chat' },
                     },
                 ],
@@ -28,14 +29,14 @@ const sendBackgroundNotification = async (title, body) => {
             if (Notification.permission === 'granted') {
                 new Notification(title || 'Coach Logy', {
                     body: body ? (body.length > 120 ? body.slice(0, 117) + '...' : body) : 'Jawaban analisismu sudah siap!',
-                    icon: '/logym-icon.webp',
+                    icon: '/icon-192.png',
                 });
             } else if (Notification.permission === 'default') {
                 Notification.requestPermission().then((perm) => {
                     if (perm === 'granted') {
                         new Notification(title || 'Coach Logy', {
                             body: body ? (body.length > 120 ? body.slice(0, 117) + '...' : body) : 'Jawaban analisismu sudah siap!',
-                            icon: '/logym-icon.webp',
+                            icon: '/icon-192.png',
                         });
                     }
                 });

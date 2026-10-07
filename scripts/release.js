@@ -19,7 +19,7 @@ import fs from 'fs';
 const run = (cmd, env) => execSync(cmd, { stdio: 'inherit', env: { ...process.env, ...env } });
 const readVersion = () => JSON.parse(fs.readFileSync('package.json', 'utf8')).version;
 
-const BUMPS = ['patch', 'minor', 'major'];
+const BUMPS = ['patch', 'minor', 'major', 'none'];
 const args = process.argv.slice(2);
 const forced = args.includes('force');
 const apk = args.includes('apk');
@@ -48,7 +48,9 @@ if (apk && !fs.existsSync('public/apk/logym-latest.apk')) {
 }
 
 const from = readVersion();
-run(`npm version ${bump} --no-git-tag-version`);
+if (bump !== 'none') {
+  run(`npm version ${bump} --no-git-tag-version`);
+}
 const version = readVersion(); // WAJIB baca ulang: nilai lama sudah basi setelah bump
 console.log(`\nRelease v${from} -> v${version}${forced ? '  [WAJIB — user diblokir sampai update]' : ''}${apk ? '  [jalur APK]' : ''}\n`);
 

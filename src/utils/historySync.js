@@ -199,6 +199,73 @@ export const diffFields = (local, baseline) => {
 export const MAX_AUTO_DELETE = 3;
 
 /**
+ * Memadatkan data bioData harian:
+ * 1. Membuang rekursi atau objek bersarang di _manualFlags (hanya nilai skalar/boolean yang valid).
+ * 2. Membuang properti bernilai null atau undefined.
+ * 3. Membuang log intraday (sleepLog, heartRateLog, bloodPressureLog, oxygenSaturationLog, weightLog)
+ *    untuk tanggal yang lebih tua dari batas usia (default 30 hari).
+ * 4. Memastikan ringkasan harian (steps, sleep, heartRate, weight, dll.) 100% utuh.
+ */
+export const compactDayBioData = (bioData, dateStr, options = {}) => {
+  if (!bioData || typeof bioData !== 'object') return bioData;
+  const { maxLogAgeDays = 30, referenceDate = new Date() } = options;
+
+  const cutoff = (() => {
+    const d = new Date(referenceDate);
+    d.setDate(d.getDate() - maxLogAgeDays);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  })();
+
+  const clean = {};
+
+  // 1. Ekstrak dan bersihkan manualFlags dari rekursi dan tipe non-skalar
+  let manualFlags = null;
+  if (bioData._manualFlags && typeof bioData._manualFlags === 'object') {
+    const extractScalarFlags = (obj) => {
+      if (!obj || typeof obj !== 'object') return;
+      for (const [k, v] of Object.entries(obj)) {
+        if (k === '_manualFlags' && typeof v === 'object' && v !== null) {
+          extractScalarFlags(v);
+        } else if (v !== null && v !== undefined && typeof v !== 'object') {
+          if (!manualFlags) manualFlags = {};
+          manualFlags[k] = v;
+        }
+      }
+    };
+    extractScalarFlags(bioData._manualFlags);
+  }
+
+  // 2. Salin field yang valid, buang null/undefined
+  const isOlder = dateStr && dateStr < cutoff;
+  for (const [k, v] of Object.entries(bioData)) {
+    if (k === '_manualFlags') continue;
+    if (v === null || v === undefined) continue;
+
+    // Prune intraday minute logs untuk tanggal lama
+    if (isOlder && (
+      k === 'sleepLog' ||
+      k === 'heartRateLog' ||
+      k === 'bloodPressureLog' ||
+      k === 'oxygenSaturationLog' ||
+      k === 'weightLog'
+    )) {
+      continue;
+    }
+
+    clean[k] = v;
+  }
+
+  if (manualFlags && Object.keys(manualFlags).length > 0) {
+    clean._manualFlags = manualFlags;
+  }
+
+  return clean;
+};
+
+/**
  * Gabungkan snapshot server ke state lokal, per tanggal.
  *
  * Aturannya berbasis ISI, bukan waktu:
@@ -233,7 +300,11 @@ export const reconcileHistory = (prev, serverData, baseline, snapshotYear) => {
     if (hasUnsavedLocal) { kept.push(d); return; }
 
     const serverDay = serverData[d] && typeof serverData[d] === 'object'
-      ? { ...serverData[d], ...(serverData[d].workouts !== undefined ? { workouts: workoutsToArray(serverData[d].workouts) } : {}) }
+      ? {
+          ...serverData[d],
+          ...(serverData[d].workouts !== undefined ? { workouts: workoutsToArray(serverData[d].workouts) } : {}),
+          ...(serverData[d].bioData ? { bioData: compactDayBioData(serverData[d].bioData, d) } : {})
+        }
       : serverData[d];
 
     next[d] = {

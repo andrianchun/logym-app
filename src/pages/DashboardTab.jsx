@@ -510,7 +510,11 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
          let initialBio = { ...emptyBio };
          if (history[modalDate] && history[modalDate].bioData) {
              const enriched = enrichBioWithImpedance(history[modalDate].bioData, userProfile, null, modalDate, biometricStandard);
-             initialBio = { ...enriched };
+             Object.keys(emptyBio).forEach(k => {
+                 if (enriched[k] !== undefined && enriched[k] !== null) {
+                     initialBio[k] = enriched[k];
+                 }
+             });
          }
 
          // Prefill height dan waist dari riwayat jika hari ini kosong (berguna jika timbangan
@@ -636,7 +640,22 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
              
              setHistory(prev => {
                  const existingBio = prev[modalDate]?.bioData || {};
-                 const manualFlags = { ...(existingBio._manualFlags || {}) };
+                 
+                 // Bersihkan manualFlags lama dari rekursi dan tipe non-skalar
+                 const manualFlags = {};
+                 if (existingBio._manualFlags && typeof existingBio._manualFlags === 'object') {
+                     const extractScalarFlags = (obj) => {
+                         if (!obj || typeof obj !== 'object') return;
+                         for (const [k, v] of Object.entries(obj)) {
+                             if (k === '_manualFlags' && typeof v === 'object' && v !== null) {
+                                 extractScalarFlags(v);
+                             } else if (v !== null && v !== undefined && typeof v !== 'object') {
+                                 manualFlags[k] = v;
+                             }
+                         }
+                     };
+                     extractScalarFlags(existingBio._manualFlags);
+                 }
                  
                  // HANYA field yang BENAR-BENAR DIUBAH user yang ditandai manual.
                  //
@@ -653,31 +672,44 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                      if (typeof a === 'object' || typeof b === 'object') return JSON.stringify(a) === JSON.stringify(b);
                      return String(a) === String(b);
                  };
-                 Object.keys(evaluatedData).forEach(k => {
-                     const kosong = evaluatedData[k] === null || evaluatedData[k] === '';
+                 // Hanya periksa field yang ada di form (emptyBio) dan bukan _manualFlags
+                 Object.keys(emptyBio).forEach(k => {
+                     if (k === '_manualFlags') return;
+                     const val = evaluatedData[k];
+                     const kosong = val === null || val === undefined || val === '';
                      if (kosong) {
                          delete manualFlags[k]; // dikosongkan = kembalikan ke otomatis
                          return;
                      }
                      // Tidak berubah dari nilai prefill → bukan input user, biarkan tetap otomatis.
-                     if (sama(evaluatedData[k], prefillBioRef.current?.[k])) {
+                     if (sama(val, prefillBioRef.current?.[k])) {
                          delete manualFlags[k];
                          return;
                      }
-                     // Simpan nilainya sendiri (bukan cuma `true`) — activityCalories butuh angka
-                     // manual yang STABIL sebagai basis, supaya tidak ikut kebaca ulang dari
-                     // bioData.activityCalories yang tiap render ditimpa hasil hitung otomatis.
-                     manualFlags[k] = evaluatedData[k];
+                     // Simpan nilainya sendiri (hanya tipe skalar / boolean)
+                     if (typeof val !== 'object') {
+                         manualFlags[k] = val;
+                     }
                  });
+
+                 // Bersihkan _manualFlags dari evaluatedData sebelum di-merge
+                 const cleanEvaluated = { ...evaluatedData };
+                 delete cleanEvaluated._manualFlags;
+
+                 const nextBio = {
+                     ...existingBio,
+                     ...cleanEvaluated,
+                     ...(Object.keys(manualFlags).length > 0 ? { _manualFlags: manualFlags } : {})
+                 };
+                 if (Object.keys(manualFlags).length === 0) {
+                     delete nextBio._manualFlags;
+                 }
 
                  return {
                      ...prev,
                      [modalDate]: {
                          ...(prev[modalDate] || {}),
-                         bioData: {
-                             ...evaluatedData,
-                             _manualFlags: manualFlags
-                         }
+                         bioData: nextBio
                      }
                  };
              });
