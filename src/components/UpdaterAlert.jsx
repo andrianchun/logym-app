@@ -94,24 +94,38 @@ export default function UpdaterAlert({
   currentVersion, newVersion, progress,
 }) {
   const downloading = progress !== null && progress !== undefined;
+  const [isTriggering, setIsTriggering] = useState(false);
 
-  // Kunci scroll background saat dialog update wajib terbuka
+  // Kunci scroll background saat dialog update wajib terbuka tanpa merusak touch event tombol
   useEffect(() => {
     if (!open || !force) return;
     const originalOverflow = document.body.style.overflow;
-    const originalTouchAction = document.body.style.touchAction;
     const originalHtmlOverflow = document.documentElement.style.overflow;
     document.body.style.overflow = 'hidden';
-    document.body.style.touchAction = 'none';
     document.documentElement.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = originalOverflow;
-      document.body.style.touchAction = originalTouchAction;
       document.documentElement.style.overflow = originalHtmlOverflow;
     };
   }, [open, force]);
 
   if (!open) return null;
+
+  const handleTriggerUpdate = async (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (isTriggering || downloading) return;
+    setIsTriggering(true);
+    try {
+      await onUpdate?.();
+    } catch (err) {
+      console.error('onUpdate error:', err);
+    } finally {
+      setTimeout(() => setIsTriggering(false), 2500);
+    }
+  };
 
   const t = theme;
   const versionLine = currentVersion && newVersion
@@ -122,7 +136,7 @@ export default function UpdaterAlert({
     // Scrim sengaja TIDAK ikut di-fade: elemen ber-backdrop-filter yang animasi opacity-nya
     // sendiri bikin blur baru menyala setelah animasi selesai (kedipan layer).
     return (
-      <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center p-6 bg-black/80 backdrop-blur-md overscroll-contain select-none no-swipe">
+      <div className="fixed inset-0 z-[99999] flex flex-col items-center justify-center p-6 bg-black/80 backdrop-blur-md overscroll-contain select-none no-swipe">
         <div className={`w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl ${t.bgCardSolid} border ${t.border} ${t.textMain} flex flex-col items-center text-center animate-in zoom-in-95 duration-500 overscroll-contain touch-auto select-auto`}>
           <div className="pt-8 pb-4">
             <img src="/icon-512.webp" alt="LOGYM Logo" className="w-24 h-24 mx-auto rounded-2xl shadow-lg mb-4 bg-white/5 border border-white/10 p-2" />
@@ -146,13 +160,35 @@ export default function UpdaterAlert({
             {downloading ? (
               <DownloadProgress progress={progress} t={t} />
             ) : (
-              <button
-                onClick={onUpdate}
-                className={`w-full py-4 ${t.bgAccent} rounded-2xl font-bold text-lg flex items-center justify-center gap-2 active:scale-95 transition-transform`}
-              >
-                <DownloadCloud size={24} />
-                Update Sekarang
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={handleTriggerUpdate}
+                  disabled={isTriggering || downloading}
+                  style={{ touchAction: 'manipulation', cursor: 'pointer' }}
+                  className={`w-full py-4 ${t.bgAccent} rounded-2xl font-bold text-lg flex items-center justify-center gap-2 active:scale-95 transition-transform cursor-pointer select-none`}
+                >
+                  {isTriggering ? (
+                    <>
+                      <Loader2 className="animate-spin" size={24} />
+                      <span>Menghubungkan...</span>
+                    </>
+                  ) : (
+                    <>
+                      <DownloadCloud size={24} />
+                      <span>Update Sekarang</span>
+                    </>
+                  )}
+                </button>
+                <a
+                  href="https://logym.web.app/apk/logym-latest.apk"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`inline-block mt-3 text-xs ${t.textMuted} hover:underline opacity-70 hover:opacity-100 transition-opacity`}
+                >
+                  Atau unduh file APK langsung
+                </a>
+              </>
             )}
           </div>
         </div>
@@ -162,7 +198,7 @@ export default function UpdaterAlert({
 
   // Update opsional — kartu di dasbor, bisa ditutup
   return (
-    <div className="fixed bottom-24 inset-x-4 z-[100] flex justify-center pointer-events-none animate-in slide-in-from-bottom-8 fade-in duration-500">
+    <div className="fixed bottom-24 inset-x-4 z-[99999] flex justify-center pointer-events-none animate-in slide-in-from-bottom-8 fade-in duration-500">
       <div className={`pointer-events-auto ${t.bgCardSolid} ${t.textMain} rounded-2xl p-4 shadow-2xl w-full max-w-sm border ${t.border} flex flex-col gap-3 relative overflow-hidden`}>
         {/* Tombol tutup disembunyikan saat mengunduh supaya kartu (dan progresnya) tidak hilang di tengah jalan */}
         {!downloading && (
@@ -193,11 +229,23 @@ export default function UpdaterAlert({
           <DownloadProgress progress={progress} t={t} />
         ) : (
           <button
-            onClick={onUpdate}
-            className={`w-full py-2.5 ${t.bgAccent} rounded-xl font-bold text-sm shadow-sm active:scale-95 transition-transform flex items-center justify-center gap-2`}
+            type="button"
+            onClick={handleTriggerUpdate}
+            disabled={isTriggering || downloading}
+            style={{ touchAction: 'manipulation', cursor: 'pointer' }}
+            className={`w-full py-2.5 ${t.bgAccent} rounded-xl font-bold text-sm shadow-sm active:scale-95 transition-transform flex items-center justify-center gap-2 cursor-pointer select-none`}
           >
-            <DownloadCloud size={18} />
-            Update Sekarang
+            {isTriggering ? (
+              <>
+                <Loader2 className="animate-spin" size={18} />
+                <span>Menghubungkan...</span>
+              </>
+            ) : (
+              <>
+                <DownloadCloud size={18} />
+                <span>Update Sekarang</span>
+              </>
+            )}
           </button>
         )}
       </div>

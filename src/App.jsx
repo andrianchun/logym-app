@@ -228,22 +228,28 @@ export default function App() {
           if (res?.needsPermission) {
             setDownloadProgress(null);
             setApkPermissionAsk(true);
+            return;
           }
+          return;
         } catch (err) {
-          console.warn('Gagal memasang APK', err);
+          console.warn('Gagal memasang APK lewat plugin, beralih ke unduhan browser:', err);
           setDownloadProgress(null);
         }
-        return;
       }
 
-      // Browser biasa (PWA di desktop/HP): tidak ada installer, jadi unduhan normal.
+      // Browser biasa (PWA di desktop/HP) ATAU fallback jika ApkInstallerPlugin gagal:
       setDownloadProgress('apk');
-      const link = document.createElement('a');
-      link.href = otaState.url;
-      link.target = '_blank';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      try {
+        const link = document.createElement('a');
+        link.href = otaState.url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } catch (e) {
+        window.open(otaState.url, '_blank');
+      }
       
       // Reset after 10 seconds to allow retry if the download didn't trigger
       setTimeout(() => {
