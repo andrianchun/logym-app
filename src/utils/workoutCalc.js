@@ -213,7 +213,9 @@ export const sessionSpanSeconds = (exercises, exerciseLogs) => {
   if (selesai.length === 0) return 0;
   if (selesai.length === 1) return Math.max(1, setSeconds(selesai[0].ex, selesai[0].s));
   const stamps = selesai.map((x) => x.at);
-  return Math.round((Math.max(...stamps) - Math.min(...stamps)) / 1000);
+  const stampSpan = Math.round((Math.max(...stamps) - Math.min(...stamps)) / 1000);
+  const totalSetSecs = selesai.reduce((sum, item) => sum + setSeconds(item.ex, item.s), 0);
+  return Math.max(stampSpan, totalSetSecs);
 };
 
 // MET kardio berdasar kecepatan rata-rata. Tanpa data jarak, pakai default sedang (7.0).

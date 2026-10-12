@@ -53,7 +53,7 @@ import { fetchExercisesFromApi } from './utils/exerciseDbApi';
 import { AI_MODELS, detectPlateaus, getLogyNotification } from './utils/aiAgent';
 import { calculateReadiness, restingHrBaseline } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
-import { calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, deduplicateWorkouts, recomputeStrengthRecords, buildExLookupByName, canonicalExId, sessionSpanSeconds, repairActualWeights, buildHcSessionDetail, estimate10RM, defaultSetWeight, gymStepFor, mergeRm10, getEquipmentConfig, calculateActualWeight, calculateInputWeight, getSetActualWeight, resolveExerciseProgressiveTarget } from './utils/workoutCalc';
+import { isCardioExercise, calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, deduplicateWorkouts, recomputeStrengthRecords, buildExLookupByName, canonicalExId, sessionSpanSeconds, repairActualWeights, buildHcSessionDetail, estimate10RM, defaultSetWeight, gymStepFor, mergeRm10, getEquipmentConfig, calculateActualWeight, calculateInputWeight, getSetActualWeight, resolveExerciseProgressiveTarget } from './utils/workoutCalc';
 import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcReadHeartRateWindow, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission, capIntradayLog, HC_FIELDS, fillOnlyPatch, hcDroppedTypes } from './utils/healthConnect';
 import { bumpExercisePopularity } from './utils/exercisePopularity';
 import { rapikanNamaProgram, rapikanNamaSesi, pertahankanNamaSesi } from './utils/programNaming';
@@ -3416,8 +3416,31 @@ export default function App() {
       // waktu timer. Kejadian nyata: sesi ekstra treadmill 8 menit tercatat 1 jam 4 menit karena
       // ikut memakan waktu sesi beban yang belum disimpan.
       currentLogs[setIdx] = { ...currentLogs[setIdx], done: isDoneNow };
-      if (isDoneNow) currentLogs[setIdx].at = Date.now();
-      else delete currentLogs[setIdx].at; // undefined ditolak Firestore — hapus kuncinya
+      if (isDoneNow) {
+        currentLogs[setIdx].at = Date.now();
+        // Auto-fill durasi kardio jika masih kosong/0 dan sesi sedang aktif
+        if (isCardioExercise(ex) && !(Number(currentLogs[setIdx].duration) > 0) && isWorkoutActive && workoutStartTime) {
+          let prevStamp = workoutStartTime;
+          for (let i = 0; i < setIdx; i++) {
+            if (currentLogs[i]?.done && Number(currentLogs[i]?.at) > 0) {
+              prevStamp = Math.max(prevStamp, Number(currentLogs[i].at));
+            }
+          }
+          const elapsedMins = Math.max(1, Number(((Date.now() - prevStamp) / 60000).toFixed(2)));
+          currentLogs[setIdx].duration = elapsedMins;
+          const spd = Number(currentLogs[setIdx].speed || 0);
+          if (spd > 0 && !(Number(currentLogs[setIdx].distance) > 0)) {
+            currentLogs[setIdx].distance = Number((spd * (elapsedMins / 60)).toFixed(2));
+          } else {
+            const dist = Number(currentLogs[setIdx].distance || 0);
+            if (dist > 0 && !(spd > 0)) {
+              currentLogs[setIdx].speed = Number((dist / (elapsedMins / 60)).toFixed(1));
+            }
+          }
+        }
+      } else {
+        delete currentLogs[setIdx].at; // undefined ditolak Firestore — hapus kuncinya
+      }
       if (!isDoneNow) {
         currentLogs[setIdx].skipped = false;
       }

@@ -211,6 +211,19 @@ Setiap perubahan pada struktur latihan atau timer wajib lolos verifikasi di 5 la
   2. **Isolasi Durasi & Timer**: Pembacaan durasi awal di `proceedStartWorkout` dan `activateWorkoutFromCard` untuk sesi `extra` **WAJIB mengabaikan** sesi adhoc yang sudah berstatus `completed`.
   3. **Identitas Sesi pada Edit**: Saat mengedit sesi adhoc di `handleEditPastWorkout`, `focusWorkoutId` dan `sessionToRun` **WAJIB disetel ke `w.id`** asli (bukan `'extra'`) agar operasi simpan mengenali sesi target secara presisi.
 
+### Insiden 12: Desinkronisasi Timer Kardio (Treadmill) & Jam Dinding WebView Throttling (12 Oktober 2026)
+* **Gejala**: 
+  1. Timer treadmill/kardio di kartu latihan sering melambat atau beku saat layar ponsel dimatikan/background (`setInterval` throttled di WebView), sehingga catatan waktu berbeda jauh dari waktu nyata dan waktu yang tercatat di Floating Bar (kapsul waktu bawah).
+  2. Saat pengguna berlari (misal 28 menit berdasarkan kapsul waktu) tanpa menyalakan timer play kecil per set, lalu mencentang selesai, durasi set tersimpan `0` / kosong sehingga rekap menit kardio dan kalori terbengkalai.
+  3. Latihan multi-set kardio (misal 15 menit + 15 menit) saat dicentang berdekatan sebelum sesi selesai berisiko runtuh durasinya di `sessionSpanSeconds`.
+  4. Penomoran latihan ekstra di header adhoc menampilkan nomor ganjil/lanjutan (misal nomor 5) padahal program utama hari itu tidak memiliki latihan (`activeProgramsList.length === 0`).
+* **Pelajaran**:
+  1. **Jam Dinding Wajib (`Date.now()`)**: Timer kardio dan rest timer di `ExerciseCard` maupun `ImmersiveWorkout` **WAJIB** berbasis jam dinding riil (`startTime`, `targetTime`, `mode`) dengan menghitung selisih nyata `Date.now() - startTime`. Tidak boleh hanya mengandalkan akumulator `timeLeft + 1` di dalam `setInterval`.
+  2. **Sinkronisasi Terpusat (`logym_active_timer_change`)**: Event timer aktif disinkronkan antar-komponen via event bus window. Jika timer sedang berjalan saat tombol centang selesai ditekan, timer otomatis di-commit ke input durasi dan dimatikan tanpa menonaktifkan tombol centang.
+  3. **Auto-Fill Kardio dari Sesi Berjalan**: Jika pengguna mencentang set kardio yang durasinya kosong sementara sesi sedang aktif (`workoutStartTime`), sistem secara otomatis mengisi durasi dari durasi sesi yang telah berjalan (`Date.now() - prevStamp`) serta menghitung estimasi jarak & kecepatan secara proporsional.
+  4. **Multi-Set Cardio Lower Bound Invariant**: `sessionSpanSeconds` **WAJIB** memperhitungkan durasi riil multi-set kardio (`Math.max(stampSpan, totalSetSecs)`), mencegah durasi sesi terpangkas menjadi hitungan detik jika set dicentang hampir bersamaan.
+  5. **Penomoran Adaptif Latihan Ekstra**: Jika tidak ada program utama yang aktif (`activeProgramsList.length === 0`), indeks penomoran latihan ekstra dimulai dari 1.
+
 ---
 
 ## 5. Checklist Wajib Sebelum Rilis / Selesai Debugging
@@ -227,5 +240,7 @@ Setiap perubahan pada struktur latihan atau timer wajib lolos verifikasi di 5 la
 - [ ] 10. Apakah toggle set pada sesi selesai menarik set tersimpan dari riwayat secara akurat tanpa mereset set lain menjadi undone?
 - [ ] 11. Apakah gesture swipe-down di Immersive Mode memicu minimize seketika dan pencocokan media/riwayat latihan mendukung normalisasi alias?
 - [ ] 12. Apakah multi-sesi ekstra (adhoc) tersimpan sebagai entri terpisah tanpa saling menimpa latihan atau durasi?
+- [ ] 13. Apakah timer kardio/treadmill memakai jam dinding (Date.now()) dan durasi otomatis terisi saat set dicentang?
+
 
 

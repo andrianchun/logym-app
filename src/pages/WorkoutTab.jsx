@@ -1310,6 +1310,7 @@ const WorkoutTab = ({
                                 sets={getSetLogs(ex)}
                                 overloadHint={getOverloadHint(ex)}
                                 isWorkoutActive={isWorkoutActive}
+                                workoutStartTime={workoutStartTime}
                                 onStartWorkout={() => handleStartWorkout(prog.workoutId || prog.id)}
                                 onUpdateSet={(exId, setIdx, field, val) => {
                                   if (requestSessionSwitch(prog.workoutId, () => {
@@ -1446,7 +1447,7 @@ const WorkoutTab = ({
                             {group.items.map(({ex, idx}) => (
                             <div id={`exercise-card-${ex.id}`} key={`extra-${ex.id}-${idx}`}>
                               <ExerciseCard 
-                                ex={ex} idx={activeProgram?.exercises?.length ? activeProgram.exercises.length + idx : idx} isExtra={true}
+                                ex={ex} idx={activeProgramsList.length > 0 ? (activeProgramsList.reduce((sum, p) => sum + (p.exercises?.length || 0), 0) + idx) : idx} isExtra={true}
                                 t={t} lang={lang} soundEnabled={soundEnabled}
                                 units={units}
                                 isSkip={!!skippedExercises[ex.id]} 
@@ -1455,6 +1456,7 @@ const WorkoutTab = ({
                                 onOpenVideo={() => handleOpenDetail(ex)}
                                 sets={getSetLogs(ex)}
                                 isWorkoutActive={isWorkoutActive}
+                                workoutStartTime={workoutStartTime}
                                 onStartWorkout={() => handleStartWorkout('extra')}
                                 onUpdateSet={(exId, setIdx, field, val) => {
                                   if (requestSessionSwitch('extra', () => {

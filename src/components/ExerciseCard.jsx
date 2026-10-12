@@ -15,7 +15,7 @@ const ExerciseCard = ({
   sets, onUpdateSet, onToggleSet, onSkipSet, onAddSet, onAddWarmupSets, onRemoveSet,
   gymProfiles, activeGymId, overloadHint,
   canDeleteCompleted = false, onRemoveProgramExercise,
-  isWorkoutActive, onStartWorkout
+  isWorkoutActive, onStartWorkout, workoutStartTime
 }) => {
   const isImp = units?.weight === 'lbs';
   const exType = resolveExerciseKind(ex);
@@ -71,17 +71,24 @@ const ExerciseCard = ({
   // ==========================================
   // window.logymActiveTimer dipakai bareng ImmersiveWorkout buat oper timer yang lagi jalan saat
   // pindah tampilan. Formatnya WAJIB pakai jam dinding (targetTime/startTime) — punya Immersive —
-  // karena itu satu-satunya yang tetap akurat kalau app di-background. Kartu ini internalnya
-  // menghitung mundur pakai `timeLeft` (detik), jadi konversi di dua titik pertukaran ini.
+  // karena itu satu-satunya yang tetap akurat kalau app di-background atau layar mati.
   const [activeTimer, setActiveTimer] = useState(() => {
      const shared = window.logymActiveTimer?.exId === ex?.id ? window.logymActiveTimer.timer : null;
      if (shared && shared.idx !== null && shared.idx !== undefined) {
         const timeLeft = shared.mode === 'down'
-          ? Math.max(0, Math.ceil((shared.targetTime - Date.now()) / 1000))
-          : Math.max(0, Math.floor((Date.now() - shared.startTime) / 1000));
-        if (Number.isFinite(timeLeft)) return { idx: shared.idx, timeLeft, mode: shared.mode };
+          ? Math.max(0, Math.ceil(((shared.targetTime || Date.now()) - Date.now()) / 1000))
+          : Math.max(0, Math.floor((Date.now() - (shared.startTime || Date.now())) / 1000));
+        if (Number.isFinite(timeLeft)) {
+          return {
+            idx: shared.idx,
+            startTime: shared.startTime || null,
+            targetTime: shared.targetTime || null,
+            timeLeft,
+            mode: shared.mode || 'down'
+          };
+        }
      }
-     return { idx: null, timeLeft: 0, mode: 'down' };
+     return { idx: null, startTime: null, targetTime: null, timeLeft: 0, mode: 'down' };
   });
   const [deletingSetIdx, setDeletingSetIdx] = useState(null);
   const [showCardioExtras, setShowCardioExtras] = useState({});
@@ -151,24 +158,60 @@ const ExerciseCard = ({
   const timerRef = useRef(activeTimer);
   useEffect(() => { timerRef.current = activeTimer; }, [activeTimer]);
 
+  // Dengarkan perubahan timer dari ImmersiveWorkout / FloatingTimer
+  useEffect(() => {
+    const handleSharedChange = () => {
+      const shared = window.logymActiveTimer;
+      if (shared && shared.exId === ex?.id && shared.timer) {
+        const t = shared.timer;
+        if (t.idx !== null && t.idx !== undefined) {
+          const timeLeft = t.mode === 'down'
+            ? Math.max(0, Math.ceil(((t.targetTime || Date.now()) - Date.now()) / 1000))
+            : Math.max(0, Math.floor((Date.now() - (t.startTime || Date.now())) / 1000));
+          setActiveTimer({
+            idx: t.idx,
+            startTime: t.startTime || null,
+            targetTime: t.targetTime || null,
+            timeLeft,
+            mode: t.mode || 'down'
+          });
+        }
+      } else if (!shared && timerRef.current.idx !== null && window.logymActiveTimer === null) {
+        setActiveTimer({ idx: null, startTime: null, targetTime: null, timeLeft: 0, mode: 'down' });
+      }
+    };
+    window.addEventListener('logym_active_timer_change', handleSharedChange);
+    return () => window.removeEventListener('logym_active_timer_change', handleSharedChange);
+  }, [ex?.id]);
+
   useEffect(() => {
     if (activeTimer.idx === null) return;
     const terapkan = (next) => { timerRef.current = next; setActiveTimer(next); };
     const interval = setInterval(() => {
       const cur = timerRef.current;
       if (cur.idx === null) return;
-      if (cur.mode !== 'down') { terapkan({ ...cur, timeLeft: cur.timeLeft + 1 }); return; }
-      if (cur.timeLeft > 1) { terapkan({ ...cur, timeLeft: cur.timeLeft - 1 }); return; }
 
-      // Timer set HABIS — nadanya sama lantangnya dengan timer istirahat, apa pun jenis
-      // latihannya (kardio, plank, hold). Dulu di sini 'click': bunyi "plup" pelan yang tidak
-      // kedengaran dari treadmill, dan cuma dibunyikan kalau setnya kebetulan belum tercentang.
-      clearInterval(interval);
-      terapkan({ idx: null, timeLeft: 0, mode: 'down' });
-      playSoundEffect('timerEnd', soundEnabled);
-      if (soundEnabled && navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 500]);
-      if (!sets[cur.idx]?.done) onToggleSet(ex.id, cur.idx);
-    }, 1000);
+      // Mode UP (hitung maju berbasis jam dinding Date.now())
+      if (cur.mode !== 'down') {
+        const elapsed = cur.startTime ? Math.floor((Date.now() - cur.startTime) / 1000) : (cur.timeLeft + 1);
+        if (cur.timeLeft !== elapsed) {
+          terapkan({ ...cur, timeLeft: elapsed });
+        }
+        return;
+      }
+
+      // Mode DOWN (hitung mundur berbasis jam dinding targetTime)
+      const remaining = cur.targetTime ? Math.ceil((cur.targetTime - Date.now()) / 1000) : (cur.timeLeft - 1);
+      if (remaining <= 0) {
+        clearInterval(interval);
+        terapkan({ idx: null, startTime: null, targetTime: null, timeLeft: 0, mode: 'down' });
+        playSoundEffect('timerEnd', soundEnabled);
+        if (soundEnabled && navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 500]);
+        if (!sets[cur.idx]?.done) onToggleSet(ex.id, cur.idx);
+      } else if (cur.timeLeft !== remaining) {
+        terapkan({ ...cur, timeLeft: remaining });
+      }
+    }, 500);
     return () => clearInterval(interval);
   }, [activeTimer.idx, ex?.id, sets, onToggleSet, soundEnabled]);
 
@@ -179,44 +222,80 @@ const ExerciseCard = ({
          exId: ex?.id,
          exName: ex?.name,
          setIdx: activeTimer.idx,
-         timer: activeTimer.mode === 'down'
-           ? { idx: activeTimer.idx, mode: 'down', targetTime: Date.now() + activeTimer.timeLeft * 1000, startTime: null, timeLeft: activeTimer.timeLeft }
-           : { idx: activeTimer.idx, mode: 'up', startTime: Date.now() - activeTimer.timeLeft * 1000, targetTime: null, timeLeft: activeTimer.timeLeft }
+         timer: {
+           idx: activeTimer.idx,
+           mode: activeTimer.mode,
+           startTime: activeTimer.startTime,
+           targetTime: activeTimer.targetTime,
+           timeLeft: activeTimer.timeLeft
+         }
        };
        window.dispatchEvent(new CustomEvent('logym_active_timer_change'));
     } else if (window.logymActiveTimer?.exId === ex?.id) {
        window.logymActiveTimer = null;
        window.dispatchEvent(new CustomEvent('logym_active_timer_change'));
     }
-  }, [activeTimer, ex?.id, ex?.name]);
+  }, [activeTimer.idx, activeTimer.mode, activeTimer.startTime, activeTimer.targetTime, ex?.id, ex?.name]);
 
   const toggleTimer = (setIdx, durationMins) => {
     playSoundEffect('click', soundEnabled);
     if (activeTimer.idx === setIdx) {
         // Matikan timer
         if (activeTimer.mode === 'up') {
-           // Satuannya beda: set kardio menyimpan MENIT, set 'time' (plank dsb) menyimpan DETIK
-           // — sama seperti yang dibaca input & kalkulator kalori.
-           if (exType === 'cardio') {
-               handleCardioChange(setIdx, 'duration', Number((activeTimer.timeLeft / 60).toFixed(2)));
-           } else {
-               onUpdateSet(ex.id, setIdx, 'd', Math.round(activeTimer.timeLeft));
-           }
+            const elapsedSecs = activeTimer.startTime ? Math.max(1, Math.floor((Date.now() - activeTimer.startTime) / 1000)) : activeTimer.timeLeft;
+            if (exType === 'cardio') {
+                handleCardioChange(setIdx, 'duration', Number((elapsedSecs / 60).toFixed(2)));
+            } else {
+                onUpdateSet(ex.id, setIdx, 'd', Math.round(elapsedSecs));
+            }
         }
-        setActiveTimer({ idx: null, timeLeft: 0, mode: 'down' });
+        setActiveTimer({ idx: null, startTime: null, targetTime: null, timeLeft: 0, mode: 'down' });
     } else {
         // Mulai timer -> Otomatis mulai sesi latihan jika belum dimulai!
         if (!isWorkoutActive && onStartWorkout) {
           onStartWorkout();
         }
+        const now = Date.now();
         const d = Number(durationMins || 0);
         if (d > 0) {
            const timeInSeconds = exType === 'cardio' ? Math.round(d * 60) : Math.round(d);
-           setActiveTimer({ idx: setIdx, timeLeft: timeInSeconds, mode: 'down' }); // Hitung mundur
+           setActiveTimer({ idx: setIdx, startTime: null, targetTime: now + timeInSeconds * 1000, timeLeft: timeInSeconds, mode: 'down' }); // Hitung mundur
         } else {
-           setActiveTimer({ idx: setIdx, timeLeft: 0, mode: 'up' }); // Hitung maju
+           setActiveTimer({ idx: setIdx, startTime: now, targetTime: null, timeLeft: 0, mode: 'up' }); // Hitung maju
         }
     }
+  };
+
+  const handleCheckSet = (setIdx) => {
+    const s = sets[setIdx];
+    const isDoneNow = !s?.done;
+    playSoundEffect(s?.done ? 'click' : 'done_set', soundEnabled);
+
+    // 1. Jika timer sedang jalan di set ini dan user mencentang selesai:
+    if (activeTimer.idx === setIdx) {
+      if (activeTimer.mode === 'up') {
+        const elapsedSecs = activeTimer.startTime ? Math.max(1, Math.floor((Date.now() - activeTimer.startTime) / 1000)) : activeTimer.timeLeft;
+        if (exType === 'cardio') {
+          handleCardioChange(setIdx, 'duration', Number((elapsedSecs / 60).toFixed(2)));
+        } else {
+          onUpdateSet(ex.id, setIdx, 'd', Math.round(elapsedSecs));
+        }
+      }
+      setActiveTimer({ idx: null, startTime: null, targetTime: null, timeLeft: 0, mode: 'down' });
+    }
+    // 2. Jika kardio, durasi set masih kosong/0, dan sesi sedang aktif:
+    else if (isDoneNow && exType === 'cardio' && !(Number(s?.duration) > 0) && isWorkoutActive && workoutStartTime) {
+      let prevStamp = workoutStartTime;
+      for (let i = 0; i < setIdx; i++) {
+        if (sets[i]?.done && Number(sets[i]?.at) > 0) {
+          prevStamp = Math.max(prevStamp, Number(sets[i].at));
+        }
+      }
+      const elapsedMins = Math.max(1, Number(((Date.now() - prevStamp) / 60000).toFixed(2)));
+      handleCardioChange(setIdx, 'duration', elapsedMins);
+    }
+
+    onToggleSet(ex.id, setIdx);
   };
 
   const formatTime = (seconds) => {
@@ -614,7 +693,7 @@ const ExerciseCard = ({
 
                                        {/* Checkmark Button */}
                                        <div className="flex justify-center">
-                                         <button onClick={() => { playSoundEffect(s.done ? 'click' : 'done_set', soundEnabled); onToggleSet(ex.id, setIdx); }} disabled={activeTimer.idx === setIdx} className={`w-11 h-11 rounded-full flex justify-center items-center font-bold transition-all ${s.skipped ? 'bg-rose-500/20 text-rose-500 border border-rose-500/50 hover:bg-rose-500/30' : s.done ? t.bgAccent + ' text-white shadow-lg scale-105' : 'bg-transparent border-2 ' + t.borderAccentSoft + ' ' + t.textAccent + ' hover:bg-black/5 dark:hover:bg-white/5'} ${activeTimer.idx === setIdx ? 'opacity-30 cursor-not-allowed' : ''}`}>
+                                         <button onClick={() => handleCheckSet(setIdx)} className={`w-11 h-11 rounded-full flex justify-center items-center font-bold transition-all ${s.skipped ? 'bg-rose-500/20 text-rose-500 border border-rose-500/50 hover:bg-rose-500/30' : s.done ? t.bgAccent + ' text-white shadow-lg scale-105' : 'bg-transparent border-2 ' + t.borderAccentSoft + ' ' + t.textAccent + ' hover:bg-black/5 dark:hover:bg-white/5'}`}>
                                            {s.skipped ? <X size={18} /> : <CheckCircle size={18} />}
                                          </button>
                                        </div>
@@ -822,7 +901,7 @@ const ExerciseCard = ({
                       {/* Sama seperti set beban di atas: mencentang berbunyi 'done_set', membatalkan
                           berbunyi 'click'. Dulu set durasi selalu 'click' — menyelesaikan plank
                           terdengar sama saja dengan menekan tombol biasa. */}
-                      <button onClick={() => { playSoundEffect(s.done ? 'click' : 'done_set', soundEnabled); onToggleSet(ex.id, setIdx); }} disabled={activeTimer.idx === setIdx} className={`w-11 h-11 rounded-2xl flex justify-center items-center font-bold transition-all ${s.skipped ? 'bg-rose-500/20 text-rose-500 border border-rose-500/50 hover:bg-rose-500/30' : s.done ? t.bgAccent + ' text-white shadow-lg scale-105' : 'bg-transparent border-2 ' + t.borderAccentSoft + ' ' + t.textAccent + ' hover:bg-black/5 dark:hover:bg-white/5'} ${activeTimer.idx === setIdx ? 'opacity-30 cursor-not-allowed' : ''}`}>
+                      <button onClick={() => handleCheckSet(setIdx)} className={`w-11 h-11 rounded-2xl flex justify-center items-center font-bold transition-all ${s.skipped ? 'bg-rose-500/20 text-rose-500 border border-rose-500/50 hover:bg-rose-500/30' : s.done ? t.bgAccent + ' text-white shadow-lg scale-105' : 'bg-transparent border-2 ' + t.borderAccentSoft + ' ' + t.textAccent + ' hover:bg-black/5 dark:hover:bg-white/5'}`}>
                         {s.skipped ? <X size={18} /> : <CheckCircle size={18} />}
                       </button>
                       {hasWeightDiff && <div className="h-3.5 mt-1"></div>}

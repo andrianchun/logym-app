@@ -309,6 +309,14 @@ console.log('workoutCalc OK', { cardioKcal, plankKcal, liftKcal });
   assert.equal(setSeconds(bench, { r: 10 }), 40);
   assert.equal(sessionSpanSeconds([bench], { b1: [{ done: true, at: T, w: 60, r: 10 }] }), 40);
 
+  // 8b. Dua set kardio (mis. treadmill 15 mnt + 15 mnt = 30 mnt) dicentang bersamaan:
+  // durasi sesi tidak boleh runtuh ke selisih stempel 5 detik, harus minimal 1800 detik (30 menit).
+  const treadmillEx = { id: 't1', name: 'Running, Treadmill', type: 'cardio' };
+  assert.equal(sessionSpanSeconds([treadmillEx], { t1: [
+    { done: true, at: T, duration: 15 },
+    { done: true, at: T + 5000, duration: 15 }
+  ] }), 1800, 'dua set treadmill 15 menit harus menghasilkan 30 menit (1800 dtk)');
+
   console.log('sessionSpanSeconds OK', { plank1dtk: kkal, jalurLama: lama });
 }
 

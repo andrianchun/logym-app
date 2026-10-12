@@ -419,10 +419,24 @@ const ImmersiveWorkout = ({
   React.useEffect(() => {
     if (activeTimer.idx !== null) {
        window.logymActiveTimer = { exId: ex?.id, timer: activeTimer };
+       window.dispatchEvent(new CustomEvent('logym_active_timer_change'));
     } else if (window.logymActiveTimer?.exId === ex?.id) {
        window.logymActiveTimer = null;
+       window.dispatchEvent(new CustomEvent('logym_active_timer_change'));
     }
   }, [activeTimer, ex?.id]);
+
+  React.useEffect(() => {
+    const handleTimerChange = () => {
+      if (window.logymActiveTimer && window.logymActiveTimer.exId === ex?.id) {
+        setActiveTimer(window.logymActiveTimer.timer);
+      } else if (!window.logymActiveTimer && activeTimer.idx !== null) {
+        setActiveTimer({ idx: null, targetTime: null, startTime: null, mode: 'down' });
+      }
+    };
+    window.addEventListener('logym_active_timer_change', handleTimerChange);
+    return () => window.removeEventListener('logym_active_timer_change', handleTimerChange);
+  }, [ex?.id, activeTimer.idx]);
 
   const toggleTimer = (setIdx, duration, isCardio = false) => {
     playSoundEffect('click', soundEnabled);
@@ -817,7 +831,34 @@ const ImmersiveWorkout = ({
     if (!ex) return;
     playSoundEffect('done_set', soundEnabled);
     const itemLogs = getLogsForEx(ex);
-    if (!itemLogs[activeSetIdx]?.done) {
+    const curSet = itemLogs[activeSetIdx] || {};
+
+    // 1. Jika timer sedang berjalan di set ini saat Done ditekan:
+    if (activeTimer.idx === activeSetIdx) {
+      if (activeTimer.mode === 'up' && activeTimer.startTime) {
+        const elapsed = Math.floor((Date.now() - activeTimer.startTime) / 1000);
+        const elapsedMins = Number((elapsed / 60).toFixed(2));
+        if (exType === 'cardio') {
+          handleCardioChange('duration', elapsedMins);
+        } else {
+          onSetChange(ex.id, activeSetIdx, 'd', elapsed);
+        }
+      }
+      setActiveTimer({ idx: null, targetTime: null, startTime: null, mode: 'down' });
+    }
+    // 2. Jika kardio, durasi set masih kosong/0, dan sesi sedang aktif:
+    else if (!curSet.done && exType === 'cardio' && !(Number(curSet.duration) > 0) && workoutStartTime) {
+      let prevStamp = workoutStartTime;
+      for (let i = 0; i < activeSetIdx; i++) {
+        if (itemLogs[i]?.done && Number(itemLogs[i]?.at) > 0) {
+          prevStamp = Math.max(prevStamp, Number(itemLogs[i].at));
+        }
+      }
+      const elapsedMins = Math.max(1, Number(((Date.now() - prevStamp) / 60000).toFixed(2)));
+      handleCardioChange('duration', elapsedMins);
+    }
+
+    if (!curSet.done) {
       let siblingIds = null;
       if (ex.supersetId) {
          siblingIds = validExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
