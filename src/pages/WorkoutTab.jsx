@@ -10,7 +10,6 @@ import { estimate10RM, defaultSetWeight, gymStepFor, getEquipmentConfig, calcula
 import WorkoutHeader from '../components/WorkoutHeader';
 import ExerciseCard from '../components/ExerciseCard';
 import ImmersiveWorkout from '../components/ImmersiveWorkout';
-import ExerciseDetailModal from '../components/ExerciseDetailModal';
 import AlternativeExerciseModal from '../components/AlternativeExerciseModal';
 import EmptyWorkoutState from '../components/EmptyWorkoutState';
 import WellnessCheckModal from '../components/WellnessCheckModal';
@@ -54,7 +53,8 @@ const WorkoutTab = ({
   sessionToRun, setSessionToRun, onSessionExercises,
   resumeDurationSecs, setResumeDurationSecs,
   units, userProfile, activePlanIds = [], showSupersetToast, tabSlideDir = 'right',
-  expandedSessions, setExpandedSessions
+  expandedSessions, setExpandedSessions,
+  onOpenDetail
 }) => {
   
   const [detailExercise, setDetailExercise] = useState(null);
@@ -226,7 +226,7 @@ const WorkoutTab = ({
   // detail satu gerakan.
   const scrollBeforeOverlay = React.useRef(null);
   const blockAutoScrollUntil = React.useRef(0);
-  const overlayOpen = isImmersiveMode || isClosingImmersive || !!detailExercise;
+  const overlayOpen = isImmersiveMode || isClosingImmersive || showAlternativeModal;
   React.useEffect(() => {
     if (overlayOpen) {
       if (scrollBeforeOverlay.current === null) scrollBeforeOverlay.current = window.scrollY;
@@ -436,7 +436,11 @@ const WorkoutTab = ({
          if (fullEx.equipment) mergedEx.equipment = fullEx.equipment;
      }
 
-     setDetailExercise(mergedEx);
+     if (onOpenDetail) {
+       onOpenDetail(mergedEx);
+     } else {
+       setDetailExercise(mergedEx);
+     }
   };
 
   const handleSelectAlternative = (newEx) => {
@@ -661,7 +665,7 @@ const WorkoutTab = ({
       exLookup: rmLookup,
     });
 
-    const { best10RM, last10RM, lastSessionWeight, lastSessionReps, eqConf: eqConfNow } = targetPlan;
+    const { best10RM, last10RM, lastSessionWeight, lastSessionInputWeight, lastSessionReps, eqConf: eqConfNow } = targetPlan;
 
     // 2. Scan current session — pakai beban AKTUAL. Abaikan set pemanasan (warmup)
     // agar tidak prematur memicu acuan 10RM pada beban ringan.
@@ -719,10 +723,10 @@ const WorkoutTab = ({
       return `Total Beban: ${actWeight} ${uStr}`;
     };
 
-    const formatRefWeight = (actWeight, reps = null) => {
+    const formatRefWeight = (actWeight, reps = null, inputWParam = null) => {
       if (!actWeight || actWeight <= 0) return null;
       if (hasWeightDiff) {
-        const inputW = calculateInputWeight(actWeight, eqConfNow);
+        const inputW = inputWParam !== null && inputWParam !== undefined ? inputWParam : calculateInputWeight(actWeight, eqConfNow);
         return reps ? `${inputLabel} ${inputW} ${uStr} × ${reps} reps` : `${inputLabel} ${inputW} ${uStr}`;
       }
       return reps ? `${actWeight} ${uStr} × ${reps} reps` : `${actWeight} ${uStr}`;
@@ -737,7 +741,7 @@ const WorkoutTab = ({
         weightLabel: hasWeightDiff ? inputLabel : null,
         target: formatHeroTarget(currentMaxWeight, currentMaxReps),
         targetDetail: formatSubTotal(currentMaxWeight),
-        lastSession: lastSessionWeight > 0 ? formatRefWeight(lastSessionWeight, lastSessionReps) : null,
+        lastSession: lastSessionWeight > 0 ? formatRefWeight(lastSessionWeight, lastSessionReps, lastSessionInputWeight) : null,
         message: `Luar biasa! Kamu berhasil memecahkan rekor 10RM baru. Terus pertahankan progres luar biasa ini!`,
         rm10: `${currentMax10RM} ${uStr}`,
         rm10Number: currentMax10RM,
@@ -796,7 +800,7 @@ const WorkoutTab = ({
         weightLabel: hasWeightDiff ? inputLabel : null,
         target: formatHeroTarget(targetActualWeight, displayTargetReps),
         targetDetail: formatSubTotal(targetActualWeight),
-        lastSession: formatRefWeight(lastSessionWeight, lastSessionReps),
+        lastSession: formatRefWeight(lastSessionWeight, lastSessionReps, lastSessionInputWeight),
         message: targetPlan.message,
         rm10: true10RM > 0 ? `${true10RM} ${uStr}` : null,
         rm10Detail: formatSubTotal(true10RM),
@@ -818,7 +822,7 @@ const WorkoutTab = ({
         weightLabel: hasWeightDiff ? inputLabel : null,
         target: formatHeroTarget(targetActualWeight, displayTargetReps),
         targetDetail: formatSubTotal(targetActualWeight),
-        lastSession: formatRefWeight(lastSessionWeight, lastSessionReps),
+        lastSession: formatRefWeight(lastSessionWeight, lastSessionReps, lastSessionInputWeight),
         message: targetPlan.message,
         rm10: true10RM > 0 ? `${true10RM} ${uStr}` : null,
         rm10Detail: formatSubTotal(true10RM),
@@ -839,7 +843,7 @@ const WorkoutTab = ({
         weightLabel: hasWeightDiff ? inputLabel : null,
         target: formatHeroTarget(targetActualWeight, displayTargetReps),
         targetDetail: formatSubTotal(targetActualWeight),
-        lastSession: formatRefWeight(lastSessionWeight, lastSessionReps),
+        lastSession: formatRefWeight(lastSessionWeight, lastSessionReps, lastSessionInputWeight),
         message: targetPlan.message,
         rm10: true10RM > 0 ? `${true10RM} ${uStr}` : null,
         rm10Detail: formatSubTotal(true10RM),
@@ -1192,20 +1196,6 @@ const WorkoutTab = ({
 
       {/* KONTEN UTAMA WORKOUT TAB */}
       <div className="relative z-10">
-      {detailExercise && !showAlternativeModal && (
-        <ExerciseDetailModal 
-            ex={detailExercise} 
-            onClose={() => setDetailExercise(null)} 
-            t={t} lang={lang} soundEnabled={soundEnabled} 
-            fullHistory={history}
-            onReplace={(ex) => { if (ex) setDetailExercise(ex); setShowAlternativeModal(true); }}
-            units={units}
-            exerciseLibrary={exerciseLibrary}
-            setExerciseLibrary={setExerciseLibrary}
-            programs={programs}
-          />
-      )}
-
       <AlternativeExerciseModal
         isOpen={showAlternativeModal}
         onClose={() => { setShowAlternativeModal(false); setDetailExercise(null); }}

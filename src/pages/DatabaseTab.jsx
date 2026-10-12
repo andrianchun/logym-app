@@ -4,7 +4,6 @@ import { formatTarget, normalizeMuscleKey, muscleOptions, equipmentOptions, getV
 import EquipmentIcon from '../components/EquipmentIcon';
 import { fetchExercisesFromApi, clearExerciseDbCache, getCachedExercises } from '../utils/exerciseDbApi';
 import { playSoundEffect } from '../utils/audio';
-import ExerciseDetailModal from '../components/ExerciseDetailModal';
 import UnifiedExerciseCard from '../components/UnifiedExerciseCard';
 import FilterChips from '../components/FilterChips';
 import SwipeInput from '../components/SwipeInput';

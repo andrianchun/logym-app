@@ -3,21 +3,23 @@ import fs from 'fs';
 import path from 'path';
 
 async function generateNotificationIcons() {
-  const sourcePath = 'public/logo-white.webp';
+  const sourcePath = fs.existsSync('public/logym-emblem-white.png') 
+    ? 'public/logym-emblem-white.png' 
+    : (fs.existsSync('public/5.png') ? 'public/5.png' : 'public/logo-white.webp');
+
   if (!fs.existsSync(sourcePath)) {
     throw new Error(`Source file ${sourcePath} not found!`);
   }
 
   console.log('Extracting emblem from', sourcePath);
 
-  // 1. Extract emblem from public/logo-white.webp (excluding "LOGYM" text below)
-  // Bounding box of emblem: left 240, top 191, width 1534, height 1242
+  // 1. Trim emblem otomatis ke bounding box piksel aktif
   const emblemRaw = await sharp(sourcePath)
-    .extract({ left: 240, top: 191, width: 1534, height: 1242 })
+    .trim()
     .raw()
     .toBuffer({ resolveWithObject: true });
 
-  // 2. Ensure all visible pixels have pure white RGB (255, 255, 255) with antialiased alpha
+  // 2. Pastikan seluruh piksel yang terlihat berwarna putih murni (255, 255, 255) dengan alpha antialias asli
   for (let i = 0; i < emblemRaw.data.length; i += 4) {
     emblemRaw.data[i] = 255;     // R
     emblemRaw.data[i + 1] = 255; // G

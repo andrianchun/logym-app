@@ -1,4 +1,4 @@
-import { manualFieldValue, resolveLoggedExercise, defaultEquipmentConfig, normalizeEquipmentName } from '../data/constants.js';
+import { manualFieldValue, resolveLoggedExercise, defaultEquipmentConfig, normalizeEquipmentName, cleanExerciseNameForMatching } from '../data/constants.js';
 import { dayBmr } from './bmr.js';
 
 // MET (Metabolic Equivalent) untuk latihan beban/resistance training. Dipakai konsisten di
@@ -729,11 +729,21 @@ export const calculateInputWeight = (actualWeight, config) => {
  */
 export const getSetActualWeight = (set, config = null) => {
   if (!set) return 0;
-  if (set.total_w !== undefined && set.total_w !== null && Number(set.total_w) > 0) {
+  const rawW = Number(set.input_w !== undefined ? set.input_w : set.w) || 0;
+  if (!config) {
+    if (set.total_w !== undefined && set.total_w !== null && Number(set.total_w) > 0) {
+      return Number(set.total_w);
+    }
+    return rawW;
+  }
+
+  // Jika set sudah memiliki total_w dan explicit base_w atau ratio (bukan 1:1 default)
+  const hasExplicitConfig = (set.base_w !== undefined && Number(set.base_w) > 0) || (set.ratio !== undefined && Number(set.ratio) !== 1);
+  if (set.total_w !== undefined && set.total_w !== null && Number(set.total_w) > 0 && hasExplicitConfig) {
     return Number(set.total_w);
   }
-  const rawW = Number(set.input_w !== undefined ? set.input_w : set.w) || 0;
-  if (!config) return rawW;
+
+  // Fallback untuk legacy sets atau set tanpa config eksplisit: hitung ulang dari input
   return calculateActualWeight(rawW, config);
 };
 
@@ -803,7 +813,10 @@ export const defaultSetWeight = (libEx, ex, step, eqConf = null) => {
  * berbeda di tiap program, dan `handleAddExerciseToProgram`/`handleReplaceExercise` memberi
  * crypto.randomUUID() baru setiap kali user menambah atau mengganti latihan.
  */
-export const canonicalExId = (name) => `nm:${String(name || '').trim().toLowerCase()}`;
+export const canonicalExId = (name) => {
+  const cleaned = cleanExerciseNameForMatching ? cleanExerciseNameForMatching(name) : String(name || '').trim().toLowerCase();
+  return `nm:${cleaned || String(name || '').trim().toLowerCase()}`;
+};
 
 /**
  * Peta "setiap id yang pernah dipakai latihan ini" -> satu objek kanonik per NAMA, untuk dipakai
@@ -824,13 +837,17 @@ export const buildExLookupByName = (history, ...exLists) => {
   const daftarkan = (ex) => {
     const id = ex?.id;
     if (id === undefined || id === null) return;
-    let nama = String(ex?.name || '').trim().toLowerCase();
-    if (!nama) return;
-    if ((String(id) === '104' || String(ex?.originalId) === '104') && (nama === 'cable seated lateral raise' || nama === 'seated cable lateral raise')) {
+    let rawName = String(ex?.name || '').trim().toLowerCase();
+    let nama = cleanExerciseNameForMatching ? cleanExerciseNameForMatching(ex?.name || '') : rawName;
+    if (!nama && !rawName) return;
+    const finalKey = nama || rawName;
+    if ((String(id) === '104' || String(ex?.originalId) === '104') && (finalKey === 'cable seated lateral raise' || finalKey === 'seated cable lateral raise')) {
       nama = 'standing cable lateral raise';
     }
-    const c = kanonik[nama] || (kanonik[nama] = { ...ex, id: canonicalExId(nama), name: (nama === 'standing cable lateral raise' && String(ex?.name || '').toLowerCase().includes('seated')) ? 'Standing Cable Lateral Raise' : ex.name });
+    const c = kanonik[finalKey] || (kanonik[finalKey] = { ...ex, id: canonicalExId(finalKey), name: ex.name });
     if (!out[String(id)]) out[String(id)] = c;
+    if (ex.originalId && !out[String(ex.originalId)]) out[String(ex.originalId)] = c;
+    if (rawName && !kanonik[rawName]) kanonik[rawName] = c;
   };
   exLists.forEach((list) => (list || []).forEach(daftarkan));
   Object.values(history || {}).forEach((day) =>
@@ -841,7 +858,7 @@ export const buildExLookupByName = (history, ...exLists) => {
   return out;
 };
 
-export const recomputeStrengthRecords = (history, logKeys, exLookup) => {
+export const recomputeStrengthRecords = (history, logKeys, exLookup, gymProfiles = null, activeGymId = null, userProfile = null) => {
   const ids = new Set();
   (logKeys || []).forEach((k) => {
     const ex = resolveLoggedExercise(k, exLookup);
@@ -862,7 +879,7 @@ export const recomputeStrengthRecords = (history, logKeys, exLookup) => {
         const rec = (out[id] = out[id] || { rm10: 0, rm10At: 0, rm10Best: 0, lastWeight: 0, _at: 0 });
         let bestInSession = 0;
         let rm10InSession = 0;
-        const eqConf = exObj ? getEquipmentConfig(null, null, exObj) : null;
+        const eqConf = exObj ? getEquipmentConfig(gymProfiles, activeGymId, exObj, userProfile) : null;
         
         Object.values(wk.log[k] || {}).forEach((s) => {
           if (!s || s.skipped || !(Number(s.w) > 0 || Number(s.total_w) > 0) || !(Number(s.r) > 0)) return;
@@ -889,28 +906,34 @@ export const recomputeStrengthRecords = (history, logKeys, exLookup) => {
  * Riwayat 10RM satu latihan, satu titik per sesi — bahan grafik progressive overload.
  * Sumbu Y wajib menggunakan actual weight (total_w).
  *
- * @returns {Array<{date: string, rm10: number, weight: number, reps: number}>} urut lama -> baru
+ * @returns {Array<{date: string, rm10: number, weight: number, reps: number, inputWeight: number}>} urut lama -> baru
  */
-export const rm10Series = (history, exerciseId, exLookup) => {
+export const rm10Series = (history, exerciseId, exLookup, gymProfiles = null, activeGymId = null, userProfile = null) => {
   const target = String(exerciseId);
   const titik = [];
   Object.keys(history || {}).sort().forEach((dateStr) => {
-    let rm10 = 0, weight = 0, reps = 0;
+    let rm10 = 0, weight = 0, reps = 0, inputWeight = 0;
     (history[dateStr]?.workouts || []).forEach((wk) => {
       if (wk?.status !== 'completed' || !wk.log) return;
       Object.keys(wk.log).forEach((k) => {
         const exObj = resolveLoggedExercise(k, exLookup);
         if (String(exObj?.id) !== target) return;
-        const eqConf = exObj ? getEquipmentConfig(null, null, exObj) : null;
+        const eqConf = exObj ? getEquipmentConfig(gymProfiles, activeGymId, exObj, userProfile) : null;
         Object.values(wk.log[k] || {}).forEach((s) => {
           if (!s || s.skipped || !(Number(s.w) > 0 || Number(s.total_w) > 0) || !(Number(s.r) > 0)) return;
           const actW = getSetActualWeight(s, eqConf);
+          const rawW = Number(s.input_w !== undefined ? s.input_w : s.w) || 0;
           const c = estimate10RM(actW, s.r);
-          if (c > rm10) { rm10 = c; weight = actW; reps = Number(s.r); }
+          if (c > rm10) { 
+            rm10 = c; 
+            weight = actW; 
+            reps = Number(s.r); 
+            inputWeight = rawW;
+          }
         });
       });
     });
-    if (rm10 > 0) titik.push({ date: dateStr, rm10, weight, reps });
+    if (rm10 > 0) titik.push({ date: dateStr, rm10, weight, reps, inputWeight });
   });
   return titik;
 };
@@ -1325,7 +1348,7 @@ export const repairActualWeights = (history, exLookup, eqConfOf) => {
  * @param {object} [exLookup] peta id -> latihan (opsional, untuk nama dan info alat)
  * @returns {object}
  */
-export const calculatePersonalRecords = (history, exLookup = {}) => {
+export const calculatePersonalRecords = (history, exLookup = {}, gymProfiles = null, activeGymId = null, userProfile = null) => {
   let lifetimeVolumeKg = 0;
   let maxSessionVolume = { volumeKg: 0, date: '', workoutName: '' };
   let totalWorkouts = 0;
@@ -1374,12 +1397,13 @@ export const calculatePersonalRecords = (history, exLookup = {}) => {
       keys.forEach((key) => {
         const ex = resolveLoggedExercise(key, exLookup);
         const exName = ex?.name || String(key);
+        const eqConf = ex ? getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile) : null;
         const sets = log[key];
         const setList = Array.isArray(sets) ? sets : Object.values(sets || {});
 
         setList.forEach((set) => {
           if (!set || set.skipped) return;
-          const wKg = Number(set.total_w !== undefined ? set.total_w : (set.w !== undefined ? set.w : set.input_w)) || 0;
+          const wKg = getSetActualWeight(set, eqConf);
           const reps = Number(set.r) || 0;
 
           if (reps > 0 && wKg > 0) {
@@ -1688,7 +1712,7 @@ export const resolveExerciseProgressiveTarget = ({
 
   const lookup = exLookup || buildExLookupByName(history, [ex], exerciseLibrary, extraExercises, ...(programs || []).map(p => p?.exercises));
   const canonicalId = canonicalExId(ex?.name);
-  const series = rm10Series(history, canonicalId, lookup);
+  const series = rm10Series(history, canonicalId, lookup, gymProfiles, activeGymId, userProfile);
   const lastPoint = series[series.length - 1];
   const histBest = series.reduce((m, p) => Math.max(m, p.rm10), 0);
 
@@ -1702,6 +1726,7 @@ export const resolveExerciseProgressiveTarget = ({
   const best10RM = Math.max(histBest, libBest);
   const last10RM = lastPoint?.rm10 || libRm10;
   const lastSessionWeight = (lastPoint?.weight !== undefined && lastPoint?.weight > 0) ? lastPoint.weight : libLastW;
+  const lastSessionInputWeight = (lastPoint?.inputWeight !== undefined && lastPoint?.inputWeight > 0) ? lastPoint.inputWeight : (eqConf ? calculateInputWeight(lastSessionWeight, eqConf) : lastSessionWeight);
   const lastSessionReps = (lastPoint?.reps !== undefined && lastPoint?.reps > 0) ? lastPoint.reps : (lastPoint ? 10 : (libLastW > 0 ? 10 : 0));
   const hasLastSession = lastSessionWeight > 0 && lastSessionReps > 0;
 
@@ -1721,6 +1746,7 @@ export const resolveExerciseProgressiveTarget = ({
         targetReps,
         totalWeight,
         lastSessionWeight,
+        lastSessionInputWeight,
         lastSessionReps,
         last10RM,
         best10RM,
@@ -1749,6 +1775,7 @@ export const resolveExerciseProgressiveTarget = ({
         targetReps,
         totalWeight,
         lastSessionWeight,
+        lastSessionInputWeight,
         lastSessionReps,
         last10RM,
         best10RM,
@@ -1792,6 +1819,7 @@ export const resolveExerciseProgressiveTarget = ({
       targetReps,
       totalWeight,
       lastSessionWeight,
+      lastSessionInputWeight,
       lastSessionReps,
       last10RM,
       best10RM,

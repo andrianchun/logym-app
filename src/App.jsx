@@ -61,7 +61,7 @@ import useDialog from './hooks/useDialog';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import UpdaterAlert from './components/UpdaterAlert';
 import PwaInstallPrompt from './components/PwaInstallPrompt';
-import { getLocalYMD, resolveProjectedProgramId, isLomealOwned, resolveLoggedExercise, splitSessionLogs, buildLogymSyncPayload, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos, getDayWorkouts, countMissedScheduledDays, canonicalizeExercise } from './data/constants';
+import { getLocalYMD, resolveProjectedProgramId, isLomealOwned, resolveLoggedExercise, splitSessionLogs, buildLogymSyncPayload, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos, getDayWorkouts, countMissedScheduledDays, canonicalizeExercise, findMatchingMasterExercise } from './data/constants';
 import { serializeDay, dayFingerprint, migrateBaseline, reconcileHistory, workoutsToMap, workoutIdsFromBaseline, diffFields, cleanFirestoreData, stableStringify, mergeBackupIntoHistory, sessionsPendingSave, compactDayBioData } from './utils/historySync';
 import { useBleManager } from './hooks/useBleManager';
 import { bolehSync, gabungAntrean } from './utils/hcSchedule';
@@ -1010,6 +1010,44 @@ export default function App() {
   const [showHelp, setShowHelp] = useState(false);
   const [showQuestionnaire, setShowQuestionnaire] = useState(false);
   const [globalDetailExercise, setGlobalDetailExercise] = useState(null);
+
+  const handleOpenGlobalExerciseDetail = useCallback(async (ex) => {
+    if (!ex) return;
+    playSoundEffect('click', soundEnabled);
+    const canonical = canonicalizeExercise(ex);
+    let fullEx = findMatchingMasterExercise(canonical, exerciseLibrary || defaultMasterExercises) || canonical;
+
+    if (!fullEx || !fullEx.instructions || fullEx.instructions.length === 0) {
+      try {
+        const onlineDb = await fetchExercisesFromApi();
+        const onlineMatch = findMatchingMasterExercise(fullEx || canonical, onlineDb);
+        if (onlineMatch) {
+          fullEx = { 
+            ...onlineMatch, 
+            ...fullEx, 
+            instructions: onlineMatch.instructions,
+            instructions_id: onlineMatch.instructions_id || onlineMatch.instructions,
+            instructions_en: onlineMatch.instructions_en || onlineMatch.instructions,
+            equipment: onlineMatch.equipment || fullEx?.equipment 
+          };
+        }
+      } catch (err) {}
+    }
+
+    let mergedEx = { ...(fullEx || {}), ...canonical };
+    if (fullEx) {
+      if (!mergedEx.instructions || mergedEx.instructions.length === 0) mergedEx.instructions = fullEx.instructions;
+      if (!mergedEx.instructions_id || mergedEx.instructions_id.length === 0) mergedEx.instructions_id = fullEx.instructions_id || fullEx.instructions;
+      if (!mergedEx.instructions_en || mergedEx.instructions_en.length === 0) mergedEx.instructions_en = fullEx.instructions_en || fullEx.instructions;
+      if (fullEx.videoUrl !== undefined) mergedEx.videoUrl = fullEx.videoUrl;
+      if (fullEx.ytVideo !== undefined) mergedEx.ytVideo = fullEx.ytVideo;
+      if (fullEx.thumbnailUrl !== undefined) mergedEx.thumbnailUrl = fullEx.thumbnailUrl;
+      if (fullEx.gifUrl !== undefined) mergedEx.gifUrl = fullEx.gifUrl;
+      if (fullEx.equipment) mergedEx.equipment = fullEx.equipment;
+    }
+
+    setGlobalDetailExercise(mergedEx);
+  }, [soundEnabled, exerciseLibrary]);
 
   const urlParamsHandled = useRef(false);
   useEffect(() => {
@@ -2855,6 +2893,59 @@ export default function App() {
     });
   }, [isHistoryLoaded, user?.uid]);
 
+  // SEKALI JALAN: Koreksi otomatis tidur yang terlanjur terdobel (>= 11 jam dengan loop/duplikasi log)
+  const sleepDoubledFixDone = useRef(false);
+  useEffect(() => { sleepDoubledFixDone.current = false; }, [user?.uid]);
+  useEffect(() => {
+    if (!isHistoryLoaded || sleepDoubledFixDone.current) return;
+    if (Object.keys(history).length === 0) return;
+    sleepDoubledFixDone.current = true;
+    const KEY = `hc_sleep_doubled_fix_${user?.uid || 'anon'}`;
+    if (localStorage.getItem(KEY)) return;
+
+    setHistory(prev => {
+      let changed = false;
+      const next = { ...prev };
+      Object.keys(prev).forEach(dateStr => {
+        const bio = prev[dateStr]?.bioData;
+        if (!bio || bio._manualFlags?.sleep !== undefined) return;
+        const sleepHours = Number(bio.sleep);
+        const log = bio.sleepLog;
+        let hasLoop = false;
+        if (Array.isArray(log) && log.length >= 4) {
+          const mnt = (e) => { const [h, m] = (e?.time || '').split(':').map(Number); return h * 60 + m; };
+          for (let i = 1; i < log.length; i++) {
+            const prevM = mnt(log[i - 1]);
+            const currM = mnt(log[i]);
+            if (currM < prevM && (prevM - currM) > 120 && !(prevM > 20 * 60 && currM < 8 * 60)) {
+              hasLoop = true;
+              break;
+            }
+          }
+        }
+
+        const stagesSum = (Number(bio.sleepDeep) || 0) + (Number(bio.sleepLight) || 0) + (Number(bio.sleepRem) || 0) + (Number(bio.sleepAwake) || 0);
+        if (sleepHours >= 11 && (hasLoop || (stagesSum > 0 && Math.abs(stagesSum / 60 - sleepHours) < 1))) {
+          const healedBio = { ...bio };
+          healedBio.sleep = Number((sleepHours / 2).toFixed(1));
+          if (bio.sleepDeep) healedBio.sleepDeep = String(Math.round((Number(bio.sleepDeep) || 0) / 2));
+          if (bio.sleepLight) healedBio.sleepLight = String(Math.round((Number(bio.sleepLight) || 0) / 2));
+          if (bio.sleepRem) healedBio.sleepRem = String(Math.round((Number(bio.sleepRem) || 0) / 2));
+          if (bio.sleepAwake) healedBio.sleepAwake = String(Math.round((Number(bio.sleepAwake) || 0) / 2));
+          if (Array.isArray(log) && log.length > 2) {
+            healedBio.sleepLog = log.slice(0, Math.ceil(log.length / 2));
+          }
+          healedBio._sleepDoubledHealed = true;
+          next[dateStr] = { ...prev[dateStr], bioData: healedBio };
+          changed = true;
+        }
+      });
+
+      localStorage.setItem(KEY, '1');
+      return changed ? next : prev;
+    });
+  }, [isHistoryLoaded, user?.uid]);
+
 
   useEffect(() => {
     window.history.pushState({ lyfit: true }, '');
@@ -4564,6 +4655,9 @@ export default function App() {
           exerciseLibrary={exerciseLibrary}
           setExerciseLibrary={setExerciseLibrary}
           programs={programs}
+          gymProfiles={gymProfiles}
+          activeGymId={activeGymId}
+          userProfile={userProfile}
         />
       )}
       
@@ -4706,7 +4800,7 @@ export default function App() {
                   units={units} userProfile={userProfile}
                   tabSlideDir={tabSlideDir}
                   activeProgramId={activeProgramId} setActiveProgramId={setActiveProgramId} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
-                   warmupVideos={warmupVideos} cooldownVideos={cooldownVideos} onOpenDetail={setGlobalDetailExercise}
+                   warmupVideos={warmupVideos} cooldownVideos={cooldownVideos} onOpenDetail={handleOpenGlobalExerciseDetail}
                    exerciseLibrary={exerciseLibrary} setExerciseLibrary={setExerciseLibrary}
                    exerciseLogs={exerciseLogs} skippedExercises={skippedExercises} extraExercises={extraExercises}
                    expandedSessions={expandedSessions} setExpandedSessions={setExpandedSessions}
@@ -4783,6 +4877,7 @@ export default function App() {
                    setHighlightPostId={setHighlightPostId}
                    setShowProfileModal={setShowProfileModal}
                    setProfileForceTab={setProfileForceTab}
+                   onOpenDetail={handleOpenGlobalExerciseDetail}
                  />
              </div>
          )}
@@ -4797,7 +4892,7 @@ export default function App() {
                     soundEnabled={soundEnabled}
                     warmupVideos={warmupVideos} setWarmupVideos={setWarmupVideos}
                     cooldownVideos={cooldownVideos} setCooldownVideos={setCooldownVideos}
-                    onOpenDetail={setGlobalDetailExercise}
+                    onOpenDetail={handleOpenGlobalExerciseDetail}
                     theme={theme}
                     gymProfiles={gymProfiles} setGymProfiles={setGymProfiles}
                     activeGymId={activeGymId} setActiveGymId={setActiveGymId}

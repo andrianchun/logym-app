@@ -62,4 +62,74 @@ import { sleepPerDay, ymdOf } from './healthConnect.js';
   assert.equal(oct2.sleepLight, '0');
 }
 
+// 4. Overlapping duplicate sessions from multiple apps (e.g. Samsung Health + Google Fit)
+{
+  const start = '2026-10-09T23:45:00.000Z';
+  const end = '2026-10-10T06:06:00.000Z';
+
+  const samples = [
+    {
+      startDate: start,
+      endDate: end,
+      sourceId: 'com.sec.android.app.shealth',
+      stages: [
+        { stage: 'deep', durationMinutes: 40 },
+        { stage: 'light', durationMinutes: 224 },
+        { stage: 'rem', durationMinutes: 101 },
+        { stage: 'awake', durationMinutes: 16 }
+      ]
+    },
+    {
+      startDate: start,
+      endDate: end,
+      sourceId: 'com.google.android.apps.fitness',
+      stages: [
+        { stage: 'deep', durationMinutes: 41 },
+        { stage: 'light', durationMinutes: 224 },
+        { stage: 'rem', durationMinutes: 101 },
+        { stage: 'awake', durationMinutes: 15 }
+      ]
+    }
+  ];
+
+  const result = sleepPerDay(samples);
+  const oct10 = result['2026-10-10'];
+  assert.ok(oct10, 'Data 10 Okt harus ada');
+  assert.equal(oct10.sleep, 6.3, 'Tidur tidak boleh kedobel jadi 12.7 jam!');
+  assert.equal(oct10.sleepDeep, '40', 'Deep sleep harus 40 menit, bukan 81');
+  assert.equal(oct10.sleepLight, '224', 'Light sleep harus 224 menit, bukan 448');
+  assert.equal(oct10.sleepRem, '101', 'REM sleep harus 101 menit, bukan 202');
+  assert.equal(oct10.sleepAwake, '16', 'Awake sleep harus 16 menit, bukan 31');
+}
+
+// 5. Legitimate afternoon nap + overnight sleep on the same day are both kept
+{
+  // Overnight sleep: 23:00 (Oct 9) -> 06:00 (Oct 10) = 7 hours
+  // Afternoon nap: 13:00 (Oct 10) -> 14:00 (Oct 10) = 1 hour
+  const samples = [
+    {
+      startDate: '2026-10-09T23:00:00.000Z',
+      endDate: '2026-10-10T06:00:00.000Z',
+      stages: [
+        { stage: 'deep', durationMinutes: 60 },
+        { stage: 'light', durationMinutes: 300 },
+        { stage: 'rem', durationMinutes: 60 }
+      ]
+    },
+    {
+      startDate: '2026-10-10T13:00:00.000Z',
+      endDate: '2026-10-10T14:00:00.000Z',
+      stages: [
+        { stage: 'light', durationMinutes: 60 }
+      ]
+    }
+  ];
+
+  const result = sleepPerDay(samples);
+  const oct10 = result['2026-10-10'];
+  assert.ok(oct10);
+  assert.equal(oct10.sleep, 8.0, '7 jam tidur malam + 1 jam tidur siang = 8 jam');
+  assert.equal(oct10.sleepLight, '360', 'Light sleep 300 + 60 = 360');
+}
+
 console.log('healthConnectSleep OK');

@@ -178,21 +178,21 @@ const FloatingTimer = ({
     // "hilang total".
     <div className="fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 pointer-events-none flex justify-center animate-in slide-in-from-bottom-8 duration-300">
       <div 
-        className={`pointer-events-auto w-full max-w-2xl mx-auto flex items-center justify-between px-6 py-4 rounded-full ${t.bgAccent} text-white shadow-xl shadow-[color:var(--tw-shadow-color)] cursor-pointer active:scale-95 transition-all border border-white/20`} 
+        className={`pointer-events-auto w-full max-w-2xl mx-auto flex items-center justify-between pl-5 sm:pl-6 pr-4 sm:pr-5 py-3 sm:py-3.5 rounded-full ${t.bgAccent} text-white shadow-xl shadow-[color:var(--tw-shadow-color)] cursor-pointer active:scale-95 transition-all border border-white/20`} 
         style={{ shadowColor: 'rgba(0,0,0,0.3)' }}
         onClick={handleClick}
       >
-      <div className="flex flex-col">
-        <span className="text-xs font-black uppercase text-white/70 tracking-widest truncate max-w-[45vw]">
+      <div className="flex flex-col min-w-0 flex-1 pr-3">
+        <span className="text-xs font-black uppercase text-white/70 tracking-widest truncate">
            {activeExerciseName || 'Workout Berjalan'}
         </span>
-        <span className="h2 text-white leading-tight flex items-baseline gap-1.5">
+        <span className="h2 text-white leading-tight flex items-baseline gap-1.5 shrink-0">
            <span className="tabular-nums tracking-tight">{formatTime(workoutSeconds)}</span>
-           {caloriesBurned > 0 && <span className="text-white/80 text-xs font-semibold flex items-center gap-0.5"><Flame size={12} className="text-white/80" strokeWidth={2.5} /> {caloriesBurned} kcal</span>}
+           {caloriesBurned > 0 && <span className="text-white/80 text-xs font-semibold flex items-center gap-0.5 shrink-0"><Flame size={12} className="text-white/80" strokeWidth={2.5} /> {caloriesBurned} kcal</span>}
         </span>
       </div>
 
-      <div className="flex items-center gap-2 pr-1.5">
+      <div className="flex items-center shrink-0">
         {showTimer ? (() => {
           const currentRemaining = restTargetTime !== null ? Math.ceil((restTargetTime - Date.now()) / 1000) : 0;
           const displayRest = (localRestTimer !== 0 || currentRemaining <= 0) ? localRestTimer : currentRemaining;

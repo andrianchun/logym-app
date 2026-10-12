@@ -5,7 +5,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tool
 import { getLocalYMD, formatTarget, normalizeMuscleKey, resolveLoggedExercise, resolveProjectedProgramId, getDayWorkouts, defaultMasterExercises } from '../data/constants';
 import { estimate10RM, getEquipmentConfig, calculateActualWeight, getSetActualWeight, calculatePersonalRecords } from '../utils/workoutCalc';
 
-const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibrary, soundEnabled, playSoundEffect, selectedDate, units, activePlanIds, isSubCard = false, expandedSessions = {} }) => {
+const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibrary, soundEnabled, playSoundEffect, selectedDate, units, activePlanIds, isSubCard = false, expandedSessions = {}, gymProfiles = null, activeGymId = null, userProfile = null }) => {
   const [chartType, setChartType] = useState(() => {
       try {
           const saved = localStorage.getItem('lyfit_prog_chart_type');
@@ -134,7 +134,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
               }
               const isImp = units?.weight === 'lbs';
               
-              const eqConf = getEquipmentConfig(null, null, ex);
+              const eqConf = getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile);
               Object.values(sets).forEach(s => {
                   if (s && s.done && !s.skipped) {
                       const actW = getSetActualWeight(s, eqConf);
@@ -742,8 +742,8 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
     defaultMasterExercises.forEach(ex => { if (ex?.id) lookup[ex.id] = ex; });
     (exerciseLibrary || []).forEach(ex => { if (ex?.id) lookup[ex.id] = ex; });
     (programs || []).forEach(p => (p.exercises || []).forEach(ex => { if (ex?.id) lookup[ex.id] = ex; }));
-    return calculatePersonalRecords(history, lookup);
-  }, [history, exerciseLibrary, programs]);
+    return calculatePersonalRecords(history, lookup, gymProfiles, activeGymId, userProfile);
+  }, [history, exerciseLibrary, programs, gymProfiles, activeGymId, userProfile]);
 
   return (
     <div className={`${!isSubCard ? 'px-4 pt-4 pb-1' : ''} animate-in fade-in duration-300`}>
@@ -1011,9 +1011,9 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
                              if (foundEx) {
                                  if (foundEx.type === 'time') unit = ' s';
                                  else if (foundEx.type === 'reps') unit = ' reps';
-                                 else unit = isImp ? ' lbs (10RM)' : ' kg (10RM)';
+                                 else unit = isImp ? ' lbs' : ' kg';
                              } else {
-                                 unit = isImp ? ' lbs (10RM)' : ' kg (10RM)';
+                                 unit = isImp ? ' lbs' : ' kg';
                              }
                          }
                          return [`${value}${unit}`, name];
@@ -1089,7 +1089,7 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
             {/* Keterangan miring di bawah toggle2 */}
             <p className={`mt-2 text-xs italic font-medium ${t.textMuted}`}>
               {chartType === 'exercise' 
-                ? '* Berdasarkan estimasi 10RM dan repetisi.' 
+                ? '* Berdasarkan estimasi 10RM.' 
                 : '* Berdasarkan total volume beban (kg × reps).'}
             </p>
             </div>

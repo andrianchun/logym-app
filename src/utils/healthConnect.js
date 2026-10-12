@@ -428,47 +428,104 @@ export const capIntradayLog = (list) => {
 // semalam. Dulu dikelompokkan dari tanggal MULAI, akibatnya dasbor hari ini selalu kosong
 // karena tidur semalam tercatat di tanggal kemarin.
 export const sleepPerDay = (samples) => {
-  const byDay = {};
+  if (!Array.isArray(samples) || samples.length === 0) return {};
+
+  // 1. Kelompokkan sampel berdasarkan tanggal BANGUN (ymdOf(s.endDate))
+  const samplesByDay = {};
   for (const s of samples) {
-    // Tanggal BANGUN = tanggal lokal endDate. Dulu di sini dipakai `startDate - 12 jam`, yang
-    // justru kebalikannya: tidur 23:00 -> 07:00 mundur jadi 11:00 tanggal MULAI, sehingga tidur
-    // semalam muncul di slot kemarin dan slot hari ini kosong (grafik terlihat "bolong 1 hari").
+    if (!s?.startDate || !s?.endDate) continue;
+    const startMs = new Date(s.startDate).getTime();
+    const endMs = new Date(s.endDate).getTime();
+    if (isNaN(startMs) || isNaN(endMs) || endMs <= startMs) continue;
+
     const ymd = ymdOf(s.endDate);
-    if (!byDay[ymd]) byDay[ymd] = { totalMinutes: 0, awake: 0, rem: 0, light: 0, deep: 0, sleepLog: [] };
-    
-    let currentEpoch = new Date(s.startDate).getTime();
-    
-    if ((s.stages && s.stages.length > 0) || (s.hasStageData && s.stages?.length)) {
-      s.stages.forEach((stage) => {
-        byDay[ymd].totalMinutes += stage.durationMinutes;
-        if (stage.stage in byDay[ymd]) byDay[ymd][stage.stage] += stage.durationMinutes;
-        
-        // Map string stages to chart numeric values (3=Awake, 2=REM, 1=Light, 0=Deep)
-        let numStage = 1; // default Light
-        const stg = stage.stage?.toLowerCase() || '';
-        if (stg.includes('awake') || stg.includes('out') || stg === 'awake') numStage = 3;
-        else if (stg.includes('rem') || stg === 'rem') numStage = 2;
-        else if (stg.includes('deep') || stg === 'deep') numStage = 0;
-        
-        const timeStr = new Date(currentEpoch).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit', hour12: false});
-        byDay[ymd].sleepLog.push({ time: timeStr, stage: numStage });
-        
-        currentEpoch += (stage.durationMinutes * 60000);
-      });
-      // Add closing point for the area chart
-      const endTimeStr = new Date(currentEpoch).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit', hour12: false});
-      const lastStage = byDay[ymd].sleepLog.length > 0 ? byDay[ymd].sleepLog[byDay[ymd].sleepLog.length - 1].stage : 1;
-      byDay[ymd].sleepLog.push({ time: endTimeStr, stage: lastStage });
-    } else {
-      const durMins = (new Date(s.endDate) - new Date(s.startDate)) / 60000;
-      byDay[ymd].totalMinutes += durMins;
-      
-      const timeStr = new Date(currentEpoch).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit', hour12: false});
-      const endTimeStr = new Date(currentEpoch + (durMins * 60000)).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit', hour12: false});
-      byDay[ymd].sleepLog.push({ time: timeStr, stage: 1 });
-      byDay[ymd].sleepLog.push({ time: endTimeStr, stage: 1 });
-    }
+    if (!samplesByDay[ymd]) samplesByDay[ymd] = [];
+    samplesByDay[ymd].push({ ...s, _startMs: startMs, _endMs: endMs, _durMs: endMs - startMs });
   }
+
+  const byDay = {};
+
+  // 2. Proses tiap hari dengan deduplikasi sesi yang tumpang-tindih (overlapping duplicate sessions)
+  // Health Connect menyimpan record dari beberapa aplikasi (mis. Samsung Health & Google Fit / Mi Fitness).
+  // Tanpa penyaringan ini, dua record untuk malam yang sama akan dijumlahkan dan durasi tidur menjadi 2x lipat.
+  Object.entries(samplesByDay).forEach(([ymd, daySamples]) => {
+    // Urutkan kandidat:
+    // a. Sesi yang punya rincian tahapan (stages) diprioritaskan di atas sesi tanpa tahapan
+    // b. Jumlah tahapan terbanyak
+    // c. Durasi tidur terpanjang
+    // d. Sumber utama (shealth / Samsung Health diprioritaskan)
+    daySamples.sort((a, b) => {
+      const aStages = a.stages?.length || 0;
+      const bStages = b.stages?.length || 0;
+      if (aStages > 0 && bStages === 0) return -1;
+      if (bStages > 0 && aStages === 0) return 1;
+      if (aStages !== bStages) return bStages - aStages;
+      if (b._durMs !== a._durMs) return b._durMs - a._durMs;
+      const aSrc = (a.sourceId || a.sourceName || '').toLowerCase();
+      const bSrc = (b.sourceId || b.sourceName || '').toLowerCase();
+      if (aSrc.includes('shealth') && !bSrc.includes('shealth')) return -1;
+      if (bSrc.includes('shealth') && !aSrc.includes('shealth')) return 1;
+      return 0;
+    });
+
+    // Pilih sesi yang tidak saling tumpang-tindih (overlap > 15 mnt dianggap duplikat dari tracker lain)
+    const acceptedSessions = [];
+    for (const cand of daySamples) {
+      const isOverlap = acceptedSessions.some(acc => {
+        const overlapStart = Math.max(cand._startMs, acc._startMs);
+        const overlapEnd = Math.min(cand._endMs, acc._endMs);
+        const overlapMs = Math.max(0, overlapEnd - overlapStart);
+        if (overlapMs <= 0) return false;
+        const minDur = Math.min(cand._durMs, acc._durMs);
+        return overlapMs > 15 * 60 * 1000 || (minDur > 0 && overlapMs / minDur > 0.2);
+      });
+
+      if (!isOverlap) {
+        acceptedSessions.push(cand);
+      }
+    }
+
+    // Urutkan sesi yang diterima secara kronologis
+    acceptedSessions.sort((a, b) => a._startMs - b._startMs);
+
+    byDay[ymd] = { totalMinutes: 0, awake: 0, rem: 0, light: 0, deep: 0, sleepLog: [] };
+
+    for (const s of acceptedSessions) {
+      let currentEpoch = s._startMs;
+
+      if ((s.stages && s.stages.length > 0) || (s.hasStageData && s.stages?.length)) {
+        s.stages.forEach((stage) => {
+          byDay[ymd].totalMinutes += stage.durationMinutes;
+          if (stage.stage in byDay[ymd]) byDay[ymd][stage.stage] += stage.durationMinutes;
+
+          // Map string stages to chart numeric values (3=Awake, 2=REM, 1=Light, 0=Deep)
+          let numStage = 1; // default Light
+          const stg = stage.stage?.toLowerCase() || '';
+          if (stg.includes('awake') || stg.includes('out') || stg === 'awake') numStage = 3;
+          else if (stg.includes('rem') || stg === 'rem') numStage = 2;
+          else if (stg.includes('deep') || stg === 'deep') numStage = 0;
+
+          const timeStr = new Date(currentEpoch).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit', hour12: false});
+          byDay[ymd].sleepLog.push({ time: timeStr, stage: numStage });
+
+          currentEpoch += (stage.durationMinutes * 60000);
+        });
+        // Add closing point for the area chart
+        const endTimeStr = new Date(currentEpoch).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit', hour12: false});
+        const lastStage = byDay[ymd].sleepLog.length > 0 ? byDay[ymd].sleepLog[byDay[ymd].sleepLog.length - 1].stage : 1;
+        byDay[ymd].sleepLog.push({ time: endTimeStr, stage: lastStage });
+      } else {
+        const durMins = s._durMs / 60000;
+        byDay[ymd].totalMinutes += durMins;
+
+        const timeStr = new Date(currentEpoch).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit', hour12: false});
+        const endTimeStr = new Date(s._endMs).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit', hour12: false});
+        byDay[ymd].sleepLog.push({ time: timeStr, stage: 1 });
+        byDay[ymd].sleepLog.push({ time: endTimeStr, stage: 1 });
+      }
+    }
+  });
+
   const out = {};
   Object.entries(byDay).forEach(([ymd, d]) => {
     out[ymd] = {

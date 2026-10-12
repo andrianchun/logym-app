@@ -7,7 +7,6 @@ import { formatTarget, getVideoId } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
 import SwipeInput from '../components/SwipeInput';
 import AlternativeExerciseModal from '../components/AlternativeExerciseModal';
-import ExerciseDetailModal from '../components/ExerciseDetailModal';
 import CreatePostModal from '../components/CreatePostModal';
 import useDialog from '../hooks/useDialog';
 import { getPlanBgConfig } from '../utils/planBg';
@@ -229,7 +228,8 @@ const ProgramTab = ({
   userApiKeys, userProfile, history,
   keyStatuses, setKeyStatuses, setShowSettings,
   setHighlightPostId, setShowProfileModal, setProfileForceTab, onPostCreated,
-  weekStartDay = 1
+  weekStartDay = 1,
+  onOpenDetail
 }) => {
   
   const isDark = theme === 'dark' || (t?.bgApp?.includes('dark') ?? true);
@@ -299,7 +299,6 @@ const ProgramTab = ({
   const [dragOverExId, setDragOverExId] = useState(null);
   const [showAlternativeModal, setShowAlternativeModal] = useState(false);
   const [detailExercise, setDetailExercise] = useState(null);
-  const [selectedDetailExercise, setSelectedDetailExercise] = useState(null);
   const [routineIdForAlt, setRoutineIdForAlt] = useState(null);
   const [targetIndexForAlt, setTargetIndexForAlt] = useState(null);
   const [pendingShareProgram, setPendingShareProgram] = useState(null);
@@ -842,7 +841,7 @@ const ProgramTab = ({
                       handleRemoveExercise={handleRemoveExercise}
                       handleToggleSupersetInline={handleToggleSupersetInline}
                       exerciseLibrary={exerciseLibrary}
-                      onOpenDetail={(targetEx) => setSelectedDetailExercise(targetEx)}
+                      onOpenDetail={onOpenDetail}
                       onReplaceClick={(ex, rId, replaceIdx) => {
                         setDetailExercise(ex);
                         setRoutineIdForAlt(rId);
@@ -1050,19 +1049,14 @@ const ProgramTab = ({
                                      {(r.exercises || []).map((ex, exIdx) => {
                                          const matchedLibEx = exerciseLibrary?.find(e => e.id === ex.id || e.id === ex.originalId || e.name?.toLowerCase() === ex.name?.toLowerCase());
                                          const resolvedEx = { ...matchedLibEx, ...ex };
-                                         const thumb = resolvedEx.thumbnailUrl || resolvedEx.gifUrl;
                                          return (
                                            <div 
                                              key={ex.id || exIdx} 
                                              className="flex items-start gap-2.5 py-1.5 cursor-pointer hover:opacity-80 transition-opacity"
-                                             onClick={(e) => { e.stopPropagation(); setSelectedDetailExercise(resolvedEx); }}
+                                             onClick={(e) => { e.stopPropagation(); onOpenDetail?.(resolvedEx); }}
                                              title="Klik untuk melihat detail latihan"
                                            >
-                                             {thumb ? (
-                                               <img src={thumb} alt={ex.name} className="w-8 h-8 rounded-lg object-cover border border-white/10 shrink-0 bg-white/5 mt-0.5" loading="lazy" />
-                                             ) : (
-                                               <span className="w-2 h-2 rounded-full bg-sky-400 shrink-0 mx-1 mt-1.5" />
-                                             )}
+                                             <span className="w-1.5 h-1.5 rounded-full bg-sky-400/80 shrink-0 mt-1.5" />
                                              <div className="flex-1 min-w-0 flex flex-col gap-0.5">
                                                <span className="text-xs text-slate-200 font-semibold leading-snug break-words w-full" title={ex.name}>
                                                  {ex.name}
@@ -1453,17 +1447,7 @@ const ProgramTab = ({
         />
       )}
 
-      {selectedDetailExercise && (
-        <ExerciseDetailModal
-          ex={selectedDetailExercise}
-          onClose={() => setSelectedDetailExercise(null)}
-          t={t}
-          lang={lang}
-          units={userProfile?.units}
-          exerciseLibrary={exerciseLibrary}
-          programs={programs}
-        />
-      )}
+
 
       {dialog}
       </div>

@@ -271,7 +271,11 @@ const DashboardModals = ({
               
               <div className="flex justify-between items-start p-5 pb-4 shrink-0">
                  <div>
-                    <h3 className="h2 leading-tight">Input Manual</h3>
+                    <h3 className="h2 leading-tight">
+                      {manualTab === 'komposisi'
+                        ? (lang?.workout === 'Latihan' ? 'Sesuaikan Komposisi Tubuh' : 'Adjust Body Composition')
+                        : (lang?.workout === 'Latihan' ? 'Sesuaikan Data Harian' : 'Adjust Daily Data')}
+                    </h3>
                     <div className="relative flex items-center space-x-2 mt-2 w-max cursor-pointer">
                         <CalendarDays size={14} className={t.textAccent} />
                         <span className={`body-md ${t.textAccent}`}>{new Date(modalDate).toLocaleDateString(lang.workout === 'Latihan' ? 'id-ID' : 'en-US', { year: 'numeric', month: '2-digit', day: '2-digit' })}</span>
@@ -332,15 +336,6 @@ const DashboardModals = ({
                  </div>
               </div>
 
-              <div className="mb-2 shrink-0 px-5">
-                 <div className={`relative flex w-full p-1.5 rounded-full ${t.btnBg}`}>
-                     <div className={`absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] rounded-full transition-transform duration-300 ease-out ${t.bgAccent} shadow-sm`} style={{ transform: manualTab === 'komposisi' ? 'translateX(0)' : 'translateX(100%)', left: '6px' }}></div>
-                     
-                     <button onClick={() => setManualTab('komposisi')} className={`flex-1 py-2 rounded-full caption font-black relative z-10 transition-colors duration-300 ${manualTab === 'komposisi' ? 'text-white' : t.textMuted}`}>Komposisi Tubuh</button>
-                     <button onClick={() => setManualTab('harian')} className={`flex-1 py-2 rounded-full caption font-black relative z-10 transition-colors duration-300 ${manualTab === 'harian' ? 'text-white' : t.textMuted}`}>Data Harian</button>
-                 </div>
-              </div>
-
               {scanError && (
                   <div className="mx-5 mb-2 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-start space-x-2">
                       <ShieldAlert size={16} className="text-rose-500 shrink-0 mt-0.5" />
@@ -348,7 +343,7 @@ const DashboardModals = ({
                   </div>
               )}
 
-              <div className="flex-1 overflow-hidden space-y-4 body-md pb-2 px-5 pt-0">
+              <div className="flex-1 overflow-y-auto space-y-4 body-md pb-2 px-5 pt-0">
                  {manualTab === 'komposisi' ? (
                    <div className="grid grid-cols-2 gap-2.5">
                          <div><label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Berat Badan ({units?.weight || 'kg'})</label><SwipeInput language={lang?.id || 'ID'} value={!formBio.weight ? '' : (isImp ? Math.round(formBio.weight * 2.20462 * 10)/10 : formBio.weight)} onChange={(val) => {

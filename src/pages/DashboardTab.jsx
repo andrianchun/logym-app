@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Activity, Zap, Brain, Footprints, HeartPulse, Moon, Droplets, Droplet, Dumbbell, Scale, RefreshCw, Trophy, Link2, Pencil, Settings, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Wind, Utensils, Flame, Clock, Cloud, CloudOff, Bluetooth, Target } from 'lucide-react';
+import { Activity, Zap, Brain, Footprints, HeartPulse, Moon, Droplets, Droplet, Dumbbell, Scale, RefreshCw, Trophy, Link2, Pencil, Settings, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Wind, Utensils, Flame, Clock, Cloud, CloudOff, Target } from 'lucide-react';
 import { getLocalYMD, hasDeletedProjected, isLomealOwned } from '../data/constants';
 import { calculateReadiness, restingHrBaseline } from '../utils/readinessEngine';
 import DashboardModals from '../components/DashboardModals';
@@ -1180,9 +1180,8 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
           <div id="komposisi-accordion" className={`p-4 relative z-20 flex flex-col justify-between`}>
            <div className="flex justify-between items-center mb-5 relative z-10">
                <div>
-                   <h3 className={`h3 ${t.textMain} flex items-center`}>
+                   <h3 className={`h3 ${t.textMain}`}>
                      Komposisi Tubuh
-                     {isBleBusy && <Bluetooth className="w-4 h-4 text-blue-500 animate-pulse ml-2" />}
                    </h3>
                    {bioDataDate && (
                        <p className={`caption ${t.textMuted} mt-0.5`} >{bioDataDate === activeDate ? 'Hari ini: ' : 'Data dari: '}{new Date(bioDataDate).toLocaleDateString(language==='ID'?'id-ID':'en-US', { day: 'numeric', month: 'short' })}</p>
@@ -1400,9 +1399,8 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
          <div id="aktivitas-accordion" className={`p-4 relative z-20 flex flex-col h-full justify-between`}>
              <div className="flex justify-between items-center shrink-0">
                  <div>
-                     <h3 className={`h3 ${t.textMain} flex items-center`}>
+                     <h3 className={`h3 ${t.textMain}`}>
                        Aktivitas Harian
-                       {isBleBusy && <Bluetooth className="w-4 h-4 text-blue-500 animate-pulse ml-2" />}
                      </h3>
                      <p className={`caption ${t.textMuted} mt-0.5`} >Hari ini: {new Date(activeDate).toLocaleDateString(language==='ID'?'id-ID':'en-US', { day: 'numeric', month: 'short' })}</p>
                  </div>
@@ -1640,6 +1638,9 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                   activePlanIds={activePlanIds}
                   units={units}
                   expandedSessions={expandedSessions}
+                  gymProfiles={gymProfiles}
+                  activeGymId={activeGymId}
+                  userProfile={userProfile}
                 />
              </div>
             <button

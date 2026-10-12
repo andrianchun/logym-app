@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Dumbbell, History, Calculator, Replace, Video, Info, ChevronLeft, ChevronRight, Loader2, Play } from 'lucide-react';
-import { formatTarget, resolveProjectedProgramId, defaultMasterExercises, findMatchingMasterExercise, cleanExerciseNameForMatching, canonicalizeExercise, exerciseAliasMap, resolveExerciseDbId } from '../data/constants';
+import { formatTarget, resolveProjectedProgramId, defaultMasterExercises, findMatchingMasterExercise, cleanExerciseNameForMatching, canonicalizeExercise, exerciseAliasMap, resolveExerciseDbId, resolveLoggedExercise } from '../data/constants';
 import { getCachedExercises, fetchExercisesFromApi } from '../utils/exerciseDbApi';
-import { resolveExerciseKind, estimate10RM, estimate1RM, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from '../utils/workoutCalc';
+import { resolveExerciseKind, estimate10RM, estimate1RM, getEquipmentConfig, calculateActualWeight, getSetActualWeight, buildExLookupByName, canonicalExId } from '../utils/workoutCalc';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 import SwipeInput from './SwipeInput';
 import TwoFrameMotionLoop from './TwoFrameMotionLoop';
@@ -37,11 +37,14 @@ const ExerciseDetailModal = ({
   t, 
   lang, 
   fullHistory, 
-  onReplace,
   units,
   exerciseLibrary,
   setExerciseLibrary,
-  programs
+  programs,
+  gymProfiles = null,
+  activeGymId = null,
+  userProfile = null,
+  soundEnabled = true
 }) => {
   useEffect(() => {
     const orig = document.body.style.overflow;
@@ -55,68 +58,45 @@ const ExerciseDetailModal = ({
   const initialExType = resolveExerciseKind(initialEx);
   const historyData = useMemo(() => {
     if (!fullHistory || !initialEx) return [];
+    const lookup = buildExLookupByName(fullHistory, [initialEx], exerciseLibrary, ...(programs || []).map(p => p?.exercises));
+    const targetCanonical = canonicalExId(initialEx?.name);
+    const eqConf = getEquipmentConfig(gymProfiles, activeGymId, initialEx, userProfile);
     const logs = [];
+
     Object.entries(fullHistory).forEach(([date, dayData]) => {
       if (!dayData || !dayData.workouts) return;
-      // Handle both array of workouts or object mapping (just in case)
       const workoutsArray = Array.isArray(dayData.workouts) ? dayData.workouts : Object.values(dayData.workouts);
       workoutsArray.forEach(w => {
         if (w.status !== 'completed') return;
 
         let completedSets = [];
-        let realProgId = w.programId;
-        if (realProgId && realProgId.startsWith('projected_')) {
-            realProgId = resolveProjectedProgramId(realProgId);
-        }
-        
         let pName = w.name || w.programName || 'Sesi Latihan';
-        if (realProgId && realProgId !== 'adhoc' && realProgId !== 'custom') {
-           const p = programs?.find(prog => prog.id === realProgId);
-           if (p && p.name) {
-             pName = p.planName ? `${p.planName} - ${p.name}` : p.name;
-           }
-        }
-        
-        if (w.log) {
-          let targetExIds = [];
 
-          if (realProgId === 'adhoc' || realProgId === 'custom') {
-            if (w.exercises) {
-               const matchingExs = w.exercises.filter(e => isSameExerciseEntity(e, initialEx));
-               targetExIds = matchingExs.map(e => e.id);
+        // 1. Scan w.log dengan SSOT lookup
+        if (w.log) {
+          Object.keys(w.log).forEach(k => {
+            const exObj = resolveLoggedExercise(k, lookup);
+            const isMatch = (exObj && (canonicalExId(exObj.name) === targetCanonical || isSameExerciseEntity(exObj, initialEx)))
+              || isSameExerciseEntity({ id: k, name: k }, initialEx)
+              || k === String(initialEx.id)
+              || k.startsWith(`${initialEx.id}-`)
+              || (initialEx.originalId && (k === String(initialEx.originalId) || k.startsWith(`${initialEx.originalId}-`)));
+
+            if (isMatch) {
+              const sets = Array.isArray(w.log[k]) ? w.log[k] : Object.values(w.log[k] || {});
+              completedSets.push(...sets.filter(s => s && s.done && !s.skipped));
             }
-          } else {
-            const p = programs?.find(prog => prog.id === realProgId);
-            if (p && p.exercises) {
-               const matchingExs = p.exercises.filter(e => isSameExerciseEntity(e, initialEx));
-               targetExIds = matchingExs.map(e => e.id);
-            }
-          }
-          
-          targetExIds.forEach(tId => {
-             const compositeKey = `${tId}-${w.id}`;
-             const exactKey = tId;
-             if (w.log[compositeKey]) {
-                completedSets.push(...w.log[compositeKey].filter(s => s.done));
-             } else if (w.log[exactKey]) {
-                completedSets.push(...w.log[exactKey].filter(s => s.done));
-             }
           });
-          
-          // Fallback if still not found
-          if (completedSets.length === 0 && w.log[initialEx.id]) {
-             completedSets.push(...w.log[initialEx.id].filter(s => s.done));
-          }
         }
-        
+
+        // 2. Fallback scan w.exercises jika belum ada dari w.log
         if (completedSets.length === 0 && w.exercises) {
           const targetEx = w.exercises.find(e => isSameExerciseEntity(e, initialEx));
           if (targetEx && Array.isArray(targetEx.sets)) {
-            completedSets = targetEx.sets.filter(s => s.done);
+            completedSets.push(...targetEx.sets.filter(s => s && s.done && !s.skipped));
           }
         }
 
-        const eqConf = getEquipmentConfig(null, null, initialEx);
         if (completedSets.length > 0) {
           logs.push({
             date,
@@ -141,8 +121,9 @@ const ExerciseDetailModal = ({
         }
       });
     });
+
     return logs.sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [fullHistory, initialEx, programs]);
+  }, [fullHistory, initialEx, programs, gymProfiles, activeGymId, userProfile, exerciseLibrary]);
 
   const historyMax10RM = useMemo(() => {
     let max = 0;
@@ -533,7 +514,7 @@ const ExerciseDetailModal = ({
     }).filter(v => v.videoId);
 
     return createPortal(
-      <div role="dialog" aria-modal="true" className={`fixed inset-0 z-[100] flex flex-col ${t.bgApp} no-swipe overscroll-contain touch-pan-y`}>
+      <div role="dialog" aria-modal="true" className={`fixed inset-0 z-[150] flex flex-col ${t.bgApp} no-swipe overscroll-contain touch-pan-y`}>
         <div className="p-4 flex justify-between items-center bg-black/80 absolute top-0 w-full z-20" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
           <h2 className="h2 text-white drop-shadow-md">{ex.name}</h2>
           <button data-close-modal="true" onClick={onClose} className="p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition">
@@ -601,7 +582,7 @@ const ExerciseDetailModal = ({
   };
 
   return createPortal(
-    <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in no-swipe overscroll-contain touch-none`} onClick={onClose}>
+    <div className={`fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in no-swipe overscroll-contain touch-none`} onClick={onClose}>
       <div className={`w-full max-w-md sm:max-w-4xl mx-auto ${t.bgCard} rounded-[2.5rem] overflow-hidden flex flex-col sm:flex-row h-[85vh] sm:h-[80vh] animate-in zoom-in-95 duration-200 shadow-2xl overscroll-contain`} onClick={e => e.stopPropagation()}>
         
         {/* Kolom Kiri: Header with Video/Image */}
@@ -699,19 +680,6 @@ const ExerciseDetailModal = ({
             {/* Top gradient for obscuring iframe remnants and better button visibility */}
             <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-black/80 via-black/40 to-transparent z-10 pointer-events-none"></div>
 
-            {onReplace && (
-              <button 
-                type="button"
-                onClick={() => onReplace(ex)} 
-                aria-label="Ganti Alternatif"
-                className="absolute top-4 right-14 bg-black/60 text-white/90 px-3 py-1.5 rounded-full hover:bg-black/80 border border-white/10 backdrop-blur-md transition-all flex items-center gap-1.5 text-xs font-bold shadow-lg z-20 active:scale-95"
-                title="Ganti Latihan Alternatif"
-              >
-                <Replace size={13} className="text-amber-400" />
-                <span>Ganti</span>
-              </button>
-            )}
-
             <button data-close-modal="true" onClick={onClose} aria-label="Tutup" className="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 backdrop-blur-sm transition-all sm:hidden z-20">
               <X size={20} />
             </button>
@@ -755,19 +723,6 @@ const ExerciseDetailModal = ({
 
         {/* Kolom Kanan: Action Tabs & Tab Content */}
         <div className="w-full sm:w-[55%] flex flex-col bg-transparent overflow-hidden h-full relative">
-          {onReplace && (
-            <button 
-              type="button"
-              onClick={() => onReplace(ex)} 
-              aria-label="Ganti Alternatif"
-              className="hidden sm:flex absolute top-3 right-14 bg-black/5 hover:bg-amber-500 hover:text-white dark:bg-white/5 dark:hover:bg-amber-500 text-slate-500 dark:text-slate-300 px-3 py-1.5 rounded-full transition-all text-xs font-bold items-center gap-1.5 z-20 active:scale-95"
-              title="Ganti Latihan Alternatif"
-            >
-              <Replace size={14} className="text-amber-500 group-hover:text-white" />
-              <span>Ganti</span>
-            </button>
-          )}
-
           {/* Desktop Close Button */}
           <button data-close-modal="true" onClick={onClose} aria-label="Tutup" className="hidden sm:flex absolute top-3 right-3 bg-black/5 hover:bg-rose-500 hover:text-white dark:bg-white/5 dark:hover:bg-rose-500 text-slate-500 dark:text-slate-300 p-2 rounded-full transition-all z-20">
             <X size={20} />
