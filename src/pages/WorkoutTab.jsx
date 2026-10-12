@@ -1411,21 +1411,6 @@ const WorkoutTab = ({
                       className="flex flex-col items-start gap-0.5 flex-1 min-w-0 pr-4 cursor-pointer"
                     >
                       <span className="text-xl sm:text-2xl uppercase tracking-widest break-words leading-tight">Sesi {activeProgramsList.length + 1}: Ekstra</span>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-xs ${t.textMuted} font-medium`}>{displayExtraExercises.length} latihan di luar program</span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            playSoundEffect('click', soundEnabled);
-                            (displayExtraExercises || []).forEach(ex => onRemoveExtra(ex.id));
-                          }}
-                          className="text-xs text-rose-400 hover:text-rose-500 font-bold px-2 py-0.5 rounded-md bg-rose-500/10 hover:bg-rose-500/20 transition-colors"
-                          title="Bersihkan latihan ekstra"
-                        >
-                          Bersihkan
-                        </button>
-                      </div>
                     </div>
 
                     {/* Sisi Kanan: Chevron Toggle */}
