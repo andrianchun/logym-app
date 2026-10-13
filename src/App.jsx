@@ -48,7 +48,7 @@ import AchievementPopup from './components/AchievementPopup';
 import { checkAchievements, ACHIEVEMENTS } from './data/achievements';
 
 // --- IMPORT DATA & MESIN ---
-import { playSoundEffect } from './utils/audio';
+import { playSoundEffect, initAudio, preloadTimerEnd } from './utils/audio';
 import { fetchExercisesFromApi } from './utils/exerciseDbApi';
 import { AI_MODELS, detectPlateaus, getLogyNotification } from './utils/aiAgent';
 import { calculateReadiness, restingHrBaseline } from './utils/readinessEngine';
@@ -1589,6 +1589,22 @@ export default function App() {
     }
   }, []);
 
+  // Buka kunci (unlock) AudioContext dan preload buffer nada alarm pada sentuhan pertama pengguna
+  useEffect(() => {
+    const handleFirstInteraction = () => {
+      initAudio();
+      preloadTimerEnd();
+      window.removeEventListener('pointerdown', handleFirstInteraction);
+      window.removeEventListener('keydown', handleFirstInteraction);
+    };
+    window.addEventListener('pointerdown', handleFirstInteraction, { passive: true });
+    window.addEventListener('keydown', handleFirstInteraction, { passive: true });
+    return () => {
+      window.removeEventListener('pointerdown', handleFirstInteraction);
+      window.removeEventListener('keydown', handleFirstInteraction);
+    };
+  }, []);
+
   // Nama sesi yang BENAR-BENAR sedang dijalankan. Notifikasi & overlay native dulu memakai
   // `activeProgramId` — variabel yang cuma menandai program terakhir yang dipilih di UI, jadi
   // barnya bisa menyebut program yang tidak sedang dikerjakan sama sekali.
@@ -1629,6 +1645,7 @@ export default function App() {
 
   useEffect(() => {
     if (!restTargetTime) return;
+    preloadTimerEnd();
     
     const timeRemainingMs = restTargetTime - Date.now();
     

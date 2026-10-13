@@ -9,7 +9,7 @@ import fs from 'fs';
 import path from 'path';
 
 const base = 'android/app/src/main/assets/public';
-for (const dir of ['ota', 'apk']) {
+for (const dir of ['ota', 'apk', 'generator-site']) {
   const target = path.join(base, dir);
   if (fs.existsSync(target)) {
     fs.rmSync(target, { recursive: true, force: true });

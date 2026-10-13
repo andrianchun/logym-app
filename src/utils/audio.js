@@ -1,23 +1,21 @@
 let audioCtx = null;
+let timerEndAudioBuffer = null;
+let isPreloadingTimerEnd = false;
 
 export const initAudio = () => {
   try {
     if (!audioCtx) {
        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
-    if (audioCtx.state === 'suspended') audioCtx.resume();
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {});
+    }
   } catch (e) {
     console.warn("AudioContext init blocked by browser:", e);
   }
 };
 
-// Pemutar berkas. Dipakai HANYA untuk timer selesai — nada itu harus sama persis dengan yang
-// dibunyikan service native saat aplikasi ditutup (res/raw/timer_end.wav, file yang sama dari
-// scripts/generate-timer-sound.cjs). Sinyal penting lain tetap disintesis: tanpa berkas, tanpa
-// tunggu unduh, dan tidak pernah gagal karena berkasnya belum ter-cache.
-//
-// cloneNode: satu elemen Audio yang sama tidak bisa berbunyi tumpang tindih — pemanggilan kedua
-// akan memotong yang pertama. Elemen dasarnya disimpan supaya berkasnya cuma diunduh sekali.
+// Pemutar berkas HTMLAudioElement sebagai fallback sekunder.
 const fileCache = {};
 const playFile = (src, volume = 1) => {
   try {
@@ -27,15 +25,121 @@ const playFile = (src, volume = 1) => {
       base.preload = 'auto';
       fileCache[src] = base;
     }
-    const node = base.cloneNode();
-    node.volume = volume;
-    node.play().catch(() => {});
+    base.currentTime = 0;
+    base.volume = volume;
+    const playPromise = base.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(() => {
+        try {
+          const node = base.cloneNode();
+          node.volume = volume;
+          node.play().catch(() => {});
+        } catch (_) {}
+      });
+    }
   } catch (e) {
-    console.warn('Gagal memutar', src, e);
+    console.warn('Gagal memutar file audio:', src, e);
   }
 };
 
-// Satu nada sintesis. `when` = jeda detik dari sekarang, buat merangkai beberapa nada.
+/**
+ * Preload dan decode berkas alarm istirahat ke memori (AudioBuffer).
+ * Menghilangkan latensi jaringan, kegagalan pemutaran pertama (cold-start),
+ * dan pemblokiran Autoplay Policy setelah 60-90 detik istirahat tanpa interaksi layar.
+ */
+export const preloadTimerEnd = async () => {
+  if (timerEndAudioBuffer || isPreloadingTimerEnd) return timerEndAudioBuffer;
+  isPreloadingTimerEnd = true;
+  try {
+    initAudio();
+
+    // Hangatkan juga cache HTMLAudioElement sebagai cadangan
+    if (!fileCache['/timer-end.wav']) {
+      try {
+        const audio = new Audio('/timer-end.wav');
+        audio.preload = 'auto';
+        audio.load();
+        fileCache['/timer-end.wav'] = audio;
+      } catch (_) {}
+    }
+
+    if (!audioCtx) return null;
+    const res = await fetch('/timer-end.wav');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const arrayBuffer = await res.arrayBuffer();
+    const decoded = await new Promise((resolve, reject) => {
+      audioCtx.decodeAudioData(arrayBuffer, resolve, reject);
+    });
+    timerEndAudioBuffer = decoded;
+    return timerEndAudioBuffer;
+  } catch (e) {
+    console.warn('Preload timer-end.wav buffer warning:', e);
+    return null;
+  } finally {
+    isPreloadingTimerEnd = false;
+  }
+};
+
+// Sintesis darurat: 4 nada tangga gelombang kotak (600, 800, 1000, 1200 Hz)
+// dengan durasi 170ms & 400ms yang identik dengan scripts/generate-timer-sound.cjs.
+const playSynthesizedTimerEnd = () => {
+  if (!audioCtx) return;
+  const tones = [
+    { freq: 600, dur: 0.17, when: 0 },
+    { freq: 800, dur: 0.17, when: 0.17 },
+    { freq: 1000, dur: 0.17, when: 0.34 },
+    { freq: 1200, dur: 0.40, when: 0.51 }
+  ];
+  tones.forEach(({ freq, dur, when }) => {
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.type = 'square';
+    const at = audioCtx.currentTime + when;
+    osc.frequency.setValueAtTime(freq, at);
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.linearRampToValueAtTime(0.45, at + 0.008);
+    g.gain.setValueAtTime(0.45, at + dur - 0.008);
+    g.gain.linearRampToValueAtTime(0.0001, at + dur);
+    osc.connect(g);
+    g.connect(audioCtx.destination);
+    osc.start(at);
+    osc.stop(at + dur + 0.02);
+  });
+};
+
+const playTimerEndSound = () => {
+  try {
+    initAudio();
+    if (audioCtx) {
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+      }
+
+      // 1. Prioritas utama: AudioBuffer ter-decode (0 latensi, nada asli dari berkas)
+      if (timerEndAudioBuffer) {
+        const source = audioCtx.createBufferSource();
+        source.buffer = timerEndAudioBuffer;
+        const gainNode = audioCtx.createGain();
+        gainNode.gain.setValueAtTime(0.9, audioCtx.currentTime);
+        source.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        source.start(0);
+        return;
+      }
+
+      // 2. Cadangan Web Audio instan jika berkas belum selesai diunduh
+      playSynthesizedTimerEnd();
+      return;
+    }
+  } catch (e) {
+    console.warn('Web Audio timerEnd gagal, beralih ke HTMLAudio:', e);
+  }
+
+  // 3. Cadangan terakhir jika Web Audio tidak tersedia sama sekali di browser
+  playFile('/timer-end.wav');
+};
+
+// Satu nada sintesis sederhana untuk efek UI lainnya.
 const tone = (freq, { type = 'sine', gain = 0.4, dur = 0.08, when = 0 } = {}) => {
   const osc = audioCtx.createOscillator();
   const g = audioCtx.createGain();
@@ -54,9 +158,8 @@ const tone = (freq, { type = 'sine', gain = 0.4, dur = 0.08, when = 0 } = {}) =>
 export const playSoundEffect = (type, enabled) => {
     if (!enabled) return;
 
-    // Timer selesai: berkas, bukan sintesis — lihat catatan playFile di atas.
     if (type === 'timerEnd') {
-      playFile('/timer-end.wav');
+      playTimerEndSound();
       return;
     }
 
@@ -69,17 +172,11 @@ export const playSoundEffect = (type, enabled) => {
       } else if (type === 'swipe') {
         tone(200, { gain: 0.05, dur: 0.05 });
       } else if (type === 'done_set') {
-        // Centang: tiga nada naik cepat (E6-B6-E7) pakai gelombang segitiga yang lebih "berisi"
-        // dari sinus, plus ekor sedikit panjang di nada terakhir supaya terdengar tuntas —
-        // bukan 'tik' datar. Dulu nyaris identik dengan 'click' (sama-sama sinus 600 Hz turun),
-        // jadi menyelesaikan set terasa sama saja dengan menekan tombol biasa.
+        // Centang: tiga nada naik cepat (E6-B6-E7) pakai gelombang segitiga
         tone(1318, { type: 'triangle', gain: 0.4, dur: 0.05 });
         tone(1976, { type: 'triangle', gain: 0.45, dur: 0.05, when: 0.048 });
         tone(2637, { type: 'triangle', gain: 0.32, dur: 0.22, when: 0.096 });
       } else if (type === 'success') {
-        // Dulu TIDAK ADA cabangnya sama sekali — sepuluh pemanggil (termasuk simpan latihan
-        // dan popup pencapaian) memanggil playSoundEffect('success') dan tidak menghasilkan
-        // bunyi apa pun, tanpa error. Arpeggio naik tiga nada.
         tone(659, { gain: 0.3, dur: 0.09 });
         tone(880, { gain: 0.33, dur: 0.09, when: 0.085 });
         tone(1319, { gain: 0.38, dur: 0.22, when: 0.17 });

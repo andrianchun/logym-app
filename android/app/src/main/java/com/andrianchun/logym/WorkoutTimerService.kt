@@ -181,36 +181,7 @@ class WorkoutTimerService : Service() {
             // SAMA PERSIS (public/timer-end.wav). Tanpa penjaga ini keduanya berbunyi bersamaan
             // dan terdengar seperti gema.
             if (previousRestLeft > 0 && restLeft <= 0 && !isAppActive) {
-                try {
-                    // Nada yang SAMA PERSIS dengan yang dibunyikan aplikasi (public/timer-end.wav
-                    // dan res/raw/timer_end.wav dibuat dari satu sumber, scripts/generate-timer-sound.cjs).
-                    // Dulu di sini memakai nada alarm bawaan HP, di-loop, DAN memaksa volume alarm
-                    // ke maksimum lalu mengembalikannya — mengubah setelan volume punya user, dan
-                    // membuat timer terdengar sangat berbeda di dalam vs di luar aplikasi.
-                    // Sekarang berbunyi sekali di volume yang user pilih sendiri.
-                    val mediaPlayer = android.media.MediaPlayer.create(applicationContext, R.raw.timer_end)
-                    mediaPlayer.setAudioAttributes(
-                        android.media.AudioAttributes.Builder()
-                            .setUsage(android.media.AudioAttributes.USAGE_ALARM)
-                            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                            .build()
-                    )
-                    mediaPlayer.setOnCompletionListener { it.release() }
-                    mediaPlayer.start()
-
-
-                    val v = getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
-                    // Polanya mengikuti nada: dua ketuk pendek lalu satu getar panjang. Dulu 5,6
-                    // detik bergetar untuk bunyi yang sudah lama selesai.
-                    val pattern = longArrayOf(0, 150, 90, 150, 90, 520)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        v.vibrate(android.os.VibrationEffect.createWaveform(pattern, -1))
-                    } else {
-                        v.vibrate(pattern, -1)
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
+                playRestEndAlarm()
             }
             previousRestLeft = restLeft
             
@@ -406,6 +377,83 @@ class WorkoutTimerService : Service() {
             }
         } else {
             restContainer?.visibility = android.view.View.GONE
+        }
+    }
+
+    private fun getLatestOtaTimerSound(): java.io.File? {
+        try {
+            val versionsDir = java.io.File(filesDir, "versions")
+            if (versionsDir.exists() && versionsDir.isDirectory) {
+                val subdirs = versionsDir.listFiles { f -> f.isDirectory }
+                if (!subdirs.isNullOrEmpty()) {
+                    subdirs.sortByDescending { it.lastModified() }
+                    for (dir in subdirs) {
+                        val candidate = java.io.File(dir, "timer-end.wav")
+                        if (candidate.exists() && candidate.length() > 0) {
+                            return candidate
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return null
+    }
+
+    private fun playRestEndAlarm() {
+        try {
+            var player: android.media.MediaPlayer? = null
+            val otaSound = getLatestOtaTimerSound()
+            if (otaSound != null) {
+                try {
+                    val mp = android.media.MediaPlayer()
+                    mp.setAudioAttributes(
+                        android.media.AudioAttributes.Builder()
+                            .setUsage(android.media.AudioAttributes.USAGE_ALARM)
+                            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build()
+                    )
+                    mp.setDataSource(otaSound.absolutePath)
+                    mp.prepare()
+                    player = mp
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+
+            if (player == null) {
+                val afd = resources.openRawResourceFd(R.raw.timer_end)
+                if (afd != null) {
+                    val mp = android.media.MediaPlayer()
+                    mp.setAudioAttributes(
+                        android.media.AudioAttributes.Builder()
+                            .setUsage(android.media.AudioAttributes.USAGE_ALARM)
+                            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build()
+                    )
+                    mp.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                    afd.close()
+                    mp.prepare()
+                    player = mp
+                }
+            }
+
+            player?.let { mp ->
+                mp.setOnCompletionListener { it.release() }
+                mp.start()
+            }
+
+            val v = getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
+            // Polanya mengikuti nada: 150ms getar, 90ms jeda, 150ms getar, 90ms jeda, 520ms getar panjang.
+            val pattern = longArrayOf(0, 150, 90, 150, 90, 520)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                v.vibrate(android.os.VibrationEffect.createWaveform(pattern, -1))
+            } else {
+                v.vibrate(pattern, -1)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 }

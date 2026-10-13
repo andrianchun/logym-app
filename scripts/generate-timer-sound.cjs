@@ -73,12 +73,13 @@ const blast = (freq, ms, gain = 0.92) => {
   return out;
 };
 
-// Tangga naik empat nada dengan tempo normal alami (~1.3s total)
+// Tangga naik empat nada: 170 ms per tingkat dengan nada penutup 400 ms (total ~0.97s).
+// Durasinya sinkron persis dengan pola getaran (150-90-150-90-520 ms) dan kecepatan di APK native.
 const samples = [
-  ...blast(600, 250),
-  ...blast(800, 250),
-  ...blast(1000, 250),
-  ...blast(1200, 550),
+  ...blast(600, 170),
+  ...blast(800, 170),
+  ...blast(1000, 170),
+  ...blast(1200, 400),
   ...silence(60),
 ];
 
