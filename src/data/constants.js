@@ -3045,6 +3045,9 @@ export const buildLogymSyncPayload = (history, userWeight = 70, targetDateStr = 
   });
 
   const activityKcal = Number(todayData.bioData?.activityCalories) || 0;
+  const steps = Number(todayData.bioData?.steps) || 0;
+  const stepsKcal = Math.round(steps * 0.04);
+  const bmr = Number(todayData.bioData?.bmr) || 0;
 
   return {
     logymSync: {
@@ -3055,6 +3058,9 @@ export const buildLogymSyncPayload = (history, userWeight = 70, targetDateStr = 
         workoutsCount: completedWorkouts.length,
         sessionsCount: completedWorkouts.length,
         exercisesCount: completedExercisesCount,
+        steps,
+        stepsKcal,
+        bmr,
         updatedAt: Date.now()
       }
     }
