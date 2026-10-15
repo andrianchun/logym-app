@@ -330,7 +330,7 @@ const ImmersiveWorkout = ({
       if (typeof window !== 'undefined' && !window.logymCelebrated10RM) {
         window.logymCelebrated10RM = {};
       }
-      const currentVal = Number(hint.rm10Number) || parseFloat(hint.rm10) || 0;
+      const currentVal = Number(hint.rm10Number) || parseFloat(hint.rm10) || (hint.targetRepsNumber || 1);
       const alreadyCelebrated = Math.max(
         lastCelebrated10RM.current,
         (typeof window !== 'undefined' && Number(window.logymCelebrated10RM?.[ex.id])) || 0
@@ -565,31 +565,9 @@ const ImmersiveWorkout = ({
     setYtLoaded(false);
   }, [activeMediaIndex, currentIndex]);
 
-  // Back button protection
-  const popped = React.useRef(false);
-  
-  React.useEffect(() => {
-    window.history.pushState({ immersive: true }, '');
-
-    const handlePopState = () => {
-      if (popped.current) return;
-      popped.current = true;
-      playSoundEffect('click', soundEnabled);
-      onClose();
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-    };
-  }, []);
-
   const handleMinimize = () => {
-    if (!popped.current) {
-      popped.current = true;
-      window.history.back(); // Trigger popstate or at least clean up history state
-      onClose();
-    }
+    playSoundEffect('click', soundEnabled);
+    onClose();
   };
 
   const activeMedia = mediaItems[activeMediaIndex];
@@ -1152,7 +1130,7 @@ const ImmersiveWorkout = ({
 
                                 {/* Target Angka Utama (Fokus di Angka, tulisan plat & reps kecil) */}
                                 {(hint.targetWeightNumber !== undefined || hint.target || hint.benchmark) && (
-                                  <div className="flex flex-col items-center mb-2.5">
+                                  <div className="flex flex-col items-center mb-2">
                                     {hint.weightLabel && (
                                       <span className="text-xs font-bold uppercase tracking-widest text-sky-400/90 mb-1 px-2.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20">
                                         Beban {hint.weightLabel}
@@ -1187,30 +1165,49 @@ const ImmersiveWorkout = ({
                                       </div>
                                     )}
 
-                                    {hint.targetDetail && (
-                                      <div className="mt-1.5 text-xs font-semibold text-emerald-300/90 px-3 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 max-w-full text-center">
-                                        {hint.targetDetail}
+                                    {/* Jika ada perbedaan Plat vs Total: Sesi Lalu (Plat) disandingkan langsung di bawah Plat */}
+                                    {hint.targetDetail && hint.lastSession && (
+                                      <div className="mt-1.5 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-slate-300 backdrop-blur-sm">
+                                        <span className="text-slate-400">Sesi Lalu:</span>
+                                        <span className="text-slate-200 font-semibold">{hint.lastSession}</span>
                                       </div>
                                     )}
                                   </div>
                                 )}
 
-                                {/* Acuan Deketan: Sesi Lalu & 10RM Acuan berdampingan tepat di bawah target */}
-                                {(hint.lastSession || hint.rm10) && (
+                                {/* Baris Acuan:
+                                    Jika ada targetDetail: Beban Total & 10RM disandingkan berdampingan (keduanya hitung Total).
+                                    Jika tidak ada targetDetail: Sesi Lalu & 10RM disandingkan berdampingan.
+                                */}
+                                {hint.targetDetail ? (
                                   <div className="flex items-center justify-center flex-wrap gap-1.5 mb-3.5">
-                                    {hint.lastSession && (
-                                      <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-slate-300 backdrop-blur-sm">
-                                        <span className="text-slate-500">Sesi Lalu:</span>
-                                        <span className="text-slate-200 font-semibold">{hint.lastSession}</span>
-                                      </div>
-                                    )}
+                                    <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs font-semibold text-emerald-300/90 backdrop-blur-sm">
+                                      {hint.targetDetail}
+                                    </div>
                                     {hint.rm10 && (
-                                      <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-slate-300 backdrop-blur-sm">
-                                        <span className="text-slate-500">10RM:</span>
+                                      <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-500/10 border border-sky-500/20 text-xs font-medium text-sky-200 backdrop-blur-sm">
+                                        <span className="text-sky-400/80">10RM:</span>
                                         <span className="text-sky-300 font-bold">{hint.rm10}</span>
                                       </div>
                                     )}
                                   </div>
+                                ) : (
+                                  (hint.lastSession || hint.rm10) && (
+                                    <div className="flex items-center justify-center flex-wrap gap-1.5 mb-3.5">
+                                      {hint.lastSession && (
+                                        <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-slate-300 backdrop-blur-sm">
+                                          <span className="text-slate-400">Sesi Lalu:</span>
+                                          <span className="text-slate-200 font-semibold">{hint.lastSession}</span>
+                                        </div>
+                                      )}
+                                      {hint.rm10 && (
+                                        <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-500/10 border border-sky-500/20 text-xs font-medium text-sky-200 backdrop-blur-sm">
+                                          <span className="text-sky-400/80">10RM:</span>
+                                          <span className="text-sky-300 font-bold">{hint.rm10}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )
                                 )}
 
                                 {/* Pesan Arahan Coach */}
@@ -1224,7 +1221,7 @@ const ImmersiveWorkout = ({
                                   TARGET HARI INI
                                 </h3>
                                 <p className="text-slate-200 text-xs sm:text-sm font-medium leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)] max-w-[280px]">
-                                  Belum ada rekor 10RM. Gunakan beban yang menantang tapi sanggup diangkat 10 repetisi dengan form sempurna (RPE 8).
+                                  Pilih beban yang menantang untuk 10 repetisi dengan form bersih (RPE 8).
                                 </p>
                               </>
                             )}
@@ -1286,7 +1283,7 @@ const ImmersiveWorkout = ({
                                {showWeightInfo && (
                                  <>
                                    <div 
-                                     className="fixed inset-0 z-30 bg-transparent overscroll-contain touch-none" 
+                                     className="fixed inset-0 z-30 bg-transparent overscroll-contain touch-none" data-close-modal="true"
                                      onClick={(e) => { e.stopPropagation(); setShowWeightInfo(false); }} 
                                    />
                                    <div 
@@ -1713,7 +1710,7 @@ const ImmersiveWorkout = ({
                   {/* POPUP INFO */}
                   {showIntensityInfo && (
                     <>
-                      <div className="fixed inset-0 z-40 overscroll-contain touch-none" onClick={(e) => { e.stopPropagation(); setShowIntensityInfo(false); }} />
+                      <div className="fixed inset-0 z-40 overscroll-contain touch-none" data-close-modal="true" onClick={(e) => { e.stopPropagation(); setShowIntensityInfo(false); }} />
                       <div className="absolute bottom-full right-0 mb-4 w-64 p-4 rounded-3xl bg-white/95 dark:bg-[#121a2f]/95 backdrop-blur-2xl shadow-2xl border border-black/10 dark:border-white/10 animate-in slide-in-from-bottom-2 z-50 pointer-events-none">
                         <div className="text-xs text-slate-600 dark:text-slate-300 space-y-2">
                           {rpeMode ? (

@@ -667,23 +667,63 @@ const WorkoutTab = ({
 
     const { best10RM, last10RM, lastSessionWeight, lastSessionInputWeight, lastSessionReps, eqConf: eqConfNow } = targetPlan;
 
+    const targetActualWeight = targetPlan.targetWeight;
+    const targetInputWeight = targetPlan.inputWeight;
+    const displayTargetReps = targetPlan.targetReps;
+    const target10RM = estimate10RM(targetActualWeight, displayTargetReps);
+
     // 2. Scan current session — pakai beban AKTUAL. Abaikan set pemanasan (warmup)
     // agar tidak prematur memicu acuan 10RM pada beban ringan.
     let currentMax10RM = 0;
     let currentMaxWeight = 0;
     let currentMaxReps = 0;
+    let bestAchievedWeight = 0;
+    let bestAchievedReps = 0;
+    let targetAchieved = false;
+    let targetExceeded = false;
+
     const currentLogs = getSetLogs(exItem) || exerciseLogs[exItem.id] || [];
     currentLogs.forEach(s => {
       if (s.done && !s.skipped && s.type !== 'warmup' && (Number(s.w) > 0 || Number(s.total_w) > 0) && s.r > 0) {
         const actW = getSetActualWeight(s, eqConfNow);
-        const c10RM = estimate10RM(actW, s.r);
+        const inputW = Number(s.input_w !== undefined ? s.input_w : s.w) || 0;
+        const sReps = Number(s.r);
+        const c10RM = estimate10RM(actW, sReps);
         if (c10RM > currentMax10RM) {
           currentMax10RM = c10RM;
           currentMaxWeight = actW;
-          currentMaxReps = Number(s.r);
+          currentMaxReps = sReps;
+        }
+
+        if (displayTargetReps > 0) {
+          const isWeightAtTarget = (targetActualWeight <= 0) 
+            || (actW >= targetActualWeight - 0.05) 
+            || (inputW >= targetInputWeight - 0.05);
+
+          const isEq10RMMet = target10RM > 0 && c10RM >= (target10RM - 0.05);
+
+          if ((isWeightAtTarget && sReps > displayTargetReps) || (isEq10RMMet && sReps > displayTargetReps) || (c10RM > target10RM + 0.5 && sReps >= displayTargetReps)) {
+            targetExceeded = true;
+            targetAchieved = true;
+            if (sReps > bestAchievedReps || actW > bestAchievedWeight) {
+              bestAchievedWeight = actW;
+              bestAchievedReps = sReps;
+            }
+          } else if ((isWeightAtTarget && sReps >= displayTargetReps) || isEq10RMMet) {
+            targetAchieved = true;
+            if (sReps >= bestAchievedReps || actW >= bestAchievedWeight) {
+              bestAchievedWeight = actW;
+              bestAchievedReps = sReps;
+            }
+          }
         }
       }
     });
+
+    if (targetAchieved && bestAchievedReps === 0) {
+      bestAchievedReps = currentMaxReps || displayTargetReps;
+      bestAchievedWeight = currentMaxWeight || targetActualWeight;
+    }
 
     const record10RM = best10RM;
     const true10RM = targetPlan.true10RM;
@@ -716,11 +756,11 @@ const WorkoutTab = ({
         const baseName = eqConfNow.isBodyweightPlus 
           ? 'BB' 
           : (eqConfNow.equipment?.includes('Sled') ? 'Sled' : 'Bar');
-        return `Total Beban: ${actWeight} ${uStr} (${baseName} ${eqConfNow.baseWeight} ${uStr})`;
+        return `Total: ${actWeight} ${uStr} (${baseName} ${eqConfNow.baseWeight} ${uStr})`;
       } else if (eqConfNow.ratio !== 1) {
-        return `Beban Efektif: ${actWeight} ${uStr} (Katrol ${eqConfNow.ratio}:1)`;
+        return `Efektif: ${actWeight} ${uStr} (Katrol ${eqConfNow.ratio}:1)`;
       }
-      return `Total Beban: ${actWeight} ${uStr}`;
+      return `Total: ${actWeight} ${uStr}`;
     };
 
     const formatRefWeight = (actWeight, reps = null, inputWParam = null) => {
@@ -742,7 +782,7 @@ const WorkoutTab = ({
         target: formatHeroTarget(currentMaxWeight, currentMaxReps),
         targetDetail: formatSubTotal(currentMaxWeight),
         lastSession: lastSessionWeight > 0 ? formatRefWeight(lastSessionWeight, lastSessionReps, lastSessionInputWeight) : null,
-        message: `Luar biasa! Kamu berhasil memecahkan rekor 10RM baru. Terus pertahankan progres luar biasa ini!`,
+        message: `Rekor 10RM baru terpecahkan! Pertahankan performa ini!`,
         rm10: `${currentMax10RM} ${uStr}`,
         rm10Number: currentMax10RM,
         rm10Detail: formatSubTotal(currentMax10RM),
@@ -751,7 +791,65 @@ const WorkoutTab = ({
         isNewRecord: true,
         benchmark: formatHeroTarget(currentMaxWeight, currentMaxReps),
         benchmarkDetail: formatSubTotal(currentMaxWeight),
-        text: `Mantap! Kamu baru saja buat rekor 10RM baru: ${currentMax10RM} ${uStr} (${currentMaxWeight} ${uStr} x ${currentMaxReps} Reps)!\n\nLanjutkan kerja kerasnya!`
+        text: `Rekor 10RM baru: ${currentMax10RM} ${uStr} (${currentMaxWeight} ${uStr} × ${currentMaxReps} reps)! Pertahankan!`
+      };
+    }
+
+    if (targetExceeded) {
+      const heroWeight = bestAchievedWeight || currentMaxWeight || targetActualWeight;
+      const heroReps = bestAchievedReps || currentMaxReps || displayTargetReps;
+      const msg = heroReps > displayTargetReps
+        ? `Luar biasa! ${heroReps} reps melampaui target hari ini (${displayTargetReps} reps). Progressive overload sukses!`
+        : `Luar biasa! Performa set melampaui target beban hari ini. Progressive overload sukses!`;
+
+      return {
+        title: "Target Terlampaui!",
+        targetWeightNumber: hasWeightDiff ? calculateInputWeight(heroWeight, eqConfNow) : heroWeight,
+        targetRepsNumber: heroReps,
+        weightUnit: uStr,
+        weightLabel: hasWeightDiff ? inputLabel : null,
+        target: formatHeroTarget(heroWeight, heroReps),
+        targetDetail: formatSubTotal(heroWeight),
+        lastSession: lastSessionWeight > 0 ? formatRefWeight(lastSessionWeight, lastSessionReps, lastSessionInputWeight) : null,
+        message: msg,
+        rm10: currentMax10RM > 0 ? `${currentMax10RM} ${uStr}` : (true10RM > 0 ? `${true10RM} ${uStr}` : null),
+        rm10Number: currentMax10RM || true10RM || heroReps,
+        rm10Detail: formatSubTotal(currentMax10RM || true10RM),
+        hasWeightDiff,
+        mode: 'praise',
+        isNewRecord: true,
+        benchmark: formatHeroTarget(targetActualWeight, displayTargetReps),
+        benchmarkDetail: formatSubTotal(targetActualWeight),
+        text: msg
+      };
+    }
+
+    if (targetAchieved) {
+      const heroWeight = bestAchievedWeight || targetActualWeight || currentMaxWeight;
+      const heroReps = bestAchievedReps || displayTargetReps || currentMaxReps;
+      const msg = targetPlan.isDeload
+        ? `Target deload ${displayTargetReps} reps tuntas dengan form bersih. Pemulihan berjalan optimal!`
+        : `Mantap! Target ${displayTargetReps} reps berhasil dicapai dengan solid. Beban siap dinaikkan sesi depan!`;
+
+      return {
+        title: targetPlan.isDeload ? "Target Deload Tuntas!" : "Target Tercapai!",
+        targetWeightNumber: hasWeightDiff ? calculateInputWeight(heroWeight, eqConfNow) : heroWeight,
+        targetRepsNumber: heroReps,
+        weightUnit: uStr,
+        weightLabel: hasWeightDiff ? inputLabel : null,
+        target: formatHeroTarget(heroWeight, heroReps),
+        targetDetail: formatSubTotal(heroWeight),
+        lastSession: lastSessionWeight > 0 ? formatRefWeight(lastSessionWeight, lastSessionReps, lastSessionInputWeight) : null,
+        message: msg,
+        rm10: currentMax10RM > 0 ? `${currentMax10RM} ${uStr}` : (true10RM > 0 ? `${true10RM} ${uStr}` : null),
+        rm10Number: currentMax10RM || true10RM || heroReps,
+        rm10Detail: formatSubTotal(currentMax10RM || true10RM),
+        hasWeightDiff,
+        mode: 'praise',
+        isNewRecord: true,
+        benchmark: formatHeroTarget(targetActualWeight, displayTargetReps),
+        benchmarkDetail: formatSubTotal(targetActualWeight),
+        text: msg
       };
     }
 
@@ -760,8 +858,8 @@ const WorkoutTab = ({
       const isProgressRecord = alreadyCelebrated > 0 && currentMax10RM > alreadyCelebrated;
       const titleText = isProgressRecord ? "Rekor Baru!" : "10RM Pertama Tercatat";
       const messageText = isProgressRecord
-        ? `Luar biasa! Kamu berhasil memecahkan rekor 10RM baru. Terus pertahankan progres luar biasa ini!`
-        : `Keren! 10RM acuan pertamamu berhasil tercatat. Angka ini otomatis menjadi target acuan progresifmu untuk sesi latihan berikutnya.`;
+        ? `Rekor 10RM baru terpecahkan! Pertahankan performa ini!`
+        : `10RM pertama tercatat! Angka ini jadi target acuan sesi berikutnya.`;
 
       return {
         title: titleText,
@@ -782,14 +880,10 @@ const WorkoutTab = ({
         benchmark: formatHeroTarget(currentMaxWeight, currentMaxReps),
         benchmarkDetail: formatSubTotal(currentMaxWeight),
         text: isProgressRecord
-          ? `Mantap! Kamu baru saja buat rekor 10RM baru: ${currentMax10RM} ${uStr} (${currentMaxWeight} ${uStr} x ${currentMaxReps} Reps)!\n\nLanjutkan kerja kerasnya!`
-          : `Keren! 10RM acuan pertamamu berhasil tercatat: ${currentMax10RM} ${uStr} (${currentMaxWeight} ${uStr} x ${currentMaxReps} Reps).\n\nAngka ini otomatis menjadi target acuan progresifmu untuk sesi latihan berikutnya!`
+          ? `Rekor 10RM baru: ${currentMax10RM} ${uStr} (${currentMaxWeight} ${uStr} × ${currentMaxReps} reps)! Pertahankan!`
+          : `10RM acuan pertama tercatat: ${currentMax10RM} ${uStr}. Otomatis jadi acuan sesi berikutnya!`
       };
     }
-
-    const targetActualWeight = targetPlan.targetWeight;
-    const targetInputWeight = targetPlan.inputWeight;
-    const displayTargetReps = targetPlan.targetReps;
 
     if (targetPlan.isDeload && targetPlan.hasHistory) {
       return {
@@ -809,7 +903,7 @@ const WorkoutTab = ({
         isDeload: true,
         benchmark: formatHeroTarget(targetActualWeight, displayTargetReps),
         benchmarkDetail: formatSubTotal(targetActualWeight),
-        text: `Target beban dipangkas ~17.5% untuk pemulihan sendi & sistem saraf:\n(${targetActualWeight} ${uStr} x ${displayTargetReps} Reps)\n\nFokus pada kontrol gerakan dan tempo yang sempurna. Jangan memaksakan beban berat!`
+        text: `Target beban dipangkas ~17.5% untuk pemulihan (${targetActualWeight} ${uStr} × ${displayTargetReps} reps). Fokus kontrol gerakan.`
       };
     }
 
@@ -830,7 +924,7 @@ const WorkoutTab = ({
         mode: 'push',
         benchmark: formatHeroTarget(targetActualWeight, displayTargetReps),
         benchmarkDetail: formatSubTotal(targetActualWeight),
-        text: `Beban dipertahankan di sesi lalu (${targetActualWeight} ${uStr} x ${displayTargetReps} Reps).\n\nOtot sedang pegal/lelah, jangan memaksakan naik beban hari ini. Prioritaskan kontrol repetisi dan kesempurnaan form gerakan!`
+        text: `Beban dipertahankan (${targetActualWeight} ${uStr} × ${displayTargetReps} reps). Otot sedang pegal, prioritaskan kontrol form!`
       };
     }
 
@@ -851,7 +945,7 @@ const WorkoutTab = ({
         mode: 'push',
         benchmark: formatHeroTarget(targetActualWeight, displayTargetReps),
         benchmarkDetail: formatSubTotal(targetActualWeight),
-        text: `Target: ${targetActualWeight} ${uStr} x ${displayTargetReps} Reps (Sesi Lalu: ${lastSessionWeight} ${uStr} x ${lastSessionReps} Reps)\n\n${targetPlan.message}\n\n10RM acuan: ${true10RM} ${uStr}`
+        text: targetPlan.message
       };
     } else if (currentMax10RM > 0) {
       return {
@@ -863,14 +957,14 @@ const WorkoutTab = ({
         target: formatHeroTarget(currentMaxWeight, currentMaxReps),
         targetDetail: formatSubTotal(currentMaxWeight),
         lastSession: null,
-        message: `Fokus tuntaskan sisa set dengan form dan kontrol gerakan yang rapi!`,
+        message: `Fokus tuntaskan sisa set dengan form dan kontrol yang rapi!`,
         rm10: `${currentMax10RM} ${uStr}`,
         rm10Detail: formatSubTotal(currentMax10RM),
         hasWeightDiff,
         mode: 'push',
         benchmark: formatHeroTarget(currentMaxWeight, currentMaxReps),
         benchmarkDetail: formatSubTotal(currentMaxWeight),
-        text: `Beban terbaik sesi ini:\n${currentMaxWeight} ${uStr} x ${currentMaxReps} Reps\n\n10RM acuan saat ini: ${currentMax10RM} ${uStr}.\nFokus tuntaskan sisa set dengan form dan kontrol yang rapi!`
+        text: `Beban terbaik sesi ini: ${currentMaxWeight} ${uStr} × ${currentMaxReps} reps (10RM: ${currentMax10RM} ${uStr}).`
       };
     } else {
       return {
@@ -944,25 +1038,22 @@ const WorkoutTab = ({
     || (history?.[selectedDate]?.isDeloadWeek ? 'deload' : autoWellnessFromReadiness);
 
   const wellnessConfig = useMemo(() => {
-    const map = {
-      prima: {
-        label: 'Prima',
-        icon: <Zap size={20} strokeWidth={2.2} className="text-emerald-500 dark:text-emerald-400" />,
-        btnStyle: 'bg-emerald-500/15 border-emerald-500/30 hover:bg-emerald-500/25 text-emerald-500 dark:text-emerald-400 shadow-emerald-950/10'
-      },
-      doms: {
-        label: 'Pegal',
-        icon: <Activity size={20} strokeWidth={2.2} className="text-amber-500 dark:text-amber-400" />,
-        btnStyle: 'bg-amber-500/15 border-amber-500/30 hover:bg-amber-500/25 text-amber-500 dark:text-amber-400 shadow-amber-950/10'
-      },
-      deload: {
-        label: 'Nyeri (Deload)',
-        icon: <ShieldAlert size={20} strokeWidth={2.2} className="text-rose-500 dark:text-rose-400" />,
-        btnStyle: 'bg-rose-500/15 border-rose-500/30 hover:bg-rose-500/25 text-rose-500 dark:text-rose-400 shadow-rose-950/10'
-      }
+    const icons = {
+      prima: <Zap size={20} strokeWidth={2.2} className={t?.textAccent || 'text-sky-400'} />,
+      doms: <Activity size={20} strokeWidth={2.2} className={t?.textAccent || 'text-sky-400'} />,
+      deload: <ShieldAlert size={20} strokeWidth={2.2} className={t?.textAccent || 'text-sky-400'} />
     };
-    return map[currentWellness] || map.prima;
-  }, [currentWellness]);
+    const labels = {
+      prima: 'Prima',
+      doms: 'Pegal',
+      deload: 'Nyeri (Deload)'
+    };
+    return {
+      label: labels[currentWellness] || labels.prima,
+      icon: icons[currentWellness] || icons.prima,
+      btnStyle: `${t?.bgAccentSoft || 'bg-sky-500/15'} ${t?.borderAccentSoft || 'border-sky-500/30'} hover:opacity-80 ${t?.textAccent || 'text-sky-400'}`
+    };
+  }, [currentWellness, t]);
 
   const requestSessionSwitch = (targetWorkoutId, onProceed) => {
     if (isSwitchingSessionRef.current) return true;
@@ -1158,9 +1249,25 @@ const WorkoutTab = ({
           onClose={() => {
             playSoundEffect('click', soundEnabled);
             setIsClosingImmersive(true);
+            if (activeExerciseId) {
+              const strId = String(activeExerciseId);
+              const targetProg = activeProgramsList.find(p => (p.exercises || []).some(e => String(e.id) === strId || String(e.originalId) === strId));
+              if (targetProg) {
+                setExpandedSessions(prev => ({ ...(prev || {}), [targetProg.workoutId]: true }));
+              } else if (extraExercises.some(e => String(e.id) === strId || String(e.originalId) === strId)) {
+                setExpandedSessions(prev => ({ ...(prev || {}), extra: true }));
+              }
+              const el = document.getElementById(`exercise-card-${activeExerciseId}`) || document.getElementById(`exercise-card-${strId}`);
+              if (el) smartScrollTo(el, 100, true, true);
+            }
             setTimeout(() => {
               setIsClosingImmersive(false);
               setIsImmersiveMode(false);
+              if (activeExerciseId) {
+                const strId = String(activeExerciseId);
+                const el = document.getElementById(`exercise-card-${activeExerciseId}`) || document.getElementById(`exercise-card-${strId}`);
+                if (el) smartScrollTo(el, 100, true, false);
+              }
             }, 300);
           }}
           onSaveWorkout={() => {
@@ -1290,6 +1397,7 @@ const WorkoutTab = ({
                                 ex={ex} idx={idx} isExtra={false}
                                 t={t} lang={lang} soundEnabled={soundEnabled}
                                 units={units}
+                                onActiveExercise={setActiveExerciseId}
                                 isSkip={!!skippedExercises[ex.id]}
                                 onToggleSkip={() => onToggleSkip(ex.id)}
                                 onRemoveExtra={onRemoveExtra}
@@ -1425,6 +1533,7 @@ const WorkoutTab = ({
                                 ex={ex} idx={activeProgramsList.length > 0 ? (activeProgramsList.reduce((sum, p) => sum + (p.exercises?.length || 0), 0) + idx) : idx} isExtra={true}
                                 t={t} lang={lang} soundEnabled={soundEnabled}
                                 units={units}
+                                onActiveExercise={setActiveExerciseId}
                                 isSkip={!!skippedExercises[ex.id]} 
                                 onToggleSkip={() => onToggleSkip(ex.id)} 
                                 onRemoveExtra={onRemoveExtra} 
@@ -1682,7 +1791,7 @@ const WorkoutTab = ({
       {/* WELLNESS CHECK MODAL */}
       <WellnessCheckModal 
         isOpen={showWellnessModal} 
-        currentWellness={history?.[selectedDate]?.wellness}
+        currentWellness={currentWellness}
         onSelect={handleSelectWellness} 
         onClose={() => {
           setShowWellnessModal(false);

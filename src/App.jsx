@@ -1160,13 +1160,21 @@ export default function App() {
           if (fireAt.getTime() <= Date.now()) continue; // jam hari ini sudah lewat
 
           const ymd = getLocalYMD(fireAt);
-          const terjadwal = getDayWorkouts(history, programs, activePlanIds, ymd)
-            .filter(w => w.status !== 'completed');
-          const nama = terjadwal.map(w => w.programName || w.name).filter(Boolean).join(' + ');
+          const allDayWorkouts = getDayWorkouts(history, programs, activePlanIds, ymd);
+          const hasCompleted = allDayWorkouts.some(w => w.status === 'completed');
+          const uncompleted = allDayWorkouts.filter(w => w.status !== 'completed');
+          const nama = uncompleted.map(w => w.programName || w.name).filter(Boolean).join(' + ');
 
-          const copy = terjadwal.length > 0
-            ? getLogyNotification('start', logyPersona, { program: nama || 'Latihan hari ini' })
-            : getLogyNotification('rest', logyPersona, {});
+          let copy = null;
+          if (uncompleted.length > 0) {
+            copy = getLogyNotification('start', logyPersona, { program: nama || 'Latihan hari ini' });
+          } else if (hasCompleted) {
+            // Sudah melakukan latihan di hari tersebut (misal latihan pagi) -> kirim notif apresiasi/pemulihan
+            copy = getLogyNotification('completed', logyPersona, {});
+          } else {
+            // Benar-benar rest day (tidak ada jadwal dan belum ada sesi latihan yang selesai)
+            copy = getLogyNotification('rest', logyPersona, {});
+          }
           if (!copy) continue;
 
           notifications.push({
@@ -2971,7 +2979,7 @@ export default function App() {
       const activeModals = Array.from(document.querySelectorAll('.fixed.inset-0:not(.pointer-events-none)')).filter(el => window.getComputedStyle(el).display !== 'none');
       if (activeModals.length > 0) {
         const topModal = activeModals[activeModals.length - 1];
-        const designatedCloseBtn = topModal.querySelector('[data-close-modal="true"]');
+        const designatedCloseBtn = topModal.querySelector('[data-close-modal="true"]') || (topModal.getAttribute('data-close-modal') === 'true' ? topModal : null);
         if (designatedCloseBtn) designatedCloseBtn.click();
         else {
           const closeBtn = Array.from(topModal.querySelectorAll('button')).find(b => ['batal', 'tutup'].includes((b.textContent||'').trim().toLowerCase()));

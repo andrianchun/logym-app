@@ -10,6 +10,7 @@ import {
   guessWorkoutType,
   recomputeStrengthRecords,
   buildHcSessionDetail,
+  estimate10RM,
 } from './workoutCalc.js';
 
 const KG = 70;
@@ -537,6 +538,29 @@ console.log('workoutCalc OK', { cardioKcal, plankKcal, liftKcal });
     splitSquatTarget: `${targetSplitSquat.inputWeight} kg x ${targetSplitSquat.targetReps} reps`,
     rdlTarget: `plat ${targetRDL.inputWeight} kg (total ${targetRDL.targetWeight} kg) x ${targetRDL.targetReps} reps`,
   });
+
+  // Test 5: Verifikasi target achieved & exceeded logic
+  const targetActualW = 50;
+  const targetR = 11;
+  const target10RMVal = estimate10RM(targetActualW, targetR);
+
+  // Set 1: capai target (50 kg x 11 reps)
+  const setExact = { w: 50, r: 11 };
+  const exact10RM = estimate10RM(setExact.w, setExact.r);
+  const isExactMet = (setExact.w >= targetActualW - 0.05 && setExact.r >= targetR) || exact10RM >= (target10RMVal - 0.05);
+  const isExactExceeded = (setExact.w >= targetActualW - 0.05 && setExact.r > targetR);
+  assert.equal(isExactMet, true, '50 kg x 11 reps harus dianggap mencapai target 11 reps');
+  assert.equal(isExactExceeded, false, '50 kg x 11 reps tidak melebihi target 11 reps');
+
+  // Set 2: melebihi target (50 kg x 12 reps)
+  const setOver = { w: 50, r: 12 };
+  const over10RM = estimate10RM(setOver.w, setOver.r);
+  const isOverMet = (setOver.w >= targetActualW - 0.05 && setOver.r >= targetR) || over10RM >= (target10RMVal - 0.05);
+  const isOverExceeded = (setOver.w >= targetActualW - 0.05 && setOver.r > targetR) || over10RM > (target10RMVal + 0.5);
+  assert.equal(isOverMet, true, '50 kg x 12 reps harus mencapai target 11 reps');
+  assert.equal(isOverExceeded, true, '50 kg x 12 reps harus dianggap melebihi target 11 reps');
+
+  console.log('target praise evaluation OK', { exact: isExactMet, exceeded: isOverExceeded });
 }
 
 

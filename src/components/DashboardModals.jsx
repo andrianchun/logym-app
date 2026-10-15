@@ -273,8 +273,8 @@ const DashboardModals = ({
                  <div>
                     <h3 className="h2 leading-tight">
                       {manualTab === 'komposisi'
-                        ? (lang?.workout === 'Latihan' ? 'Sesuaikan Komposisi Tubuh' : 'Adjust Body Composition')
-                        : (lang?.workout === 'Latihan' ? 'Sesuaikan Data Harian' : 'Adjust Daily Data')}
+                        ? (lang?.workout === 'Latihan' ? 'Komposisi Tubuh' : 'Body Composition')
+                        : (lang?.workout === 'Latihan' ? 'Aktivitas Harian' : 'Daily Activity')}
                     </h3>
                     <div className="relative flex items-center space-x-2 mt-2 w-max cursor-pointer">
                         <CalendarDays size={14} className={t.textAccent} />
@@ -399,10 +399,12 @@ const DashboardModals = ({
                  ) : (
                     <div className="space-y-5">
                         
-                        {/* SECTION: NUTRISI & GIZI (LOMEAL) */}
+                        {/* SECTION: KALORI DIKONSUMSI (LOMEAL) */}
                         <div className="bg-black/5 dark:bg-white/5 rounded-2xl p-4 border border-black/5 dark:border-white/5">
-                            <div className="flex items-center justify-between mb-3">
-                                <h4 className={`text-sm font-black ${t.textMain}`}>Nutrisi & Gizi</h4>
+                            <div className="flex items-center justify-between mb-2.5">
+                                <h4 className={`text-sm font-black ${t.textMain}`}>
+                                    {lang?.workout === 'Latihan' ? 'Kalori Dikonsumsi (kkal)' : 'Calories Consumed (kcal)'}
+                                </h4>
                                 {/* Terkunci untuk hari APA PUN yang datanya sudah ditulis Lomeal, bukan
                                     cuma hari ini — Lomeal mengirim tiap hari yang diedit, termasuk yang
                                     lampau, jadi mengetik manual di hari itu cuma akan tertimpa. Hari
@@ -414,20 +416,15 @@ const DashboardModals = ({
                                     </span>
                                 )}
                             </div>
-                            <div className="grid grid-cols-1 gap-2.5">
-                                <div>
-                                    <label className={`block ${t.textMuted} text-xs mb-0.5 truncate`}>Kalori Dimakan (kcal)</label>
-                                    <SwipeInput
-                                        language={lang?.id || 'ID'}
-                                        value={lomealToday && isToday ? Math.round(lomealToday.kcal) : (formBio.nutritionCalories || '')}
-                                        disabled={lomealLocked}
-                                        onChange={(val) => setFormBio({...formBio, nutritionCalories: val})}
-                                        step={10} min={0} soundEnabled={soundEnabled}
-                                        className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-xl outline-none font-bold text-sm text-center ${lomealLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                        placeholder={ph(bioData?.nutritionCalories, "2000")}
-                                    />
-                                </div>
-                            </div>
+                            <SwipeInput
+                                language={lang?.id || 'ID'}
+                                value={lomealToday && isToday ? Math.round(lomealToday.kcal) : (formBio.nutritionCalories || '')}
+                                disabled={lomealLocked}
+                                onChange={(val) => setFormBio({...formBio, nutritionCalories: val})}
+                                step={10} min={0} soundEnabled={soundEnabled}
+                                className={`w-full ${t.placeholderAccent} ${t.inputBg} ${t.textMain} py-2 px-3 rounded-xl outline-none font-bold text-sm text-center ${lomealLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                placeholder={ph(bioData?.nutritionCalories, "2000")}
+                            />
                         </div>
 
                         {/* SECTION: KESEHATAN & AKTIVITAS (HEALTH CONNECT) */}

@@ -59,6 +59,19 @@ export const LOGI_NOTIF_TEMPLATES = {
             ['Hari pemulihan', 'Tidak ada sesi terjadwal. Pemulihan menjaga sesi berikutnya.'],
         ],
     },
+    // Hari di mana sesi latihan sudah diselesaikan (misal user sudah latihan pagi).
+    completed: {
+        santai: [
+            ['Sesi hari ini beres!', 'Mantap latihannya tadi! Istirahat cukup & penuhi nutrisi ya.'],
+            ['Latihan tuntas!', 'Kerja keras tadi mantap. Cukupi protein biar recovery maksimal.'],
+        ],
+        galak: [
+            ['Latihan tuntas', 'Udah kelar latihan. Jangan rusak hasilnya dengan begadang.'],
+        ],
+        serius: [
+            ['Sesi tuntas', 'Latihan hari ini selesai. Istirahat dan nutrisi mendukung pemulihan.'],
+        ],
+    },
     insight: {
         santai: [
             ['{exName} lu stuck', 'Flat {weeks} minggu di {maxWeight}kg. Ada ide, cek chat.'],

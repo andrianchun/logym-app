@@ -380,12 +380,10 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
      const sortedDates = Object.keys(history).filter(d => d <= activeDate).sort((a,b) => b.localeCompare(a));
 
      // Komposisi tubuh dibaca dari SATU hari snapshot (bukan campur per-field dari tanggal
-     // beda-beda) — biar "Data dari: X" akurat, semua angka yang tampil beneran dari tanggal
-     // itu, bukan gado-gado field lama+baru yang bikin labelnya menyesatkan. Pemicunya WAJIB
-     // mencakup semua field komposisi (termasuk waist) — dulu cuma cek 5 field dan waist gak
-     // pernah bisa jadi pemicu, jadi entri "cuma isi lingkar perut hari ini" ketimpa balik
-     // snapshot hari lama yang gak punya lingkar perut sama sekali.
-     const COMPOSITION_FIELDS = ['weight', 'bodyFat', 'musclePercent', 'muscleMass', 'boneMass', 'visceralFat', 'waterPercent', 'proteinPercent', 'bodyAge', 'bmr', 'bodyScore', 'waist'];
+     // beda-beda) — biar "Data dari: X" akurat. Hanya field komposisi tubuh nyata (berat, lemak,
+     // otot, skor, dll) yang memicu snapshot baru. Mengisi tensi atau lingkar perut saja TIDAK
+     // boleh menimpa snapshot komposisi tubuh menjadi kosong.
+     const COMPOSITION_FIELDS = ['weight', 'bodyFat', 'musclePercent', 'muscleMass', 'boneMass', 'visceralFat', 'waterPercent', 'proteinPercent', 'bodyAge', 'bmr', 'bodyScore'];
      let latestBodyData = null;
      let bodyDataDate = null;
      let fallbackHeight = null;
@@ -394,8 +392,11 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
      for (const date of sortedDates) {
          const dayBio = history[date]?.bioData;
          if (dayBio) {
+             const isAccidentalWaist = dayBio.waist && !dayBio._manualFlags?.waist && !dayBio.weight && !dayBio.bodyFat && !dayBio.muscleMass;
+             const effectiveWaist = isAccidentalWaist ? null : dayBio.waist;
+
              if (!fallbackHeight && dayBio.height) fallbackHeight = dayBio.height;
-             if (!fallbackWaist && dayBio.waist) fallbackWaist = dayBio.waist;
+             if (!fallbackWaist && effectiveWaist) fallbackWaist = effectiveWaist;
 
              if (!latestBodyData && COMPOSITION_FIELDS.some(f => Number(dayBio[f]) > 0)) {
                  latestBodyData = dayBio;
@@ -417,7 +418,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
          weight: userProfile?.weight || null,
          ...latestBodyData,
          height: (latestBodyData && latestBodyData.height) || fallbackHeight || userProfile?.height || emptyBio.height,
-         waist: (latestBodyData && latestBodyData.waist) || fallbackWaist || emptyBio.waist,
+         waist: fallbackWaist || (latestBodyData && latestBodyData.waist) || emptyBio.waist,
          steps: todayDailyData.steps !== undefined ? todayDailyData.steps : (emptyBio.steps || 0),
          stepMinutes: todayDailyData.stepMinutes !== undefined ? todayDailyData.stepMinutes : (emptyBio.stepMinutes || 0),
          distance: todayDailyData.distance !== undefined ? todayDailyData.distance : (emptyBio.distance || 0),
@@ -509,7 +510,13 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
      if (showManualModal) {
          let initialBio = { ...emptyBio };
          if (history[modalDate] && history[modalDate].bioData) {
-             const enriched = enrichBioWithImpedance(history[modalDate].bioData, userProfile, null, modalDate, biometricStandard);
+             const rawBio = { ...history[modalDate].bioData };
+             // Bersihkan waist yang terlanjur terinjeksi otomatis akibat bug simpan tensi terdahulu
+             const isAccidentalWaist = rawBio.waist && !rawBio._manualFlags?.waist && !rawBio.weight && !rawBio.bodyFat && !rawBio.muscleMass;
+             if (isAccidentalWaist) {
+                 delete rawBio.waist;
+             }
+             const enriched = enrichBioWithImpedance(rawBio, userProfile, null, modalDate, biometricStandard);
              Object.keys(emptyBio).forEach(k => {
                  if (enriched[k] !== undefined && enriched[k] !== null) {
                      initialBio[k] = enriched[k];
@@ -517,22 +524,18 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
              });
          }
 
-         // Prefill height dan waist dari riwayat jika hari ini kosong (berguna jika timbangan
-         // cuma ngasih berat, biar form gak kosong).
-         if (!initialBio.height || !initialBio.waist) {
+         // Prefill height dari riwayat / profil jika hari ini kosong (berguna untuk kalkulasi BMI)
+         if (!initialBio.height) {
              const sortedDates = Object.keys(history).filter(d => d <= modalDate).sort().reverse();
-             let fallbackH = initialBio.height;
-             let fallbackW = initialBio.waist;
+             let fallbackH = null;
              for (const d of sortedDates) {
-                 if (fallbackH && fallbackW) break;
                  const past = history[d]?.bioData;
-                 if (past) {
-                     if (!fallbackH && past.height) fallbackH = past.height;
-                     if (!fallbackW && past.waist) fallbackW = past.waist;
+                 if (past?.height) {
+                     fallbackH = past.height;
+                     break;
                  }
              }
              initialBio.height = fallbackH || userProfile?.height || emptyBio.height;
-             initialBio.waist = fallbackW || emptyBio.waist;
          }
          
          // Injeksi nilai Smart Merge agar UI Swipe Input menampilkan angka yang tersinkronisasi
@@ -672,9 +675,30 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                      if (typeof a === 'object' || typeof b === 'object') return JSON.stringify(a) === JSON.stringify(b);
                      return String(a) === String(b);
                  };
-                 // Hanya periksa field yang ada di form (emptyBio) dan bukan _manualFlags
-                 Object.keys(emptyBio).forEach(k => {
-                     if (k === '_manualFlags') return;
+                 const COMPOSITION_KEYS = [
+                     'weight', 'height', 'waist', 'bmi', 'bmiStatus',
+                     'bodyFat', 'bodyFatStatus', 'bmr', 'muscleMass', 'musclePercent',
+                     'boneMass', 'visceralFat', 'waterPercent', 'proteinPercent',
+                     'bodyAge', 'bodyScore'
+                 ];
+
+                 const DAILY_KEYS = [
+                     'nutritionCalories',
+                     'steps', 'stepMinutes', 'distance', 'activeMinutes',
+                     'activityCalories', 'activityCaloriesFloor',
+                     'sleep', 'sleepAwake', 'sleepRem', 'sleepLight', 'sleepDeep', 'hrv', 'sleepLog',
+                     'heartRate', 'minHeartRate', 'maxHeartRate', 'restingHeartRate', 'heartRateLog',
+                     'bloodPressure', 'bloodPressureLog',
+                     'oxygenSaturation', 'oxygenSaturationLog',
+                     'waterIntake',
+                     'weeklyDuration', 'weeklySessions', 'weeklyCalories',
+                     'energyScore'
+                 ];
+
+                 const targetKeys = manualTab === 'komposisi' ? COMPOSITION_KEYS : DAILY_KEYS;
+
+                 // Hanya periksa field yang ada di tab aktif dan bukan _manualFlags
+                 targetKeys.forEach(k => {
                      const val = evaluatedData[k];
                      const kosong = val === null || val === undefined || val === '';
                      if (kosong) {
@@ -692,24 +716,49 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                      }
                  });
 
-                 // Bersihkan _manualFlags dari evaluatedData sebelum di-merge
-                 const cleanEvaluated = { ...evaluatedData };
-                 delete cleanEvaluated._manualFlags;
+                 // Pisahkan tegas data komposisi tubuh vs data aktivitas harian
+                 const nextBio = { ...existingBio };
 
-                 const nextBio = {
-                     ...existingBio,
-                     ...cleanEvaluated,
-                     ...(Object.keys(manualFlags).length > 0 ? { _manualFlags: manualFlags } : {})
-                 };
-                 if (Object.keys(manualFlags).length === 0) {
+                 if (manualTab === 'komposisi') {
+                     COMPOSITION_KEYS.forEach(k => {
+                         const val = evaluatedData[k];
+                         if (val !== undefined && val !== null && val !== '') {
+                             nextBio[k] = val;
+                         } else {
+                             delete nextBio[k];
+                         }
+                     });
+                 } else {
+                     DAILY_KEYS.forEach(k => {
+                         const val = evaluatedData[k];
+                         if (val !== undefined && val !== null && val !== '') {
+                             nextBio[k] = val;
+                         } else {
+                             delete nextBio[k];
+                         }
+                     });
+                     // Bersihkan field komposisi yang terlanjur terinjeksi tanpa sengaja akibat bug tensi terdahulu
+                     if (!existingBio._manualFlags?.waist && !existingBio.weight && !existingBio.bodyFat && !existingBio.muscleMass) {
+                         delete nextBio.waist;
+                     }
+                     if (!existingBio._manualFlags?.height && !existingBio.weight && !existingBio.bodyFat && !existingBio.muscleMass) {
+                         delete nextBio.height;
+                     }
+                 }
+
+                 if (Object.keys(manualFlags).length > 0) {
+                     nextBio._manualFlags = manualFlags;
+                 } else {
                      delete nextBio._manualFlags;
                  }
+
+                 const hasAnyValue = Object.keys(nextBio).some(k => k !== '_manualFlags' && nextBio[k] !== null && nextBio[k] !== undefined && nextBio[k] !== '');
 
                  return {
                      ...prev,
                      [modalDate]: {
                          ...(prev[modalDate] || {}),
-                         bioData: nextBio
+                         bioData: hasAnyValue ? nextBio : null
                      }
                  };
              });
@@ -751,7 +800,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                  // "hapus data hari ini" ketiganya tertinggal dengan nilai lama sementara yang lain
                  // kosong, dan tampilannya jadi campur aduk (Langkah "–" tapi Durasi Aktif tetap
                  // menampilkan menit dari langkah).
-                 ['steps', 'stepMinutes', 'distance', 'bmr', 'activeMinutes', 'activityCalories', 'activityCaloriesFloor', 'nutritionCalories', 'sleep', 'sleepLog', 'heartRate', 'minHeartRate', 'maxHeartRate', 'restingHeartRate', 'bloodPressure', 'oxygenSaturation', 'heartRateLog', 'bloodPressureLog', 'oxygenSaturationLog', 'waterIntake', 'weeklyDuration', 'weeklySessions', 'weeklyCalories', 'sleepAwake', 'sleepRem', 'sleepLight', 'sleepDeep', 'hrv', 'energyScore'].forEach(k => {
+                 ['steps', 'stepMinutes', 'distance', 'activeMinutes', 'activityCalories', 'activityCaloriesFloor', 'nutritionCalories', 'sleep', 'sleepLog', 'heartRate', 'minHeartRate', 'maxHeartRate', 'restingHeartRate', 'bloodPressure', 'oxygenSaturation', 'heartRateLog', 'bloodPressureLog', 'oxygenSaturationLog', 'waterIntake', 'weeklyDuration', 'weeklySessions', 'weeklyCalories', 'sleepAwake', 'sleepRem', 'sleepLight', 'sleepDeep', 'hrv', 'energyScore'].forEach(k => {
                      newBio[k] = null;
                      if (newBio._manualFlags) delete newBio._manualFlags[k];
                  });

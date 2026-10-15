@@ -15,7 +15,8 @@ const ExerciseCard = ({
   sets, onUpdateSet, onToggleSet, onSkipSet, onAddSet, onAddWarmupSets, onRemoveSet,
   gymProfiles, activeGymId, overloadHint,
   canDeleteCompleted = false, onRemoveProgramExercise,
-  isWorkoutActive, onStartWorkout, workoutStartTime
+  isWorkoutActive, onStartWorkout, workoutStartTime,
+  onActiveExercise
 }) => {
   const isImp = units?.weight === 'lbs';
   const exType = resolveExerciseKind(ex);
@@ -25,7 +26,6 @@ const ExerciseCard = ({
   const isAllDone = doneCount === totalSets && totalSets > 0;
   const progressPercent = totalSets > 0 ? (doneCount / totalSets) * 100 : 0;
   const [showHint, setShowHint] = useState(false);
-  const [canCloseHint, setCanCloseHint] = useState(false);
   const [showWeightInfo, setShowWeightInfo] = useState(false);
   const eqConfig = getEquipmentConfig(gymProfiles, activeGymId, ex);
   const lastCelebrated10RM = React.useRef(
@@ -39,7 +39,7 @@ const ExerciseCard = ({
       if (typeof window !== 'undefined' && !window.logymCelebrated10RM) {
         window.logymCelebrated10RM = {};
       }
-      const currentVal = Number(hint.rm10Number) || parseFloat(hint.rm10) || 0;
+      const currentVal = Number(hint.rm10Number) || parseFloat(hint.rm10) || (hint.targetRepsNumber || 1);
       const alreadyCelebrated = Math.max(
         lastCelebrated10RM.current,
         (typeof window !== 'undefined' && Number(window.logymCelebrated10RM?.[ex.id])) || 0
@@ -55,9 +55,7 @@ const ExerciseCard = ({
         if (typeof window !== 'undefined') {
           window.logymCelebrated10RM[ex.id] = currentVal;
         }
-        setCanCloseHint(false);
-        setShowHint(true); // Auto-show the gamified popup
-        setTimeout(() => setCanCloseHint(true), 2500); // Wait 2.5s before allowing close
+        setShowHint(true); // Auto-show popup tanpa jeda kunci, langsung bisa ditutup
       }
     }
   }, [ex, overloadHint, soundEnabled]);
@@ -464,11 +462,11 @@ const ExerciseCard = ({
                    )}
                  {exType === 'weight' && !isSkip && (
                     <div className="relative">
-                      <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowHint(true); }} className={`w-10 h-10 rounded-full ${t.bgAccent} text-white shadow-lg hover:scale-105 transition-transform flex items-center justify-center`} title="Coach">
+                      <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onActiveExercise?.(ex.id); setShowHint(true); }} className={`w-10 h-10 rounded-full ${t.bgAccent} text-white shadow-lg hover:scale-105 transition-transform flex items-center justify-center`} title="Coach">
                           <Brain size={18} className="animate-pulse" />
                       </button>
                       {showHint && createPortal(
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-300 overscroll-contain touch-none" data-close-modal="true" onClick={() => { if (canCloseHint || !overloadHint?.isNewRecord) setShowHint(false); }}>
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-300 overscroll-contain touch-none" data-close-modal="true" onClick={() => setShowHint(false)}>
                           <div 
                             className="relative w-full max-w-[340px] mt-28 animate-in fade-in zoom-in-95 duration-300 pointer-events-auto text-center"
                             onClick={e => e.stopPropagation()}
@@ -480,7 +478,7 @@ const ExerciseCard = ({
                               <button
                                 type="button"
                                 data-close-modal="true"
-                                onClick={() => { if (canCloseHint || !overloadHint?.isNewRecord) setShowHint(false); }}
+                                onClick={() => setShowHint(false)}
                                 className="absolute top-4 right-4 z-30 p-2 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-colors"
                                 title="Tutup"
                               >
@@ -510,7 +508,7 @@ const ExerciseCard = ({
 
                                     {/* Target Angka Utama (Fokus di Angka, tulisan plat & reps kecil) */}
                                     {(overloadHint.targetWeightNumber !== undefined || overloadHint.target || overloadHint.benchmark) && (
-                                      <div className="flex flex-col items-center mb-2.5">
+                                      <div className="flex flex-col items-center mb-2">
                                         {overloadHint.weightLabel && (
                                           <span className="text-xs font-bold uppercase tracking-widest text-sky-400/90 mb-1 px-2.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20">
                                             Beban {overloadHint.weightLabel}
@@ -545,30 +543,49 @@ const ExerciseCard = ({
                                           </div>
                                         )}
 
-                                        {overloadHint.targetDetail && (
-                                          <div className="mt-1.5 text-xs font-semibold text-emerald-300/90 px-3 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 max-w-full text-center">
-                                            {overloadHint.targetDetail}
+                                        {/* Jika ada perbedaan Plat vs Total: Sesi Lalu (Plat) disandingkan langsung di bawah Plat */}
+                                        {overloadHint.targetDetail && overloadHint.lastSession && (
+                                          <div className="mt-1.5 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-slate-300 backdrop-blur-sm">
+                                            <span className="text-slate-400">Sesi Lalu:</span>
+                                            <span className="text-slate-200 font-semibold">{overloadHint.lastSession}</span>
                                           </div>
                                         )}
                                       </div>
                                     )}
 
-                                    {/* Acuan Deketan: Sesi Lalu & 10RM Acuan berdampingan tepat di bawah target */}
-                                    {(overloadHint.lastSession || overloadHint.rm10) && (
+                                    {/* Baris Acuan:
+                                        Jika ada targetDetail: Beban Total & 10RM disandingkan berdampingan (keduanya hitung Total).
+                                        Jika tidak ada targetDetail: Sesi Lalu & 10RM disandingkan berdampingan.
+                                    */}
+                                    {overloadHint.targetDetail ? (
                                       <div className="flex items-center justify-center flex-wrap gap-1.5 mb-3.5">
-                                        {overloadHint.lastSession && (
-                                          <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-slate-300 backdrop-blur-sm">
-                                            <span className="text-slate-500">Sesi Lalu:</span>
-                                            <span className="text-slate-200 font-semibold">{overloadHint.lastSession}</span>
-                                          </div>
-                                        )}
+                                        <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs font-semibold text-emerald-300/90 backdrop-blur-sm">
+                                          {overloadHint.targetDetail}
+                                        </div>
                                         {overloadHint.rm10 && (
-                                          <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-slate-300 backdrop-blur-sm">
-                                            <span className="text-slate-500">10RM:</span>
+                                          <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-500/10 border border-sky-500/20 text-xs font-medium text-sky-200 backdrop-blur-sm">
+                                            <span className="text-sky-400/80">10RM:</span>
                                             <span className="text-sky-300 font-bold">{overloadHint.rm10}</span>
                                           </div>
                                         )}
                                       </div>
+                                    ) : (
+                                      (overloadHint.lastSession || overloadHint.rm10) && (
+                                        <div className="flex items-center justify-center flex-wrap gap-1.5 mb-3.5">
+                                          {overloadHint.lastSession && (
+                                            <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-slate-300 backdrop-blur-sm">
+                                              <span className="text-slate-400">Sesi Lalu:</span>
+                                              <span className="text-slate-200 font-semibold">{overloadHint.lastSession}</span>
+                                            </div>
+                                          )}
+                                          {overloadHint.rm10 && (
+                                            <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-500/10 border border-sky-500/20 text-xs font-medium text-sky-200 backdrop-blur-sm">
+                                              <span className="text-sky-400/80">10RM:</span>
+                                              <span className="text-sky-300 font-bold">{overloadHint.rm10}</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )
                                     )}
 
                                     {/* Pesan Arahan Coach */}
@@ -582,7 +599,7 @@ const ExerciseCard = ({
                                       TARGET HARI INI
                                     </h3>
                                     <p className="text-slate-200 text-xs sm:text-sm font-medium leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)] max-w-[280px]">
-                                      Belum ada rekor 10RM. Gunakan beban yang menantang tapi sanggup diangkat 10 repetisi dengan form sempurna (RPE 8).
+                                      Pilih beban yang menantang untuk 10 repetisi dengan form bersih (RPE 8).
                                     </p>
                                   </>
                                 )}
@@ -754,7 +771,7 @@ const ExerciseCard = ({
                                 {showWeightInfo && (
                                   <>
                                     <div 
-                                      className="fixed inset-0 z-20 bg-transparent overscroll-contain touch-none" 
+                                      className="fixed inset-0 z-20 bg-transparent overscroll-contain touch-none" data-close-modal="true"
                                       onClick={(e) => { e.stopPropagation(); setShowWeightInfo(false); }} 
                                     />
                                     <div 

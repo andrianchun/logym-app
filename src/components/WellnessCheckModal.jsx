@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Zap, Activity, ShieldAlert, X } from 'lucide-react';
+import { Zap, Activity, ShieldAlert, X, Check } from 'lucide-react';
 import { playSoundEffect } from '../utils/audio';
 
 const WellnessCheckModal = ({ isOpen, onSelect, onClose, t, soundEnabled, currentWellness = null }) => {
@@ -21,6 +21,8 @@ const WellnessCheckModal = ({ isOpen, onSelect, onClose, t, soundEnabled, curren
     playSoundEffect('click', soundEnabled);
     onSelect(option);
   };
+
+  const activeOption = currentWellness || 'prima';
 
   return (
     <div 
@@ -48,53 +50,65 @@ const WellnessCheckModal = ({ isOpen, onSelect, onClose, t, soundEnabled, curren
 
         {/* 3 Opsi Langsung: Prima, Pegal, Nyeri */}
         <div className="space-y-2.5">
-          {/* Option 1: Prima */}
-          <button
-            onClick={() => handleChoose('prima')}
-            className={`w-full p-3.5 rounded-2xl border ${currentWellness === 'prima' ? 'border-emerald-400 bg-emerald-500/20 ring-1 ring-emerald-400/50' : 'border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20'} active:scale-[0.98] transition-all text-left flex items-center gap-3.5 group`}
-          >
-            <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 shrink-0">
-              <Zap size={20} className="group-hover:scale-110 transition-transform" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h4 className="font-bold text-sm text-emerald-400 leading-tight flex items-center gap-2">
-                Prima {currentWellness === 'prima' && <span className="text-xs py-0.5 px-2.5 rounded-full bg-emerald-500/30 text-emerald-300 font-bold">Aktif</span>}
-              </h4>
-              <p className="text-xs text-slate-400 mt-0.5 leading-snug">Target beban 100% & progresi normal</p>
-            </div>
-          </button>
-
-          {/* Option 2: Pegal */}
-          <button
-            onClick={() => handleChoose('doms')}
-            className={`w-full p-3.5 rounded-2xl border ${currentWellness === 'doms' ? 'border-amber-400 bg-amber-500/20 ring-1 ring-amber-400/50' : 'border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20'} active:scale-[0.98] transition-all text-left flex items-center gap-3.5 group`}
-          >
-            <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 shrink-0">
-              <Activity size={20} className="group-hover:scale-110 transition-transform" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h4 className="font-bold text-sm text-amber-400 leading-tight flex items-center gap-2">
-                Pegal {currentWellness === 'doms' && <span className="text-xs py-0.5 px-2.5 rounded-full bg-amber-500/30 text-amber-300 font-bold">Aktif</span>}
-              </h4>
-              <p className="text-xs text-slate-400 mt-0.5 leading-snug">Fokus teknik form & kontrol repetisi</p>
-            </div>
-          </button>
-
-          {/* Option 3: Nyeri */}
-          <button
-            onClick={() => handleChoose('deload')}
-            className={`w-full p-3.5 rounded-2xl border ${currentWellness === 'deload' ? 'border-rose-400 bg-rose-500/20 ring-1 ring-rose-400/50' : 'border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20'} active:scale-[0.98] transition-all text-left flex items-center gap-3.5 group`}
-          >
-            <div className="p-2.5 rounded-xl bg-rose-500/20 text-rose-400 shrink-0">
-              <ShieldAlert size={20} className="group-hover:scale-110 transition-transform" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h4 className="font-bold text-sm text-rose-400 leading-tight flex items-center gap-2">
-                Nyeri {currentWellness === 'deload' && <span className="text-xs py-0.5 px-2.5 rounded-full bg-rose-500/30 text-rose-300 font-bold">Aktif</span>}
-              </h4>
-              <p className="text-xs text-slate-400 mt-0.5 leading-snug">Pangkas beban 15–20% untuk cegah cedera</p>
-            </div>
-          </button>
+          {[
+            {
+              id: 'prima',
+              label: 'Prima',
+              desc: 'Target beban 100% & progresi normal',
+              icon: Zap
+            },
+            {
+              id: 'doms',
+              label: 'Pegal',
+              desc: 'Fokus teknik form & kontrol repetisi',
+              icon: Activity
+            },
+            {
+              id: 'deload',
+              label: 'Nyeri',
+              desc: 'Pangkas beban 15–20% untuk cegah cedera',
+              icon: ShieldAlert
+            }
+          ].map((opt) => {
+            const isSelected = activeOption === opt.id;
+            const IconComp = opt.icon;
+            return (
+              <button
+                key={opt.id}
+                onClick={() => handleChoose(opt.id)}
+                className={`w-full p-3.5 rounded-2xl border transition-all text-left flex items-center gap-3.5 active:scale-[0.98] group ${
+                  isSelected
+                    ? `${t?.borderAccent || 'border-sky-400'} ${t?.bgAccentSoft || 'bg-sky-500/15'} ring-1 ${t?.ringAccent ? `${t.ringAccent}/40` : 'ring-sky-400/40'}`
+                    : `${t?.border || 'border-white/10'} ${t?.inputBg || 'bg-white/5'} hover:bg-white/10`
+                }`}
+              >
+                <div className={`p-2.5 rounded-xl shrink-0 transition-colors ${
+                  isSelected 
+                    ? `${t?.bgAccentSoft || 'bg-sky-500/20'} ${t?.textAccent || 'text-sky-400'}` 
+                    : `bg-white/5 ${t?.textMuted || 'text-slate-400'} group-hover:${t?.textMain || 'text-white'}`
+                }`}>
+                  <IconComp size={20} className="group-hover:scale-110 transition-transform" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className={`font-bold text-sm leading-tight transition-colors ${
+                    isSelected ? (t?.textAccent || 'text-sky-400') : (t?.textMain || 'text-white')
+                  }`}>
+                    {opt.label}
+                  </h4>
+                  <p className={`text-xs mt-0.5 leading-snug ${t?.textMuted || 'text-slate-400'}`}>
+                    {opt.desc}
+                  </p>
+                </div>
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center border transition-all shrink-0 ${
+                  isSelected 
+                    ? `${t?.bgAccent || 'bg-blue-600'} border-transparent shadow-sm` 
+                    : 'border-slate-500/30'
+                }`}>
+                  {isSelected && <Check size={12} strokeWidth={3} className="text-white" />}
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>

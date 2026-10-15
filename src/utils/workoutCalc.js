@@ -1576,7 +1576,7 @@ export const calculateProgressiveOverloadTarget = ({
       mode: 'reps_first',
       repsReadyThreshold: targetReps,
       isWeightJump: false,
-      message: `Fokus tambah repetisi (${nextReps} reps) dengan form bersih dan tempo terkontrol!`
+      message: `Fokus kejar ${nextReps} reps dengan form bersih dan terkontrol!`
     };
   }
 
@@ -1601,7 +1601,7 @@ export const calculateProgressiveOverloadTarget = ({
       mode: 'maintain',
       repsReadyThreshold,
       isWeightJump: false,
-      message: `Saat defisit kalori, prioritaskan menjaga massa otot. Angkat beban yang sama (${lastSessionWeight} ${uStr}) dengan form solid, jangan memaksakan jika tubuh kurang fit.`
+      message: `Pertahankan beban ${lastSessionWeight} ${uStr} dan form solid untuk jaga massa otot.`
     };
   }
 
@@ -1614,7 +1614,7 @@ export const calculateProgressiveOverloadTarget = ({
         mode: 'weight_jump',
         repsReadyThreshold,
         isWeightJump: true,
-        message: `Target kekuatan tercapai! Saatnya naik ke beban alat berikutnya (+${step} ${uStr} -> ${nextWeight} ${uStr}) hari ini. Tetap jaga stabilitas form.`
+        message: `Target kekuatan tembus! Naik ke ${nextWeight} ${uStr} (+${step} ${uStr}), jaga stabilitas form.`
       };
     } else {
       return {
@@ -1624,7 +1624,7 @@ export const calculateProgressiveOverloadTarget = ({
         mode: 'reps_first',
         repsReadyThreshold,
         isWeightJump: false,
-        message: `Fokus pada adaptasi kekuatan di ${lastSessionWeight} ${uStr}. Kejar target ${targetReps} reps dengan form solid sebelum naik beban.`
+        message: `Adaptasi di ${lastSessionWeight} ${uStr}. Kejar ${targetReps} reps dengan form solid!`
       };
     }
   }
@@ -1638,7 +1638,7 @@ export const calculateProgressiveOverloadTarget = ({
       mode: 'weight_jump',
       repsReadyThreshold,
       isWeightJump: true,
-      message: `Target repetisi tembus (${lastSessionReps} reps)! Kekuatanmu sudah matang untuk naik ke beban alat berikutnya (+${step} ${uStr}) hari ini, repetisi kembali ke ${targetReps} reps.`
+      message: `Target ${lastSessionReps} reps tembus! Naik beban (+${step} ${uStr}), target kembali ke ${targetReps} reps.`
     };
   }
 
@@ -1651,7 +1651,7 @@ export const calculateProgressiveOverloadTarget = ({
       mode: 'reps_first',
       repsReadyThreshold,
       isWeightJump: false,
-      message: `Target repetisi dasar tercapai (${lastSessionReps} reps)! Karena kenaikan beban alat berikutnya adalah +${step} ${uStr} (${nextWeight} ${uStr}), kejar ${nextTargetReps} reps dulu dengan form solid dan tempo terkontrol sebelum melompat beban.`
+      message: `Target ${lastSessionReps} reps tercapai! Kejar ${nextTargetReps} reps dulu sebelum lompat beban (+${step} ${uStr}).`
     };
   }
 
@@ -1662,7 +1662,7 @@ export const calculateProgressiveOverloadTarget = ({
     mode: 'reps_first',
     repsReadyThreshold,
     isWeightJump: false,
-    message: `Fokus tambah repetisi dengan beban yang sama (${lastSessionWeight} ${uStr}) sampai menembus target ${targetReps} reps!`
+    message: `Pertahankan ${lastSessionWeight} ${uStr}. Kejar target ${targetReps} reps dengan form solid!`
   };
 };
 
@@ -1759,7 +1759,7 @@ export const resolveExerciseProgressiveTarget = ({
         eqConf,
         step,
         title: 'Mode Deload',
-        message: 'Beban dipangkas ~17.5% untuk pemulihan sendi dan sistem saraf. Fokus pada kontrol tempo dan kesempurnaan form gerakan.',
+        message: 'Beban dipangkas ~17.5% untuk pemulihan. Fokus kontrol tempo dan form bersih.',
       };
     }
 
@@ -1788,7 +1788,7 @@ export const resolveExerciseProgressiveTarget = ({
         eqConf,
         step,
         title: 'Mode Pegal / Fokus Form',
-        message: 'Kondisi otot sedang lelah/pegal. Beban dipertahankan di angka sesi lalu tanpa kenaikan beban progresif. Prioritaskan tempo repetisi lambat dan form yang bersih.',
+        message: 'Otot sedang pegal. Beban dipertahankan, fokus tempo lambat dan form bersih.',
       };
     }
 
@@ -1862,7 +1862,7 @@ export const resolveExerciseProgressiveTarget = ({
     eqConf,
     step,
     title: 'Target Hari Ini',
-    message: 'Belum ada riwayat sesi lalu. Awali dengan beban default yang aman dan fokus pada teknik gerakan.',
+    message: 'Awali dengan beban nyaman dan kuasai form gerakan (RPE 8).',
   };
 };
 

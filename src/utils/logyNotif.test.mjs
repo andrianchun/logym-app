@@ -28,7 +28,7 @@ for (const [type, byPersona] of Object.entries(LOGI_NOTIF_TEMPLATES)) {
 
 // Tiap tipe yang dipakai App.jsx harus punya teks — getLogyNotification mengembalikan null
 // kalau tidak, dan pemanggilnya diam-diam melewatkan notifikasinya.
-for (const type of ['prep', 'start', 'missed', 'rest', 'insight']) {
+for (const type of ['prep', 'start', 'missed', 'rest', 'completed', 'insight']) {
   for (const persona of ['santai', 'galak', 'serius', 'custom']) {
     const copy = getLogyNotification(type, persona, vars);
     assert.ok(copy && copy.title && copy.body, `${type}/${persona} tidak menghasilkan teks`);
