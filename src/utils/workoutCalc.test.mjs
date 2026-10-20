@@ -11,7 +11,11 @@ import {
   recomputeStrengthRecords,
   buildHcSessionDetail,
   estimate10RM,
+  getEquipmentConfig,
+  calculateActualWeight,
+  getSetActualWeight,
 } from './workoutCalc.js';
+import { normalizeEquipmentName } from '../data/constants.js';
 
 const KG = 70;
 
@@ -561,6 +565,81 @@ console.log('workoutCalc OK', { cardioKcal, plankKcal, liftKcal });
   assert.equal(isOverExceeded, true, '50 kg x 12 reps harus dianggap melebihi target 11 reps');
 
   console.log('target praise evaluation OK', { exact: isExactMet, exceeded: isOverExceeded });
+}
+
+// ─── TEST EQUIPMENT NORMALIZATION & GYM PROFILE CALCULATIONS ─────────────
+{
+  // 1. Normalisasi nama alat (case-insensitive & alias)
+  assert.equal(normalizeEquipmentName('cable'), 'Cable');
+  assert.equal(normalizeEquipmentName('CABLE'), 'Cable');
+  assert.equal(normalizeEquipmentName('barbell'), 'Barbell');
+  assert.equal(normalizeEquipmentName('smith machine'), 'Smith Machine');
+  assert.equal(normalizeEquipmentName('dumbbell'), 'Dumbbell');
+  assert.equal(normalizeEquipmentName('ez barbell'), 'EZ Barbell');
+
+  // 2. Fallback inferensi dari nama latihan jika equipment kosong atau 'Lainnya'
+  assert.equal(normalizeEquipmentName('', 'Cable Rear Delt Fly'), 'Cable');
+  assert.equal(normalizeEquipmentName(null, 'Cable Crossover'), 'Cable');
+  assert.equal(normalizeEquipmentName('Lainnya', 'Tricep Rope Pushdown'), 'Cable');
+  assert.equal(normalizeEquipmentName('other', 'Smith Machine Incline Bench Press'), 'Smith Machine');
+  assert.equal(normalizeEquipmentName(undefined, 'Lat Pulldown'), 'Cable');
+  assert.equal(normalizeEquipmentName('Cable/Machine', 'Cable Row'), 'Cable');
+  assert.equal(normalizeEquipmentName('Cable/Machine', 'Leg Extension Machine'), 'Machine');
+
+  // 3. Konfigurasi Profil Gym untuk Cable:
+  //    Contoh user: Beban Dasar Alat = 5 kg, Rasio Katrol = 1:1, Kenaikan Beban = 5 kg
+  //    Jika plat 5 kg -> Aktual harus 10 kg
+  const gymProfiles1to1 = [{
+    id: 'gym_user',
+    name: 'My Gym',
+    config: {
+      Cable: { baseWeight: 5, ratio: 1, increment: 5 }
+    }
+  }];
+  const exCable = { id: 101, name: 'Cable Rear Delt Fly', equipment: 'Cable' };
+  const conf1to1 = getEquipmentConfig(gymProfiles1to1, 'gym_user', exCable);
+  assert.equal(conf1to1.baseWeight, 5, 'Beban dasar Cable harus 5 kg');
+  assert.equal(conf1to1.ratio, 1, 'Rasio katrol Cable harus 1:1');
+  assert.equal(conf1to1.increment, 5, 'Kenaikan beban harus 5 kg');
+  assert.equal(calculateActualWeight(5, conf1to1), 10, 'Plat 5 kg + beban dasar 5 kg (rasio 1:1) harus = 10 kg aktual');
+
+  // 4. Konfigurasi Profil Gym untuk Cable:
+  //    Contoh katrol 2:1 (0.5x), beban dasar 5 kg
+  //    Jika plat 5 kg -> (5 * 0.5) + 5 = 7.5 kg
+  const gymProfiles2to1 = [{
+    id: 'gym_user_2',
+    name: 'My Gym 2',
+    config: {
+      Cable: { baseWeight: 5, ratio: 0.5, increment: 5 }
+    }
+  }];
+  const conf2to1 = getEquipmentConfig(gymProfiles2to1, 'gym_user_2', exCable);
+  assert.equal(conf2to1.baseWeight, 5);
+  assert.equal(conf2to1.ratio, 0.5);
+  assert.equal(calculateActualWeight(5, conf2to1), 7.5, 'Plat 5 kg katrol 2:1 + dasar 5 kg = 7.5 kg');
+
+  // 5. Case-insensitivity pada gym.config dan equipment exercise
+  const gymProfilesLower = [{
+    id: 'gym_lower',
+    name: 'Lower Gym',
+    config: {
+      cable: { baseWeight: 5, ratio: 1, increment: 5 }
+    }
+  }];
+  const exCableLower = { id: 102, name: 'Cable Rear Delt Fly', equipment: 'cable' };
+  const confLower = getEquipmentConfig(gymProfilesLower, 'gym_lower', exCableLower);
+  assert.equal(confLower.baseWeight, 5, 'Harus membaca baseWeight meski gym.config / ex memakai huruf kecil');
+  assert.equal(calculateActualWeight(5, confLower), 10);
+
+  // 6. getSetActualWeight fallback dan integrasi
+  const setWithInput = { w: 5, input_w: 5 };
+  assert.equal(getSetActualWeight(setWithInput, conf1to1), 10);
+
+  console.log('equipmentConfig & cable actualWeight OK', {
+    conf1to1_actual: calculateActualWeight(5, conf1to1),
+    conf2to1_actual: calculateActualWeight(5, conf2to1),
+    confLower_actual: calculateActualWeight(5, confLower),
+  });
 }
 
 

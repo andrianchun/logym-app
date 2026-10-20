@@ -215,25 +215,27 @@ export default function App() {
 
   const handleUpdateApp = async () => {
     localStorage.removeItem('logym_dismissed_ota');
+    setApkError(null);
 
-    if (otaState.url && !otaState.url.toLowerCase().endsWith('.zip')) {
-      // Di APK: unduh & pasang DI DALAM aplikasi. Dulu baris-baris ini membuka tautan hosting di
-      // browser, dan user harus mencari sendiri berkasnya di folder Downloads — langkah manual
-      // yang paling sering bikin pembaruan tidak jadi dipasang. Dialog "Install" milik Android
-      // tetap muncul; itu batas platform, bukan sesuatu yang bisa dilewati.
+    const isApkRelease = otaState.url && (!otaState.url.toLowerCase().endsWith('.zip') || otaState.isApk);
+
+    if (isApkRelease) {
+      // Di APK: unduh & pasang DI DALAM aplikasi tanpa jejak sampah di folder Downloads.
       if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
         setDownloadProgress(0);
         try {
           const res = await ApkInstallerPlugin.install({ url: otaState.url });
           if (res?.needsPermission) {
             setDownloadProgress(null);
-            setApkPermissionAsk(true);
+            setApkError('Android butuh izin untuk memasang pembaruan langsung. Silakan aktifkan "Izinkan dari sumber ini", lalu tekan Update lagi.');
+            ApkInstallerPlugin.openInstallSettings().catch(() => {});
             return;
           }
           return;
         } catch (err) {
           console.warn('Gagal memasang APK lewat plugin, beralih ke unduhan browser:', err);
           setDownloadProgress(null);
+          setApkError('Gagal memasang otomatis lewat sistem in-app. Mengalihkan ke peramban...');
         }
       }
 
@@ -4868,6 +4870,8 @@ export default function App() {
                    units={units}
                    activePlanIds={activePlanIds}
                    userProfile={userProfile}
+                   gymProfiles={gymProfiles}
+                   activeGymId={activeGymId}
                    logyPersona={logyPersona}
                    activityTargets={activityTargets}
                    workoutStartTime={workoutStartTime}
@@ -5010,6 +5014,8 @@ export default function App() {
         currentVersion={currentVer}
         newVersion={otaState.version}
         progress={downloadProgress}
+        isApk={otaState.url && (!otaState.url.toLowerCase().endsWith('.zip') || otaState.isApk)}
+        errorMsg={apkError}
         onUpdate={handleUpdateApp}
         onClose={() => {
           localStorage.setItem('logym_dismissed_ota', otaState.version);

@@ -755,10 +755,10 @@ const WorkoutTab = ({
       if (eqConfNow.baseWeight > 0) {
         const baseName = eqConfNow.isBodyweightPlus 
           ? 'BB' 
-          : (eqConfNow.equipment?.includes('Sled') ? 'Sled' : 'Bar');
+          : (eqConfNow.equipment?.includes('Sled') ? 'Sled' : (eqConfNow.equipment?.includes('Cable') || eqConfNow.equipment?.includes('Machine') ? 'Alat' : (eqConfNow.equipment?.includes('Dumbbell') || eqConfNow.equipment?.includes('Kettlebell') ? 'Handle' : 'Bar')));
         return `Total: ${actWeight} ${uStr} (${baseName} ${eqConfNow.baseWeight} ${uStr})`;
       } else if (eqConfNow.ratio !== 1) {
-        return `Efektif: ${actWeight} ${uStr} (Katrol ${eqConfNow.ratio}:1)`;
+        return `Efektif: ${actWeight} ${uStr} (Katrol ${eqConfNow.ratio === 0.5 ? '2:1' : `${eqConfNow.ratio}:1`})`;
       }
       return `Total: ${actWeight} ${uStr}`;
     };
@@ -1237,13 +1237,13 @@ const WorkoutTab = ({
           onSetChange={onSetChange}
           activeExerciseId={activeExerciseId}
           onActiveExercise={setActiveExerciseId}
-          onToggleSet={(exId, setIdx, siblingIds) => {
+          onToggleSet={(exId, setIdx, siblingIds, exParam) => {
             setActiveExerciseId(exId);
-            onToggleSet(exId, setIdx, siblingIds);
+            onToggleSet(exId, setIdx, siblingIds, exParam);
           }}
-          onSkipSet={(exId, setIdx) => {
+          onSkipSet={(exId, setIdx, exParam) => {
             setActiveExerciseId(exId);
-            onSkipSet(exId, setIdx);
+            onSkipSet(exId, setIdx, exParam);
           }}
           userProfile={userProfile}
           onClose={() => {
@@ -1397,6 +1397,9 @@ const WorkoutTab = ({
                                 ex={ex} idx={idx} isExtra={false}
                                 t={t} lang={lang} soundEnabled={soundEnabled}
                                 units={units}
+                                gymProfiles={gymProfiles}
+                                activeGymId={activeGymId}
+                                userProfile={userProfile}
                                 onActiveExercise={setActiveExerciseId}
                                 isSkip={!!skippedExercises[ex.id]}
                                 onToggleSkip={() => onToggleSkip(ex.id)}
@@ -1533,6 +1536,9 @@ const WorkoutTab = ({
                                 ex={ex} idx={activeProgramsList.length > 0 ? (activeProgramsList.reduce((sum, p) => sum + (p.exercises?.length || 0), 0) + idx) : idx} isExtra={true}
                                 t={t} lang={lang} soundEnabled={soundEnabled}
                                 units={units}
+                                gymProfiles={gymProfiles}
+                                activeGymId={activeGymId}
+                                userProfile={userProfile}
                                 onActiveExercise={setActiveExerciseId}
                                 isSkip={!!skippedExercises[ex.id]} 
                                 onToggleSkip={() => onToggleSkip(ex.id)} 

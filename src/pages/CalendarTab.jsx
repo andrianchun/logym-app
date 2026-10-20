@@ -22,7 +22,7 @@ const CalendarTab = ({
   setActiveTab, soundEnabled, playSoundEffect, navigateToWorkoutDate,
   exerciseLogs, skippedExercises, handleEditPastWorkout,
   weekStartDay = 0, defaultReminderTime = "15:00", reminderEnabled = true,
-  unitSystem, setConfirmModal, activePlanIds = [], userProfile, logyPersona = 'santai', activityTargets, sessionToRun, isWorkoutActive, workoutStartTime,
+  unitSystem, setConfirmModal, activePlanIds = [], userProfile, gymProfiles, activeGymId, logyPersona = 'santai', activityTargets, sessionToRun, isWorkoutActive, workoutStartTime,
   extraExercises = [], setExtraExercises,
   isActive = true
 }) => {
@@ -1948,7 +1948,7 @@ const CalendarTab = ({
                                                             }
                                                         } else {
                                                             const maxW = Math.max(...doneSets.map(s => Number(s.input_w !== undefined ? s.input_w : s.w) || 0)) || ex.defaultWeight || 0;
-                                                            const eqConf = getEquipmentConfig(null, null, ex, userProfile);
+                                                            const eqConf = getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile);
                                                             const maxActW = Math.max(...doneSets.map(s => getSetActualWeight(s, eqConf))) || calculateActualWeight(maxW, eqConf);
                                                             const maxR = Math.max(...doneSets.map(s => Number(s.r) || 0)) || ex.reps || 0;
                                                             const maxD = Math.max(...doneSets.map(s => Number(s.d) || 0)) || ex.duration || 0;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Play, ChevronRight, ChevronLeft, Dumbbell, Check, Info, Clock, Minimize2, SkipForward, ClipboardEdit, Brain, Flame, Activity, ArrowLeftRight, Square, Zap } from 'lucide-react';
+import { X, Play, ChevronRight, ChevronLeft, Dumbbell, Check, Info, Clock, Minimize2, SkipForward, FastForward, ClipboardEdit, Brain, Flame, Activity, ArrowLeftRight, Square, Zap } from 'lucide-react';
 import ScrollPicker from './ScrollPicker';
 import { exerciseTypeLabels, defaultMasterExercises, findMatchingMasterExercise, canonicalizeExercise, resolveExerciseDbId } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
@@ -8,6 +8,7 @@ import { calculateWorkoutCalories, calculateLiveWorkoutCalories, resolveExercise
 import { getCachedExercises } from '../utils/exerciseDbApi';
 import { WorkoutTimerPlugin } from '../App';
 import TwoFrameMotionLoop from './TwoFrameMotionLoop';
+import { getBaseWeightLabel } from './ExerciseCard';
 
 const LiveWorkoutStats = ({ workoutStartTime, userProfile, validExercises, exerciseLogs, t, formatTime }) => {
   const [workoutSeconds, setWorkoutSeconds] = useState(() => {
@@ -153,8 +154,12 @@ const ImmersiveRestBar = ({ restTargetTime, setRestTargetTime, formatTime, theme
         if (prevLocalRestRef.current !== remaining) {
           prevLocalRestRef.current = remaining;
           setLocalRestTimer(remaining);
-          if (remaining <= 0 && remaining >= -30 && Math.abs(remaining) % 5 === 0 && navigator.vibrate) {
-            try { navigator.vibrate([200, 100, 200]); } catch(e) {}
+          if (remaining <= 0) {
+            if (navigator.vibrate) {
+              try { navigator.vibrate([200, 100, 200]); } catch(e) {}
+            }
+            // Auto-dismiss saat waktu istirahat habis (<= 0) agar user langsung siap ke set berikutnya
+            setRestTargetTime(null);
           }
         }
       };
@@ -165,7 +170,7 @@ const ImmersiveRestBar = ({ restTargetTime, setRestTargetTime, formatTime, theme
       prevLocalRestRef.current = null;
     }
     return () => clearInterval(interval);
-  }, [restTargetTime]);
+  }, [restTargetTime, setRestTargetTime]);
 
   const [maxRestTimer, setMaxRestTimer] = useState(0);
   useEffect(() => {
@@ -175,22 +180,44 @@ const ImmersiveRestBar = ({ restTargetTime, setRestTargetTime, formatTime, theme
   if (restTargetTime === null) return null;
 
   return (
-    <div className={`w-full relative flex items-stretch justify-between rounded-2xl shadow-xl transition-colors overflow-hidden border ${
-      localRestTimer < -30 ? 'bg-rose-600 border-rose-600 animate-pulse text-white' :
-      localRestTimer <= 0 ? 'bg-amber-500 border-amber-500 text-white' :
-      `${t.bgAccentSoft} ${t.borderAccent}`
-    }`}>
+    <div className={`w-full relative flex items-center justify-between rounded-2xl shadow-lg transition-all overflow-hidden border py-2.5 px-3.5 animate-in fade-in slide-in-from-top-2 duration-200 ${t.bgAccentSoft} ${t.borderAccent}`}>
       {localRestTimer > 0 && maxRestTimer > 0 && (
         <div 
-          className={`absolute top-0 left-0 h-full transition-all duration-1000 ease-linear pointer-events-none ${theme === 'dark' ? 'bg-white/25' : 'bg-black/25'}`}
+          className={`absolute top-0 left-0 h-full transition-all duration-1000 ease-linear pointer-events-none ${theme === 'dark' ? 'bg-white/15' : 'bg-black/10'}`}
           style={{ width: `${Math.min(100, Math.max(0, ((maxRestTimer - localRestTimer) / maxRestTimer) * 100))}%` }}
         />
       )}
-      <button onClick={(e) => { e.stopPropagation(); setRestTargetTime(prev => (prev || Date.now()) - 5000); }} className={`relative z-10 w-16 sm:w-20 flex items-center justify-center bg-transparent ${theme === 'dark' ? 'hover:bg-white/10 active:bg-white/20 border-white/20' : 'hover:bg-black/10 active:bg-black/20 border-black/10'} ${localRestTimer <= 0 ? 'text-white' : t.textMain} font-black transition-colors border-r h2`}>-5</button>
-      <button onClick={() => setRestTargetTime(null)} className={`relative z-10 flex-1 py-4 flex items-center justify-center font-black h2 ${localRestTimer <= 0 ? 'text-white' : t.textMain} ${theme === 'dark' ? 'active:bg-white/10' : 'active:bg-black/10'} transition-colors`}>
-        REST: {formatTime(localRestTimer)}
-      </button>
-      <button onClick={(e) => { e.stopPropagation(); setRestTargetTime(prev => (prev || Date.now()) + 5000); }} className={`relative z-10 w-16 sm:w-20 flex items-center justify-center bg-transparent ${theme === 'dark' ? 'hover:bg-white/10 active:bg-white/20 border-white/20' : 'hover:bg-black/10 active:bg-black/20 border-black/10'} ${localRestTimer <= 0 ? 'text-white' : t.textMain} font-black transition-colors border-l h2`}>+5</button>
+      <div className="relative z-10 flex items-center gap-2">
+        <Clock size={16} className={t.textAccent} />
+        <span className={`text-xs font-black uppercase tracking-wider ${t.textMuted}`}>Istirahat</span>
+        <span className={`text-base font-black ${t.textMain}`}>{formatTime(Math.max(0, localRestTimer))}</span>
+      </div>
+      <div className="relative z-10 flex items-center gap-1.5">
+        <button 
+          type="button" 
+          onClick={(e) => { e.stopPropagation(); setRestTargetTime(prev => (prev || Date.now()) - 5000); }} 
+          className={`px-2 py-1 rounded-xl text-xs font-bold ${theme === 'dark' ? 'bg-white/10 hover:bg-white/20 active:bg-white/30' : 'bg-black/10 hover:bg-black/20 active:bg-black/30'} ${t.textMain} transition`}
+          title="Kurangi 5 detik"
+        >
+          -5s
+        </button>
+        <button 
+          type="button" 
+          onClick={(e) => { e.stopPropagation(); setRestTargetTime(prev => (prev || Date.now()) + 5000); }} 
+          className={`px-2 py-1 rounded-xl text-xs font-bold ${theme === 'dark' ? 'bg-white/10 hover:bg-white/20 active:bg-white/30' : 'bg-black/10 hover:bg-black/20 active:bg-black/30'} ${t.textMain} transition`}
+          title="Tambah 5 detik"
+        >
+          +5s
+        </button>
+        <button 
+          type="button" 
+          onClick={(e) => { e.stopPropagation(); setRestTargetTime(null); }} 
+          className={`ml-1 px-3 py-1 rounded-xl text-xs font-black bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 active:scale-95 transition flex items-center gap-1`}
+          title="Lewati istirahat dan lanjut sekarang"
+        >
+          <FastForward size={12} /> Lewati
+        </button>
+      </div>
     </div>
   );
 };
@@ -381,16 +408,23 @@ const ImmersiveWorkout = ({
 
   const [showWeightInfo, setShowWeightInfo] = useState(false);
 
+  const [selectedSetIdx, setSelectedSetIdx] = useState(null);
+
+  useEffect(() => {
+    setSelectedSetIdx(null);
+  }, [currentIndex]);
+
   // 3. Current Set Logic
   const logs = ex ? getLogsForEx(ex) : [];
 
   let activeSetIdx = 0;
   if (ex) {
      const incompleteIdx = getLogsForEx(ex).findIndex(s => !s.done);
-     if (incompleteIdx !== -1) {
-       activeSetIdx = incompleteIdx;
+     const defaultIdx = incompleteIdx !== -1 ? incompleteIdx : Math.max(0, getLogsForEx(ex).length - 1);
+     if (selectedSetIdx !== null && selectedSetIdx >= 0 && selectedSetIdx < logs.length) {
+       activeSetIdx = selectedSetIdx;
      } else {
-       activeSetIdx = Math.max(0, getLogsForEx(ex).length - 1);
+       activeSetIdx = defaultIdx;
      }
   }
 
@@ -412,7 +446,7 @@ const ImmersiveWorkout = ({
         if (ex.supersetId) {
            siblingIds = validExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
         }
-        onToggleSet(ex.id, completedIdx, siblingIds);
+        onToggleSet(ex.id, completedIdx, siblingIds, ex);
      }
   }, [activeTimer.idx, activeSetIdx, ex, onToggleSet, validExercises]);
 
@@ -735,6 +769,7 @@ const ImmersiveWorkout = ({
 
   const handlePrevSet = () => {
     playSoundEffect('click', soundEnabled);
+    setSelectedSetIdx(null);
     const targetSetIdx = isAllDone ? Math.max(0, activeSetIdx) : activeSetIdx - 1;
     if (targetSetIdx >= 0 && (!isAllDone || logs.length > 0)) {
        const itemLogs = getLogsForEx(ex);
@@ -743,7 +778,7 @@ const ImmersiveWorkout = ({
           if (ex.supersetId) {
              siblingIds = validExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
           }
-          onToggleSet(ex.id, targetSetIdx, siblingIds);
+          onToggleSet(ex.id, targetSetIdx, siblingIds, ex);
        }
     } else if (currentIndex > 0) {
       setCurrentIndex(currentIndex - 1);
@@ -760,7 +795,7 @@ const ImmersiveWorkout = ({
         if (isLastSibling) {
           let isAllDone = true;
           supersetGroup.forEach(s => {
-              const sLogs = exerciseLogs[s.id] || [];
+              const sLogs = getLogsForEx(s);
               if (sLogs.some(l => !l.done && !l.skipped)) isAllDone = false;
           });
           
@@ -807,6 +842,9 @@ const ImmersiveWorkout = ({
 
   const handleDoneClick = () => {
     if (!ex) return;
+    if (restTargetTime !== null && setRestTargetTime) {
+      setRestTargetTime(null);
+    }
     playSoundEffect('done_set', soundEnabled);
     const itemLogs = getLogsForEx(ex);
     const curSet = itemLogs[activeSetIdx] || {};
@@ -841,8 +879,9 @@ const ImmersiveWorkout = ({
       if (ex.supersetId) {
          siblingIds = validExercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
       }
-      onToggleSet(ex.id, activeSetIdx, siblingIds);
+      onToggleSet(ex.id, activeSetIdx, siblingIds, ex);
     }
+    setSelectedSetIdx(null);
     advanceAfterSet();
   };
 
@@ -850,7 +889,8 @@ const ImmersiveWorkout = ({
     if (!ex) return;
     playSoundEffect('click', soundEnabled);
     if (!isAllDone) {
-       onSkipSet(ex.id, activeSetIdx);
+       onSkipSet(ex.id, activeSetIdx, ex);
+       setSelectedSetIdx(null);
        advanceAfterSet();
     }
   };
@@ -1264,7 +1304,7 @@ const ImmersiveWorkout = ({
                       const eqConf = getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile);
                       const actW = getSetActualWeight(itemSet, eqConf);
                       const inputW = Number(itemSet?.input_w !== undefined ? itemSet?.input_w : itemSet?.w) || 0;
-                      const hasWeightDiff = (eqConf.baseWeight > 0 || eqConf.ratio !== 1) && actW !== inputW && actW > 0;
+                      const hasWeightDiff = (eqConf.baseWeight > 0 || eqConf.ratio !== 1) && actW > 0;
                       return (
                         <div className="flex-1 flex flex-col items-center relative">
                           <div className="h-7 mb-2 flex items-center justify-center gap-1.5 relative z-30">
@@ -1300,8 +1340,8 @@ const ImmersiveWorkout = ({
                                      </div>
                                      {(eqConf.baseWeight > 0 || eqConf.ratio !== 1) && (
                                        <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-300 font-medium">
-                                         {eqConf.baseWeight > 0 && <span>Bar {eqConf.baseWeight} kg</span>}
-                                         {eqConf.ratio !== 1 && <span>Katrol {eqConf.ratio}:1</span>}
+                                         {eqConf.baseWeight > 0 && <span>{getBaseWeightLabel(eqConf)}</span>}
+                                         {eqConf.ratio !== 1 && <span>Katrol {eqConf.ratio === 0.5 ? '2:1 (0.5x)' : `${eqConf.ratio}:1`}</span>}
                                        </div>
                                      )}
                                    </div>
@@ -1417,7 +1457,7 @@ const ImmersiveWorkout = ({
                       const eqConf = getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile);
                       const actW = getSetActualWeight(itemSet, eqConf);
                       const inputW = Number(itemSet?.input_w !== undefined ? itemSet?.input_w : itemSet?.w) || 0;
-                      const hasWeightDiff = exType === 'weight' && (eqConf.baseWeight > 0 || eqConf.ratio !== 1) && actW !== inputW && actW > 0;
+                      const hasWeightDiff = exType === 'weight' && (eqConf.baseWeight > 0 || eqConf.ratio !== 1) && actW > 0;
                       return (
                         <div className="flex-1 flex flex-col items-center">
                           <div className="h-7 mb-2 flex items-center justify-center">
@@ -1452,16 +1492,22 @@ const ImmersiveWorkout = ({
 
           <div className="flex-1 flex items-center justify-center gap-2">
             {logs.map((s, i) => (
-              <div 
+              <button 
                 key={i} 
+                type="button"
+                onClick={() => {
+                  playSoundEffect('click', soundEnabled);
+                  setSelectedSetIdx(i);
+                }}
                 style={{ flex: i === activeSetIdx ? 3 : (s.done || s.skipped ? 2 : 1) }}
-                className={`h-2 rounded-full transition-all duration-300 ${
+                className={`h-3 rounded-full transition-all duration-300 cursor-pointer ${
                   s.type === 'warmup' ? `bg-amber-500` :
                   s.skipped ? `bg-rose-500` :
                   s.done ? `bg-emerald-500` : 
                   i === activeSetIdx ? `${t.bgAccent} shadow-[0_0_10px_rgba(255,255,255,0.3)]` : 
-                  `${theme === 'dark' ? 'bg-white/20' : 'bg-black/10'}`
+                  `${theme === 'dark' ? 'bg-white/20 hover:bg-white/40' : 'bg-black/10 hover:bg-black/20'}`
                 }`} 
+                title={`Pilih Set ${i + 1}${s.done ? ' (Selesai)' : s.skipped ? ' (Skip)' : ''}`}
               />
             ))}
           </div>
@@ -1476,14 +1522,8 @@ const ImmersiveWorkout = ({
         </div>
 
         {/* Actions Row (Full Width) */}
-        <div className="w-full relative">
-          {/* Spanduk "Otot mulai dingin!" DIHAPUS, dan tidak perlu diganti apa pun.
-              Bar istirahat di bawah ini SUDAH berubah warna untuk keadaan yang sama persis:
-              amber saat istirahat habis, rose + pulse saat lewat 30 detik. Spanduknya cuma
-              mengulang informasi itu dengan kalimat panjang, animate-bounce, dan emoji —
-              berisik untuk sesuatu yang sudah tersampaikan lewat warna. */}
-
-          {restTargetTime !== null && !isAllDone ? (
+        <div className="w-full relative flex flex-col gap-2.5">
+          {restTargetTime !== null && !isAllDone && (
             <ImmersiveRestBar
               restTargetTime={restTargetTime}
               setRestTargetTime={setRestTargetTime}
@@ -1491,7 +1531,9 @@ const ImmersiveWorkout = ({
               theme={theme}
               t={t}
             />
-          ) : !isAllDone ? (
+          )}
+
+          {!isAllDone ? (
             <div className="flex gap-2 w-full">
               {(() => {
                 const s = getLogsForEx(ex)[activeSetIdx] || {};

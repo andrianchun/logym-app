@@ -665,9 +665,9 @@ export const getEquipmentConfig = (gymProfiles, activeGymId, ex, userProfile = n
     baseWeight = Number(userProfile?.biometrics?.weight || userProfile?.weight || 60);
   }
 
-  if (gymProfiles && activeGymId) {
-    const gym = gymProfiles.find((g) => g.id === activeGymId) || gymProfiles[0];
-    const custom = gym?.config?.[eq];
+  if (Array.isArray(gymProfiles) && gymProfiles.length > 0) {
+    const gym = (activeGymId ? gymProfiles.find((g) => g.id === activeGymId) : null) || gymProfiles[0];
+    const custom = gym?.config?.[eq] || (gym?.config ? Object.entries(gym.config).find(([k]) => k.toLowerCase() === eq.toLowerCase())?.[1] : null);
     if (custom) {
       if (custom.baseWeight !== undefined && custom.baseWeight !== null && custom.baseWeight !== '') {
         baseWeight = Number(custom.baseWeight) || 0;
@@ -766,10 +766,11 @@ export const roundDownToStep = (weightKg, step) => {
  */
 export const gymStepFor = (gymProfiles, activeGymId, equipment, isImperial = false) => {
   const bawaan = isImperial ? 5 : 2.5;
-  if (!gymProfiles || !activeGymId || !equipment) return bawaan;
+  if (!Array.isArray(gymProfiles) || gymProfiles.length === 0 || !equipment) return bawaan;
   const eq = normalizeEquipmentName(equipment);
-  const gym = gymProfiles.find((g) => g.id === activeGymId) || gymProfiles[0];
-  return Number(gym?.config?.[eq]?.increment) || bawaan;
+  const gym = (activeGymId ? gymProfiles.find((g) => g.id === activeGymId) : null) || gymProfiles[0];
+  const custom = gym?.config?.[eq] || (gym?.config ? Object.entries(gym.config).find(([k]) => k.toLowerCase() === eq.toLowerCase())?.[1] : null);
+  return Number(custom?.increment) || bawaan;
 };
 
 /**

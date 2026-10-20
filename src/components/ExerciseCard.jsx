@@ -8,12 +8,22 @@ import { playSoundEffect } from '../utils/audio';
 import { resolveExerciseKind, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from '../utils/workoutCalc';
 import { getCachedExercises } from '../utils/exerciseDbApi';
 
+export const getBaseWeightLabel = (eqConf) => {
+  if (!eqConf || !eqConf.baseWeight) return '';
+  if (eqConf.isBodyweightPlus) return `BB ${eqConf.baseWeight} kg`;
+  const eq = (eqConf.equipment || '').toLowerCase();
+  if (eq.includes('sled')) return `Sled ${eqConf.baseWeight} kg`;
+  if (eq.includes('dumbbell') || eq.includes('kettlebell')) return `Handle ${eqConf.baseWeight} kg`;
+  if (eq.includes('cable') || eq.includes('machine')) return `Beban dasar ${eqConf.baseWeight} kg`;
+  return `Bar ${eqConf.baseWeight} kg`;
+};
+
 const ExerciseCard = ({
   ex, idx, isExtra = false,
   t, lang, soundEnabled, units,
   isSkip, onToggleSkip, onRemoveExtra, onOpenVideo, onReplaceClick,
   sets, onUpdateSet, onToggleSet, onSkipSet, onAddSet, onAddWarmupSets, onRemoveSet,
-  gymProfiles, activeGymId, overloadHint,
+  gymProfiles, activeGymId, userProfile, overloadHint,
   canDeleteCompleted = false, onRemoveProgramExercise,
   isWorkoutActive, onStartWorkout, workoutStartTime,
   onActiveExercise
@@ -27,7 +37,7 @@ const ExerciseCard = ({
   const progressPercent = totalSets > 0 ? (doneCount / totalSets) * 100 : 0;
   const [showHint, setShowHint] = useState(false);
   const [showWeightInfo, setShowWeightInfo] = useState(false);
-  const eqConfig = getEquipmentConfig(gymProfiles, activeGymId, ex);
+  const eqConfig = getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile);
   const lastCelebrated10RM = React.useRef(
     (typeof window !== 'undefined' && window.logymCelebrated10RM?.[ex?.id]) || 0
   );
@@ -788,8 +798,8 @@ const ExerciseCard = ({
                                       </div>
                                       {(eqConfig.baseWeight > 0 || eqConfig.ratio !== 1) && (
                                         <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-300 font-medium">
-                                          {eqConfig.baseWeight > 0 && <span>Bar {eqConfig.baseWeight} kg</span>}
-                                          {eqConfig.ratio !== 1 && <span>Katrol {eqConfig.ratio}:1</span>}
+                                          {eqConfig.baseWeight > 0 && <span>{getBaseWeightLabel(eqConfig)}</span>}
+                                          {eqConfig.ratio !== 1 && <span>Katrol {eqConfig.ratio === 0.5 ? '2:1 (0.5x)' : `${eqConfig.ratio}:1`}</span>}
                                         </div>
                                       )}
                                     </div>
@@ -810,7 +820,7 @@ const ExerciseCard = ({
               {sets.map((s, setIdx) => {
                 const actW = getSetActualWeight(s, eqConfig);
                 const inputW = Number(s.input_w !== undefined ? s.input_w : s.w) || 0;
-                const hasWeightDiff = exType === 'weight' && (eqConfig.baseWeight > 0 || eqConfig.ratio !== 1) && actW !== inputW && actW > 0;
+                const hasWeightDiff = exType === 'weight' && (eqConfig.baseWeight > 0 || eqConfig.ratio !== 1) && actW > 0;
 
                 return (
                   <div key={setIdx} className={`grid ${exType==='weight' ? 'grid-cols-[1fr_2fr_2fr_1fr_1fr]' : 'grid-cols-[1fr_3fr_1fr_1fr]'} gap-2 ${hasWeightDiff ? 'items-start' : 'items-center'} text-center transition-all ${s.skipped ? 'opacity-50' : s.done ? 'opacity-60' : ''}`}>
@@ -844,15 +854,8 @@ const ExerciseCard = ({
                         {exType === 'weight' && (
                           <div className="flex flex-col items-center w-full">
                             {(() => {
-                              let customStep = isImp ? 5 : 2.5;
-                              let customMin = 0;
-                              if (gymProfiles && activeGymId) {
-                                const activeGym = gymProfiles.find(g => g.id === activeGymId) || gymProfiles[0];
-                                if (activeGym && ex.equipment && activeGym.config && activeGym.config[ex.equipment]) {
-                                  const conf = activeGym.config[ex.equipment];
-                                  if (conf.increment) customStep = conf.increment;
-                                }
-                              }
+                              const customStep = eqConfig.increment || (isImp ? 5 : 2.5);
+                              const customMin = 0;
                               return (
                                 <>
                                   <SwipeInput language={lang?.id || 'ID'} 

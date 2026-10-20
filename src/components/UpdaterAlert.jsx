@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { DownloadCloud, X, Loader2 } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 
-// Bar progres unduhan. Bundle OTA puluhan MB, diinterpolasi halus 60fps dengan active crawler
+// Bar progres unduhan. Bundle OTA puluhan MB atau APK streaming, diinterpolasi halus 60fps dengan active crawler
 // agar progres selalu bergerak dinamis (tidak mandek di 0%), dan memberi status transparan
 // saat fase ekstraksi/pemasangan ke disk berlangsung.
-function DownloadProgress({ progress, t }) {
+function DownloadProgress({ progress, isApk = false, t }) {
   const [displayProgress, setDisplayProgress] = useState(0);
   const targetRef = useRef(0);
   const isDoneRef = useRef(false);
@@ -52,20 +53,22 @@ function DownloadProgress({ progress, t }) {
         <Loader2 className={`animate-spin ${t.textAccent} mb-3`} size={32} />
         <span className={`text-sm font-bold ${t.textMain}`}>Mempersiapkan Unduhan...</span>
         <p className={`text-xs ${t.textMuted} mt-2 leading-tight text-center`}>
-          Tunggu sebentar, file APK sedang diproses oleh browser.
+          Tunggu sebentar, file APK sedang diproses.
         </p>
       </div>
     );
   }
 
   const rounded = Math.round(displayProgress);
-  const isExtracting = rounded >= 100;
+  const isInstalling = rounded >= 100;
 
   return (
     <div className="w-full text-left">
       <div className="flex items-center justify-between mb-2">
         <span className={`text-xs font-bold ${t.textMuted}`}>
-          {isExtracting ? 'Mengekstrak & memasang…' : 'Mengunduh pembaruan…'}
+          {isInstalling
+            ? (isApk ? 'Mempersiapkan pemasangan APK…' : 'Memasang berkas & memuat ulang…')
+            : (isApk ? 'Mengunduh paket pembaruan APK…' : 'Mengunduh pembaruan OTA…')}
         </span>
         <span className={`text-xs font-bold ${t.textMain} tabular-nums`}>
           {rounded}%
@@ -76,14 +79,16 @@ function DownloadProgress({ progress, t }) {
           className={`${t.bgAccent} h-full rounded-full transition-all duration-75 ease-out`}
           style={{ width: `${Math.min(100, Math.max(rounded, 3))}%` }}
         />
-        {isExtracting && (
+        {isInstalling && (
           <div className="absolute inset-0 bg-white/30 animate-pulse rounded-full" />
         )}
       </div>
       <p className={`text-xs ${t.textMuted} mt-2 leading-tight`}>
-        {isExtracting
-          ? 'Memasang berkas baru ke aplikasi. LOGYM akan segera dimuat ulang…'
-          : 'Jangan tutup aplikasi. LOGYM akan otomatis dimuat ulang setelah selesai.'}
+        {isInstalling
+          ? (isApk
+              ? 'Membuka dialog pemasangan paket Android…'
+              : 'Memasang berkas baru ke aplikasi. LOGYM akan segera dimuat ulang…')
+          : 'Jangan tutup aplikasi saat proses berlangsung.'}
       </p>
     </div>
   );
@@ -91,7 +96,7 @@ function DownloadProgress({ progress, t }) {
 
 export default function UpdaterAlert({
   open, force, onUpdate, onClose, releaseNotes, theme,
-  currentVersion, newVersion, progress,
+  currentVersion, newVersion, progress, isApk = false, errorMsg = '',
 }) {
   const downloading = progress !== null && progress !== undefined;
   const [isTriggering, setIsTriggering] = useState(false);
@@ -156,9 +161,15 @@ export default function UpdaterAlert({
             </div>
           )}
 
+          {errorMsg && (
+            <p className="w-full px-6 py-2.5 text-center text-xs font-semibold text-rose-400 bg-rose-500/10 border-y border-rose-500/20">
+              {errorMsg}
+            </p>
+          )}
+
           <div className="w-full p-6 mt-2 text-center">
             {downloading ? (
-              <DownloadProgress progress={progress} t={t} />
+              <DownloadProgress progress={progress} isApk={isApk} t={t} />
             ) : (
               <>
                 <button
@@ -180,14 +191,16 @@ export default function UpdaterAlert({
                     </>
                   )}
                 </button>
-                <a
-                  href="https://logym.web.app/apk/logym-latest.apk"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`inline-block mt-3 text-xs ${t.textMuted} hover:underline opacity-70 hover:opacity-100 transition-opacity`}
-                >
-                  Atau unduh file APK langsung
-                </a>
+                {isApk && !Capacitor.isNativePlatform() && (
+                  <a
+                    href="https://logym.web.app/apk/logym-latest.apk"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`inline-block mt-3 text-xs ${t.textMuted} hover:underline opacity-70 hover:opacity-100 transition-opacity`}
+                  >
+                    Atau unduh berkas APK langsung
+                  </a>
+                )}
               </>
             )}
           </div>
@@ -225,8 +238,12 @@ export default function UpdaterAlert({
           <p className={`text-xs ${t.textMuted} leading-snug whitespace-pre-wrap`}>{releaseNotes}</p>
         )}
 
+        {errorMsg && (
+          <p className="text-xs font-semibold text-rose-400 bg-rose-500/10 p-2.5 rounded-xl border border-rose-500/20">{errorMsg}</p>
+        )}
+
         {downloading ? (
-          <DownloadProgress progress={progress} t={t} />
+          <DownloadProgress progress={progress} isApk={isApk} t={t} />
         ) : (
           <button
             type="button"

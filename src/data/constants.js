@@ -18,34 +18,126 @@ export const defaultEquipmentConfig = {
   'Assisted': { baseWeight: 0, ratio: 1, inputRule: 'assisted', label: 'Bantuan Pin', placeholder: 'Beban bantuan' },
 };
 
+export const CANONICAL_EQUIPMENT_MAP = {
+  'assisted': 'Assisted',
+  'band': 'Resistance Band',
+  'resistance band': 'Resistance Band',
+  'barbell': 'Barbell',
+  'body weight': 'Body Weight',
+  'bodyweight': 'Body Weight',
+  'body_weight': 'Body Weight',
+  'bosu ball': 'Bosu Ball',
+  'cable': 'Cable',
+  'cables': 'Cable',
+  'dumbbell': 'Dumbbell',
+  'dumbbells': 'Dumbbell',
+  'db': 'Dumbbell',
+  'elliptical machine': 'Elliptical Machine',
+  'ez barbell': 'EZ Barbell',
+  'ez-barbell': 'EZ Barbell',
+  'ez bar': 'EZ Barbell',
+  'hammer': 'Hammer',
+  'kettlebell': 'Kettlebell',
+  'kettlebells': 'Kettlebell',
+  'kb': 'Kettlebell',
+  'leverage machine': 'Leverage Machine',
+  'lever machine': 'Leverage Machine',
+  'machine': 'Machine',
+  'medicine ball': 'Medicine Ball',
+  'olympic barbell': 'Olympic Barbell',
+  'roller': 'Roller',
+  'rope': 'Rope',
+  'rowing machine': 'Rowing Machine',
+  'skierg': 'Skierg',
+  'sled machine': 'Sled Machine',
+  'sled': 'Sled Machine',
+  'smith machine': 'Smith Machine',
+  'smith': 'Smith Machine',
+  'stability ball': 'Stability Ball',
+  'stationary bike': 'Stationary Bike',
+  'stepmill machine': 'Stepmill Machine',
+  'tire': 'Tire',
+  'trap bar': 'Trap Bar',
+  'hex bar': 'Trap Bar',
+  'treadmill': 'Treadmill',
+  'upper body ergometer': 'Upper Body Ergometer',
+  'weighted': 'Weighted',
+  'wheel roller': 'Wheel Roller',
+  'lainnya': 'Lainnya',
+  'other': 'Lainnya',
+};
+
 /**
- * Normalisasi nama alat untuk menghilangkan ambiguitas warisan ("Cable/Machine").
- * Latihan kabel dipecah menjadi "Cable" murni agar rasio katrol & beban dasar di Gym Manager
- * terbaca dengan benar, dan mesin isolasi dipecah menjadi "Machine" murni.
+ * Infer jenis alat berdasarkan kata kunci pada nama latihan jika data equipment kosong / 'Lainnya'.
+ */
+export const inferEquipmentFromName = (name = '') => {
+  const n = String(name || '').toLowerCase();
+  if (!n) return '';
+  if (n.includes('smith')) return 'Smith Machine';
+  if (
+    n.includes('cable') ||
+    n.includes('pulley') ||
+    n.includes('crossover') ||
+    n.includes('pushdown') ||
+    n.includes('pulldown') ||
+    n.includes('face pull') ||
+    n.includes('rope extension') ||
+    n.includes('cable row') ||
+    n.includes('lat pull') ||
+    n.includes('pull through')
+  ) return 'Cable';
+  if (n.includes('ez bar') || n.includes('ez-bar') || n.includes('ez barbell')) return 'EZ Barbell';
+  if (n.includes('trap bar') || n.includes('hex bar')) return 'Trap Bar';
+  if (n.includes('olympic bar')) return 'Olympic Barbell';
+  if (n.includes('barbell') || n.includes(' bb ') || n.endsWith(' bb') || n.startsWith('bb ')) return 'Barbell';
+  if (n.includes('dumbbell') || n.includes(' db ') || n.endsWith(' db') || n.startsWith('db ')) return 'Dumbbell';
+  if (n.includes('kettlebell') || n.includes(' kb ') || n.endsWith(' kb') || n.startsWith('kb ')) return 'Kettlebell';
+  if (n.includes('sled') || n.includes('prowler')) return 'Sled Machine';
+  if (n.includes('leverage')) return 'Leverage Machine';
+  if (n.includes('machine') || n.includes('pec deck') || n.includes('leg press') || n.includes('hack squat')) return 'Machine';
+  if (n.includes('band')) return 'Resistance Band';
+  if (n.includes('weighted')) return 'Weighted';
+  return '';
+};
+
+/**
+ * Normalisasi nama alat untuk menghilangkan ambiguitas warisan ("Cable/Machine")
+ * serta menyeragamkan format huruf (Title Case) agar selalu match dengan defaultEquipmentConfig
+ * dan profil gym yang disimpan.
+ * Jika alat kosong atau 'Lainnya', coba infer dari nama latihan.
  */
 export const normalizeEquipmentName = (equipment, exerciseName = '') => {
-  if (!equipment) return '';
-  const eqTrimmed = String(equipment).trim();
+  const eqTrimmed = equipment ? String(equipment).trim() : '';
   const eqLower = eqTrimmed.toLowerCase();
+
+  // 1. Tangani ambiguitas warisan ("Cable/Machine")
   if (
     eqLower === 'cable/machine' ||
     eqLower === 'cable / machine' ||
     eqLower === 'machine/cable' ||
     eqLower === 'machine / cable'
   ) {
-    const nameLower = String(exerciseName || '').toLowerCase();
-    const isCable =
-      nameLower.includes('cable') ||
-      nameLower.includes('pulley') ||
-      nameLower.includes('crossover') ||
-      nameLower.includes('rope') ||
-      nameLower.includes('pushdown') ||
-      nameLower.includes('pulldown') ||
-      nameLower.includes('face pull') ||
-      nameLower.includes('lat pull') ||
-      nameLower.includes('pull through');
-    return isCable ? 'Cable' : 'Machine';
+    const inferred = inferEquipmentFromName(exerciseName);
+    return inferred === 'Cable' ? 'Cable' : 'Machine';
   }
+
+  // 2. Jika equipment kosong atau generic ('lainnya'/'other'/'unknown'), coba infer dari nama exercise
+  if (!eqTrimmed || eqLower === 'lainnya' || eqLower === 'other' || eqLower === 'unknown') {
+    const inferred = inferEquipmentFromName(exerciseName);
+    if (inferred) return inferred;
+    if (eqTrimmed) return 'Lainnya';
+    return '';
+  }
+
+  // 3. Cocokkan dengan canonical dictionary
+  if (CANONICAL_EQUIPMENT_MAP[eqLower]) {
+    return CANONICAL_EQUIPMENT_MAP[eqLower];
+  }
+
+  // 4. Cek case-insensitive terhadap equipmentOptions
+  const optMatch = equipmentOptions.find(opt => opt.toLowerCase() === eqLower);
+  if (optMatch) return optMatch;
+
   return eqTrimmed;
 };
 
