@@ -345,7 +345,7 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
               // Nama hari dibuang dari nama sesi — harinya jadi badge di kartu program.
               name: rapikanNamaSesi(r.name, `Sesi ${i+1}`),
               exercises: exercises,
-              restTime: 90,
+              restTime: r.restTime || 120,
               assignedDays: assigned
           };
       });

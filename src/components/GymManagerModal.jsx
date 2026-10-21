@@ -111,9 +111,7 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
                   </p>
                 </div>
                 <div className="flex gap-1.5">
-                  {gym.id !== 'default' && (
-                    <button onClick={() => handleEditGym(gym)} className={`p-2 rounded-xl ${t.btnBg} hover:opacity-80 text-sm`} title="Edit"><Edit2 size={15} className={t.textMain} /></button>
-                  )}
+                  <button onClick={() => handleEditGym(gym)} className={`p-2 rounded-xl ${t.btnBg} hover:opacity-80 text-sm`} title="Edit"><Edit2 size={15} className={t.textMain} /></button>
                   {gym.id !== 'default' && gymProfiles.length > 1 && (
                     <button onClick={() => handleDeleteGym(gym)} className="p-2 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 text-sm" title="Hapus"><Trash2 size={15} /></button>
                   )}
@@ -213,7 +211,7 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
                 onClick={() => updateConfig(eqName, 'ratio', 0.5)}
                 className={`flex-1 py-1 rounded-lg text-xs font-bold transition-all ${conf.ratio === 0.5 ? `${t.bgAccent} text-white shadow-sm` : 'bg-black/10 dark:bg-white/10 opacity-60'}`}
               >
-                2:1 (0.5x)
+                2:1
               </button>
             </div>
           </div>

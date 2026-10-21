@@ -799,7 +799,7 @@ const ExerciseCard = ({
                                       {(eqConfig.baseWeight > 0 || eqConfig.ratio !== 1) && (
                                         <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-300 font-medium">
                                           {eqConfig.baseWeight > 0 && <span>{getBaseWeightLabel(eqConfig)}</span>}
-                                          {eqConfig.ratio !== 1 && <span>Katrol {eqConfig.ratio === 0.5 ? '2:1 (0.5x)' : `${eqConfig.ratio}:1`}</span>}
+                                          {eqConfig.ratio !== 1 && <span>Katrol {eqConfig.ratio === 0.5 ? '2:1' : `${eqConfig.ratio}:1`}</span>}
                                         </div>
                                       )}
                                     </div>

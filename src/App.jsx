@@ -1292,7 +1292,7 @@ export default function App() {
         // ditampilkan sebagai badge terpisah di kartu program.
         name: rapikanNamaSesi(r.name, `Sesi ${i + 1}`),
         exercises,
-        restTime: 90,
+        restTime: r.restTime || 120,
         source: 'ai'
       };
     });
@@ -1547,7 +1547,7 @@ export default function App() {
       return {
         id: `prog-${Date.now()}-${idx}`,
         name: routine.name.replace(/\s*\([^)]*\)/g, ''),
-        restTime: routine.restTime || 90,
+        restTime: routine.restTime || 120,
         warmupVideoUrls: routine.warmupVideoUrls || [],
         cooldownVideoUrls: routine.cooldownVideoUrls || [],
         exercises: routine.exercises.map(ex => ({
@@ -3525,6 +3525,38 @@ export default function App() {
 
   const handleToggleSet = (exId, setIdx, siblingIds = null, exParam = null) => {
     playSoundEffect('click', soundEnabled);
+
+    // Cari sesi & program yang BENAR-BENAR sedang dijalankan user (bukan cuma activeProgramId yang statis)
+    const dayWorkouts = history[activeWorkoutDate || selectedDate]?.workouts || [];
+    const runningWorkout = dayWorkouts.find(w => 
+      (exParam?.workoutId && w.id === exParam.workoutId) ||
+      (w.id && String(exId).endsWith(`-${w.id}`)) ||
+      (sessionToRun && (w.id === sessionToRun || w.programId === sessionToRun)) ||
+      (sessionToRunRef.current && (w.id === sessionToRunRef.current || w.programId === sessionToRunRef.current))
+    );
+    
+    let targetProgId = runningWorkout?.programId || sessionToRunRef.current || sessionToRun;
+    if (typeof targetProgId === 'string' && targetProgId.startsWith('projected_')) {
+      targetProgId = resolveProjectedProgramId(targetProgId);
+    }
+    
+    let currentRoutine = null;
+    if (targetProgId && targetProgId !== 'extra' && targetProgId !== 'adhoc') {
+      currentRoutine = programs.find(p => p.id === targetProgId);
+    }
+    if (!currentRoutine && exParam) {
+      currentRoutine = programs.find(p => p.exercises?.some(e => String(e.id) === String(exParam.originalId || exParam.id)));
+    }
+    if (!currentRoutine) {
+      currentRoutine = programs.find(p => p.id === activeProgramId) || programs[0];
+    }
+    
+    const programRestTime = Number(runningWorkout?.restTime ?? currentRoutine?.restTime ?? defaultRestTime ?? 120) || 120;
+
+    if (currentRoutine && currentRoutine.id && currentRoutine.id !== activeProgramId) {
+      setActiveProgramId(currentRoutine.id);
+    }
+
     setExerciseLogs(prev => {
       const ex = exParam || getBaseEx(exId);
       const currentLogs = prev[exId] ? [...prev[exId]] : [...getSetLogs(ex, exId, prev)];
@@ -3586,9 +3618,7 @@ export default function App() {
         }
       }
       
-      const activeProgram = programs.find(p => p.id === activeProgramId) || programs[0];
-      const programRestTime = activeProgram?.restTime || defaultRestTime;
-      
+
       let isSupersetComplete = true;
       const isSuperset = siblingIds && siblingIds.length > 1;
       

@@ -1341,7 +1341,7 @@ const ImmersiveWorkout = ({
                                      {(eqConf.baseWeight > 0 || eqConf.ratio !== 1) && (
                                        <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-300 font-medium">
                                          {eqConf.baseWeight > 0 && <span>{getBaseWeightLabel(eqConf)}</span>}
-                                         {eqConf.ratio !== 1 && <span>Katrol {eqConf.ratio === 0.5 ? '2:1 (0.5x)' : `${eqConf.ratio}:1`}</span>}
+                                         {eqConf.ratio !== 1 && <span>Katrol {eqConf.ratio === 0.5 ? '2:1' : `${eqConf.ratio}:1`}</span>}
                                        </div>
                                      )}
                                    </div>

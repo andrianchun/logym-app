@@ -1786,7 +1786,7 @@ const CalendarTab = ({
                                        const skippedToUse = w.skipped || sessionSkipped;
                                        const effectiveTime = w.reminderTime || defaultReminderTime || "15:00";
                                        const isNotifOn = Object.prototype.hasOwnProperty.call(w, 'reminderEnabled') ? w.reminderEnabled : (w.reminderTime ? true : reminderEnabled);
-                                       const estDuration = Math.round((w.overriddenExercises || prog?.exercises || []).reduce((acc, ex) => acc + (parseInt(ex.sets) || 3), 0) * (45 + (parseInt(w.restTime) || parseInt(prog?.restTime) || 90)) / 60) || 0;
+                                       const estDuration = Math.round((w.overriddenExercises || prog?.exercises || []).reduce((acc, ex) => acc + (parseInt(ex.sets) || 3), 0) * (45 + (parseInt(w.restTime || prog?.restTime || 120) || 120)) / 60) || 0;
                                        
                                        // Sesi yang timernya sedang berjalan. Dipakai dua kali: badge status di bawah
                                        // dan tombol "Lanjutkan Latihan" di panel yang terbuka.

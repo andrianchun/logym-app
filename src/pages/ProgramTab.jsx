@@ -1160,7 +1160,7 @@ const ProgramTab = ({
             {/* ROUTINES LIST */}
             <div className="px-4 py-6 flex flex-col gap-6 max-w-4xl mx-auto w-full">
                 {groupedPrograms[editingPlanId].routines.map((routine) => {
-                    const estDuration = Math.round((routine.exercises || []).reduce((acc, ex) => acc + (parseInt(ex.sets) || 3), 0) * (45 + (parseInt(routine.restTime) || 90)) / 60);
+                    const estDuration = Math.round((routine.exercises || []).reduce((acc, ex) => acc + (parseInt(ex.sets) || 3), 0) * (45 + (parseInt(routine.restTime ?? 120) || 120)) / 60);
                     return (
                         <div id={`routine-${routine.id}`} key={routine.id} className="bg-slate-900 border border-white/5 rounded-3xl overflow-hidden shadow-xl">
                             <div className="p-5 border-b border-white/5 bg-black/20 flex flex-col gap-2.5">
@@ -1274,6 +1274,15 @@ const ProgramTab = ({
                                 });
                             } else {
                                 playSoundEffect('success', soundEnabled);
+                                setPrograms(prev => (prev || []).map(p => {
+                                  if ((p.planId || 'custom') === editingPlanId) {
+                                    return {
+                                      ...p,
+                                      restTime: p.restTime ?? 120
+                                    };
+                                  }
+                                  return p;
+                                }));
                                 setProgramsSnapshot(null); // commit changes
                                 closeEditAndScrollToPlan(editingPlanId);
                             }

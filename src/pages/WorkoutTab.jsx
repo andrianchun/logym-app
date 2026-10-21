@@ -1129,6 +1129,14 @@ const WorkoutTab = ({
     const doStart = () => {
       playSoundEffect('success', soundEnabled);
       setSessionToRun(progId);
+      if (setActiveProgramId) {
+        let realProgId = progId;
+        if (typeof realProgId === 'string' && realProgId.startsWith('projected_')) {
+          realProgId = resolveProjectedProgramId(realProgId);
+        }
+        const pObj = programs.find(p => p.id === realProgId || p.id === currentProg?.id);
+        if (pObj) setActiveProgramId(pObj.id);
+      }
 
       // Temukan latihan pertama yang belum selesai agar saat resume langsung ke latihan tersebut
       const currentProg = activeProgramsList.find(p => p.workoutId === progId || p.id === progId);
@@ -1418,11 +1426,13 @@ const WorkoutTab = ({
                                     onSetChange(exId, setIdx, field, val, ex);
                                   })) return;
                                   setSessionToRun(prog.workoutId);
+                                  if (setActiveProgramId && prog.id) setActiveProgramId(prog.id);
                                   onSetChange(exId, setIdx, field, val, ex);
                                 }} 
                                 onToggleSet={(exId, setIdx) => {
                                   if (requestSessionSwitch(prog.workoutId, () => {
                                     setActiveExerciseId(exId);
+                                    if (setActiveProgramId && prog.id) setActiveProgramId(prog.id);
                                     let siblingIds = null;
                                     if (ex.supersetId) {
                                       siblingIds = prog.exercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
@@ -1432,6 +1442,7 @@ const WorkoutTab = ({
                                   })) return;
                                   setActiveExerciseId(exId);
                                   setSessionToRun(prog.workoutId);
+                                  if (setActiveProgramId && prog.id) setActiveProgramId(prog.id);
                                   let siblingIds = null;
                                   if (ex.supersetId) {
                                     siblingIds = prog.exercises.filter(e => e.supersetId === ex.supersetId).map(e => e.id);
