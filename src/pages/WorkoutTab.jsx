@@ -1747,7 +1747,42 @@ const WorkoutTab = ({
 
         const areAllSessionsFinished = evaluatedSessions.length > 0 && evaluatedSessions.every(s => s.isFinished || !s.hasExercises || s.allSkipped);
 
+        // Cek apakah ada sesi aktif berjalan atau belum tersimpan ke history
+        const activeUnsavedSession = evaluatedSessions.find(s => 
+          (isWorkoutActive && (s.workoutId === sessionToRun || s.workoutId === focusWorkoutId)) ||
+          (s.hasExercises && s.hasSomeSetsDone && s.wInHistory?.status !== 'completed')
+        );
+
         if (areAllSessionsFinished) {
+          // Jika ada sesi yang sedang aktif / baru selesai diceklis semua setnya dan belum disimpan ke riwayat:
+          if (activeUnsavedSession || isWorkoutActive) {
+            const targetSaveId = activeUnsavedSession?.workoutId || sessionToRun || evaluatedSessions[0]?.workoutId;
+            return (
+              <div className="fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 pointer-events-none flex justify-center animate-in fade-in duration-200">
+                <button 
+                  onClick={() => {
+                    if (onSaveWorkout && targetSaveId) {
+                      if (soundEnabled) {
+                        const audio = new Audio('/cheer.wav');
+                        audio.volume = 1.0;
+                        audio.play().catch(() => {});
+                      }
+                      setCelebrationSession(targetSaveId);
+                      setShowCelebration(true);
+                      setTimeout(() => {
+                        setShowCelebration(false);
+                        onSaveWorkout(targetSaveId);
+                      }, 2000);
+                    }
+                  }}
+                  className={`pointer-events-auto w-full max-w-2xl mx-auto py-5 rounded-full text-xl font-black flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-95 ${t.bgAccent} text-white shadow-[0_8px_30px_rgb(0,0,0,0.25)]`}
+                >
+                  <CheckCircle size={24} /> SIMPAN SESI
+                </button>
+              </div>
+            );
+          }
+
           return (
             <div className="fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 pointer-events-none flex justify-center animate-in fade-in duration-200">
               <button 
@@ -1767,7 +1802,7 @@ const WorkoutTab = ({
         const btnIcon = <Play size={24} className="ml-1" />;
 
         return (
-          <div className="fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 pointer-events-none flex justify-center animate-in fade-in duration-200">
+          <div className="fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 pointer-events-none flex justify-center gap-3 max-w-2xl mx-auto animate-in fade-in duration-200">
             <button 
               onClick={() => {
                 // Otomatis buka kartu latihan sesi target yang bersangkutan dan scroll ke kartu tersebut
@@ -1780,10 +1815,34 @@ const WorkoutTab = ({
                 }, 100);
                 handleStartWorkout(targetSession.workoutId);
               }}
-              className={`pointer-events-auto w-full max-w-2xl mx-auto py-5 rounded-full text-xl font-black flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-95 ${t.bgAccent} shadow-[0_8px_30px_rgb(0,0,0,0.25)] text-white`}
+              className={`pointer-events-auto flex-1 py-5 rounded-full text-xl font-black flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-95 ${t.bgAccent} shadow-[0_8px_30px_rgb(0,0,0,0.25)] text-white`}
             >
               {btnIcon} {btnText}
             </button>
+            {targetSession.hasSomeSetsDone && (
+              <button
+                onClick={() => {
+                  const saveTargetId = targetSession.workoutId;
+                  if (onSaveWorkout && saveTargetId) {
+                    if (soundEnabled) {
+                      const audio = new Audio('/cheer.wav');
+                      audio.volume = 1.0;
+                      audio.play().catch(() => {});
+                    }
+                    setCelebrationSession(saveTargetId);
+                    setShowCelebration(true);
+                    setTimeout(() => {
+                      setShowCelebration(false);
+                      onSaveWorkout(saveTargetId);
+                    }, 2000);
+                  }
+                }}
+                className={`pointer-events-auto px-6 py-5 rounded-full text-base font-black flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-95 bg-emerald-600 hover:bg-emerald-500 shadow-[0_8px_30px_rgb(0,0,0,0.25)] text-white shrink-0`}
+                title="Selesaikan & Simpan Sesi"
+              >
+                <CheckCircle size={22} /> Selesai
+              </button>
+            )}
           </div>
         );
       })()}

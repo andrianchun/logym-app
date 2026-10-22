@@ -322,7 +322,16 @@ console.log('workoutCalc OK', { cardioKcal, plankKcal, liftKcal });
     { done: true, at: T + 5000, duration: 15 }
   ] }), 1800, 'dua set treadmill 15 menit harus menghasilkan 30 menit (1800 dtk)');
 
-  console.log('sessionSpanSeconds OK', { plank1dtk: kkal, jalurLama: lama });
+  // 8c. Jeda abnormal berjam-jam (mis. set 1 jam 15:00, set 2 jam 15:05, set 3 jam 21:30 karena edit belakangan):
+  // Durasi TIDAK BOLEH menjadi 6.5 jam (23400 dtk), melainkan hanya durasi riil + estimasi set wajar.
+  const multiHourSpan = sessionSpanSeconds([bench], { b1: [
+    { done: true, at: T, w: 60, r: 10 },
+    { done: true, at: T + 300000, w: 60, r: 10 }, // 5 menit kemudian
+    { done: true, at: T + (6 * 3600 + 30 * 60) * 1000, w: 60, r: 10 }, // 6.5 jam kemudian!
+  ] });
+  assert.ok(multiHourSpan < 600, `jeda 6.5 jam tidak boleh menghasilkan durasi 6.5 jam, dapat ${multiHourSpan} detik`);
+
+  console.log('sessionSpanSeconds OK', { plank1dtk: kkal, jalurLama: lama, multiHourSpan });
 }
 
 // --- calculatePersonalRecords (PR Hall of Fame) --------------------------

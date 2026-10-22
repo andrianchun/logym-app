@@ -65,7 +65,7 @@ import { getLocalYMD, resolveProjectedProgramId, isLomealOwned, resolveLoggedExe
 import { serializeDay, dayFingerprint, migrateBaseline, reconcileHistory, workoutsToMap, workoutIdsFromBaseline, diffFields, cleanFirestoreData, stableStringify, mergeBackupIntoHistory, sessionsPendingSave, compactDayBioData } from './utils/historySync';
 import { useBleManager } from './hooks/useBleManager';
 import { bolehSync, gabungAntrean } from './utils/hcSchedule';
-import { Loader2, Download, X } from 'lucide-react';
+import { Loader2, Download, X, RotateCcw, Trash2 } from 'lucide-react';
 
 // Kalau device ini baru aja nulis lokal (dalam LOCAL_WRITE_GUARD_MS terakhir), skip snapshot
 // yang masuk SEKALI SAJA — jangan diretry. Tulisan lokal yang masih pending bakal ke-upload
@@ -1333,6 +1333,8 @@ export default function App() {
   const [showExitToast, setShowExitToast] = useState(false);
   const [showSupersetToast, setShowSupersetToast] = useState(false);
   const [showRestoreToast, setShowRestoreToast] = useState('');
+  const [undoDeletedSet, setUndoDeletedSet] = useState(null);
+  const undoTimeoutRef = useRef(null);
   const backPressedOnce = useRef(false);
   const scrollPositions = useRef({});
   const prevTab = useRef(activeTab);
@@ -3766,18 +3768,48 @@ export default function App() {
   const handleRemoveSet = (exIds, setIdx) => {
     playSoundEffect('click', soundEnabled);
     const ids = Array.isArray(exIds) ? exIds : [exIds];
+    const removedData = [];
     setExerciseLogs(prev => {
       let newPrev = { ...prev };
       ids.forEach(id => {
         const ex = getBaseEx(id);
         if (!ex) return;
         const currentLogs = newPrev[id] ? [...newPrev[id]] : [...getSetLogs(ex, id, newPrev)];
+        if (currentLogs[setIdx]) {
+          removedData.push({ id, setIdx, setData: { ...currentLogs[setIdx] }, exName: ex.name || 'Set' });
+        }
         currentLogs.splice(setIdx, 1);
         newPrev[id] = currentLogs;
       });
       return newPrev;
     });
+    if (removedData.length > 0) {
+      if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
+      setUndoDeletedSet(removedData);
+      undoTimeoutRef.current = setTimeout(() => {
+        setUndoDeletedSet(null);
+      }, 6000);
+    }
     setLastActionTime(Date.now()); 
+  };
+
+  const handleRestoreSet = () => {
+    if (!undoDeletedSet || undoDeletedSet.length === 0) return;
+    playSoundEffect('click', soundEnabled);
+    setExerciseLogs(prev => {
+      let newPrev = { ...prev };
+      undoDeletedSet.forEach(({ id, setIdx, setData }) => {
+        const ex = getBaseEx(id);
+        const currentLogs = newPrev[id] ? [...newPrev[id]] : (ex ? [...getSetLogs(ex, id, newPrev)] : []);
+        // Sisipkan kembali ke posisi indeks aslinya
+        currentLogs.splice(setIdx, 0, setData);
+        newPrev[id] = currentLogs;
+      });
+      return newPrev;
+    });
+    setUndoDeletedSet(null);
+    if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
+    setLastActionTime(Date.now());
   };
 
   const handleToggleSkip = (exId) => {
@@ -4037,7 +4069,12 @@ export default function App() {
     // di-uncheck lalu recheck mendapat stempel `at` baru yang mencakup waktu edit saja,
     // bukan total waktu latihan asli + edit.
     const timerSecs = workoutStartTime ? Math.floor((Date.now() - workoutStartTime) / 1000) : 0;
-    const durationSecs = Math.max(rentangSesiSecs, timerSecs);
+    // Proteksi timer menganggur di latar belakang: jika sesi memiliki stempel set (rentangSesiSecs > 0),
+    // timer global tidak boleh melonjak berjam-jam melebihi stempel set karena app ditinggal buka.
+    const effectiveTimerSecs = rentangSesiSecs > 0
+      ? Math.min(timerSecs, rentangSesiSecs + 900)
+      : Math.min(timerSecs, 14400);
+    const durationSecs = Math.max(rentangSesiSecs, effectiveTimerSecs);
     if (healthConnectEnabled && workoutStartTime) {
       hcPushAfterSave.current = true;
     }
@@ -4171,14 +4208,18 @@ export default function App() {
               else if (parts.length === 2) existingSecs = (parts[0] || 0) * 60 + (parts[1] || 0);
             }
           }
-          const finalSecs = calcFallbackDurationSecs(cleanLogs, Math.max(durationSecs, existingSecs));
+          let candidateSecs = Math.max(durationSecs, existingSecs);
+          if (existingSecs > 0 && durationSecs > existingSecs + 1800) {
+            candidateSecs = Math.min(durationSecs, existingSecs + 900);
+          }
+          const finalSecs = Math.min(14400, calcFallbackDurationSecs(cleanLogs, candidateSecs));
           workouts[matchedIdx] = {
             ...existingW,
             status: 'completed',
             log: cleanLogs,
             skipped: cleanSkipped,
             exercises: cleanExtra.length > 0 ? cleanExtra : existingW.exercises,
-            timestamp: endStamp,
+            timestamp: (existingW?.status === 'completed' && existingW.timestamp) ? existingW.timestamp : endStamp,
             startedAt: startedAtFor(finalSecs),
             duration: formatDur(finalSecs)
           };
@@ -4248,7 +4289,11 @@ export default function App() {
                 }
               }
             }
-            const finalSecs = calcFallbackDurationSecs(cleanLogs, Math.max(durationSecs, existingSecs));
+            let candidateSecs = Math.max(durationSecs, existingSecs);
+            if (existingSecs > 0 && durationSecs > existingSecs + 1800) {
+              candidateSecs = Math.min(durationSecs, existingSecs + 900);
+            }
+            const finalSecs = Math.min(14400, calcFallbackDurationSecs(cleanLogs, candidateSecs));
 
             return {
               ...w,
@@ -4256,7 +4301,7 @@ export default function App() {
               status: 'completed',
               log: cleanLogs,
               skipped: cleanSkipped,
-              timestamp: endStamp,
+              timestamp: (w.status === 'completed' && w.timestamp) ? w.timestamp : endStamp,
               startedAt: startedAtFor(finalSecs),
               duration: formatDur(finalSecs),
               ...(frozenExercises ? { overriddenExercises: frozenExercises } : {})
@@ -5022,6 +5067,25 @@ export default function App() {
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
           <div className={`px-5 py-2.5 rounded-full shadow-lg text-sm font-medium ${theme === 'dark' ? 'bg-slate-700 text-white' : 'bg-slate-800 text-white'}`}>
             Tekan sekali lagi untuk keluar
+          </div>
+        </div>
+      )}
+
+      {/* Toast Urungkan Hapus Set */}
+      {undoDeletedSet && undoDeletedSet.length > 0 && (
+        <div className="fixed bottom-24 left-4 right-4 z-[9999] max-w-sm mx-auto animate-in slide-in-from-bottom-4 fade-in duration-200 pointer-events-auto">
+          <div className="bg-slate-900/95 dark:bg-slate-800/95 text-white backdrop-blur-md px-4 py-3 rounded-2xl shadow-2xl border border-white/10 flex items-center justify-between gap-3">
+            <div className="text-sm font-semibold flex items-center gap-2 truncate">
+              <Trash2 size={16} className="text-rose-400 shrink-0" />
+              <span className="truncate">Set {undoDeletedSet[0].setIdx + 1} dihapus</span>
+            </div>
+            <button
+              onClick={handleRestoreSet}
+              className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black uppercase tracking-wider transition-all active:scale-95 shrink-0 flex items-center gap-1 shadow-md"
+            >
+              <RotateCcw size={13} />
+              Urungkan
+            </button>
           </div>
         </div>
       )}

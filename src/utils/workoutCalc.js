@@ -212,10 +212,29 @@ export const sessionSpanSeconds = (exercises, exerciseLogs) => {
   });
   if (selesai.length === 0) return 0;
   if (selesai.length === 1) return Math.max(1, setSeconds(selesai[0].ex, selesai[0].s));
-  const stamps = selesai.map((x) => x.at);
-  const stampSpan = Math.round((Math.max(...stamps) - Math.min(...stamps)) / 1000);
+
+  // Urutkan kronologis berdasarkan stempel `at`
+  selesai.sort((a, b) => a.at - b.at);
+
+  const MAX_REST_GAP_SECS = 20 * 60; // 20 menit: batas atas realistis jeda istirahat antar-set dalam 1 sesi latihan
+  let accumulatedSpan = 0;
+
+  for (let i = 1; i < selesai.length; i++) {
+    const gapSecs = Math.round((selesai[i].at - selesai[i - 1].at) / 1000);
+    if (gapSecs <= MAX_REST_GAP_SECS) {
+      accumulatedSpan += gapSecs;
+    } else {
+      // Jeda abnormal (>20 menit): pengguna beristirahat lama di luar gym, meninggalkan app,
+      // mengedit set berjam-jam kemudian, atau melanjutkan sesi di waktu lain.
+      // Jangan telan jam-jam menganggur menjadi durasi latihan!
+      // Cukup tambahkan durasi set + istirahat standar (90 detik).
+      const setDur = setSeconds(selesai[i].ex, selesai[i].s);
+      accumulatedSpan += Math.max(setDur, 90);
+    }
+  }
+
   const totalSetSecs = selesai.reduce((sum, item) => sum + setSeconds(item.ex, item.s), 0);
-  return Math.max(stampSpan, totalSetSecs);
+  return Math.max(accumulatedSpan, totalSetSecs);
 };
 
 // MET kardio berdasar kecepatan rata-rata. Tanpa data jarak, pakai default sedang (7.0).
