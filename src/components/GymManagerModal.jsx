@@ -195,28 +195,6 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
           />
         </div>
 
-        {isCableOrMachine && (
-          <div>
-            <label className={`text-xs uppercase font-bold tracking-wider ${t.textMuted} block mb-1`}>Rasio Katrol</label>
-            <div className="flex gap-1.5 pt-1">
-              <button 
-                type="button"
-                onClick={() => updateConfig(eqName, 'ratio', 1)}
-                className={`flex-1 py-1 rounded-lg text-xs font-bold transition-all ${conf.ratio === 1 || !conf.ratio ? `${t.bgAccent} text-white shadow-sm` : 'bg-black/10 dark:bg-white/10 opacity-60'}`}
-              >
-                1:1
-              </button>
-              <button 
-                type="button"
-                onClick={() => updateConfig(eqName, 'ratio', 0.5)}
-                className={`flex-1 py-1 rounded-lg text-xs font-bold transition-all ${conf.ratio === 0.5 ? `${t.bgAccent} text-white shadow-sm` : 'bg-black/10 dark:bg-white/10 opacity-60'}`}
-              >
-                2:1
-              </button>
-            </div>
-          </div>
-        )}
-
         <div>
           <label className={`text-xs uppercase font-bold tracking-wider ${t.textMuted} block mb-1`}>Kenaikan Beban (kg)</label>
           <SwipeInput language={language} 

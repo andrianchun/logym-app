@@ -4,7 +4,7 @@ import { Plus, Snowflake, Play, CalendarDays, X, CheckCircle, ChevronDown, Chevr
 import { fetchExercisesFromApi } from '../utils/exerciseDbApi';
 import { shareWorkoutToFeed } from '../utils/communityApi';
 import { normalizeMuscleKey, resolveProjectedProgramId, getDayWorkouts, defaultMasterExercises, findMatchingMasterExercise, canonicalizeExercise } from '../data/constants';
-import { estimate10RM, defaultSetWeight, gymStepFor, getEquipmentConfig, calculateActualWeight, calculateInputWeight, getSetActualWeight, rm10Series, buildExLookupByName, canonicalExId, calculateProgressiveOverloadTarget, resolveExerciseProgressiveTarget } from '../utils/workoutCalc';
+import { estimate10RM, defaultSetWeight, gymStepFor, getEquipmentConfig, calculateActualWeight, calculateInputWeight, getSetActualWeight, rm10Series, buildExLookupByName, canonicalExId, calculateProgressiveOverloadTarget, resolveExerciseProgressiveTarget, resolveDefaultExerciseDuration } from '../utils/workoutCalc';
 
 // Import Komponen Pecahan
 import WorkoutHeader from '../components/WorkoutHeader';
@@ -489,7 +489,7 @@ const WorkoutTab = ({
             ...cleanEx,
             sets: detailExercise.sets || 3,
             reps: detailExercise.reps || 10,
-            duration: detailExercise.duration || 10,
+            duration: resolveDefaultExerciseDuration(detailExercise),
             defaultWeight: detailExercise.defaultWeight ?? cleanEx.defaultWeight,
             id: cleanEx.id || `ex-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
             ...(detailExercise.supersetId ? { supersetId: detailExercise.supersetId } : {})
@@ -636,7 +636,7 @@ const WorkoutTab = ({
         ratio: eqConf.ratio,
         total_w: total_w,
         r: suggestedReps,
-        d: ex.duration || 10,
+        d: resolveDefaultExerciseDuration(ex),
         done: false,
         skipped: false
     }));
@@ -733,11 +733,11 @@ const WorkoutTab = ({
     const isImp = units?.weight === 'lbs';
     const uStr = isImp ? 'lbs' : 'kg';
 
-    const hasWeightDiff = Boolean(eqConfNow && (eqConfNow.baseWeight > 0 || (eqConfNow.ratio !== undefined && eqConfNow.ratio !== 1)));
+    const hasWeightDiff = Boolean(eqConfNow && eqConfNow.baseWeight > 0);
 
     const inputLabel = eqConfNow?.isBodyweightPlus 
       ? 'Beban' 
-      : (eqConfNow?.inputRule === 'pin' || (eqConfNow?.ratio !== 1 && (!eqConfNow?.baseWeight || eqConfNow?.baseWeight <= 0))
+      : (eqConfNow?.inputRule === 'pin'
           ? 'Pin' 
           : 'Plat');
 
@@ -755,10 +755,8 @@ const WorkoutTab = ({
       if (eqConfNow.baseWeight > 0) {
         const baseName = eqConfNow.isBodyweightPlus 
           ? 'BB' 
-          : (eqConfNow.equipment?.includes('Sled') ? 'Sled' : (eqConfNow.equipment?.includes('Cable') || eqConfNow.equipment?.includes('Machine') ? 'Alat' : (eqConfNow.equipment?.includes('Dumbbell') || eqConfNow.equipment?.includes('Kettlebell') ? 'Handle' : 'Bar')));
+          : (eqConfNow.equipment?.includes('Sled') ? 'Sled' : (eqConfNow.equipment?.includes('Cable') || eqConfNow.equipment?.includes('Machine') ? 'Beban dasar' : (eqConfNow.equipment?.includes('Dumbbell') || eqConfNow.equipment?.includes('Kettlebell') ? 'Handle' : 'Bar')));
         return `Total: ${actWeight} ${uStr} (${baseName} ${eqConfNow.baseWeight} ${uStr})`;
-      } else if (eqConfNow.ratio !== 1) {
-        return `Efektif: ${actWeight} ${uStr} (Katrol ${eqConfNow.ratio === 0.5 ? '2:1' : `${eqConfNow.ratio}:1`})`;
       }
       return `Total: ${actWeight} ${uStr}`;
     };

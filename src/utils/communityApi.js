@@ -417,7 +417,29 @@ export const shareTemplate = async (userId, userName, program) => {
   }
 };
 
+const inFlightAchievementShares = new Set();
+const recentAchievementShares = new Map();
+
 export const shareAchievementToFeed = async (userId, userName, userPhoto, achievement) => {
+  if (!userId || !achievement?.id) return null;
+  const dedupKey = `${userId}_${achievement.id}`;
+
+  // 1. Cegah request paralel (double tap / multi click beruntun)
+  if (inFlightAchievementShares.has(dedupKey)) {
+    console.warn("Share achievement sudah berjalan, abaikan klik ganda:", dedupKey);
+    return null;
+  }
+
+  // 2. Debounce cooldown 15 detik agar tidak terjadi spam postingan identik
+  const lastShared = recentAchievementShares.get(dedupKey);
+  if (lastShared && (Date.now() - lastShared) < 15000) {
+    console.warn("Pencapaian ini baru saja dibagikan, klik spam dicegah:", dedupKey);
+    return null;
+  }
+
+  inFlightAchievementShares.add(dedupKey);
+  recentAchievementShares.set(dedupKey, Date.now());
+
   try {
     const docRef = await addDoc(collection(db, 'logym_community_posts'), {
       sourceApp: 'logym',
@@ -432,6 +454,8 @@ export const shareAchievementToFeed = async (userId, userName, userPhoto, achiev
   } catch (err) {
     console.error("Gagal share achievement:", err);
     return null;
+  } finally {
+    inFlightAchievementShares.delete(dedupKey);
   }
 };
 

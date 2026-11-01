@@ -1062,7 +1062,7 @@ const ProgramTab = ({
                                                  {ex.name}
                                                </span>
                                                <span className="text-[11px] text-slate-400 font-bold text-left">
-                                                 {ex.sets || 3} &times; {ex.reps || (ex.duration ? String(ex.duration) + 'm' : 10)}
+                                                 {ex.sets || 3} &times; {ex.reps || (ex.duration ? (Number(ex.duration) > 5 && Number(ex.duration) % 60 !== 0 ? `${ex.duration}s` : `${Number(ex.duration) > 5 ? Number(ex.duration) / 60 : ex.duration}m`) : '1m')}
                                                </span>
                                              </div>
                                            </div>

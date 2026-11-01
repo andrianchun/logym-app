@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Info, CheckCircle, CalendarDays, Edit2, PlayCircle, X, Copy, Repeat, Plus, Clock, Bell, CalendarPlus, CalendarCheck, BellOff, BellRing, ToggleLeft, ToggleRight, Flame, Check, Activity } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Info, CheckCircle, CalendarDays, Edit2, PlayCircle, X, Copy, Repeat, Plus, Clock, Bell, CalendarPlus, CalendarCheck, BellOff, BellRing, ToggleLeft, ToggleRight, Flame, Check, Activity, Loader2 } from 'lucide-react';
 // Tanpa import ini, `typeof Capacitor === 'undefined'` di penjadwalan notifikasi selalu bernilai
 // true — jadi setiap pengingat latihan diam-diam berhenti di baris pertama dan tidak pernah
 // terpasang, di web MAUPUN di APK. Tidak pernah melempar error, jadi tidak ada gejalanya selain
@@ -24,7 +24,9 @@ const CalendarTab = ({
   weekStartDay = 0, defaultReminderTime = "15:00", reminderEnabled = true,
   unitSystem, setConfirmModal, activePlanIds = [], userProfile, gymProfiles, activeGymId, logyPersona = 'santai', activityTargets, sessionToRun, isWorkoutActive, workoutStartTime,
   extraExercises = [], setExtraExercises,
-  isActive = true
+  isActive = true,
+  ensureYearHistoryLoaded = null,
+  loadingHistoryYear = null
 }) => {
 
   // DURASI & KALORI SESI YANG SEDANG BERJALAN.
@@ -82,6 +84,13 @@ const CalendarTab = ({
     const [y, m, d] = dStr.split('-');
     return new Date(y, parseInt(m)-1, d);
   });
+
+  // Otomatis tarik arsip riwayat tahun lampau saat user bernavigasi ke tahun tsb
+  useEffect(() => {
+    if (ensureYearHistoryLoaded && calendarDate) {
+      ensureYearHistoryLoaded(calendarDate.getFullYear().toString());
+    }
+  }, [calendarDate, ensureYearHistoryLoaded]);
   
   const [isTablet, setIsTablet] = useState(window.innerWidth >= 640);
   const [calendarMode, setCalendarMode] = useState(() => {
@@ -1204,6 +1213,12 @@ const CalendarTab = ({
             mentok ke tepi, dan judul tahun ikut tergeser dari tengah layar. */}
         {/* --- FIXED HEADER: Mode toggle + Year label + Today btn --- */}
         <div ref={fixedHeaderRef} className="shrink-0 relative z-[50] px-2">
+          {loadingHistoryYear && (
+            <div className="flex items-center justify-center gap-2 py-1 px-3 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full text-xs font-semibold animate-pulse mb-2 max-w-fit mx-auto">
+              <Loader2 size={12} className="animate-spin" />
+              <span>Memuat arsip {loadingHistoryYear}...</span>
+            </div>
+          )}
           <div className="flex justify-between items-center mb-4 px-1">
             <div className="w-[90px] flex justify-start gap-1">
               <button 

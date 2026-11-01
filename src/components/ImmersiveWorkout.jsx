@@ -4,7 +4,7 @@ import { X, Play, ChevronRight, ChevronLeft, Dumbbell, Check, Info, Clock, Minim
 import ScrollPicker from './ScrollPicker';
 import { exerciseTypeLabels, defaultMasterExercises, findMatchingMasterExercise, canonicalizeExercise, resolveExerciseDbId } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
-import { calculateWorkoutCalories, calculateLiveWorkoutCalories, resolveExerciseKind, defaultSetWeight, gymStepFor, getEquipmentConfig, calculateActualWeight, getSetActualWeight, resolveExerciseProgressiveTarget } from '../utils/workoutCalc';
+import { calculateWorkoutCalories, calculateLiveWorkoutCalories, resolveExerciseKind, defaultSetWeight, gymStepFor, getEquipmentConfig, calculateActualWeight, getSetActualWeight, resolveExerciseProgressiveTarget, resolveDefaultExerciseDuration } from '../utils/workoutCalc';
 import { getCachedExercises } from '../utils/exerciseDbApi';
 import { WorkoutTimerPlugin } from '../App';
 import TwoFrameMotionLoop from './TwoFrameMotionLoop';
@@ -299,7 +299,7 @@ const ImmersiveWorkout = ({
       ratio: eqConf.ratio,
       total_w: total_w,
       r: suggestedReps,
-      d: exItem.duration || 10,
+      d: resolveDefaultExerciseDuration(exItem),
       done: false
     }));
   };
@@ -1304,7 +1304,7 @@ const ImmersiveWorkout = ({
                       const eqConf = getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile);
                       const actW = getSetActualWeight(itemSet, eqConf);
                       const inputW = Number(itemSet?.input_w !== undefined ? itemSet?.input_w : itemSet?.w) || 0;
-                      const hasWeightDiff = (eqConf.baseWeight > 0 || eqConf.ratio !== 1) && actW > 0;
+                      const hasWeightDiff = eqConf.baseWeight > 0 && actW > 0;
                       return (
                         <div className="flex-1 flex flex-col items-center relative">
                           <div className="h-7 mb-2 flex items-center justify-center gap-1.5 relative z-30">
@@ -1331,17 +1331,17 @@ const ImmersiveWorkout = ({
                                      onClick={(e) => e.stopPropagation()}
                                    >
                                      <div className="font-bold text-xs text-sky-400 whitespace-nowrap">
-                                       {eqConf.inputRule === 'plates_total' ? 'Input Total Plat 2 Sisi' :
+                                       {eqConf.inputRule === 'plates_total' || eqConf.inputRule === 'total_plates' ? 'Input Total Plat 2 Sisi' :
                                         eqConf.inputRule === 'plate_per_side' ? 'Input Plat 1 Sisi' :
                                         eqConf.inputRule === 'pin' ? 'Input Pin Beban' :
+                                        eqConf.inputRule === 'per_side_or_pin' ? (eqConf.baseWeight > 0 ? 'Input Plat / Pin' : 'Input Beban 1 Sisi / Pin') :
                                         eqConf.inputRule === 'dumbbell_single' ? 'Input 1 Dumbbell' :
                                         eqConf.inputRule === 'bodyweight_plus' ? 'Input Tambahan Beban' :
                                         `Input ${eqConf.label}`}
                                      </div>
-                                     {(eqConf.baseWeight > 0 || eqConf.ratio !== 1) && (
+                                     {eqConf.baseWeight > 0 && (
                                        <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-300 font-medium">
-                                         {eqConf.baseWeight > 0 && <span>{getBaseWeightLabel(eqConf)}</span>}
-                                         {eqConf.ratio !== 1 && <span>Katrol {eqConf.ratio === 0.5 ? '2:1' : `${eqConf.ratio}:1`}</span>}
+                                         <span>{getBaseWeightLabel(eqConf)}</span>
                                        </div>
                                      )}
                                    </div>
@@ -1457,7 +1457,7 @@ const ImmersiveWorkout = ({
                       const eqConf = getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile);
                       const actW = getSetActualWeight(itemSet, eqConf);
                       const inputW = Number(itemSet?.input_w !== undefined ? itemSet?.input_w : itemSet?.w) || 0;
-                      const hasWeightDiff = exType === 'weight' && (eqConf.baseWeight > 0 || eqConf.ratio !== 1) && actW > 0;
+                      const hasWeightDiff = exType === 'weight' && eqConf.baseWeight > 0 && actW > 0;
                       return (
                         <div className="flex-1 flex flex-col items-center">
                           <div className="h-7 mb-2 flex items-center justify-center">

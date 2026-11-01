@@ -634,7 +634,7 @@ Tolong buatkan program dengan format JSON sesuai aturan <program_proposal>.`;
               return (
                 <div 
                   key={idx}
-                  className={`absolute inset-x-0 top-0 flex flex-col justify-center transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] p-6 sm:p-8 min-h-full rounded-[2.5rem] border ${isDark ? 'border-white/10 bg-[#12141c]/80' : 'border-black/5 bg-white/80'} backdrop-blur-2xl shadow-2xl overflow-y-auto hide-scrollbar`}
+                  className={`absolute inset-x-0 top-0 flex flex-col justify-center transition-all duration-500 ease-out p-6 sm:p-8 min-h-full rounded-[2.5rem] border ${isDark ? 'border-white/10 bg-[#12141c]/80' : 'border-black/5 bg-white/80'} backdrop-blur-2xl shadow-2xl overflow-y-auto hide-scrollbar`}
                   style={{
                     zIndex: 50 - idx,
                     transform: isPast 

@@ -3,7 +3,7 @@ import { doc, setDoc, deleteDoc, getDocs, collection, addDoc, serverTimestamp } 
 import { Send, X, Check, Loader2, Dumbbell, Menu, Plus, MessageSquare, Trash2, Bookmark, ChevronDown, ChevronRight } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
-import { buildSystemPrompt, summarizeWorkoutLogs, summarizeHealthAndRecovery, summarizeBiometrics, summarizeActivePrograms, summarizeFavoriteProgram, needsPersonalContext, needsAppHelpContext, APP_HELP_REFERENCE, chatWithAI, AI_MODELS, getAvailableModels, getProviderStatus, checkOverallAIStatus } from '../utils/aiAgent';
+import { buildSystemPrompt, summarizeWorkoutLogs, summarizeHealthAndRecovery, summarizeBiometrics, summarizeActivePrograms, summarizeFavoriteProgram, needsPersonalContext, needsAppHelpContext, APP_HELP_REFERENCE, chatWithAI, AI_MODELS, getAvailableModels, getProviderStatus, checkOverallAIStatus, generateOfflineAiReply } from '../utils/aiAgent';
 import { fetchExercisesFromApi, pickRelevantExercises } from '../utils/exerciseDbApi';
 import renderMiniMarkdown from '../utils/miniMarkdown';
 import { db } from '../firebase';
@@ -555,12 +555,16 @@ export default function GymAIChat({
         } catch (err) {
             console.error(err);
             if (isOpenRef.current && activeSessionIdRef.current === currentSessionId) {
-                // Drop the empty thinking placeholder instead of leaving it dangling next to the error bubble
-                let errorMsg = `Error: ${err.message}`;
-                if (err.message.includes('quota') || err.message.includes('RATE_LIMIT') || err.message.includes('Semua jalur AI gagal')) {
-                    errorMsg = `Server AI sedang sibuk/penuh, dan API Key pribadi Anda juga telah mencapai limit. Silakan perbarui di Pengaturan.`;
+                // Drop the empty thinking placeholder and provide offline rule-based guidance
+                const isOfflineError = (typeof navigator !== 'undefined' && !navigator.onLine) || err.message?.includes('Failed to fetch') || err.message?.includes('Semua jalur AI gagal') || err.message?.includes('network');
+                const offlineFallbackText = generateOfflineAiReply(currentInput, { history, programs, userProfile, readiness, plateauInsights });
+                
+                let fallbackMsg = offlineFallbackText;
+                if (!isOfflineError && (err.message?.includes('quota') || err.message?.includes('RATE_LIMIT'))) {
+                    fallbackMsg = `Server AI sedang sibuk/penuh limit kuota. Berikut panduan cepat:\n\n${offlineFallbackText}`;
                 }
-                setMessages(prev => [...prev.filter(m => m.id !== tempId), { role: 'model', content: errorMsg, timestamp: Date.now(), isError: true }]);
+                
+                setMessages(prev => [...prev.filter(m => m.id !== tempId), { role: 'model', content: fallbackMsg, timestamp: Date.now(), isOfflineFallback: true }]);
             }
         } finally {
             setIsLoading(false);

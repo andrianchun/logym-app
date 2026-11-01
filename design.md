@@ -45,24 +45,26 @@ Logym mengusung tema **Modern Athletic Glassmorphism** yang selaras dengan ekosi
 | **Emerald / Selesai / Rekor** | `#10B981` (`emerald-500`) | Status "Selesai", pencapaian rekor baru (PR), target tercapai |
 | **Amber / Istirahat / Belum Disimpan** | `#F59E0B` (`amber-500`) | Countdown rest (0s s/d -30s), status "Belum Disimpan", warning |
 | **Violet / AI Coach Logy** | `#8B5CF6` (`violet-500`) | Badge AI Coach Logy, rekomendasi cerdas, badge analitik |
+| **Notification Badge (Putih)** | `#FFFFFF` (`bg-white text-blue-600`) | Badge angka notifikasi belum dibaca (putih bersih dengan kontras teks biru elektrik) |
 
 ---
 
-## 3. Standar Tipografi (1 Jenis Font Seragam: `Inter`)
+## 3. Standar Tipografi Golden Ratio (1 Jenis Font Seragam: `Inter`)
 
-Menggunakan **1 jenis font seragam untuk seluruh aplikasi: `Inter`** (`font-sans`) dengan **Sistem 3 Tingkat Ukuran Baku berbasis `rem`** (Sama persis dengan arsitektur Lomeal). Seluruh judul, subjudul, isi, tombol, dan badge konsisten menggunakan `Inter`.
+Menggunakan **1 jenis font seragam untuk seluruh aplikasi: `Inter`** (`font-sans`) dengan **Sistem 3 Tingkat Ukuran Baku berbasis Golden Ratio ($\phi \approx 1.618$)** (Dipetakan di `tailwind.config.js`). Seluruh judul, subjudul, isi, tombol, dan badge konsisten menggunakan `Inter`.
 
-### 1 Keluarga Huruf Seragam (*Single Font Family*)
-- **`Inter`** (`font-sans`): Digunakan untuk seluruh teks di aplikasi (Judul, Angka, Tombol, Isi, Label, Badge). Memberikan nuansa bersih, modern, dan sangat nyaman dibaca (*high legibility*) di berbagai layar HP/APK.
+### Golden Ratio Scale ($\phi \approx 1.618$)
+Skala tipografi Logym diturunkan dari rasio emas untuk menciptakan ritme optik yang seimbang dan tidak melelahkan mata atlet di gym:
+$$\text{Tier 3 (Caption/Base)} \approx 13\text{px} \xrightarrow{\times 1.618} \text{Tier 2 (Card Title/Metric)} \approx 21\text{px} \xrightarrow{\times 1.618} \text{Tier 1 (Display/Heading)} \approx 34\text{px}$$
 
 ### 3 Hierarki Ukuran Font Baku (Dipetakan di `tailwind.config.js`)
 
-| Tingkat | Utility Class | Ukuran REM (Default PX) | Ketebalan & Tracking | Penggunaan Wajib |
+| Tingkat | Utility Class | Ukuran REM (Default PX) | Rasio Emas | Penggunaan Wajib |
 | :--- | :--- | :--- | :--- | :--- |
-| **Tier 1: Display / Judul Layar** | `.h1` (`text-2xl`) | **2.0625rem** (~33px) | `font-black tracking-tight leading-tight` | • Judul Halaman Utama & Header Layar |
-| **Tier 2: Judul Kartu & Angka Metrik** | `.h2`, `.body-lg` (`text-md`) | **1.3125rem** (~21px) | `font-bold leading-snug` | • Nama Latihan, Angka Beban & Reps, Tombol Aksi Utama |
-| **Tier 3a: Teks Isi & Label** | `.h3`, `.body-md` (`text-sm`) | **1.0000rem** (~16px) | `font-bold / font-semibold leading-relaxed` | • Instruksi Latihan, Label Section, Deskripsi, Status, Pesan |
-| **Tier 3b: Caption & Unit** | `.caption` (`text-xs`) | **0.8125rem** (~13px) | `font-bold / font-semibold` | • Unit suffix (kg, cm, %), Badge kecil, Legend, Keterangan ringkas |
+| **Tier 1: Display / Judul Layar** | `.h1` (`text-2xl` / `text-3xl`) | **2.0625rem** (~33–34px) | $\approx 21\text{px} \times 1.618$ | • Judul Halaman Utama & Header Layar |
+| **Tier 2: Judul Kartu & Angka Metrik** | `.h2`, `.body-lg` (`text-md` / `text-lg`) | **1.3125rem** (~21px) | $\approx 13\text{px} \times 1.618$ | • Nama Latihan, Angka Beban & Reps, Tombol Aksi Utama |
+| **Tier 3: Teks Isi & Label** | `.h3`, `.body-md` (`text-sm`) | **1.0000rem** (~16px) | Skala teks bacaan nyaman | • Instruksi Latihan, Label Section, Deskripsi, Status, Pesan |
+| **Subordinat: Caption & Unit** | `.caption` (`text-xs`) | **0.8125rem** (~13px) | Titik dasar ($\phi^0$) | • Unit suffix (kg, cm, %), Badge kecil, Legend, Keterangan ringkas |
 
 > 💡 **Prinsip Utama**: `text-xs` (13px) untuk elemen subordinat (unit suffix, caption, legend), `text-sm` (16px) untuk teks isi dan label penting. Dilarang keras memakai `text-[10px]` atau font kecil arbitrary agar tata letak tetap proporsional dan tidak pernah kerdil di APK.
 

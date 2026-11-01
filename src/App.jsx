@@ -21,7 +21,7 @@ import BottomNav from './components/BottomNav';
 import TabSlider from './components/TabSlider';
 import FloatingTimer from './components/FloatingTimer';
 import CoachLogyFloat from './components/CoachLogyFloat';
-import GymAIChat from './components/GymAIChat';
+const GymAIChat = React.lazy(() => import('./components/GymAIChat'));
 
 // --- IMPORT HALAMAN (PAGES) ---
 import AuthPage from './pages/AuthPage';
@@ -35,13 +35,12 @@ import DatabaseTab from './pages/DatabaseTab';
 import ProgramTab from './pages/ProgramTab';
 
 // --- IMPORT MODALS ---
-import ExerciseDetailModal from './components/ExerciseDetailModal';
 import ConfirmModal from './modals/ConfirmModal';
-import AddExerciseModal from './modals/AddExerciseModal';
-import SettingsModal from './modals/SettingsModal';
-import HelpModal from './modals/HelpModal';
-// Lazy: modal berat ini (beserta CommunityTab, ShareCardGenerator, html2canvas, dsb.)
-// baru diunduh & di-mount saat pertama kali dibuka — mempercepat startup.
+// Lazy: modal-modal sekunder baru diunduh saat pertama kali dibuka — memangkas bundle awal.
+const ExerciseDetailModal = React.lazy(() => import('./components/ExerciseDetailModal'));
+const AddExerciseModal = React.lazy(() => import('./modals/AddExerciseModal'));
+const SettingsModal = React.lazy(() => import('./modals/SettingsModal'));
+const HelpModal = React.lazy(() => import('./modals/HelpModal'));
 const ProfileModal = React.lazy(() => import('./modals/ProfileModal'));
 const ProgramQuestionnaireModal = React.lazy(() => import('./modals/ProgramQuestionnaireModal'));
 import AchievementPopup from './components/AchievementPopup';
@@ -53,7 +52,7 @@ import { fetchExercisesFromApi } from './utils/exerciseDbApi';
 import { AI_MODELS, detectPlateaus, getLogyNotification } from './utils/aiAgent';
 import { calculateReadiness, restingHrBaseline } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
-import { isCardioExercise, calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, deduplicateWorkouts, recomputeStrengthRecords, buildExLookupByName, canonicalExId, sessionSpanSeconds, repairActualWeights, buildHcSessionDetail, estimate10RM, defaultSetWeight, gymStepFor, mergeRm10, getEquipmentConfig, calculateActualWeight, calculateInputWeight, getSetActualWeight, resolveExerciseProgressiveTarget } from './utils/workoutCalc';
+import { isCardioExercise, calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, deduplicateWorkouts, recomputeStrengthRecords, buildExLookupByName, canonicalExId, sessionSpanSeconds, repairActualWeights, buildHcSessionDetail, estimate10RM, defaultSetWeight, gymStepFor, mergeRm10, getEquipmentConfig, calculateActualWeight, calculateInputWeight, getSetActualWeight, resolveExerciseProgressiveTarget, resolveDefaultExerciseDuration } from './utils/workoutCalc';
 import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcReadHeartRateWindow, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission, capIntradayLog, HC_FIELDS, fillOnlyPatch, hcDroppedTypes } from './utils/healthConnect';
 import { bumpExercisePopularity } from './utils/exercisePopularity';
 import { rapikanNamaProgram, rapikanNamaSesi, pertahankanNamaSesi } from './utils/programNaming';
@@ -65,7 +64,7 @@ import { getLocalYMD, resolveProjectedProgramId, isLomealOwned, resolveLoggedExe
 import { serializeDay, dayFingerprint, migrateBaseline, reconcileHistory, workoutsToMap, workoutIdsFromBaseline, diffFields, cleanFirestoreData, stableStringify, mergeBackupIntoHistory, sessionsPendingSave, compactDayBioData } from './utils/historySync';
 import { useBleManager } from './hooks/useBleManager';
 import { bolehSync, gabungAntrean } from './utils/hcSchedule';
-import { Loader2, Download, X, RotateCcw, Trash2 } from 'lucide-react';
+import { Loader2, Download, X, RotateCcw } from 'lucide-react';
 
 // Kalau device ini baru aja nulis lokal (dalam LOCAL_WRITE_GUARD_MS terakhir), skip snapshot
 // yang masuk SEKALI SAJA — jangan diretry. Tulisan lokal yang masih pending bakal ke-upload
@@ -271,21 +270,45 @@ export default function App() {
       return;
     }
 
+    let bundle = null;
+    const maxRetries = 3;
+    let lastErr = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        setDownloadProgress(attempt === 1 ? 0 : Math.min(25, attempt * 10));
+        bundle = await CapacitorUpdater.download({ url: otaState.url, version: otaState.version });
+        break;
+      } catch (err) {
+        lastErr = err;
+        console.warn(`[OTA] Percobaan unduh ke-${attempt} gagal:`, err);
+        if (attempt < maxRetries) {
+          const backoffDelay = attempt * 1500; // 1.5s, 3s
+          await new Promise(resolve => setTimeout(resolve, backoffDelay));
+        }
+      }
+    }
+
+    if (!bundle) {
+      console.error('OTA Update failed after retries:', lastErr);
+      setDownloadProgress(null);
+      if (otaState.force) {
+        showOtaAlert('Gagal mengunduh pembaruan setelah 3x percobaan. Periksa koneksi internetmu lalu coba lagi.', { title: 'Update gagal' });
+      } else {
+        showOtaAlert('Gagal mengunduh pembaruan. Silakan coba lagi.', { type: 'error' });
+      }
+      return;
+    }
+
     try {
-      setDownloadProgress(0);
-      const bundle = await CapacitorUpdater.download({ url: otaState.url, version: otaState.version });
       setDownloadProgress(100);
       // Jeda 600ms agar user melihat bar 100% dan status ekstraksi sebelum app me-reload bundle baru
       await new Promise(resolve => setTimeout(resolve, 600));
       await CapacitorUpdater.set(bundle); 
     } catch (err) {
-      console.error('OTA Update failed:', err);
+      console.error('OTA Set failed:', err);
       setDownloadProgress(null);
-      if (otaState.force) {
-        showOtaAlert('Gagal mengunduh pembaruan. Periksa koneksi internetmu lalu coba lagi.', { title: 'Update gagal' });
-      } else {
-        showOtaAlert('Gagal mengunduh pembaruan.', { type: 'error' });
-      }
+      showOtaAlert('Gagal menerapkan pembaruan sistem.', { type: 'error' });
     }
   };
 
@@ -1118,7 +1141,7 @@ export default function App() {
           id,
           title: copy.title,
           body: copy.body,
-          schedule: { at: fireAt },
+          schedule: { at: fireAt, allowWhileIdle: true },
           // smallIcon: logo Logym putih 24dp (drawable/ic_stat_logym), bukan ikon 'i' bawaan
           // Capacitor. Ditulis di tiap notifikasi, BUKAN cuma di capacitor.config.json: config
           // itu ikut ter-bundle ke APK, jadi perubahannya tidak pernah sampai lewat OTA.
@@ -1134,19 +1157,32 @@ export default function App() {
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
+    // Riwayat & program HARUS sudah selesai dimuat agar penentuan jadwal dan hari bolos akurat.
+    if (!isDataLoaded || !isHistoryLoaded) return;
+
     const scheduleDailyReminder = async () => {
       try {
         // Dijadwalkan TUJUH HARI ke depan, satu notifikasi per hari (id 8888..8894).
         //
-        // Versi lama memakai satu alarm `repeats: true` dengan teks tetap "Latihan hari ini" —
-        // tidak pernah membaca jadwal, jadi hari istirahat pun tetap disuruh latihan. Teks yang
-        // menyesuaikan mustahil dengan alarm berulang, karena isinya dikunci sekali di awal.
+        // SSOT ENGINE NOTIFIKASI HARIAN:
+        // Seluruh penentuan status hari ini (Rest Day, Hari Latihan, Selesai, atau Absen/Bolos)
+        // disatukan di sini agar TIDAK ADA DUA NOTIFIKASI YANG BERTABRAKAN dalam satu hari.
         //
-        // Kenapa tujuh dan bukan satu: alarm berulang punya satu keunggulan nyata yang tidak
-        // boleh hilang — tetap berbunyi walau aplikasi tidak pernah dibuka lagi. Menjadwalkan
-        // sepekan ke depan mempertahankan itu; tiap kali aplikasi dibuka, jadwalnya disegarkan.
+        // Dulu: sistem pengingat harian (id 8888) dan sistem bolos (id 88000xxx) jalan terpisah.
+        // Akibatnya di Rest Day, sistem harian mengirim "Santai dulu, jadwal kosong" sementara
+        // sistem bolos mengirim "Balik yuk, 2 hari absen" di hari yang sama.
         const ids = Array.from({ length: 7 }, (_, i) => 8888 + i);
         await LocalNotifications.cancel({ notifications: ids.map(id => ({ id })) });
+
+        // Bersihkan ID notifikasi bolos lama (88000xxx) jika tersisa di storage
+        const pendingKey = `lyfit_missed_notif_id_${user?.uid || 'guest'}`;
+        const idLama = Number(localStorage.getItem(pendingKey));
+        if (idLama) {
+          try { await LocalNotifications.cancel({ notifications: [{ id: idLama }] }); } catch (e) {}
+          localStorage.removeItem(pendingKey);
+        }
+        localStorage.removeItem(`lyfit_missed_notif_${user?.uid || 'guest'}`);
+
         if (!reminderEnabled) return;
 
         const perm = await LocalNotifications.checkPermissions();
@@ -1154,6 +1190,9 @@ export default function App() {
 
         const [h, m] = (defaultReminderTime || '09:00').split(':');
         const notifications = [];
+        const MISSED_THRESHOLD_DAYS = 2;
+        const todayYmd = getLocalYMD(new Date());
+        const daysMissed = countMissedScheduledDays(history, programs, activePlanIds, todayYmd);
 
         for (let i = 0; i < 7; i++) {
           const fireAt = new Date();
@@ -1169,7 +1208,13 @@ export default function App() {
 
           let copy = null;
           if (uncompleted.length > 0) {
-            copy = getLogyNotification('start', logyPersona, { program: nama || 'Latihan hari ini' });
+            // Jika hari ini (i === 0) ada jadwal latihan dan user sempat bolos >= 2 sesi sebelumnya:
+            // Dorong dengan notifikasi 'missed' ("Balik yuk, X hari absen...") alih-alih pengingat rutin biasa.
+            if (i === 0 && daysMissed >= MISSED_THRESHOLD_DAYS) {
+              copy = getLogyNotification('missed', logyPersona, { days: daysMissed });
+            } else {
+              copy = getLogyNotification('start', logyPersona, { program: nama || 'Latihan hari ini' });
+            }
           } else if (hasCompleted) {
             // Sudah melakukan latihan di hari tersebut (misal latihan pagi) -> kirim notif apresiasi/pemulihan
             copy = getLogyNotification('completed', logyPersona, {});
@@ -1194,52 +1239,7 @@ export default function App() {
       }
     };
     scheduleDailyReminder();
-  }, [reminderEnabled, defaultReminderTime, logyPersona, history, programs, activePlanIds]);
-
-
-  useEffect(() => {
-    if (!Capacitor.isNativePlatform() || !reminderEnabled) return;
-    // Riwayat & program HARUS sudah selesai dimuat. Efek ini ikut berjalan pada render pertama
-    // ketika history masih kosong/separuh dari cache — hitungannya jadi ngawur (mis. "7 hari"
-    // padahal kemarin latihan), notifikasinya terlanjur dijadwalkan, dan dedup menyimpan angka
-    // salah itu sehingga tidak pernah dikoreksi.
-    if (!isDataLoaded || !isHistoryLoaded) return;
-
-    const MISSED_THRESHOLD_DAYS = 2;
-    const todayYmd = getLocalYMD(new Date());
-    // Hari TERJADWAL yang dilewatkan — bukan "hari sejak latihan terakhir". Yang lama menghitung
-    // hari istirahat sebagai bolos, jadi program 3x seminggu memicu tuduhan ini tiap minggu.
-    const daysMissed = countMissedScheduledDays(history, programs, activePlanIds, todayYmd);
-
-    // Notifikasi "bolos" dijadwalkan ke JAM PENGINGAT, bisa besok — kalau user latihan lagi
-    // sebelum jamnya tiba, tuduhan basi itu tetap berbunyi. Jadi yang tertunda selalu dibatalkan
-    // dulu, baik saat angkanya berubah maupun saat user sudah kembali ke jadwal.
-    const dedupKey = `lyfit_missed_notif_${user?.uid || 'guest'}`;
-    const pendingKey = `lyfit_missed_notif_id_${user?.uid || 'guest'}`;
-    const batalkanTertunda = async () => {
-      const idLama = Number(localStorage.getItem(pendingKey));
-      if (!idLama) return;
-      try { await LocalNotifications.cancel({ notifications: [{ id: idLama }] }); } catch (e) {}
-      localStorage.removeItem(pendingKey);
-    };
-
-    if (daysMissed < MISSED_THRESHOLD_DAYS) {
-      batalkanTertunda();
-      localStorage.removeItem(dedupKey);
-      return;
-    }
-
-    const dedupVal = `${todayYmd}_${daysMissed}`;
-    if (localStorage.getItem(dedupKey) === dedupVal) return;
-
-    const id = 88000000 + (daysMissed % 1000);
-    batalkanTertunda().then(() =>
-      scheduleLogyPush('missed', id, { days: daysMissed }).then(() => {
-        localStorage.setItem(dedupKey, dedupVal);
-        localStorage.setItem(pendingKey, String(id));
-      })
-    );
-  }, [history, programs, activePlanIds, reminderEnabled, logyPersona, defaultReminderTime, user?.uid, isDataLoaded, isHistoryLoaded]);
+  }, [reminderEnabled, defaultReminderTime, logyPersona, history, programs, activePlanIds, isDataLoaded, isHistoryLoaded, user?.uid]);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform() || !reminderEnabled) return;
@@ -1517,11 +1517,16 @@ export default function App() {
       }
     }
 
-    if (!userAchievements.includes('first_workout')) {
-      const newBadge = ACHIEVEMENTS.find(a => a.id === 'first_workout');
-      if (newBadge) {
+    if (!userAchievements.includes('feature_program_1')) {
+      const newBadge = ACHIEVEMENTS.find(a => a.id === 'feature_program_1');
+      if (newBadge && !poppedBadgesRef.current.has('feature_program_1')) {
+        poppedBadgesRef.current.add('feature_program_1');
+        try {
+          const key = `lyfit_popped_badges_${user?.uid || 'guest'}`;
+          localStorage.setItem(key, JSON.stringify(Array.from(poppedBadgesRef.current)));
+        } catch (e) {}
         setUnlockedAchievementsPopup(prev => [...prev, newBadge]);
-        setUserAchievements(prev => [...prev, 'first_workout']);
+        setUserAchievements(prev => [...prev, 'feature_program_1']);
       }
     }
 
@@ -2071,7 +2076,9 @@ export default function App() {
               setLogyCustomInstruction(parsedSettings.logyCustomInstruction || '');
               setLogyMemory(prev => takeServer('logyMemory', prev) ? (Array.isArray(parsedSettings.logyMemory) ? parsedSettings.logyMemory : []) : prev);
             }
-            if (data.userAchievements) setUserAchievements(data.userAchievements);
+            if (Array.isArray(data.userAchievements)) {
+              setUserAchievements(prev => Array.from(new Set([...(prev || []), ...data.userAchievements])));
+            }
             setUser(prev => {
                 if (!prev) return prev;
                 const next = {
@@ -2173,6 +2180,33 @@ export default function App() {
       if (unsubscribeHistory) unsubscribeHistory();
     };
   }, [user?.uid, isAuthChecking]);
+
+  // Muat arsip tahun-tahun terdahulu saat user membuka atau menjelajahi kalender tahun lampau
+  const loadedHistoryYearsRef = useRef(new Set([new Date().getFullYear().toString(), String(new Date().getFullYear() - 1)]));
+  const [loadingHistoryYear, setLoadingHistoryYear] = useState(null);
+
+  const ensureYearHistoryLoaded = useCallback(async (targetYear) => {
+    const yr = String(targetYear);
+    if (!user?.uid || loadedHistoryYearsRef.current.has(yr)) return;
+    loadedHistoryYearsRef.current.add(yr);
+    try {
+      setLoadingHistoryYear(yr);
+      const snap = await getDoc(doc(db, "logym_users", user.uid, "history_years", yr));
+      if (snap.exists()) {
+        const yearData = snap.data();
+        setHistory(prev => {
+          const { next, baseline, kept } = reconcileHistory(prev, yearData, lastSavedHistoryJson.current, yr);
+          setHistoryBaseline(baseline);
+          if (kept.length > 0) console.log(`[Sync] ${yr}: riwayat lampau dimuat:`, kept);
+          return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+        });
+      }
+    } catch (e) {
+      console.warn(`Gagal memuat arsip riwayat tahun ${yr}:`, e);
+    } finally {
+      setLoadingHistoryYear(null);
+    }
+  }, [user?.uid]);
 
   useEffect(() => {
     if (user && isDataLoaded && !hasParseError) {
@@ -2474,30 +2508,65 @@ export default function App() {
   const historyRef = useRef(history);
   const poppedBadgesRef = useRef(new Set());
 
+  // Restore popped badges from localStorage on user change
+  useEffect(() => {
+    try {
+      const key = `lyfit_popped_badges_${user?.uid || 'guest'}`;
+      const saved = localStorage.getItem(key);
+      const parsed = saved ? JSON.parse(saved) : [];
+      const set = new Set([...parsed, ...(Array.isArray(userAchievements) ? userAchievements : [])]);
+      poppedBadgesRef.current = set;
+    } catch (e) {
+      console.warn('Gagal memuat popped badges dari localStorage:', e);
+    }
+  }, [user?.uid]);
+
+  // Keep poppedBadgesRef in sync whenever userAchievements changes
+  useEffect(() => {
+    if (Array.isArray(userAchievements) && userAchievements.length > 0) {
+      let changed = false;
+      userAchievements.forEach(id => {
+        if (!poppedBadgesRef.current.has(id)) {
+          poppedBadgesRef.current.add(id);
+          changed = true;
+        }
+      });
+      if (changed) {
+        try {
+          const key = `lyfit_popped_badges_${user?.uid || 'guest'}`;
+          localStorage.setItem(key, JSON.stringify(Array.from(poppedBadgesRef.current)));
+        } catch (e) {
+          console.warn('Gagal simpan popped badges ke localStorage:', e);
+        }
+      }
+    }
+  }, [userAchievements, user?.uid]);
+
   useEffect(() => {
     if (history === historyRef.current || !isDataLoaded) return;
     const timer = setTimeout(() => {
-      const allDates = Object.keys(history).sort();
-      let lastWorkout = null;
-      if (allDates.length > 0) {
-        const lastDay = history[allDates[allDates.length - 1]];
-        if (lastDay && lastDay.workouts) {
-          const completed = lastDay.workouts.filter(w => w.status === 'completed');
-          if (completed.length > 0) lastWorkout = completed[completed.length - 1];
-        }
-      }
-      const newBadges = checkAchievements(history, userAchievements, lastWorkout);
+      const extraData = {
+        customProgramCount: programs?.length || 0
+      };
+      const newBadges = checkAchievements(history, userAchievements, userProfile, extraData);
       const isRetroactiveSpam = userAchievements.length === 0 && Object.keys(history).length > 1;
       
       const newlyEarned = [];
       newBadges.forEach(b => {
-          if (!poppedBadgesRef.current.has(b.id)) {
-              newlyEarned.push(b);
-              poppedBadgesRef.current.add(b.id);
-          }
+        if (!poppedBadgesRef.current.has(b.id)) {
+          newlyEarned.push(b);
+          poppedBadgesRef.current.add(b.id);
+        }
       });
 
       if (newlyEarned.length > 0) {
+        try {
+          const key = `lyfit_popped_badges_${user?.uid || 'guest'}`;
+          localStorage.setItem(key, JSON.stringify(Array.from(poppedBadgesRef.current)));
+        } catch (e) {
+          console.warn('Gagal simpan popped badges ke localStorage:', e);
+        }
+
         if (!isRetroactiveSpam) {
           if (soundEnabled) {
             const audio = new Audio('/cheer.wav');
@@ -2514,7 +2583,7 @@ export default function App() {
       historyRef.current = history;
     }, 800);
     return () => clearTimeout(timer);
-  }, [history, isDataLoaded, userAchievements, soundEnabled]);
+  }, [history, isDataLoaded, userAchievements, userProfile, programs, soundEnabled, user?.uid]);
 
   useEffect(() => {
     const handleShowAchievement = (e) => {
@@ -2522,6 +2591,10 @@ export default function App() {
       if (!detail || !detail.id) return;
       if (poppedBadgesRef.current.has(detail.id)) return;
       poppedBadgesRef.current.add(detail.id);
+      try {
+        const key = `lyfit_popped_badges_${user?.uid || 'guest'}`;
+        localStorage.setItem(key, JSON.stringify(Array.from(poppedBadgesRef.current)));
+      } catch (e) {}
       
       if (soundEnabled) {
         const audio = new Audio('/cheer.wav');
@@ -2532,7 +2605,7 @@ export default function App() {
     };
     window.addEventListener('show-achievement', handleShowAchievement);
     return () => window.removeEventListener('show-achievement', handleShowAchievement);
-  }, [soundEnabled]);
+  }, [soundEnabled, user?.uid]);
 
   useEffect(() => {
     if (contentTab === 'workout') {
@@ -3485,7 +3558,7 @@ export default function App() {
       ratio: eqConf.ratio,
       total_w: total_w,
       r: suggestedReps, 
-      d: ex?.duration || 10, 
+      d: resolveDefaultExerciseDuration(ex), 
       done: false,
       skipped: false
     }));
@@ -3731,7 +3804,7 @@ export default function App() {
         const ex = getBaseEx(id);
         if (!ex) return;
         const currentLogs = newPrev[id] ? [...newPrev[id]] : [...getSetLogs(ex, id, newPrev)];
-        const lastSet = currentLogs[currentLogs.length - 1] || { w: ex.defaultWeight || 0, r: ex.reps || 10, d: ex.duration || 10 };
+        const lastSet = currentLogs[currentLogs.length - 1] || { w: ex.defaultWeight || 0, r: ex.reps || 10, d: resolveDefaultExerciseDuration(ex) };
         currentLogs.push({ w: lastSet.w, r: lastSet.r, d: lastSet.d, done: false, skipped: false });
         newPrev[id] = currentLogs;
       });
@@ -4534,7 +4607,7 @@ export default function App() {
       saveStateToHistory(); 
       
       let defaultSets = 3; let defaultReps = 10; let defaultDuration = 10;
-      if (ex.type === 'time') { defaultSets = 1; defaultReps = 0; defaultDuration = ex.duration || 15; }
+      if (ex.type === 'time') { defaultSets = 1; defaultReps = 0; defaultDuration = resolveDefaultExerciseDuration(ex); }
       else if (ex.type === 'reps') { defaultSets = 3; defaultReps = ex.reps || 15; defaultDuration = 0; }
 
       const generateId = () => (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
@@ -4603,69 +4676,6 @@ export default function App() {
   const activeDayData = getDayHistory(selectedDate);
   const isCurrentlyCompleted = activeDayData?.status === 'completed';
 
-  const globalTouchStartX = useRef(null);
-  const globalTouchStartY = useRef(null);
-  const swipeAreaRef = useRef(null);
-
-  // SATU penjaga untuk semua dialog, bukan satu penanda per dialog.
-  //
-  // Modal di app ini dirender lewat createPortal ke document.body — tapi React mengalirkan event
-  // lewat pohon KOMPONEN, bukan pohon DOM, jadi sentuhan di dalam modal tetap sampai ke handler
-  // swipe ini. Penjaga lama mengandalkan tiap modal menandai dirinya (`no-swipe` atau
-  // role="dialog"), dan dari ~14 root portal cuma 2 yang melakukannya. Sisanya bocor: swipe di
-  // dalam Detail Latihan layar penuh ikut menggeser tab di belakangnya.
-  //
-  // Pemeriksaan containment DOM menutup semuanya sekaligus, termasuk modal yang belum ditulis:
-  // apa pun yang tidak berada di dalam area swipe secara fisik bukan gestur untuk area ini.
-  const diLuarAreaSwipe = (e) => {
-    const el = e.target;
-    if (swipeAreaRef.current && el instanceof Node && !swipeAreaRef.current.contains(el)) return true;
-    const isTablet = typeof window !== 'undefined' && window.innerWidth >= 640;
-    if (isTablet && el.closest?.('.sm\\:no-swipe')) return true;
-    return !!(el.closest?.('input[type="range"]') || el.closest?.('[role="dialog"]') || el.closest?.('.no-swipe'));
-  };
-
-  const handleGlobalTouchStart = (e) => {
-    if (diLuarAreaSwipe(e)) return;
-    globalTouchStartX.current = e.touches[0].clientX;
-    globalTouchStartY.current = e.touches[0].clientY;
-  };
-
-  const handleGlobalTouchEnd = (e) => {
-    if (globalTouchStartX.current === null || globalTouchStartY.current === null) return;
-    if (diLuarAreaSwipe(e)) return;
-    
-    const touchEndX = e.changedTouches[0].clientX;
-    const touchEndY = e.changedTouches[0].clientY;
-    
-    const distanceX = globalTouchStartX.current - touchEndX;
-    const distanceY = globalTouchStartY.current - touchEndY;
-    
-    globalTouchStartX.current = null;
-    globalTouchStartY.current = null;
-
-    if (window.scrollX !== 0) {
-      window.scrollTo(0, window.scrollY);
-    }
-
-    if (Math.abs(distanceX) > 60 && Math.abs(distanceX) > Math.abs(distanceY) * 1.5) {
-      const tabs = ['dashboard', 'workout', 'calendar', 'program', 'database'];
-      const currentIndex = tabs.indexOf(activeTab);
-      
-      // Sengaja tanpa suara: pindah tab terjadi puluhan kali per sesi, bunyinya jadi berisik.
-      // Tap di BottomNav juga sudah senyap, jadi kedua cara pindah tab konsisten.
-      if (distanceX > 0) {
-        if (currentIndex < tabs.length - 1) {
-          setActiveTab(tabs[currentIndex + 1]);
-        }
-      } else {
-        if (currentIndex > 0) {
-          setActiveTab(tabs[currentIndex - 1]);
-        }
-      }
-    }
-  };
-
   const __cachedUidRender = localStorage.getItem('__CACHED_UID');
   const isWaitingForAuth = isAuthChecking && !__cachedUidRender;
   
@@ -4720,9 +4730,6 @@ export default function App() {
     <>
       <div 
       className={`min-h-screen flex flex-col ${t.bgApp} ${t.textMain} font-sans ${contentTab === 'calendar' ? 'h-[100dvh] overflow-hidden' : 'pb-32'} w-full`}
-      ref={swipeAreaRef}
-      onTouchStart={handleGlobalTouchStart}
-      onTouchEnd={handleGlobalTouchEnd}
     >
       <ConfirmModal confirmModal={confirmModal} setConfirmModal={setConfirmModal} t={t} lang={lang} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} />
 
@@ -4745,22 +4752,35 @@ export default function App() {
           )}
         </div>
       )}
-      <AddExerciseModal t={t} lang={lang} activeAddModalTarget={activeAddModalTarget} setActiveAddModalTarget={setActiveAddModalTarget} exerciseLibrary={exerciseLibrary} onAddExerciseTarget={addExerciseTarget} setActiveTab={setActiveTab} history={history} />
-      <HelpModal showHelp={showHelp} setShowHelp={setShowHelp} t={t} lang={lang} />
+
+      {activeAddModalTarget && (
+        <React.Suspense fallback={null}>
+          <AddExerciseModal t={t} lang={lang} activeAddModalTarget={activeAddModalTarget} setActiveAddModalTarget={setActiveAddModalTarget} exerciseLibrary={exerciseLibrary} onAddExerciseTarget={addExerciseTarget} setActiveTab={setActiveTab} history={history} />
+        </React.Suspense>
+      )}
+
+      {showHelp && (
+        <React.Suspense fallback={null}>
+          <HelpModal showHelp={showHelp} setShowHelp={setShowHelp} t={t} lang={lang} />
+        </React.Suspense>
+      )}
+
       {globalDetailExercise && (
-        <ExerciseDetailModal 
-          ex={globalDetailExercise} 
-          onClose={() => setGlobalDetailExercise(null)} 
-          t={t} lang={lang} soundEnabled={soundEnabled} 
-          fullHistory={history}
-          units={units}
-          exerciseLibrary={exerciseLibrary}
-          setExerciseLibrary={setExerciseLibrary}
-          programs={programs}
-          gymProfiles={gymProfiles}
-          activeGymId={activeGymId}
-          userProfile={userProfile}
-        />
+        <React.Suspense fallback={null}>
+          <ExerciseDetailModal 
+            ex={globalDetailExercise} 
+            onClose={() => setGlobalDetailExercise(null)} 
+            t={t} lang={lang} soundEnabled={soundEnabled} 
+            fullHistory={history}
+            units={units}
+            exerciseLibrary={exerciseLibrary}
+            setExerciseLibrary={setExerciseLibrary}
+            programs={programs}
+            gymProfiles={gymProfiles}
+            activeGymId={activeGymId}
+            userProfile={userProfile}
+          />
+        </React.Suspense>
       )}
       
       {(showQuestionnaire || questionnaireOpened.current) && (
@@ -4815,36 +4835,40 @@ export default function App() {
       </React.Suspense>
       )}
 
-        <SettingsModal
-           showSettings={showSettings} setShowSettings={setShowSettings} t={t} lang={lang} 
-           theme={theme} setTheme={setTheme} language={language} setLanguage={setLanguage} 
-           soundEnabled={soundEnabled} setSoundEnabled={setSoundEnabled}
-           userApiKeys={userApiKeys} setUserApiKeys={setUserApiKeys}
-           keyStatuses={keyStatuses}
-           userProfile={userProfile}
-           bleManager={bleManager}
-           logyPersona={logyPersona} setLogyPersona={setLogyPersona}
-           logyCustomInstruction={logyCustomInstruction} setLogyCustomInstruction={setLogyCustomInstruction}
-           logyMemory={logyMemory} setLogyMemory={setLogyMemory}
-         defaultRestTime={defaultRestTime} setDefaultRestTime={setDefaultRestTime}
-         weekStartDay={weekStartDay} setWeekStartDay={setWeekStartDay}
-         defaultReminderTime={defaultReminderTime} setDefaultReminderTime={setDefaultReminderTime}
-         reminderEnabled={reminderEnabled} setReminderEnabled={setReminderEnabled}
-         biometricStandard={biometricStandard} setBiometricStandard={setBiometricStandard}
-         units={units} setUnits={setUnits}
-         undoStack={undoStack} redoStack={redoStack} handleUndo={handleUndo} handleRedo={handleRedo}
-         setShowHelp={setShowHelp}
-         exportData={exportData} handleImportFile={handleImportFile}
-         user={user} handleLogout={handleLogout} handleDeleteAccount={handleDeleteAccount}
-         setConfirmModal={setConfirmModal}
-         connectedApps={connectedApps} setConnectedApps={setConnectedApps}
-         otaAvailable={!!otaState.version && otaState.version !== currentVer}
-         otaState={otaState} currentVer={currentVer} onUpdateApp={handleUpdateApp} downloadProgress={downloadProgress}
-         healthConnectEnabled={healthConnectEnabled} onToggleHealthConnect={handleToggleHealthConnect}
-         healthAvailable={healthAvailable} onHcBackfill={handleHcBackfill}
-         setHistory={setHistory}
-         backupList={backupList} isRestoring={isRestoring} onLoadBackups={loadBackupList} onRestoreBackup={restoreFromBackup}
-      />
+      {showSettings && (
+        <React.Suspense fallback={null}>
+          <SettingsModal
+             showSettings={showSettings} setShowSettings={setShowSettings} t={t} lang={lang} 
+             theme={theme} setTheme={setTheme} language={language} setLanguage={setLanguage} 
+             soundEnabled={soundEnabled} setSoundEnabled={setSoundEnabled}
+             userApiKeys={userApiKeys} setUserApiKeys={setUserApiKeys}
+             keyStatuses={keyStatuses}
+             userProfile={userProfile}
+             bleManager={bleManager}
+             logyPersona={logyPersona} setLogyPersona={setLogyPersona}
+             logyCustomInstruction={logyCustomInstruction} setLogyCustomInstruction={setLogyCustomInstruction}
+             logyMemory={logyMemory} setLogyMemory={setLogyMemory}
+             defaultRestTime={defaultRestTime} setDefaultRestTime={setDefaultRestTime}
+             weekStartDay={weekStartDay} setWeekStartDay={setWeekStartDay}
+             defaultReminderTime={defaultReminderTime} setDefaultReminderTime={setDefaultReminderTime}
+             reminderEnabled={reminderEnabled} setReminderEnabled={setReminderEnabled}
+             biometricStandard={biometricStandard} setBiometricStandard={setBiometricStandard}
+             units={units} setUnits={setUnits}
+             undoStack={undoStack} redoStack={redoStack} handleUndo={handleUndo} handleRedo={handleRedo}
+             setShowHelp={setShowHelp}
+             exportData={exportData} handleImportFile={handleImportFile}
+             user={user} handleLogout={handleLogout} handleDeleteAccount={handleDeleteAccount}
+             setConfirmModal={setConfirmModal}
+             connectedApps={connectedApps} setConnectedApps={setConnectedApps}
+             otaAvailable={!!otaState.version && otaState.version !== currentVer}
+             otaState={otaState} currentVer={currentVer} onUpdateApp={handleUpdateApp} downloadProgress={downloadProgress}
+             healthConnectEnabled={healthConnectEnabled} onToggleHealthConnect={handleToggleHealthConnect}
+             healthAvailable={healthAvailable} onHcBackfill={handleHcBackfill}
+             setHistory={setHistory}
+             backupList={backupList} isRestoring={isRestoring} onLoadBackups={loadBackupList} onRestoreBackup={restoreFromBackup}
+          />
+        </React.Suspense>
+      )}
 
       <Header
         setConfirmModal={setConfirmModal} t={t} theme={theme} user={user} 
@@ -4952,6 +4976,8 @@ export default function App() {
                    workoutStartTime={workoutStartTime}
                    extraExercises={extraExercises}
                    setExtraExercises={setExtraExercises}
+                   ensureYearHistoryLoaded={ensureYearHistoryLoaded}
+                   loadingHistoryYear={loadingHistoryYear}
                  />
              </div>
          )}
@@ -5034,33 +5060,37 @@ export default function App() {
       )}
 
       {/* === GLOBAL GYMCHAT (accessible from any tab) === */}
-      <GymAIChat
-        isOpen={showAiChat}
-        onClose={() => setShowAiChat(false)}
-        userApiKeys={userApiKeys}
-        keyStatuses={keyStatuses}
-        setKeyStatuses={setKeyStatuses}
-        setShowSettings={setShowSettings}
-        userProfile={userProfile}
-        history={history}
-        exerciseLibrary={exerciseLibrary}
-        programs={programs}
-        activePlanIds={activePlanIds}
-        plateauInsights={plateauInsights}
-        logyPersona={logyPersona}
-        logyCustomInstruction={logyCustomInstruction}
-        logyMemory={logyMemory}
-        setLogyMemory={setLogyMemory}
-        onUnreadChange={setHasUnreadChat}
-        onAcceptProgram={handleAcceptAiProgram}
-        user={user}
-        setConfirmModal={setConfirmModal}
-        avatarOrigin={avatarPos}
-        lomealToday={lomealToday}
-        lomealTargets={lomealTargets}
-        readiness={readiness}
-        activityTargets={activityTargets}
-      />
+      {showAiChat && (
+        <React.Suspense fallback={null}>
+          <GymAIChat
+            isOpen={showAiChat}
+            onClose={() => setShowAiChat(false)}
+            userApiKeys={userApiKeys}
+            keyStatuses={keyStatuses}
+            setKeyStatuses={setKeyStatuses}
+            setShowSettings={setShowSettings}
+            userProfile={userProfile}
+            history={history}
+            exerciseLibrary={exerciseLibrary}
+            programs={programs}
+            activePlanIds={activePlanIds}
+            plateauInsights={plateauInsights}
+            logyPersona={logyPersona}
+            logyCustomInstruction={logyCustomInstruction}
+            logyMemory={logyMemory}
+            setLogyMemory={setLogyMemory}
+            onUnreadChange={setHasUnreadChat}
+            onAcceptProgram={handleAcceptAiProgram}
+            user={user}
+            setConfirmModal={setConfirmModal}
+            avatarOrigin={avatarPos}
+            lomealToday={lomealToday}
+            lomealTargets={lomealTargets}
+            readiness={readiness}
+            activityTargets={activityTargets}
+          />
+        </React.Suspense>
+      )}
       {aiDialog}
       {/* Toast "Tekan Back Sekali Lagi" */}
       {showExitToast && (
@@ -5071,20 +5101,19 @@ export default function App() {
         </div>
       )}
 
-      {/* Toast Urungkan Hapus Set */}
+      {/* Toast Urungkan Hapus Set (Standar design.md: Glassmorphism, Primary Gradient, Touch Target >= 44px, Tanpa Ikon Sampah Redundan) */}
       {undoDeletedSet && undoDeletedSet.length > 0 && (
-        <div className="fixed bottom-24 left-4 right-4 z-[9999] max-w-sm mx-auto animate-in slide-in-from-bottom-4 fade-in duration-200 pointer-events-auto">
-          <div className="bg-slate-900/95 dark:bg-slate-800/95 text-white backdrop-blur-md px-4 py-3 rounded-2xl shadow-2xl border border-white/10 flex items-center justify-between gap-3">
-            <div className="text-sm font-semibold flex items-center gap-2 truncate">
-              <Trash2 size={16} className="text-rose-400 shrink-0" />
-              <span className="truncate">Set {undoDeletedSet[0].setIdx + 1} dihapus</span>
-            </div>
+        <div className={`fixed ${isWorkoutActive && !isImmersiveMode ? 'bottom-[calc(10.5rem+env(safe-area-inset-bottom,20px))]' : 'bottom-[calc(5.75rem+env(safe-area-inset-bottom,16px))]'} left-4 right-4 z-[9999] max-w-sm mx-auto animate-in slide-in-from-bottom-3 fade-in duration-200 pointer-events-auto transition-all`}>
+          <div className="bg-[#0B132B]/95 text-white backdrop-blur-xl px-4 sm:px-5 py-3 rounded-2xl sm:rounded-3xl shadow-2xl shadow-black/50 border border-white/10 flex items-center justify-between gap-3">
+            <span className="text-sm font-semibold text-slate-100 truncate">
+              Set {undoDeletedSet[0].setIdx + 1} dihapus
+            </span>
             <button
               onClick={handleRestoreSet}
-              className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black uppercase tracking-wider transition-all active:scale-95 shrink-0 flex items-center gap-1 shadow-md"
+              className="h-10 px-4 rounded-xl bg-gradient-to-r from-[#3B82F6] to-[#1D4ED8] hover:brightness-110 active:scale-95 text-white text-sm font-bold tracking-wide transition-all shrink-0 flex items-center gap-1.5 shadow-md shadow-blue-500/20"
             >
-              <RotateCcw size={13} />
-              Urungkan
+              <RotateCcw size={15} strokeWidth={2.5} />
+              <span>Urungkan</span>
             </button>
           </div>
         </div>

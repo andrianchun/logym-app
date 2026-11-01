@@ -613,8 +613,8 @@ console.log('workoutCalc OK', { cardioKcal, plankKcal, liftKcal });
   assert.equal(calculateActualWeight(5, conf1to1), 10, 'Plat 5 kg + beban dasar 5 kg (rasio 1:1) harus = 10 kg aktual');
 
   // 4. Konfigurasi Profil Gym untuk Cable:
-  //    Contoh katrol 2:1 (0.5x), beban dasar 5 kg
-  //    Jika plat 5 kg -> (5 * 0.5) + 5 = 7.5 kg
+  //    Rasio katrol diseragamkan 1:1, beban dasar 5 kg
+  //    Jika plat 5 kg -> 5 + 5 = 10 kg
   const gymProfiles2to1 = [{
     id: 'gym_user_2',
     name: 'My Gym 2',
@@ -624,8 +624,8 @@ console.log('workoutCalc OK', { cardioKcal, plankKcal, liftKcal });
   }];
   const conf2to1 = getEquipmentConfig(gymProfiles2to1, 'gym_user_2', exCable);
   assert.equal(conf2to1.baseWeight, 5);
-  assert.equal(conf2to1.ratio, 0.5);
-  assert.equal(calculateActualWeight(5, conf2to1), 7.5, 'Plat 5 kg katrol 2:1 + dasar 5 kg = 7.5 kg');
+  assert.equal(conf2to1.ratio, 1, 'Rasio katrol diseragamkan 1:1');
+  assert.equal(calculateActualWeight(5, conf2to1), 10, 'Plat 5 kg + dasar 5 kg = 10 kg');
 
   // 5. Case-insensitivity pada gym.config dan equipment exercise
   const gymProfilesLower = [{

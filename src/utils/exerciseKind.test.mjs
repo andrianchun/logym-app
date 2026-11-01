@@ -2,7 +2,7 @@
 // Kalau ini salah, tidak ada yang error — satuan durasi diam-diam terbaca menit padahal detik
 // (atau sebaliknya), dan kalori sesi meleset puluhan kali lipat.
 import assert from 'node:assert/strict';
-import { resolveExerciseKind, durationUnitOf } from './workoutCalc.js';
+import { resolveExerciseKind, durationUnitOf, resolveDefaultExerciseDuration } from './workoutCalc.js';
 
 // 1. Tipe non-'time' diteruskan apa adanya — tidak pernah dipromosikan.
 assert.equal(resolveExerciseKind({ name: 'Bench Press', type: 'weight' }), 'weight');
@@ -38,5 +38,12 @@ assert.equal(resolveExerciseKind({ name: 'Cable Seated Row', type: 'weight' }), 
 
 // 7. target boleh string, bukan cuma array — beberapa latihan custom menyimpannya begitu.
 assert.equal(resolveExerciseKind({ name: 'Sesi X', type: 'time', target: 'Cardio' }), 'cardio');
+
+// 8. Resolusi durasi default detik untuk Plank / latihan waktu (konversi menit -> detik)
+assert.equal(resolveDefaultExerciseDuration({ name: 'Plank', type: 'time', duration: 1 }), 60, '1 menit di program harus 60 detik');
+assert.equal(resolveDefaultExerciseDuration({ name: 'Plank', type: 'time', duration: 2 }), 120, '2 menit di program harus 120 detik');
+assert.equal(resolveDefaultExerciseDuration({ name: 'Plank', type: 'time', duration: 45 }), 45, '45 detik tetap 45 detik');
+assert.equal(resolveDefaultExerciseDuration({ name: 'Plank', type: 'time', duration: 0 }), 60, '0 / kosong default 60 detik (1 menit)');
+assert.equal(resolveDefaultExerciseDuration({ name: 'Treadmill', type: 'cardio', duration: 20 }), 20, 'Kardio tetap dalam menit');
 
 console.log('exerciseKind OK');

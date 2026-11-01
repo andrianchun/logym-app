@@ -1105,3 +1105,45 @@ export const generateDeterministicProgram = (answers, userProfile, exerciseLibra
     }
 };
 
+/**
+ * Fallback offline berbasis aturan deterministik saat perangkat tidak terhubung internet
+ * atau API cloud mengalami kegagalan.
+ */
+export function generateOfflineAiReply(userPrompt, context = {}) {
+    const prompt = (userPrompt || '').toLowerCase();
+    const { readiness = null } = context;
+
+    // 1. Target beban / Progressive Overload
+    if (prompt.includes('target') || prompt.includes('beban') || prompt.includes('progres') || prompt.includes('naik beban') || prompt.includes('overload')) {
+        return `[Mode Offline] Untuk progres latihan berikutnya, terapkan aturan Progressive Overload:\n\n1. Selesaikan target repetisi tertinggi di semua set dengan form sempurna terlebih dahulu.\n2. Jika sudah tembus (misal 3 set x 12 reps), naikkan beban ke step terkecil (+1.25 kg s/d +2.5 kg untuk barbell/dumbbell, atau 1 pin untuk mesin/cable).\n3. Saat beban naik, turunkan target reps ke batas bawah (misal 8–10 reps), lalu ulangi prosesnya bertahap.`;
+    }
+
+    // 2. Kesiapan fisik / Capek / Tidur / Recovery / Readiness
+    if (prompt.includes('capek') || prompt.includes('lelah') || prompt.includes('istirahat') || prompt.includes('recovery') || prompt.includes('readiness') || prompt.includes('tidur')) {
+        const score = readiness?.score;
+        let advice = `[Mode Offline] Kondisi pemulihan fisikmu`;
+        if (score !== undefined && score !== null) {
+            advice += ` saat ini berada di skor ${score}/100. `;
+            if (score >= 80) advice += `Kondisimu prima! Siap untuk latihan dengan intensitas atau volume maksimal.`;
+            else if (score >= 60) advice += `Kondisimu cukup baik. Lakukan latihan sesuai program reguler tanpa memaksakan PR ekstrem.`;
+            else advice += `Kondisimu sedang lelah atau kurang tidur. Prioritaskan tidur berkualitas, nutrisi cukup, atau pertimbangkan sesi pemulihan ringan (active recovery / deload).`;
+        } else {
+            advice += `: Pastikan tidur 7–8 jam dan konsumsi protein serta cairan cukup untuk mengoptimalkan regenerasi otot sebelum sesi berikutnya.`;
+        }
+        return advice;
+    }
+
+    // 3. Jadwal latihan / Program hari ini
+    if (prompt.includes('jadwal') || prompt.includes('hari ini') || prompt.includes('program') || prompt.includes('latihan apa')) {
+        return `[Mode Offline] Buka tab 'Latihan' untuk melihat rutinitas aktif terjadwal hari ini. Jika hari ini rest day, kamu bisa fokus pada pemulihan, mobilitas ringan, atau mencukupi kebutuhan langkah harianmu.`;
+    }
+
+    // 4. Stagnasi / Plateau
+    if (prompt.includes('plateau') || prompt.includes('stuck') || prompt.includes('stagnan') || prompt.includes('mentok')) {
+        return `[Mode Offline] Jika angkatanmu mentok di beban yang sama selama 2–3 sesi:\n\n1. Lakukan Deload: turunkan beban 10–15% selama 1 minggu untuk memberi sendi dan sistem saraf waktu regenerasi.\n2. Tingkatkan volume mikro: tambah 1–2 repetisi ekstra atau perlambat tempo negatif (eccentric 3 detik).\n3. Evaluasi asupan nutrisi dan tidur: otot butuh bahan bakar dan istirahat untuk tumbuh lebih kuat.`;
+    }
+
+    // 5. Default offline coach response
+    return `[Mode Offline] Coach Logy sedang dalam mode offline tanpa koneksi internet. Kamu tetap bisa mencatat set latihan, melihat target beban otomatis di kartu latihan, dan mengecek kesiapan fisikmu secara offline!`;
+}
+

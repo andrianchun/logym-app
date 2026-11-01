@@ -1,9 +1,10 @@
-import React, { useEffect } from 'react';
-import { X, Share2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { X, Share2, Loader2 } from 'lucide-react';
 import { shareAchievementToFeed } from '../utils/communityApi';
 
 const AchievementPopup = ({ achievements, onClose, soundEnabled, playSoundEffect, theme, t, user, onShareComplete }) => {
-  const [canClose, setCanClose] = React.useState(false);
+  const [canClose, setCanClose] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
 
   useEffect(() => {
     if (achievements && achievements.length > 0) {
@@ -32,22 +33,29 @@ const AchievementPopup = ({ achievements, onClose, soundEnabled, playSoundEffect
   const ach = achievements[0];
 
   const handleShare = async () => {
-    if (!canClose) return;
+    if (!canClose || isSharing) return;
+    setIsSharing(true);
     playSoundEffect('click', soundEnabled);
-    if (user) {
-      const postId = await shareAchievementToFeed(
-        user.uid,
-        user.name || user.email?.split('@')[0],
-        user.photoURL,
-        ach
-      );
-      if (onShareComplete) onShareComplete(postId);
+    try {
+      if (user) {
+        const postId = await shareAchievementToFeed(
+          user.uid,
+          user.name || user.email?.split('@')[0],
+          user.photoURL,
+          ach
+        );
+        if (onShareComplete) onShareComplete(postId);
+      }
+      onClose(ach.id);
+    } catch (err) {
+      console.error("Gagal share achievement:", err);
+    } finally {
+      setIsSharing(false);
     }
-    onClose(ach.id);
   };
 
   const handleClose = () => {
-    if (!canClose) return;
+    if (!canClose || isSharing) return;
     playSoundEffect('click', soundEnabled);
     onClose(ach.id);
   };
@@ -93,16 +101,25 @@ const AchievementPopup = ({ achievements, onClose, soundEnabled, playSoundEffect
           <div className="flex flex-col gap-2 w-full">
             <button
               onClick={handleShare}
-              disabled={!canClose}
-              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-2 font-black text-white ${btnBg} shadow-lg ${btnShadow} transition-all ${!canClose ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90 active:scale-[0.98]'}`}
+              disabled={!canClose || isSharing}
+              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-2 font-black text-white ${btnBg} shadow-lg ${btnShadow} transition-all ${(!canClose || isSharing) ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90 active:scale-[0.98]'}`}
             >
-              <Share2 size={20} />
-              Bagikan ke Komunitas
+              {isSharing ? (
+                <>
+                  <Loader2 size={20} className="animate-spin" />
+                  <span>Membagikan...</span>
+                </>
+              ) : (
+                <>
+                  <Share2 size={20} />
+                  <span>Bagikan ke Komunitas</span>
+                </>
+              )}
             </button>
             <button
               onClick={handleClose}
-              disabled={!canClose}
-              className={`w-full py-3 rounded-2xl flex items-center justify-center gap-2 font-bold transition-colors ${!canClose ? 'opacity-50 cursor-not-allowed' : (isDark ? 'text-white/60 hover:text-white bg-white/5' : 'text-black/60 hover:text-black bg-black/5')}`}
+              disabled={!canClose || isSharing}
+              className={`w-full py-3 rounded-2xl flex items-center justify-center gap-2 font-bold transition-colors ${(!canClose || isSharing) ? 'opacity-50 cursor-not-allowed' : (isDark ? 'text-white/60 hover:text-white bg-white/5' : 'text-black/60 hover:text-black bg-black/5')}`}
             >
               Nanti Saja
             </button>

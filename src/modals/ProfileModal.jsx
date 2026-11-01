@@ -59,6 +59,7 @@ export default function ProfileModal({
     const [isEditingName, setIsEditingName] = useState(false);
     const [newName, setNewName] = useState(user?.name || '');
     const [isUploading, setIsUploading] = useState(false);
+    const [isSharingBadge, setIsSharingBadge] = useState(false);
     const [showModPanel, setShowModPanel] = useState(false);
     const [localHighlight, setLocalHighlight] = useState(null);
     const [viewingUserId, setViewingUserId] = useState(initialViewingUserId?.userId || null);
@@ -825,17 +826,25 @@ export default function ProfileModal({
                         {userAchievements?.includes(selectedAchievement.id) && (
                             <button 
                                 onClick={async () => {
-                                    const postId = await shareAchievementToFeed(user.uid, user.name || user.email?.split('@')[0], user.photoURL, selectedAchievement);
-                                    setSelectedAchievement(null);
-                                    // Switch to community feed and highlight the post
-                                    setActiveTab('beranda');
-                                    if (onAchievementShareComplete) {
-                                        onAchievementShareComplete(postId);
+                                    if (isSharingBadge) return;
+                                    setIsSharingBadge(true);
+                                    try {
+                                        const postId = await shareAchievementToFeed(user.uid, user.name || user.email?.split('@')[0], user.photoURL, selectedAchievement);
+                                        setSelectedAchievement(null);
+                                        // Switch to community feed and highlight the post
+                                        setActiveTab('beranda');
+                                        if (onAchievementShareComplete) {
+                                            onAchievementShareComplete(postId);
+                                        }
+                                    } finally {
+                                        setIsSharingBadge(false);
                                     }
                                 }}
-                                className={`w-full py-3.5 rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition-all active:scale-95 ${t.bgAccent} shadow-md ${t.textAccent === 'text-white' ? 'text-white' : 'text-slate-900'}`}
+                                disabled={isSharingBadge}
+                                className={`w-full py-3.5 rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition-all active:scale-95 ${t.bgAccent} shadow-md ${t.textAccent === 'text-white' ? 'text-white' : 'text-slate-900'} ${isSharingBadge ? 'opacity-60 cursor-not-allowed' : ''}`}
                             >
-                                <Share2 size={18} /> Bagikan ke Feed Komunitas
+                                {isSharingBadge ? <Loader2 size={18} className="animate-spin" /> : <Share2 size={18} />} 
+                                {isSharingBadge ? 'Membagikan...' : 'Bagikan ke Feed Komunitas'}
                             </button>
                         )}
                     </div>

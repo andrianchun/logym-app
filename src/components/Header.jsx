@@ -63,7 +63,7 @@ const Header = ({ t, theme, user, showSettings, setShowSettings, setShowProfileM
           >
             <Bell size={22} strokeWidth={2} />
             {unreadCount > 0 && (
-              <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center border border-white">
+              <span className="absolute -top-0.5 -right-0.5 min-w-[1.125rem] h-[1.125rem] px-1 bg-white text-blue-600 text-xs font-black rounded-full flex items-center justify-center shadow-md border border-slate-200 dark:border-white/30 z-10 animate-pulse">
                 {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}

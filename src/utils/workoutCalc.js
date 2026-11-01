@@ -347,6 +347,22 @@ export const resolveExerciseKind = (ex) => {
 export const durationUnitOf = (ex) => (resolveExerciseKind(ex) === 'cardio' ? 'menit' : 'detik');
 
 /**
+ * Resolusi durasi default (dalam DETIK) untuk set latihan bertipe 'time' (mis. Plank).
+ *
+ * Di editor program (ProgramTab), satuan durasi berlabel 'Min' (mis. user memasukkan 1 untuk 1 menit).
+ * Jika angka di program bernilai kecil (<= 5), itu merepresentasikan MENIT dan wajib dikonversi ke DETIK (1 mnt -> 60 dtk).
+ * Jika bernilai > 5 (mis. 30, 45, 60), angka tersebut sudah berupa DETIK.
+ * Jika kosong / 0, gunakan default realistis 60 detik (1 menit).
+ */
+export const resolveDefaultExerciseDuration = (ex) => {
+  const isCardio = ex?.type === 'cardio' || ex?.target?.includes('Cardio') || ex?.category === 'cardio';
+  if (isCardio) return Number(ex?.duration) || 15;
+  const raw = Number(ex?.duration);
+  if (!raw || raw <= 0) return 60;
+  return (raw <= 5) ? raw * 60 : raw;
+};
+
+/**
  * Pecah kalori satu sesi jadi { kardio, beban }.
  *
  * Jumlah keduanya DIJAMIN sama persis dengan calculateSmartWorkoutCalories untuk sesi yang sama:
@@ -705,7 +721,7 @@ export const getEquipmentConfig = (gymProfiles, activeGymId, ex, userProfile = n
   return {
     equipment: eq,
     baseWeight: Number(baseWeight) || 0,
-    ratio: Number(ratio) || 1,
+    ratio: 1,
     increment: Number(increment) || 2.5,
     inputRule: def.inputRule || 'custom',
     label: def.label || 'Beban',
@@ -716,28 +732,26 @@ export const getEquipmentConfig = (gymProfiles, activeGymId, ex, userProfile = n
 
 /**
  * Hitung beban aktual dari input mentah user (plat/pin).
- * Rumus Wajib: total_w = (input_w * ratio) + baseWeight
+ * Rumus Wajib: total_w = input_w + baseWeight
  */
 export const calculateActualWeight = (inputWeight, config) => {
   const inputW = Number(inputWeight) || 0;
   if (!config) return inputW;
-  const ratio = config.ratio !== undefined ? Number(config.ratio) : 1;
   const baseWeight = config.baseWeight !== undefined ? Number(config.baseWeight) : 0;
-  return Math.round(((inputW * ratio) + baseWeight) * 100) / 100;
+  return Math.round((inputW + baseWeight) * 100) / 100;
 };
 
 /**
  * Konversi beban aktual (total_w) kembali ke input mentah user (plat/pin).
  * Kebalikan dari calculateActualWeight:
- * total_w = (input_w * ratio) + baseWeight
- * input_w = (total_w - baseWeight) / ratio
+ * total_w = input_w + baseWeight
+ * input_w = total_w - baseWeight
  */
 export const calculateInputWeight = (actualWeight, config) => {
   const actW = Number(actualWeight) || 0;
   if (!config) return actW;
-  const ratio = config.ratio !== undefined && Number(config.ratio) > 0 ? Number(config.ratio) : 1;
   const baseWeight = config.baseWeight !== undefined ? Number(config.baseWeight) : 0;
-  const rawInput = (actW - baseWeight) / ratio;
+  const rawInput = actW - baseWeight;
   return Math.round(Math.max(0, rawInput) * 100) / 100;
 };
 
@@ -756,8 +770,17 @@ export const getSetActualWeight = (set, config = null) => {
     return rawW;
   }
 
-  // Jika set sudah memiliki total_w dan explicit base_w atau ratio (bukan 1:1 default)
-  const hasExplicitConfig = (set.base_w !== undefined && Number(set.base_w) > 0) || (set.ratio !== undefined && Number(set.ratio) !== 1);
+  // Set lama yang memakai rasio katrol < 1 (misal 0.5 pada 2:1) membuat total_w < rawW,
+  // yang menyebabkan pengguna terpotong bebannya hingga setengah saat rasio diseragamkan ke 1:1.
+  // Jika rasio set < 1 atau total_w < rawW padahal bukan assisted: hitung ulang beban aktual dari rawW + baseWeight!
+  const hasCorruptedRatio = set.ratio !== undefined && Number(set.ratio) < 1;
+  const isCorruptedTotal = set.total_w !== undefined && Number(set.total_w) < rawW && rawW > 0 && !config.isAssisted;
+  if (hasCorruptedRatio || isCorruptedTotal) {
+    return calculateActualWeight(rawW, config);
+  }
+
+  // Jika set sudah memiliki total_w dan explicit base_w (bukan 0 default)
+  const hasExplicitConfig = set.base_w !== undefined && Number(set.base_w) > 0;
   if (set.total_w !== undefined && set.total_w !== null && Number(set.total_w) > 0 && hasExplicitConfig) {
     return Number(set.total_w);
   }
@@ -1328,11 +1351,14 @@ export const repairActualWeights = (history, exLookup, eqConfOf) => {
         const baru = daftar.map((set) => {
           if (!set) return set;
           const dasarLama = Number(set.base_w) || 0;
-          if (dasarLama > 0) return set;                       // sudah punya dasar sungguhan
+          const rasioLama = Number(set.ratio) || 1;
           const input = Number(set.input_w !== undefined ? set.input_w : set.w) || 0;
           if (input <= 0) return set;                          // set kosong / bukan set beban
-          const rasio = Number(set.ratio) || Number(conf.ratio) || 1;
-          const totalBaru = Math.round((input * rasio + dasarBaru) * 100) / 100;
+          const hasInvalidRatio = rasioLama < 1;
+          const isCorruptedTotal = set.total_w !== undefined && Number(set.total_w) < input && !conf?.isAssisted;
+          if (dasarLama > 0 && !hasInvalidRatio && !isCorruptedTotal) return set;
+          const rasio = 1;
+          const totalBaru = Math.round((input + dasarBaru) * 100) / 100;
           if (totalBaru === (Number(set.total_w) || 0)) return set;
           adaYangBerubah = true;
           diubah++;

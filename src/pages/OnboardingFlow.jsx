@@ -178,7 +178,7 @@ const OnboardingFlow = ({ t, theme, onComplete }) => {
             return (
               <div
                 key={s.key}
-                className={`absolute inset-0 flex flex-col justify-center transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] p-6 sm:p-8 rounded-[2.5rem] border ${isDark ? 'border-white/10 bg-white/[0.045]' : 'border-black/5 bg-white/80'} backdrop-blur-2xl shadow-2xl overflow-hidden`}
+                className={`absolute inset-0 flex flex-col justify-center transition-all duration-500 ease-out p-6 sm:p-8 rounded-[2.5rem] border ${isDark ? 'border-white/10 bg-white/[0.045]' : 'border-black/5 bg-white/80'} backdrop-blur-2xl shadow-2xl overflow-hidden`}
                 style={{
                   zIndex: 50 - idx,
                   transform: isPast ? 'translateX(-100%) scale(0.9) rotate(-5deg)' : `translateX(${offset * 24}px) translateY(${offset * 4}px) scale(${1 - offset * 0.05})`,

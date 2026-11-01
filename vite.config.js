@@ -80,7 +80,7 @@ export default defineConfig({
           if (!id.includes('node_modules')) return undefined;
           if (id.includes('html2canvas')) return undefined; // biarkan ikut dynamic import (lazy)
           if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'vendor-react';
-          if (id.includes('node_modules/firebase/') || id.includes('node_modules/@firebase/')) return 'vendor-firebase';
+          if (id.includes('node_modules/firebase') || id.includes('node_modules/@firebase') || id.includes('node_modules/@capacitor-firebase')) return 'vendor-firebase';
           if (id.includes('recharts') || id.includes('victory-vendor') || /node_modules\/d3-/.test(id)) return 'vendor-recharts';
           if (id.includes('lucide-react') || id.includes('@dnd-kit')) return 'vendor-ui';
           return 'vendor';

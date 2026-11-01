@@ -5,7 +5,7 @@ import EquipmentIcon from './EquipmentIcon';
 import SwipeInput from './SwipeInput';
 import { formatTarget, exerciseTypeLabels, getVideoId, defaultMasterExercises, findMatchingMasterExercise, canonicalizeExercise } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
-import { resolveExerciseKind, getEquipmentConfig, calculateActualWeight, getSetActualWeight } from '../utils/workoutCalc';
+import { resolveExerciseKind, getEquipmentConfig, calculateActualWeight, getSetActualWeight, resolveDefaultExerciseDuration } from '../utils/workoutCalc';
 import { getCachedExercises } from '../utils/exerciseDbApi';
 
 export const getBaseWeightLabel = (eqConf) => {
@@ -264,7 +264,10 @@ const ExerciseCard = ({
           onStartWorkout();
         }
         const now = Date.now();
-        const d = Number(durationMins || 0);
+        const rawD = Number(durationMins || 0);
+        const d = (rawD > 0 && rawD <= 5 && exType === 'time')
+          ? rawD * 60
+          : (rawD || (exType === 'time' ? resolveDefaultExerciseDuration(ex) : 0));
         if (d > 0) {
            const timeInSeconds = exType === 'cardio' ? Math.round(d * 60) : Math.round(d);
            setActiveTimer({ idx: setIdx, startTime: null, targetTime: now + timeInSeconds * 1000, timeLeft: timeInSeconds, mode: 'down' }); // Hitung mundur
@@ -789,17 +792,17 @@ const ExerciseCard = ({
                                       onClick={(e) => e.stopPropagation()}
                                     >
                                       <div className="font-bold text-xs text-sky-400 whitespace-nowrap">
-                                        {eqConfig.inputRule === 'plates_total' ? 'Input Total Plat 2 Sisi' :
+                                        {eqConfig.inputRule === 'plates_total' || eqConfig.inputRule === 'total_plates' ? 'Input Total Plat 2 Sisi' :
                                          eqConfig.inputRule === 'plate_per_side' ? 'Input Plat 1 Sisi' :
                                          eqConfig.inputRule === 'pin' ? 'Input Pin Beban' :
+                                         eqConfig.inputRule === 'per_side_or_pin' ? (eqConfig.baseWeight > 0 ? 'Input Plat / Pin' : 'Input Beban 1 Sisi / Pin') :
                                          eqConfig.inputRule === 'dumbbell_single' ? 'Input 1 Dumbbell' :
                                          eqConfig.inputRule === 'bodyweight_plus' ? 'Input Tambahan Beban' :
                                          `Input ${eqConfig.label}`}
                                       </div>
-                                      {(eqConfig.baseWeight > 0 || eqConfig.ratio !== 1) && (
+                                      {eqConfig.baseWeight > 0 && (
                                         <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-300 font-medium">
-                                          {eqConfig.baseWeight > 0 && <span>{getBaseWeightLabel(eqConfig)}</span>}
-                                          {eqConfig.ratio !== 1 && <span>Katrol {eqConfig.ratio === 0.5 ? '2:1' : `${eqConfig.ratio}:1`}</span>}
+                                          <span>{getBaseWeightLabel(eqConfig)}</span>
                                         </div>
                                       )}
                                     </div>
@@ -820,7 +823,7 @@ const ExerciseCard = ({
               {sets.map((s, setIdx) => {
                 const actW = getSetActualWeight(s, eqConfig);
                 const inputW = Number(s.input_w !== undefined ? s.input_w : s.w) || 0;
-                const hasWeightDiff = exType === 'weight' && (eqConfig.baseWeight > 0 || eqConfig.ratio !== 1) && actW > 0;
+                const hasWeightDiff = exType === 'weight' && eqConfig.baseWeight > 0 && actW > 0;
 
                 return (
                   <div key={setIdx} className={`grid ${exType==='weight' ? 'grid-cols-[1fr_2fr_2fr_1fr_1fr]' : 'grid-cols-[1fr_3fr_1fr_1fr]'} gap-2 ${hasWeightDiff ? 'items-start' : 'items-center'} text-center transition-all ${s.skipped ? 'opacity-50' : s.done ? 'opacity-60' : ''}`}>
@@ -881,22 +884,28 @@ const ExerciseCard = ({
                         )}
                         
                         {/* KHUSUS TIMER DURASI */}
-                         {exType === 'time' && (
-                          <div className="flex items-center justify-center relative">
-                             {activeTimer.idx === setIdx ? (
-                                <div className={`w-full bg-black/5 dark:bg-white/5 h-11 ${s.done ? 'rounded-2xl' : 'rounded-l-2xl'} flex items-center justify-center font-black ${t.textAccent} text-lg ring-2 ring-inset ${t.ringAccent}`}>
-                                   {formatTime(activeTimer.timeLeft)}
-                                </div>
-                             ) : (
-                                <SwipeInput language={lang?.id || 'ID'} value={s.d || ''} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'd', val)} disabled={s.done} step={1} min={0} soundEnabled={soundEnabled} isTimeFormat={true} isSecondsFormat={true} className={`w-full bg-black/5 dark:bg-white/5 h-11 ${s.done ? 'rounded-2xl' : 'rounded-l-2xl'} text-center font-black ${t.textMain} no-spinners transition-colors text-lg focus:bg-black/10 dark:focus:bg-white/10`} />
-                             )}
-                             {!s.done && (
-                               <button onClick={() => toggleTimer(setIdx, s.d)} className={`h-11 w-12 shrink-0 rounded-r-2xl flex items-center justify-center text-white transition-all ${activeTimer.idx === setIdx ? 'bg-rose-500 shadow-md' : t.bgAccent + ' hover:opacity-80'}`}>
-                                  {activeTimer.idx === setIdx ? <Square size={18}/> : <Play size={18} className="ml-[2px]"/>}
-                               </button>
-                             )}
-                          </div>
-                        )}
+                         {exType === 'time' && (() => {
+                          const rawD = Number(s.d);
+                          const effectiveD = (rawD > 0 && rawD <= 5)
+                            ? rawD * 60
+                            : (s.d !== undefined && s.d !== null && s.d !== '' ? s.d : resolveDefaultExerciseDuration(ex));
+                          return (
+                            <div className="flex items-center justify-center relative">
+                               {activeTimer.idx === setIdx ? (
+                                  <div className={`w-full bg-black/5 dark:bg-white/5 h-11 ${s.done ? 'rounded-2xl' : 'rounded-l-2xl'} flex items-center justify-center font-black ${t.textAccent} text-lg ring-2 ring-inset ${t.ringAccent}`}>
+                                     {formatTime(activeTimer.timeLeft)}
+                                  </div>
+                               ) : (
+                                  <SwipeInput language={lang?.id || 'ID'} value={effectiveD || ''} onChange={(val)=>onUpdateSet(ex.id, setIdx, 'd', val)} disabled={s.done} step={5} min={0} soundEnabled={soundEnabled} isTimeFormat={true} isSecondsFormat={true} className={`w-full bg-black/5 dark:bg-white/5 h-11 ${s.done ? 'rounded-2xl' : 'rounded-l-2xl'} text-center font-black ${t.textMain} no-spinners transition-colors text-lg focus:bg-black/10 dark:focus:bg-white/10`} />
+                               )}
+                               {!s.done && (
+                                 <button onClick={() => toggleTimer(setIdx, effectiveD)} className={`h-11 w-12 shrink-0 rounded-r-2xl flex items-center justify-center text-white transition-all ${activeTimer.idx === setIdx ? 'bg-rose-500 shadow-md' : t.bgAccent + ' hover:opacity-80'}`}>
+                                    {activeTimer.idx === setIdx ? <Square size={18}/> : <Play size={18} className="ml-[2px]"/>}
+                                 </button>
+                               )}
+                            </div>
+                          );
+                        })()}
 
                         {(exType === 'weight' || exType === 'reps') && (
                           <div className="flex flex-col items-center w-full">
