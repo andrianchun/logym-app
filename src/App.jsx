@@ -900,32 +900,35 @@ export default function App() {
       setTabSlideDir(newIdx > curIdx ? 'right' : 'left');
     }
 
-    const emptyCustomPrograms = programs.filter(p => {
-        const isCustom = p.planId === 'custom' || (p.planId && p.planId.startsWith('custom-'));
-        const hasNoExercises = (!p.exercises || p.exercises.length === 0);
-        const hasNoAssignedDays = (!p.assignedDays || p.assignedDays.length === 0);
-        return isCustom && hasNoExercises && hasNoAssignedDays;
-    });
+    // Hanya periksa program kosong jika user sedang KELUAR dari tab 'program'
+    if (activeTab === 'program' && newTab !== 'program') {
+      const emptyCustomPrograms = programs.filter(p => {
+          const isCustom = p.planId === 'custom' || (p.planId && p.planId.startsWith('custom-'));
+          const hasNoExercises = (!p.exercises || p.exercises.length === 0);
+          const hasNoAssignedDays = (!p.assignedDays || p.assignedDays.length === 0);
+          return isCustom && hasNoExercises && hasNoAssignedDays;
+      });
 
-    if (emptyCustomPrograms.length > 0) {
-       setConfirmModal({
-           isOpen: true,
-           title: 'Bersihkan Sesi Kosong?',
-           message: `Sistem mendeteksi ada ${emptyCustomPrograms.length} program custom kosong (tidak ada latihannya sama sekali). Apakah kamu ingin menghapusnya agar daftar programmu tetap rapi?`,
-           onConfirm: () => {
-               playSoundEffect('success', soundEnabled);
-               setPrograms(prev => prev.filter(p => !emptyCustomPrograms.some(emp => emp.id === p.id)));
-               setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null, onCancel: null });
-               _setActiveTab(newTab);
-           },
-           onCancel: () => {
-               const targetProg = emptyCustomPrograms[0];
-               setFocusRoutineId(targetProg.id);
-               _setActiveTab('program');
-               setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null, onCancel: null });
-           }
-       });
-       return;
+      if (emptyCustomPrograms.length > 0) {
+         setConfirmModal({
+             isOpen: true,
+             title: 'Bersihkan Sesi Kosong?',
+             message: `Sistem mendeteksi ada ${emptyCustomPrograms.length} program custom kosong (tidak ada latihannya sama sekali). Apakah kamu ingin menghapusnya agar daftar programmu tetap rapi?`,
+             onConfirm: () => {
+                 playSoundEffect('success', soundEnabled);
+                 setPrograms(prev => prev.filter(p => !emptyCustomPrograms.some(emp => emp.id === p.id)));
+                 setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null, onCancel: null });
+                 _setActiveTab(newTab);
+             },
+             onCancel: () => {
+                 const targetProg = emptyCustomPrograms[0];
+                 setFocusRoutineId(targetProg.id);
+                 _setActiveTab('program');
+                 setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null, onCancel: null });
+             }
+         });
+         return;
+      }
     }
 
     _setActiveTab(newTab);
@@ -1356,10 +1359,9 @@ export default function App() {
       // tab BARU — jadi posisi tersimpan sudah jadi 0 sebelum sempat dipulihkan.
       const target = scrollPositions.current[contentTab] || 0;
       restoringUntil.current = Date.now() + 300; // abaikan clamp selama tab baru menata diri
-      const restore = () => window.scrollTo(0, target);
+      const restore = () => requestAnimationFrame(() => window.scrollTo(0, target));
       restore();
-      // Konten tab baru sering belum setinggi target di frame pertama → scrollTo ke-clamp.
-      if (target > 0) timers.push(setTimeout(restore, 80), setTimeout(restore, 250));
+      if (target > 0) timers.push(setTimeout(restore, 100));
     }
 
     const handleScroll = () => {
@@ -4891,7 +4893,7 @@ export default function App() {
       
       <main className={`${contentTab === 'calendar' ? 'p-0 flex-1 flex flex-col min-h-0 overflow-hidden' : contentTab === 'database' ? 'px-4 pb-4 pt-0 min-h-[70vh] max-w-5xl mx-auto w-full' : 'p-4 min-h-[70vh] max-w-5xl mx-auto w-full'}`}>
         <TabSlider activeTab={contentTab} tabSlideDir={tabSlideDir} tabIndex={['dashboard','workout','calendar','program','database'].indexOf(contentTab)} className={contentTab === 'calendar' ? 'flex-1 flex flex-col min-h-0' : ''}>
-         <div style={{ display: contentTab === 'dashboard' ? 'contents' : 'none' }}>
+         <div style={{ display: contentTab === 'dashboard' ? 'block' : 'none' }} className="w-full">
              <DashboardTab setConfirmModal={setConfirmModal} 
                isActive={contentTab === 'dashboard'}
                t={t} lang={lang} language={language} user={user} 
@@ -4917,7 +4919,7 @@ export default function App() {
          </div>
          
          {mountedTabs.has('workout') && (
-             <div style={{ display: contentTab === 'workout' ? 'contents' : 'none' }}>
+             <div style={{ display: contentTab === 'workout' ? 'block' : 'none' }} className="w-full">
                  <WorkoutTab 
                   isActive={contentTab === 'workout'}
                   setConfirmModal={setConfirmModal}
@@ -4956,7 +4958,7 @@ export default function App() {
          )}
          
          {mountedTabs.has('calendar') && (
-             <div style={{ display: contentTab === 'calendar' ? 'contents' : 'none' }}>
+             <div style={{ display: contentTab === 'calendar' ? 'flex' : 'none' }} className="flex-1 flex flex-col min-h-0 w-full">
                  <CalendarTab 
                    isActive={contentTab === 'calendar'}
                    setConfirmModal={setConfirmModal} 
@@ -4983,7 +4985,7 @@ export default function App() {
          )}
 
          {mountedTabs.has('program') && (
-             <div style={{ display: contentTab === 'program' ? 'contents' : 'none' }}>
+             <div style={{ display: contentTab === 'program' ? 'block' : 'none' }} className="w-full">
                  <ProgramTab setConfirmModal={setConfirmModal} 
                    isActive={contentTab === 'program'}
                    onPostCreated={handlePostCreated}
@@ -5013,7 +5015,7 @@ export default function App() {
          )}
 
          {mountedTabs.has('database') && (
-             <div style={{ display: contentTab === 'database' ? 'contents' : 'none' }}>
+             <div style={{ display: contentTab === 'database' ? 'block' : 'none' }} className="w-full">
                  <DatabaseTab setConfirmModal={setConfirmModal} 
                     isActive={contentTab === 'database'}
                     t={t} lang={lang}
