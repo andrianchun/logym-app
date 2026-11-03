@@ -1527,7 +1527,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                        // cuma dipercaya kalau ymd-nya beneran hari ini, biar gak nampilin angka kemarin.
                        const lomealFresh = lomealToday?.ymd === todayStr ? lomealToday : null;
                        const nutritionCalories = lomealFresh?.kcal ?? bioData.nutritionCalories;
-                       const foodTarget = lomealTargets?.kcal || 2000;
+                       const foodTarget = lomealFresh?.targetKcal || lomealTargets?.todayTarget || lomealTargets?.kcal || 2000;
                        return (
                          <>
                            <div className="flex items-center space-x-1.5 mb-1">

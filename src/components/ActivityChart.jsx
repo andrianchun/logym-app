@@ -250,6 +250,9 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
               })(),
               targetSleep: histBio?.targetSleep || targetSleepH,
               targetCalories: (() => {
+                  if (entry.dateStr === todayStr && (lomealFresh?.targetKcal || lomealTargets?.todayTarget)) {
+                      return lomealFresh?.targetKcal || lomealTargets?.todayTarget;
+                  }
                   if (lomealTargets?.kcal) {
                       return lomealTargets.kcal;
                   }
