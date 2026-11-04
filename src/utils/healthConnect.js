@@ -892,6 +892,7 @@ export const mapHcWorkoutType = (type) => {
   if (t.includes('yoga')) return 'Yoga';
   if (t.includes('pilates')) return 'Pilates';
   if (t.includes('hiit') || t.includes('highintensity')) return 'HIIT';
+  if (t === 'other') return 'Lainnya';
   return type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Kardio Eksternal';
 };
 

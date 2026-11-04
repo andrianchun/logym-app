@@ -700,7 +700,7 @@ export default function App() {
             const nativeWorkouts = day.workouts.filter(w => !w.isExternal && w.programId !== 'cardio-external');
             const cleanWorkouts = day.workouts.filter(w => {
               if (!w.isExternal && w.programId !== 'cardio-external') return true;
-              if (!isAllowedCardioType(w.workoutType) || (w.programName || '').toLowerCase() === 'other') {
+              if (!isAllowedCardioType(w.workoutType) || ['other', 'lainnya'].includes((w.programName || '').toLowerCase())) {
                 return false;
               }
               const conflict = nativeWorkouts.some(nativeW => isWorkoutConflict(w, nativeW, ymd));

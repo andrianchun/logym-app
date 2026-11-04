@@ -39,6 +39,7 @@ assert.equal(mapHcWorkoutType('runningTreadmill'), 'Lari (Running)');
 assert.equal(mapHcWorkoutType('walking'), 'Jalan Santai (Walking)');
 assert.equal(mapHcWorkoutType('swimming'), 'Berenang (Swimming)');
 assert.equal(mapHcWorkoutType('hiking'), 'Mendaki (Hiking)');
+assert.equal(mapHcWorkoutType('other'), 'Lainnya');
 console.log('✅ mapHcWorkoutType passed');
 
 // 4. formatDurationFromSeconds
