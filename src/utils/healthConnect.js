@@ -821,6 +821,59 @@ export const hcBackfillHistory = async (days, hasOtherSource, onDayResult) => {
 // Dilengkapi proteksi Zero-Ping-Pong dan Anti-Double-Counting.
 // ============================================================
 
+const ALLOWED_CARDIO_TYPES = new Set([
+  'cycling',
+  'bikingStationary',
+  'handCycling',
+  'running',
+  'runningTreadmill',
+  'walking',
+  'swimming',
+  'swimmingPool',
+  'swimmingOpenWater',
+  'hiking',
+  'rowing',
+  'rowingMachine',
+  'elliptical',
+  'jumpRope',
+  'stairClimbing',
+  'stairClimbingMachine',
+  'stairs',
+  'skatingSports',
+  'snowboarding',
+  'skiing',
+  'crossCountrySkiing',
+  'downhillSkiing',
+  'paddling',
+  'paddleSports',
+]);
+
+export const isAllowedCardioType = (type) => {
+  if (!type) return false;
+  if (ALLOWED_CARDIO_TYPES.has(type)) return true;
+  const t = type.toLowerCase();
+  // Cegah mutlak 'other', 'strength', 'weight', 'calisthenics', 'gym'
+  if (t === 'other' || t.includes('strength') || t.includes('weight') || t.includes('calisthenic') || t.includes('bodyweight')) {
+    return false;
+  }
+  return t.includes('cycl') || t.includes('bik') || t.includes('run') || t.includes('walk') ||
+         t.includes('swim') || t.includes('hik') || t.includes('row') || t.includes('ellipt');
+};
+
+export const cleanSourceAppName = (sourceName, sourceId) => {
+  const s = `${sourceName || ''} ${sourceId || ''}`.toLowerCase();
+  if (s.includes('shealth') || s.includes('samsung')) return 'Samsung Health';
+  if (s.includes('strava')) return 'Strava';
+  if (s.includes('garmin')) return 'Garmin';
+  if (s.includes('fitbit')) return 'Fitbit';
+  if (s.includes('google') || s.includes('fit')) return 'Google Fit';
+  if (s.includes('polar')) return 'Polar';
+  if (s.includes('coros')) return 'Coros';
+  if (s.includes('wahoo')) return 'Wahoo';
+  if (sourceName && !sourceName.includes('.')) return sourceName;
+  return 'Samsung Health';
+};
+
 export const mapHcWorkoutType = (type) => {
   const t = (type || '').toLowerCase();
   if (t.includes('cycl') || t.includes('bik')) return 'Bersepeda (Cycling)';
@@ -861,7 +914,7 @@ export const convertHcWorkoutToLogym = (w, ymd) => {
   const distanceKm = w.totalDistance ? Number((Number(w.totalDistance) / 1000).toFixed(2)) : null;
   const platformId = w.platformId || `${w.startDate}_${w.workoutType}`;
   const exId = `ex_${(w.workoutType || 'cardio').toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
-  const source = w.sourceName || 'Samsung Health';
+  const source = cleanSourceAppName(w.sourceName, w.sourceId);
 
   return {
     id: `hc_${platformId}`,
@@ -902,31 +955,75 @@ export const convertHcWorkoutToLogym = (w, ymd) => {
   };
 };
 
-export const isWorkoutConflict = (externalWorkout, existingWorkout) => {
-  if (!externalWorkout?.startDate || !existingWorkout?.startTime) return false;
+export const getWorkoutTimeRange = (w, ymd) => {
+  if (!w) return null;
+  if (w.startTime) {
+    const s = new Date(w.startTime).getTime();
+    let durMs = 3600000;
+    if (w.endTime) {
+      durMs = Math.max(1000, new Date(w.endTime).getTime() - s);
+    } else if (typeof w.durationSecs === 'number' && w.durationSecs > 0) {
+      durMs = w.durationSecs * 1000;
+    } else if (typeof w.duration === 'string') {
+      const parts = w.duration.split(':').map(Number);
+      if (parts.length === 3) durMs = (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000;
+      else if (parts.length === 2) durMs = (parts[0] * 60 + parts[1]) * 1000;
+    }
+    return { start: s, end: s + durMs };
+  }
+
+  // Sesi Logym dengan startedAt (epoch ms)
+  const startedAt = Number(w.startedAt) || 0;
+  let durMs = 3600000;
+  if (typeof w.durationSecs === 'number' && w.durationSecs > 0) {
+    durMs = w.durationSecs * 1000;
+  } else if (typeof w.duration === 'string') {
+    const parts = w.duration.split(':').map(Number);
+    if (parts.length === 3) durMs = (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000;
+    else if (parts.length === 2) durMs = (parts[0] * 60 + parts[1]) * 1000;
+    else {
+      const mMatch = w.duration.match(/(\d+)\s*(mnt|menit)/i);
+      const hMatch = w.duration.match(/(\d+)\s*jam/i);
+      if (mMatch || hMatch) {
+        durMs = ((Number(hMatch?.[1]) || 0) * 3600 + (Number(mMatch?.[1]) || 0) * 60) * 1000;
+      }
+    }
+  }
+
+  if (startedAt > 0) {
+    return { start: startedAt, end: startedAt + durMs };
+  }
+
+  // Sesi Logym dengan timestamp ("15:00")
+  if (w.timestamp && ymd) {
+    const timeMatch = String(w.timestamp).match(/^(\d{1,2}):(\d{2})/);
+    if (timeMatch) {
+      const hh = timeMatch[1].padStart(2, '0');
+      const mm = timeMatch[2];
+      const endD = new Date(`${ymd}T${hh}:${mm}:00`).getTime();
+      return { start: endD - durMs, end: endD };
+    }
+  }
+
+  return null;
+};
+
+export const isWorkoutConflict = (externalWorkout, existingWorkout, ymd) => {
+  if (!externalWorkout?.startDate || !existingWorkout) return false;
   const wStart = new Date(externalWorkout.startDate).getTime();
   const wEnd = new Date(externalWorkout.endDate || externalWorkout.startDate).getTime();
   const durationMs = Math.max(1000, wEnd - wStart);
 
-  const exStart = new Date(existingWorkout.startTime).getTime();
-  let exDurationMs = 3600000;
-  if (existingWorkout.endTime) {
-    exDurationMs = Math.max(1000, new Date(existingWorkout.endTime).getTime() - exStart);
-  } else if (typeof existingWorkout.durationSecs === 'number' && existingWorkout.durationSecs > 0) {
-    exDurationMs = existingWorkout.durationSecs * 1000;
-  } else if (typeof existingWorkout.duration === 'string') {
-    const parts = existingWorkout.duration.split(':').map(Number);
-    if (parts.length === 3) exDurationMs = (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000;
-    else if (parts.length === 2) exDurationMs = (parts[0] * 60 + parts[1]) * 1000;
-  }
-  const exEnd = exStart + exDurationMs;
+  const exRange = getWorkoutTimeRange(existingWorkout, ymd);
+  if (!exRange) return false;
 
-  const overlapStart = Math.max(wStart, exStart);
-  const overlapEnd = Math.min(wEnd, exEnd);
+  const overlapStart = Math.max(wStart, exRange.start);
+  const overlapEnd = Math.min(wEnd, exRange.end);
   const overlapMs = Math.max(0, overlapEnd - overlapStart);
 
-  // Jika tumpang tindih waktu > 50% dari durasi sesi eksternal, anggap konflik
-  return (overlapMs / durationMs) > 0.5;
+  // Jika tumpang tindih waktu > 40% durasi sesi salah satunya, anggap konflik
+  const exDur = Math.max(1000, exRange.end - exRange.start);
+  return (overlapMs / durationMs) > 0.4 || (overlapMs / exDur) > 0.4;
 };
 
 export const hcPullExternalWorkouts = async (startYmd, endYmd, existingHistory = {}) => {
@@ -945,6 +1042,9 @@ export const hcPullExternalWorkouts = async (startYmd, endYmd, existingHistory =
       // Zero-Ping-Pong: lewati sesi yang berasal dari Logym
       if (src.includes('logym') || src.includes('lyfeat')) continue;
 
+      // HANYA tarik jenis olahraga KARDIO yang valid (cegah "Other", "strengthTraining", dll.)
+      if (!isAllowedCardioType(w.workoutType)) continue;
+
       const ymd = ymdOf(new Date(w.startDate));
       const existing = existingHistory[ymd]?.workouts || [];
       const platformId = w.platformId || `${w.startDate}_${w.workoutType}`;
@@ -954,7 +1054,7 @@ export const hcPullExternalWorkouts = async (startYmd, endYmd, existingHistory =
       if (alreadyImported) continue;
 
       // Cek tumpang tindih waktu untuk mencegah double counting
-      const hasConflict = existing.some(exW => isWorkoutConflict(w, exW));
+      const hasConflict = existing.some(exW => isWorkoutConflict(w, exW, ymd));
       if (hasConflict) continue;
 
       const mapped = convertHcWorkoutToLogym(w, ymd);

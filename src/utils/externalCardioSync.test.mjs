@@ -4,12 +4,34 @@ import {
   formatDurationFromSeconds,
   convertHcWorkoutToLogym,
   isWorkoutConflict,
+  isAllowedCardioType,
+  cleanSourceAppName,
 } from './healthConnect.js';
 import { dailyBurnCalories, splitWorkoutCalories, calculateSmartWorkoutCalories } from './workoutCalc.js';
 
 console.log('Testing External Cardio Sync (Samsung Health / Health Connect)...');
 
-// 1. mapHcWorkoutType
+// 1. isAllowedCardioType (Cegah import 'Other' atau 'strengthTraining')
+assert.equal(isAllowedCardioType('cycling'), true);
+assert.equal(isAllowedCardioType('bikingStationary'), true);
+assert.equal(isAllowedCardioType('running'), true);
+assert.equal(isAllowedCardioType('walking'), true);
+assert.equal(isAllowedCardioType('swimming'), true);
+assert.equal(isAllowedCardioType('hiking'), true);
+assert.equal(isAllowedCardioType('other'), false, "'other' BUKAN kardio, dilarang di-pull!");
+assert.equal(isAllowedCardioType('strengthTraining'), false, "'strengthTraining' dilarang di-pull!");
+assert.equal(isAllowedCardioType('weightlifting'), false, "'weightlifting' dilarang di-pull!");
+console.log('✅ isAllowedCardioType passed');
+
+// 2. cleanSourceAppName (Tampilan badge bersih, bukan package name)
+assert.equal(cleanSourceAppName('com.sec.android.app.shealth', 'com.sec.android.app.shealth'), 'Samsung Health');
+assert.equal(cleanSourceAppName(null, 'com.sec.android.app.shealth'), 'Samsung Health');
+assert.equal(cleanSourceAppName('Samsung Health', 'com.sec.android.app.shealth'), 'Samsung Health');
+assert.equal(cleanSourceAppName('Strava', 'com.strava'), 'Strava');
+assert.equal(cleanSourceAppName(null, 'com.garmin.android.apps.connectmobile'), 'Garmin');
+console.log('✅ cleanSourceAppName passed');
+
+// 3. mapHcWorkoutType
 assert.equal(mapHcWorkoutType('cycling'), 'Bersepeda (Cycling)');
 assert.equal(mapHcWorkoutType('bikingStationary'), 'Bersepeda (Cycling)');
 assert.equal(mapHcWorkoutType('running'), 'Lari (Running)');
@@ -19,13 +41,13 @@ assert.equal(mapHcWorkoutType('swimming'), 'Berenang (Swimming)');
 assert.equal(mapHcWorkoutType('hiking'), 'Mendaki (Hiking)');
 console.log('✅ mapHcWorkoutType passed');
 
-// 2. formatDurationFromSeconds
+// 4. formatDurationFromSeconds
 assert.equal(formatDurationFromSeconds(45), '00:45');
 assert.equal(formatDurationFromSeconds(1800), '30:00');
 assert.equal(formatDurationFromSeconds(3665), '01:01:05');
 console.log('✅ formatDurationFromSeconds passed');
 
-// 3. convertHcWorkoutToLogym
+// 5. convertHcWorkoutToLogym
 const sampleHcWorkout = {
   workoutType: 'cycling',
   duration: 2700, // 45 menit
@@ -53,36 +75,32 @@ assert.equal(converted.exercises.length, 1);
 assert.equal(converted.exercises[0].category, 'cardio');
 console.log('✅ convertHcWorkoutToLogym passed');
 
-// 4. isWorkoutConflict (Anti-Double-Counting)
-// Case A: Sesi pada waktu yang sama (overlap 100%) -> KONFLIK
-const existingTreadmill = {
-  id: 'workout_treadmill_1',
-  startTime: '2026-11-04T06:30:00.000Z',
-  endTime: '2026-11-04T07:15:00.000Z',
-  durationSecs: 2700,
+// 6. isWorkoutConflict (Anti-Double-Counting dengan Sesi Asli Logym)
+// Case A: Sesi pada waktu yang sama (overlap 100%) dengan format Logym (timestamp: "15:00")
+const externalOtherWorkout = {
+  workoutType: 'other',
+  startDate: '2026-11-04T08:00:00.000Z', // 15:00 WIB (UTC+7)
+  endDate: '2026-11-04T09:14:00.000Z',   // 16:14 WIB (UTC+7)
+  duration: 4440,
 };
-assert.equal(isWorkoutConflict(sampleHcWorkout, existingTreadmill), true);
 
-// Case B: Sesi berbeda jam (pagi sepedahan, sore angkat beban) -> TIDAK KONFLIK
-const eveningGym = {
-  id: 'workout_evening_gym',
-  startTime: '2026-11-04T17:00:00.000Z',
-  endTime: '2026-11-04T18:00:00.000Z',
-  durationSecs: 3600,
+const logymPullSession = {
+  id: 'workout_pull_today',
+  programName: 'Pull',
+  status: 'completed',
+  startedAt: new Date('2026-11-04T08:00:00.000Z').getTime(), // 15:00 WIB
+  duration: '48 menit',
+  timestamp: '15:48',
 };
-assert.equal(isWorkoutConflict(sampleHcWorkout, eveningGym), false);
 
-// Case C: Sesi tumpang tindih sedikit (<50%) -> TIDAK KONFLIK
-const slightOverlap = {
-  id: 'workout_slight',
-  startTime: '2026-11-04T07:10:00.000Z', // tumpang tindih cuma 5 menit dari total 45 menit (11%)
-  endTime: '2026-11-04T08:00:00.000Z',
-  durationSecs: 3000,
-};
-assert.equal(isWorkoutConflict(sampleHcWorkout, slightOverlap), false);
+// Harus terdeteksi bentrok karena user nyalain Samsung Health bareng Logym saat Pull!
+assert.equal(isWorkoutConflict(externalOtherWorkout, logymPullSession, '2026-11-04'), true);
+
+// Case B: Sesi berbeda jam (pagi sepedahan vs sore Pull) -> TIDAK BENTROK
+assert.equal(isWorkoutConflict(sampleHcWorkout, logymPullSession, '2026-11-04'), false);
 console.log('✅ isWorkoutConflict (Anti-Double-Counting) passed');
 
-// 5. Integrasi Energi SSOT (workoutCalc & dailyBurnCalories)
+// 7. Integrasi Energi SSOT (workoutCalc & dailyBurnCalories)
 const userWeight = 70;
 const split = splitWorkoutCalories(userWeight, converted, converted.log);
 assert.equal(split.kardio, 380, 'Seluruh kalori sepedahan eksternal harus masuk kardio');

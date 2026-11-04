@@ -53,7 +53,7 @@ import { AI_MODELS, detectPlateaus, getLogyNotification } from './utils/aiAgent'
 import { calculateReadiness, restingHrBaseline } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
 import { isCardioExercise, calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, deduplicateWorkouts, recomputeStrengthRecords, buildExLookupByName, canonicalExId, sessionSpanSeconds, repairActualWeights, buildHcSessionDetail, estimate10RM, defaultSetWeight, gymStepFor, mergeRm10, getEquipmentConfig, calculateActualWeight, calculateInputWeight, getSetActualWeight, resolveExerciseProgressiveTarget, resolveDefaultExerciseDuration } from './utils/workoutCalc';
-import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcReadHeartRateWindow, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission, capIntradayLog, HC_FIELDS, fillOnlyPatch, hcDroppedTypes, hcPullExternalWorkouts } from './utils/healthConnect';
+import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcReadHeartRateWindow, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission, capIntradayLog, HC_FIELDS, fillOnlyPatch, hcDroppedTypes, hcPullExternalWorkouts, isAllowedCardioType, isWorkoutConflict } from './utils/healthConnect';
 import { bumpExercisePopularity } from './utils/exercisePopularity';
 import { rapikanNamaProgram, rapikanNamaSesi, pertahankanNamaSesi } from './utils/programNaming';
 import useDialog from './hooks/useDialog';
@@ -686,12 +686,37 @@ export default function App() {
       const startYmd = getLocalYMD(startD);
       const endYmd = getLocalYMD(endD);
       const extByDay = await hcPullExternalWorkouts(startYmd, endYmd, historyMirror.current || history);
-      if (Object.keys(extByDay).length > 0) {
-        setHistory(prev => {
-          const next = { ...prev };
-          let changed = false;
+      setHistory(prev => {
+        const next = { ...prev };
+        let changed = false;
+
+        // A. Pembersihan: buang sesi eksternal non-kardio (seperti 'Other') atau yang bentrok dengan latihan Logym
+        for (let i = 0; i <= days; i++) {
+          const d = new Date();
+          d.setDate(d.getDate() - i);
+          const ymd = getLocalYMD(d);
+          const day = next[ymd];
+          if (day && Array.isArray(day.workouts)) {
+            const nativeWorkouts = day.workouts.filter(w => !w.isExternal && w.programId !== 'cardio-external');
+            const cleanWorkouts = day.workouts.filter(w => {
+              if (!w.isExternal && w.programId !== 'cardio-external') return true;
+              if (!isAllowedCardioType(w.workoutType) || (w.programName || '').toLowerCase() === 'other') {
+                return false;
+              }
+              const conflict = nativeWorkouts.some(nativeW => isWorkoutConflict(w, nativeW, ymd));
+              return !conflict;
+            });
+            if (cleanWorkouts.length !== day.workouts.length) {
+              next[ymd] = { ...day, workouts: cleanWorkouts };
+              changed = true;
+            }
+          }
+        }
+
+        // B. Tambahkan sesi kardio baru yang valid
+        if (Object.keys(extByDay).length > 0) {
           Object.entries(extByDay).forEach(([ymd, extWorkouts]) => {
-            const existingDay = prev[ymd] || {};
+            const existingDay = next[ymd] || {};
             const existingWorkouts = Array.isArray(existingDay.workouts) ? existingDay.workouts : [];
             const toAdd = extWorkouts.filter(nw =>
               !existingWorkouts.some(ew => (ew.externalId && ew.externalId === nw.externalId) || ew.id === nw.id)
@@ -705,9 +730,9 @@ export default function App() {
               changed = true;
             }
           });
-          return changed ? next : prev;
-        });
-      }
+        }
+        return changed ? next : prev;
+      });
     } catch (e) {
       console.warn('Gagal menarik sesi latihan eksternal:', e);
     }
