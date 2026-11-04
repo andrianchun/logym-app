@@ -113,11 +113,11 @@ const matchTreadmill = findMatchingMasterExercise({ name: 'Treadmill Running' },
 assert.equal(matchTreadmill.name, 'Running, Treadmill');
 assert.equal(matchTreadmill.id, 126);
 
-// Bicycling & Stationary Bike canonicalization
-assert.equal(canonicalizeExercise({ name: 'Cycling / Sepeda' }).name, 'Bicycling');
-assert.equal(canonicalizeExercise({ name: 'Sepeda' }).name, 'Bicycling');
-assert.equal(canonicalizeExercise({ name: 'Stationary Bike' }).name, 'Bicycling, Stationary');
-assert.equal(canonicalizeExercise({ name: 'Sepeda Statis' }).name, 'Bicycling, Stationary');
+// Bicycling & Stationary Bike canonicalization (Bersepeda & Sepeda Statis)
+assert.equal(canonicalizeExercise({ name: 'Cycling / Sepeda' }).name, 'Bersepeda');
+assert.equal(canonicalizeExercise({ name: 'Sepeda' }).name, 'Bersepeda');
+assert.equal(canonicalizeExercise({ name: 'Stationary Bike' }).name, 'Sepeda Statis');
+assert.equal(canonicalizeExercise({ name: 'Sepeda Statis' }).name, 'Sepeda Statis');
 assert.equal(findMatchingMasterExercise({ name: 'Cycling / Sepeda' }, defaultMasterExercises)?.id, 139);
 assert.equal(findMatchingMasterExercise({ name: 'Stationary Bike' }, defaultMasterExercises)?.id, 127);
 assert.equal(exerciseAliasMap['126'], 'edb-Running_Treadmill');

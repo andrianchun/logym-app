@@ -6,6 +6,7 @@ import {
   isWorkoutConflict,
   isAllowedCardioType,
   cleanSourceAppName,
+  formatExternalWorkoutName,
 } from './healthConnect.js';
 import { dailyBurnCalories, splitWorkoutCalories, calculateSmartWorkoutCalories } from './workoutCalc.js';
 
@@ -31,16 +32,27 @@ assert.equal(cleanSourceAppName('Strava', 'com.strava'), 'Strava');
 assert.equal(cleanSourceAppName(null, 'com.garmin.android.apps.connectmobile'), 'Garmin');
 console.log('✅ cleanSourceAppName passed');
 
-// 3. mapHcWorkoutType
-assert.equal(mapHcWorkoutType('cycling'), 'Bersepeda (Cycling)');
-assert.equal(mapHcWorkoutType('bikingStationary'), 'Bersepeda (Cycling)');
-assert.equal(mapHcWorkoutType('running'), 'Lari (Running)');
-assert.equal(mapHcWorkoutType('runningTreadmill'), 'Lari (Running)');
-assert.equal(mapHcWorkoutType('walking'), 'Jalan Santai (Walking)');
-assert.equal(mapHcWorkoutType('swimming'), 'Berenang (Swimming)');
-assert.equal(mapHcWorkoutType('hiking'), 'Mendaki (Hiking)');
+// 3. mapHcWorkoutType & formatExternalWorkoutName (ID vs EN dipisah murni)
+assert.equal(mapHcWorkoutType('cycling'), 'Bersepeda');
+assert.equal(mapHcWorkoutType('cycling', 'en'), 'Cycling');
+assert.equal(mapHcWorkoutType('bikingStationary'), 'Bersepeda');
+assert.equal(mapHcWorkoutType('running'), 'Lari');
+assert.equal(mapHcWorkoutType('running', 'en'), 'Running');
+assert.equal(mapHcWorkoutType('runningTreadmill'), 'Lari');
+assert.equal(mapHcWorkoutType('walking'), 'Jalan Santai');
+assert.equal(mapHcWorkoutType('walking', 'en'), 'Walking');
+assert.equal(mapHcWorkoutType('swimming'), 'Berenang');
+assert.equal(mapHcWorkoutType('swimming', 'en'), 'Swimming');
+assert.equal(mapHcWorkoutType('hiking'), 'Mendaki');
+assert.equal(mapHcWorkoutType('hiking', 'en'), 'Hiking');
 assert.equal(mapHcWorkoutType('other'), 'Lainnya');
-console.log('✅ mapHcWorkoutType passed');
+assert.equal(mapHcWorkoutType('other', 'en'), 'Other');
+
+assert.equal(formatExternalWorkoutName('Bersepeda (Cycling)'), 'Bersepeda');
+assert.equal(formatExternalWorkoutName('Bersepeda (Cycling)', 'en'), 'Cycling');
+assert.equal(formatExternalWorkoutName('Other'), 'Lainnya');
+assert.equal(formatExternalWorkoutName('Other', 'en'), 'Other');
+console.log('✅ mapHcWorkoutType & formatExternalWorkoutName passed');
 
 // 4. formatDurationFromSeconds
 assert.equal(formatDurationFromSeconds(45), '00:45');
@@ -67,7 +79,7 @@ assert.equal(converted.externalId, 'hc_sample_cycle_1');
 assert.equal(converted.isExternal, true);
 assert.equal(converted.source, 'Samsung Health');
 assert.equal(converted.type, 'cardio');
-assert.equal(converted.programName, 'Bersepeda (Cycling)');
+assert.equal(converted.programName, 'Bersepeda');
 assert.equal(converted.duration, '45:00');
 assert.equal(converted.calories, 380);
 assert.equal(converted.distanceKm, 15.42);

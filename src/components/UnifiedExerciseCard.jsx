@@ -1,6 +1,6 @@
 import React from 'react';
 import { Heart, Edit2, X } from 'lucide-react';
-import { formatTarget, getVideoId, exerciseTypeLabels } from '../data/constants';
+import { formatTarget, getVideoId, exerciseTypeLabels, getExerciseDisplayName } from '../data/constants';
 import EquipmentIcon from './EquipmentIcon';
 
 const UnifiedExerciseCard = React.memo(({ t, lang, ex, onEdit, onDelete, onToggleFavorite, index, onOpenDetail, isCustom, actionButton }) => {
@@ -73,7 +73,7 @@ const UnifiedExerciseCard = React.memo(({ t, lang, ex, onEdit, onDelete, onToggl
             className={`body-lg font-black ${t.textMain} whitespace-nowrap overflow-hidden w-full`}
             style={{ maskImage: 'linear-gradient(to right, black 85%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to right, black 85%, transparent 100%)' }}
           >
-             {ex.name}
+             {getExerciseDisplayName(ex, lang?.id)}
           </h4>
         <div className="flex flex-col gap-1.5 mt-1">
           <div className="flex gap-1.5 flex-wrap items-center">

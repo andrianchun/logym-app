@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Dumbbell, History, Calculator, Replace, Video, Info, ChevronLeft, ChevronRight, Loader2, Play } from 'lucide-react';
-import { formatTarget, resolveProjectedProgramId, defaultMasterExercises, findMatchingMasterExercise, cleanExerciseNameForMatching, canonicalizeExercise, exerciseAliasMap, resolveExerciseDbId, resolveLoggedExercise } from '../data/constants';
+import { formatTarget, resolveProjectedProgramId, defaultMasterExercises, findMatchingMasterExercise, cleanExerciseNameForMatching, canonicalizeExercise, exerciseAliasMap, resolveExerciseDbId, resolveLoggedExercise, getExerciseDisplayName } from '../data/constants';
 import { getCachedExercises, fetchExercisesFromApi } from '../utils/exerciseDbApi';
 import { resolveExerciseKind, estimate10RM, estimate1RM, getEquipmentConfig, calculateActualWeight, getSetActualWeight, buildExLookupByName, canonicalExId } from '../utils/workoutCalc';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
@@ -516,7 +516,7 @@ const ExerciseDetailModal = ({
     return createPortal(
       <div role="dialog" aria-modal="true" className={`fixed inset-0 z-[150] flex flex-col ${t.bgApp} no-swipe overscroll-contain touch-pan-y`}>
         <div className="p-4 flex justify-between items-center bg-black/80 absolute top-0 w-full z-20" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
-          <h2 className="h2 text-white drop-shadow-md">{ex.name}</h2>
+          <h2 className="h2 text-white drop-shadow-md">{getExerciseDisplayName(ex, lang?.id)}</h2>
           <button data-close-modal="true" onClick={onClose} className="p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition">
             <X size={20} strokeWidth={2.5} />
           </button>
@@ -686,7 +686,7 @@ const ExerciseDetailModal = ({
             
             <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/90 via-black/50 to-transparent pt-12 pb-4 px-4 flex flex-col gap-2 z-10">
               <div>
-                <h2 className="text-white h1 leading-tight drop-shadow-md">{ex.name}</h2>
+                <h2 className="text-white h1 leading-tight drop-shadow-md">{getExerciseDisplayName(ex, lang?.id)}</h2>
                 <div className="flex gap-1.5 mt-1.5 overflow-x-auto hide-scrollbar w-full pb-1 -mx-1 px-1">
                   {ex.target?.map(m => (
                     <span key={m} className={`shrink-0 whitespace-nowrap px-2.5 py-1 rounded-md text-xs font-bold bg-black/40 text-slate-200 border border-white/10 backdrop-blur-md`}>

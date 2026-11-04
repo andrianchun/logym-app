@@ -15,7 +15,7 @@ import { getLogyNotification } from '../utils/aiAgent';
 import ActivityRings from '../components/ActivityRings';
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts';
 import { calculateAge, getHRZone } from '../utils/hrZones';
-import { cleanSourceAppName } from '../utils/healthConnect';
+import { cleanSourceAppName, formatExternalWorkoutName } from '../utils/healthConnect';
 
 const CalendarTab = ({
   t, lang, theme, history, setHistory, programs,
@@ -1890,8 +1890,7 @@ const CalendarTab = ({
                                               <div className={`text-xs font-semibold opacity-70 mb-1 flex items-center gap-2 ${c.text}`}>
                                                 <span>{effectiveTime}</span>
                                                 {w.isExternal && (
-                                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-sky-500/10 text-sky-400 font-bold text-xs">
-                                                    <Activity size={10} />
+                                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-sky-500/10 text-sky-400 font-bold text-xs">
                                                     <span>{cleanSourceAppName(w.source, w.sourceId)}</span>
                                                   </span>
                                                 )}
@@ -1910,7 +1909,7 @@ const CalendarTab = ({
                                               </div>
                                               
                                               <span className={`font-black text-left leading-tight break-words text-md pr-8 mb-4 ${c.text}`}>
-                                                {w.programName}
+                                                {w.isExternal ? formatExternalWorkoutName(w.programName, lang?.id || 'id') : w.programName}
                                               </span>
                                               
                                               <div className="flex justify-between items-end mt-auto">

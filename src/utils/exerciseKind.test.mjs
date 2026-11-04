@@ -24,6 +24,8 @@ assert.equal(durationUnitOf({ name: 'Running', type: 'time' }), 'menit');
 // 4. REGRESI: mode immersive dulu memakai daftar kata kunci lebih pendek (tanpa 'renang'/'swim'),
 //    jadi latihan yang sama dibaca kardio di satu layar dan bukan kardio di layar lain.
 assert.equal(resolveExerciseKind({ name: 'Swimming (Renang)', type: 'time' }), 'cardio');
+assert.equal(resolveExerciseKind({ name: 'Berenang', type: 'time' }), 'cardio');
+assert.equal(resolveExerciseKind({ name: 'Bersepeda', type: 'time' }), 'cardio');
 assert.equal(resolveExerciseKind({ name: 'Rowing Machine', type: 'time' }), 'cardio');
 
 // 5. REGRESI UTAMA: "Crunch" mengandung potongan "run" di TENGAH kata. Pencocokan substring lama

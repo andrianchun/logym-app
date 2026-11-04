@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Search, Filter, Dumbbell, Heart, ChevronDown, Clock } from 'lucide-react';
-import { formatTarget, getVideoId, muscleOptions, equipmentOptions, normalizeMuscleKey, filterByGymEquipment, exerciseAliasMap, cleanExerciseNameForMatching, canonicalizeExercise } from '../data/constants';
+import { formatTarget, getVideoId, muscleOptions, equipmentOptions, normalizeMuscleKey, filterByGymEquipment, exerciseAliasMap, cleanExerciseNameForMatching, canonicalizeExercise, getExerciseDisplayName } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
 import { fetchExercisesFromApi } from '../utils/exerciseDbApi';
 import { prepareSearchableExercise, scoreExerciseMatch, computeOwnExerciseUsage, exerciseSlug } from '../utils/exerciseSearch';
@@ -520,7 +520,7 @@ const AlternativeExerciseModal = ({
 
                   <div className="flex-1 min-w-0">
                     <h4 className={`font-black body-lg ${t.textMain} truncate flex items-center gap-1.5 flex-wrap`}>
-                      {ex.name}
+                      {getExerciseDisplayName(ex, lang?.id)}
                     </h4>
                     <div className="flex flex-col gap-1 mt-1">
                       <div className="flex gap-1.5 flex-wrap items-center">

@@ -874,26 +874,45 @@ export const cleanSourceAppName = (sourceName, sourceId) => {
   return 'Samsung Health';
 };
 
-export const mapHcWorkoutType = (type) => {
+export const mapHcWorkoutType = (type, lang = 'id') => {
   const t = (type || '').toLowerCase();
-  if (t.includes('cycl') || t.includes('bik')) return 'Bersepeda (Cycling)';
-  if (t.includes('run') || t.includes('jog')) return 'Lari (Running)';
-  if (t.includes('walk')) return 'Jalan Santai (Walking)';
-  if (t.includes('swim')) return 'Berenang (Swimming)';
-  if (t.includes('hik')) return 'Mendaki (Hiking)';
-  if (t.includes('row')) return 'Mendayung (Rowing)';
+  const isEn = String(lang || '').toLowerCase() === 'en';
+
+  if (t.includes('cycl') || t.includes('bik')) return isEn ? 'Cycling' : 'Bersepeda';
+  if (t.includes('run') || t.includes('jog')) return isEn ? 'Running' : 'Lari';
+  if (t.includes('walk')) return isEn ? 'Walking' : 'Jalan Santai';
+  if (t.includes('swim')) return isEn ? 'Swimming' : 'Berenang';
+  if (t.includes('hik')) return isEn ? 'Hiking' : 'Mendaki';
+  if (t.includes('row')) return isEn ? 'Rowing' : 'Mendayung';
   if (t.includes('elliptical')) return 'Elliptical';
-  if (t.includes('jumprope')) return 'Lompat Tali (Jump Rope)';
-  if (t.includes('stair')) return 'Naik Tangga (Stairs)';
+  if (t.includes('jumprope')) return isEn ? 'Jump Rope' : 'Lompat Tali';
+  if (t.includes('stair')) return isEn ? 'Stairs' : 'Naik Tangga';
   if (t.includes('badminton')) return 'Badminton';
-  if (t.includes('tennis')) return 'Tenis';
-  if (t.includes('basketball')) return 'Bola Basket';
-  if (t.includes('soccer') || t.includes('football')) return 'Sepak Bola';
+  if (t.includes('tennis')) return isEn ? 'Tennis' : 'Tenis';
+  if (t.includes('basketball')) return isEn ? 'Basketball' : 'Bola Basket';
+  if (t.includes('soccer') || t.includes('football')) return isEn ? 'Soccer' : 'Sepak Bola';
   if (t.includes('yoga')) return 'Yoga';
   if (t.includes('pilates')) return 'Pilates';
   if (t.includes('hiit') || t.includes('highintensity')) return 'HIIT';
-  if (t === 'other') return 'Lainnya';
-  return type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Kardio Eksternal';
+  if (t === 'other') return isEn ? 'Other' : 'Lainnya';
+  return type ? type.charAt(0).toUpperCase() + type.slice(1) : (isEn ? 'External Cardio' : 'Kardio Eksternal');
+};
+
+export const formatExternalWorkoutName = (name, lang = 'id') => {
+  if (!name) return '';
+  const isEn = String(lang || '').toLowerCase() === 'en';
+  const clean = String(name).trim();
+  if (/^bersepeda\s*\(\s*cycling\s*\)$/i.test(clean)) return isEn ? 'Cycling' : 'Bersepeda';
+  if (/^lari\s*\(\s*running\s*\)$/i.test(clean)) return isEn ? 'Running' : 'Lari';
+  if (/^jalan santai\s*\(\s*walking\s*\)$/i.test(clean)) return isEn ? 'Walking' : 'Jalan Santai';
+  if (/^berenang\s*\(\s*swimming\s*\)$/i.test(clean)) return isEn ? 'Swimming' : 'Berenang';
+  if (/^mendaki\s*\(\s*hiking\s*\)$/i.test(clean)) return isEn ? 'Hiking' : 'Mendaki';
+  if (/^mendayung\s*\(\s*rowing\s*\)$/i.test(clean)) return isEn ? 'Rowing' : 'Mendayung';
+  if (/^lompat tali\s*\(\s*jump rope\s*\)$/i.test(clean)) return isEn ? 'Jump Rope' : 'Lompat Tali';
+  if (/^naik tangga\s*\(\s*stairs\s*\)$/i.test(clean)) return isEn ? 'Stairs' : 'Naik Tangga';
+  if (/^other$/i.test(clean)) return isEn ? 'Other' : 'Lainnya';
+  if (/^lainnya$/i.test(clean)) return isEn ? 'Other' : 'Lainnya';
+  return clean;
 };
 
 export const formatDurationFromSeconds = (secs) => {
@@ -907,9 +926,9 @@ export const formatDurationFromSeconds = (secs) => {
   return `${String(m).padStart(2, '0')}:${String(remSec).padStart(2, '0')}`;
 };
 
-export const convertHcWorkoutToLogym = (w, ymd) => {
+export const convertHcWorkoutToLogym = (w, ymd, lang = 'id') => {
   if (!w) return null;
-  const name = mapHcWorkoutType(w.workoutType);
+  const name = mapHcWorkoutType(w.workoutType, lang);
   const durationSecs = Math.max(0, Math.round(Number(w.duration) || 0));
   const calories = Math.max(0, Math.round(Number(w.totalEnergyBurned) || 0));
   const distanceKm = w.totalDistance ? Number((Number(w.totalDistance) / 1000).toFixed(2)) : null;
@@ -1027,7 +1046,7 @@ export const isWorkoutConflict = (externalWorkout, existingWorkout, ymd) => {
   return (overlapMs / durationMs) > 0.4 || (overlapMs / exDur) > 0.4;
 };
 
-export const hcPullExternalWorkouts = async (startYmd, endYmd, existingHistory = {}) => {
+export const hcPullExternalWorkouts = async (startYmd, endYmd, existingHistory = {}, lang = 'id') => {
   if (!isNative()) return {};
   const startISO = new Date(`${startYmd}T00:00:00`).toISOString();
   const endISO = new Date(`${endYmd}T23:59:59`).toISOString();
@@ -1058,7 +1077,7 @@ export const hcPullExternalWorkouts = async (startYmd, endYmd, existingHistory =
       const hasConflict = existing.some(exW => isWorkoutConflict(w, exW, ymd));
       if (hasConflict) continue;
 
-      const mapped = convertHcWorkoutToLogym(w, ymd);
+      const mapped = convertHcWorkoutToLogym(w, ymd, lang);
       if (mapped) {
         if (!byDay[ymd]) byDay[ymd] = [];
         byDay[ymd].push(mapped);

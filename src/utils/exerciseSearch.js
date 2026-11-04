@@ -9,18 +9,20 @@ export const exerciseSlug = (name) => {
 // Indonesian & common gym synonyms for smart search expansion
 export const SYNONYMS = {
   // Kardio & Pergerakan
-  'lari': 'run running runner jog jogging treadmill trail sprint lari',
-  'running': 'lari runner jog jogging treadmill sprint',
-  'jogging': 'jog joging running lari santai',
+  'lari': 'run running runner jog jogging treadmill trail sprint lari pelari',
+  'running': 'lari runner jog jogging treadmill sprint pelari berari',
+  'jogging': 'jog joging running lari santai sprint',
   'joging': 'jog jogging running lari',
-  'sepeda': 'bike bicycle bicycling cycle cycling stationary gowes',
-  'bicycling': 'sepeda bike cycle cycling stationary',
-  'cycling': 'sepeda bike cycle bicycling',
-  'gowes': 'sepeda bike bicycle bicycling cycling',
-  'renang': 'swim swimming pool renang',
-  'swimming': 'renang swim pool',
-  'jalan': 'walk walking brisk hike hiking jalan kaki',
-  'walking': 'jalan walk brisk hiking',
+  'sepeda': 'bike bicycle bicycling cycle cycling stationary gowes bersepeda',
+  'bersepeda': 'bike bicycle bicycling cycle cycling stationary gowes sepeda',
+  'bicycling': 'sepeda bersepeda bike cycle cycling stationary',
+  'cycling': 'sepeda bersepeda bike cycle bicycling',
+  'gowes': 'sepeda bersepeda bike bicycle bicycling cycling',
+  'renang': 'swim swimming pool berenang',
+  'berenang': 'swim swimming pool renang',
+  'swimming': 'renang berenang swim pool',
+  'jalan': 'walk walking brisk hike hiking jalan kaki santai',
+  'walking': 'jalan jalan kaki walk brisk hiking santai',
   'treadmill': 'running run lari jog jogging walking jalan treadmill',
   'dayung': 'row rowing ergometer',
   'rowing': 'dayung row ergometer',
@@ -191,6 +193,9 @@ export const prepareSearchableExercise = (ex, langId = 'id') => {
   const nameNorm = normalizeSearchString(ex.name);
   const nameColl = collapseSearchString(ex.name);
 
+  const nameEnNorm = ex.name_en ? normalizeSearchString(ex.name_en) : '';
+  const nameEnColl = ex.name_en ? collapseSearchString(ex.name_en) : '';
+
   const targets = Array.isArray(ex.target) ? ex.target : [ex.target || ''];
   const targetId = formatTarget(ex.target, langId) || '';
   const targetEn = formatTarget(ex.target, 'en') || '';
@@ -202,7 +207,7 @@ export const prepareSearchableExercise = (ex, langId = 'id') => {
   const equip = ex.equipment || '';
   const equipNorm = normalizeSearchString(equip);
 
-  const allText = `${nameNorm} ${aliasNorm} ${targetNorm} ${equipNorm}`;
+  const allText = `${nameNorm} ${nameEnNorm} ${aliasNorm} ${targetNorm} ${equipNorm}`;
   const allColl = collapseSearchString(allText);
   const slug = exerciseSlug(ex.name);
 
@@ -210,6 +215,8 @@ export const prepareSearchableExercise = (ex, langId = 'id') => {
     ...ex,
     _nameNorm: nameNorm,
     _nameColl: nameColl,
+    _nameEnNorm: nameEnNorm,
+    _nameEnColl: nameEnColl,
     _targetNorm: targetNorm,
     _allText: allText,
     _allColl: allColl,
@@ -236,12 +243,12 @@ export const scoreExerciseMatch = (ex, query, ownUsage = 0) => {
 
   let score = 0;
 
-  // 1. Collapsed exact match on exercise name
-  if (nameColl === qColl) {
+  // 1. Collapsed exact match on exercise name (or English name)
+  if (nameColl === qColl || (ex._nameEnColl && ex._nameEnColl === qColl)) {
     score += 10000;
-  } else if (nameColl.startsWith(qColl)) {
+  } else if (nameColl.startsWith(qColl) || (ex._nameEnColl && ex._nameEnColl.startsWith(qColl))) {
     score += 6000;
-  } else if (nameColl.includes(qColl)) {
+  } else if (nameColl.includes(qColl) || (ex._nameEnColl && ex._nameEnColl.includes(qColl))) {
     score += 4000;
   } else if (allColl.includes(qColl)) {
     score += 2500;
@@ -261,9 +268,9 @@ export const scoreExerciseMatch = (ex, query, ownUsage = 0) => {
   if (matchesAll) score += 2000;
 
   // 3. Name match priority over muscle/target match
-  if (nameNorm.includes(qNorm) || nameColl.includes(qColl)) {
+  if (nameNorm.includes(qNorm) || nameColl.includes(qColl) || (ex._nameEnNorm && ex._nameEnNorm.includes(qNorm)) || (ex._nameEnColl && ex._nameEnColl.includes(qColl))) {
     score += 1500;
-  } else if (qWords.some(w => nameNorm.includes(w) || getSynonyms(w).some(syn => nameNorm.includes(syn) || nameColl.includes(collapseSearchString(syn))))) {
+  } else if (qWords.some(w => nameNorm.includes(w) || (ex._nameEnNorm && ex._nameEnNorm.includes(w)) || getSynonyms(w).some(syn => nameNorm.includes(syn) || nameColl.includes(collapseSearchString(syn)) || (ex._nameEnNorm && ex._nameEnNorm.includes(syn))))) {
     score += 1000;
   }
 

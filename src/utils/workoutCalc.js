@@ -319,7 +319,7 @@ export const isCardioExercise = (ex) => {
  * sementara "Crunch" tidak.
  */
 const CARDIO_WORDS = ['cardio', 'kardio', 'run', 'lari', 'jog', 'treadmill', 'cycl', 'bike',
-  'sepeda', 'swim', 'renang', 'elliptical', 'eliptik', 'rowing', 'dayung', 'walk', 'jalan'];
+  'sepeda', 'bersepeda', 'swim', 'renang', 'berenang', 'elliptical', 'eliptik', 'rowing', 'dayung', 'walk', 'jalan'];
 const CARDIO_RE = new RegExp(`\\b(${CARDIO_WORDS.join('|')})`, 'i');
 
 /**

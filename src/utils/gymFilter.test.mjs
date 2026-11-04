@@ -30,8 +30,8 @@ const yatim = defaultMasterExercises.filter(e => !equipmentOptions.includes(e.eq
 assert.ok(yatim.length >= 2, `sanity: ada ${yatim.length} latihan beralat tak dikenal`);
 yatim.forEach(e => assert.ok(nama(cumaDumbbell).includes(e.name),
   `${e.name} (alat "${e.equipment}" tidak ada di equipmentOptions) tidak boleh hilang`));
-assert.ok(nama(cumaDumbbell).includes('Swimming (Renang)'));
-assert.ok(nama(cumaDumbbell).includes('Bicycling') || nama(cumaDumbbell).includes('Cycling / Sepeda'));
+assert.ok(nama(cumaDumbbell).includes('Berenang') || nama(cumaDumbbell).includes('Swimming (Renang)'));
+assert.ok(nama(cumaDumbbell).includes('Bersepeda') || nama(cumaDumbbell).includes('Bicycling') || nama(cumaDumbbell).includes('Cycling / Sepeda'));
 
 // 5. Latihan online beralat asing (translateEquipment mengembalikan Title Case apa pun) ikut aman.
 const online = [{ id: 'x', name: 'Sledgehammer Swing', equipment: 'Sledgehammer' }];

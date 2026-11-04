@@ -1277,7 +1277,8 @@ export const defaultMasterExercises = [
   },
   {
     "id": 127,
-    "name": "Bicycling, Stationary",
+    "name": "Sepeda Statis",
+    "name_en": "Stationary Bike",
     "exerciseId": "Bicycling_Stationary",
     "target": [
       "Cardio",
@@ -1295,6 +1296,7 @@ export const defaultMasterExercises = [
     "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Bicycling_Stationary/0.jpg",
     "aliases": [
       "Stationary Bike",
+      "Bicycling, Stationary",
       "Sepeda Statis",
       "Sepeda Gym",
       "Spin Bike",
@@ -1600,7 +1602,8 @@ export const defaultMasterExercises = [
   },
   {
     "id": 136,
-    "name": "Swimming (Renang)",
+    "name": "Berenang",
+    "name_en": "Swimming",
     "target": [
       "Cardio",
       "Core",
@@ -1612,6 +1615,14 @@ export const defaultMasterExercises = [
     "equipment": "Pool",
     "level": "intermediate",
     "ytVideo": "",
+    "aliases": [
+      "Swimming",
+      "Renang",
+      "Berenang",
+      "Swim",
+      "Pool",
+      "Swimming (Renang)"
+    ],
     "instructions": [
       "Lakukan pemanasan peregangan sendi bahu dan leher di pinggir kolam sebelum masuk ke air.",
       "Mulai dengan 1–2 putaran gaya dada atau gaya bebas santai untuk beradaptasi dengan suhu air.",
@@ -1636,7 +1647,8 @@ export const defaultMasterExercises = [
   },
   {
     "id": 137,
-    "name": "Jogging / Running",
+    "name": "Lari",
+    "name_en": "Running",
     "target": [
       "Cardio",
       "Quads",
@@ -1648,6 +1660,16 @@ export const defaultMasterExercises = [
     "equipment": "Body Weight",
     "level": "beginner",
     "ytVideo": "",
+    "aliases": [
+      "Running",
+      "Jogging",
+      "Lari",
+      "Lari Santai",
+      "Jog",
+      "Sprint",
+      "Run",
+      "Jogging / Running"
+    ],
     "instructions": [
       "Mulai dengan jalan cepat selama 3–5 menit untuk melancarkan sirkulasi darah ke otot kaki.",
       "Tingkatkan tempo menjadi lari santai (joging) dengan postur tubuh sedikit condong ke depan dari pergelangan kaki.",
@@ -1672,7 +1694,8 @@ export const defaultMasterExercises = [
   },
   {
     "id": 138,
-    "name": "Walking / Jalan Kaki",
+    "name": "Jalan Santai",
+    "name_en": "Walking",
     "target": [
       "Cardio"
     ],
@@ -1682,6 +1705,14 @@ export const defaultMasterExercises = [
     "equipment": "Body Weight",
     "level": "beginner",
     "ytVideo": "",
+    "aliases": [
+      "Walking",
+      "Jalan Kaki",
+      "Jalan Santai",
+      "Walk",
+      "Brisk Walk",
+      "Walking / Jalan Kaki"
+    ],
     "instructions": [
       "Berdirilah tegak dengan bahu rileks ke belakang, dada terbuka, dan pandangan sekitar 3–5 meter ke depan.",
       "Langkahkan kaki ke depan dengan mendaratkan tumit terlebih dahulu, lalu gulirkan telapak kaki hingga mendorong dari ibu jari.",
@@ -1706,7 +1737,8 @@ export const defaultMasterExercises = [
   },
   {
     "id": 139,
-    "name": "Bicycling",
+    "name": "Bersepeda",
+    "name_en": "Cycling",
     "exerciseId": "Bicycling",
     "target": [
       "Cardio",
@@ -1724,11 +1756,14 @@ export const defaultMasterExercises = [
     "thumbnailUrl": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Bicycling/0.jpg",
     "aliases": [
       "Cycling",
-      "Cycling / Sepeda",
+      "Bicycling",
       "Sepeda",
       "Bersepeda",
-      "Sepeda Luar",
-      "Outdoor Bicycling"
+      "Bike",
+      "Gowes",
+      "Outdoor Bicycling",
+      "Cycling / Sepeda",
+      "Sepeda Luar"
     ],
     "ytVideo": "",
     "instructions": [
@@ -2157,27 +2192,37 @@ export const findMatchingMasterExercise = (targetEx, masterList = defaultMasterE
     'running, treadmill': 'Running, Treadmill',
     'running treadmill': 'Running, Treadmill',
     'lari treadmill': 'Running, Treadmill',
-    'cycling': 'Bicycling',
-    'cycling / sepeda': 'Bicycling',
-    'cycling sepeda': 'Bicycling',
-    'sepeda': 'Bicycling',
-    'bersepeda': 'Bicycling',
-    'sepeda luar': 'Bicycling',
-    'outdoor bicycling': 'Bicycling',
-    'bicycling': 'Bicycling',
-    'stationary bike': 'Bicycling, Stationary',
-    'sepeda statis': 'Bicycling, Stationary',
-    'sepeda gym': 'Bicycling, Stationary',
-    'spin bike': 'Bicycling, Stationary',
-    'spinning': 'Bicycling, Stationary',
-    'bicycling stationary': 'Bicycling, Stationary',
-    'bicycling, stationary': 'Bicycling, Stationary',
+    'cycling': 'Bersepeda',
+    'cycling / sepeda': 'Bersepeda',
+    'cycling sepeda': 'Bersepeda',
+    'sepeda': 'Bersepeda',
+    'bersepeda': 'Bersepeda',
+    'sepeda luar': 'Bersepeda',
+    'outdoor bicycling': 'Bersepeda',
+    'bicycling': 'Bersepeda',
+    'stationary bike': 'Sepeda Statis',
+    'sepeda statis': 'Sepeda Statis',
+    'sepeda gym': 'Sepeda Statis',
+    'spin bike': 'Sepeda Statis',
+    'spinning': 'Sepeda Statis',
+    'bicycling stationary': 'Sepeda Statis',
+    'bicycling, stationary': 'Sepeda Statis',
     'trail running': ['Trail Running', 'Trail Running/Walking', 'Trail Running Walking'],
     'trail run': ['Trail Running', 'Trail Running/Walking', 'Trail Running Walking'],
-    'jogging': 'Jogging / Running',
-    'running': 'Jogging / Running',
-    'jogging running': 'Jogging / Running',
-    'jogging / running': 'Jogging / Running',
+    'jogging': 'Lari',
+    'running': 'Lari',
+    'lari': 'Lari',
+    'jogging running': 'Lari',
+    'jogging / running': 'Lari',
+    'swimming': 'Berenang',
+    'renang': 'Berenang',
+    'berenang': 'Berenang',
+    'swimming renang': 'Berenang',
+    'swimming (renang)': 'Berenang',
+    'walking': 'Jalan Santai',
+    'jalan kaki': 'Jalan Santai',
+    'jalan santai': 'Jalan Santai',
+    'walking / jalan kaki': 'Jalan Santai',
   };
 
   const canonicalEntry = canonicalAliases[rawName];
@@ -2303,13 +2348,17 @@ export const canonicalizeExercise = (ex) => {
   } else if (locName === 'treadmill running' || locName === 'running on treadmill' || locName === 'treadmill' || locName === 'running treadmill' || locName === 'running, treadmill' || locName === 'lari treadmill') {
     name = 'Running, Treadmill';
   } else if (locName === 'cycling / sepeda' || locName === 'cycling sepeda' || locName === 'cycling' || locName === 'sepeda' || locName === 'bersepeda' || locName === 'sepeda luar' || locName === 'outdoor bicycling' || locName === 'bicycling') {
-    name = 'Bicycling';
+    name = 'Bersepeda';
   } else if (locName === 'stationary bike' || locName === 'sepeda statis' || locName === 'sepeda gym' || locName === 'spin bike' || locName === 'spinning' || locName === 'bicycling stationary' || locName === 'bicycling, stationary') {
-    name = 'Bicycling, Stationary';
+    name = 'Sepeda Statis';
   } else if (locName === 'trail running' || locName === 'trail run') {
     name = 'Trail Running';
-  } else if (locName === 'jogging' || locName === 'running' || locName === 'jogging running' || locName === 'jogging / running') {
-    name = 'Jogging / Running';
+  } else if (locName === 'jogging' || locName === 'running' || locName === 'lari' || locName === 'jogging running' || locName === 'jogging / running') {
+    name = 'Lari';
+  } else if (locName === 'swimming' || locName === 'renang' || locName === 'berenang' || locName === 'swimming renang' || locName === 'swimming (renang)') {
+    name = 'Berenang';
+  } else if (locName === 'walking' || locName === 'jalan kaki' || locName === 'jalan santai' || locName === 'walking / jalan kaki') {
+    name = 'Jalan Santai';
   } else if (locName === 'cable triceps pushdown' || locName === 'triceps pushdown' || locName === 'tricep pushdown') {
     name = 'Triceps Pushdown';
   } else if (locName === 'dumbbell biceps curl' || locName === 'dumbbell bicep curl' || locName === 'biceps curl' || locName === 'bicep curl' || locName === 'dumbbell alternate bicep curl' || locName === 'dumbbell alternating bicep curl') {
@@ -2379,6 +2428,13 @@ export const canonicalizeExercise = (ex) => {
       ...(resolvedEq ? { equipment: resolvedEq } : {})
     })
   };
+};
+
+export const getExerciseDisplayName = (ex, lang = 'id') => {
+  if (!ex) return '';
+  const isEn = String(lang || '').toLowerCase() === 'en';
+  if (isEn && ex.name_en) return ex.name_en;
+  return ex.name || '';
 };
 
 export const defaultPrograms = [

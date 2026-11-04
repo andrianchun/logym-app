@@ -136,23 +136,26 @@ const exTreadmill = prepareSearchableExercise({
 });
 const exBicycling = prepareSearchableExercise({
   id: 139,
-  name: 'Bicycling',
+  name: 'Bersepeda',
+  name_en: 'Cycling',
   target: ['Cardio', 'Quads'],
-  aliases: ['Cycling', 'Sepeda'],
+  aliases: ['Cycling', 'Sepeda', 'Bicycling', 'Gowes'],
   equipment: 'bicycle'
 });
 const exStationary = prepareSearchableExercise({
   id: 127,
-  name: 'Bicycling, Stationary',
+  name: 'Sepeda Statis',
+  name_en: 'Stationary Bike',
   target: ['Cardio', 'Quads'],
-  aliases: ['Stationary Bike', 'Sepeda Statis'],
+  aliases: ['Stationary Bike', 'Sepeda Statis', 'Bicycling, Stationary'],
   equipment: 'machine'
 });
 const exSwimming = prepareSearchableExercise({
   id: 136,
-  name: 'Swimming (Renang)',
+  name: 'Berenang',
+  name_en: 'Swimming',
   target: ['Cardio', 'Core', 'Lats'],
-  aliases: ['Renang', 'Swimming'],
+  aliases: ['Renang', 'Swimming', 'Berenang'],
   equipment: 'pool'
 });
 
@@ -160,27 +163,35 @@ const exSwimming = prepareSearchableExercise({
 const sLari = scoreExerciseMatch(exTreadmill, 'lari');
 assert.ok(sLari > 0, '"lari" must match "Running, Treadmill"');
 
-// "sepeda" matches Bicycling & Bicycling, Stationary
+// "sepeda" & "bersepeda" matches Bersepeda & Sepeda Statis
 const sSepeda = scoreExerciseMatch(exBicycling, 'sepeda');
 const sSepedaStat = scoreExerciseMatch(exStationary, 'sepeda');
-assert.ok(sSepeda > 0, '"sepeda" must match "Bicycling"');
-assert.ok(sSepedaStat > 0, '"sepeda" must match "Bicycling, Stationary"');
+assert.ok(sSepeda > 0, '"sepeda" must match "Bersepeda"');
+assert.ok(sSepedaStat > 0, '"sepeda" must match "Sepeda Statis"');
 
-// "gowes" matches Bicycling
+// "cycling" matches Bersepeda (cross-language search)
+const sCycling = scoreExerciseMatch(exBicycling, 'cycling');
+assert.ok(sCycling >= 10000, '"cycling" must match "Bersepeda" with top score');
+
+// "swimming" matches Berenang (cross-language search)
+const sSwimming = scoreExerciseMatch(exSwimming, 'swimming');
+assert.ok(sSwimming >= 10000, '"swimming" must match "Berenang" with top score');
+
+// "gowes" matches Bersepeda
 const sGowes = scoreExerciseMatch(exBicycling, 'gowes');
-assert.ok(sGowes > 0, '"gowes" must match "Bicycling"');
+assert.ok(sGowes > 0, '"gowes" must match "Bersepeda"');
 
-// "renang" matches Swimming
+// "renang" matches Berenang
 const sRenang = scoreExerciseMatch(exSwimming, 'renang');
-assert.ok(sRenang > 0, '"renang" must match "Swimming (Renang)"');
+assert.ok(sRenang > 0, '"renang" must match "Berenang"');
 
 // Prefix "lar" matches Running, Treadmill
 const sPrefixLari = scoreExerciseMatch(exTreadmill, 'lar');
 assert.ok(sPrefixLari > 0, 'Prefix "lar" must match "Running, Treadmill"');
 
-// Prefix "seped" matches Bicycling
+// Prefix "seped" matches Bersepeda
 const sPrefixSeped = scoreExerciseMatch(exBicycling, 'seped');
-assert.ok(sPrefixSeped > 0, 'Prefix "seped" must match "Bicycling"');
+assert.ok(sPrefixSeped > 0, 'Prefix "seped" must match "Bersepeda"');
 
 console.log('exerciseSearch OK', {
   scoreSpaced,
