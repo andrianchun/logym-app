@@ -13,7 +13,7 @@ import { MuscleProgress } from './MuscleProgress';
 import { shareWorkoutToFeed } from '../utils/communityApi';
 import CreatePostModal from './CreatePostModal';
 import ActivityRings from './ActivityRings';
-import { parseWorkoutDurationMinutes, calculateWorkoutCalories, calculateSmartWorkoutCalories, dailyBurnCalories, dailyActiveMinutes } from '../utils/workoutCalc';
+import { parseWorkoutDurationMinutes, calculateWorkoutCalories, calculateSmartWorkoutCalories, dailyBurnCalories, dailyActiveMinutes, calcDynamicTarget } from '../utils/workoutCalc';
 let globalTemplateIndex = 0; // default to bodycomp
 
 export default function ShareCardGenerator({ user, setUser, t, theme, history, activityTargets, programs, exerciseLibrary, lang, language, soundEnabled, playSoundEffect, selectedDate, units, activePlanIds, userProfile, onPostCreated }) {
@@ -852,13 +852,20 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                                         <div className="flex flex-col h-full">
                                             <div className="flex items-center space-x-1 mb-0 text-orange-400"><Utensils size={12}/> <span className="text-[9px] text-white/70 font-bold uppercase tracking-widest">K. Makan</span></div>
                                             <div className="flex flex-col flex-1 justify-end">
-                                                <div className="flex items-baseline space-x-1 mb-1">
-                                                    <span className="text-2xl font-black text-white leading-tight">{formatNumber(bioData.nutritionCalories) || '0'}</span>
-                                                    <span className="text-[9px] text-white/50 font-bold">/ {formatNumber(Math.max(0, (activityTargets?.activityCalories || 2000) + (activityTargets?.calorieDelta || 0)))}</span>
-                                                </div>
-                                                <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
-                                                    <div className="h-full bg-orange-400 rounded-full" style={{ width: `${Math.min(100, (Number(bioData.nutritionCalories || 0) / Math.max(1, (activityTargets?.activityCalories || 2000) + (activityTargets?.calorieDelta || 0))) * 100)}%` }}></div>
-                                                </div>
+                                                {(() => {
+                                                    const foodTargetVal = calcDynamicTarget(userProfile?.lomealSync?.targets || null, mergedDailyCalories, userProfile?.gender) || Math.max(0, (activityTargets?.activityCalories || 2000) + (activityTargets?.calorieDelta || 0));
+                                                    return (
+                                                        <>
+                                                            <div className="flex items-baseline space-x-1 mb-1">
+                                                                <span className="text-2xl font-black text-white leading-tight">{formatNumber(bioData.nutritionCalories) || '0'}</span>
+                                                                <span className="text-[9px] text-white/50 font-bold">/ {formatNumber(foodTargetVal)}</span>
+                                                            </div>
+                                                            <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+                                                                <div className="h-full bg-orange-400 rounded-full" style={{ width: `${Math.min(100, (Number(bioData.nutritionCalories || 0) / Math.max(1, foodTargetVal)) * 100)}%` }}></div>
+                                                            </div>
+                                                        </>
+                                                    );
+                                                })()}
                                             </div>
                                         </div>
 

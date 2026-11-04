@@ -11,7 +11,7 @@ import ProgressTab from './ProgressTab';
 import { MuscleProgress } from '../components/MuscleProgress';
 import SwipeInput from '../components/SwipeInput';
 import { formatNumber, sleepHoursToParts } from '../utils/numberFormat';
-import { dailyBurnCalories, dailyActiveMinutes, deduplicateWorkouts } from '../utils/workoutCalc';
+import { dailyBurnCalories, dailyActiveMinutes, deduplicateWorkouts, calcDynamicTarget } from '../utils/workoutCalc';
 import { dayBmr } from '../utils/bmr';
 import { calculateBodyComposition, enrichBioWithImpedance } from '../utils/xiaomiScaleCalc';
 import { AreaChart, Area, ResponsiveContainer, YAxis, XAxis, ReferenceArea } from 'recharts';
@@ -1527,7 +1527,11 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                        // cuma dipercaya kalau ymd-nya beneran hari ini, biar gak nampilin angka kemarin.
                        const lomealFresh = lomealToday?.ymd === todayStr ? lomealToday : null;
                        const nutritionCalories = lomealFresh?.kcal ?? bioData.nutritionCalories;
-                       const foodTarget = lomealFresh?.targetKcal || lomealTargets?.todayTarget || lomealTargets?.kcal || 2000;
+                       // Target Kalori SSOT bersama Lomeal:
+                       // Prioritaskan penghitungan dinamis live terhadap pembakaran harian (mergedDailyCalories)
+                       const foodTarget = (activeDate === todayStr && lomealTargets)
+                         ? calcDynamicTarget(lomealTargets, mergedDailyCalories, userProfile?.gender)
+                         : (lomealTargets?.todayTarget || lomealFresh?.targetKcal || lomealTargets?.kcal || activityTargets?.activityCalories || 2000);
                        return (
                          <>
                            <div className="flex items-center space-x-1.5 mb-1">

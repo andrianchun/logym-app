@@ -3,7 +3,7 @@ import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip } from 'recharts';
 import { getLocalYMD } from '../data/constants';
 import { formatNumber, formatSleepDuration } from '../utils/numberFormat';
 import { calculateReadiness, restingHrBaseline } from '../utils/readinessEngine';
-import { dailyBurnCalories, dailyActiveMinutes } from '../utils/workoutCalc';
+import { dailyBurnCalories, dailyActiveMinutes, calcDynamicTarget } from '../utils/workoutCalc';
 import { dayBmr } from '../utils/bmr';
 
 const CustomStackedBarShape = (props) => {
@@ -250,6 +250,10 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
               })(),
               targetSleep: histBio?.targetSleep || targetSleepH,
               targetCalories: (() => {
+                  if (entry.dateStr === todayStr && lomealTargets) {
+                      const curBurn = actCals || 0;
+                      return calcDynamicTarget(lomealTargets, curBurn, userProfile?.gender);
+                  }
                   if (entry.dateStr === todayStr && (lomealFresh?.targetKcal || lomealTargets?.todayTarget)) {
                       return lomealFresh?.targetKcal || lomealTargets?.todayTarget;
                   }

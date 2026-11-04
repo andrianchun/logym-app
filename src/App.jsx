@@ -52,7 +52,7 @@ import { fetchExercisesFromApi } from './utils/exerciseDbApi';
 import { AI_MODELS, detectPlateaus, getLogyNotification } from './utils/aiAgent';
 import { calculateReadiness, restingHrBaseline } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
-import { isCardioExercise, calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, deduplicateWorkouts, recomputeStrengthRecords, buildExLookupByName, canonicalExId, sessionSpanSeconds, repairActualWeights, buildHcSessionDetail, estimate10RM, defaultSetWeight, gymStepFor, mergeRm10, getEquipmentConfig, calculateActualWeight, calculateInputWeight, getSetActualWeight, resolveExerciseProgressiveTarget, resolveDefaultExerciseDuration } from './utils/workoutCalc';
+import { isCardioExercise, calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, deduplicateWorkouts, recomputeStrengthRecords, buildExLookupByName, canonicalExId, sessionSpanSeconds, repairActualWeights, buildHcSessionDetail, estimate10RM, defaultSetWeight, gymStepFor, mergeRm10, getEquipmentConfig, calculateActualWeight, calculateInputWeight, getSetActualWeight, resolveExerciseProgressiveTarget, resolveDefaultExerciseDuration, calcDynamicTarget } from './utils/workoutCalc';
 import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcReadHeartRateWindow, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission, capIntradayLog, HC_FIELDS, fillOnlyPatch, hcDroppedTypes, hcPullExternalWorkouts, isAllowedExternalType, isWorkoutConflict, formatExternalWorkoutName } from './utils/healthConnect';
 import { bumpExercisePopularity } from './utils/exercisePopularity';
 import { rapikanNamaProgram, rapikanNamaSesi, pertahankanNamaSesi } from './utils/programNaming';
@@ -1788,7 +1788,11 @@ export default function App() {
   useEffect(() => {
      if (!isDataLoaded || !activityTargets) return;
      const todayStr = getLocalYMD(new Date());
-     const effectiveTargetCal = lomealTargets?.kcal || activityTargets.activityCalories;
+     const existingBio = history[todayStr]?.bioData || {};
+     const curBurn = Number(existingBio.activityCalories) || 0;
+     const effectiveTargetCal = lomealTargets
+       ? (curBurn > 0 ? calcDynamicTarget(lomealTargets, curBurn, userProfile?.gender) : (lomealTargets.todayTarget || lomealTargets.kcal))
+       : (lomealTargets?.kcal || activityTargets.activityCalories);
      setHistory(prev => {
         const existingBio = prev[todayStr]?.bioData || {};
         
@@ -1815,7 +1819,7 @@ export default function App() {
            }
         };
      });
-  }, [isDataLoaded, activityTargets, lomealTargets?.kcal]);
+  }, [isDataLoaded, activityTargets, lomealTargets, userProfile?.gender]);
 
   // Sembuhkan & rapikan sesi kembar (misal ekstra duplikat saat save) yang terlanjur tersimpan di history hari ini
   useEffect(() => {
@@ -2536,7 +2540,7 @@ export default function App() {
   useEffect(() => {
     if (!user?.uid || !isDataLoaded) return;
     try {
-      const syncPayload = buildLogymSyncPayload(history, userProfile?.weight);
+      const syncPayload = buildLogymSyncPayload(history, userProfile, null, lomealToday);
       const syncStr = JSON.stringify(syncPayload);
       if (lastLogymSyncRef.current === syncStr) return;
 
@@ -2548,13 +2552,13 @@ export default function App() {
             console.log('[LogymSync] Terkirim ke Lomeal:', syncPayload.logymSync.today);
           })
           .catch(err => console.warn('[LogymSync] Gagal auto-sync ke Lomeal:', err));
-      }, 1000);
+      }, 500);
 
       return () => clearTimeout(timer);
     } catch (e) {
       console.warn('[LogymSync] Error build payload:', e);
     }
-  }, [history, user?.uid, isDataLoaded, userProfile?.weight]);
+  }, [history, user?.uid, isDataLoaded, userProfile, lomealToday]);
 
   useEffect(() => {
     const flush = () => {

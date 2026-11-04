@@ -1,4 +1,4 @@
-import { manualFieldValue, resolveLoggedExercise, defaultEquipmentConfig, normalizeEquipmentName, cleanExerciseNameForMatching } from '../data/constants.js';
+import { manualFieldValue, resolveLoggedExercise, defaultEquipmentConfig, normalizeEquipmentName, cleanExerciseNameForMatching, getLocalYMD } from '../data/constants.js';
 import { dayBmr } from './bmr.js';
 
 // MET (Metabolic Equivalent) untuk latihan beban/resistance training. Dipakai konsisten di
@@ -1285,6 +1285,107 @@ export const dailyBurnCalories = (bioData, workouts, fallbackWeightKg, dayExerci
     workout, kardio, beban, bmr, steps, tef, hasMacros,
     macros: { protein: proteinG, carbs: carbsG, fat: fatG },
     sessions, isManual, manualBase,
+  };
+};
+
+export const MIN_SAFE_KCAL = { male: 1500, female: 1200 };
+
+/**
+ * Target Kalori Fleksibel (Dynamic Calorie Cycling)
+ * SSOT rumus bersama Logym & Lomeal:
+ * Target Makan = Total Kalori Dibakar (TDEE Hari Ini) + Program Delta (Defisit/Surplus)
+ * - Rest day / bakar sedikit -> target makan turun (defisit tetap terjaga).
+ * - Workout day / bakar banyak -> target makan naik (memberi bahan bakar pemulihan).
+ * - Dibatasi batas aman minimum (safe min: 1500 pria / 1200 wanita).
+ */
+export const calcDynamicTarget = (baseTargets, burnedTotal, gender = 'male') => {
+  if (!baseTargets) return 2000;
+  const baseKcal = baseTargets.kcal || baseTargets.targetKcal || baseTargets.activityCalories || 2000;
+  const burn = Number(burnedTotal) || 0;
+  if (burn <= 0) return baseKcal;
+
+  let programDelta = 0;
+  if (baseTargets.programDelta != null) {
+    programDelta = Number(baseTargets.programDelta) || 0;
+  } else if (baseTargets.customDeltaKcal != null) {
+    const d = Math.abs(baseTargets.customDeltaKcal);
+    if (baseTargets.dietGoal === 'cutting' || baseTargets.dietGoal === 'cut') programDelta = -d;
+    else if (baseTargets.dietGoal === 'bulk' || baseTargets.dietGoal === 'bulking') programDelta = d;
+  } else if (baseTargets.tdee && baseTargets.kcal) {
+    programDelta = baseTargets.kcal - baseTargets.tdee;
+  } else if (baseTargets.calorieDelta != null) {
+    programDelta = Number(baseTargets.calorieDelta) || 0;
+  }
+
+  const rawTarget = Math.round(burn + programDelta);
+  const safeMin = MIN_SAFE_KCAL[gender === 'female' ? 'female' : 'male'] || 1500;
+  return Math.max(rawTarget, safeMin);
+};
+
+/**
+ * Payload ringkasan aktivitas Logym untuk disinkronkan ke dokumen root user (`logym_users/{uid}`)
+ * SSOT Engine sinkronisasi ke Lomeal:
+ * - Menghitung kalori dibakar real-time via `dailyBurnCalories` (TDEE).
+ * - Mengirim kalori murni olahraga (EAT: workoutCalories / eatKcal).
+ * - Mengirim rincian BMR, NEAT langkah, TEF, jumlah sesi dan latihan yang selesai.
+ */
+export const buildLogymSyncPayload = (history, userProfileOrWeight = 70, targetDateStr = null, lomealToday = null) => {
+  const todayStr = targetDateStr || getLocalYMD(new Date());
+  const todayData = history?.[todayStr] || {};
+  const rawWorkouts = todayData.workouts || [];
+  const completedWorkouts = deduplicateWorkouts(rawWorkouts).filter(w => w?.status === 'completed' || w?.programId === 'adhoc');
+
+  let completedExercisesCount = 0;
+  completedWorkouts.forEach(w => {
+    const exs = w.overriddenExercises || w.exercises || [];
+    const log = w.log || {};
+    exs.forEach(ex => {
+      const sLog = log[ex.id] || Object.entries(log).find(([k]) => k === String(ex.id) || k.startsWith(`${ex.id}-`))?.[1];
+      if (sLog && Object.values(sLog).some(s => s?.done && !s?.skipped)) {
+        completedExercisesCount++;
+      }
+    });
+  });
+
+  const userWeight = typeof userProfileOrWeight === 'number'
+    ? userProfileOrWeight
+    : (Number(todayData.bioData?.weight) || Number(userProfileOrWeight?.weight) || 70);
+  const userProfile = typeof userProfileOrWeight === 'object' && userProfileOrWeight !== null ? userProfileOrWeight : null;
+
+  const lomealFresh = lomealToday?.ymd === todayStr ? lomealToday : null;
+  const effectiveBio = {
+    ...(todayData.bioData || {}),
+    nutritionCalories: lomealFresh?.kcal ?? todayData.bioData?.nutritionCalories,
+    protein: lomealFresh?.protein ?? todayData.bioData?.protein,
+    carbs: lomealFresh?.carbs ?? todayData.bioData?.carbs,
+    fat: lomealFresh?.fat ?? todayData.bioData?.fat,
+  };
+
+  const burn = dailyBurnCalories(effectiveBio, completedWorkouts, userWeight, todayData.exerciseLogs, userProfile);
+  const totalBurn = burn.total > 0 ? burn.total : (Number(todayData.bioData?.activityCalories) || 0);
+  const steps = Number(todayData.bioData?.steps) || 0;
+
+  return {
+    logymSync: {
+      today: {
+        ymd: todayStr,
+        kcal: totalBurn,                // Total kalori dibakar hari ini (TDEE)
+        burnedKcal: totalBurn,
+        floorKcal: burn.floor || totalBurn,
+        workoutCalories: burn.workout, // Kalori murni olahraga (EAT)
+        eatKcal: burn.workout,
+        kardioCalories: burn.kardio,
+        bebanCalories: burn.beban,
+        workoutsCount: completedWorkouts.length,
+        sessionsCount: completedWorkouts.length,
+        exercisesCount: completedExercisesCount,
+        steps,
+        stepsKcal: burn.steps || Math.round(steps * 0.04),
+        bmr: burn.bmr || Number(todayData.bioData?.bmr) || 0,
+        tef: burn.tef || 0,
+        updatedAt: Date.now()
+      }
+    }
   };
 };
 

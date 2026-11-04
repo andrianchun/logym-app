@@ -2,7 +2,7 @@
 // Jalankan: node src/utils/dashboardCalc.test.mjs
 // Kalau rincian tidak berjumlah sama dengan angka besarnya, user berhenti percaya semua angkanya.
 import assert from 'node:assert/strict';
-import { splitWorkoutCalories, isCardioExercise, calculateSmartWorkoutCalories, dailyBurnCalories, dailyActiveMinutes, heartRateCalories, deduplicateWorkouts } from './workoutCalc.js';
+import { splitWorkoutCalories, isCardioExercise, calculateSmartWorkoutCalories, dailyBurnCalories, dailyActiveMinutes, heartRateCalories, deduplicateWorkouts, calcDynamicTarget } from './workoutCalc.js';
 import { sleepHoursToParts, formatSleepDuration } from './numberFormat.js';
 import { buildLogymSyncPayload } from '../data/constants.js';
 
@@ -445,8 +445,30 @@ assert.equal(formatSleepDuration(5.999), '6 jam');
   const payload = buildLogymSyncPayload(hist, 70, '2026-08-25');
   assert.equal(payload.logymSync.today.workoutsCount, 1);
   assert.equal(payload.logymSync.today.exercisesCount, 4);
-  assert.equal(payload.logymSync.today.kcal, 350);
+  assert.equal(payload.logymSync.today.workoutCalories, 32); // EAT murni olahraga
+  assert.equal(payload.logymSync.today.kcal, 1632);          // Total TDEE (BMR 1600 + workout 32)
   assert.equal(payload.logymSync.today.ymd, '2026-08-25');
+}
+
+// --- calcDynamicTarget (SSOT Sinkronisasi Target Lomeal-Logym) ------------
+{
+  // Maintenance (delta 0): target makan mengikuti total kalori dibakar
+  assert.equal(calcDynamicTarget({ kcal: 2000, programDelta: 0 }, 2350, 'male'), 2350);
+
+  // Cutting (-500): target makan = bakar - 500
+  assert.equal(calcDynamicTarget({ kcal: 1800, programDelta: -500 }, 2400, 'male'), 1900);
+
+  // Bulking (+300): target makan = bakar + 300
+  assert.equal(calcDynamicTarget({ kcal: 2300, programDelta: 300 }, 2200, 'male'), 2500);
+
+  // Batas aman minimum (safe min): Pria minimal 1500 kcal walau defisit dalam
+  assert.equal(calcDynamicTarget({ kcal: 1500, programDelta: -600 }, 1800, 'male'), 1500);
+
+  // Batas aman minimum wanita (1200 kcal)
+  assert.equal(calcDynamicTarget({ kcal: 1300, programDelta: -500 }, 1500, 'female'), 1200);
+
+  // Fallback jika belum ada data pembakaran (burn <= 0): gunakan base target
+  assert.equal(calcDynamicTarget({ kcal: 2000 }, 0, 'male'), 2000);
 }
 
 // History kosong tidak error
