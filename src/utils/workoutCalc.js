@@ -410,8 +410,18 @@ export const splitWorkoutCalories = (weightKg, workout, logs, globalRestTime = 9
   const total = calculateSmartWorkoutCalories(weightKg, workout, logs, globalRestTime, profile);
   if (!(total > 0)) return { kardio: 0, beban: 0 };
 
-  // Sesi kardio eksternal murni (Samsung Health / Strava / Garmin) seluruh kalorinya masuk kardio
-  if (workout?.isExternal || workout?.programId === 'cardio-external' || workout?.type === 'cardio') {
+  // Sesi eksternal (Samsung Health / Strava / Garmin)
+  if (workout?.isExternal) {
+    if (workout.type === 'strength' || workout.type === 'weight' || workout.programId === 'strength-external') {
+      return { kardio: 0, beban: total };
+    }
+    if (workout.type === 'cardio' || workout.programId === 'cardio-external') {
+      return { kardio: total, beban: 0 };
+    }
+    return { kardio: 0, beban: total };
+  }
+
+  if (workout?.type === 'cardio' || workout?.programId === 'cardio-external') {
     return { kardio: total, beban: 0 };
   }
 

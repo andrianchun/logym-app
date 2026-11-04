@@ -4,25 +4,27 @@ import {
   formatDurationFromSeconds,
   convertHcWorkoutToLogym,
   isWorkoutConflict,
+  isAllowedExternalType,
   isAllowedCardioType,
   cleanSourceAppName,
   formatExternalWorkoutName,
+  getWorkoutSortMinutes,
 } from './healthConnect.js';
 import { dailyBurnCalories, splitWorkoutCalories, calculateSmartWorkoutCalories } from './workoutCalc.js';
 
-console.log('Testing External Cardio Sync (Samsung Health / Health Connect)...');
+console.log('Testing External Cardio & Strength Sync (Samsung Health / Health Connect)...');
 
-// 1. isAllowedCardioType (Cegah import 'Other' atau 'strengthTraining')
-assert.equal(isAllowedCardioType('cycling'), true);
-assert.equal(isAllowedCardioType('bikingStationary'), true);
-assert.equal(isAllowedCardioType('running'), true);
-assert.equal(isAllowedCardioType('walking'), true);
-assert.equal(isAllowedCardioType('swimming'), true);
-assert.equal(isAllowedCardioType('hiking'), true);
-assert.equal(isAllowedCardioType('other'), false, "'other' BUKAN kardio, dilarang di-pull!");
-assert.equal(isAllowedCardioType('strengthTraining'), false, "'strengthTraining' dilarang di-pull!");
-assert.equal(isAllowedCardioType('weightlifting'), false, "'weightlifting' dilarang di-pull!");
-console.log('✅ isAllowedCardioType passed');
+// 1. isAllowedExternalType
+assert.equal(isAllowedExternalType('cycling'), true);
+assert.equal(isAllowedExternalType('bikingStationary'), true);
+assert.equal(isAllowedExternalType('running'), true);
+assert.equal(isAllowedExternalType('walking'), true);
+assert.equal(isAllowedExternalType('swimming'), true);
+assert.equal(isAllowedExternalType('hiking'), true);
+assert.equal(isAllowedExternalType('other'), true, "'other' diperbolehkan jika tidak ada konflik");
+assert.equal(isAllowedExternalType('strengthTraining'), true, "'strengthTraining' diperbolehkan jika user latihan beban di SH");
+assert.equal(isAllowedExternalType('weightlifting'), true, "'weightlifting' diperbolehkan jika user latihan beban di SH");
+console.log('✅ isAllowedExternalType passed');
 
 // 2. cleanSourceAppName (Tampilan badge bersih, bukan package name)
 assert.equal(cleanSourceAppName('com.sec.android.app.shealth', 'com.sec.android.app.shealth'), 'Samsung Health');
@@ -45,22 +47,29 @@ assert.equal(mapHcWorkoutType('swimming'), 'Berenang');
 assert.equal(mapHcWorkoutType('swimming', 'en'), 'Swimming');
 assert.equal(mapHcWorkoutType('hiking'), 'Mendaki');
 assert.equal(mapHcWorkoutType('hiking', 'en'), 'Hiking');
-assert.equal(mapHcWorkoutType('other'), 'Lainnya');
-assert.equal(mapHcWorkoutType('other', 'en'), 'Other');
+assert.equal(mapHcWorkoutType('weightlifting'), 'Latihan Beban Ekstra');
+assert.equal(mapHcWorkoutType('weightlifting', 'en'), 'Extra Strength Training');
+assert.equal(mapHcWorkoutType('other'), 'Latihan Ekstra');
+assert.equal(mapHcWorkoutType('other', 'en'), 'Extra Workout');
 
 assert.equal(formatExternalWorkoutName('Bersepeda (Cycling)'), 'Bersepeda');
 assert.equal(formatExternalWorkoutName('Bersepeda (Cycling)', 'en'), 'Cycling');
-assert.equal(formatExternalWorkoutName('Other'), 'Lainnya');
-assert.equal(formatExternalWorkoutName('Other', 'en'), 'Other');
+assert.equal(formatExternalWorkoutName('Latihan Beban Ekstra'), 'Latihan Beban Ekstra');
+assert.equal(formatExternalWorkoutName('Latihan Beban Ekstra', 'en'), 'Extra Strength Training');
+assert.equal(formatExternalWorkoutName('Other'), 'Latihan Ekstra');
+assert.equal(formatExternalWorkoutName('Other', 'en'), 'Extra Workout');
 console.log('✅ mapHcWorkoutType & formatExternalWorkoutName passed');
 
-// 4. formatDurationFromSeconds
+// 4. formatDurationFromSeconds & getWorkoutSortMinutes
 assert.equal(formatDurationFromSeconds(45), '00:45');
 assert.equal(formatDurationFromSeconds(1800), '30:00');
 assert.equal(formatDurationFromSeconds(3665), '01:01:05');
-console.log('✅ formatDurationFromSeconds passed');
 
-// 5. convertHcWorkoutToLogym
+assert.equal(getWorkoutSortMinutes({ timestamp: '06:30' }), 6 * 60 + 30);
+assert.equal(getWorkoutSortMinutes({ reminderTime: '15:00' }), 15 * 60);
+console.log('✅ formatDurationFromSeconds & getWorkoutSortMinutes passed');
+
+// 5. convertHcWorkoutToLogym (Cardio & Strength)
 const sampleHcWorkout = {
   workoutType: 'cycling',
   duration: 2700, // 45 menit
@@ -85,8 +94,23 @@ assert.equal(converted.calories, 380);
 assert.equal(converted.distanceKm, 15.42);
 assert.equal(converted.status, 'completed');
 assert.equal(converted.exercises.length, 1);
-assert.equal(converted.exercises[0].category, 'cardio');
-console.log('✅ convertHcWorkoutToLogym passed');
+
+// Strength external session (User tracked weightlifting only in Samsung Health)
+const sampleHcStrength = {
+  workoutType: 'weightlifting',
+  duration: 3600, // 60 menit
+  totalEnergyBurned: 320,
+  startDate: '2026-11-04T10:00:00.000Z',
+  endDate: '2026-11-04T11:00:00.000Z',
+  sourceName: 'Samsung Health',
+  platformId: 'hc_strength_1',
+};
+const convertedStrength = convertHcWorkoutToLogym(sampleHcStrength, '2026-11-04');
+assert.equal(convertedStrength.type, 'strength');
+assert.equal(convertedStrength.programId, 'strength-external');
+assert.equal(convertedStrength.programName, 'Latihan Beban Ekstra');
+assert.equal(convertedStrength.calories, 320);
+console.log('✅ convertHcWorkoutToLogym (cardio & strength) passed');
 
 // 6. isWorkoutConflict (Anti-Double-Counting dengan Sesi Asli Logym)
 // Case A: Sesi pada waktu yang sama (overlap 100%) dengan format Logym (timestamp: "15:00")
@@ -115,19 +139,21 @@ console.log('✅ isWorkoutConflict (Anti-Double-Counting) passed');
 
 // 7. Integrasi Energi SSOT (workoutCalc & dailyBurnCalories)
 const userWeight = 70;
-const split = splitWorkoutCalories(userWeight, converted, converted.log);
-assert.equal(split.kardio, 380, 'Seluruh kalori sepedahan eksternal harus masuk kardio');
-assert.equal(split.beban, 0, 'Kalori beban harus 0 untuk sesi sepedahan');
+const splitCardio = splitWorkoutCalories(userWeight, converted, converted.log);
+assert.equal(splitCardio.kardio, 380, 'Seluruh kalori sepedahan eksternal harus masuk kardio');
+assert.equal(splitCardio.beban, 0, 'Kalori beban harus 0 untuk sesi sepedahan');
 
-const smartKcal = calculateSmartWorkoutCalories(userWeight, converted, converted.log);
-assert.equal(smartKcal, 380);
+const splitStrength = splitWorkoutCalories(userWeight, convertedStrength, convertedStrength.log);
+assert.equal(splitStrength.kardio, 0, 'Kalori kardio harus 0 untuk sesi latihan beban eksternal');
+assert.equal(splitStrength.beban, 320, 'Seluruh kalori latihan beban eksternal harus masuk beban');
 
 const bioData = { steps: 5000, bmr: 1600 };
-const burn = dailyBurnCalories(bioData, [converted], userWeight, {});
+const burn = dailyBurnCalories(bioData, [converted, convertedStrength], userWeight, {});
 assert.equal(burn.kardio, 380, 'burn.kardio harus terhitung 380 kcal');
-assert.equal(burn.workout, 380, 'burn.workout harus mencakup 380 kcal');
-assert.equal(burn.sessions, 1, 'burn.sessions harus 1');
-assert.ok(burn.total >= 1600 + (5000 * 0.04) + 380, 'Total kalori harian harus mencakup EAT sepedahan');
+assert.equal(burn.beban, 320, 'burn.beban harus terhitung 320 kcal');
+assert.equal(burn.workout, 700, 'burn.workout harus mencakup 700 kcal (380 + 320)');
+assert.equal(burn.sessions, 2, 'burn.sessions harus 2');
+assert.ok(burn.total >= 1600 + (5000 * 0.04) + 700, 'Total kalori harian harus mencakup EAT lengkap');
 console.log('✅ Integrasi Energi SSOT (workoutCalc & dailyBurnCalories) passed');
 
-console.log('🎉 All External Cardio Sync unit tests PASSED successfully!');
+console.log('🎉 All External Cardio & Strength Sync unit tests PASSED successfully!');

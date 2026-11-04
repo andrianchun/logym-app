@@ -53,7 +53,7 @@ import { AI_MODELS, detectPlateaus, getLogyNotification } from './utils/aiAgent'
 import { calculateReadiness, restingHrBaseline } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
 import { isCardioExercise, calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, deduplicateWorkouts, recomputeStrengthRecords, buildExLookupByName, canonicalExId, sessionSpanSeconds, repairActualWeights, buildHcSessionDetail, estimate10RM, defaultSetWeight, gymStepFor, mergeRm10, getEquipmentConfig, calculateActualWeight, calculateInputWeight, getSetActualWeight, resolveExerciseProgressiveTarget, resolveDefaultExerciseDuration } from './utils/workoutCalc';
-import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcReadHeartRateWindow, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission, capIntradayLog, HC_FIELDS, fillOnlyPatch, hcDroppedTypes, hcPullExternalWorkouts, isAllowedCardioType, isWorkoutConflict, formatExternalWorkoutName } from './utils/healthConnect';
+import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcReadHeartRateWindow, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission, capIntradayLog, HC_FIELDS, fillOnlyPatch, hcDroppedTypes, hcPullExternalWorkouts, isAllowedExternalType, isWorkoutConflict, formatExternalWorkoutName } from './utils/healthConnect';
 import { bumpExercisePopularity } from './utils/exercisePopularity';
 import { rapikanNamaProgram, rapikanNamaSesi, pertahankanNamaSesi } from './utils/programNaming';
 import useDialog from './hooks/useDialog';
@@ -697,16 +697,16 @@ export default function App() {
           const ymd = getLocalYMD(d);
           const day = next[ymd];
           if (day && Array.isArray(day.workouts)) {
-            const nativeWorkouts = day.workouts.filter(w => !w.isExternal && w.programId !== 'cardio-external');
+            const nativeWorkouts = day.workouts.filter(w => !w.isExternal && !w.programId?.endsWith('-external'));
             const cleanWorkouts = day.workouts.filter(w => {
-              if (!w.isExternal && w.programId !== 'cardio-external') return true;
-              if (!isAllowedCardioType(w.workoutType) || ['other', 'lainnya'].includes((w.programName || '').toLowerCase())) {
+              if (!w.isExternal && !w.programId?.endsWith('-external')) return true;
+              if (!isAllowedExternalType(w.workoutType)) {
                 return false;
               }
               const conflict = nativeWorkouts.some(nativeW => isWorkoutConflict(w, nativeW, ymd));
               return !conflict;
             }).map(w => {
-              if (!w.isExternal && w.programId !== 'cardio-external') return w;
+              if (!w.isExternal && !w.programId?.endsWith('-external')) return w;
               const formattedName = formatExternalWorkoutName(w.programName, language);
               if (formattedName !== w.programName) {
                 return {

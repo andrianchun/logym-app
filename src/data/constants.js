@@ -3215,6 +3215,27 @@ export const buildLogymSyncPayload = (history, userWeight = 70, targetDateStr = 
   };
 };
 
+export const getWorkoutSortMinutes = (w) => {
+  if (!w) return 900;
+  if (w.startTime) {
+    const d = new Date(w.startTime);
+    if (!isNaN(d.getTime())) return d.getHours() * 60 + d.getMinutes();
+  }
+  if (w.startedAt) {
+    const d = new Date(Number(w.startedAt));
+    if (!isNaN(d.getTime())) return d.getHours() * 60 + d.getMinutes();
+  }
+  if (w.timestamp && typeof w.timestamp === 'string') {
+    const m = w.timestamp.match(/^(\d{1,2}):(\d{2})/);
+    if (m) return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+  }
+  if (w.reminderTime && typeof w.reminderTime === 'string') {
+    const m = w.reminderTime.match(/^(\d{1,2}):(\d{2})/);
+    if (m) return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+  }
+  return 900;
+};
+
 export const getDayWorkouts = (history, programs, activePlanIds, dateStr) => {
   const dData = history?.[dateStr] || {};
   const historical = Array.isArray(dData.workouts) ? dData.workouts : [];
@@ -3273,10 +3294,17 @@ export const getDayWorkouts = (history, programs, activePlanIds, dateStr) => {
 
   // Pengaman render: buang id kembar (sisa program duplikat yang belum ke-upload bersih).
   const seen = new Set();
-  return result.filter(w => {
+  const uniqueWorkouts = result.filter(w => {
     if (seen.has(w.id)) return false;
     seen.add(w.id);
     return true;
+  });
+
+  // Urutkan seluruh sesi secara kronologis berdasarkan waktu (pagi -> siang -> malam)
+  return uniqueWorkouts.sort((a, b) => {
+    const ta = getWorkoutSortMinutes(a);
+    const tb = getWorkoutSortMinutes(b);
+    return ta - tb;
   });
 };
 

@@ -4,6 +4,7 @@ import { Plus, Snowflake, Play, CalendarDays, X, CheckCircle, ChevronDown, Chevr
 import { fetchExercisesFromApi } from '../utils/exerciseDbApi';
 import { shareWorkoutToFeed } from '../utils/communityApi';
 import { normalizeMuscleKey, resolveProjectedProgramId, getDayWorkouts, defaultMasterExercises, findMatchingMasterExercise, canonicalizeExercise } from '../data/constants';
+import { cleanSourceAppName } from '../utils/healthConnect';
 import { estimate10RM, defaultSetWeight, gymStepFor, getEquipmentConfig, calculateActualWeight, calculateInputWeight, getSetActualWeight, rm10Series, buildExLookupByName, canonicalExId, calculateProgressiveOverloadTarget, resolveExerciseProgressiveTarget, resolveDefaultExerciseDuration } from '../utils/workoutCalc';
 
 // Import Komponen Pecahan
@@ -127,6 +128,7 @@ const WorkoutTab = ({
              workoutId: w.id, 
              status: w.status, 
              log: w.log,
+             isExtra: true,
              exercises: (w.exercises || []).map(ex => ({
                 ...ex,
                 originalId: ex.originalId || ex.id,
@@ -137,20 +139,29 @@ const WorkoutTab = ({
         }
         let p = programs.find(p => p.id === w.programId);
         
-        // Fallback untuk program yang sudah dihapus tapi ada di history
+        // Fallback untuk program yang sudah dihapus tapi ada di history, atau sesi eksternal (Health Connect)
         if (!p && w.status === 'completed') {
           p = {
             id: w.programId,
-            name: w.programName || 'Sesi Terdahulu',
+            name: w.programName || (w.isExternal ? 'Sesi Ekstra' : 'Sesi Terdahulu'),
             exercises: w.overriddenExercises || w.exercises || []
           };
         }
+
+        const isExtra = Boolean(w.isExternal || w.programId === 'adhoc' || w.programId === 'cardio-external' || w.programId === 'strength-external' || w.programId === 'other-external');
 
         return p ? { 
             ...p, 
             workoutId: w.id, 
             status: w.status, 
             log: w.log,
+            isExternal: Boolean(w.isExternal),
+            source: w.source,
+            sourceId: w.sourceId,
+            duration: w.duration,
+            calories: w.calories,
+            distanceKm: w.distanceKm,
+            isExtra,
             exercises: p.exercises ? (w.overriddenExercises || p.exercises).map(ex => ({
                 ...ex,
                 originalId: ex.id,
@@ -1370,7 +1381,11 @@ const WorkoutTab = ({
                             className="flex flex-col items-start gap-0.5 flex-1 min-w-0 pr-4 cursor-pointer"
                           >
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="text-xl sm:text-2xl uppercase tracking-widest break-words leading-tight flex-1">Sesi {pIdx + 1}: {prog.name}</span>
+                              <span className="text-xl sm:text-2xl uppercase tracking-widest break-words leading-tight flex-1">
+                                {prog.isExtra
+                                  ? ((prog.name && prog.name !== 'Ekstra' && prog.name !== 'adhoc') ? `Sesi Ekstra: ${prog.name}` : 'Sesi Ekstra')
+                                  : `Sesi: ${prog.name}`}
+                              </span>
                             </div>
                             {prog.planName && (
                               <span className={`text-xs ${t.textMuted} font-medium`}>Program: {prog.planName}</span>
@@ -1391,7 +1406,27 @@ const WorkoutTab = ({
                         swipe pindah tab dikunci khusus tablet. Di HP (tampilan vertikal), swipe kanan-kiri
                         tetap aktif untuk pindah tab. */}
                     {isExpanded && (
-                      <div className="sm:no-swipe pb-4 sm:p-6 sm:pt-0 space-y-4 sm:space-y-0 sm:flex sm:flex-row sm:overflow-x-auto sm:snap-x sm:gap-6 hide-scrollbar">
+                      prog.isExternal ? (
+                        <div className="p-5 sm:p-6 pt-0 space-y-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-400 font-bold text-xs">
+                              {cleanSourceAppName(prog.source, prog.sourceId)}
+                            </span>
+                            <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">
+                              Selesai
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-3 text-sm font-semibold opacity-80">
+                            <span>⏱️ {prog.duration || '00:00'}</span>
+                            <span>🔥 ~{prog.calories || 0} kcal</span>
+                            {prog.distanceKm ? <span>📍 {prog.distanceKm} km</span> : null}
+                          </div>
+                          <div className="pt-1 text-xs opacity-60">
+                            Disinkron otomatis dari {cleanSourceAppName(prog.source, prog.sourceId)}.
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="sm:no-swipe pb-4 sm:p-6 sm:pt-0 space-y-4 sm:space-y-0 sm:flex sm:flex-row sm:overflow-x-auto sm:snap-x sm:gap-6 hide-scrollbar">
                         {groupExercises(prog.exercises).map((group, gIdx) => {
                           return (
                           <div key={`${prog.id}-group-${gIdx}`} className={`sm:w-[340px] sm:shrink-0 sm:snap-center sm:bg-black/5 sm:dark:bg-white/5 sm:rounded-3xl sm:border sm:border-black/5 sm:dark:border-white/5 sm:overflow-hidden relative flex flex-col mb-4 sm:mb-0 last:mb-0 ${group.isSuperset ? 'pr-0' : ''}`}>
@@ -1504,7 +1539,8 @@ const WorkoutTab = ({
                           </div>
                         );})}
                       </div>
-                    )}
+                    )
+                  )}
                   </div>
                 );
               })}
@@ -1519,7 +1555,7 @@ const WorkoutTab = ({
                       onClick={() => { playSoundEffect('click', soundEnabled); toggleSession('extra'); }}
                       className="flex flex-col items-start gap-0.5 flex-1 min-w-0 pr-4 cursor-pointer"
                     >
-                      <span className="text-xl sm:text-2xl uppercase tracking-widest break-words leading-tight">Sesi {activeProgramsList.length + 1}: Ekstra</span>
+                      <span className="text-xl sm:text-2xl uppercase tracking-widest break-words leading-tight">Sesi Ekstra</span>
                     </div>
 
                     {/* Sisi Kanan: Chevron Toggle */}

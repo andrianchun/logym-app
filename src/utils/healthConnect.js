@@ -848,17 +848,22 @@ const ALLOWED_CARDIO_TYPES = new Set([
   'paddleSports',
 ]);
 
-export const isAllowedCardioType = (type) => {
+export const isAllowedExternalType = (type) => {
   if (!type) return false;
   if (ALLOWED_CARDIO_TYPES.has(type)) return true;
   const t = type.toLowerCase();
-  // Cegah mutlak 'other', 'strength', 'weight', 'calisthenics', 'gym'
-  if (t === 'other' || t.includes('strength') || t.includes('weight') || t.includes('calisthenic') || t.includes('bodyweight')) {
-    return false;
+  if (t === 'other') return true;
+  if (t.includes('strength') || t.includes('weight') || t.includes('calisthenic') || t.includes('bodyweight')) {
+    return true;
   }
   return t.includes('cycl') || t.includes('bik') || t.includes('run') || t.includes('walk') ||
-         t.includes('swim') || t.includes('hik') || t.includes('row') || t.includes('ellipt');
+         t.includes('swim') || t.includes('hik') || t.includes('row') || t.includes('ellipt') ||
+         t.includes('jumprope') || t.includes('stair') || t.includes('badminton') || t.includes('tennis') ||
+         t.includes('basketball') || t.includes('soccer') || t.includes('football') || t.includes('yoga') ||
+         t.includes('pilates') || t.includes('hiit');
 };
+
+export const isAllowedCardioType = isAllowedExternalType;
 
 export const cleanSourceAppName = (sourceName, sourceId) => {
   const s = `${sourceName || ''} ${sourceId || ''}`.toLowerCase();
@@ -894,8 +899,11 @@ export const mapHcWorkoutType = (type, lang = 'id') => {
   if (t.includes('yoga')) return 'Yoga';
   if (t.includes('pilates')) return 'Pilates';
   if (t.includes('hiit') || t.includes('highintensity')) return 'HIIT';
-  if (t === 'other') return isEn ? 'Other' : 'Lainnya';
-  return type ? type.charAt(0).toUpperCase() + type.slice(1) : (isEn ? 'External Cardio' : 'Kardio Eksternal');
+  if (t.includes('strength') || t.includes('weight') || t.includes('calisthenic') || t.includes('bodyweight')) {
+    return isEn ? 'Extra Strength Training' : 'Latihan Beban Ekstra';
+  }
+  if (t === 'other') return isEn ? 'Extra Workout' : 'Latihan Ekstra';
+  return type ? type.charAt(0).toUpperCase() + type.slice(1) : (isEn ? 'Extra Workout' : 'Latihan Ekstra');
 };
 
 export const formatExternalWorkoutName = (name, lang = 'id') => {
@@ -910,9 +918,34 @@ export const formatExternalWorkoutName = (name, lang = 'id') => {
   if (/^mendayung\s*\(\s*rowing\s*\)$/i.test(clean)) return isEn ? 'Rowing' : 'Mendayung';
   if (/^lompat tali\s*\(\s*jump rope\s*\)$/i.test(clean)) return isEn ? 'Jump Rope' : 'Lompat Tali';
   if (/^naik tangga\s*\(\s*stairs\s*\)$/i.test(clean)) return isEn ? 'Stairs' : 'Naik Tangga';
-  if (/^other$/i.test(clean)) return isEn ? 'Other' : 'Lainnya';
-  if (/^lainnya$/i.test(clean)) return isEn ? 'Other' : 'Lainnya';
+  if (/^latihan beban ekstra$/i.test(clean) || /^extra strength training$/i.test(clean)) {
+    return isEn ? 'Extra Strength Training' : 'Latihan Beban Ekstra';
+  }
+  if (/^other$/i.test(clean) || /^lainnya$/i.test(clean) || /^extra workout$/i.test(clean) || /^latihan ekstra$/i.test(clean)) {
+    return isEn ? 'Extra Workout' : 'Latihan Ekstra';
+  }
   return clean;
+};
+
+export const getWorkoutSortMinutes = (w) => {
+  if (!w) return 900;
+  if (w.startTime) {
+    const d = new Date(w.startTime);
+    if (!isNaN(d.getTime())) return d.getHours() * 60 + d.getMinutes();
+  }
+  if (w.startedAt) {
+    const d = new Date(Number(w.startedAt));
+    if (!isNaN(d.getTime())) return d.getHours() * 60 + d.getMinutes();
+  }
+  if (w.timestamp && typeof w.timestamp === 'string') {
+    const m = w.timestamp.match(/^(\d{1,2}):(\d{2})/);
+    if (m) return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+  }
+  if (w.reminderTime && typeof w.reminderTime === 'string') {
+    const m = w.reminderTime.match(/^(\d{1,2}):(\d{2})/);
+    if (m) return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+  }
+  return 900;
 };
 
 export const formatDurationFromSeconds = (secs) => {
@@ -933,7 +966,12 @@ export const convertHcWorkoutToLogym = (w, ymd, lang = 'id') => {
   const calories = Math.max(0, Math.round(Number(w.totalEnergyBurned) || 0));
   const distanceKm = w.totalDistance ? Number((Number(w.totalDistance) / 1000).toFixed(2)) : null;
   const platformId = w.platformId || `${w.startDate}_${w.workoutType}`;
-  const exId = `ex_${(w.workoutType || 'cardio').toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+  const rawType = (w.workoutType || '').toLowerCase();
+  const isStrength = rawType.includes('strength') || rawType.includes('weight') || rawType.includes('calisthenic');
+  const isOther = rawType === 'other';
+  const workoutTypeKind = isStrength ? 'strength' : isOther ? 'other' : 'cardio';
+  const programId = isStrength ? 'strength-external' : isOther ? 'other-external' : 'cardio-external';
+  const exId = `ex_${(w.workoutType || 'external').toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
   const source = cleanSourceAppName(w.sourceName, w.sourceId);
 
   return {
@@ -942,10 +980,10 @@ export const convertHcWorkoutToLogym = (w, ymd, lang = 'id') => {
     isExternal: true,
     source,
     sourceId: w.sourceId || '',
-    type: 'cardio',
+    type: workoutTypeKind,
     workoutType: w.workoutType,
     status: 'completed',
-    programId: 'cardio-external',
+    programId,
     programName: name,
     startTime: w.startDate,
     endTime: w.endDate,
@@ -958,8 +996,8 @@ export const convertHcWorkoutToLogym = (w, ymd, lang = 'id') => {
       {
         id: exId,
         name,
-        type: 'cardio',
-        category: 'cardio',
+        type: workoutTypeKind,
+        category: workoutTypeKind,
       }
     ],
     log: {
@@ -1062,8 +1100,8 @@ export const hcPullExternalWorkouts = async (startYmd, endYmd, existingHistory =
       // Zero-Ping-Pong: lewati sesi yang berasal dari Logym
       if (src.includes('logym') || src.includes('lyfeat')) continue;
 
-      // HANYA tarik jenis olahraga KARDIO yang valid (cegah "Other", "strengthTraining", dll.)
-      if (!isAllowedCardioType(w.workoutType)) continue;
+      // HANYA tarik jenis sesi eksternal yang valid
+      if (!isAllowedExternalType(w.workoutType)) continue;
 
       const ymd = ymdOf(new Date(w.startDate));
       const existing = existingHistory[ymd]?.workouts || [];
