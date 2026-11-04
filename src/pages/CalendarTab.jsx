@@ -270,6 +270,7 @@ const CalendarTab = ({
   }, []);
 
   const [weeklyBlockHeight, setWeeklyBlockHeight] = useState(168);
+  const weeklyMeasuredRef = useRef(false);
   const [peekHeight, setPeekHeight] = useState(300);
 
   useEffect(() => {
@@ -278,34 +279,51 @@ const CalendarTab = ({
       // +32 = padding kolom header di mode mingguan (pt-2 + pb-6) yang tidak ikut terukur
       // dari fixedHeaderRef/weeklyRulerRef sendiri.
       const h = (fixedHeaderRef.current?.getBoundingClientRect().height || 0) + (weeklyRulerRef.current?.getBoundingClientRect().height || 0) + 32;
-      if (h > 32) setWeeklyBlockHeight(prev => (Math.abs(prev - h) < 1 ? prev : h));
+      if (h > 32) {
+        weeklyMeasuredRef.current = true;
+        setWeeklyBlockHeight(prev => (Math.abs(prev - h) < 1 ? prev : h));
+      }
     };
-    const rafId = requestAnimationFrame(measure);
-    window.addEventListener('resize', measure);
-    return () => {
-      cancelAnimationFrame(rafId);
-      window.removeEventListener('resize', measure);
-    };
+    if (!weeklyMeasuredRef.current) {
+      const rafId = requestAnimationFrame(measure);
+      window.addEventListener('resize', measure);
+      return () => {
+        cancelAnimationFrame(rafId);
+        window.removeEventListener('resize', measure);
+      };
+    } else {
+      window.addEventListener('resize', measure);
+      return () => window.removeEventListener('resize', measure);
+    }
   }, [mingguStrip, isActive]);
 
   // Bottom nav mengambang (fixed, tidak makan ruang layout) di atas konten — jadi peek sheet
   // perlu ekstra jarak seukuran tinggi nav supaya tombol di dalam peek tidak ketutupan olehnya.
   const [bottomNavClearance, setBottomNavClearance] = useState(90);
+  const bottomNavMeasuredRef = useRef(false);
   useEffect(() => {
     if (!isActive) return;
     const measure = () => {
       const nav = document.querySelector('[data-bottom-nav]');
       if (nav) {
         const navH = nav.getBoundingClientRect().height;
-        if (navH > 0) setBottomNavClearance(prev => (Math.abs(prev - (navH + 16)) < 1 ? prev : navH + 16));
+        if (navH > 0) {
+          bottomNavMeasuredRef.current = true;
+          setBottomNavClearance(prev => (Math.abs(prev - (navH + 16)) < 1 ? prev : navH + 16));
+        }
       }
     };
-    const rafId = requestAnimationFrame(measure);
-    window.addEventListener('resize', measure);
-    return () => {
-      cancelAnimationFrame(rafId);
-      window.removeEventListener('resize', measure);
-    };
+    if (!bottomNavMeasuredRef.current) {
+      const rafId = requestAnimationFrame(measure);
+      window.addEventListener('resize', measure);
+      return () => {
+        cancelAnimationFrame(rafId);
+        window.removeEventListener('resize', measure);
+      };
+    } else {
+      window.addEventListener('resize', measure);
+      return () => window.removeEventListener('resize', measure);
+    }
   }, [isActive]);
 
   // --- DRAG STATE untuk bottom sheet (persis seperti AuthPage) ---
@@ -2262,8 +2280,8 @@ const NotificationModal = ({ t, target, defaultReminderTime, soundEnabled, remin
 
 // Inactive tab is frozen completely to prevent background CPU/battery drain.
 export default React.memo(CalendarTab, (prev, next) => {
-  if (prev.isActive !== next.isActive) return false;
   if (!next.isActive) return true;
+  if (prev.isActive !== next.isActive) return false;
   const keys = Object.keys(next);
   for (let i = 0; i < keys.length; i++) {
     const k = keys[i];

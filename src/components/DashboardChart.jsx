@@ -651,4 +651,4 @@ const DashboardChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPo
   );
 };
 
-export default DashboardChart;
+export default React.memo(DashboardChart);

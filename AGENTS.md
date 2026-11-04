@@ -61,3 +61,10 @@ Setiap kali pengguna meminta untuk **"audit"**, **"analisis bug"**, **"debug"**,
    node src/data/missedDays.test.mjs
    ```
 2. Pastikan build bersih tanpa error: `npm run build`.
+
+
+## 6. STANDARISASI NOTIFIKASI PEMBARUAN (UPDATER ALERT — EKOSISTEM HEXAVERSE)
+Sesuai aturan induk `E:\CODING\AGENTS.md` Pasal 12, implementasi `UpdaterAlert.jsx` di Logym merupakan standar emas (Gold Standard) yang wajib dipertahankan:
+- **Mode Opsional**: Floating bottom card (`fixed bottom-24 inset-x-4 max-w-sm pointer-events-none` dengan inner `pointer-events-auto`), logo aplikasi berbayang, loncatan versi tabular, release notes, tombol `X`, dan tombol `Update Sekarang`. DILARANG menggunakan background modal gelap yang memblokir layar pada update non-wajib.
+- **Mode Wajib (`force`)**: Fullscreen frost modal (`bg-black/80 backdrop-blur-md`), hero logo, judul hero, sunken release notes, dan tombol unduh masif.
+- **Fluid 60fps Dynamic Crawler**: Active progress crawler 200ms + fluid frame 30ms agar progres persentase bergerak dinamis.

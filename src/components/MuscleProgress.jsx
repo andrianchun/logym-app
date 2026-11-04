@@ -30,7 +30,7 @@ const muscleMapping = {
     'abductors': ['adductor', 'abductors']
 };
 
-export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, theme, soundEnabled, playSoundEffect, isSubCard = false, forceViewMode = null, disableChartAnimation = false }) => {
+const MuscleProgressComponent = ({ history, programs, exerciseLibrary, t, lang, theme, soundEnabled, playSoundEffect, isSubCard = false, forceViewMode = null, disableChartAnimation = false }) => {
     const [timeFilter, setTimeFilter] = useState('1m'); // '1m', '3m', 'all'
     const [viewMode, setViewMode] = useState(forceViewMode || 'image'); // 'image' or 'radar'
     const [selectedMuscle, setSelectedMuscle] = useState(null);
@@ -499,3 +499,6 @@ export const MuscleProgress = ({ history, programs, exerciseLibrary, t, lang, th
         </div>
     );
 };
+
+export const MuscleProgress = React.memo(MuscleProgressComponent);
+export default MuscleProgress;

@@ -232,4 +232,4 @@ const FloatingTimer = ({
   );
 };
 
-export default FloatingTimer;
+export default React.memo(FloatingTimer);

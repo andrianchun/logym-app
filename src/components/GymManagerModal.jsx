@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { X, Plus, Edit2, Trash2, Check, ArrowLeft, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { equipmentOptions } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
-import SwipeInput from './SwipeInput';
 
 const generateId = () => `gym_${Date.now()}`;
 
@@ -69,14 +68,26 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
     playSoundEffect('click', soundEnabled);
     if (!editingGym.name.trim()) return;
 
+    // Pastikan seluruh nilai angka bersih sebelum simpan
+    const cleanedConfig = {};
+    Object.entries(editingGym.config || {}).forEach(([k, conf]) => {
+      cleanedConfig[k] = {
+        ...conf,
+        baseWeight: conf.baseWeight !== undefined && conf.baseWeight !== '' ? (parseFloat(conf.baseWeight) || 0) : 0,
+        barWeight: conf.barWeight !== undefined && conf.barWeight !== '' ? (parseFloat(conf.barWeight) || 0) : 0,
+        increment: conf.increment !== undefined && conf.increment !== '' ? (parseFloat(conf.increment) || (k.includes('Barbell') || k.includes('Smith') ? 2.5 : 5)) : (k.includes('Barbell') || k.includes('Smith') ? 2.5 : 5)
+      };
+    });
+    const gymToSave = { ...editingGym, config: cleanedConfig };
+
     setGymProfiles(prev => {
-      const idx = prev.findIndex(g => g.id === editingGym.id);
+      const idx = prev.findIndex(g => g.id === gymToSave.id);
       if (idx >= 0) {
         const newProfiles = [...prev];
-        newProfiles[idx] = editingGym;
+        newProfiles[idx] = gymToSave;
         return newProfiles;
       }
-      return [...prev, editingGym];
+      return [...prev, gymToSave];
     });
 
     setEditingGym(null);
@@ -93,31 +104,36 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
           </div>
           
           <div className="p-4 overflow-y-auto flex-1 space-y-3 overscroll-contain touch-pan-y hide-scrollbar">
-            {gymProfiles.map(gym => (
-              <div key={gym.id} className={`p-4 rounded-2xl border ${activeGymId === gym.id ? `${t.borderAccent || 'border-sky-500'} shadow-lg shadow-sky-500/10` : t.border} ${t.bgCard} flex items-center justify-between`}>
-                <div 
-                  className="flex-1 cursor-pointer"
-                  onClick={() => {
-                    setActiveGymId(gym.id);
-                    playSoundEffect('click', soundEnabled);
-                  }}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className={`font-bold text-sm ${activeGymId === gym.id ? t.textAccent : t.textMain}`}>{gym.name}</span>
-                    {activeGymId === gym.id && <Check size={16} className={t.textAccent} />}
+            {gymProfiles.map(gym => {
+              const isActive = activeGymId === gym.id;
+              return (
+                <div key={gym.id} className={`p-4 rounded-2xl border ${isActive ? `${t.borderAccent || 'border-sky-500'} shadow-lg shadow-sky-500/10` : t.border} ${t.bgCard} flex items-center justify-between gap-3`}>
+                  <div 
+                    className="flex-1 flex items-center gap-3 cursor-pointer"
+                    onClick={() => {
+                      setActiveGymId(gym.id);
+                      playSoundEffect('click', soundEnabled);
+                    }}
+                  >
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 border transition-all ${isActive ? `${t.bgAccent} border-transparent shadow-sm` : `border-slate-500/30 ${t.bgCard}`}`}>
+                      {isActive && <Check size={12} className="text-white" strokeWidth={2.5} />}
+                    </div>
+                    <div>
+                      <span className={`font-bold text-sm ${isActive ? t.textAccent : t.textMain}`}>{gym.name}</span>
+                      <p className={`text-xs ${t.textMuted} mt-0.5`}>
+                        {gym.equipment === 'all' || gym.equipment?.length === equipmentOptions.length ? 'Semua Alat Tersedia' : `${gym.equipment?.length || 0} Alat Tersedia`}
+                      </p>
+                    </div>
                   </div>
-                  <p className={`text-xs ${t.textMuted} mt-0.5`}>
-                    {gym.equipment === 'all' || gym.equipment?.length === equipmentOptions.length ? 'Semua Alat Tersedia' : `${gym.equipment?.length || 0} Alat Tersedia`}
-                  </p>
+                  <div className="flex gap-1.5 shrink-0">
+                    <button onClick={() => handleEditGym(gym)} className={`p-2 rounded-xl ${t.btnBg} hover:opacity-80 text-sm`} title="Edit"><Edit2 size={15} className={t.textMain} /></button>
+                    {gym.id !== 'default' && gymProfiles.length > 1 && (
+                      <button onClick={() => handleDeleteGym(gym)} className="p-2 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 text-sm" title="Hapus"><Trash2 size={15} /></button>
+                    )}
+                  </div>
                 </div>
-                <div className="flex gap-1.5">
-                  <button onClick={() => handleEditGym(gym)} className={`p-2 rounded-xl ${t.btnBg} hover:opacity-80 text-sm`} title="Edit"><Edit2 size={15} className={t.textMain} /></button>
-                  {gym.id !== 'default' && gymProfiles.length > 1 && (
-                    <button onClick={() => handleDeleteGym(gym)} className="p-2 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 text-sm" title="Hapus"><Trash2 size={15} /></button>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className={`p-4 border-t ${t.border} shrink-0`}>
@@ -150,7 +166,7 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
       if (!prev) return prev;
       const config = { ...(prev.config || {}) };
       if (!config[eqName]) config[eqName] = { barWeight: 0, increment: 0 };
-      config[eqName] = { ...config[eqName], [key]: parseFloat(val) || 0 };
+      config[eqName] = { ...config[eqName], [key]: val };
       return { ...prev, config };
     });
   };
@@ -163,46 +179,48 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
     if (!isBarbellBased && !isCableOrMachine && !isDumbbell) return null;
 
     const gymConfig = editingGym?.config || {};
-    const conf = gymConfig[eqName] || { 
-      baseWeight: isBarbellBased ? (eqName.includes('Sled') ? 45 : (eqName.includes('Smith') ? 15 : 20)) : 0, 
-      ratio: isCableOrMachine ? 1 : 1,
-      increment: isBarbellBased ? 2.5 : 5 
-    };
+    const conf = gymConfig[eqName] || {};
+    const defaultBase = isBarbellBased ? (eqName.includes('Sled') ? 45 : (eqName.includes('Smith') ? 15 : 20)) : 0;
+    const defaultInc = isBarbellBased ? 2.5 : 5;
+
+    const currentBase = conf.baseWeight !== undefined ? conf.baseWeight : (conf.barWeight !== undefined ? conf.barWeight : defaultBase);
+    const currentInc = conf.increment !== undefined ? conf.increment : defaultInc;
 
     return (
-      <div className={`mt-3 p-3 rounded-xl ${t.bg} border ${t.border} grid grid-cols-2 gap-3 text-left`}>
-        {/* Beban dasar dulu HANYA muncul untuk alat berbasis bar. Cable, Machine, Dumbbell, dan
-            Kettlebell tidak punya kolomnya sama sekali — padahal getEquipmentConfig membaca
-            `baseWeight` untuk alat APA PUN, jadi yang hilang cuma inputnya, bukan dukungannya.
-            Akibatnya beban aktual di alat-alat itu selalu dihitung seolah beban dasarnya nol,
-            padahal di gym sungguhan tumpukan cable, rangka mesin, dan pegangan dumbbell punya
-            berat bawaan sendiri — sering 2,5 sampai 5 kg. */}
+      <div className="mt-3 pt-3 border-t border-white/10 dark:border-white/10 grid grid-cols-2 gap-3 text-left">
         <div>
-          <label className={`text-xs uppercase font-bold tracking-wider ${t.textMuted} block mb-1`}>
+          <label className={`text-xs uppercase font-bold tracking-wider ${t.textMuted} block mb-1.5 truncate text-center`}>
             {isBarbellBased ? 'Berat Bar/Alat (kg)' : isDumbbell ? 'Berat Pegangan (kg)' : 'Beban Dasar Alat (kg)'}
           </label>
-          <SwipeInput language={language} 
-            value={conf.baseWeight ?? conf.barWeight ?? (isBarbellBased ? (eqName.includes('Sled') ? 45 : 20) : 0)}
-            onChange={val => {
+          <input 
+            type="number"
+            step="0.5"
+            min="0"
+            inputMode="decimal"
+            value={currentBase}
+            onChange={e => {
+              const val = e.target.value;
               updateConfig(eqName, 'baseWeight', val);
-              // barWeight ikut ditulis: nama lama yang masih dibaca getEquipmentConfig sebagai
-              // cadangan, jadi profil gym lama tidak mendadak berubah artinya.
               updateConfig(eqName, 'barWeight', val);
             }}
-            step={0.5} min={0} soundEnabled={soundEnabled}
-            className={`w-full bg-transparent border-b border-slate-500/30 pb-1 outline-none ${t.textMain} font-semibold text-center`}
+            className={`w-full py-2 px-3 rounded-xl bg-black/25 dark:bg-black/40 border border-white/10 focus:border-sky-400 outline-none text-center font-bold text-sm ${t.textMain} transition-colors`}
             placeholder="0"
           />
         </div>
 
         <div>
-          <label className={`text-xs uppercase font-bold tracking-wider ${t.textMuted} block mb-1`}>Kenaikan Beban (kg)</label>
-          <SwipeInput language={language} 
-            value={conf.increment || (isBarbellBased ? 2.5 : 5)}
-            onChange={val => updateConfig(eqName, 'increment', val)}
-            step={0.5} min={0} soundEnabled={soundEnabled}
-            className={`w-full bg-transparent border-b border-slate-500/30 pb-1 outline-none ${t.textMain} font-semibold text-center`}
-            placeholder={isBarbellBased ? "Misal: 2.5" : "Misal: 5"}
+          <label className={`text-xs uppercase font-bold tracking-wider ${t.textMuted} block mb-1.5 truncate text-center`}>
+            Kenaikan Beban (kg)
+          </label>
+          <input 
+            type="number"
+            step="0.5"
+            min="0"
+            inputMode="decimal"
+            value={currentInc}
+            onChange={e => updateConfig(eqName, 'increment', e.target.value)}
+            className={`w-full py-2 px-3 rounded-xl bg-black/25 dark:bg-black/40 border border-white/10 focus:border-sky-400 outline-none text-center font-bold text-sm ${t.textMain} transition-colors`}
+            placeholder={isBarbellBased ? "2.5" : "5"}
           />
         </div>
       </div>
@@ -237,22 +255,21 @@ const GymManagerModal = ({ gymProfiles, setGymProfiles, activeGymId, setActiveGy
 
           {/* Equipment Toggles */}
           <div>
-            <div className="flex items-center justify-between mb-3">
-              <label className={`text-xs font-bold uppercase tracking-wider ${t.textMuted}`}>Ketersediaan Alat</label>
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => setEditingGym({...editingGym, equipment: [...equipmentOptions]})}
-                  className={`px-2.5 py-1 ${t.bgAccentSoft || 'bg-sky-500/10'} ${t.textAccent || 'text-sky-500'} rounded-lg text-xs uppercase font-black hover:opacity-80 transition-all`}
-                >
-                  Pilih Semua
-                </button>
-                <button 
-                  onClick={() => setEditingGym({...editingGym, equipment: []})}
-                  className="px-2.5 py-1 bg-rose-500/10 text-rose-500 rounded-lg text-xs uppercase font-black hover:bg-rose-500/20 transition-all"
-                >
-                  Hapus Semua
-                </button>
-              </div>
+            <div className="flex items-center justify-between w-full mb-3">
+              <button 
+                type="button"
+                onClick={() => setEditingGym({...editingGym, equipment: [...equipmentOptions]})}
+                className={`px-3 py-1.5 ${t.bgAccentSoft || 'bg-sky-500/10'} ${t.textAccent || 'text-sky-500'} rounded-xl text-xs uppercase font-black hover:opacity-80 transition-all`}
+              >
+                Pilih Semua
+              </button>
+              <button 
+                type="button"
+                onClick={() => setEditingGym({...editingGym, equipment: []})}
+                className="px-3 py-1.5 bg-rose-500/10 text-rose-500 rounded-xl text-xs uppercase font-black hover:bg-rose-500/20 transition-all"
+              >
+                Hapus Semua
+              </button>
             </div>
             
             <div className="space-y-2.5">

@@ -30,7 +30,7 @@ function clampY(y) {
  * - Drag dari avatar = no-swipe (tidak pindah tab)
  * - onPositionChange(pos) → dikembalikan ke parent untuk animasi GymAIChat
  */
-export default function CoachLogyFloat({
+function CoachLogyFloat({
     onOpenChat,
     plateauInsights = [],
     hasUnreadChat = false, // dari GymAIChat: ada balasan/insight yang belum dibaca
@@ -338,3 +338,5 @@ export default function CoachLogyFloat({
         </>
     );
 }
+
+export default React.memo(CoachLogyFloat);

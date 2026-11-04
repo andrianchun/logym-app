@@ -399,4 +399,4 @@ const VitalsChart = ({ t, theme, history, language, activeMetric }) => {
   );
 };
 
-export default VitalsChart;
+export default React.memo(VitalsChart);

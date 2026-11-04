@@ -828,7 +828,9 @@ const DatabaseTab = ({ isActive = true, t, lang, exerciseLibrary, setExerciseLib
                       className={`px-4 py-3 cursor-pointer flex items-center justify-between hover:${t.bgAccentSoft} transition-colors ${activeGymId === g.id ? `${t.bgAccentSoft}` : ''}`}
                     >
                       <span className={`font-semibold ${activeGymId === g.id ? t.textAccent : t.text}`}>{g.name}</span>
-                      {activeGymId === g.id && <Check size={16} className={t.textAccent} />}
+                      <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 border transition-all ${activeGymId === g.id ? `${t.bgAccent} border-transparent` : 'border-slate-500/30'}`}>
+                        {activeGymId === g.id && <Check size={10} className="text-white" strokeWidth={2.5} />}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1137,8 +1139,8 @@ const DatabaseTab = ({ isActive = true, t, lang, exerciseLibrary, setExerciseLib
 
 // Inactive tab is frozen completely to prevent background CPU/battery drain.
 export default React.memo(DatabaseTab, (prev, next) => {
-  if (prev.isActive !== next.isActive) return false;
   if (!next.isActive) return true;
+  if (prev.isActive !== next.isActive) return false;
   const keys = Object.keys(next);
   for (let i = 0; i < keys.length; i++) {
     const k = keys[i];

@@ -1344,7 +1344,7 @@ export const repairActualWeights = (history, exLookup, eqConfOf) => {
         const conf = ex ? eqConfOf(ex) : null;
         const dasarBaru = Number(conf?.baseWeight) || 0;
         const sets = wk.log[kunci];
-        if (!conf || dasarBaru <= 0 || !sets) { log[kunci] = sets; return; }
+        if (!conf || !sets) { log[kunci] = sets; return; }
 
         const daftar = Array.isArray(sets) ? sets : Object.values(sets);
         let adaYangBerubah = false;
@@ -1357,6 +1357,7 @@ export const repairActualWeights = (history, exLookup, eqConfOf) => {
           const hasInvalidRatio = rasioLama < 1;
           const isCorruptedTotal = set.total_w !== undefined && Number(set.total_w) < input && !conf?.isAssisted;
           if (dasarLama > 0 && !hasInvalidRatio && !isCorruptedTotal) return set;
+          if (dasarBaru <= 0 && !hasInvalidRatio && !isCorruptedTotal) return set;
           const rasio = 1;
           const totalBaru = Math.round((input + dasarBaru) * 100) / 100;
           if (totalBaru === (Number(set.total_w) || 0)) return set;

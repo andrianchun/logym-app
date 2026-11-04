@@ -838,7 +838,6 @@ export default function App() {
   const [activeTab, _setActiveTab] = useState('dashboard');
   // Transisi tab instan tanpa artificial deferral: kedua BottomNav dan konten berpindah sinkron
   const contentTab = activeTab;
-  const [tabSlideDir, setTabSlideDir] = useState('');
   const [mountedTabs, setMountedTabs] = useState(() => new Set(['dashboard', activeTab]));
   useEffect(() => {
     setMountedTabs(prev => {
@@ -892,13 +891,6 @@ export default function App() {
       next.add(newTab);
       return next;
     });
-
-    const tabsList = ['dashboard', 'workout', 'calendar', 'program', 'database'];
-    const curIdx = tabsList.indexOf(activeTab);
-    const newIdx = tabsList.indexOf(newTab);
-    if (curIdx !== -1 && newIdx !== -1) {
-      setTabSlideDir(newIdx > curIdx ? 'right' : 'left');
-    }
 
     // Hanya periksa program kosong jika user sedang KELUAR dari tab 'program'
     if (activeTab === 'program' && newTab !== 'program') {
@@ -1109,16 +1101,16 @@ export default function App() {
   const [activeAddModalTarget, setActiveAddModalTarget] = useState(null);
 
   const [showAiChat, setShowAiChat] = useState(false);
+  const handleOpenAiChat = useCallback(() => setShowAiChat(true), []);
   const [avatarPos, setAvatarPos] = useState(null); 
   const { dialog: aiDialog, showAlert: showAiAlert } = useDialog(theme === 'dark');
 
   const plateauInsights = useMemo(() => {
-    if (activeTab !== 'dashboard') return [];
     return detectPlateaus(history, 3, 2);
-  }, [history, activeTab]);
+  }, [history]);
 
   const readiness = useMemo(() => {
-    if (!user || activeTab !== 'dashboard') return null; 
+    if (!user) return null; 
     const todayStr = getLocalYMD(new Date());
     const todayData = history[todayStr] || {};
     
@@ -1127,7 +1119,7 @@ export default function App() {
 
     const todayBioData = todayData.bioData || {};
     return calculateReadiness(todayBioData, restingHrBaseline(history, todayStr));
-  }, [history, user, activeTab]);
+  }, [history, user]);
 
   const scheduleLogyPush = async (type, id, vars) => {
     try {
@@ -2610,24 +2602,24 @@ export default function App() {
   }, [soundEnabled, user?.uid]);
 
   useEffect(() => {
-    if (contentTab === 'workout') {
-      setHistory(prev => {
-        const dayData = prev[selectedDate];
-        if (dayData && dayData.workouts) {
-          // Efek ini juga jalan cuma gara-gara pindah tab. Tanpa cek ini, history diganti
-          // objek baru → seluruh useMemo yang bergantung padanya dihitung ulang tepat saat
-          // animasi BottomNav berjalan, dan navnya kelihatan macet di tengah.
-          const cur = dayData._activeSession;
-          if (cur && cur.exerciseLogs === exerciseLogs && cur.skippedExercises === skippedExercises && cur.extraExercises === extraExercises) return prev;
-          return {
-            ...prev,
-            [selectedDate]: { ...dayData, _activeSession: { exerciseLogs, skippedExercises, extraExercises } }
-          };
-        }
-        return prev;
-      });
-    }
-  }, [exerciseLogs, skippedExercises, extraExercises, contentTab, selectedDate]);
+    setHistory(prev => {
+      const dayData = prev[selectedDate];
+      if (dayData && dayData.workouts) {
+        const cur = dayData._activeSession;
+        const hasActiveData = (exerciseLogs && Object.keys(exerciseLogs).length > 0) ||
+          (skippedExercises && skippedExercises.length > 0) ||
+          (extraExercises && extraExercises.length > 0);
+        
+        if (!hasActiveData && !cur) return prev;
+        if (cur && cur.exerciseLogs === exerciseLogs && cur.skippedExercises === skippedExercises && cur.extraExercises === extraExercises) return prev;
+        return {
+          ...prev,
+          [selectedDate]: { ...dayData, _activeSession: { exerciseLogs, skippedExercises, extraExercises } }
+        };
+      }
+      return prev;
+    });
+  }, [exerciseLogs, skippedExercises, extraExercises, selectedDate]);
 
   const deviceId = useRef(null);
   if (!deviceId.current) {
@@ -4892,7 +4884,7 @@ export default function App() {
       />
       
       <main className={`${contentTab === 'calendar' ? 'p-0 flex-1 flex flex-col min-h-0 overflow-hidden' : contentTab === 'database' ? 'px-4 pb-4 pt-0 min-h-[70vh] max-w-5xl mx-auto w-full' : 'p-4 min-h-[70vh] max-w-5xl mx-auto w-full'}`}>
-        <TabSlider activeTab={contentTab} tabSlideDir={tabSlideDir} tabIndex={['dashboard','workout','calendar','program','database'].indexOf(contentTab)} className={contentTab === 'calendar' ? 'flex-1 flex flex-col min-h-0' : ''}>
+        <TabSlider activeTab={contentTab} tabIndex={['dashboard','workout','calendar','program','database'].indexOf(contentTab)} className={contentTab === 'calendar' ? 'flex-1 flex flex-col min-h-0' : ''}>
          <div style={{ display: contentTab === 'dashboard' ? 'block' : 'none' }} className="w-full">
              <DashboardTab setConfirmModal={setConfirmModal} 
                isActive={contentTab === 'dashboard'}
@@ -4926,7 +4918,6 @@ export default function App() {
                   t={t} theme={theme} lang={lang} language={language} programs={programs} selectedDate={selectedDate} setSelectedDate={setSelectedDate}
                   history={history} setHistory={setHistory} setActiveTab={setActiveTab}
                   units={units} userProfile={userProfile}
-                  tabSlideDir={tabSlideDir}
                   activeProgramId={activeProgramId} setActiveProgramId={setActiveProgramId} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} 
                    warmupVideos={warmupVideos} cooldownVideos={cooldownVideos} onOpenDetail={handleOpenGlobalExerciseDetail}
                    exerciseLibrary={exerciseLibrary} setExerciseLibrary={setExerciseLibrary}
@@ -5051,11 +5042,10 @@ export default function App() {
       {/* === GLOBAL COACH LOGI FLOAT === */}
       {user && (
         <CoachLogyFloat
-          onOpenChat={() => setShowAiChat(true)}
+          onOpenChat={handleOpenAiChat}
           plateauInsights={plateauInsights}
           hasUnreadChat={hasUnreadChat}
           isWorkoutActive={isImmersiveMode}
-          activeTab={activeTab}
           onPositionChange={setAvatarPos}
           readiness={readiness}
         />

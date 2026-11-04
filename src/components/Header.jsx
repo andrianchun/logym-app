@@ -112,4 +112,4 @@ const Header = ({ t, theme, user, showSettings, setShowSettings, setShowProfileM
   );
 };
 
-export default Header;
+export default React.memo(Header);

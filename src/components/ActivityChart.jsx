@@ -1229,4 +1229,4 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
   );
 };
 
-export default ActivityChart;
+export default React.memo(ActivityChart);

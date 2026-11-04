@@ -3212,12 +3212,10 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
   );
 };
 
-// Skip re-render when only function props changed (always new references but same behavior).
-// Data props are compared shallowly — if any data prop changes, component re-renders.
 // Inactive tab is frozen completely to prevent background CPU/battery drain.
 export default React.memo(DashboardTab, (prev, next) => {
-  if (prev.isActive !== next.isActive) return false;
   if (!next.isActive) return true;
+  if (prev.isActive !== next.isActive) return false;
   const keys = Object.keys(next);
   for (let i = 0; i < keys.length; i++) {
     const k = keys[i];

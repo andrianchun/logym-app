@@ -1466,8 +1466,8 @@ const ProgramTab = ({
 
 // Inactive tab is frozen completely to prevent background CPU/battery drain.
 export default React.memo(ProgramTab, (prev, next) => {
-  if (prev.isActive !== next.isActive) return false;
   if (!next.isActive) return true;
+  if (prev.isActive !== next.isActive) return false;
   const keys = Object.keys(next);
   for (let i = 0; i < keys.length; i++) {
     const k = keys[i];

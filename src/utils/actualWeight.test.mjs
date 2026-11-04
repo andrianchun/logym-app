@@ -46,9 +46,8 @@ assert.equal(calculateActualWeight(50, smithConf), 65);
 // Leg Press: input 120 kg (plates) + 45 kg sled = 165 kg
 assert.equal(calculateActualWeight(120, sledConf), 165);
 
-// Cable 2:1 (ratio 0.5): input 40 kg on stack -> actual 20 kg
-const cable2to1Conf = { baseWeight: 0, ratio: 0.5 };
-assert.equal(calculateActualWeight(40, cable2to1Conf), 20);
+// Cable 1:1: input 40 kg on stack + 0 kg base = actual 40 kg
+assert.equal(calculateActualWeight(40, cableConf), 40);
 
 // Weighted Pull-Up: input 15 kg belt + 75 kg body weight = 90 kg
 assert.equal(calculateActualWeight(15, weightedConf), 90);
@@ -61,8 +60,8 @@ assert.equal(calculateInputWeight(100, barbellConf), 80);
 assert.equal(calculateInputWeight(65, smithConf), 50);
 // Leg Press: 165 kg actual - 45 kg sled = 120 kg plates
 assert.equal(calculateInputWeight(165, sledConf), 120);
-// Cable 2:1: 20 kg actual * (1 / 0.5) = 40 kg pin
-assert.equal(calculateInputWeight(20, cable2to1Conf), 40);
+// Cable 1:1: 40 kg actual - 0 kg base = 40 kg pin
+assert.equal(calculateInputWeight(40, cableConf), 40);
 // Dumbbell: 20 kg actual = 20 kg dumbbell
 assert.equal(calculateInputWeight(20, dumbbellConf), 20);
 // Edge case: actual weight less than bar weight returns 0
@@ -71,7 +70,7 @@ assert.equal(calculateInputWeight(15, barbellConf), 0);
 // Roundtrip invariant: calculateActualWeight(calculateInputWeight(W)) === W
 assert.equal(calculateActualWeight(calculateInputWeight(100, barbellConf), barbellConf), 100);
 assert.equal(calculateActualWeight(calculateInputWeight(65, smithConf), smithConf), 65);
-assert.equal(calculateActualWeight(calculateInputWeight(20, cable2to1Conf), cable2to1Conf), 20);
+assert.equal(calculateActualWeight(calculateInputWeight(20, cableConf), cableConf), 20);
 
 // Test defaultSetWeight with eqConf:
 // User has 10RM 50 kg on Smith Machine (bar 10 kg, increment 2.5 kg).
@@ -151,9 +150,9 @@ console.log('✅ All Actual Weight & 10RM unit tests PASSED successfully!');
   assert.equal(getEquipmentConfig(gym({}), 'g1', cableEx).baseWeight,
     getEquipmentConfig(null, null, cableEx).baseWeight, 'config kosong = perilaku default');
 
-  // 5. Rasio katrol tetap ikut terhitung bersama beban dasar.
+  // 5. Rasio katrol diseragamkan ke 1:1, beban dasar 2.5 kg.
   const cKatrol = getEquipmentConfig(gym({ Cable: { baseWeight: 2.5, ratio: 0.5 } }), 'g1', cableEx);
-  assert.equal(calculateActualWeight(20, cKatrol), 12.5, '(20 x 0,5) + 2,5 = 12,5');
+  assert.equal(calculateActualWeight(20, cKatrol), 22.5, '20 + 2,5 = 22,5');
 
   console.log('beban dasar custom OK');
 }
@@ -192,11 +191,11 @@ console.log('✅ All Actual Weight & 10RM unit tests PASSED successfully!');
     assert.equal(r.next, h, 'tanpa perubahan, objek yang sama dikembalikan');
   }
 
-  // 3. Rasio katrol yang tersimpan di set tetap dihormati, bukan ditimpa konfigurasi gym.
+  // 3. Rasio katrol lama (< 1) otomatis disembuhkan ke 1:1 bersama beban dasar alat.
   {
     const h = hari([{ input_w: 20, ratio: 0.5, total_w: 10, r: 10, done: true }]);
     const r = repairActualWeights(h, lookup, eqConfOf);
-    assert.equal(r.next['2026-08-01'].workouts[0].log.c1[0].total_w, 12.5, '(20 x 0,5) + 2,5');
+    assert.equal(r.next['2026-08-01'].workouts[0].log.c1[0].total_w, 22.5, '20 + 2,5');
   }
 
   // 4. Alat yang beban dasarnya nol di gym sekarang tidak diapa-apakan.
@@ -278,17 +277,17 @@ console.log('✅ All Actual Weight & 10RM unit tests PASSED successfully!');
   const legacyCableEx = { name: 'Cable Lateral Raise', equipment: 'Cable/Machine' };
   const confCable = getEquipmentConfig(gymCustom, 'g_cable', legacyCableEx);
   assert.equal(confCable.equipment, 'Cable');
-  assert.equal(confCable.ratio, 0.5, 'Rasio katrol 2:1 (0.5x) dari gym harus terbaca');
+  assert.equal(confCable.ratio, 1, 'Rasio katrol diseragamkan ke 1:1');
   assert.equal(confCable.baseWeight, 2.5, 'Beban dasar kabel 2.5 kg harus terbaca');
   assert.equal(confCable.increment, 2.5);
 
-  // Pin 40 kg di katrol 2:1 dengan beban dasar 2.5 kg -> Beban aktual riil = (40 * 0.5) + 2.5 = 22.5 kg
+  // Pin 40 kg di katrol 1:1 dengan beban dasar 2.5 kg -> Beban aktual riil = 40 + 2.5 = 42.5 kg
   const actW = calculateActualWeight(40, confCable);
-  assert.equal(actW, 22.5, '40 kg pin di katrol 2:1 + 2.5 kg dasar harus menghasilkan 22.5 kg aktual');
+  assert.equal(actW, 42.5, '40 kg pin di katrol 1:1 + 2.5 kg dasar harus menghasilkan 42.5 kg aktual');
 
   // Konversi balik beban aktual ke saran pin (defaultSetWeight)
-  const suggestedPin = defaultSetWeight({ rm10: 22.5 }, legacyCableEx, 2.5, confCable);
-  assert.equal(suggestedPin, 40, '10RM 22.5 kg harus menyarankan pin 40 kg kembali ke pengguna');
+  const suggestedPin = defaultSetWeight({ rm10: 42.5 }, legacyCableEx, 2.5, confCable);
+  assert.equal(suggestedPin, 40, '10RM 42.5 kg (dengan dasar 2.5 kg) harus menyarankan pin 40 kg kembali ke pengguna');
 
   // Latihan mesin berlabel Cable/Machine HARUS mengambil config Machine gym
   const legacyMachineEx = { name: 'Leg Extension', equipment: 'Cable/Machine' };
