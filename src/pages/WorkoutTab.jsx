@@ -4,7 +4,7 @@ import { Plus, Snowflake, Play, CalendarDays, X, CheckCircle, ChevronDown, Chevr
 import { fetchExercisesFromApi } from '../utils/exerciseDbApi';
 import { shareWorkoutToFeed } from '../utils/communityApi';
 import { normalizeMuscleKey, resolveProjectedProgramId, getDayWorkouts, defaultMasterExercises, findMatchingMasterExercise, canonicalizeExercise } from '../data/constants';
-import { cleanSourceAppName } from '../utils/healthConnect';
+import { cleanSourceAppName, formatExternalWorkoutName } from '../utils/healthConnect';
 import { estimate10RM, defaultSetWeight, gymStepFor, getEquipmentConfig, calculateActualWeight, calculateInputWeight, getSetActualWeight, rm10Series, buildExLookupByName, canonicalExId, calculateProgressiveOverloadTarget, resolveExerciseProgressiveTarget, resolveDefaultExerciseDuration } from '../utils/workoutCalc';
 
 // Import Komponen Pecahan
@@ -1382,9 +1382,17 @@ const WorkoutTab = ({
                           >
                             <div className="flex items-center gap-2 mb-1">
                               <span className="text-xl sm:text-2xl uppercase tracking-widest break-words leading-tight flex-1">
-                                {prog.isExtra
-                                  ? ((prog.name && prog.name !== 'Ekstra' && prog.name !== 'adhoc') ? `Sesi Ekstra: ${prog.name}` : 'Sesi Ekstra')
-                                  : `Sesi: ${prog.name}`}
+                                {(() => {
+                                  if (!prog.isExtra) return `Sesi: ${prog.name}`;
+                                  const formatted = formatExternalWorkoutName(prog.name, lang?.id || 'id');
+                                  if (!formatted || formatted === 'Ekstra' || formatted === 'adhoc' || formatted === 'Latihan Ekstra' || formatted === 'Extra Workout') {
+                                    return 'Sesi Ekstra';
+                                  }
+                                  if (formatted === 'Latihan Beban Ekstra' || formatted === 'Extra Strength Training') {
+                                    return lang?.id === 'en' ? 'Extra Session: Strength' : 'Sesi Ekstra: Latihan Beban';
+                                  }
+                                  return `Sesi Ekstra: ${formatted}`;
+                                })()}
                               </span>
                             </div>
                             {prog.planName && (
