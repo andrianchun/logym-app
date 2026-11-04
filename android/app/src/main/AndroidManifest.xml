@@ -101,6 +101,9 @@
          ExerciseWriterPlugin.kt. Satu-satunya izin health yang tidak dibawa plugin capgo,
          karena plugin itu memang tidak punya jalur menulis sesi latihan. -->
     <uses-permission android:name="android.permission.health.WRITE_EXERCISE" />
+    <!-- Buat BACA SESI LATIHAN eksternal (misal: sepedahan, lari dari Samsung Health / Strava)
+         lewat plugin capgo (Health.queryWorkouts). Health Connect butuh izin ini agar daftar sesi latihan bisa terbaca. -->
+    <uses-permission android:name="android.permission.health.READ_EXERCISE" />
     <!-- Tanpa ini, Health Connect cuma kasih akses baca 30 hari terakhir — backfill histori
          yang lebih lama gak akan dapat apa-apa. Plugin @capgo/capacitor-health minta ini lewat
          requestHistoryAccess:true (lihat utils/healthConnect.js), tapi izinnya sendiri WAJIB

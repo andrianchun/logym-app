@@ -53,7 +53,7 @@ import { AI_MODELS, detectPlateaus, getLogyNotification } from './utils/aiAgent'
 import { calculateReadiness, restingHrBaseline } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
 import { isCardioExercise, calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, deduplicateWorkouts, recomputeStrengthRecords, buildExLookupByName, canonicalExId, sessionSpanSeconds, repairActualWeights, buildHcSessionDetail, estimate10RM, defaultSetWeight, gymStepFor, mergeRm10, getEquipmentConfig, calculateActualWeight, calculateInputWeight, getSetActualWeight, resolveExerciseProgressiveTarget, resolveDefaultExerciseDuration } from './utils/workoutCalc';
-import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcReadHeartRateWindow, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission, capIntradayLog, HC_FIELDS, fillOnlyPatch, hcDroppedTypes } from './utils/healthConnect';
+import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcReadHeartRateWindow, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission, capIntradayLog, HC_FIELDS, fillOnlyPatch, hcDroppedTypes, hcPullExternalWorkouts } from './utils/healthConnect';
 import { bumpExercisePopularity } from './utils/exercisePopularity';
 import { rapikanNamaProgram, rapikanNamaSesi, pertahankanNamaSesi } from './utils/programNaming';
 import useDialog from './hooks/useDialog';
@@ -613,7 +613,7 @@ export default function App() {
       const ymd = getLocalYMD(d);
       for (const w of history[ymd]?.workouts || []) {
         if (w.status !== 'completed') continue;
-        if (w.source === 'healthconnect') continue;
+        if (w.source === 'healthconnect' || w.isExternal || w.programId === 'cardio-external') continue;
         const mins = parseWorkoutDurationMinutes(w.duration);
         if (mins <= 0) continue;
         const logsToUse = (w.log && Object.keys(w.log).length > 0) ? w.log : (history[ymd]?.exerciseLogs);
@@ -677,6 +677,41 @@ export default function App() {
     await hcBackfillHistory(days, () => false, (ymd, summary) => { filled++; hcByDay[ymd] = summary; });
     if (filled > 0) mergeHcDays(hcByDay);
 
+    // Tarik sesi latihan eksternal (Samsung Health / Strava / dll)
+    let externalPulled = 0;
+    try {
+      const endD = new Date();
+      const startD = new Date();
+      startD.setDate(startD.getDate() - days);
+      const startYmd = getLocalYMD(startD);
+      const endYmd = getLocalYMD(endD);
+      const extByDay = await hcPullExternalWorkouts(startYmd, endYmd, historyMirror.current || history);
+      if (Object.keys(extByDay).length > 0) {
+        setHistory(prev => {
+          const next = { ...prev };
+          let changed = false;
+          Object.entries(extByDay).forEach(([ymd, extWorkouts]) => {
+            const existingDay = prev[ymd] || {};
+            const existingWorkouts = Array.isArray(existingDay.workouts) ? existingDay.workouts : [];
+            const toAdd = extWorkouts.filter(nw =>
+              !existingWorkouts.some(ew => (ew.externalId && ew.externalId === nw.externalId) || ew.id === nw.id)
+            );
+            if (toAdd.length > 0) {
+              next[ymd] = {
+                ...existingDay,
+                workouts: [...existingWorkouts, ...toAdd]
+              };
+              externalPulled += toAdd.length;
+              changed = true;
+            }
+          });
+          return changed ? next : prev;
+        });
+      }
+    } catch (e) {
+      console.warn('Gagal menarik sesi latihan eksternal:', e);
+    }
+
     const hrFilled = await fillSessionHeartRates(days);
     const canWriteSession = silent ? await hcCheckWorkoutWritePermission() : await hcRequestWorkoutWritePermission();
     const { sessions } = await pushWorkoutsToHc(days, canWriteSession);
@@ -696,6 +731,7 @@ export default function App() {
         ...(dibuang.length ? [`Tidak didukung, dilewati — ${dibuang.join(', ')}`] : []),
         `Histori masuk — ${filled} hari`,
         ...(hrvHari > 0 ? [`HRV — ${hrvHari} hari`] : []),
+        ...(externalPulled > 0 ? [`Sesi eksternal (Health/Strava) — ${externalPulled} sesi`] : []),
         `Nadi per sesi — ${hrFilled} sesi`,
         `Terkirim ke HC — ${sessions} sesi latihan`,
         `Hari bolong ditambal — ${tertambal} hari`,

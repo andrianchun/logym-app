@@ -38,7 +38,7 @@ export const hcAvailable = async () => {
 // sempat muncul, dan user cuma melihat "Gagal menyambungkan Health Connect: Unsupported data
 // type: X". Nama enum-nya tidak selalu intuitif: NutritionRecord ber-identifier
 // 'dietaryEnergyConsumed', bukan 'nutrition'.
-const READ_TYPES = ['steps', 'calories', 'totalCalories', 'heartRate', 'restingHeartRate', 'heartRateVariability', 'weight', 'height', 'sleep', 'bodyFat', 'oxygenSaturation', 'bloodPressure', 'distance', 'basalCalories', 'dietaryEnergyConsumed'];
+const READ_TYPES = ['steps', 'calories', 'totalCalories', 'heartRate', 'restingHeartRate', 'heartRateVariability', 'weight', 'height', 'sleep', 'bodyFat', 'oxygenSaturation', 'bloodPressure', 'distance', 'basalCalories', 'dietaryEnergyConsumed', 'workouts'];
 // Kalori TIDAK pernah ditulis lewat plugin ini (lihat catatan di bawah). Tiga tipe ini boleh:
 // semuanya record TITIK WAKTU dari alat ukur BLE (lihat utils/ble.js), dibaca sebagai "paling
 // baru per hari" dan tidak pernah dijumlah antar sumber — jadi tidak bisa menggandakan apa pun.
@@ -812,4 +812,160 @@ export const hcBackfillHistory = async (days, hasOtherSource, onDayResult) => {
     if (hasOtherSource(ymd)) return;
     onDayResult(ymd, summary);
   });
+};
+
+
+// ============================================================
+// SINKRONISASI SESI LATIHAN EKSTERNAL (SAMSUNG HEALTH, STRAVA, DLL)
+// Menarik sesi kardio seperti Bersepeda (Cycling) atau Lari dari Health Connect.
+// Dilengkapi proteksi Zero-Ping-Pong dan Anti-Double-Counting.
+// ============================================================
+
+export const mapHcWorkoutType = (type) => {
+  const t = (type || '').toLowerCase();
+  if (t.includes('cycl') || t.includes('bik')) return 'Bersepeda (Cycling)';
+  if (t.includes('run') || t.includes('jog')) return 'Lari (Running)';
+  if (t.includes('walk')) return 'Jalan Santai (Walking)';
+  if (t.includes('swim')) return 'Berenang (Swimming)';
+  if (t.includes('hik')) return 'Mendaki (Hiking)';
+  if (t.includes('row')) return 'Mendayung (Rowing)';
+  if (t.includes('elliptical')) return 'Elliptical';
+  if (t.includes('jumprope')) return 'Lompat Tali (Jump Rope)';
+  if (t.includes('stair')) return 'Naik Tangga (Stairs)';
+  if (t.includes('badminton')) return 'Badminton';
+  if (t.includes('tennis')) return 'Tenis';
+  if (t.includes('basketball')) return 'Bola Basket';
+  if (t.includes('soccer') || t.includes('football')) return 'Sepak Bola';
+  if (t.includes('yoga')) return 'Yoga';
+  if (t.includes('pilates')) return 'Pilates';
+  if (t.includes('hiit') || t.includes('highintensity')) return 'HIIT';
+  return type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Kardio Eksternal';
+};
+
+export const formatDurationFromSeconds = (secs) => {
+  const s = Math.max(0, Math.round(Number(secs) || 0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const remSec = s % 60;
+  if (h > 0) {
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(remSec).padStart(2, '0')}`;
+  }
+  return `${String(m).padStart(2, '0')}:${String(remSec).padStart(2, '0')}`;
+};
+
+export const convertHcWorkoutToLogym = (w, ymd) => {
+  if (!w) return null;
+  const name = mapHcWorkoutType(w.workoutType);
+  const durationSecs = Math.max(0, Math.round(Number(w.duration) || 0));
+  const calories = Math.max(0, Math.round(Number(w.totalEnergyBurned) || 0));
+  const distanceKm = w.totalDistance ? Number((Number(w.totalDistance) / 1000).toFixed(2)) : null;
+  const platformId = w.platformId || `${w.startDate}_${w.workoutType}`;
+  const exId = `ex_${(w.workoutType || 'cardio').toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+  const source = w.sourceName || 'Samsung Health';
+
+  return {
+    id: `hc_${platformId}`,
+    externalId: platformId,
+    isExternal: true,
+    source,
+    sourceId: w.sourceId || '',
+    type: 'cardio',
+    workoutType: w.workoutType,
+    status: 'completed',
+    programId: 'cardio-external',
+    programName: name,
+    startTime: w.startDate,
+    endTime: w.endDate,
+    duration: formatDurationFromSeconds(durationSecs),
+    durationSecs,
+    calories,
+    caloriesBurned: calories,
+    distanceKm,
+    exercises: [
+      {
+        id: exId,
+        name,
+        type: 'cardio',
+        category: 'cardio',
+      }
+    ],
+    log: {
+      [exId]: [
+        {
+          done: true,
+          duration: Math.round(durationSecs / 60),
+          distance: distanceKm,
+          calories,
+        }
+      ]
+    }
+  };
+};
+
+export const isWorkoutConflict = (externalWorkout, existingWorkout) => {
+  if (!externalWorkout?.startDate || !existingWorkout?.startTime) return false;
+  const wStart = new Date(externalWorkout.startDate).getTime();
+  const wEnd = new Date(externalWorkout.endDate || externalWorkout.startDate).getTime();
+  const durationMs = Math.max(1000, wEnd - wStart);
+
+  const exStart = new Date(existingWorkout.startTime).getTime();
+  let exDurationMs = 3600000;
+  if (existingWorkout.endTime) {
+    exDurationMs = Math.max(1000, new Date(existingWorkout.endTime).getTime() - exStart);
+  } else if (typeof existingWorkout.durationSecs === 'number' && existingWorkout.durationSecs > 0) {
+    exDurationMs = existingWorkout.durationSecs * 1000;
+  } else if (typeof existingWorkout.duration === 'string') {
+    const parts = existingWorkout.duration.split(':').map(Number);
+    if (parts.length === 3) exDurationMs = (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000;
+    else if (parts.length === 2) exDurationMs = (parts[0] * 60 + parts[1]) * 1000;
+  }
+  const exEnd = exStart + exDurationMs;
+
+  const overlapStart = Math.max(wStart, exStart);
+  const overlapEnd = Math.min(wEnd, exEnd);
+  const overlapMs = Math.max(0, overlapEnd - overlapStart);
+
+  // Jika tumpang tindih waktu > 50% dari durasi sesi eksternal, anggap konflik
+  return (overlapMs / durationMs) > 0.5;
+};
+
+export const hcPullExternalWorkouts = async (startYmd, endYmd, existingHistory = {}) => {
+  if (!isNative()) return {};
+  const startISO = new Date(`${startYmd}T00:00:00`).toISOString();
+  const endISO = new Date(`${endYmd}T23:59:59`).toISOString();
+  try {
+    const H = Health;
+    const res = await H.queryWorkouts({ startDate: startISO, endDate: endISO, limit: 100 });
+    const list = res?.workouts || [];
+    if (!list.length) return {};
+
+    const byDay = {};
+    for (const w of list) {
+      const src = `${w.sourceName || ''} ${w.sourceId || ''}`.toLowerCase();
+      // Zero-Ping-Pong: lewati sesi yang berasal dari Logym
+      if (src.includes('logym') || src.includes('lyfeat')) continue;
+
+      const ymd = ymdOf(new Date(w.startDate));
+      const existing = existingHistory[ymd]?.workouts || [];
+      const platformId = w.platformId || `${w.startDate}_${w.workoutType}`;
+
+      // Cek apakah sudah pernah ditarik sebelumnya
+      const alreadyImported = existing.some(exW => exW.externalId === platformId || exW.id === `hc_${platformId}`);
+      if (alreadyImported) continue;
+
+      // Cek tumpang tindih waktu untuk mencegah double counting
+      const hasConflict = existing.some(exW => isWorkoutConflict(w, exW));
+      if (hasConflict) continue;
+
+      const mapped = convertHcWorkoutToLogym(w, ymd);
+      if (mapped) {
+        if (!byDay[ymd]) byDay[ymd] = [];
+        byDay[ymd].push(mapped);
+      }
+    }
+    return byDay;
+  } catch (e) {
+    console.warn('hcPullExternalWorkouts gagal:', e);
+    return {};
+  }
 };

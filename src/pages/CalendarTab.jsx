@@ -1888,16 +1888,24 @@ const CalendarTab = ({
                                               
                                               <div className={`text-xs font-semibold opacity-70 mb-1 flex items-center gap-2 ${c.text}`}>
                                                 <span>{effectiveTime}</span>
-                                                <button 
-                                                    onClick={(e) => { 
-                                                      e.stopPropagation();
-                                                      setNotificationModalTarget({ workoutId: w.id, programId: w.programId, programName: w.programName, dateStr: targetDateStr, existingNotifId: w.reminderNotifId, currentTime: effectiveTime, currentEnabled: isNotifOn });
-                                                    }} 
-                                                    className={`hover:opacity-100 transition-opacity ${isNotifOn ? 'opacity-100' : 'opacity-40'}`} 
-                                                    title="Atur Notifikasi"
-                                                  >
-                                                    {isNotifOn ? <Bell size={12} /> : <BellOff size={12} />}
-                                                </button>
+                                                {w.isExternal && (
+                                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-sky-500/10 text-sky-400 font-bold text-xs">
+                                                    <Activity size={10} />
+                                                    <span>{w.source || 'Health'}</span>
+                                                  </span>
+                                                )}
+                                                {!w.isExternal && (
+                                                  <button 
+                                                      onClick={(e) => { 
+                                                        e.stopPropagation();
+                                                        setNotificationModalTarget({ workoutId: w.id, programId: w.programId, programName: w.programName, dateStr: targetDateStr, existingNotifId: w.reminderNotifId, currentTime: effectiveTime, currentEnabled: isNotifOn });
+                                                      }} 
+                                                      className={`hover:opacity-100 transition-opacity ${isNotifOn ? 'opacity-100' : 'opacity-40'}`} 
+                                                      title="Atur Notifikasi"
+                                                    >
+                                                      {isNotifOn ? <Bell size={12} /> : <BellOff size={12} />}
+                                                  </button>
+                                                )}
                                               </div>
                                               
                                               <span className={`font-black text-left leading-tight break-words text-md pr-8 mb-4 ${c.text}`}>
@@ -1909,6 +1917,12 @@ const CalendarTab = ({
                                                   <span>{displayDuration}</span>
                                                   <span className="opacity-50">·</span>
                                                   <span>{`~${calBurned} kcal`}</span>
+                                                  {w.distanceKm ? (
+                                                    <>
+                                                      <span className="opacity-50">·</span>
+                                                      <span>{`${w.distanceKm} km`}</span>
+                                                    </>
+                                                  ) : null}
                                                 </div>
                                                 {/* TIGA status, bukan dua. "Selesai" hanya untuk sesi yang benar-benar tersimpan
                                                     (w.status === 'completed'). Sesi yang semua setnya tercentang tapi belum

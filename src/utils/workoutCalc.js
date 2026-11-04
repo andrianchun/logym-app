@@ -410,6 +410,11 @@ export const splitWorkoutCalories = (weightKg, workout, logs, globalRestTime = 9
   const total = calculateSmartWorkoutCalories(weightKg, workout, logs, globalRestTime, profile);
   if (!(total > 0)) return { kardio: 0, beban: 0 };
 
+  // Sesi kardio eksternal murni (Samsung Health / Strava / Garmin) seluruh kalorinya masuk kardio
+  if (workout?.isExternal || workout?.programId === 'cardio-external' || workout?.type === 'cardio') {
+    return { kardio: total, beban: 0 };
+  }
+
   const weight = Number(weightKg) || 70;
   const exercises = workout?.overriddenExercises || workout?.exercises || [];
   let extraCardio = 0;
@@ -434,8 +439,12 @@ export const splitWorkoutCalories = (weightKg, workout, logs, globalRestTime = 9
     share = extraCardio / extraTotal;
   } else {
     // Tidak ada set tercatat (riwayat lama, atau kalori datang dari `caloriesBurned` wearable):
-    // jatuh ke penggolongan tingkat SESI — kardio kalau semua latihannya kardio.
-    share = exercises.length > 0 && exercises.every(isCardioExercise) ? 1 : 0;
+    // jatuh ke penggolongan tingkat SESI — kardio kalau semua latihannya kardio atau sesi eksternal/kardio.
+    if (workout?.isExternal || workout?.type === 'cardio' || workout?.programId === 'cardio-external') {
+      share = 1;
+    } else {
+      share = exercises.length > 0 && exercises.every(isCardioExercise) ? 1 : 0;
+    }
   }
 
   // Satu sisi dibulatkan, sisanya diambil dari pengurangan — dengan begitu jumlahnya tidak pernah
@@ -552,8 +561,8 @@ export const calculateSmartWorkoutCalories = (weightKg, workout, logs, globalRes
   if (!workout) return 0;
 
   // 1. Prioritas Utama: Jika ada data nyata dari Smartwatch / Health Connect
-  if (workout.caloriesBurned) {
-    return Number(workout.caloriesBurned);
+  if (workout.caloriesBurned != null || workout.calories != null) {
+    return Number(workout.caloriesBurned ?? workout.calories);
   }
 
   // 1b. HIBRIDA: sesi MURNI KARDIO yang punya nadi asli dihitung dari nadi, bukan dari MET.
