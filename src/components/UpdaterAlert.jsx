@@ -5,7 +5,7 @@ import { Capacitor } from '@capacitor/core';
 // Bar progres unduhan. Bundle OTA puluhan MB atau APK streaming, diinterpolasi halus 60fps dengan active crawler
 // agar progres selalu bergerak dinamis (tidak mandek di 0%), dan memberi status transparan
 // saat fase ekstraksi/pemasangan ke disk berlangsung.
-function DownloadProgress({ progress, isApk = false, t }) {
+function DownloadProgress({ progress, t }) {
   const [displayProgress, setDisplayProgress] = useState(0);
   const targetRef = useRef(0);
   const isDoneRef = useRef(false);
@@ -47,13 +47,13 @@ function DownloadProgress({ progress, isApk = false, t }) {
     };
   }, [progress !== null]);
 
-  if (progress === 'apk') {
+  if (progress === 'preparing' || progress === 'apk') {
     return (
       <div className="w-full flex flex-col items-center justify-center p-4">
         <Loader2 className={`animate-spin ${t.textAccent} mb-3`} size={32} />
         <span className={`text-sm font-bold ${t.textMain}`}>Mempersiapkan Unduhan...</span>
         <p className={`text-xs ${t.textMuted} mt-2 leading-tight text-center`}>
-          Tunggu sebentar, file APK sedang diproses.
+          Tunggu sebentar, berkas pembaruan sedang diproses.
         </p>
       </div>
     );
@@ -66,9 +66,7 @@ function DownloadProgress({ progress, isApk = false, t }) {
     <div className="w-full text-left">
       <div className="flex items-center justify-between mb-2">
         <span className={`text-xs font-bold ${t.textMuted}`}>
-          {isInstalling
-            ? (isApk ? 'Mempersiapkan pemasangan APK…' : 'Memasang berkas & memuat ulang…')
-            : (isApk ? 'Mengunduh paket pembaruan APK…' : 'Mengunduh pembaruan…')}
+          {isInstalling ? 'Memasang berkas & memuat ulang…' : 'Mengunduh pembaruan…'}
         </span>
         <span className={`text-xs font-bold ${t.textMain} tabular-nums`}>
           {rounded}%
@@ -85,9 +83,7 @@ function DownloadProgress({ progress, isApk = false, t }) {
       </div>
       <p className={`text-xs ${t.textMuted} mt-2 leading-tight`}>
         {isInstalling
-          ? (isApk
-              ? 'Membuka dialog pemasangan paket Android…'
-              : 'Memasang berkas baru ke aplikasi. LOGYM akan segera dimuat ulang…')
+          ? 'Memasang berkas baru ke aplikasi. LOGYM akan segera dimuat ulang…'
           : 'Jangan tutup aplikasi saat proses berlangsung.'}
       </p>
     </div>
@@ -169,7 +165,7 @@ export default function UpdaterAlert({
 
           <div className="w-full p-6 mt-2 text-center">
             {downloading ? (
-              <DownloadProgress progress={progress} isApk={isApk} t={t} />
+              <DownloadProgress progress={progress} t={t} />
             ) : (
               <>
                 <button
@@ -198,7 +194,7 @@ export default function UpdaterAlert({
                     rel="noopener noreferrer"
                     className={`inline-block mt-3 text-xs ${t.textMuted} hover:underline opacity-70 hover:opacity-100 transition-opacity`}
                   >
-                    Atau unduh berkas APK langsung
+                    Atau unduh berkas pembaruan langsung
                   </a>
                 )}
               </>
@@ -250,7 +246,7 @@ export default function UpdaterAlert({
         )}
 
         {downloading ? (
-          <DownloadProgress progress={progress} isApk={isApk} t={t} />
+          <DownloadProgress progress={progress} t={t} />
         ) : (
           <button
             type="button"
