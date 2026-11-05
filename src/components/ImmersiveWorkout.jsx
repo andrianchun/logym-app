@@ -9,6 +9,7 @@ import { getCachedExercises } from '../utils/exerciseDbApi';
 import { WorkoutTimerPlugin } from '../App';
 import TwoFrameMotionLoop from './TwoFrameMotionLoop';
 import { getBaseWeightLabel } from './ExerciseCard';
+import { renderFormattedCoachMessage } from '../utils/miniMarkdown';
 
 const LiveWorkoutStats = ({ workoutStartTime, userProfile, validExercises, exerciseLogs, t, formatTime }) => {
   const [workoutSeconds, setWorkoutSeconds] = useState(() => {
@@ -1166,96 +1167,145 @@ const ImmersiveWorkout = ({
                           <div className="relative z-20 w-full pt-32 pb-6 px-6 flex flex-col items-center text-center">
                             {hint ? (
                               <>
-                                <h3 className={`font-black ${hint.isNewRecord ? 'text-lg sm:text-xl text-sky-400 drop-shadow-[0_0_12px_rgba(56,189,248,0.8)] animate-pulse' : 'text-xs sm:text-sm text-sky-300/90'} tracking-widest uppercase mb-1.5 drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]`}>
-                                  {hint.title || "TARGET HARI INI"}
-                                </h3>
+                                {hint.lastSession ? (
+                                  <>
+                                    {/* 1. Sesi Lalu Pill */}
+                                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-xs font-semibold text-slate-200 backdrop-blur-md mb-2 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
+                                      <span className="text-slate-400 font-normal">Sesi Lalu</span>
+                                      <span>{hint.lastSession}</span>
+                                    </div>
 
-                                {/* Target Angka Utama (Fokus di Angka, tulisan plat & reps kecil) */}
-                                {(hint.targetWeightNumber !== undefined || hint.target || hint.benchmark) && (
-                                  <div className="flex flex-col items-center mb-2">
+                                    {/* 2. Pesan Arahan Coach (Evaluasi) */}
+                                    <p className="text-slate-200 text-xs sm:text-sm font-medium leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)] max-w-[290px] mb-2.5">
+                                      {renderFormattedCoachMessage(hint.message || hint.text)}
+                                    </p>
+
+                                    {/* 3. Divider Pemisah */}
+                                    <div className="w-16 h-px bg-white/20 mb-3 rounded-full" />
+
+                                    {/* 4. Target Hari Ini */}
+                                    <h3 className={`font-black ${hint.isNewRecord ? 'text-lg sm:text-xl text-sky-400 drop-shadow-[0_0_12px_rgba(56,189,248,0.8)] animate-pulse' : 'text-xs sm:text-sm text-sky-300/90'} tracking-widest uppercase mb-1 drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]`}>
+                                      {hint.title || "TARGET HARI INI"}
+                                    </h3>
+
+                                    {/* 5. Badge Beban (Beban Plat, Bar, dll jika ada perbedaan beban) */}
                                     {hint.weightLabel && (
-                                      <span className="text-xs font-bold uppercase tracking-widest text-sky-400/90 mb-1 px-2.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20">
+                                      <span className="text-[11px] font-bold uppercase tracking-wider text-sky-400/90 mb-1.5 px-2.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20">
                                         Beban {hint.weightLabel}
                                       </span>
                                     )}
-                                    
-                                    {hint.targetWeightNumber !== undefined && hint.targetWeightNumber !== null ? (
-                                      <div className="flex items-baseline justify-center gap-1 drop-shadow-[0_4px_16px_rgba(0,0,0,0.95)]">
-                                        <span className="text-4xl sm:text-5xl font-black text-white tracking-tight">
-                                          {hint.targetWeightNumber}
-                                        </span>
-                                        <span className="text-xs sm:text-sm font-semibold text-slate-400 mr-1.5">
-                                          {hint.weightUnit || 'kg'}
-                                        </span>
-                                        {hint.targetRepsNumber && (
-                                          <>
-                                            <span className="text-2xl sm:text-3xl font-light text-slate-500 mx-1">
-                                              ×
-                                            </span>
+
+                                    {/* 6. Target Angka Utama */}
+                                    {(hint.targetWeightNumber !== undefined || hint.target || hint.benchmark) && (
+                                      <div className="flex flex-col items-center mb-2.5">
+                                        {hint.targetWeightNumber !== undefined && hint.targetWeightNumber !== null ? (
+                                          <div className="flex items-baseline justify-center gap-1 drop-shadow-[0_4px_16px_rgba(0,0,0,0.95)]">
                                             <span className="text-4xl sm:text-5xl font-black text-white tracking-tight">
-                                              {hint.targetRepsNumber}
+                                              {String(hint.targetWeightNumber).replace('.', ',')}
                                             </span>
-                                            <span className="text-xs sm:text-sm font-semibold text-slate-400 ml-0.5">
-                                              reps
+                                            <span className="text-xs sm:text-sm font-semibold text-slate-400 mr-1.5">
+                                              {hint.weightUnit || 'kg'}
                                             </span>
-                                          </>
+                                            {hint.targetRepsNumber && (
+                                              <>
+                                                <span className="text-2xl sm:text-3xl font-light text-slate-500 mx-1">
+                                                  ×
+                                                </span>
+                                                <span className="text-4xl sm:text-5xl font-black text-white tracking-tight">
+                                                  {hint.targetRepsNumber}
+                                                </span>
+                                                <span className="text-xs sm:text-sm font-semibold text-slate-400 ml-0.5">
+                                                  reps
+                                                </span>
+                                              </>
+                                            )}
+                                          </div>
+                                        ) : (
+                                          <div className="text-3xl sm:text-4xl font-black text-white tracking-tight drop-shadow-[0_4px_16px_rgba(0,0,0,0.95)]">
+                                            {hint.target || hint.benchmark}
+                                          </div>
                                         )}
                                       </div>
-                                    ) : (
-                                      <div className="text-3xl sm:text-4xl font-black text-white tracking-tight drop-shadow-[0_4px_16px_rgba(0,0,0,0.95)]">
-                                        {hint.target || hint.benchmark}
-                                      </div>
                                     )}
 
-                                    {/* Jika ada perbedaan Plat vs Total: Sesi Lalu (Plat) disandingkan langsung di bawah Plat */}
-                                    {hint.targetDetail && hint.lastSession && (
-                                      <div className="mt-1.5 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-slate-300 backdrop-blur-sm">
-                                        <span className="text-slate-400">Sesi Lalu:</span>
-                                        <span className="text-slate-200 font-semibold">{hint.lastSession}</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-
-                                {/* Baris Acuan:
-                                    Jika ada targetDetail: Beban Total & 10RM disandingkan berdampingan (keduanya hitung Total).
-                                    Jika tidak ada targetDetail: Sesi Lalu & 10RM disandingkan berdampingan.
-                                */}
-                                {hint.targetDetail ? (
-                                  <div className="flex items-center justify-center flex-wrap gap-1.5 mb-3.5">
-                                    <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs font-semibold text-emerald-300/90 backdrop-blur-sm">
-                                      {hint.targetDetail}
-                                    </div>
-                                    {hint.rm10 && (
-                                      <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-500/10 border border-sky-500/20 text-xs font-medium text-sky-200 backdrop-blur-sm">
-                                        <span className="text-sky-400/80">10RM:</span>
-                                        <span className="text-sky-300 font-bold">{hint.rm10}</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                ) : (
-                                  (hint.lastSession || hint.rm10) && (
-                                    <div className="flex items-center justify-center flex-wrap gap-1.5 mb-3.5">
-                                      {hint.lastSession && (
-                                        <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-slate-300 backdrop-blur-sm">
-                                          <span className="text-slate-400">Sesi Lalu:</span>
-                                          <span className="text-slate-200 font-semibold">{hint.lastSession}</span>
+                                    {/* 7. Secondary Badges: Aktual & 10RM */}
+                                    <div className="flex items-center justify-center flex-wrap gap-2">
+                                      {hint.targetDetail && (
+                                        <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/25 text-xs font-semibold text-emerald-300 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] backdrop-blur-sm">
+                                          {hint.targetDetail}
                                         </div>
                                       )}
                                       {hint.rm10 && (
-                                        <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-500/10 border border-sky-500/20 text-xs font-medium text-sky-200 backdrop-blur-sm">
-                                          <span className="text-sky-400/80">10RM:</span>
+                                        <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-500/15 border border-sky-500/25 text-xs font-medium text-sky-200 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] backdrop-blur-sm">
+                                          <span className="text-sky-400/90 font-semibold">10RM:</span>
                                           <span className="text-sky-300 font-bold">{hint.rm10}</span>
                                         </div>
                                       )}
                                     </div>
-                                  )
-                                )}
+                                  </>
+                                ) : (
+                                  <>
+                                    <h3 className={`font-black ${hint.isNewRecord ? 'text-lg sm:text-xl text-sky-400 drop-shadow-[0_0_12px_rgba(56,189,248,0.8)] animate-pulse' : 'text-xs sm:text-sm text-sky-300/90'} tracking-widest uppercase mb-1 drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]`}>
+                                      {hint.title || "TARGET HARI INI"}
+                                    </h3>
 
-                                {/* Pesan Arahan Coach */}
-                                <p className="text-slate-200 text-xs sm:text-sm font-medium leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)] max-w-[280px]">
-                                  {hint.message || hint.text}
-                                </p>
+                                    {hint.weightLabel && (
+                                      <span className="text-[11px] font-bold uppercase tracking-wider text-sky-400/90 mb-1.5 px-2.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20">
+                                        Beban {hint.weightLabel}
+                                      </span>
+                                    )}
+
+                                    {(hint.targetWeightNumber !== undefined || hint.target || hint.benchmark) && (
+                                      <div className="flex flex-col items-center mb-2.5">
+                                        {hint.targetWeightNumber !== undefined && hint.targetWeightNumber !== null ? (
+                                          <div className="flex items-baseline justify-center gap-1 drop-shadow-[0_4px_16px_rgba(0,0,0,0.95)]">
+                                            <span className="text-4xl sm:text-5xl font-black text-white tracking-tight">
+                                              {String(hint.targetWeightNumber).replace('.', ',')}
+                                            </span>
+                                            <span className="text-xs sm:text-sm font-semibold text-slate-400 mr-1.5">
+                                              {hint.weightUnit || 'kg'}
+                                            </span>
+                                            {hint.targetRepsNumber && (
+                                              <>
+                                                <span className="text-2xl sm:text-3xl font-light text-slate-500 mx-1">
+                                                  ×
+                                                </span>
+                                                <span className="text-4xl sm:text-5xl font-black text-white tracking-tight">
+                                                  {hint.targetRepsNumber}
+                                                </span>
+                                                <span className="text-xs sm:text-sm font-semibold text-slate-400 ml-0.5">
+                                                  reps
+                                                </span>
+                                              </>
+                                            )}
+                                          </div>
+                                        ) : (
+                                          <div className="text-3xl sm:text-4xl font-black text-white tracking-tight drop-shadow-[0_4px_16px_rgba(0,0,0,0.95)]">
+                                            {hint.target || hint.benchmark}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+
+                                    <div className="flex items-center justify-center flex-wrap gap-2 mb-3">
+                                      {hint.targetDetail && (
+                                        <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/25 text-xs font-semibold text-emerald-300 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] backdrop-blur-sm">
+                                          {hint.targetDetail}
+                                        </div>
+                                      )}
+                                      {hint.rm10 && (
+                                        <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-500/15 border border-sky-500/25 text-xs font-medium text-sky-200 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] backdrop-blur-sm">
+                                          <span className="text-sky-400/90 font-semibold">10RM:</span>
+                                          <span className="text-sky-300 font-bold">{hint.rm10}</span>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <p className="text-slate-200 text-xs sm:text-sm font-medium leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)] max-w-[290px]">
+                                      {renderFormattedCoachMessage(hint.message || hint.text)}
+                                    </p>
+                                  </>
+                                )}
                               </>
                             ) : (
                               <>

@@ -763,22 +763,23 @@ const WorkoutTab = ({
 
     const formatSubTotal = (actWeight) => {
       if (!hasWeightDiff || !actWeight || actWeight <= 0) return null;
-      if (eqConfNow.baseWeight > 0) {
-        const baseName = eqConfNow.isBodyweightPlus 
-          ? 'BB' 
-          : (eqConfNow.equipment?.includes('Sled') ? 'Sled' : (eqConfNow.equipment?.includes('Cable') || eqConfNow.equipment?.includes('Machine') ? 'Beban dasar' : (eqConfNow.equipment?.includes('Dumbbell') || eqConfNow.equipment?.includes('Kettlebell') ? 'Handle' : 'Bar')));
-        return `Total: ${actWeight} ${uStr} (${baseName} ${eqConfNow.baseWeight} ${uStr})`;
-      }
-      return `Total: ${actWeight} ${uStr}`;
+      const formatted = String(actWeight).replace('.', ',');
+      return `Aktual: ${formatted} ${uStr}`;
     };
 
     const formatRefWeight = (actWeight, reps = null, inputWParam = null) => {
       if (!actWeight || actWeight <= 0) return null;
-      if (hasWeightDiff) {
-        const inputW = inputWParam !== null && inputWParam !== undefined ? inputWParam : calculateInputWeight(actWeight, eqConfNow);
-        return reps ? `${inputLabel} ${inputW} ${uStr} × ${reps} reps` : `${inputLabel} ${inputW} ${uStr}`;
-      }
-      return reps ? `${actWeight} ${uStr} × ${reps} reps` : `${actWeight} ${uStr}`;
+      const wVal = hasWeightDiff
+        ? (inputWParam !== null && inputWParam !== undefined ? inputWParam : calculateInputWeight(actWeight, eqConfNow))
+        : actWeight;
+      const formatted = String(wVal).replace('.', ',');
+      return reps ? `${formatted} ${uStr} × ${reps} reps` : `${formatted} ${uStr}`;
+    };
+
+    const format10RMStr = (val) => {
+      if (!val || val <= 0) return null;
+      const formatted = String(val).replace('.', ',');
+      return `${formatted} ${uStr}`;
     };
 
     if (isNewRecord) {
@@ -792,7 +793,7 @@ const WorkoutTab = ({
         targetDetail: formatSubTotal(currentMaxWeight),
         lastSession: lastSessionWeight > 0 ? formatRefWeight(lastSessionWeight, lastSessionReps, lastSessionInputWeight) : null,
         message: `Rekor 10RM baru terpecahkan! Pertahankan performa ini!`,
-        rm10: `${currentMax10RM} ${uStr}`,
+        rm10: format10RMStr(currentMax10RM),
         rm10Number: currentMax10RM,
         rm10Detail: formatSubTotal(currentMax10RM),
         hasWeightDiff,
@@ -821,7 +822,7 @@ const WorkoutTab = ({
         targetDetail: formatSubTotal(heroWeight),
         lastSession: lastSessionWeight > 0 ? formatRefWeight(lastSessionWeight, lastSessionReps, lastSessionInputWeight) : null,
         message: msg,
-        rm10: currentMax10RM > 0 ? `${currentMax10RM} ${uStr}` : (true10RM > 0 ? `${true10RM} ${uStr}` : null),
+        rm10: format10RMStr(currentMax10RM || true10RM),
         rm10Number: currentMax10RM || true10RM || heroReps,
         rm10Detail: formatSubTotal(currentMax10RM || true10RM),
         hasWeightDiff,
@@ -850,7 +851,7 @@ const WorkoutTab = ({
         targetDetail: formatSubTotal(heroWeight),
         lastSession: lastSessionWeight > 0 ? formatRefWeight(lastSessionWeight, lastSessionReps, lastSessionInputWeight) : null,
         message: msg,
-        rm10: currentMax10RM > 0 ? `${currentMax10RM} ${uStr}` : (true10RM > 0 ? `${true10RM} ${uStr}` : null),
+        rm10: format10RMStr(currentMax10RM || true10RM),
         rm10Number: currentMax10RM || true10RM || heroReps,
         rm10Detail: formatSubTotal(currentMax10RM || true10RM),
         hasWeightDiff,
@@ -880,7 +881,7 @@ const WorkoutTab = ({
         targetDetail: formatSubTotal(currentMaxWeight),
         lastSession: null,
         message: messageText,
-        rm10: `${currentMax10RM} ${uStr}`,
+        rm10: format10RMStr(currentMax10RM),
         rm10Number: currentMax10RM,
         rm10Detail: formatSubTotal(currentMax10RM),
         hasWeightDiff,
@@ -905,7 +906,7 @@ const WorkoutTab = ({
         targetDetail: formatSubTotal(targetActualWeight),
         lastSession: formatRefWeight(lastSessionWeight, lastSessionReps, lastSessionInputWeight),
         message: targetPlan.message,
-        rm10: true10RM > 0 ? `${true10RM} ${uStr}` : null,
+        rm10: format10RMStr(true10RM),
         rm10Detail: formatSubTotal(true10RM),
         hasWeightDiff,
         mode: 'push',
@@ -927,7 +928,7 @@ const WorkoutTab = ({
         targetDetail: formatSubTotal(targetActualWeight),
         lastSession: formatRefWeight(lastSessionWeight, lastSessionReps, lastSessionInputWeight),
         message: targetPlan.message,
-        rm10: true10RM > 0 ? `${true10RM} ${uStr}` : null,
+        rm10: format10RMStr(true10RM),
         rm10Detail: formatSubTotal(true10RM),
         hasWeightDiff,
         mode: 'push',
@@ -948,7 +949,7 @@ const WorkoutTab = ({
         targetDetail: formatSubTotal(targetActualWeight),
         lastSession: formatRefWeight(lastSessionWeight, lastSessionReps, lastSessionInputWeight),
         message: targetPlan.message,
-        rm10: true10RM > 0 ? `${true10RM} ${uStr}` : null,
+        rm10: format10RMStr(true10RM),
         rm10Detail: formatSubTotal(true10RM),
         hasWeightDiff,
         mode: 'push',
@@ -967,7 +968,7 @@ const WorkoutTab = ({
         targetDetail: formatSubTotal(currentMaxWeight),
         lastSession: null,
         message: `Fokus tuntaskan sisa set dengan form dan kontrol yang rapi!`,
-        rm10: `${currentMax10RM} ${uStr}`,
+        rm10: format10RMStr(currentMax10RM),
         rm10Detail: formatSubTotal(currentMax10RM),
         hasWeightDiff,
         mode: 'push',

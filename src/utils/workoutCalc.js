@@ -1805,7 +1805,7 @@ export const calculateProgressiveOverloadTarget = ({
       mode: 'weight_jump',
       repsReadyThreshold,
       isWeightJump: true,
-      message: `Target ${lastSessionReps} reps tembus! Naik beban (+${step} ${uStr}), target kembali ke ${targetReps} reps.`
+      message: `Sudah tembus ${lastSessionReps} reps! Sekarang naik beban (+${step} ${uStr}), ${targetReps} reps saja dulu.`
     };
   }
 
@@ -1818,7 +1818,7 @@ export const calculateProgressiveOverloadTarget = ({
       mode: 'reps_first',
       repsReadyThreshold,
       isWeightJump: false,
-      message: `Target ${lastSessionReps} reps tercapai! Kejar ${nextTargetReps} reps dulu sebelum lompat beban (+${step} ${uStr}).`
+      message: `Sudah capai ${lastSessionReps} reps! Kejar ${nextTargetReps} reps dulu sebelum naik beban (+${step} ${uStr}).`
     };
   }
 

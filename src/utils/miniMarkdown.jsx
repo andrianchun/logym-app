@@ -73,3 +73,21 @@ export default function renderMiniMarkdown(text) {
 
     return blocks;
 }
+
+// Bolds numbers with units (e.g., "+5 kg", "14 reps", "10 reps") for Progressive Overload Coach guidance
+export function renderFormattedCoachMessage(text) {
+    if (!text) return null;
+    const regex = /(\+\s*\d+(?:[.,]\d+)?\s*(?:kg|lbs)|\b\d+(?:[.,]\d+)?\s*(?:kg|lbs)|\b\d+\s*reps)/gi;
+    const matchRegex = /^(\+\s*\d+(?:[.,]\d+)?\s*(?:kg|lbs)|\b\d+(?:[.,]\d+)?\s*(?:kg|lbs)|\b\d+\s*reps)$/i;
+    const parts = text.split(regex);
+    return parts.map((part, i) => {
+        if (matchRegex.test(part.trim())) {
+            return (
+                <span key={i} className="font-extrabold text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]">
+                    {part}
+                </span>
+            );
+        }
+        return <React.Fragment key={i}>{part}</React.Fragment>;
+    });
+}
