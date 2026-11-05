@@ -955,9 +955,17 @@ export default function App() {
     });
   };
 
-  const setActiveTab = (newTab) => {
-    if (typeof newTab === 'function') newTab = newTab(activeTab);
-    if (newTab === activeTab) return;
+  const activeTabRef = useRef(activeTab);
+  useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
+  const programsRef = useRef(programs);
+  useEffect(() => { programsRef.current = programs; }, [programs]);
+  const soundEnabledRef = useRef(soundEnabled);
+  useEffect(() => { soundEnabledRef.current = soundEnabled; }, [soundEnabled]);
+
+  const setActiveTab = useCallback((newTab) => {
+    const curActive = activeTabRef.current;
+    if (typeof newTab === 'function') newTab = newTab(curActive);
+    if (newTab === curActive) return;
 
     setMountedTabs(prev => {
       if (prev.has(newTab)) return prev;
@@ -967,8 +975,9 @@ export default function App() {
     });
 
     // Hanya periksa program kosong jika user sedang KELUAR dari tab 'program'
-    if (activeTab === 'program' && newTab !== 'program') {
-      const emptyCustomPrograms = programs.filter(p => {
+    if (curActive === 'program' && newTab !== 'program') {
+      const curPrograms = programsRef.current;
+      const emptyCustomPrograms = curPrograms.filter(p => {
           const isCustom = p.planId === 'custom' || (p.planId && p.planId.startsWith('custom-'));
           const hasNoExercises = (!p.exercises || p.exercises.length === 0);
           const hasNoAssignedDays = (!p.assignedDays || p.assignedDays.length === 0);
@@ -981,7 +990,7 @@ export default function App() {
              title: 'Bersihkan Sesi Kosong?',
              message: `Sistem mendeteksi ada ${emptyCustomPrograms.length} program custom kosong (tidak ada latihannya sama sekali). Apakah kamu ingin menghapusnya agar daftar programmu tetap rapi?`,
              onConfirm: () => {
-                 playSoundEffect('success', soundEnabled);
+                 playSoundEffect('success', soundEnabledRef.current);
                  setPrograms(prev => prev.filter(p => !emptyCustomPrograms.some(emp => emp.id === p.id)));
                  setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null, onCancel: null });
                  _setActiveTab(newTab);
@@ -998,7 +1007,7 @@ export default function App() {
     }
 
     _setActiveTab(newTab);
-  };
+  }, []);
 
   const [focusRoutineId, setFocusRoutineId] = useState(null);
   const [isEditingMode, setIsEditingMode] = useState(false);
@@ -1396,6 +1405,22 @@ export default function App() {
   const [skippedExercises, setSkippedExercises] = useState({});
   const [extraExercises, setExtraExercises] = useState([]);
   const [sessionExercises, setSessionExercises] = useState([]);
+  const handleSessionExercises = useCallback((newExs) => {
+    setSessionExercises(prev => {
+      if (prev === newExs) return prev;
+      if (Array.isArray(prev) && Array.isArray(newExs) && prev.length === newExs.length) {
+        let isSame = true;
+        for (let i = 0; i < prev.length; i++) {
+          if (prev[i]?.id !== newExs[i]?.id) {
+            isSame = false;
+            break;
+          }
+        }
+        if (isSame) return prev;
+      }
+      return newExs || [];
+    });
+  }, []);
 
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
@@ -1425,9 +1450,11 @@ export default function App() {
       // tab BARU — jadi posisi tersimpan sudah jadi 0 sebelum sempat dipulihkan.
       const target = scrollPositions.current[contentTab] || 0;
       restoringUntil.current = Date.now() + 300; // abaikan clamp selama tab baru menata diri
-      const restore = () => requestAnimationFrame(() => window.scrollTo(0, target));
-      restore();
-      if (target > 0) timers.push(setTimeout(restore, 100));
+      if (contentTab !== 'calendar' && (target > 0 || window.scrollY > 0)) {
+        const restore = () => requestAnimationFrame(() => window.scrollTo(0, target));
+        restore();
+        if (target > 0) timers.push(setTimeout(restore, 100));
+      }
     }
 
     const handleScroll = () => {
@@ -5014,7 +5041,7 @@ export default function App() {
                    restTargetTime={restTargetTime} setRestTargetTime={setRestTargetTime}
                    isImmersiveMode={isImmersiveMode} setIsImmersiveMode={setIsImmersiveMode}
                    sessionToRun={sessionToRun} setSessionToRun={setSessionToRun}
-                   onSessionExercises={setSessionExercises}
+                   onSessionExercises={handleSessionExercises}
                    resumeDurationSecs={resumeDurationSecs} setResumeDurationSecs={setResumeDurationSecs}
                    showSupersetToast={showSupersetToast}
                    
