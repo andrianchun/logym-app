@@ -326,6 +326,8 @@ const ImmersiveWorkout = ({
   });
   
   const ex = validExercises[currentIndex];
+  const exType = ex ? resolveExerciseKind(ex) : 'weight';
+  const isCardio = exType === 'cardio';
 
   // activeExerciseId dulu berarti "set terakhir yang dicentang", bukan "latihan yang sedang
   // dibuka" — tombol LATIHAN BERIKUTNYA cuma menggeser currentIndex lokal. Akibatnya minimize lalu
@@ -1293,8 +1295,6 @@ const ImmersiveWorkout = ({
         {/* Scroll Pickers */}
         <div className="flex flex-col gap-6 no-swipe-minimize">
           {(() => {
-            const exType = resolveExerciseKind(ex);
-            const isCardio = exType === 'cardio';
             const itemLogs = getLogsForEx(ex);
             const itemSet = itemLogs[activeSetIdx] || itemLogs[0];
             return (
