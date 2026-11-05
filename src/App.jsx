@@ -109,13 +109,17 @@ export default function App() {
   const [isSlowLoading, setIsSlowLoading] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
-  const [lomealToday, setLomealToday] = useState(null);
-  const [lomealTargets, setLomealTargets] = useState(null);
+  const [lomealToday, setLomealToday] = useState(() => readCache('__CACHED_LOMEAL_TODAY', null));
+  const [lomealTargets, setLomealTargets] = useState(() => readCache('__CACHED_LOMEAL_TARGETS', null));
   useEffect(() => {
     if (!user?.uid) { setLomealToday(null); setLomealTargets(null); return; }
     const unsub = onSnapshot(doc(db, 'logym_users', user.uid), (snap) => {
-      setLomealToday(snap.data()?.lomealSync?.today || null);
-      setLomealTargets(snap.data()?.lomealSync?.targets || null);
+      const today = snap.data()?.lomealSync?.today || null;
+      const targets = snap.data()?.lomealSync?.targets || null;
+      setLomealToday(today);
+      setLomealTargets(targets);
+      if (today) writeCache('__CACHED_LOMEAL_TODAY', today);
+      if (targets) writeCache('__CACHED_LOMEAL_TARGETS', targets);
     });
     return unsub;
   }, [user?.uid]);
@@ -652,6 +656,7 @@ export default function App() {
   };
 
   const hcSyncing = useRef(false);
+  const pushLogymSyncImmediatelyRef = useRef(null);
   const hcLastSync = useRef(0);   // sapuan lebar (>2 hari)
   const hcLastQuick = useRef(0);  // penyegaran hari ini + semalam
   const hcQueued = useRef(null);
@@ -778,6 +783,7 @@ export default function App() {
     } finally {
       hcSyncing.current = false;
       hcLastQuick.current = Date.now();
+      if (filled > 0 || externalPulled > 0) pushLogymSyncImmediatelyRef.current?.();
       // Cuma sapuan lebar yang menyetel jam sapuan. Kalau penyegaran 2 hari ikut menyetelnya,
       // membuka app tiap beberapa menit akan terus menunda sapuan penambal lubang.
       if (days > 2) hcLastSync.current = Date.now();
@@ -2564,6 +2570,28 @@ export default function App() {
 
   // Sinkronisasi ringkasan aktivitas hari ini ke Lomeal via dokumen root `logym_users/{uid}`
   const lastLogymSyncRef = useRef('');
+  const pendingLogymSyncRef = useRef(null);
+
+  const pushLogymSyncImmediately = useCallback((customHistory = null) => {
+    if (!user?.uid || !isDataLoaded) return;
+    try {
+      const targetHistory = customHistory || history;
+      const syncPayload = buildLogymSyncPayload(targetHistory, userProfile, null, lomealToday);
+      const syncStr = JSON.stringify(syncPayload);
+      if (lastLogymSyncRef.current === syncStr) return;
+      lastLogymSyncRef.current = syncStr;
+      const safePayload = cleanFirestoreData(syncPayload);
+      setDoc(doc(db, 'logym_users', user.uid), safePayload, { merge: true })
+        .then(() => {
+          console.log('[LogymSync] Terkirim ke Lomeal (instan):', syncPayload.logymSync.today);
+        })
+        .catch(err => console.warn('[LogymSync] Gagal push instan ke Lomeal:', err));
+    } catch (e) {
+      console.warn('[LogymSync] Error build payload instan:', e);
+    }
+  }, [user?.uid, isDataLoaded, history, userProfile, lomealToday]);
+  pushLogymSyncImmediatelyRef.current = pushLogymSyncImmediately;
+
   useEffect(() => {
     if (!user?.uid || !isDataLoaded) return;
     try {
@@ -2571,7 +2599,7 @@ export default function App() {
       const syncStr = JSON.stringify(syncPayload);
       if (lastLogymSyncRef.current === syncStr) return;
 
-      const timer = setTimeout(() => {
+      const attemptSave = () => {
         lastLogymSyncRef.current = syncStr;
         const safePayload = cleanFirestoreData(syncPayload);
         setDoc(doc(db, 'logym_users', user.uid), safePayload, { merge: true })
@@ -2579,9 +2607,15 @@ export default function App() {
             console.log('[LogymSync] Terkirim ke Lomeal:', syncPayload.logymSync.today);
           })
           .catch(err => console.warn('[LogymSync] Gagal auto-sync ke Lomeal:', err));
-      }, 500);
+      };
 
-      return () => clearTimeout(timer);
+      const timer = setTimeout(attemptSave, 80);
+      pendingLogymSyncRef.current = { timer, attemptSave };
+
+      return () => {
+        clearTimeout(timer);
+        pendingLogymSyncRef.current = null;
+      };
     } catch (e) {
       console.warn('[LogymSync] Error build payload:', e);
     }
@@ -2590,7 +2624,7 @@ export default function App() {
   useEffect(() => {
     const flush = () => {
       if (document.visibilityState === 'visible') return;
-      [pendingHistorySaveRef, pendingMainSaveRef, pendingCloudSessionRef].forEach(ref => {
+      [pendingHistorySaveRef, pendingMainSaveRef, pendingCloudSessionRef, pendingLogymSyncRef].forEach(ref => {
         if (!ref.current) return;
         clearTimeout(ref.current.timer);
         try { ref.current.attemptSave(); } catch (e) { console.warn('flush gagal:', e); }
@@ -4569,6 +4603,8 @@ export default function App() {
 
       return h;
     });
+
+    pushLogymSyncImmediately();
 
     pendingRmLogKeys.current = Object.keys(cleanLogs);
 
