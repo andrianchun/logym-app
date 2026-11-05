@@ -902,26 +902,29 @@ export const mapHcWorkoutType = (type, lang = 'id') => {
   if (t.includes('strength') || t.includes('weight') || t.includes('calisthenic') || t.includes('bodyweight')) {
     return isEn ? 'Extra Strength Training' : 'Latihan Beban Ekstra';
   }
-  if (t === 'other') return isEn ? 'Extra Workout' : 'Latihan Ekstra';
-  return type ? type.charAt(0).toUpperCase() + type.slice(1) : (isEn ? 'Extra Workout' : 'Latihan Ekstra');
+  if (t === 'other') return isEn ? 'Other' : 'Lainnya';
+  return type ? type.charAt(0).toUpperCase() + type.slice(1) : (isEn ? 'Other' : 'Lainnya');
 };
 
 export const formatExternalWorkoutName = (name, lang = 'id') => {
   if (!name) return '';
   const isEn = String(lang || '').toLowerCase() === 'en';
   const clean = String(name).trim();
-  if (/^bersepeda\s*\(\s*cycling\s*\)$/i.test(clean)) return isEn ? 'Cycling' : 'Bersepeda';
-  if (/^lari\s*\(\s*running\s*\)$/i.test(clean)) return isEn ? 'Running' : 'Lari';
-  if (/^jalan santai\s*\(\s*walking\s*\)$/i.test(clean)) return isEn ? 'Walking' : 'Jalan Santai';
-  if (/^berenang\s*\(\s*swimming\s*\)$/i.test(clean)) return isEn ? 'Swimming' : 'Berenang';
-  if (/^mendaki\s*\(\s*hiking\s*\)$/i.test(clean)) return isEn ? 'Hiking' : 'Mendaki';
-  if (/^mendayung\s*\(\s*rowing\s*\)$/i.test(clean)) return isEn ? 'Rowing' : 'Mendayung';
-  if (/^lompat tali\s*\(\s*jump rope\s*\)$/i.test(clean)) return isEn ? 'Jump Rope' : 'Lompat Tali';
-  if (/^naik tangga\s*\(\s*stairs\s*\)$/i.test(clean)) return isEn ? 'Stairs' : 'Naik Tangga';
-  if (/^latihan beban ekstra$/i.test(clean) || /^extra strength training$/i.test(clean)) {
+  if (/^bersepeda(\s*\(\s*cycling\s*\))?$/i.test(clean) || /^cycling$/i.test(clean)) return isEn ? 'Cycling' : 'Bersepeda';
+  if (/^lari(\s*\(\s*running\s*\))?$/i.test(clean) || /^running$/i.test(clean)) return isEn ? 'Running' : 'Lari';
+  if (/^jalan\s*santai(\s*\(\s*walking\s*\))?$/i.test(clean) || /^walking$/i.test(clean)) return isEn ? 'Walking' : 'Jalan Santai';
+  if (/^berenang(\s*\(\s*swimming\s*\))?$/i.test(clean) || /^swimming$/i.test(clean)) return isEn ? 'Swimming' : 'Berenang';
+  if (/^mendaki(\s*\(\s*hiking\s*\))?$/i.test(clean) || /^hiking$/i.test(clean)) return isEn ? 'Hiking' : 'Mendaki';
+  if (/^mendayung(\s*\(\s*rowing\s*\))?$/i.test(clean) || /^rowing$/i.test(clean)) return isEn ? 'Rowing' : 'Mendayung';
+  if (/^lompat\s*tali(\s*\(\s*jump\s*rope\s*\))?$/i.test(clean) || /^jump\s*rope$/i.test(clean)) return isEn ? 'Jump Rope' : 'Lompat Tali';
+  if (/^naik\s*tangga(\s*\(\s*stairs\s*\))?$/i.test(clean) || /^stairs$/i.test(clean)) return isEn ? 'Stairs' : 'Naik Tangga';
+  if (/^latihan\s*beban\s*ekstra$/i.test(clean) || /^extra\s*strength\s*training$/i.test(clean)) {
     return isEn ? 'Extra Strength Training' : 'Latihan Beban Ekstra';
   }
-  if (/^other$/i.test(clean) || /^lainnya$/i.test(clean) || /^extra workout$/i.test(clean) || /^latihan ekstra$/i.test(clean)) {
+  if (/^other$/i.test(clean) || /^lainnya$/i.test(clean)) {
+    return isEn ? 'Other' : 'Lainnya';
+  }
+  if (/^extra\s*workout$/i.test(clean) || /^latihan\s*ekstra$/i.test(clean)) {
     return isEn ? 'Extra Workout' : 'Latihan Ekstra';
   }
   return clean;

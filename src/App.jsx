@@ -4247,6 +4247,12 @@ export default function App() {
     if (progId && progId !== 'extra' && fokusSesi === 'extra') {
       fokusSesi = progId;
     }
+    const targetDateStr = activeWorkoutDate || selectedDate;
+    const targetW = history[targetDateStr]?.workouts?.find(w => w.id === progId || w.id === fokusSesi);
+    if (targetW?.isExternal || progId?.startsWith('hc_') || fokusSesi?.startsWith('hc_') || targetW?.programId?.endsWith('-external')) {
+      console.warn("[handleSaveWorkout] Aborted: cannot overwrite external synced workout", { progId, fokusSesi });
+      return;
+    }
     playSoundEffect('success', soundEnabled);
 
     // DURASI SESI INI SAJA, bukan seluruh waktu timer.
@@ -4323,7 +4329,6 @@ export default function App() {
     // HANYA log milik sesi ini yang disimpan & dibuang dari state. Versi lama mengosongkan
     // exerciseLogs/skippedExercises/extraExercises tanpa syarat dan menulis SELURUH log hari itu
     // ke sesi yang kebetulan disimpan duluan.
-    const targetDateStr = activeWorkoutDate || selectedDate;
     const targetSessionExercises = progId === 'extra'
       ? (extraExercises || [])
       : (programs.find(p => p.id === progId || p.id === baseProgId || p.id === fokusSesi || p.id === baseFokusId)?.exercises
@@ -4460,9 +4465,13 @@ export default function App() {
 
             let frozenExercises = w.overriddenExercises;
             if (!frozenExercises || frozenExercises.length === 0) {
-              const srcProg = programs.find(pr => pr.id === realProgramId);
-              if (srcProg?.exercises?.length > 0) frozenExercises = JSON.parse(JSON.stringify(srcProg.exercises));
-              else frozenExercises = [];
+              if (w.exercises && w.exercises.length > 0) {
+                frozenExercises = JSON.parse(JSON.stringify(w.exercises));
+              } else {
+                const srcProg = programs.find(pr => pr.id === realProgramId);
+                if (srcProg?.exercises?.length > 0) frozenExercises = JSON.parse(JSON.stringify(srcProg.exercises));
+                else frozenExercises = [];
+              }
             }
             {
               const known = new Set(frozenExercises.map(ex => String(ex.id)));
@@ -4505,8 +4514,8 @@ export default function App() {
               ...w,
               programId: realProgramId,
               status: 'completed',
-              log: cleanLogs,
-              skipped: cleanSkipped,
+              log: (w.isExternal && (!cleanLogs || Object.keys(cleanLogs).length === 0)) ? (w.log || {}) : cleanLogs,
+              skipped: w.isExternal ? (w.skipped || {}) : cleanSkipped,
               timestamp: (w.status === 'completed' && w.timestamp) ? w.timestamp : endStamp,
               startedAt: startedAtFor(finalSecs),
               duration: formatDur(finalSecs),

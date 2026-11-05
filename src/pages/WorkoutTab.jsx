@@ -1223,7 +1223,8 @@ const WorkoutTab = ({
      onAddExtraClick();
   };
 
-  const isCompletelyEmpty = (activeProgramsList.length === 0 || activeProgramsList.every(p => !p.exercises || p.exercises.length === 0)) && displayExtraExercises.length === 0;
+  const hasExternalSession = activeProgramsList.some(p => p.isExternal);
+  const isCompletelyEmpty = !hasExternalSession && (activeProgramsList.length === 0 || activeProgramsList.every(p => !p.exercises || p.exercises.length === 0)) && displayExtraExercises.length === 0;
 
   // Dipakai untuk kasih jarak ekstra di bawah supaya "Tambah Latihan Ekstra"/"Pendinginan"
   // tidak ketutup tombol floating "Mulai Sesi Latihan" saat sebuah sesi sedang diexpand.
@@ -1378,25 +1379,23 @@ const WorkoutTab = ({
                         >
                           <div
                             onClick={() => { playSoundEffect('click', soundEnabled); toggleSession(prog.workoutId); }}
-                            className="flex flex-col items-start gap-0.5 flex-1 min-w-0 pr-4 cursor-pointer"
+                            className="flex flex-col items-start flex-1 min-w-0 pr-4 cursor-pointer"
                           >
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-xl sm:text-2xl uppercase tracking-widest break-words leading-tight flex-1">
-                                {(() => {
-                                  if (!prog.isExtra) return `Sesi: ${prog.name}`;
-                                  const formatted = formatExternalWorkoutName(prog.name, lang?.id || 'id');
-                                  if (!formatted || formatted === 'Ekstra' || formatted === 'adhoc' || formatted === 'Latihan Ekstra' || formatted === 'Extra Workout') {
-                                    return 'Sesi Ekstra';
-                                  }
-                                  if (formatted === 'Latihan Beban Ekstra' || formatted === 'Extra Strength Training') {
-                                    return lang?.id === 'en' ? 'Extra Session: Strength' : 'Sesi Ekstra: Latihan Beban';
-                                  }
-                                  return `Sesi Ekstra: ${formatted}`;
-                                })()}
-                              </span>
-                            </div>
+                            <span className="text-xs font-bold uppercase tracking-wider text-sky-400 opacity-90 mb-1">
+                              {prog.isExtra ? (lang?.id === 'en' ? 'Extra' : 'Ekstra') : (lang?.id === 'en' ? 'Session' : 'Sesi')}
+                            </span>
+                            <h2 className="text-lg sm:text-xl font-black uppercase tracking-wide break-words leading-tight">
+                              {(() => {
+                                if (!prog.isExtra) return prog.name;
+                                const formatted = formatExternalWorkoutName(prog.name, lang?.id || 'id');
+                                if (!formatted || formatted === 'Ekstra' || formatted === 'adhoc' || formatted === 'Latihan Ekstra' || formatted === 'Extra Workout') {
+                                  return lang?.id === 'en' ? 'Extra Workout' : 'Latihan Ekstra';
+                                }
+                                return formatted;
+                              })()}
+                            </h2>
                             {prog.planName && (
-                              <span className={`text-xs ${t.textMuted} font-medium`}>Program: {prog.planName}</span>
+                              <span className={`text-xs ${t.textMuted} font-medium mt-0.5`}>Program: {prog.planName}</span>
                             )}
                           </div>
                           
@@ -1424,13 +1423,16 @@ const WorkoutTab = ({
                               Selesai
                             </span>
                           </div>
-                          <div className="flex flex-wrap items-center gap-3 text-sm font-semibold opacity-80">
-                            <span>⏱️ {prog.duration || '00:00'}</span>
-                            <span>🔥 ~{prog.calories || 0} kcal</span>
-                            {prog.distanceKm ? <span>📍 {prog.distanceKm} km</span> : null}
-                          </div>
-                          <div className="pt-1 text-xs opacity-60">
-                            Disinkron otomatis dari {cleanSourceAppName(prog.source, prog.sourceId)}.
+                          <div className="flex flex-wrap items-center gap-2 text-sm font-semibold opacity-80">
+                            <span>{prog.duration || '00:00'}</span>
+                            <span className="opacity-40">•</span>
+                            <span>~{prog.calories || 0} kcal</span>
+                            {prog.distanceKm ? (
+                              <>
+                                <span className="opacity-40">•</span>
+                                <span>{prog.distanceKm} km</span>
+                              </>
+                            ) : null}
                           </div>
                         </div>
                       ) : (
@@ -1713,19 +1715,21 @@ const WorkoutTab = ({
 
       {/* FLOATING START / RESUME WORKOUT BUTTON */}
       {(() => {
-        if (!isActive || isImmersiveMode || isWorkoutActive) return null;
+        if (!isActive || isImmersiveMode || isWorkoutActive || isCompletelyEmpty) return null;
 
         // 1. Kumpulkan seluruh sesi latihan hari ini (Program + Ekstra)
         const allSessionsList = [
           ...activeProgramsList.map(p => ({
             ...p,
             workoutId: p.workoutId,
-            isExtra: false,
+            isExternal: Boolean(p.isExternal),
+            isExtra: Boolean(p.isExtra),
             exercises: p.exercises || []
           })),
           ...(displayExtraExercises.length > 0 ? [{
             workoutId: 'extra',
             name: 'Ekstra',
+            isExternal: false,
             isExtra: true,
             exercises: displayExtraExercises
           }] : [])
@@ -1746,23 +1750,29 @@ const WorkoutTab = ({
             (session.workoutId === 'extra' && w.programId === 'adhoc' && w.status !== 'completed')
           );
           
+          const isExternal = Boolean(session.isExternal || session.source === 'health_connect' || session.programId?.endsWith('-external') || session.workoutId?.startsWith('hc_'));
+          const isExternalCompleted = isExternal && (session.status === 'completed' || wInHistory?.status === 'completed' || !!session.duration);
+
           // Sesi dianggap selesai JIKA dan HANYA JIKA:
-          // Seluruh set dari seluruh latihan yang tidak diskip di sesi ini sudah dicentang (done/skipped)
-          const isAllSetsDone = hasExercises && !allSkipped && activeExercises.every(ex => {
+          // - Sesi eksternal yang sudah selesai, ATAU
+          // - Seluruh set dari seluruh latihan yang tidak diskip di sesi ini sudah dicentang (done/skipped)
+          const isAllSetsDone = !isExternal && hasExercises && !allSkipped && activeExercises.every(ex => {
             const logs = getSetLogs(ex);
             return Array.isArray(logs) && logs.length > 0 && logs.every(s => s.done || s.skipped);
           });
           
-          const hasSomeSetsDone = hasExercises && activeExercises.some(ex => {
+          const hasSomeSetsDone = !isExternal && hasExercises && activeExercises.some(ex => {
             const logs = getSetLogs(ex);
             return Array.isArray(logs) && logs.some(s => s.done || s.skipped);
           });
 
-          const isFinished = hasExercises && (isAllSetsDone || (wInHistory?.status === 'completed' && isAllSetsDone));
+          const isFinished = isExternalCompleted || (hasExercises && (isAllSetsDone || (wInHistory?.status === 'completed' && isAllSetsDone)));
           const hasHistoryDuration = !!(wInHistory && wInHistory.duration);
 
           return {
             ...session,
+            isExternal,
+            wInHistory,
             hasExercises,
             allSkipped,
             isFinished,
@@ -1771,14 +1781,19 @@ const WorkoutTab = ({
           };
         });
 
+        // Pisahkan sesi native (latihan beban / manual Logym) dari sesi eksternal (Samsung Health)
+        const nativeSessions = evaluatedSessions.filter(s => !s.isExternal);
+        // Jika HANYA ada sesi eksternal yang selesai dan tidak ada latihan Logym asli hari ini, jangan tampilkan tombol floating
+        if (nativeSessions.length === 0) return null;
+
         // 3. Tentukan sesi target yang akan dijalankan
         const activeExpandedId = Object.keys(expandedSessions || {}).find(k => (expandedSessions || {})[k]);
-        const expandedSession = evaluatedSessions.find(s => s.workoutId === activeExpandedId);
+        const expandedSession = nativeSessions.find(s => s.workoutId === activeExpandedId);
         
-        // Cari semua sesi yang BELUM selesai
-        const unfinishedSessions = evaluatedSessions.filter(s => !s.isFinished && s.hasExercises && !s.allSkipped);
+        // Cari semua sesi native yang BELUM selesai
+        const unfinishedSessions = nativeSessions.filter(s => !s.isFinished && s.hasExercises && !s.allSkipped);
 
-        // Jika sesi yang sedang dibuka belum selesai, utamakan itu. Jika sudah selesai, lanjutkan ke sesi pertama yang belum selesai!
+        // Jika sesi native yang sedang dibuka belum selesai, utamakan itu. Jika sudah selesai, lanjutkan ke sesi native pertama yang belum selesai!
         let targetSession = null;
         if (expandedSession && !expandedSession.isFinished && expandedSession.hasExercises && !expandedSession.allSkipped) {
           targetSession = expandedSession;
@@ -1786,18 +1801,18 @@ const WorkoutTab = ({
           targetSession = unfinishedSessions[0];
         }
 
-        const areAllSessionsFinished = evaluatedSessions.length > 0 && evaluatedSessions.every(s => s.isFinished || !s.hasExercises || s.allSkipped);
+        const areAllNativeSessionsFinished = nativeSessions.every(s => s.isFinished || !s.hasExercises || s.allSkipped);
 
-        // Cek apakah ada sesi aktif berjalan atau belum tersimpan ke history
-        const activeUnsavedSession = evaluatedSessions.find(s => 
+        // Cek apakah ada sesi native aktif berjalan atau belum tersimpan ke history
+        const activeUnsavedSession = nativeSessions.find(s => 
           (isWorkoutActive && (s.workoutId === sessionToRun || s.workoutId === focusWorkoutId)) ||
           (s.hasExercises && s.hasSomeSetsDone && s.wInHistory?.status !== 'completed')
         );
 
-        if (areAllSessionsFinished) {
-          // Jika ada sesi yang sedang aktif / baru selesai diceklis semua setnya dan belum disimpan ke riwayat:
-          if (activeUnsavedSession || isWorkoutActive) {
-            const targetSaveId = activeUnsavedSession?.workoutId || sessionToRun || evaluatedSessions[0]?.workoutId;
+        if (areAllNativeSessionsFinished) {
+          // Jika ada sesi native yang sedang aktif / baru selesai diceklis semua setnya dan belum disimpan ke riwayat:
+          if (activeUnsavedSession || (isWorkoutActive && sessionToRun && !sessionToRun.startsWith('hc_'))) {
+            const targetSaveId = activeUnsavedSession?.workoutId || sessionToRun || nativeSessions[0]?.workoutId;
             return (
               <div className="fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 pointer-events-none flex justify-center animate-in fade-in duration-200">
                 <button 
@@ -1824,16 +1839,20 @@ const WorkoutTab = ({
             );
           }
 
-          return (
-            <div className="fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 pointer-events-none flex justify-center animate-in fade-in duration-200">
-              <button 
-                disabled={true}
-                className={`pointer-events-auto w-full max-w-2xl mx-auto py-5 rounded-full text-xl font-black flex items-center justify-center gap-3 transition-all ${t.bgAccent} text-white shadow-lg opacity-85 cursor-default`}
-              >
-                <CheckCircle size={24} /> SESI SELESAI
-              </button>
-            </div>
-          );
+          if (nativeSessions.some(s => s.isFinished && s.hasExercises)) {
+            return (
+              <div className="fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 pointer-events-none flex justify-center animate-in fade-in duration-200">
+                <button 
+                  disabled={true}
+                  className={`pointer-events-auto w-full max-w-2xl mx-auto py-5 rounded-full text-xl font-black flex items-center justify-center gap-3 transition-all ${t.bgAccent} text-white shadow-lg opacity-85 cursor-default`}
+                >
+                  <CheckCircle size={24} /> SESI SELESAI
+                </button>
+              </div>
+            );
+          }
+
+          return null;
         }
 
         if (!targetSession) return null;

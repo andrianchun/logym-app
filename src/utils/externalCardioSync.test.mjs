@@ -49,15 +49,15 @@ assert.equal(mapHcWorkoutType('hiking'), 'Mendaki');
 assert.equal(mapHcWorkoutType('hiking', 'en'), 'Hiking');
 assert.equal(mapHcWorkoutType('weightlifting'), 'Latihan Beban Ekstra');
 assert.equal(mapHcWorkoutType('weightlifting', 'en'), 'Extra Strength Training');
-assert.equal(mapHcWorkoutType('other'), 'Latihan Ekstra');
-assert.equal(mapHcWorkoutType('other', 'en'), 'Extra Workout');
+assert.equal(mapHcWorkoutType('other'), 'Lainnya');
+assert.equal(mapHcWorkoutType('other', 'en'), 'Other');
 
 assert.equal(formatExternalWorkoutName('Bersepeda (Cycling)'), 'Bersepeda');
 assert.equal(formatExternalWorkoutName('Bersepeda (Cycling)', 'en'), 'Cycling');
 assert.equal(formatExternalWorkoutName('Latihan Beban Ekstra'), 'Latihan Beban Ekstra');
 assert.equal(formatExternalWorkoutName('Latihan Beban Ekstra', 'en'), 'Extra Strength Training');
-assert.equal(formatExternalWorkoutName('Other'), 'Latihan Ekstra');
-assert.equal(formatExternalWorkoutName('Other', 'en'), 'Extra Workout');
+assert.equal(formatExternalWorkoutName('Other'), 'Lainnya');
+assert.equal(formatExternalWorkoutName('Other', 'en'), 'Other');
 console.log('✅ mapHcWorkoutType & formatExternalWorkoutName passed');
 
 // 4. formatDurationFromSeconds & getWorkoutSortMinutes

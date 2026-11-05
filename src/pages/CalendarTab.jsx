@@ -1793,9 +1793,9 @@ const CalendarTab = ({
                                   const exs = w.overriddenExercises || w.exercises || (prog?.exercises) || [];
                                   const isCardio = exs.length > 0 && exs.every(ex => ex.target?.some(t => t.toLowerCase().includes('cardio') || t.toLowerCase().includes('kardio')));
                                   
-                                  let parentPlanName = prog?.planName || (prog?.planId ? 'Latihan Kustom' : 'Sesi Ekstra');
+                                  let parentPlanName = prog?.planName || (prog?.planId ? 'Latihan Kustom' : 'Ekstra');
                                   if (w.isExternal || w.programId === 'adhoc' || w.programId === 'cardio-external' || w.programId === 'strength-external' || w.programId === 'other-external') {
-                                    parentPlanName = 'Sesi Ekstra';
+                                    parentPlanName = 'Ekstra';
                                   }
                                   if (!acc[parentPlanName]) acc[parentPlanName] = [];
                                   acc[parentPlanName].push(w);
