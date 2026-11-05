@@ -881,6 +881,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
     workoutCalories = 0,
     tefCalories = 0,
     tefDetail = null,
+    plannedBurnTarget = 2000,
   } = useMemo(() => {
      const currentWeight = Number(bioData.weight) || 70; // Asumsi 70kg jika tidak ada data
 
@@ -1017,6 +1018,20 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
            hasMacros: burn.hasMacros,
            macros: burn.macros,
          },
+         plannedBurnTarget: (() => {
+           const targetSteps = Number(activityTargets?.steps) || 10000;
+           const targetNeatKcal = Math.round(targetSteps * 0.04);
+           const hasPlannedWorkouts = todayWks.some(w => 
+             w.status === 'completed' || w.status === 'planned' || w.programId === 'adhoc' || w.isExternal
+           );
+           const plannedEatKcal = workoutCalories > 0 ? workoutCalories : (hasPlannedWorkouts ? 250 : 0);
+           const foodTargetKcal = Number(lomealTargets?.todayTarget || lomealFresh?.targetKcal || lomealTargets?.kcal || 2000);
+           const plannedTefKcal = tefCalories > 0 ? tefCalories : Math.round(foodTargetKcal * 0.10);
+           const customBurnTarget = Number(activityTargets?.burnCalories);
+           return customBurnTarget > 0 
+             ? customBurnTarget 
+             : Math.round(bmrCalories + targetNeatKcal + plannedEatKcal + plannedTefKcal);
+         })(),
          mergedDailyCalories: dailyCals,
          mergedDailyCaloriesFloor: totalDailyCals,
          mergedDailySessions: intTodayExercises,
@@ -1030,7 +1045,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
   // userProfile WAJIB ikut: umur & jenis kelamin datang async dari Firestore SETELAH render
   // pertama. Tanpa ini memo tidak pernah dihitung ulang saat profil tiba, dan sesi kardio
   // menempel di hitungan non-nadi sampai kebetulan ada hal lain yang berubah.
-  }, [history, activeDate, bioData, userProfile, lomealToday]);
+  }, [history, activeDate, bioData, userProfile, lomealToday, activityTargets, lomealTargets]);
 
   // Tulis balik mergedDailyCalories (udah dilindungi Math.max lantai BMR+langkah+workout,
   // lihat useMemo di atas) ke bioData.activityCalories — biar Lomeal, yang baca field mentah
@@ -1566,10 +1581,11 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                         <span className="w-5 h-5 rounded-full bg-blue-500/15 text-blue-500 flex items-center justify-center shrink-0"><Flame size={11}/></span>
                      </div>
                      <div className="flex flex-col flex-1 w-full">
-                         <div className={`flex items-baseline justify-end ${NUM_ROW}`}>
+                         <div className={`flex items-baseline justify-end space-x-1 ${NUM_ROW}`}>
                              <span className={`text-3xl font-black ${t.textMain} leading-none tracking-tight`}>{mergedDailyCalories > 0 ? formatNumber(mergedDailyCalories, language) : '-'}</span>
+                             <span className="text-xs text-slate-500 dark:text-slate-400 font-bold whitespace-nowrap">/ {formatNumber(plannedBurnTarget, language)} kkal</span>
                          </div>
-                         <StackedBar parts={mergedCalorieParts} basis={mergedDailyCalories} language={language} align="right" showLegend={false} />
+                         <StackedBar parts={mergedCalorieParts} basis={Math.max(mergedDailyCalories, plannedBurnTarget)} language={language} align="right" showLegend={false} />
                      </div>
                  </div>
                      </div>
@@ -2926,7 +2942,10 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
 
               {/* Total Banner */}
               <div className="mt-4 pt-3 border-t border-dashed border-white/10 flex items-baseline justify-between">
-                <span className="caption text-slate-300 font-semibold uppercase tracking-wider">Total Kalori Dibakar</span>
+                <div>
+                  <span className="caption text-slate-300 font-semibold uppercase tracking-wider">Total Kalori Dibakar</span>
+                  <div className="text-xs text-slate-400 mt-0.5">Target Rencana: {formatNumber(plannedBurnTarget, language)} kcal</div>
+                </div>
                 <div className="flex items-baseline gap-1">
                   <span className="text-2xl font-black text-blue-400">
                     {mergedDailyCalories > 0 ? formatNumber(mergedDailyCalories, language) : '0'}

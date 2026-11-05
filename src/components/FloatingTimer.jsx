@@ -206,7 +206,7 @@ const FloatingTimer = ({
                  REST
               </span>
               <Clock size={15} className="animate-pulse text-white" />
-              <span className="font-mono font-black h2 text-white">
+              <span className="font-sans font-black tabular-nums h2 text-white">
                 {formatTime(displayRest)}
               </span>
             </div>
@@ -217,7 +217,7 @@ const FloatingTimer = ({
                SET
             </span>
             <Clock size={15} className="text-white" />
-            <span className="font-mono font-black h2 text-white">
+            <span className="font-sans font-black tabular-nums h2 text-white">
               {formatTime(activeSetTimerInfo.currentSeconds)}
             </span>
           </div>

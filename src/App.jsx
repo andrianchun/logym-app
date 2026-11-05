@@ -916,8 +916,9 @@ export default function App() {
 
 
   const [activeTab, _setActiveTab] = useState('dashboard');
-  // Transisi tab instan tanpa artificial deferral: kedua BottomNav dan konten berpindah sinkron
-  const contentTab = activeTab;
+  // Transisi optimistik: activeTab merespons instan 0ms untuk BottomNav,
+  // sedangkan contentTab dialihkan via startTransition agar render tab berat tidak memblokir UI
+  const [contentTab, setContentTab] = useState('dashboard');
   const [mountedTabs, setMountedTabs] = useState(() => new Set(['dashboard', activeTab]));
   useEffect(() => {
     setMountedTabs(prev => {
@@ -928,15 +929,15 @@ export default function App() {
     });
   }, [contentTab]);
 
-  // Pre-mount semua tab saat browser idle agar transisi tab instan dan tidak mengalami freeze first-mount
+  // Pre-mount tab esensial secara bertahap saat browser idle agar tidak membebani memori awal
   useEffect(() => {
     if (isInitialSplash) return;
     const scheduleWarmup = typeof window !== 'undefined' && 'requestIdleCallback' in window
       ? window.requestIdleCallback
-      : (cb) => setTimeout(cb, 1200);
+      : (cb) => setTimeout(cb, 1500);
 
     const handle = scheduleWarmup(() => {
-      setMountedTabs(new Set(['dashboard', 'workout', 'calendar', 'program', 'database']));
+      setMountedTabs(prev => new Set([...prev, 'workout', 'calendar']));
     });
 
     return () => {
@@ -1000,11 +1001,17 @@ export default function App() {
                  setPrograms(prev => prev.filter(p => !emptyCustomPrograms.some(emp => emp.id === p.id)));
                  setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null, onCancel: null });
                  _setActiveTab(newTab);
+                 React.startTransition(() => {
+                   setContentTab(newTab);
+                 });
              },
              onCancel: () => {
                  const targetProg = emptyCustomPrograms[0];
                  setFocusRoutineId(targetProg.id);
                  _setActiveTab('program');
+                 React.startTransition(() => {
+                   setContentTab('program');
+                 });
                  setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null, onCancel: null });
              }
          });
@@ -1013,6 +1020,9 @@ export default function App() {
     }
 
     _setActiveTab(newTab);
+    React.startTransition(() => {
+      setContentTab(newTab);
+    });
   }, []);
 
   const [focusRoutineId, setFocusRoutineId] = useState(null);
@@ -1427,6 +1437,10 @@ export default function App() {
       return newExs || [];
     });
   }, []);
+
+  const handleAddExtraClick = useCallback(() => setActiveAddModalTarget({ type: 'adhoc' }), []);
+  const handleAddExtraExercise = useCallback((ex) => setExtraExercises(prev => [...prev, ex]), []);
+  const handleOpenQuestionnaire = useCallback(() => setShowQuestionnaire(true), []);
 
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
@@ -5077,8 +5091,8 @@ export default function App() {
                    onToggleSkip={handleToggleSkip} onRemoveExtra={handleRemoveExtraEx} onRemoveProgramExercise={handleRemoveProgramExercise}
                    isCurrentlyCompleted={isCurrentlyCompleted} onSaveWorkout={handleSaveWorkout} onCancelWorkout={handleCancelWorkout}
                    gymProfiles={gymProfiles} activeGymId={activeGymId}
-                   onAddExtraClick={() => setActiveAddModalTarget({type: 'adhoc'})} 
-                   onAddExtraExercise={(ex) => setExtraExercises([...extraExercises, ex])}
+                   onAddExtraClick={handleAddExtraClick}
+                   onAddExtraExercise={handleAddExtraExercise}
                    
                    // New Global Timer Props
                    isWorkoutActive={isWorkoutActive} setIsWorkoutActive={setIsWorkoutActive}
@@ -5135,7 +5149,7 @@ export default function App() {
                    user={user} exerciseLibrary={exerciseLibrary} soundEnabled={soundEnabled}
                    setActiveAddModalTarget={setActiveAddModalTarget}
                    saveStateToHistory={saveStateToHistory}
-                   openQuestionnaire={() => setShowQuestionnaire(true)}
+                   openQuestionnaire={handleOpenQuestionnaire}
                    activePlanIds={activePlanIds} setActivePlanIds={setActivePlanIds}
                    // activeGymId ikut dikirim supaya dialog "Alternatif Latihan" di editor program
                    // menyaring alat sesuai gym aktif — sama persis dengan yang dibuka dari tab Latihan.

@@ -2001,27 +2001,27 @@ const CalendarTab = ({
                                                             const maxR = Math.max(...doneSets.map(s => Number(s.r) || 0)) || ex.reps || 0;
                                                             const maxD = Math.max(...doneSets.map(s => Number(s.d) || 0)) || ex.duration || 0;
                                                             
-                                                            if (exType === 'time') textStr = `${doneSets.length} x ${formatNumber(maxD, langId)}s`;
-                                                            else if (exType === 'reps') textStr = `${doneSets.length} x ${formatNumber(maxR, langId)}`;
+                                                            if (exType === 'time') textStr = `${doneSets.length} × ${formatNumber(maxD, langId)}s`;
+                                                            else if (exType === 'reps') textStr = `${doneSets.length} × ${formatNumber(maxR, langId)}`;
                                                             else {
                                                               const wStr = isImp ? formatNumber(Math.round(maxW * 2.20462 * 10)/10, langId) + ' lbs' : formatNumber(maxW, langId) + ' kg';
                                                               const actWStr = isImp ? formatNumber(Math.round(maxActW * 2.20462 * 10)/10, langId) + ' lbs' : formatNumber(maxActW, langId) + ' kg';
-                                                              textStr = `${doneSets.length} x ${formatNumber(maxR, langId)} x ${wStr}`;
+                                                              textStr = `${doneSets.length} × ${formatNumber(maxR, langId)} × ${wStr}`;
                                                               if (maxActW !== maxW && maxActW > 0) aktualStr = `Total ${actWStr}`;
                                                             }
                                                         }
                                                      } else textStr = "Belum dimulai";
                       
                                                      return (
-                                                       <div key={ex.id} className={`p-2 px-3 rounded-lg bg-black/5 dark:bg-white/5 flex justify-between items-center`}>
-                                                         <div className={`body-md truncate mr-2 ${c.text}`}>{idx + 1}. {ex.name}</div>
+                                                       <div key={ex.id} className={`p-2 px-3 rounded-lg bg-black/5 dark:bg-white/5 flex justify-between items-center gap-2`}>
+                                                         <div className={`body-md font-semibold truncate flex-1 min-w-0 ${c.text}`}>{idx + 1}. {ex.name}</div>
                                                          <div className={`flex flex-col items-end shrink-0 ${c.text}`}>
-                                                           <div className="body-md font-mono whitespace-nowrap opacity-80 flex items-center">
+                                                           <div className={`text-xs whitespace-nowrap flex items-center ${textStr === 'Belum dimulai' ? 'font-medium opacity-60' : 'font-bold tabular-nums opacity-90'}`}>
                                                              {textStr}
                                                              {zoneNode}
                                                            </div>
                                                            {aktualStr && (
-                                                             <div className="font-mono whitespace-nowrap text-xs opacity-50 leading-tight">
+                                                             <div className="whitespace-nowrap text-[11px] opacity-50 tabular-nums leading-tight mt-0.5">
                                                                {aktualStr}
                                                              </div>
                                                            )}

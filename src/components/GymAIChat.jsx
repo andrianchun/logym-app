@@ -714,7 +714,7 @@ export default function GymAIChat({
                                                 {(r.exercises || []).map((ex, j) => (
                                                     <div key={j} className="text-xs text-slate-400 flex justify-between items-center bg-black/20 px-2 py-1.5 rounded-md">
                                                         <span className="text-slate-200">{ex.name}</span>
-                                                        <span className="font-mono shrink-0 ml-2">{ex.sets}x{ex.reps}</span>
+                                                        <span className="font-sans font-bold tabular-nums shrink-0 ml-2">{ex.sets} × {ex.reps}</span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -833,7 +833,7 @@ export default function GymAIChat({
                             <h3 className="font-bold text-white leading-tight">Coach Logy</h3>
                             <div className="flex items-center gap-1 mt-1">
                                 <span className={`w-1.5 h-1.5 rounded-full animate-pulse bg-emerald-500`}></span>
-                                <span className="text-blue-400 text-xs font-mono">Online</span>
+                                <span className="text-sky-400 text-xs font-semibold">Online</span>
                             </div>
                         </div>
                     </div>
