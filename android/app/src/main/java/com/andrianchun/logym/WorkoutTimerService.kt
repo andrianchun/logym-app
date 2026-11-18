@@ -101,7 +101,15 @@ class WorkoutTimerService : Service() {
                 1L
             }
             
-            startForeground(9999, buildNotification())
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    startForeground(9999, buildNotification(), android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+                } else {
+                    startForeground(9999, buildNotification())
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
             startTicker()
             updateFloatingWidgetVisibility()
         } else if (action == "UPDATE") {

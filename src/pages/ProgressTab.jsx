@@ -97,13 +97,12 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
 
 
     const aggregatedByDate = {};
+    const dateFmt = new Intl.DateTimeFormat(language === 'ID' ? 'id-ID' : 'en-US', { day: 'numeric', month: 'short' });
 
     filteredHistory.forEach(({dateStr, dayData, fullDay}) => {
-      const dateObj = new Date(dateStr);
-      const dateLabel = dateObj.toLocaleDateString(language==='ID'?'id-ID':'en-US', { day: 'numeric', month: 'short' });
-
       if (!aggregatedByDate[dateStr]) {
-          aggregatedByDate[dateStr] = { date: dateLabel, rawDate: dateStr };
+          const dateObj = new Date(dateStr);
+          aggregatedByDate[dateStr] = { date: dateFmt.format(dateObj), rawDate: dateStr };
       }
       const point = aggregatedByDate[dateStr];
 
@@ -1099,4 +1098,4 @@ const ProgressTab = ({ t, lang, language, theme, history, programs, exerciseLibr
   );
 };
 
-export default ProgressTab;
+export default React.memo(ProgressTab);

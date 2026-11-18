@@ -29,6 +29,9 @@ body {
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
+button, a, [role="button"] {
+  touch-action: manipulation;
+}
 #root {
   min-height: 100%;
   width: 100%;

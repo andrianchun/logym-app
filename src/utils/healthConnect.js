@@ -1106,6 +1106,10 @@ export const hcPullExternalWorkouts = async (startYmd, endYmd, existingHistory =
       // HANYA tarik jenis sesi eksternal yang valid
       if (!isAllowedExternalType(w.workoutType)) continue;
 
+      // Abaikan sesi micro-test yang tidak sengaja atau terlalu singkat (< 45 detik)
+      const durSecs = Math.max(0, Math.round(Number(w.duration) || 0));
+      if (durSecs < 45) continue;
+
       const ymd = ymdOf(new Date(w.startDate));
       const existing = existingHistory[ymd]?.workouts || [];
       const platformId = w.platformId || `${w.startDate}_${w.workoutType}`;

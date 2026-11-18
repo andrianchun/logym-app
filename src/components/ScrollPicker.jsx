@@ -1,9 +1,22 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 
-const ScrollPicker = ({ value, onChange, min = 0, max = 200, step = 1, width = 'w-16', height = 120, theme = 'light', t }) => {
+const ScrollPicker = ({ 
+  value, 
+  onChange, 
+  onLiveChange, 
+  onLiveEnd, 
+  min = 0, 
+  max = 200, 
+  step = 1, 
+  width = 'w-16', 
+  height = 120, 
+  theme = 'light', 
+  t 
+}) => {
   const containerRef = useRef(null);
-  const [isScrolling, setIsScrolling] = useState(false);
+  const isScrollingRef = useRef(false);
   const [activeOpt, setActiveOpt] = useState(value);
+  const activeOptRef = useRef(value);
   const scrollTimeout = useRef(null);
   const lastScrollEndAt = useRef(0);
   const pointerDownPos = useRef(null);
@@ -14,19 +27,24 @@ const ScrollPicker = ({ value, onChange, min = 0, max = 200, step = 1, width = '
   const [draftValue, setDraftValue] = useState('');
   const editInputRef = useRef(null);
 
-  // Generate options based on min, max, step
-  const options = [];
-  for (let i = min; i <= max; i += step) {
-    options.push(Number(i.toFixed(1))); // Handle float step
-  }
+  // Memoize options agar tidak alokasi array baru di tiap render
+  const options = useMemo(() => {
+    const opts = [];
+    const validMin = Number(min) || 0;
+    const validMax = Number(max) || 200;
+    const validStep = Number(step) || 1;
+    for (let i = validMin; i <= validMax; i += validStep) {
+      opts.push(Number(i.toFixed(1)));
+    }
+    return opts;
+  }, [min, max, step]);
 
-  // Handle initial scroll position
+  // Handle initial / external scroll position secara stabil tanpa interupsi gestur
   useEffect(() => {
-    if (!containerRef.current || isScrolling || isEditing) return;
+    if (!containerRef.current || isScrollingRef.current || isEditing) return;
     let index = options.indexOf(value);
     
     if (index === -1) {
-      // Find closest option if exact match not found (e.g. 78.1 with step 1)
       let minDiff = Infinity;
       options.forEach((opt, idx) => {
         const diff = Math.abs(opt - value);
@@ -38,13 +56,14 @@ const ScrollPicker = ({ value, onChange, min = 0, max = 200, step = 1, width = '
     }
 
     if (index !== -1) {
-      containerRef.current.scrollTop = index * 40; // 40px is the height of one item
-      setActiveOpt(options[index]);
-      if (options[index] !== value) {
-        onChange(options[index]); // Sync parent state with snapped value
+      const targetScroll = index * 40;
+      if (Math.abs(containerRef.current.scrollTop - targetScroll) > 2) {
+        containerRef.current.scrollTop = targetScroll;
       }
+      activeOptRef.current = options[index];
+      setActiveOpt(options[index]);
     }
-  }, [value, options, isScrolling, isEditing]);
+  }, [value, options, isEditing]);
 
   useEffect(() => {
     if (isEditing && editInputRef.current) {
@@ -54,19 +73,24 @@ const ScrollPicker = ({ value, onChange, min = 0, max = 200, step = 1, width = '
   }, [isEditing]);
 
   const handleScroll = (e) => {
-    setIsScrolling(true);
+    isScrollingRef.current = true;
     
     const scrollTop = e.target.scrollTop;
     const index = Math.round(scrollTop / 40);
     
     if (index >= 0 && index < options.length) {
-      setActiveOpt(options[index]);
+      const currentOpt = options[index];
+      if (currentOpt !== activeOptRef.current) {
+        activeOptRef.current = currentOpt;
+        setActiveOpt(currentOpt);
+        if (onLiveChange) onLiveChange(currentOpt);
+      }
     }
 
     if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
 
     scrollTimeout.current = setTimeout(() => {
-      setIsScrolling(false);
+      isScrollingRef.current = false;
       lastScrollEndAt.current = Date.now();
 
       if (index >= 0 && index < options.length) {
@@ -75,7 +99,8 @@ const ScrollPicker = ({ value, onChange, min = 0, max = 200, step = 1, width = '
           onChange(newValue);
         }
       }
-    }, 150); // Debounce scroll end
+      if (onLiveEnd) onLiveEnd();
+    }, 120); // Debounce scroll end yang responsif
   };
 
   const handlePointerDown = (e) => {
@@ -85,7 +110,7 @@ const ScrollPicker = ({ value, onChange, min = 0, max = 200, step = 1, width = '
 
   const handleTap = (e) => {
     // Bedakan tap murni dari geser: kalau baru saja scroll (atau masih scrolling), abaikan.
-    if (isScrolling || Date.now() - lastScrollEndAt.current < 300) return;
+    if (isScrollingRef.current || Date.now() - lastScrollEndAt.current < 250) return;
     const point = e.changedTouches ? e.changedTouches[0] : e;
     if (pointerDownPos.current) {
       const dx = Math.abs(point.clientX - pointerDownPos.current.x);
@@ -136,8 +161,8 @@ const ScrollPicker = ({ value, onChange, min = 0, max = 200, step = 1, width = '
 
   return (
     <div
-      className={`relative ${width} ${theme === 'dark' ? 'bg-white/5' : 'bg-black/5'} rounded-xl overflow-hidden shadow-inner`}
-      style={{ height: `${height}px`, touchAction: 'pan-y', scrollSnapType: 'y mandatory' }}
+      className={`relative ${width} ${theme === 'dark' ? 'bg-white/5' : 'bg-black/5'} rounded-xl overflow-hidden shadow-inner select-none`}
+      style={{ height: `${height}px` }}
     >
       {/* Active selection overlay */}
       <div className={`absolute top-1/2 left-0 w-full h-[40px] -translate-y-1/2 border-y-2 pointer-events-none z-10 ${bgSoftClass} ${borderClass}`} />
@@ -149,8 +174,8 @@ const ScrollPicker = ({ value, onChange, min = 0, max = 200, step = 1, width = '
         onTouchStart={handlePointerDown}
         onMouseUp={handleTap}
         onTouchEnd={handleTap}
-        className="h-full w-full overflow-y-auto snap-y snap-mandatory hide-scrollbar relative z-20"
-        style={{ scrollBehavior: isScrolling ? 'auto' : 'smooth' }}
+        className="h-full w-full overflow-y-auto snap-y snap-mandatory hide-scrollbar relative z-20 overscroll-contain"
+        style={{ touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' }}
       >
         {/* Padding items to allow snapping to first and last */}
         <div style={{ height: `${paddingHeight}px` }} className="snap-center shrink-0"></div>
@@ -158,7 +183,7 @@ const ScrollPicker = ({ value, onChange, min = 0, max = 200, step = 1, width = '
         {options.map((opt) => (
           <div
             key={opt}
-            className={`h-[40px] flex items-center justify-center snap-center font-bold text-lg transition-opacity ${
+            className={`h-[40px] flex items-center justify-center snap-center font-bold text-lg select-none ${
               opt === activeOpt ? `opacity-100 ${textAccentClass}` : `opacity-20 ${textMutedClass}`
             }`}
           >
@@ -172,4 +197,4 @@ const ScrollPicker = ({ value, onChange, min = 0, max = 200, step = 1, width = '
   );
 };
 
-export default ScrollPicker;
+export default React.memo(ScrollPicker);

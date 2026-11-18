@@ -1,11 +1,12 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Activity, Zap, Brain, Footprints, HeartPulse, Moon, Droplets, Droplet, Dumbbell, Scale, RefreshCw, Trophy, Link2, Pencil, Settings, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Wind, Utensils, Flame, Clock, Cloud, CloudOff, Target } from 'lucide-react';
+import { Activity, Zap, Brain, Footprints, HeartPulse, Moon, Droplets, Droplet, Dumbbell, Scale, RefreshCw, Trophy, Link2, Pencil, Settings, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Wind, Utensils, Flame, Clock, Cloud, CloudOff, Target, Coffee } from 'lucide-react';
 import { getLocalYMD, hasDeletedProjected, isLomealOwned } from '../data/constants';
-import { calculateReadiness, restingHrBaseline } from '../utils/readinessEngine';
+import { calculateDynamicReadiness, restingHrBaseline } from '../utils/readinessEngine';
 import DashboardModals from '../components/DashboardModals';
 import DashboardChart from '../components/DashboardChart';
 import ActivityChart from '../components/ActivityChart';
+import IntradayEnergyChart from '../components/IntradayEnergyChart';
 import VitalsChart, { VITALS_METRICS } from '../components/VitalsChart';
 import ProgressTab from './ProgressTab';
 import { MuscleProgress } from '../components/MuscleProgress';
@@ -491,11 +492,17 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
   // Hari ini pakai bioData hasil merge (sudah termasuk warisan & input manual); hari lain
   // dibaca langsung dari riwayat.
   const sleepBio = sleepOffset === 0 ? bioData : (history[sleepDate]?.bioData || {});
-  // Skor kesiapan untuk tanggal yang sedang dilihat kartu Pemulihan (punya navigasi tanggal
-  // sendiri), bukan selalu hari ini. Baselinenya diambil dari 14 hari SEBELUM tanggal itu.
+  // Skor kesiapan dinamis untuk tanggal yang sedang dilihat kartu Pemulihan.
+  // Untuk hari ini: bergerak real-time mengikuti jam + boost kafein/pre-workout Lomeal.
   const sleepReadiness = useMemo(
-    () => calculateReadiness(sleepBio, restingHrBaseline(history, sleepDate)),
-    [sleepBio, history, sleepDate]
+    () => calculateDynamicReadiness(sleepBio, restingHrBaseline(history, sleepDate), {
+      history,
+      ymd: sleepDate,
+      workouts: history?.[sleepDate]?.workouts || [],
+      lomealDay: sleepDate === todayStr && lomealToday?.ymd === todayStr ? lomealToday : null,
+      isToday: sleepDate === todayStr,
+    }),
+    [sleepBio, history, sleepDate, todayStr, lomealToday]
   );
   const sleepDateLabel = sleepOffset === 0
     ? 'Semalam'
@@ -536,6 +543,25 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                  }
              }
              initialBio.height = fallbackH || userProfile?.height || emptyBio.height;
+         }
+
+         // Prefill waist dari riwayat jika hari ini kosong (berguna untuk kalkulasi WtHR)
+         if (!initialBio.waist) {
+             const sortedDates = Object.keys(history).filter(d => d <= modalDate).sort().reverse();
+             let fallbackW = null;
+             for (const d of sortedDates) {
+                 const dayBio = history[d]?.bioData;
+                 if (dayBio) {
+                     const isAccidentalWaist = dayBio.waist && !dayBio._manualFlags?.waist && !dayBio.weight && !dayBio.bodyFat && !dayBio.muscleMass;
+                     if (!isAccidentalWaist && dayBio.waist) {
+                         fallbackW = dayBio.waist;
+                         break;
+                     }
+                 }
+             }
+             if (fallbackW) {
+                 initialBio.waist = fallbackW;
+             }
          }
          
          // Injeksi nilai Smart Merge agar UI Swipe Input menampilkan angka yang tersinkronisasi
@@ -1896,10 +1922,42 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                      milik Samsung, yang harus diketik manual karena Samsung tidak pernah
                      mengekspornya ke Health Connect — praktisnya selalu kosong. */}
                  <div className="pb-1">
-                     <div className="flex items-center space-x-2">
+                     <div className="flex items-center justify-between gap-2">
                          <span className={`text-sm font-bold uppercase tracking-widest ${t.textMuted}`}>Skor Kesiapan</span>
+                         <button
+                             type="button"
+                             onClick={(e) => {
+                                 e.stopPropagation();
+                                 playSoundEffect('click', soundEnabled);
+                                 const alreadyShowingIntraday = isSleepExpanded && sleepSubTab === 'intraday';
+                                 if (alreadyShowingIntraday) {
+                                     setIsSleepExpanded(false);
+                                 } else {
+                                     setSleepSubTab('intraday');
+                                     setIsSleepExpanded(true);
+                                     setTimeout(() => {
+                                         const el = document.getElementById('sleep-subcard');
+                                         if (el) {
+                                             const bottom = el.getBoundingClientRect().bottom;
+                                             if (bottom > window.innerHeight - 100) {
+                                                 window.scrollTo({ top: bottom + window.scrollY - window.innerHeight + 120, behavior: 'smooth' });
+                                             }
+                                         }
+                                     }, 320);
+                                 }
+                             }}
+                             className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border transition-all active:scale-95 ${
+                                 isSleepExpanded && sleepSubTab === 'intraday'
+                                     ? `${t.bgAccent} text-white border-transparent shadow-sm`
+                                     : `${t.btnBg} ${t.textMuted} ${t.border} hover:${t.textMain}`
+                             }`}
+                             title="Lihat kurva energi dinamis per jam"
+                         >
+                             <Activity size={13} />
+                             <span>Per Jam</span>
+                         </button>
                      </div>
-                     <div className="flex items-baseline space-x-3 mt-1">
+                     <div className="flex flex-wrap items-baseline gap-2.5 mt-1">
                          <div className="flex items-baseline space-x-1">
                              <span className={`text-3xl font-black tracking-tighter ${t.textMain}`}>{sleepReadiness.status !== 'unknown' ? formatNumber(sleepReadiness.score, language) : '-'}</span>
                              <span className={`text-sm font-bold ${t.textMuted}`}>/ 100</span>
@@ -1922,6 +1980,12 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                              }
                              return <span className={`px-2 py-0.5 rounded-full text-xs uppercase font-bold tracking-wider ${color} border shadow-sm`}>{text}</span>;
                          })()}
+                         {sleepReadiness.caffeineBoost > 0 && (
+                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                                 <Coffee size={11} />
+                                 <span>+{sleepReadiness.caffeineBoost}</span>
+                             </span>
+                         )}
                      </div>
                      {/* Alasannya ikut ditulis. Skor tanpa sebab itu kotak hitam — persis keluhan
                          yang bikin Skor Energi Samsung tidak berguna di sini. */}
@@ -1961,11 +2025,29 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
             {isSleepExpanded && (
               <div className={`rounded-b-2xl border border-t-0 ${t.border} ${t.bgSunken} shadow-inner relative z-10 p-6 no-swipe`} onTouchStart={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
                 <div className={`relative flex w-full p-1.5 rounded-full ${t.btnBg} mb-6`} style={{ zIndex: 10 }}>
-                     <div className={`absolute top-1.5 bottom-1.5 w-[calc(33.333%-5px)] rounded-full transition-transform duration-300 ease-out ${t.bgAccent} shadow-sm`} style={{ transform: sleepSubTab === 'durasi' ? 'translateX(0)' : sleepSubTab === 'detail' ? 'translateX(100%)' : 'translateX(200%)', left: '6px', zIndex: 1 }}></div>
-                     <button onClick={() => { playSoundEffect('click', soundEnabled); setSleepSubTab('durasi'); }} className={`flex-1 py-2.5 rounded-full body-md font-black relative transition-colors duration-300 ${sleepSubTab === 'durasi' ? 'text-white' : t.textMuted}`} style={{ zIndex: 2 }}>Durasi</button>
-                     <button onClick={() => { playSoundEffect('click', soundEnabled); setSleepSubTab('detail'); }} className={`flex-1 py-2.5 rounded-full body-md font-black relative transition-colors duration-300 ${sleepSubTab === 'detail' ? 'text-white' : t.textMuted}`} style={{ zIndex: 2 }}>Detail</button>
-                     <button onClick={() => { playSoundEffect('click', soundEnabled); setSleepSubTab('somnogram'); }} className={`flex-1 py-2.5 rounded-full body-md font-black relative transition-colors duration-300 ${sleepSubTab === 'somnogram' ? 'text-white' : t.textMuted}`} style={{ zIndex: 2 }}>Hipnogram</button>
+                     <div
+                         className={`absolute top-1.5 bottom-1.5 w-[calc(25%-3px)] rounded-full transition-transform duration-300 ease-out ${t.bgAccent} shadow-sm`}
+                         style={{
+                             transform: sleepSubTab === 'intraday' ? 'translateX(0)' : sleepSubTab === 'durasi' ? 'translateX(100%)' : sleepSubTab === 'detail' ? 'translateX(200%)' : 'translateX(300%)',
+                             left: '6px',
+                             zIndex: 1,
+                         }}
+                     ></div>
+                     <button onClick={() => { playSoundEffect('click', soundEnabled); setSleepSubTab('intraday'); }} className={`flex-1 py-2.5 rounded-full text-xs font-black relative transition-colors duration-300 ${sleepSubTab === 'intraday' ? 'text-white' : t.textMuted}`} style={{ zIndex: 2 }}>Per Jam</button>
+                     <button onClick={() => { playSoundEffect('click', soundEnabled); setSleepSubTab('durasi'); }} className={`flex-1 py-2.5 rounded-full text-xs font-black relative transition-colors duration-300 ${sleepSubTab === 'durasi' ? 'text-white' : t.textMuted}`} style={{ zIndex: 2 }}>Tren</button>
+                     <button onClick={() => { playSoundEffect('click', soundEnabled); setSleepSubTab('detail'); }} className={`flex-1 py-2.5 rounded-full text-xs font-black relative transition-colors duration-300 ${sleepSubTab === 'detail' ? 'text-white' : t.textMuted}`} style={{ zIndex: 2 }}>Detail</button>
+                     <button onClick={() => { playSoundEffect('click', soundEnabled); setSleepSubTab('somnogram'); }} className={`flex-1 py-2.5 rounded-full text-xs font-black relative transition-colors duration-300 ${sleepSubTab === 'somnogram' ? 'text-white' : t.textMuted}`} style={{ zIndex: 2 }}>Hipnogram</button>
                 </div>
+
+                {sleepSubTab === 'intraday' && (
+                  <IntradayEnergyChart
+                     t={t}
+                     theme={theme}
+                     readiness={sleepReadiness}
+                     isToday={sleepDate === todayStr}
+                     language={language}
+                  />
+                )}
 
                 {sleepSubTab === 'durasi' && (
                   <ActivityChart
@@ -1973,13 +2055,14 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                      soundEnabled={soundEnabled} playSoundEffect={playSoundEffect}
                      onPointClick={navigateToWorkoutDate}
                      language={language}
+                     lomealToday={lomealToday}
                      metricKeys={['sleep', 'energyScore']}
                      storageKey="lyfit_sleep_chart"
                      activityTargets={activityTargets} userProfile={userProfile}
                   />
                 )}
 
-                {sleepSubTab !== 'durasi' && (() => {
+                {(sleepSubTab === 'detail' || sleepSubTab === 'somnogram') && (() => {
                     const sAwake = parseFloat(sleepBio.sleepAwake);
                     const sRem = parseFloat(sleepBio.sleepRem);
                     const sLight = parseFloat(sleepBio.sleepLight);
@@ -2303,12 +2386,25 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                    const displayBioData = enrichBioWithImpedance(history[modalDate]?.bioData, userProfile, bioData?.height, modalDate, biometricStandard) || emptyBio;
                    const dispWeight = isImp && displayBioData.weight ? Number((displayBioData.weight * 2.20462).toFixed(1)) : displayBioData.weight || '0';
                    const dispMuscle = isImp && displayBioData.muscleMass ? Number((displayBioData.muscleMass * 2.20462).toFixed(1)) : displayBioData.muscleMass || 0;
-                   const dispWaist = isImp && displayBioData.waist ? Number((displayBioData.waist * 0.393701).toFixed(1)) : displayBioData.waist || 0;
+                   const effectiveWaistCm = (() => {
+                       if (displayBioData.waist) return Number(displayBioData.waist);
+                       if (bioData?.waist) return Number(bioData.waist);
+                       const sortedDates = Object.keys(history).filter(d => d <= modalDate).sort((a,b) => b.localeCompare(a));
+                       for (const d of sortedDates) {
+                           const dayBio = history[d]?.bioData;
+                           if (dayBio) {
+                               const isAccidentalWaist = dayBio.waist && !dayBio._manualFlags?.waist && !dayBio.weight && !dayBio.bodyFat && !dayBio.muscleMass;
+                               if (!isAccidentalWaist && dayBio.waist) return Number(dayBio.waist);
+                           }
+                       }
+                       return 0;
+                   })();
+                   const dispWaist = effectiveWaistCm > 0 ? (isImp ? Number((effectiveWaistCm * 0.393701).toFixed(1)) : effectiveWaistCm) : '-';
                    const userHeightCm = Number(displayBioData.height || bioData?.height || userProfile?.height || 0);
                     const dispHeight = isImp && userHeightCm ? Number((userHeightCm * 0.393701).toFixed(1)) : userHeightCm || '-';
                    const userWeightKg = Number(displayBioData.weight || bioData?.weight || 0);
                    const userBodyFat = Number(displayBioData.bodyFat || 0);
-                   const userWaistCm = Number(displayBioData.waist || 0);
+                   const userWaistCm = effectiveWaistCm;
 
                     const userAge = (() => {
                         const dobStr = userProfile?.dob || userProfile?.birthDate || userProfile?.biometrics?.birthDate;
@@ -2430,36 +2526,36 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                                           { 
                                              id: 'bmi',
                                              label: 'BMI', 
-                                             val: displayBioData.bmi, 
+                                             val: displayBioData.bmi || '-', 
                                              unit: '', 
                                              t: biometricStandard === 'western' ? [18.5, 25.0, 30.0] : [18.5, 23.0, 25.0], 
                                              c: ['bg-sky-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500'], 
                                              labels: isID ? ['Kurang', 'Normal', 'Berlebih', 'Obesitas'] : ['Under', 'Standard', 'Overweight', 'Obese'], 
-                                             status: resolveBmiStatus(displayBioData.bmiStatus, isID), 
-                                             sColor: displayBioData.bmiStatus === 'Normal' ? 'text-emerald-500' : displayBioData.bmiStatus === 'Overweight' ? 'text-amber-500' : 'text-rose-500' 
+                                             status: Number(displayBioData.bmi) > 0 ? resolveBmiStatus(displayBioData.bmiStatus, isID) : (isID ? 'BELUM DIISI' : 'NOT SET'), 
+                                             sColor: Number(displayBioData.bmi) > 0 ? (displayBioData.bmiStatus === 'Normal' ? 'text-emerald-500' : displayBioData.bmiStatus === 'Overweight' ? 'text-amber-500' : 'text-rose-500') : 'text-slate-400' 
                                          },
                                           { 
                                              id: 'bmr',
                                              label: 'BMR', 
                                              subtitle: isID ? 'Laju Metabolisme Basal' : 'Basal Metabolic Rate',
                                              val: displayBioData.bmr || '-', 
-                                             unit: 'kcal', 
+                                             unit: displayBioData.bmr ? 'kcal' : '', 
                                              t: userProfile?.gender === 'female' ? [1100, 1400] : [1300, 1600], 
                                              c: ['bg-sky-500', 'bg-emerald-500', 'bg-amber-500'], 
                                              labels: isID ? ['Rendah', 'Standar', 'Tinggi'] : ['Low', 'Standard', 'High'], 
-                                             status: !displayBioData.bmr ? '-' : displayBioData.bmr < (userProfile?.gender === 'female' ? 1100 : 1300) ? (isID ? 'Rendah' : 'Low') : displayBioData.bmr <= (userProfile?.gender === 'female' ? 1400 : 1600) ? (isID ? 'Standar' : 'Standard') : (isID ? 'Tinggi' : 'High'), 
-                                             sColor: !displayBioData.bmr ? 'text-slate-500' : (displayBioData.bmr >= (userProfile?.gender === 'female' ? 1100 : 1300) && displayBioData.bmr <= (userProfile?.gender === 'female' ? 1400 : 1600)) ? 'text-emerald-500' : 'text-amber-500' 
+                                             status: !displayBioData.bmr ? (isID ? 'BELUM DIISI' : 'NOT SET') : displayBioData.bmr < (userProfile?.gender === 'female' ? 1100 : 1300) ? (isID ? 'Rendah' : 'Low') : displayBioData.bmr <= (userProfile?.gender === 'female' ? 1400 : 1600) ? (isID ? 'Standar' : 'Standard') : (isID ? 'Tinggi' : 'High'), 
+                                             sColor: !displayBioData.bmr ? 'text-slate-400' : (displayBioData.bmr >= (userProfile?.gender === 'female' ? 1100 : 1300) && displayBioData.bmr <= (userProfile?.gender === 'female' ? 1400 : 1600)) ? 'text-emerald-500' : 'text-amber-500' 
                                          },
                                           { 
                                              id: 'bodyFat',
                                              label: isID ? 'Kadar Lemak' : 'Body Fat Percentage', 
-                                             val: displayBioData.bodyFat, 
-                                             unit: '%', 
+                                             val: displayBioData.bodyFat || '-', 
+                                             unit: displayBioData.bodyFat ? '%' : '', 
                                              t: userProfile?.gender === 'female' ? [18, 28, 33] : [10, 20, 25], 
                                              c: ['bg-sky-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500'], 
                                              labels: isID ? ['Rendah', 'Normal', 'Tinggi', 'Sangat Tinggi'] : ['Low', 'Normal', 'High', 'Very High'], 
-                                             status: resolveBfStatus(displayBioData.bodyFat, userProfile?.gender === 'female', isID), 
-                                             sColor: resolveBfColor(displayBioData.bodyFat, userProfile?.gender === 'female') 
+                                             status: Number(displayBioData.bodyFat) > 0 ? resolveBfStatus(displayBioData.bodyFat, userProfile?.gender === 'female', isID) : (isID ? 'BELUM DIISI' : 'NOT SET'), 
+                                             sColor: Number(displayBioData.bodyFat) > 0 ? resolveBfColor(displayBioData.bodyFat, userProfile?.gender === 'female') : 'text-slate-400' 
                                          },
                                           { 
                                              id: 'ffmi',
@@ -2470,74 +2566,74 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                                              t: ffmiThresholds, 
                                              c: ['bg-sky-500', 'bg-emerald-500', 'bg-blue-500', 'bg-amber-500', 'bg-violet-500'], 
                                              labels: isID ? ['Kurus', 'Standar', 'Atletis', 'Lanjutan', 'Elit'] : ['Low', 'Average', 'Athletic', 'Advanced', 'Elite'], 
-                                             status: getFfmiStatus(ffmiVal), 
-                                             sColor: getFfmiColor(ffmiVal) 
+                                             status: ffmiVal > 0 ? getFfmiStatus(ffmiVal) : (isID ? 'BELUM DIISI' : 'NOT SET'), 
+                                             sColor: ffmiVal > 0 ? getFfmiColor(ffmiVal) : 'text-slate-400' 
                                          },
                                           { 
                                              id: 'muscleMass',
                                              label: isID ? 'Massa Otot' : 'Muscle Mass', 
-                                             val: dispMuscle, 
-                                             unit: isImp ? 'lbs' : 'kg', 
+                                             val: Number(dispMuscle) > 0 ? dispMuscle : '-', 
+                                             unit: Number(dispMuscle) > 0 ? (isImp ? 'lbs' : 'kg') : '', 
                                              t: isImp ? [66] : [30], 
                                              c: ['bg-sky-500', 'bg-emerald-500'], 
                                              labels: isID ? ['Kurang', 'Standar'] : ['Under', 'Standard'], 
-                                             status: (Number(dispMuscle) || 0) >= (isImp ? 66 : 30) ? (isID ? 'Standar' : 'Standard') : (isID ? 'Kurang' : 'Under'), 
-                                             sColor: (Number(dispMuscle) || 0) >= (isImp ? 66 : 30) ? 'text-emerald-500' : 'text-amber-500' 
+                                             status: Number(dispMuscle) > 0 ? ((Number(dispMuscle) || 0) >= (isImp ? 66 : 30) ? (isID ? 'Standar' : 'Standard') : (isID ? 'Kurang' : 'Under')) : (isID ? 'BELUM DIISI' : 'NOT SET'), 
+                                             sColor: Number(dispMuscle) > 0 ? ((Number(dispMuscle) || 0) >= (isImp ? 66 : 30) ? 'text-emerald-500' : 'text-amber-500') : 'text-slate-400' 
                                          },
                                           { 
                                              id: 'musclePercent',
                                              label: isID ? 'Kadar Otot' : 'Muscle Percentage', 
-                                             val: displayBioData.musclePercent, 
-                                             unit: '%', 
+                                             val: displayBioData.musclePercent || '-', 
+                                             unit: displayBioData.musclePercent ? '%' : '', 
                                              t: [30], 
                                              c: ['bg-sky-500', 'bg-emerald-500'], 
                                              labels: isID ? ['Kurang', 'Standar'] : ['Under', 'Standard'], 
-                                             status: displayBioData.musclePercent >= 30 ? (isID ? 'Standar' : 'Standard') : (isID ? 'Kurang' : 'Under'), 
-                                             sColor: displayBioData.musclePercent >= 30 ? 'text-emerald-500' : 'text-amber-500' 
+                                             status: Number(displayBioData.musclePercent) > 0 ? (displayBioData.musclePercent >= 30 ? (isID ? 'Standar' : 'Standard') : (isID ? 'Kurang' : 'Under')) : (isID ? 'BELUM DIISI' : 'NOT SET'), 
+                                             sColor: Number(displayBioData.musclePercent) > 0 ? (displayBioData.musclePercent >= 30 ? 'text-emerald-500' : 'text-amber-500') : 'text-slate-400' 
                                          },
                                           { 
                                              id: 'proteinPercent',
                                              label: isID ? 'Kadar Protein' : 'Protein Percentage', 
-                                             val: displayBioData.proteinPercent, 
-                                             unit: '%', 
+                                             val: displayBioData.proteinPercent || '-', 
+                                             unit: displayBioData.proteinPercent ? '%' : '', 
                                              t: [16], 
                                              c: ['bg-sky-500', 'bg-emerald-500'], 
                                              labels: isID ? ['Kurang', 'Standar'] : ['Under', 'Standard'], 
-                                             status: displayBioData.proteinPercent >= 16 ? (isID ? 'Standar' : 'Standard') : (isID ? 'Kurang' : 'Under'), 
-                                             sColor: displayBioData.proteinPercent >= 16 ? 'text-emerald-500' : 'text-amber-500' 
+                                             status: Number(displayBioData.proteinPercent) > 0 ? (displayBioData.proteinPercent >= 16 ? (isID ? 'Standar' : 'Standard') : (isID ? 'Kurang' : 'Under')) : (isID ? 'BELUM DIISI' : 'NOT SET'), 
+                                             sColor: Number(displayBioData.proteinPercent) > 0 ? (displayBioData.proteinPercent >= 16 ? 'text-emerald-500' : 'text-amber-500') : 'text-slate-400' 
                                          },
                                           { 
                                              id: 'waterPercent',
                                              label: isID ? 'Kadar Air' : 'Water Percentage', 
-                                             val: displayBioData.waterPercent, 
-                                             unit: '%', 
+                                             val: displayBioData.waterPercent || '-', 
+                                             unit: displayBioData.waterPercent ? '%' : '', 
                                              t: [45, 65], 
                                              c: ['bg-sky-500', 'bg-emerald-500', 'bg-amber-500'], 
                                              labels: isID ? ['Rendah', 'Standar', 'Tinggi'] : ['Low', 'Standard', 'High'], 
-                                             status: !displayBioData.waterPercent ? '-' : displayBioData.waterPercent < 45 ? (isID ? 'Rendah' : 'Low') : displayBioData.waterPercent <= 65 ? (isID ? 'Standar' : 'Standard') : (isID ? 'Tinggi' : 'High'), 
-                                             sColor: !displayBioData.waterPercent ? 'text-slate-500' : (displayBioData.waterPercent >= 45 && displayBioData.waterPercent <= 65) ? 'text-emerald-500' : 'text-amber-500' 
+                                             status: !displayBioData.waterPercent ? (isID ? 'BELUM DIISI' : 'NOT SET') : displayBioData.waterPercent < 45 ? (isID ? 'Rendah' : 'Low') : displayBioData.waterPercent <= 65 ? (isID ? 'Standar' : 'Standard') : (isID ? 'Tinggi' : 'High'), 
+                                             sColor: !displayBioData.waterPercent ? 'text-slate-400' : (displayBioData.waterPercent >= 45 && displayBioData.waterPercent <= 65) ? 'text-emerald-500' : 'text-amber-500' 
                                          },
                                           { 
                                              id: 'visceralFat',
                                              label: isID ? 'Lemak Visceral' : 'Visceral Fat Rating', 
-                                             val: displayBioData.visceralFat, 
+                                             val: displayBioData.visceralFat || '-', 
                                              unit: '', 
                                              t: [10, 15], 
                                              c: ['bg-emerald-500', 'bg-amber-500', 'bg-rose-500'], 
                                              labels: isID ? ['Standar', 'Tinggi', 'Sangat Tinggi'] : ['Standard', 'High', 'Very High'], 
-                                             status: !displayBioData.visceralFat ? '-' : displayBioData.visceralFat < 10 ? (isID ? 'Standar' : 'Standard') : displayBioData.visceralFat < 15 ? (isID ? 'Tinggi' : 'High') : (isID ? 'Sangat Tinggi' : 'Very High'), 
-                                             sColor: !displayBioData.visceralFat ? 'text-slate-500' : displayBioData.visceralFat < 10 ? 'text-emerald-500' : displayBioData.visceralFat < 15 ? 'text-amber-500' : 'text-rose-500' 
+                                             status: !displayBioData.visceralFat ? (isID ? 'BELUM DIISI' : 'NOT SET') : displayBioData.visceralFat < 10 ? (isID ? 'Standar' : 'Standard') : displayBioData.visceralFat < 15 ? (isID ? 'Tinggi' : 'High') : (isID ? 'Sangat Tinggi' : 'Very High'), 
+                                             sColor: !displayBioData.visceralFat ? 'text-slate-400' : displayBioData.visceralFat < 10 ? 'text-emerald-500' : displayBioData.visceralFat < 15 ? 'text-amber-500' : 'text-rose-500' 
                                          },
                                           { 
                                              id: 'waist',
                                              label: isID ? 'Lingkar Perut' : 'Waist Circumference', 
                                              val: dispWaist, 
-                                             unit: isImp ? 'in' : 'cm', 
+                                             unit: effectiveWaistCm > 0 ? (isImp ? 'in' : 'cm') : '', 
                                              t: isImp ? (userProfile?.gender === 'female' ? [31.5] : [35.4]) : (userProfile?.gender === 'female' ? [80] : [90]), 
                                              c: ['bg-emerald-500', 'bg-rose-500'], 
                                              labels: isID ? ['Standar', 'Berlebih'] : ['Standard', 'Over'], 
-                                             status: !displayBioData.waist ? '-' : displayBioData.waist < (userProfile?.gender === 'female' ? 80 : 90) ? (isID ? 'Standar' : 'Standard') : (isID ? 'Berlebih' : 'Over'), 
-                                             sColor: !displayBioData.waist ? 'text-slate-500' : displayBioData.waist < (userProfile?.gender === 'female' ? 80 : 90) ? 'text-emerald-500' : 'text-rose-500' 
+                                             status: effectiveWaistCm <= 0 ? (isID ? 'BELUM DIISI' : 'NOT SET') : effectiveWaistCm < (userProfile?.gender === 'female' ? (isImp ? 31.5 : 80) : (isImp ? 35.4 : 90)) ? (isID ? 'Standar' : 'Standard') : (isID ? 'Berlebih' : 'Over'), 
+                                             sColor: effectiveWaistCm <= 0 ? 'text-slate-400' : effectiveWaistCm < (userProfile?.gender === 'female' ? (isImp ? 31.5 : 80) : (isImp ? 35.4 : 90)) ? 'text-emerald-500' : 'text-rose-500' 
                                          },
                                           { 
                                              id: 'wthr',
@@ -2547,33 +2643,34 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                                              t: [0.40, 0.50, 0.60], 
                                              c: ['bg-sky-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500'], 
                                              labels: isID ? ['Ramping', 'Ideal', 'Waspada', 'Tinggi'] : ['Slim', 'Ideal', 'Warning', 'High'], 
-                                             status: getWthrStatus(wthrVal), 
-                                             sColor: getWthrColor(wthrVal) 
+                                             status: wthrVal > 0 ? getWthrStatus(wthrVal) : (isID ? 'BELUM DIISI' : 'NOT SET'), 
+                                             sColor: wthrVal > 0 ? getWthrColor(wthrVal) : 'text-slate-400' 
                                          },
                                           { 
                                              id: 'boneMass',
                                              label: isID ? 'Mineral Tulang' : 'Bone Mass', 
-                                             val: displayBioData.boneMass, 
-                                             unit: '%', 
+                                             val: displayBioData.boneMass || '-', 
+                                             unit: displayBioData.boneMass ? '%' : '', 
                                              t: [2.0, 3.2], 
                                              c: ['bg-sky-500', 'bg-emerald-500', 'bg-amber-500'], 
                                              labels: isID ? ['Kurang', 'Standar', 'Cukup'] : ['Under', 'Standard', 'Good'], 
-                                             status: !displayBioData.boneMass ? '-' : displayBioData.boneMass < 2.0 ? (isID ? 'Kurang' : 'Under') : displayBioData.boneMass <= 3.2 ? (isID ? 'Standar' : 'Standard') : (isID ? 'Cukup' : 'Good'), 
-                                             sColor: !displayBioData.boneMass ? 'text-slate-500' : displayBioData.boneMass >= 2.0 ? 'text-emerald-500' : 'text-amber-500' 
+                                             status: !displayBioData.boneMass ? (isID ? 'BELUM DIISI' : 'NOT SET') : displayBioData.boneMass < 2.0 ? (isID ? 'Kurang' : 'Under') : displayBioData.boneMass <= 3.2 ? (isID ? 'Standar' : 'Standard') : (isID ? 'Cukup' : 'Good'), 
+                                             sColor: !displayBioData.boneMass ? 'text-slate-400' : displayBioData.boneMass >= 2.0 ? 'text-emerald-500' : 'text-amber-500' 
                                          },
                                           { 
                                              id: 'bodyAge',
                                              label: isID ? (userAge ? `Usia Tubuh (Aktual: ${userAge} th)` : 'Usia Tubuh') : (userAge ? `Metabolic Age (Actual: ${userAge} yo)` : 'Metabolic Age'), 
-                                             val: displayBioData.bodyAge, 
-                                             unit: isID ? 'th' : 'yo', 
+                                             val: displayBioData.bodyAge || '-', 
+                                             unit: displayBioData.bodyAge ? (isID ? 'th' : 'yo') : '', 
                                              t: userAge ? [userAge - 3, userAge + 3] : [25, 45], 
                                              c: ['bg-emerald-500', 'bg-sky-500', 'bg-amber-500'], 
                                              labels: isID ? ['Muda', 'Sesuai', 'Tua'] : ['Young', 'Matching', 'Older'], 
-                                             status: !displayBioData.bodyAge ? '-' : userAge ? (displayBioData.bodyAge < userAge - 2 ? (isID ? 'Lebih Muda' : 'Younger') : displayBioData.bodyAge <= userAge + 2 ? (isID ? 'Sesuai' : 'Matching') : (isID ? 'Lebih Tua' : 'Older')) : (isID ? 'Standar' : 'Standard'), 
-                                             sColor: !displayBioData.bodyAge ? 'text-slate-500' : userAge ? (displayBioData.bodyAge <= userAge ? 'text-emerald-500' : 'text-amber-500') : 'text-emerald-500' 
+                                             status: !displayBioData.bodyAge ? (isID ? 'BELUM DIISI' : 'NOT SET') : userAge ? (displayBioData.bodyAge < userAge - 2 ? (isID ? 'Lebih Muda' : 'Younger') : displayBioData.bodyAge <= userAge + 2 ? (isID ? 'Sesuai' : 'Matching') : (isID ? 'Lebih Tua' : 'Older')) : (isID ? 'Standar' : 'Standard'), 
+                                             sColor: !displayBioData.bodyAge ? 'text-slate-400' : userAge ? (displayBioData.bodyAge <= userAge ? 'text-emerald-500' : 'text-amber-500') : 'text-emerald-500' 
                                          }
                                     ].map((item, idx) => {
                            const v = Number(item.val) || 0;
+                           const hasValue = item.val !== undefined && item.val !== null && item.val !== '' && item.val !== '-' && v > 0;
                            let pointerPos = 0;
                            if (item.t && item.t.length > 0) {
                                const numSegments = item.t.length + 1;
@@ -2601,18 +2698,20 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                                         </div>
                                         <div className="text-right shrink-0">
                                             <div className="flex items-baseline space-x-1 justify-end">
-                                                <span className="h1 font-light">{item.val || '-'}</span>
-                                                {item.unit && <span className={`caption font-bold ${t.textMuted}`}>{item.unit}</span>}
+                                                <span className="h1 font-light">{hasValue ? item.val : '-'}</span>
+                                                {hasValue && item.unit && <span className={`caption font-bold ${t.textMuted}`}>{item.unit}</span>}
                                             </div>           
                                         </div>
                                    </div>
                                    
                                    {item.c && item.c.length > 0 && (
                                        <div className="relative mt-2 mb-2 px-1">
-                                           {/* Pointer */}
-                                           <div className={`absolute -top-3.5 w-3 h-3 transition-all duration-500 ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`} style={{ left: `calc(${pointerPos}% - 6px)` }}>
-                                               <svg viewBox="0 0 10 10" fill="currentColor"><polygon points="0,0 10,0 5,6" /></svg>
-                                           </div>
+                                           {/* Pointer - disembunyikan jika metrik belum diisi */}
+                                           {hasValue && (
+                                               <div className={`absolute -top-3.5 w-3 h-3 transition-all duration-500 ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`} style={{ left: `calc(${pointerPos}% - 6px)` }}>
+                                                   <svg viewBox="0 0 10 10" fill="currentColor"><polygon points="0,0 10,0 5,6" /></svg>
+                                               </div>
+                                           )}
                                            {/* Bar */}
                                            <div className="flex h-2.5 rounded-full overflow-hidden mb-2.5 opacity-90">
                                                {item.c.map((color, i) => <div key={i} className={`flex-1 ${color}`}></div>)}

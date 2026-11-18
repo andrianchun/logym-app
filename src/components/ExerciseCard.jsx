@@ -19,6 +19,57 @@ export const getBaseWeightLabel = (eqConf) => {
   return `Bar ${eqConf.baseWeight} kg`;
 };
 
+const SetWeightCell = React.memo(({
+  s,
+  setIdx,
+  exId,
+  eqConfig,
+  isImp,
+  lang,
+  soundEnabled,
+  t,
+  onUpdateSet
+}) => {
+  const [liveW, setLiveW] = useState(null);
+
+  const displayW = liveW !== null 
+    ? liveW 
+    : (isImp ? Math.round(Number(s.w || 0) * 2.20462 * 10) / 10 : (s.w || 0));
+  const effectiveKg = isImp ? (Number(displayW || 0) / 2.20462) : Number(displayW || 0);
+  const actW = liveW !== null 
+    ? calculateActualWeight(effectiveKg, eqConfig) 
+    : getSetActualWeight(s, eqConfig);
+  const hasWeightDiff = eqConfig.baseWeight > 0 && actW > 0;
+  const customStep = eqConfig.increment || (isImp ? 5 : 2.5);
+
+  return (
+    <div className="flex flex-col items-center w-full">
+      <SwipeInput 
+        language={lang?.id || 'ID'} 
+        value={isImp ? Math.round(Number(s.w || 0) * 2.20462 * 10) / 10 : s.w} 
+        onLiveChange={setLiveW}
+        onLiveEnd={() => setLiveW(null)}
+        onChange={(val) => {
+          setLiveW(null);
+          onUpdateSet(exId, setIdx, 'w', isImp ? Number((val / 2.20462).toFixed(2)) : val);
+        }} 
+        disabled={s.done} 
+        step={customStep} 
+        min={0} 
+        soundEnabled={soundEnabled} 
+        className={`w-full bg-black/5 dark:bg-white/5 h-11 rounded-2xl text-center font-black ${t.textMain} no-spinners transition-colors text-lg focus:bg-black/10 dark:focus:bg-white/10`} 
+      />
+      {hasWeightDiff && (
+        <div className="h-3.5 mt-1 flex items-center justify-center">
+          <span className="text-xs text-sky-400 font-bold tracking-tight whitespace-nowrap">
+            Total: {isImp ? Number((actW * 2.20462).toFixed(1)) + ' lbs' : actW + ' kg'}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+});
+
 const ExerciseCard = ({
   ex, idx, isExtra = false,
   t, lang, soundEnabled, units,
@@ -872,7 +923,6 @@ const ExerciseCard = ({
              <div className="space-y-3">
               {sets.map((s, setIdx) => {
                 const actW = getSetActualWeight(s, eqConfig);
-                const inputW = Number(s.input_w !== undefined ? s.input_w : s.w) || 0;
                 const hasWeightDiff = exType === 'weight' && eqConfig.baseWeight > 0 && actW > 0;
 
                 return (
@@ -905,32 +955,17 @@ const ExerciseCard = ({
                     ) : (
                       <>
                         {exType === 'weight' && (
-                          <div className="flex flex-col items-center w-full">
-                            {(() => {
-                              const customStep = eqConfig.increment || (isImp ? 5 : 2.5);
-                              const customMin = 0;
-                              return (
-                                <>
-                                  <SwipeInput language={lang?.id || 'ID'} 
-                                    value={isImp ? Math.round(Number(s.w || 0) * 2.20462 * 10)/10 : s.w} 
-                                    onChange={(val)=>onUpdateSet(ex.id, setIdx, 'w', isImp ? Number((val / 2.20462).toFixed(2)) : val)} 
-                                    disabled={s.done} 
-                                    step={customStep} 
-                                    min={customMin} 
-                                    soundEnabled={soundEnabled} 
-                                    className={`w-full bg-black/5 dark:bg-white/5 h-11 rounded-2xl text-center font-black ${t.textMain} no-spinners transition-colors text-lg focus:bg-black/10 dark:focus:bg-white/10`} 
-                                  />
-                                  {hasWeightDiff && (
-                                    <div className="h-3.5 mt-1 flex items-center justify-center">
-                                      <span className="text-xs text-sky-400 font-bold tracking-tight whitespace-nowrap">
-                                        Total: {isImp ? Number((actW * 2.20462).toFixed(1)) + ' lbs' : actW + ' kg'}
-                                      </span>
-                                    </div>
-                                  )}
-                                </>
-                              );
-                            })()}
-                          </div>
+                          <SetWeightCell
+                            s={s}
+                            setIdx={setIdx}
+                            exId={ex.id}
+                            eqConfig={eqConfig}
+                            isImp={isImp}
+                            lang={lang}
+                            soundEnabled={soundEnabled}
+                            t={t}
+                            onUpdateSet={onUpdateSet}
+                          />
                         )}
                         
                         {/* KHUSUS TIMER DURASI */}
@@ -1167,12 +1202,13 @@ const ExerciseCard = ({
 };
 
 const areEqual = (prev, next) => {
-  if (prev.ex?.id !== next.ex?.id) return false;
+  if (prev.ex?.id !== next.ex?.id || prev.ex?.name !== next.ex?.name) return false;
   if (prev.idx !== next.idx) return false;
   if (prev.isSkip !== next.isSkip) return false;
   if (prev.isExtra !== next.isExtra) return false;
   if (prev.isWorkoutActive !== next.isWorkoutActive) return false;
   if (prev.activeGymId !== next.activeGymId) return false;
+  if (prev.gymProfiles !== next.gymProfiles) return false;
   if (prev.soundEnabled !== next.soundEnabled) return false;
   if (prev.canDeleteCompleted !== next.canDeleteCompleted) return false;
   if (prev.units?.weight !== next.units?.weight) return false;
@@ -1185,22 +1221,32 @@ const areEqual = (prev, next) => {
       prev.overloadHint?.isNewRecord !== next.overloadHint?.isNewRecord ||
       prev.overloadHint?.mode !== next.overloadHint?.mode ||
       prev.overloadHint?.rm10Number !== next.overloadHint?.rm10Number ||
-      prev.overloadHint?.rm10 !== next.overloadHint?.rm10
+      prev.overloadHint?.rm10 !== next.overloadHint?.rm10 ||
+      prev.overloadHint?.targetAchieved !== next.overloadHint?.targetAchieved ||
+      prev.overloadHint?.targetExceeded !== next.overloadHint?.targetExceeded
     ) {
       return false;
     }
   }
 
-  // Bandingkan sets
+  // Bandingkan sets (field aktual: w, r, d, total_w, kardio, note, status)
   const pSets = prev.sets || [];
   const nSets = next.sets || [];
   if (pSets.length !== nSets.length) return false;
   for (let i = 0; i < pSets.length; i++) {
     const p = pSets[i];
     const n = nSets[i];
+    if (p === n) continue;
     if (
-      p.weight !== n.weight ||
-      p.reps !== n.reps ||
+      p.w !== n.w ||
+      p.r !== n.r ||
+      p.d !== n.d ||
+      p.total_w !== n.total_w ||
+      p.duration !== n.duration ||
+      p.distance !== n.distance ||
+      p.speed !== n.speed ||
+      p.incline !== n.incline ||
+      p.note !== n.note ||
       p.done !== n.done ||
       p.skipped !== n.skipped ||
       p.rpe !== n.rpe ||

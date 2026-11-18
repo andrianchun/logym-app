@@ -7,6 +7,11 @@ import NotificationPanel from './NotificationPanel';
 const Header = ({ t, theme, user, showSettings, setShowSettings, setShowProfileModal, soundEnabled, playSoundEffect, activeTab, setActiveTab, setConfirmModal, isOffline, onNotifClick }) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [user?.photoURL]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -81,19 +86,31 @@ const Header = ({ t, theme, user, showSettings, setShowSettings, setShowProfileM
 
         {/* Tombol Profil & Sosial */}
         <button 
+          type="button"
           onClick={() => { if(playSoundEffect) playSoundEffect('click', soundEnabled); setShowProfileModal(true); }}
-          className="relative rounded-full transition-transform active:scale-95 shadow-sm"
+          className="relative rounded-full transition-transform active:scale-95 shadow-sm focus:outline-none"
+          title="Profil Pengguna"
         >
-          {user?.photoURL ? (
+          {user?.photoURL && !imgError ? (
               <img 
                 src={user.photoURL} 
-                alt="Profil" 
+                alt="" 
                 referrerPolicy="no-referrer"
+                crossOrigin="anonymous"
+                decoding="async"
+                loading="lazy"
+                onError={() => setImgError(true)}
                 className={`w-10 h-10 rounded-full object-cover border-2 ${t?.border || 'border-slate-200'}`} 
               />
           ) : (
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${t?.btnBg || 'bg-slate-100'} border-2 ${t?.border || 'border-slate-200'}`}>
-                  <User size={20} className={t?.textMain || 'text-slate-700'} />
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-xs ${t?.btnBg || 'bg-slate-100'} border-2 ${t?.border || 'border-slate-200'}`}>
+                  {user?.name ? (
+                    <span className="text-sky-400">
+                      {user.name.substring(0, 2).toUpperCase()}
+                    </span>
+                  ) : (
+                    <User size={20} className={t?.textMain || 'text-slate-700'} />
+                  )}
               </div>
           )}
         </button>

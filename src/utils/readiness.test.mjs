@@ -1,10 +1,18 @@
-// Cek mesin skor kesiapan latihan (Readiness).
+// Cek mesin skor kesiapan latihan (Readiness) — termasuk kurva intraday & kafein Lomeal.
 // Jalankan: node src/utils/readiness.test.mjs
 //
 // Kenapa ini dites: skornya menggerakkan saran yang dibaca user ("deload hari ini", "hajar PR"),
 // dan salahnya tidak kelihatan — angka 82 yang keliru tetap terlihat seperti angka yang benar.
 import assert from 'node:assert/strict';
-import { calculateReadiness, restingHrBaseline } from './readinessEngine.js';
+import {
+  calculateReadiness,
+  restingHrBaseline,
+  sleepHistoryBaseline,
+  extractCaffeineEvents,
+  caffeineBoostAtHour,
+  generateIntradayEnergyCurve,
+  calculateDynamicReadiness,
+} from './readinessEngine.js';
 
 const hari = (ymd, bio) => ({ [ymd]: { bioData: bio } });
 
@@ -71,6 +79,74 @@ const hari = (ymd, bio) => ({ [ymd]: { bioData: bio } });
 {
   const r = calculateReadiness({ sleep: 3, restingHeartRate: 70, sleepDeep: 1, sleepRem: 1, sleepLight: 150, sleepAwake: 30 }, 50);
   assert.ok(r.score >= 0 && r.score <= 100, `skor di luar batas: ${r.score}`);
+}
+
+// 9. Multi-day sleep buffer: 3 hari sebelumnya tidur 8 jam -> pagi hari tetap lebih tahan meski semalam 5.5 jam.
+{
+  const h = {
+    ...hari('2026-11-15', { sleep: 8 }),
+    ...hari('2026-11-16', { sleep: 8 }),
+    ...hari('2026-11-17', { sleep: 7.5 }),
+  };
+  const buf = sleepHistoryBaseline(h, '2026-11-18');
+  assert.ok(buf && buf.avgSleep >= 7.5, 'sleep buffer harus dihitung dari 3 hari sebelumnya');
+
+  const tanpaBuf = generateIntradayEnergyCurve({ bio: { sleep: 5.5 }, sleepBuffer: null });
+  const denganBuf = generateIntradayEnergyCurve({ bio: { sleep: 5.5 }, sleepBuffer: buf });
+  assert.ok(denganBuf.morningScore > tanpaBuf.morningScore, 'sleep buffer harus memberi resiliensi pagi');
+}
+
+// 10. Kurva sirkadian intraday: kurang tidur terasa segar di pagi hari, tapi sore hari (15:00-16:00) turun lebih curam.
+{
+  const pendek = generateIntradayEnergyCurve({ bio: { sleep: 5.5 }, wakeHour: 6 });
+  const pagi = pendek.points.find((p) => p.hour === 8);
+  const sore = pendek.points.find((p) => p.hour === 16);
+  assert.ok(pagi && sore, 'titik pagi dan sore harus ada');
+  assert.ok(pagi.score > sore.score + 15, `energi sore kurang tidur harus jauh lebih rendah dari pagi (${pagi.score} vs ${sore.score})`);
+}
+
+// 11. Ekstraksi kafein Lomeal: dukung caffeineLogs, objek caffeine, dan deteksi nama menu (kopi/matcha/preworkout).
+{
+  const ev1 = extractCaffeineEvents(null, {
+    meals: [
+      { name: 'Iced Americano', time: '08:30' },
+      { name: 'Pre-Workout C4', time: '15:00' },
+      { name: 'Nasi Dada Ayam', time: '12:00' },
+    ],
+  });
+  assert.equal(ev1.length, 2, 'hanya kopi & pre-workout yang terdeteksi sebagai kafein');
+  assert.equal(ev1[0].source, 'Kopi');
+  assert.equal(ev1[1].source, 'Pre-Workout');
+
+  const ev2 = extractCaffeineEvents(null, {
+    caffeine: { totalMg: 120, hour: 14.5, source: 'Matcha Latte' },
+  });
+  assert.equal(ev2.length, 1);
+  assert.equal(ev2[0].mg, 120);
+}
+
+// 12. Kurva farmakokinetik kafein: 0 sebelum minum, puncak ~45 menit setelah minum, melandai setelah 5 jam.
+{
+  const events = [{ hour: 14, mg: 150, source: 'Pre-Workout' }];
+  const sebelum = caffeineBoostAtHour(events, 13);
+  const puncak = caffeineBoostAtHour(events, 15);
+  const malam = caffeineBoostAtHour(events, 21);
+  assert.equal(sebelum.boost, 0, 'belum diminum = boost 0');
+  assert.ok(puncak.boost >= 10 && puncak.boost <= 18, `puncak boost tidak wajar: ${puncak.boost}`);
+  assert.ok(malam.boost < puncak.boost, 'boost kafein harus melandai seiring half-life');
+}
+
+// 13. Dynamic Readiness terintegrasi: minum Pre-Workout jam 15:00 mengangkat skor sore jam 16:00.
+{
+  const tanpaKopi = calculateDynamicReadiness({ sleep: 5.5 }, null, { hour: 16, isToday: true });
+  const denganKopi = calculateDynamicReadiness({ sleep: 5.5 }, null, {
+    hour: 16,
+    isToday: true,
+    lomealDay: { caffeineLogs: [{ mg: 180, hour: 15, source: 'Pre-Workout' }] },
+  });
+  assert.ok(denganKopi.score > tanpaKopi.score, `kafein harus menaikkan skor sore (${denganKopi.score} vs ${tanpaKopi.score})`);
+  assert.ok(denganKopi.caffeineBoost > 0);
+  assert.equal(denganKopi.caffeineSource, 'Pre-Workout');
 }
 
 console.log('readiness OK');

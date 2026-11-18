@@ -2,7 +2,7 @@ import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip } from 'recharts';
 import { getLocalYMD } from '../data/constants';
 import { formatNumber, formatSleepDuration } from '../utils/numberFormat';
-import { calculateReadiness, restingHrBaseline } from '../utils/readinessEngine';
+import { calculateReadiness, calculateDynamicReadiness, restingHrBaseline } from '../utils/readinessEngine';
 import { dailyBurnCalories, dailyActiveMinutes, calcDynamicTarget } from '../utils/workoutCalc';
 import { dayBmr } from '../utils/bmr';
 
@@ -55,6 +55,7 @@ const roundInt = (val) => val != null ? Math.round(Number(val)) : null;
 // pas tab itu aktif, seluruh area chart bar diganti sama renderExtra(key), baris toggle-nya
 // tetap satu biar gak makan tempat vertikal buat tab row kedua.
 const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPointClick, language, lomealToday, metricKeys, storageKey = 'lyfit_activity_chart', extraTabs, renderExtra, activityTargets, lomealTargets, userWeight, userProfile }) => {
+  const isID = language !== 'en';
   // `stackId` = batang bertumpuk (rincian satu angka), tanpa itu = batang berdampingan.
   // Kalori: "Masuk" berdiri sendiri di sebelah tumpukan "Dibakar" yang dirinci per sumber.
   // Tidur: satu tumpukan tahapan; `total` cuma dipakai hari yang sumbernya tidak merinci tahapan.
@@ -136,7 +137,7 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
       // Fallback ke dailyActiveMinutes lama untuk backward compat.
       const targetActive = activityTargets?.weeklyActiveMinutes ? Math.round(activityTargets.weeklyActiveMinutes / 7) : (activityTargets?.dailyActiveMinutes || null);
       const targetSleepH = activityTargets?.sleep || null;
-      const targetBurn = activityTargets?.activityCalories || null;
+      const targetBurn = activityTargets?.burnCalories || activityTargets?.activityCalories || activityTargets?.tdee || null;
 
       bioEntries.forEach(entry => {
           const d = new Date(entry.dateStr.includes('T') ? entry.dateStr : entry.dateStr + 'T12:00:00');
@@ -238,6 +239,17 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
               // hari baru terkumpul. Hari tanpa data tidur mengembalikan status 'unknown' dan
               // sengaja dibiarkan kosong, bukan digambar sebagai skor 80 yang menyesatkan.
               energyScore: (() => {
+                  if (metricKeys && !metricKeys.includes('energyScore')) return null;
+                  if (entry.dateStr === todayStr) {
+                      const r = calculateDynamicReadiness(histBio, restingHrBaseline(history, entry.dateStr), {
+                          history,
+                          ymd: entry.dateStr,
+                          workouts: history?.[entry.dateStr]?.workouts || [],
+                          lomealDay: lomealFresh || null,
+                          isToday: true,
+                      });
+                      return r.status === 'unknown' ? null : r.score;
+                  }
                   const r = calculateReadiness(histBio, restingHrBaseline(history, entry.dateStr));
                   return r.status === 'unknown' ? null : r.score;
               })(),
@@ -250,17 +262,14 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
               })(),
               targetSleep: histBio?.targetSleep || targetSleepH,
               targetCalories: (() => {
-                  if (entry.dateStr === todayStr && lomealTargets) {
-                      const curBurn = actCals || 0;
-                      return calcDynamicTarget(lomealTargets, curBurn, userProfile?.gender);
+                  const dayTargetBurn = histBio?.targetBurnCalories 
+                    || histBio?.targetCalories 
+                    || targetBurn;
+                  if (dayTargetBurn) return dayTargetBurn;
+                  if (histBio?.bmr) {
+                      return Math.round(Number(histBio.bmr) + (targetSteps || 10000) * 0.04 + 300);
                   }
-                  if (entry.dateStr === todayStr && (lomealFresh?.targetKcal || lomealTargets?.todayTarget)) {
-                      return lomealFresh?.targetKcal || lomealTargets?.todayTarget;
-                  }
-                  if (lomealTargets?.kcal) {
-                      return lomealTargets.kcal;
-                  }
-                  return histBio?.targetCalories || targetBurn || null;
+                  return 2000;
               })(),
               topBurnKey,
               topSleepKey,
@@ -1030,9 +1039,11 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
                                             targetFormatted = `${formatNumber(targetItem.value, language)}`;
                                         }
 
+                                        const targetLabel = k === 'targetCalories' ? (isID ? 'Target Bakar :' : 'Target Burn :') : 'Target :';
+
                                         return (
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '6px', paddingBottom: '4px', borderBottom: `1px solid ${theme === 'dark' ? '#27272a' : '#e4e4e7'}` }}>
-                                                <span style={{ color: TARGET_COLOR(theme) }}>Target :</span>
+                                                <span style={{ color: TARGET_COLOR(theme) }}>{targetLabel}</span>
                                                 <span style={{ color: theme === 'dark' ? '#f4f4f5' : '#18181b', fontWeight: 'bold' }}>{targetFormatted}</span>
                                             </div>
                                         );
@@ -1195,7 +1206,7 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
                         <Line
                             type="bumpX"
                             dataKey={activeObj.target}
-                            name="Target"
+                            name={activeMetric === 'calories' ? (isID ? 'Target Bakar' : 'Target Burn') : 'Target'}
                             stroke={TARGET_COLOR(theme)}
                             strokeWidth={2}
                             dot={false}

@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { playSoundEffect } from '../utils/audio';
 import { formatNumber, parseFormattedNumber } from '../utils/numberFormat';
 
-const SwipeInput = ({ value, onChange, disabled, step = 1, className, min = 0, max, wrap = false, soundEnabled, placeholder, language = 'ID', isTimeFormat = false, isSecondsFormat = false, formatValue }) => {
+const SwipeInput = ({ value, onChange, onLiveChange, onLiveEnd, disabled, step = 1, className, min = 0, max, wrap = false, soundEnabled, placeholder, language = 'ID', isTimeFormat = false, isSecondsFormat = false, formatValue }) => {
     const inputRef = useRef(null);
     const dragRef = useRef({ isDragging: false, startY: 0, startVal: 0, lastCalculatedValue: undefined });
+    const lastSoundTimeRef = useRef(0);
     const [isFocused, setIsFocused] = useState(false);
     
     // STATE LOKAL: Untuk render 60fps tanpa menunggu parent re-render
@@ -62,7 +63,12 @@ const SwipeInput = ({ value, onChange, disabled, step = 1, className, min = 0, m
         if (newValue !== Number(localValue)) {
             dragRef.current.lastCalculatedValue = newValue;
             setLocalValue(newValue); // Update UI lokal secara instan
-            playSoundEffect('swipe', soundEnabled);
+            const now = Date.now();
+            if (soundEnabled && now - lastSoundTimeRef.current > 75) {
+                lastSoundTimeRef.current = now;
+                playSoundEffect('swipe', soundEnabled);
+            }
+            if (onLiveChange) onLiveChange(newValue);
         }
     };
 
@@ -76,6 +82,7 @@ const SwipeInput = ({ value, onChange, disabled, step = 1, className, min = 0, m
                     onChange(dragRef.current.lastCalculatedValue);
                 }
             }
+            if (onLiveEnd) onLiveEnd();
         }
     };
 
@@ -115,7 +122,10 @@ const SwipeInput = ({ value, onChange, disabled, step = 1, className, min = 0, m
             setLocalValue(toStore);
             
             const numVal = parseFloat(parsed);
-            if (!isNaN(numVal)) onChange(numVal);
+            if (!isNaN(numVal)) {
+                if (onLiveChange) onLiveChange(numVal);
+                onChange(numVal);
+            }
         }
     };
 
@@ -182,6 +192,7 @@ const SwipeInput = ({ value, onChange, disabled, step = 1, className, min = 0, m
                 }}
                 onBlur={() => {
                     setIsFocused(false);
+                    if (onLiveEnd) onLiveEnd();
                     // On blur, sync back
                     if (localValue === '' || localValue === '.') {
                         setLocalValue('');
@@ -206,4 +217,4 @@ const SwipeInput = ({ value, onChange, disabled, step = 1, className, min = 0, m
     );
 };
 
-export default SwipeInput;
+export default React.memo(SwipeInput);

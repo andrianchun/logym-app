@@ -50,7 +50,7 @@ import { checkAchievements, ACHIEVEMENTS } from './data/achievements';
 import { playSoundEffect, initAudio, preloadTimerEnd } from './utils/audio';
 import { fetchExercisesFromApi } from './utils/exerciseDbApi';
 import { AI_MODELS, detectPlateaus, getLogyNotification } from './utils/aiAgent';
-import { calculateReadiness, restingHrBaseline } from './utils/readinessEngine';
+import { calculateDynamicReadiness, restingHrBaseline } from './utils/readinessEngine';
 import { calcBMR, ACTIVITY_MULTIPLIERS } from './utils/bmr';
 import { isCardioExercise, calculateSmartWorkoutCalories, parseWorkoutDurationMinutes, guessWorkoutType, workoutWindow, summarizeHeartRate, recoveredWorkoutSeconds, dailyBurnCalories, deduplicateWorkouts, recomputeStrengthRecords, buildExLookupByName, canonicalExId, sessionSpanSeconds, repairActualWeights, buildHcSessionDetail, estimate10RM, defaultSetWeight, gymStepFor, mergeRm10, getEquipmentConfig, calculateActualWeight, calculateInputWeight, getSetActualWeight, resolveExerciseProgressiveTarget, resolveDefaultExerciseDuration, calcDynamicTarget } from './utils/workoutCalc';
 import { hcAvailable, hcRequestPermissions, hcReadRange, hcBackfillHistory, hcReadHeartRateWindow, hcCheckStatus, hcInventory, hcWriteWorkoutSession, hcRequestWorkoutWritePermission, hcCheckWorkoutWritePermission, capIntradayLog, HC_FIELDS, fillOnlyPatch, hcDroppedTypes, hcPullExternalWorkouts, isAllowedExternalType, isWorkoutConflict, formatExternalWorkoutName } from './utils/healthConnect';
@@ -61,7 +61,7 @@ import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import UpdaterAlert from './components/UpdaterAlert';
 import PwaInstallPrompt from './components/PwaInstallPrompt';
 import { getLocalYMD, resolveProjectedProgramId, isLomealOwned, resolveLoggedExercise, splitSessionLogs, buildLogymSyncPayload, defaultMasterExercises, defaultPrograms, defaultWarmupVideos, defaultCooldownVideos, getDayWorkouts, countMissedScheduledDays, canonicalizeExercise, findMatchingMasterExercise } from './data/constants';
-import { serializeDay, dayFingerprint, migrateBaseline, reconcileHistory, workoutsToMap, workoutIdsFromBaseline, diffFields, cleanFirestoreData, stableStringify, mergeBackupIntoHistory, sessionsPendingSave, compactDayBioData } from './utils/historySync';
+import { serializeDay, dayFingerprint, migrateBaseline, reconcileHistory, workoutsToMap, workoutIdsFromBaseline, diffFields, cleanFirestoreData, stableStringify, mergeBackupIntoHistory, sessionsPendingSave, compactDayBioData, compactYearHistory } from './utils/historySync';
 import { useBleManager } from './hooks/useBleManager';
 import { bolehSync, gabungAntrean } from './utils/hcSchedule';
 import { Loader2, Download, X, RotateCcw } from 'lucide-react';
@@ -1133,6 +1133,10 @@ export default function App() {
   const handleOpenGlobalExerciseDetail = useCallback(async (ex) => {
     if (!ex) return;
     playSoundEffect('click', soundEnabled);
+    if (ex.type === 'warmup' || ex.type === 'cooldown') {
+      setGlobalDetailExercise(ex);
+      return;
+    }
     const canonical = canonicalizeExercise(ex);
     let fullEx = findMatchingMasterExercise(canonical, exerciseLibrary || defaultMasterExercises) || canonical;
 
@@ -1217,8 +1221,14 @@ export default function App() {
     if (!hasWorkoutToday) return null;
 
     const todayBioData = todayData.bioData || {};
-    return calculateReadiness(todayBioData, restingHrBaseline(history, todayStr));
-  }, [history, user]);
+    return calculateDynamicReadiness(todayBioData, restingHrBaseline(history, todayStr), {
+      history,
+      ymd: todayStr,
+      workouts: todayData.workouts || [],
+      lomealDay: lomealToday?.ymd === todayStr ? lomealToday : null,
+      isToday: true,
+    });
+  }, [history, user, lomealToday]);
 
   const scheduleLogyPush = async (type, id, vars) => {
     try {
@@ -2486,12 +2496,41 @@ export default function App() {
         if (dirtyYears.length === 0) return; 
 
         dirtyYears.forEach(year => {
-           const yearBytes = Object.keys(history)
+           let yearBytes = Object.keys(history)
               .filter(d => d.startsWith(year))
               .reduce((n, d) => n + serializeDay(history[d]).length, 0);
-           if (yearBytes > 800_000) {
+
+           // Self-healing Auto-Compaction: Jika ukuran data tahun ini mendekati batas (> 700 KB),
+           // ringkas log intraday menit lama secara otomatis agar dokumen Firestore tetap ramping (< 300 KB)
+           if (yearBytes > 700_000) {
+              console.log(`[Auto-Compact] history_years/${year} mencapai ${Math.round(yearBytes / 1024)} KB — memadatkan log lama otomatis...`);
+              const { nextHistory, changedDates, totalBytes } = compactYearHistory(history, year, { maxLogAgeDays: 14 });
+              if (changedDates.length > 0) {
+                 yearBytes = totalBytes;
+                 changedDates.forEach(d => {
+                    const { _activeSession, ...dayData } = nextHistory[d];
+                    dirtyByYear[year][d] = {
+                       ...dayData,
+                       ...(dayData.workouts !== undefined ? {
+                          workouts: workoutsToMap(
+                             dayData.workouts,
+                             workoutIdsFromBaseline(baseline[d]),
+                             deleteField()
+                          )
+                       } : {}),
+                       bioData: dayData.bioData,
+                       _activeSession: deleteField()
+                    };
+                    newBaseline[d] = dayFingerprint(nextHistory[d]);
+                 });
+                 setHistory(nextHistory);
+                 console.log(`[Auto-Compact] Sukses meringkas ${changedDates.length} tanggal di ${year}. Ukuran baru: ${Math.round(yearBytes / 1024)} KB.`);
+              }
+           }
+
+           if (yearBytes > 950_000) {
               console.warn(`[Ukuran] history_years/${year} ≈ ${Math.round(yearBytes / 1024)} KB — mendekati batas 1 MiB Firestore.`);
-              setCloudSaveError(`Data tahun ${year} sudah ${Math.round(yearBytes / 1024)} KB, mendekati batas 1 MB per dokumen. Di atas batas itu latihan berhenti tersimpan — laporkan ini supaya datanya bisa diringkas.`);
+              setCloudSaveError(`Kapasitas data tahun ${year} hampir penuh (${Math.round(yearBytes / 1024)} KB / 1 MB). Hubungi pengembang untuk pemisahan arsip.`);
            }
         });
 
@@ -2534,31 +2573,40 @@ export default function App() {
         return Promise.all(writes).then(() => {
            clearTimeout(pendingWarn);
 
-           try {
-              const todayStr = getLocalYMD(new Date());
-              const sesiSelesai = Object.values(history)
-                .reduce((n, d) => n + (d?.workouts || []).filter(w => w?.status === 'completed').length, 0);
-              const todayFingerprint = dayFingerprint(history[todayStr]);
-              const backupKey = `${todayStr}:${sesiSelesai}:${todayFingerprint}`;
-              const memoKey = `lyfit_last_backup_key_${user.uid}`;
-              if (localStorage.getItem(memoKey) !== backupKey && Object.keys(history).length > 0 && sesiSelesai > 0) {
-                const backupDocId = `${todayStr}_${Date.now()}`;
-                const backupRef = doc(db, 'logym_users', user.uid, 'history_backups', backupDocId);
-                setDoc(backupRef, {
-                  payload: JSON.stringify(history),
-                  timestamp: Date.now(),
-                  sessions: sesiSelesai,
-                  expireAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-                })
-                  .then(() => {
-                    localStorage.setItem(memoKey, backupKey);
-                    console.log(`[Auto-Backup] Tersimpan: ${backupDocId} (${sesiSelesai} sesi), kedaluwarsa 7 hari.`);
+           // Tunda serialisasi backup penuh ke idle frame agar tidak membekukan UI setelah klik Simpan
+           const snapshotHistory = history;
+           const runBackup = () => {
+             try {
+                const todayStr = getLocalYMD(new Date());
+                const sesiSelesai = Object.values(snapshotHistory)
+                  .reduce((n, d) => n + (d?.workouts || []).filter(w => w?.status === 'completed').length, 0);
+                const todayFingerprint = dayFingerprint(snapshotHistory[todayStr]);
+                const backupKey = `${todayStr}:${sesiSelesai}:${todayFingerprint}`;
+                const memoKey = `lyfit_last_backup_key_${user.uid}`;
+                if (localStorage.getItem(memoKey) !== backupKey && Object.keys(snapshotHistory).length > 0 && sesiSelesai > 0) {
+                  const backupDocId = `${todayStr}_${Date.now()}`;
+                  const backupRef = doc(db, 'logym_users', user.uid, 'history_backups', backupDocId);
+                  setDoc(backupRef, {
+                    payload: JSON.stringify(snapshotHistory),
+                    timestamp: Date.now(),
+                    sessions: sesiSelesai,
+                    expireAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
                   })
-                  .catch(err => console.error('[Auto-Backup] Gagal menyimpan backup:', err));
+                    .then(() => {
+                      localStorage.setItem(memoKey, backupKey);
+                      console.log(`[Auto-Backup] Tersimpan: ${backupDocId} (${sesiSelesai} sesi), kedaluwarsa 7 hari.`);
+                    })
+                    .catch(err => console.error('[Auto-Backup] Gagal menyimpan backup:', err));
+                }
+              } catch (e) {
+                console.error('[Auto-Backup] Error:', e);
               }
-            } catch (e) {
-              console.error('[Auto-Backup] Error:', e);
-            }
+           };
+           if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+             window.requestIdleCallback(runBackup, { timeout: 2500 });
+           } else {
+             setTimeout(runBackup, 200);
+           }
 
            const sent = deletedDates.filter(d => !failedYears.has(d.substring(0, 4)));
            if (sent.length === 0) return;
@@ -2754,25 +2802,42 @@ export default function App() {
     return () => window.removeEventListener('show-achievement', handleShowAchievement);
   }, [soundEnabled, user?.uid]);
 
+  const pendingActiveHistorySyncRef = useRef(null);
   useEffect(() => {
-    setHistory(prev => {
-      const dayData = prev[selectedDate];
-      if (dayData && dayData.workouts) {
+    const hasActiveData = (exerciseLogs && Object.keys(exerciseLogs).length > 0) ||
+      (skippedExercises && (Array.isArray(skippedExercises) ? skippedExercises.length > 0 : Object.keys(skippedExercises).length > 0)) ||
+      (extraExercises && extraExercises.length > 0);
+
+    const syncActiveToHistory = () => {
+      pendingActiveHistorySyncRef.current = null;
+      setHistory(prev => {
+        const dayData = prev[selectedDate] || (hasActiveData ? { workouts: [] } : null);
+        if (!dayData) return prev;
         const cur = dayData._activeSession;
-        const hasActiveData = (exerciseLogs && Object.keys(exerciseLogs).length > 0) ||
-          (skippedExercises && skippedExercises.length > 0) ||
-          (extraExercises && extraExercises.length > 0);
-        
         if (!hasActiveData && !cur) return prev;
         if (cur && cur.exerciseLogs === exerciseLogs && cur.skippedExercises === skippedExercises && cur.extraExercises === extraExercises) return prev;
         return {
           ...prev,
           [selectedDate]: { ...dayData, _activeSession: { exerciseLogs, skippedExercises, extraExercises } }
         };
-      }
-      return prev;
-    });
-  }, [exerciseLogs, skippedExercises, extraExercises, selectedDate]);
+      });
+    };
+
+    // Debounce 1200ms agar setiap swipe/centang tidak memicu mutasi `history` sinkron
+    // yang membangunkan ulang cache, fingerprint, achievement, dan memo lintas tab.
+    // Langsung di-flush saat pindah tab (contentTab !== 'workout') atau app di-minimize.
+    const delay = contentTab !== 'workout' ? 0 : 1200;
+    if (delay === 0) {
+      syncActiveToHistory();
+      return;
+    }
+    const timer = setTimeout(syncActiveToHistory, delay);
+    pendingActiveHistorySyncRef.current = { timer, flush: syncActiveToHistory };
+    return () => {
+      clearTimeout(timer);
+      pendingActiveHistorySyncRef.current = null;
+    };
+  }, [exerciseLogs, skippedExercises, extraExercises, selectedDate, contentTab]);
 
   const deviceId = useRef(null);
   if (!deviceId.current) {
@@ -2791,21 +2856,22 @@ export default function App() {
     if (!user?.uid || !isDataLoaded) return;
     if (Object.keys(exerciseLogs).length === 0 && Object.keys(skippedExercises).length === 0 && extraExercises.length === 0) return;
     const payload = { date: selectedDate, savedAt: Date.now(), exerciseLogs, skippedExercises, extraExercises };
-    try {
-      localStorage.setItem(`lyfit_active_session_${user.uid}`, JSON.stringify(payload));
-    } catch { /* storage penuh/diblokir — abaikan, sesi tetap jalan di memori */ }
 
-    // DEBOUNCE EKOR, bukan throttle kepala. Versi lama: `if (now - last < 30_000) return` —
-    // perubahannya tidak ditunda, tapi DIBUANG, dan tidak ada yang menjadwalkannya lagi. Artinya
-    // set terakhir yang dicentang sebelum app ditutup atau crash sangat mungkin tidak pernah
-    // sampai ke cloud sama sekali, betapapun lamanya sesi itu berjalan. Yang paling akhir justru
-    // yang paling rawan hilang.
-    //
-    // Sekarang setiap centang menjadwalkan tulisan 2 detik ke depan, dan setiap centang baru
-    // menggeser jadwalnya. Yang tertulis SELALU keadaan terakhir, dan tidak ada satu pun
-    // perubahan yang berakhir tanpa jadwal. Tidak sekali-tulis-per-centang: mencentang 40 set
-    // beruntun tetap satu tulisan, bukan 40.
+    const writeLocalActiveSession = () => {
+      try {
+        localStorage.setItem(`lyfit_active_session_${user.uid}`, JSON.stringify(payload));
+      } catch { /* storage penuh/diblokir — abaikan, sesi tetap jalan di memori */ }
+    };
+    // Debounce penulisan localStorage 500ms agar swipe cepat tidak memblokir main thread
+    const localTimer = setTimeout(writeLocalActiveSession, 500);
+
     const kirim = () => {
+      clearTimeout(localTimer);
+      writeLocalActiveSession();
+      if (pendingActiveHistorySyncRef.current) {
+        clearTimeout(pendingActiveHistorySyncRef.current.timer);
+        pendingActiveHistorySyncRef.current.flush();
+      }
       const ref = cloudSessionRef();
       const p = pendingCloudSessionRef.current?.payload;
       if (!ref || !p) return;
@@ -2826,7 +2892,10 @@ export default function App() {
     // Bentuk { timer, attemptSave } sengaja sama dengan pendingHistorySaveRef/pendingMainSaveRef
     // supaya efek flush di bawah bisa memperlakukan ketiganya identik saat app disembunyikan.
     pendingCloudSessionRef.current = { timer, attemptSave: kirim, payload };
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(localTimer);
+      clearTimeout(timer);
+    };
   }, [exerciseLogs, skippedExercises, extraExercises, selectedDate, user?.uid, isDataLoaded]);
 
   const clearCloudSession = () => {
@@ -3240,30 +3309,16 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [globalDetailExercise, showProfileModal, showSettings, showHelp, confirmModal.isOpen, activeAddModalTarget, activeTab]);
 
-  const [lastActionTime, setLastActionTime] = useState(0);
-
-  useEffect(() => {
-    if (lastActionTime === 0) return;
-    
-    setHistory(prev => {
-      const dayData = prev[selectedDate] || { workouts: [] };
-      let workouts = [...(dayData.workouts || [])];
-
-      return {
-        ...prev,
-        [selectedDate]: {
-          ...dayData,
-          workouts,
-          _activeSession: { exerciseLogs, skippedExercises, extraExercises }
-        }
-      };
-    });
-  }, [lastActionTime, exerciseLogs, skippedExercises, extraExercises]); 
+  // Menggunakan ref tanpa re-render (sinkronisasi _activeSession ke history sudah ditangani
+  // secara debounced di pendingActiveHistorySyncRef di atas — menghilangkan render ganda &
+  // mutasi history sinkron di setiap swipe/tap).
+  const lastActionTimeRef = useRef(0);
+  const setLastActionTime = useCallback((ts) => { lastActionTimeRef.current = ts; }, []);
 
   const MAX_UNDO_STEPS = 20; 
 
   const saveStateToHistory = () => {
-     setUndoStack(prev => [...prev.slice(-(MAX_UNDO_STEPS - 1)), { history: JSON.parse(JSON.stringify(history)), programs: JSON.parse(JSON.stringify(programs)) }]);
+     setUndoStack(prev => [...prev.slice(-(MAX_UNDO_STEPS - 1)), { history, programs }]);
      setRedoStack([]);
   };
 
@@ -3419,8 +3474,10 @@ export default function App() {
 
   const t = useMemo(() => ({
     bgApp: theme === 'dark' ? 'app-bg-dark' : 'app-bg-light',
-    bgCard: theme === 'dark' ? 'bg-white/[0.045] glass-card' : 'bg-white/60 glass-card',
-    bgCardSoft: theme === 'dark' ? 'bg-white/[0.02] glass-card' : 'bg-black/[0.02] glass-card',
+    // Permukaan kartu modern tanpa backdrop-filter per-kartu agar GPU Android WebView tidak
+    // melakukan 20-50x Gaussian blur setiap frame scroll (tetap memakai glass-nav pada header/navbar).
+    bgCard: theme === 'dark' ? 'bg-[#0e1526]/85' : 'bg-white/85',
+    bgCardSoft: theme === 'dark' ? 'bg-[#0e1526]/55' : 'bg-white/60',
     // Permukaan legap, TANPA backdrop-filter. Wajib dipakai untuk apa pun yang punya animasi
     // masuk: `opacity`/`transform` pada ancestor menjadikannya backdrop root di Chromium, jadi
     // elemen `glass-card` di dalamnya kehilangan sampel latarnya selama animasi berjalan lalu
@@ -4895,7 +4952,7 @@ export default function App() {
         <div className="fixed top-[calc(1rem+env(safe-area-inset-top,0px))] left-1/2 -translate-x-1/2 z-[9999] w-[92%] max-w-md p-3 px-4 rounded-2xl bg-rose-600 text-white shadow-2xl flex items-start gap-2.5 animate-in slide-in-from-top-4 fade-in duration-300">
           <div className="flex-1 min-w-0">
             <p className="text-xs font-black mb-0.5">
-              {hasParseError ? 'Perubahan TIDAK tersimpan' : 'Gagal menyimpan ke cloud'}
+              {hasParseError ? 'Perubahan TIDAK tersimpan' : (cloudSaveError?.includes('hampir penuh') || cloudSaveError?.includes('mendekati batas') ? 'Penyimpanan Mendekati Batas' : 'Gagal menyimpan ke cloud')}
             </p>
             <p className="text-xs leading-snug text-white/85 break-words">
               {hasParseError
@@ -5108,6 +5165,7 @@ export default function App() {
                    focusWorkoutId={focusWorkoutId} setFocusWorkoutId={setFocusWorkoutId}
                    activeExerciseId={activeExerciseId} setActiveExerciseId={setActiveExerciseId}
                    activePlanIds={activePlanIds}
+                   lomealToday={lomealToday}
                  />
              </div>
          )}

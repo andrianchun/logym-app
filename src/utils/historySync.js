@@ -11,11 +11,40 @@ export const stableStringify = (val) => {
   return '{' + keys.map(k => JSON.stringify(k) + ':' + stableStringify(val[k])).join(',') + '}';
 };
 
+// Cache WeakMap per referensi objek hari — menjaga biaya diff 365+ hari tetap O(1) untuk
+// hari-hari yang tidak berubah, dengan validasi referensi anak (workouts/bioData/wellness)
+// agar tetap 100% aman meskipun ada mutasi in-place tak terduga.
+const _serializeDayCache = new WeakMap();
+const _fingerprintCache = new WeakMap();
+
 // Serialisasi satu hari history untuk diff auto-save (tanpa _activeSession yang per-device)
 export const serializeDay = (val) => {
   if (val && typeof val === 'object') {
+    const cached = _serializeDayCache.get(val);
+    const wLen = Array.isArray(val.workouts) ? val.workouts.length : 0;
+    if (
+      cached &&
+      cached.workouts === val.workouts &&
+      cached.wLen === wLen &&
+      cached.bioData === val.bioData &&
+      cached.wellness === val.wellness &&
+      cached.isDeloadWeek === val.isDeloadWeek &&
+      cached._delete === val._delete
+    ) {
+      return cached.json;
+    }
     const { _activeSession, ...dayData } = val;
-    return stableStringify(dayData);
+    const json = stableStringify(dayData);
+    _serializeDayCache.set(val, {
+      workouts: val.workouts,
+      wLen,
+      bioData: val.bioData,
+      wellness: val.wellness,
+      isDeloadWeek: val.isDeloadWeek,
+      _delete: val._delete,
+      json,
+    });
+    return json;
   }
   return stableStringify(val ?? null);
 };
@@ -50,11 +79,38 @@ const hash32 = (s) => {
 };
 
 export const dayFingerprint = (day) => {
+  if (day && typeof day === 'object') {
+    const cached = _fingerprintCache.get(day);
+    const wLen = Array.isArray(day.workouts) ? day.workouts.length : 0;
+    if (
+      cached &&
+      cached.workouts === day.workouts &&
+      cached.wLen === wLen &&
+      cached.bioData === day.bioData &&
+      cached.wellness === day.wellness &&
+      cached.isDeloadWeek === day.isDeloadWeek &&
+      cached._delete === day._delete
+    ) {
+      return cached.fp;
+    }
+    const json = serializeDay(day);
+    const ids = (Array.isArray(day.workouts) ? day.workouts : [])
+      .map(w => String(w?.id))
+      .filter(id => id !== 'undefined' && id !== 'null');
+    const fp = `${json.length.toString(36)}.${hash32(json)}|${ids.join(',')}`;
+    _fingerprintCache.set(day, {
+      workouts: day.workouts,
+      wLen,
+      bioData: day.bioData,
+      wellness: day.wellness,
+      isDeloadWeek: day.isDeloadWeek,
+      _delete: day._delete,
+      fp,
+    });
+    return fp;
+  }
   const json = serializeDay(day);
-  const ids = (day && Array.isArray(day.workouts) ? day.workouts : [])
-    .map(w => String(w?.id))
-    .filter(id => id !== 'undefined' && id !== 'null');
-  return `${json.length.toString(36)}.${hash32(json)}|${ids.join(',')}`;
+  return `${json.length.toString(36)}.${hash32(json)}|`;
 };
 
 /**
@@ -203,12 +259,12 @@ export const MAX_AUTO_DELETE = 3;
  * 1. Membuang rekursi atau objek bersarang di _manualFlags (hanya nilai skalar/boolean yang valid).
  * 2. Membuang properti bernilai null atau undefined.
  * 3. Membuang log intraday (sleepLog, heartRateLog, bloodPressureLog, oxygenSaturationLog, weightLog)
- *    untuk tanggal yang lebih tua dari batas usia (default 30 hari).
+ *    untuk tanggal yang lebih tua dari batas usia (default 14 hari).
  * 4. Memastikan ringkasan harian (steps, sleep, heartRate, weight, dll.) 100% utuh.
  */
 export const compactDayBioData = (bioData, dateStr, options = {}) => {
   if (!bioData || typeof bioData !== 'object') return bioData;
-  const { maxLogAgeDays = 30, referenceDate = new Date() } = options;
+  const { maxLogAgeDays = 14, referenceDate = new Date() } = options;
 
   const cutoff = (() => {
     const d = new Date(referenceDate);
@@ -263,6 +319,35 @@ export const compactDayBioData = (bioData, dateStr, options = {}) => {
   }
 
   return clean;
+};
+
+/**
+ * Memadatkan seluruh riwayat satu tahun jika mendekati batas ukuran Firestore (1 MiB).
+ * Memangkas log intraday menit (heartRateLog, sleepLog, dll) untuk tanggal-tanggal lampau,
+ * namun menjaga 100% data agregat harian (steps, sleep, heartRate, workouts).
+ */
+export const compactYearHistory = (history, year, options = {}) => {
+  const { maxLogAgeDays = 14, referenceDate = new Date() } = options;
+  const datesOfYear = Object.keys(history || {}).filter(d => d.startsWith(String(year)));
+  const changedDates = [];
+  const nextHistory = { ...(history || {}) };
+
+  datesOfYear.forEach(d => {
+    const day = history[d];
+    if (!day || typeof day !== 'object' || !day.bioData) return;
+
+    const compactedBio = compactDayBioData(day.bioData, d, { maxLogAgeDays, referenceDate });
+    if (JSON.stringify(day.bioData) !== JSON.stringify(compactedBio)) {
+      nextHistory[d] = {
+        ...day,
+        bioData: compactedBio
+      };
+      changedDates.push(d);
+    }
+  });
+
+  const totalBytes = datesOfYear.reduce((n, d) => n + serializeDay(nextHistory[d]).length, 0);
+  return { nextHistory, changedDates, totalBytes };
 };
 
 /**

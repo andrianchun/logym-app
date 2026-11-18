@@ -644,10 +644,21 @@ console.log('workoutCalc OK', { cardioKcal, plankKcal, liftKcal });
   const setWithInput = { w: 5, input_w: 5 };
   assert.equal(getSetActualWeight(setWithInput, conf1to1), 10);
 
+  // 7. Dynamic recomputation saat user menaikkan/menurunkan kg di UI (hindari stale total_w)
+  const setEditedW = { w: 10, input_w: 5, base_w: 5, total_w: 10 };
+  assert.equal(getSetActualWeight(setEditedW, conf1to1), 15, 'Saat input kg diedit ke 10, total harus ikut naik ke 15 kg');
+  const setEditedBoth = { w: 10, input_w: 10, base_w: 5, total_w: 10 };
+  assert.equal(getSetActualWeight(setEditedBoth, conf1to1), 15, 'Stale total_w=10 tidak boleh mengabaikan perhitungan 10 + 5 = 15 kg');
+
+  // 8. Historical set dari gym berbeda tetap mempertahankan total_w tersimpan
+  const setHistorical = { w: 10, input_w: 10, base_w: 2.5, total_w: 12.5 };
+  assert.equal(getSetActualWeight(setHistorical, conf1to1), 12.5, 'Set riwayat gym lama tetap menjaga total_w tersimpan');
+
   console.log('equipmentConfig & cable actualWeight OK', {
     conf1to1_actual: calculateActualWeight(5, conf1to1),
     conf2to1_actual: calculateActualWeight(5, conf2to1),
     confLower_actual: calculateActualWeight(5, confLower),
+    editedW_actual: getSetActualWeight(setEditedW, conf1to1),
   });
 }
 

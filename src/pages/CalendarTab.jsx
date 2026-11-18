@@ -17,6 +17,128 @@ import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts';
 import { calculateAge, getHRZone } from '../utils/hrZones';
 import { cleanSourceAppName, formatExternalWorkoutName } from '../utils/healthConnect';
 
+// Panel bulan di-memoize agar klik 1 tanggal di mode bulanan HANYA merender ulang 1-2 bulan
+// yang terdampak (bukan seluruh 19 bulan / ~570 sel tanggal sekaligus).
+const CalendarMonthPanel = React.memo(({
+  panelDate,
+  isID,
+  weekStartDay,
+  dayHeaders,
+  t,
+  todayStr,
+  selectedDateInMonth,
+  showMonthlyStats,
+  history,
+  getDayWorkouts,
+  checkIsCompletedStrictRef,
+  sesiBerjalan,
+  userWeight,
+  activityTargets,
+  onSelectDayRef,
+}) => {
+  const panelYear = panelDate.getFullYear();
+  const panelMonth = panelDate.getMonth();
+  const panelMonthName = panelDate.toLocaleString(isID ? 'id-ID' : 'en-US', { month: 'long' });
+
+  const cells = useMemo(() => {
+    const out = [];
+    const daysInMonth = new Date(panelYear, panelMonth + 1, 0).getDate();
+    let firstDayOfMonth = new Date(panelYear, panelMonth, 1).getDay();
+    firstDayOfMonth = (firstDayOfMonth - weekStartDay + 7) % 7;
+    for (let i = 0; i < firstDayOfMonth; i++) out.push(null);
+    for (let i = 1; i <= daysInMonth; i++) out.push(new Date(panelYear, panelMonth, i));
+    return out;
+  }, [panelYear, panelMonth, weekStartDay]);
+
+  const targetDuration = activityTargets?.dailyActiveMinutes || (activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 7) : 45);
+  const targetCalories = activityTargets?.calories || 400;
+  const targetSteps = activityTargets?.steps || 10000;
+
+  return (
+    <div className="flex flex-col px-2">
+      <h2 className={`text-2xl font-black mb-2 px-1 shrink-0 ${t.textMain} tracking-tight`}>{panelMonthName} {panelYear}</h2>
+      <div className="grid grid-cols-7 gap-1 mb-2 px-1 shrink-0">
+        {dayHeaders.map((day, i) => (
+          <div key={i} className="text-center text-xs font-bold uppercase text-slate-500 tracking-widest opacity-80">{day}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-0 px-1" style={{ gridAutoRows: '46px' }}>
+        {cells.map((dateObj, idx) => {
+          if (!dateObj) return <div key={`blank-${idx}`} />;
+          const dateKey = getLocalYMD(dateObj);
+          const day = dateObj.getDate();
+          const workouts = getDayWorkouts(dateKey);
+          const isToday = dateKey === todayStr;
+          const isSelected = dateKey === selectedDateInMonth;
+
+          let cellStyle = `w-full h-full max-w-[44px] max-h-[44px] mx-auto relative flex flex-col items-center justify-center rounded-2xl transition-transform cursor-pointer border border-transparent hover:bg-black/5 dark:hover:bg-white/5 text-slate-500 dark:text-slate-300`;
+          if (isSelected) {
+            cellStyle = `w-full h-full max-w-[44px] max-h-[44px] mx-auto relative flex flex-col items-center justify-center rounded-2xl transition-transform cursor-pointer ${t.bgAccent} text-white shadow-lg ${t.shadowAccent} scale-[1.1] z-10`;
+          } else if (isToday) {
+            cellStyle = `w-full h-full max-w-[44px] max-h-[44px] mx-auto relative flex flex-col items-center justify-center rounded-2xl transition-transform cursor-pointer border-2 ${t.borderAccentSoft} ${t.textAccent} font-bold hover:bg-black/5 dark:hover:bg-white/5`;
+          }
+
+          let ringRender = null;
+          const dayData = history[dateKey] || {};
+          const totalSteps = parseInt(dayData.bioData?.steps) || 0;
+          const berjalan = dateKey === todayStr ? sesiBerjalan : null;
+          const hasActivity = workouts.length > 0 || totalSteps > 0 || !!berjalan;
+
+          if (showMonthlyStats && hasActivity) {
+            const checkStrict = checkIsCompletedStrictRef.current;
+            const completedWorkouts = workouts.filter(w => checkStrict(w, dateKey));
+            let totalDuration = berjalan?.menit || 0;
+            let totalCalories = berjalan?.kkal || 0;
+            completedWorkouts.forEach(w => {
+              const dur = parseWorkoutDurationMinutes(w.duration) || 0;
+              totalDuration += dur;
+              const logsToUse = (w.log && Object.keys(w.log).length > 0) ? w.log : (history[dateKey]?.exerciseLogs);
+              totalCalories += calculateSmartWorkoutCalories(userWeight, w, logsToUse) || 0;
+            });
+
+            ringRender = (
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+                <ActivityRings
+                  calories={totalCalories} calorieTarget={targetCalories}
+                  duration={totalDuration} durationTarget={targetDuration}
+                  steps={totalSteps} stepTarget={targetSteps}
+                  size={38} strokeWidth={3} gap={1}
+                />
+              </div>
+            );
+          }
+
+          return (
+            <div
+              key={dateKey}
+              onClick={() => onSelectDayRef.current(dateKey)}
+              className="flex items-center justify-center p-0.5 min-h-0"
+            >
+              <div className={cellStyle}>
+                {ringRender}
+                <span className={`body-md font-bold ${showMonthlyStats ? 'z-10' : 'mb-1'}`}>{day}</span>
+                {!showMonthlyStats && workouts.length > 0 && (
+                  <div className="absolute bottom-1 flex gap-0.5 items-center">
+                    {workouts.slice(0, workouts.length > 3 ? 2 : 3).map(w => {
+                      const isDone = checkIsCompletedStrictRef.current(w, dateKey);
+                      return (
+                        <div key={w.id} className={`w-1 h-1 rounded-full ${isSelected ? (isDone ? 'bg-white' : 'bg-white/30 border border-white/50') : (isDone ? t.bgAccent.replace('text-', 'bg-') : 'bg-transparent border border-slate-400')}`}></div>
+                      );
+                    })}
+                    {workouts.length > 3 && (
+                      <span className={`text-xs font-bold leading-none ${isSelected ? 'text-white/80' : 'text-slate-400'}`}>+{workouts.length - 2}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+});
+
 const CalendarTab = ({
   t, lang, theme, history, setHistory, programs,
   selectedDate, setSelectedDate,
@@ -1116,105 +1238,13 @@ const CalendarTab = ({
   const hasPlanned = selectedWorkouts.some(w => !checkIsCompletedStrict(w, calendarSelectedDate));
   const hasCompleted = selectedWorkouts.some(w => checkIsCompletedStrict(w, calendarSelectedDate));
 
-  // Satu panel bulan dengan tinggi natural (mengikuti isi, bukan dipaksa penuh 1 layar) —
-  // supaya di list scroll vertikal, beberapa bulan sekaligus kelihatan alih-alih 1 bulan = 1 layar.
-  const renderMonthPanel = (panelDate) => {
-    const cells = getGridCellsForDate(panelDate);
-    const panelMonthName = panelDate.toLocaleString(isID ? 'id-ID' : 'en-US', { month: 'long' });
-    const panelYear = panelDate.getFullYear();
-
-    return (
-      <div className="flex flex-col px-2">
-        <h2 className={`text-2xl font-black mb-2 px-1 shrink-0 ${t.textMain} tracking-tight`}>{panelMonthName} {panelYear}</h2>
-        <div className="grid grid-cols-7 gap-1 mb-2 px-1 shrink-0">
-          {dayHeaders.map((day, i) => (
-            <div key={i} className="text-center text-xs font-bold uppercase text-slate-500 tracking-widest opacity-80">{day}</div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 gap-0 px-1" style={{ gridAutoRows: '46px' }}>
-          {cells.map((dateObj, idx) => {
-            if (!dateObj) return <div key={`blank-${idx}`} />;
-            const dateKey = getLocalYMD(dateObj);
-            const day = dateObj.getDate();
-            const workouts = getDayWorkouts(dateKey);
-            const isToday = dateKey === todayStr;
-            const isSelected = dateKey === calendarSelectedDate;
-
-            let cellStyle = `w-full h-full max-w-[44px] max-h-[44px] mx-auto relative flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer border border-transparent hover:bg-black/5 dark:hover:bg-white/5 text-slate-500 dark:text-slate-300`;
-            if (isSelected) {
-              cellStyle = `w-full h-full max-w-[44px] max-h-[44px] mx-auto relative flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer ${t.bgAccent} text-white shadow-lg ${t.shadowAccent} scale-[1.1] z-10`;
-            } else if (isToday) {
-              cellStyle = `w-full h-full max-w-[44px] max-h-[44px] mx-auto relative flex flex-col items-center justify-center rounded-2xl transition-all cursor-pointer border-2 ${t.borderAccentSoft} ${t.textAccent} font-bold hover:bg-black/5 dark:hover:bg-white/5`;
-            }
-
-            let ringRender = null;
-            const dayData = history[dateKey] || {};
-            const totalSteps = parseInt(dayData.bioData?.steps) || 0;
-            const berjalan = dateKey === todayStr ? sesiBerjalan : null;
-            const hasActivity = workouts.length > 0 || totalSteps > 0 || !!berjalan;
-
-            if (showMonthlyStats && hasActivity) {
-               const completedWorkouts = workouts.filter(w => checkIsCompletedStrict(w, dateKey));
-               // Sesi berjalan jadi nilai awal, sesi tersimpan ditumpuk di atasnya — hari dengan
-               // satu sesi selesai plus satu sesi berjalan tetap benar.
-               let totalDuration = berjalan?.menit || 0;
-               let totalCalories = berjalan?.kkal || 0;
-               completedWorkouts.forEach(w => {
-                 const dur = parseWorkoutDurationMinutes(w.duration) || 0;
-                 totalDuration += dur;
-                 const logsToUse = (w.log && Object.keys(w.log).length > 0) ? w.log : (history[dateKey]?.exerciseLogs);
-                 totalCalories += calculateSmartWorkoutCalories(userProfile?.weight, w, logsToUse) || 0;
-               });
-               
-               const targetDuration = activityTargets?.dailyActiveMinutes || (activityTargets?.weeklyDuration ? Math.round(activityTargets.weeklyDuration / 7) : 45);
-               const targetCalories = activityTargets?.calories || 400;
-               const targetSteps = activityTargets?.steps || 10000;
-               
-               ringRender = (
-                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
-                   <ActivityRings 
-                     calories={totalCalories} calorieTarget={targetCalories}
-                     duration={totalDuration} durationTarget={targetDuration}
-                     steps={totalSteps} stepTarget={targetSteps}
-                     size={38} strokeWidth={3} gap={1} 
-                   />
-                 </div>
-               );
-            }
-
-            return (
-              <div
-                key={dateKey}
-                onClick={() => {
-                  changeSelectedDateWithAnim(dateKey);
-                  setShowProgramSelect(false);
-                  setShowActionMenu(null);
-                }}
-                className="flex items-center justify-center p-0.5 min-h-0"
-              >
-                <div className={cellStyle}>
-                  {ringRender}
-                  <span className={`body-md font-bold ${showMonthlyStats ? 'z-10' : 'mb-1'}`}>{day}</span>
-                  {calendarMode === 'monthly' && !showMonthlyStats && workouts.length > 0 && (
-                    <div className="absolute bottom-1 flex gap-0.5 items-center">
-                      {workouts.slice(0, workouts.length > 3 ? 2 : 3).map(w => {
-                        const isDone = checkIsCompletedStrict(w, dateKey);
-                        return (
-                          <div key={w.id} className={`w-1 h-1 rounded-full ${isSelected ? (isDone ? 'bg-white' : 'bg-white/30 border border-white/50') : (isDone ? t.bgAccent.replace('text-', 'bg-') : 'bg-transparent border border-slate-400')}`}></div>
-                        );
-                      })}
-                      {workouts.length > 3 && (
-                        <span className={`text-xs font-bold leading-none ${isSelected ? 'text-white/80' : 'text-slate-400'}`}>+{workouts.length - 2}</span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
+  const checkIsCompletedStrictRef = useRef(checkIsCompletedStrict);
+  checkIsCompletedStrictRef.current = checkIsCompletedStrict;
+  const onSelectDayRef = useRef(null);
+  onSelectDayRef.current = (dateKey) => {
+    changeSelectedDateWithAnim(dateKey);
+    setShowProgramSelect(false);
+    setShowActionMenu(null);
   };
 
   return (
@@ -1443,16 +1473,38 @@ const CalendarTab = ({
             className={`flex-1 min-h-0 overflow-y-auto hide-scrollbar pb-32 px-1 pt-2 animate-in fade-in duration-300 ease-out`}
             style={{ flex: '1 1 0%', minHeight: 0 }}
           >
-            {monthRange.map(monthDate => (
-              <div
-                key={`${monthDate.getFullYear()}-${monthDate.getMonth()}`}
-                data-month-key={`${monthDate.getFullYear()}-${monthDate.getMonth()}`}
-                className="mb-6"
-                style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 340px' }}
-              >
-                {renderMonthPanel(monthDate)}
-              </div>
-            ))}
+            {monthRange.map(monthDate => {
+              const mYear = monthDate.getFullYear();
+              const mMonth = monthDate.getMonth();
+              const monthPrefix = `${mYear}-${String(mMonth + 1).padStart(2, '0')}-`;
+              const selectedDateInMonth = calendarSelectedDate && calendarSelectedDate.startsWith(monthPrefix) ? calendarSelectedDate : null;
+              return (
+                <div
+                  key={`${mYear}-${mMonth}`}
+                  data-month-key={`${mYear}-${mMonth}`}
+                  className="mb-6"
+                  style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 340px' }}
+                >
+                  <CalendarMonthPanel
+                    panelDate={monthDate}
+                    isID={isID}
+                    weekStartDay={weekStartDay}
+                    dayHeaders={dayHeaders}
+                    t={t}
+                    todayStr={todayStr}
+                    selectedDateInMonth={selectedDateInMonth}
+                    showMonthlyStats={showMonthlyStats}
+                    history={history}
+                    getDayWorkouts={getDayWorkouts}
+                    checkIsCompletedStrictRef={checkIsCompletedStrictRef}
+                    sesiBerjalan={todayStr.startsWith(monthPrefix) ? sesiBerjalan : null}
+                    userWeight={userProfile?.weight}
+                    activityTargets={activityTargets}
+                    onSelectDayRef={onSelectDayRef}
+                  />
+                </div>
+              );
+            })}
           </div>
         )}
       </div>{/* end flex-1 min-h-0 scrollable/picker area */}
@@ -1955,9 +2007,9 @@ const CalendarTab = ({
                       
                                                      if (shouldShowNotDone) {
                                                         return (
-                                                          <div key={ex.id} className={`p-2 px-3 rounded-lg bg-black/5 dark:bg-white/5 opacity-50 flex justify-between items-center`}>
-                                                            <div className="body-md truncate mr-2 line-through opacity-70">{idx + 1}. {ex.name}</div>
-                                                            <div className="text-xs font-bold text-rose-500">{isSkipped ? 'Di-skip' : 'Tidak Dikerjakan'}</div>
+                                                          <div key={ex.id} className={`p-2 px-3 rounded-lg bg-black/5 dark:bg-white/5 opacity-50 flex justify-between items-center gap-2`}>
+                                                            <div className="body-md line-clamp-2 break-words flex-1 min-w-0 line-through opacity-70 leading-snug">{ex.name}</div>
+                                                            <div className="text-xs font-bold text-rose-500 shrink-0">{isSkipped ? 'Di-skip' : 'Tidak Dikerjakan'}</div>
                                                           </div>
                                                         );
                                                      }
@@ -2014,7 +2066,7 @@ const CalendarTab = ({
                       
                                                      return (
                                                        <div key={ex.id} className={`p-2 px-3 rounded-lg bg-black/5 dark:bg-white/5 flex justify-between items-center gap-2`}>
-                                                         <div className={`body-md font-semibold truncate flex-1 min-w-0 ${c.text}`}>{idx + 1}. {ex.name}</div>
+                                                         <div className={`body-md font-semibold line-clamp-2 break-words flex-1 min-w-0 leading-snug ${c.text}`}>{ex.name}</div>
                                                          <div className={`flex flex-col items-end shrink-0 ${c.text}`}>
                                                            <div className={`text-xs whitespace-nowrap flex items-center ${textStr === 'Belum dimulai' ? 'font-medium opacity-60' : 'font-bold tabular-nums opacity-90'}`}>
                                                              {textStr}
@@ -2043,8 +2095,8 @@ const CalendarTab = ({
                                                           e.stopPropagation(); 
                                                           if (isActiveSession) {
                                                             navigateToWorkoutDate(targetDateStr, sessionToRun);
-                                                          } else if (!isCompleted && !hasExercises) { 
-                                                            navigateToWorkoutDate(targetDateStr, w.programId); 
+                                                          } else if (!isCompleted) {
+                                                            navigateToWorkoutDate(targetDateStr, w.programId || w.id); 
                                                           } else { 
                                                             handleEditPastWorkout(targetDateStr, w); 
                                                           } 

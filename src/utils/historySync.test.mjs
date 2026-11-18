@@ -538,3 +538,42 @@ console.log('historySync OK');
 
   console.log('compactDayBioData OK');
 }
+
+// ---- compactYearHistory: pemadatan tahunan otomatis jika mendekati batas 1 MiB ----
+{
+  const { compactYearHistory } = await import('./historySync.js');
+  const refDate = new Date('2026-10-25T12:00:00Z');
+
+  const historyFixture = {
+    '2026-08-01': {
+      bioData: {
+        steps: 12000,
+        heartRate: 70,
+        heartRateLog: Array(96).fill({ time: '08:00', value: 70 }),
+        sleepLog: Array(50).fill({ time: '23:00', stage: 1 })
+      },
+      workouts: []
+    },
+    '2026-10-24': {
+      bioData: {
+        steps: 8000,
+        heartRate: 65,
+        heartRateLog: [{ time: '08:00', value: 65 }]
+      },
+      workouts: []
+    }
+  };
+
+  const { nextHistory, changedDates, totalBytes } = compactYearHistory(historyFixture, '2026', { referenceDate: refDate });
+
+  assert.equal(changedDates.length, 1, 'Hanya tanggal lampau yang masuk changedDates');
+  assert.equal(changedDates[0], '2026-08-01');
+  assert.equal(nextHistory['2026-08-01'].bioData.steps, 12000, 'Ringkasan steps harus utuh');
+  assert.equal(nextHistory['2026-08-01'].bioData.heartRate, 70, 'Ringkasan heartRate harus utuh');
+  assert.equal(nextHistory['2026-08-01'].bioData.heartRateLog, undefined, 'heartRateLog tanggal lampau harus dipangkas');
+  assert.equal(nextHistory['2026-08-01'].bioData.sleepLog, undefined, 'sleepLog tanggal lampau harus dipangkas');
+  assert.equal(nextHistory['2026-10-24'].bioData.heartRateLog.length, 1, 'heartRateLog tanggal baru harus tetap ada');
+  assert.ok(totalBytes > 0, 'totalBytes harus berupa angka positif');
+
+  console.log('compactYearHistory OK');
+}

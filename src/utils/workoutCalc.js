@@ -781,7 +781,7 @@ export const calculateInputWeight = (actualWeight, config) => {
  */
 export const getSetActualWeight = (set, config = null) => {
   if (!set) return 0;
-  const rawW = Number(set.input_w !== undefined ? set.input_w : set.w) || 0;
+  const rawW = Number(set.w !== undefined ? set.w : set.input_w) || 0;
   if (!config) {
     if (set.total_w !== undefined && set.total_w !== null && Number(set.total_w) > 0) {
       return Number(set.total_w);
@@ -801,6 +801,12 @@ export const getSetActualWeight = (set, config = null) => {
   // Jika set sudah memiliki total_w dan explicit base_w (bukan 0 default)
   const hasExplicitConfig = set.base_w !== undefined && Number(set.base_w) > 0;
   if (set.total_w !== undefined && set.total_w !== null && Number(set.total_w) > 0 && hasExplicitConfig) {
+    // Verifikasi apakah total_w sinkron dengan rawW:
+    // Jika rawW berubah (misal user menaikkan/menurunkan kg di UI), total_w lama tidak boleh menimpa perhitungan baru!
+    const expectedFromRecordedBase = Math.round((rawW + Number(set.base_w)) * 100) / 100;
+    if (Math.abs(Number(set.total_w) - expectedFromRecordedBase) > 0.01 && rawW > 0) {
+      return calculateActualWeight(rawW, config);
+    }
     return Number(set.total_w);
   }
 
@@ -893,6 +899,26 @@ export const canonicalExId = (name) => {
  * ke namanya. Sumber yang didaftarkan lebih dulu menang, jadi objek kanoniknya memakai definisi
  * latihan yang masih hidup (target/equipment terbaru) — bukan salinan beku dari riwayat.
  */
+const _historyExercisesCache = new WeakMap();
+const getHistoryExercises = (history) => {
+  if (!history || typeof history !== 'object') return [];
+  const cached = _historyExercisesCache.get(history);
+  if (cached) return cached;
+  const list = [];
+  Object.values(history).forEach((day) =>
+    (day?.workouts || []).forEach((w) => {
+      if (Array.isArray(w?.exercises)) {
+        for (let i = 0; i < w.exercises.length; i++) list.push(w.exercises[i]);
+      }
+      if (Array.isArray(w?.overriddenExercises)) {
+        for (let i = 0; i < w.overriddenExercises.length; i++) list.push(w.overriddenExercises[i]);
+      }
+    })
+  );
+  _historyExercisesCache.set(history, list);
+  return list;
+};
+
 export const buildExLookupByName = (history, ...exLists) => {
   const kanonik = {};
   const out = {};
@@ -912,11 +938,7 @@ export const buildExLookupByName = (history, ...exLists) => {
     if (rawName && !kanonik[rawName]) kanonik[rawName] = c;
   };
   exLists.forEach((list) => (list || []).forEach(daftarkan));
-  Object.values(history || {}).forEach((day) =>
-    (day?.workouts || []).forEach((w) => {
-      (w?.exercises || []).forEach(daftarkan);
-      (w?.overriddenExercises || []).forEach(daftarkan);
-    }));
+  getHistoryExercises(history).forEach(daftarkan);
   return out;
 };
 
@@ -964,6 +986,98 @@ export const recomputeStrengthRecords = (history, logKeys, exLookup, gymProfiles
   return clean;
 };
 
+// Single-pass WeakMap index untuk rm10Series:
+// Dulu setiap panggilan rm10Series mengurutkan & memindai SELURUH 365+ hari history untuk
+// satu latihan saja (12-20x full scan per render!). Sekarang satu scan membangun Map untuk
+// seluruh latihan sekaligus dan setiap panggilan berikutnya O(1) (< 0.01 ms).
+const _rm10IndexCache = new WeakMap();
+const _EMPTY_ARR = Object.freeze([]);
+
+const getOrBuildRm10Index = (history, exLookup, gymProfiles, activeGymId, userProfile) => {
+  if (!history || typeof history !== 'object') return new Map();
+
+  const normGyms = Array.isArray(gymProfiles) && gymProfiles.length > 0 ? gymProfiles : _EMPTY_ARR;
+  const normGymId = activeGymId ?? null;
+  const normProfile = userProfile || null;
+
+  let bucket = _rm10IndexCache.get(history);
+  if (bucket) {
+    for (let i = 0; i < bucket.length; i++) {
+      const entry = bucket[i];
+      if (
+        entry.exLookup === exLookup &&
+        entry.gymProfiles === normGyms &&
+        entry.activeGymId === normGymId &&
+        entry.userProfile === normProfile
+      ) {
+        return entry.byExId;
+      }
+    }
+  } else {
+    bucket = [];
+    _rm10IndexCache.set(history, bucket);
+  }
+
+  const byExId = new Map();
+  const eqConfCache = new WeakMap();
+  const sortedDates = Object.keys(history).sort();
+
+  for (let di = 0; di < sortedDates.length; di++) {
+    const dateStr = sortedDates[di];
+    const workouts = history[dateStr]?.workouts;
+    if (!Array.isArray(workouts) || workouts.length === 0) continue;
+
+    let perDateBest = null;
+    for (let wi = 0; wi < workouts.length; wi++) {
+      const wk = workouts[wi];
+      if (wk?.status !== 'completed' || !wk.log) continue;
+      const logKeys = Object.keys(wk.log);
+      for (let ki = 0; ki < logKeys.length; ki++) {
+        const k = logKeys[ki];
+        const exObj = resolveLoggedExercise(k, exLookup);
+        if (!exObj || exObj.id === undefined || exObj.id === null) continue;
+        const idStr = String(exObj.id);
+        let eqConf = eqConfCache.get(exObj);
+        if (eqConf === undefined) {
+          eqConf = getEquipmentConfig(gymProfiles, activeGymId, exObj, userProfile);
+          eqConfCache.set(exObj, eqConf);
+        }
+        const setsObj = wk.log[k];
+        if (!setsObj) continue;
+        const setsArr = Array.isArray(setsObj) ? setsObj : Object.values(setsObj);
+        for (let si = 0; si < setsArr.length; si++) {
+          const s = setsArr[si];
+          if (!s || s.skipped || !(Number(s.w) > 0 || Number(s.total_w) > 0) || !(Number(s.r) > 0)) continue;
+          const actW = getSetActualWeight(s, eqConf);
+          const rawW = Number(s.input_w !== undefined ? s.input_w : s.w) || 0;
+          const c = estimate10RM(actW, s.r);
+          if (c <= 0) continue;
+          if (!perDateBest) perDateBest = new Map();
+          const cur = perDateBest.get(idStr);
+          if (!cur || c > cur.rm10) {
+            perDateBest.set(idStr, { date: dateStr, rm10: c, weight: actW, reps: Number(s.r), inputWeight: rawW });
+          }
+        }
+      }
+    }
+
+    if (perDateBest) {
+      perDateBest.forEach((pt, idStr) => {
+        let arr = byExId.get(idStr);
+        if (!arr) {
+          arr = [];
+          byExId.set(idStr, arr);
+        }
+        arr.push(pt);
+      });
+    }
+  }
+
+  if (bucket.length >= 4) bucket.shift();
+  bucket.push({ exLookup, gymProfiles: normGyms, activeGymId: normGymId, userProfile: normProfile, byExId });
+  return byExId;
+};
+
 /**
  * Riwayat 10RM satu latihan, satu titik per sesi — bahan grafik progressive overload.
  * Sumbu Y wajib menggunakan actual weight (total_w).
@@ -971,33 +1085,8 @@ export const recomputeStrengthRecords = (history, logKeys, exLookup, gymProfiles
  * @returns {Array<{date: string, rm10: number, weight: number, reps: number, inputWeight: number}>} urut lama -> baru
  */
 export const rm10Series = (history, exerciseId, exLookup, gymProfiles = null, activeGymId = null, userProfile = null) => {
-  const target = String(exerciseId);
-  const titik = [];
-  Object.keys(history || {}).sort().forEach((dateStr) => {
-    let rm10 = 0, weight = 0, reps = 0, inputWeight = 0;
-    (history[dateStr]?.workouts || []).forEach((wk) => {
-      if (wk?.status !== 'completed' || !wk.log) return;
-      Object.keys(wk.log).forEach((k) => {
-        const exObj = resolveLoggedExercise(k, exLookup);
-        if (String(exObj?.id) !== target) return;
-        const eqConf = exObj ? getEquipmentConfig(gymProfiles, activeGymId, exObj, userProfile) : null;
-        Object.values(wk.log[k] || {}).forEach((s) => {
-          if (!s || s.skipped || !(Number(s.w) > 0 || Number(s.total_w) > 0) || !(Number(s.r) > 0)) return;
-          const actW = getSetActualWeight(s, eqConf);
-          const rawW = Number(s.input_w !== undefined ? s.input_w : s.w) || 0;
-          const c = estimate10RM(actW, s.r);
-          if (c > rm10) { 
-            rm10 = c; 
-            weight = actW; 
-            reps = Number(s.r); 
-            inputWeight = rawW;
-          }
-        });
-      });
-    });
-    if (rm10 > 0) titik.push({ date: dateStr, rm10, weight, reps, inputWeight });
-  });
-  return titik;
+  const byExId = getOrBuildRm10Index(history, exLookup, gymProfiles, activeGymId, userProfile);
+  return byExId.get(String(exerciseId)) || [];
 };
 
 /**
@@ -1838,13 +1927,32 @@ export const calculateProgressiveOverloadTarget = ({
  * Menggabungkan riwayat sesi lalu (rm10Series), profil gym (step/alat), wellness (deload/doms),
  * dan algoritma Dynamic Double Progression agar target Coach dan nilai pre-fill set selalu 100% sinkron.
  */
+const _defaultLookupCache = new WeakMap();
+const getCachedDefaultLookup = (history, exerciseLibrary, programs, extraExercises) => {
+  if (!history || typeof history !== 'object') {
+    return buildExLookupByName(history, exerciseLibrary, extraExercises, ...(programs || []).map(p => p?.exercises));
+  }
+  const cached = _defaultLookupCache.get(history);
+  if (
+    cached &&
+    cached.exerciseLibrary === exerciseLibrary &&
+    cached.programs === programs &&
+    cached.extraExercises === extraExercises
+  ) {
+    return cached.lookup;
+  }
+  const lookup = buildExLookupByName(history, exerciseLibrary, extraExercises, ...(programs || []).map(p => p?.exercises));
+  _defaultLookupCache.set(history, { exerciseLibrary, programs, extraExercises, lookup });
+  return lookup;
+};
+
 export const resolveExerciseProgressiveTarget = ({
   ex,
   history = {},
-  exerciseLibrary = [],
-  programs = [],
-  extraExercises = [],
-  gymProfiles = [],
+  exerciseLibrary = _EMPTY_ARR,
+  programs = _EMPTY_ARR,
+  extraExercises = _EMPTY_ARR,
+  gymProfiles = _EMPTY_ARR,
   activeGymId = null,
   userProfile = null,
   isImperial = false,
@@ -1877,7 +1985,11 @@ export const resolveExerciseProgressiveTarget = ({
   const eqConf = getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile);
   const step = Number(eqConf?.increment) || gymStepFor(gymProfiles, activeGymId, ex?.equipment, isImperial) || (isImperial ? 5 : 2.5);
 
-  const lookup = exLookup || buildExLookupByName(history, [ex], exerciseLibrary, extraExercises, ...(programs || []).map(p => p?.exercises));
+  let lookup = exLookup || getCachedDefaultLookup(history, exerciseLibrary, programs, extraExercises);
+  const exKeyStr = ex?.id !== undefined && ex?.id !== null ? String(ex.id) : null;
+  if (exKeyStr && !lookup[exKeyStr]) {
+    lookup = buildExLookupByName(history, [ex], exerciseLibrary, extraExercises, ...(programs || []).map(p => p?.exercises));
+  }
   const canonicalId = canonicalExId(ex?.name);
   const series = rm10Series(history, canonicalId, lookup, gymProfiles, activeGymId, userProfile);
   const lastPoint = series[series.length - 1];

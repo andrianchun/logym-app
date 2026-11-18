@@ -137,7 +137,7 @@ const LiveRestStats = ({ restTargetTime, setRestTargetTime, isAllDone, theme, t,
   );
 };
 
-const ImmersiveRestBar = ({ restTargetTime, setRestTargetTime, formatTime, theme, t }) => {
+const ImmersiveRestBar = ({ restTargetTime, setRestTargetTime, formatTime, theme, t, soundEnabled }) => {
   const [localRestTimer, setLocalRestTimer] = useState(() => {
     return restTargetTime !== null ? Math.ceil((restTargetTime - Date.now()) / 1000) : 0;
   });
@@ -181,47 +181,140 @@ const ImmersiveRestBar = ({ restTargetTime, setRestTargetTime, formatTime, theme
   if (restTargetTime === null) return null;
 
   return (
-    <div className={`w-full relative flex items-center justify-between rounded-2xl shadow-lg transition-all overflow-hidden border py-2.5 px-3.5 animate-in fade-in slide-in-from-top-2 duration-200 ${t.bgAccentSoft} ${t.borderAccent}`}>
+    <div className={`w-full relative flex items-stretch justify-between rounded-2xl shadow-xl transition-colors overflow-hidden border ${
+      localRestTimer <= 0 ? 'bg-amber-500 border-amber-500 text-white' :
+      `${t.bgAccentSoft} ${t.borderAccent}`
+    }`}>
       {localRestTimer > 0 && maxRestTimer > 0 && (
         <div 
           className={`absolute top-0 left-0 h-full transition-all duration-1000 ease-linear pointer-events-none ${theme === 'dark' ? 'bg-white/15' : 'bg-black/10'}`}
           style={{ width: `${Math.min(100, Math.max(0, ((maxRestTimer - localRestTimer) / maxRestTimer) * 100))}%` }}
         />
       )}
-      <div className="relative z-10 flex items-center gap-2">
-        <Clock size={16} className={t.textAccent} />
-        <span className={`text-xs font-black uppercase tracking-wider ${t.textMuted}`}>Istirahat</span>
-        <span className={`text-base font-black ${t.textMain}`}>{formatTime(Math.max(0, localRestTimer))}</span>
-      </div>
-      <div className="relative z-10 flex items-center gap-1.5">
-        <button 
-          type="button" 
-          onClick={(e) => { e.stopPropagation(); setRestTargetTime(prev => (prev || Date.now()) - 5000); }} 
-          className={`px-2 py-1 rounded-xl text-xs font-bold ${theme === 'dark' ? 'bg-white/10 hover:bg-white/20 active:bg-white/30' : 'bg-black/10 hover:bg-black/20 active:bg-black/30'} ${t.textMain} transition`}
-          title="Kurangi 5 detik"
-        >
-          -5s
-        </button>
-        <button 
-          type="button" 
-          onClick={(e) => { e.stopPropagation(); setRestTargetTime(prev => (prev || Date.now()) + 5000); }} 
-          className={`px-2 py-1 rounded-xl text-xs font-bold ${theme === 'dark' ? 'bg-white/10 hover:bg-white/20 active:bg-white/30' : 'bg-black/10 hover:bg-black/20 active:bg-black/30'} ${t.textMain} transition`}
-          title="Tambah 5 detik"
-        >
-          +5s
-        </button>
-        <button 
-          type="button" 
-          onClick={(e) => { e.stopPropagation(); setRestTargetTime(null); }} 
-          className={`ml-1 px-3 py-1 rounded-xl text-xs font-black bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 active:scale-95 transition flex items-center gap-1`}
-          title="Lewati istirahat dan lanjut sekarang"
-        >
-          <FastForward size={12} /> Lewati
-        </button>
-      </div>
+      <button 
+        type="button" 
+        onClick={(e) => { 
+          e.stopPropagation(); 
+          playSoundEffect('click', soundEnabled);
+          setRestTargetTime(prev => (prev || Date.now()) - 5000); 
+        }} 
+        className={`relative z-10 w-16 sm:w-20 flex items-center justify-center bg-transparent ${theme === 'dark' ? 'hover:bg-white/10 active:bg-white/20 border-white/15' : 'hover:bg-black/10 active:bg-black/20 border-black/10'} ${localRestTimer <= 0 ? 'text-white' : t.textMain} font-black transition-colors border-r h2 select-none`}
+        title="Kurangi 5 detik"
+      >
+        -5s
+      </button>
+      <button 
+        type="button" 
+        onClick={() => {
+          playSoundEffect('click', soundEnabled);
+          setRestTargetTime(null);
+        }} 
+        className={`relative z-10 flex-1 py-4 flex items-center justify-center font-black h2 ${localRestTimer <= 0 ? 'text-white' : t.textMain} ${theme === 'dark' ? 'active:bg-white/10' : 'active:bg-black/10'} transition-colors gap-2 select-none`}
+        title="Lewati istirahat dan lanjut ke set berikutnya"
+      >
+        <Clock size={20} className={localRestTimer <= 0 ? 'text-white' : t.textAccent} />
+        <span>ISTIRAHAT {formatTime(Math.max(0, localRestTimer))}</span>
+      </button>
+      <button 
+        type="button" 
+        onClick={(e) => { 
+          e.stopPropagation(); 
+          playSoundEffect('click', soundEnabled);
+          setRestTargetTime(prev => (prev || Date.now()) + 5000); 
+        }} 
+        className={`relative z-10 w-16 sm:w-20 flex items-center justify-center bg-transparent ${theme === 'dark' ? 'hover:bg-white/10 active:bg-white/20 border-white/15' : 'hover:bg-black/10 active:bg-black/20 border-black/10'} ${localRestTimer <= 0 ? 'text-white' : t.textMain} font-black transition-colors border-l h2 select-none`}
+        title="Tambah 5 detik"
+      >
+        +5s
+      </button>
     </div>
   );
 };
+
+const ImmersiveWeightPickerCell = React.memo(({
+  itemSet,
+  activeSetIdx,
+  ex,
+  eqConf,
+  isImp,
+  theme,
+  t,
+  showWeightInfo,
+  setShowWeightInfo,
+  onSetChange
+}) => {
+  const [liveW, setLiveW] = useState(null);
+
+  const rawDisplayW = liveW !== null ? liveW : (isImp ? Math.round(Number(itemSet?.w || 0) * 2.20462 * 10) / 10 : (itemSet?.w || 0));
+  const effectiveKg = isImp ? (Number(rawDisplayW || 0) / 2.20462) : Number(rawDisplayW || 0);
+  const actW = liveW !== null 
+    ? calculateActualWeight(effectiveKg, eqConf) 
+    : getSetActualWeight(itemSet, eqConf);
+  const hasWeightDiff = eqConf.baseWeight > 0 && actW > 0;
+
+  return (
+    <div className="flex-1 flex flex-col items-center relative">
+      <div className="h-7 mb-2 flex items-center justify-center gap-1.5 relative z-30">
+        <span className="body-md uppercase font-bold">{isImp ? 'LBS' : 'KG'}</span>
+        <div className="relative">
+          <button 
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setShowWeightInfo(prev => !prev); }}
+            className={`p-0.5 rounded-full transition-all ${showWeightInfo ? 'text-sky-400 scale-110' : 'text-slate-400 hover:text-sky-400'}`}
+            title="Info Beban Total"
+          >
+            <Info size={14} strokeWidth={2.2} />
+          </button>
+
+          {showWeightInfo && (
+            <>
+              <div 
+                className="fixed inset-0 z-30 bg-transparent overscroll-contain touch-none" data-close-modal="true"
+                onClick={(e) => { e.stopPropagation(); setShowWeightInfo(false); }} 
+              />
+              <div 
+                className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-max max-w-[240px] px-3.5 py-2 rounded-2xl bg-[#0a1022] border border-white/15 backdrop-blur-xl text-left shadow-2xl shadow-black/80 z-40 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="font-bold text-xs text-sky-400 whitespace-nowrap">
+                  {eqConf.inputRule === 'plates_total' || eqConf.inputRule === 'total_plates' ? 'Input Total Plat 2 Sisi' :
+                   eqConf.inputRule === 'plate_per_side' ? 'Input Plat 1 Sisi' :
+                   eqConf.inputRule === 'pin' ? 'Input Pin Beban' :
+                   eqConf.inputRule === 'per_side_or_pin' ? (eqConf.baseWeight > 0 ? 'Input Plat / Pin' : 'Input Beban 1 Sisi / Pin') :
+                   eqConf.inputRule === 'dumbbell_single' ? 'Input 1 Dumbbell' :
+                   eqConf.inputRule === 'bodyweight_plus' ? 'Input Tambahan Beban' :
+                   `Input ${eqConf.label}`}
+                </div>
+                {eqConf.baseWeight > 0 && (
+                  <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-300 font-medium">
+                    <span>{getBaseWeightLabel(eqConf)}</span>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+      <ScrollPicker 
+        value={isImp ? Math.round(Number(itemSet?.w || 0) * 2.20462 * 10) / 10 : (itemSet?.w || 0)} 
+        onLiveChange={setLiveW}
+        onLiveEnd={() => setLiveW(null)}
+        onChange={(val) => {
+          setLiveW(null);
+          onSetChange(ex.id, activeSetIdx, 'w', isImp ? Number((val / 2.20462).toFixed(2)) : val, ex);
+        }}
+        min={0} max={isImp ? 440 : 200} step={eqConf.increment || (isImp ? 5 : 2.5)} width="w-full" theme={theme} t={t}
+      />
+      {hasWeightDiff && (
+        <div className="h-5 mt-1 flex items-center justify-center">
+          <span className="text-xs text-sky-400 font-bold">
+            Total: {isImp ? Number((actW * 2.20462).toFixed(1)) + ' lbs' : actW + ' kg'}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+});
 
 const ImmersiveWorkout = ({
   t,
@@ -254,7 +347,9 @@ const ImmersiveWorkout = ({
   userProfile,
   activeExerciseId,
   onActiveExercise,
-  onUpdateExercise
+  onUpdateExercise,
+  wellness,
+  selectedDate
 }) => {
 
   // 1. Gather all active exercise groups
@@ -288,6 +383,7 @@ const ImmersiveWorkout = ({
       activeGymId,
       userProfile,
       isImperial: units?.weight === 'lbs',
+      wellness: wellness || (selectedDate && history?.[selectedDate]?.wellness) || null,
     });
     const suggestedWeight = targetPlan.inputWeight;
     const suggestedReps = targetPlan.targetReps;
@@ -604,7 +700,7 @@ const ImmersiveWorkout = ({
 
   const handleMinimize = () => {
     playSoundEffect('click', soundEnabled);
-    onClose();
+    onClose(ex?.id || ex?.originalId);
   };
 
   const activeMedia = mediaItems[activeMediaIndex];
@@ -634,61 +730,107 @@ const ImmersiveWorkout = ({
   }, [activeMediaIndex, currentIndex]);
 
   // Swipe Logic on Center Visual (Video & Image)
-  const [touchStartX, setTouchStartX] = React.useState(null);
-  const [touchStartY, setTouchStartY] = React.useState(null);
-  const [touchEndX, setTouchEndX] = React.useState(null);
-  const [touchEndY, setTouchEndY] = React.useState(null);
+  const touchStateRef = React.useRef({
+    startX: 0,
+    startY: 0,
+    currentX: 0,
+    currentY: 0,
+    startTime: 0,
+    isDragging: false,
+    direction: null, // 'horizontal' | 'vertical' | null
+  });
 
-  const minSwipeDistance = 50;
+  const [dragOffsetPx, setDragOffsetPx] = React.useState(0);
+  const [isSwipingMedia, setIsSwipingMedia] = React.useState(false);
 
   const onTouchStart = (e) => {
     if (diLuarImmersive(e)) return;
-    setTouchEndX(null);
-    setTouchEndY(null);
-    setTouchStartX(e.targetTouches[0].clientX);
-    setTouchStartY(e.targetTouches[0].clientY);
+    const touch = e.targetTouches[0];
+    touchStateRef.current = {
+      startX: touch.clientX,
+      startY: touch.clientY,
+      currentX: touch.clientX,
+      currentY: touch.clientY,
+      startTime: Date.now(),
+      isDragging: true,
+      direction: null,
+    };
+    setIsSwipingMedia(false);
+    setDragOffsetPx(0);
   };
 
   const onTouchMove = (e) => {
-    if (diLuarImmersive(e)) return;
-    const curX = e.targetTouches[0].clientX;
-    const curY = e.targetTouches[0].clientY;
-    setTouchEndX(curX);
-    setTouchEndY(curY);
+    if (!touchStateRef.current.isDragging || diLuarImmersive(e)) return;
+    const touch = e.targetTouches[0];
+    const curX = touch.clientX;
+    const curY = touch.clientY;
+    touchStateRef.current.currentX = curX;
+    touchStateRef.current.currentY = curY;
 
-    // Langsung minimize seketika saat tarikan ke bawah terdeteksi > 35px!
-    if (touchStartY !== null && (curY - touchStartY) > 35 && (curY - touchStartY) > Math.abs(curX - (touchStartX || curX)) * 1.1) {
-      setTouchStartY(null);
-      setTouchStartX(null);
+    const diffX = curX - touchStateRef.current.startX;
+    const diffY = curY - touchStateRef.current.startY;
+
+    // Kunci arah geser setelah gerakan awal > 6px
+    if (!touchStateRef.current.direction) {
+      if (Math.abs(diffX) > 6 || Math.abs(diffY) > 6) {
+        touchStateRef.current.direction = Math.abs(diffX) >= Math.abs(diffY) ? 'horizontal' : 'vertical';
+      }
+    }
+
+    // Jika horizontal & ada lebih dari 1 media: geser kartu visual secara visual di layar
+    if (touchStateRef.current.direction === 'horizontal' && mediaItems.length > 1) {
+      if (e.cancelable) e.preventDefault();
+      setIsSwipingMedia(true);
+      // Batasi tarikan visual elastis
+      const clampedOffset = Math.max(-140, Math.min(140, diffX));
+      setDragOffsetPx(clampedOffset);
+      return;
+    }
+
+    // Jika vertikal ke bawah: minimize saat ditarik > 45px
+    if (touchStateRef.current.direction === 'vertical' && diffY > 45 && diffY > Math.abs(diffX) * 1.4) {
+      touchStateRef.current.isDragging = false;
+      setIsSwipingMedia(false);
+      setDragOffsetPx(0);
       playSoundEffect('click', soundEnabled);
       handleMinimize();
     }
   };
 
   const onTouchEnd = () => {
-    if (touchStartX === null || touchEndX === null || touchStartY === null || touchEndY === null) return;
-    const deltaX = touchStartX - touchEndX;
-    const deltaY = touchEndY - touchStartY; // positive = swipe down
+    if (!touchStateRef.current.isDragging) return;
+    const { startX, startY, currentX, currentY, startTime, direction } = touchStateRef.current;
+    touchStateRef.current.isDragging = false;
 
-    // 1. Swipe Down -> MINIMIZE LANGSUNG DARI AREA VIDEO!
-    if (deltaY > 35 && deltaY > Math.abs(deltaX) * 1.1) {
-      playSoundEffect('click', soundEnabled);
-      handleMinimize();
-      return;
-    }
+    const deltaX = currentX - startX;
+    const deltaY = currentY - startY;
+    const elapsed = Math.max(1, Date.now() - startTime);
+    const velocityX = Math.abs(deltaX) / elapsed; // px per ms
 
-    // 2. Swipe Horizontal -> Ganti Media Carousel
-    const isLeftSwipe = deltaX > minSwipeDistance;
-    const isRightSwipe = deltaX < -minSwipeDistance;
-    if (isLeftSwipe || isRightSwipe) {
+    setIsSwipingMedia(false);
+    setDragOffsetPx(0);
+
+    // 1. Geser Horizontal -> ganti media (sangat ringan & responsif)
+    if (direction === 'horizontal' || Math.abs(deltaX) > Math.abs(deltaY)) {
+      const isFlick = velocityX > 0.25;
+      const threshold = isFlick ? 18 : 28; // Cukup 18-28px, tidak butuh tarikan panjang
       if (mediaItems.length > 1) {
-        playSoundEffect('click', soundEnabled);
-        if (isLeftSwipe) {
+        if (deltaX < -threshold) {
+          playSoundEffect('click', soundEnabled);
           setActiveMediaIndex(prev => prev < mediaItems.length - 1 ? prev + 1 : 0);
-        } else {
+          return;
+        } else if (deltaX > threshold) {
+          playSoundEffect('click', soundEnabled);
           setActiveMediaIndex(prev => prev > 0 ? prev - 1 : mediaItems.length - 1);
+          return;
         }
       }
+    }
+
+    // 2. Geser Vertikal ke bawah -> minimize
+    if (deltaY > 45 && deltaY > Math.abs(deltaX) * 1.3) {
+      playSoundEffect('click', soundEnabled);
+      handleMinimize();
     }
   };
 
@@ -979,10 +1121,11 @@ const ImmersiveWorkout = ({
           onTouchEnd={onTouchEnd}
         >
         <div 
-          className="flex h-full w-full transition-transform duration-300 ease-in-out"
+          className="flex h-full w-full"
           style={{ 
-            transform: `translateX(-${activeMediaIndex * (100 / Math.max(1, mediaItems.length))}%)`,
-            width: `${Math.max(1, mediaItems.length) * 100}%`
+            transform: `translateX(calc(-${activeMediaIndex * (100 / Math.max(1, mediaItems.length))}% + ${dragOffsetPx}px))`,
+            width: `${Math.max(1, mediaItems.length) * 100}%`,
+            transition: isSwipingMedia ? 'none' : 'transform 280ms cubic-bezier(0.25, 1, 0.5, 1)',
           }}
         >
           {mediaItems.length === 0 ? (
@@ -1048,42 +1191,55 @@ const ImmersiveWorkout = ({
           )}
         </div>
 
-        {/* Carousel Controls */}
+        {/* Carousel Controls & Edge Tap Zones */}
         {mediaItems.length > 1 && (
-          <div className="absolute inset-y-0 left-0 right-0 flex items-center justify-between px-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <>
             <button 
+              type="button"
               onClick={(e) => { e.stopPropagation(); playSoundEffect('click', soundEnabled); setActiveMediaIndex(prev => prev > 0 ? prev - 1 : mediaItems.length - 1); }}
-              className="p-3 rounded-full ${t.bgCard} opacity-90 ${t.textMain} backdrop-blur-sm hover:${t.bgApp}/70 transition-all shadow-lg active:scale-95"
+              aria-label="Media Sebelumnya"
+              className="absolute inset-y-12 left-0 w-16 z-20 flex items-center justify-start pl-2 text-white/60 hover:text-white transition-opacity active:scale-95 focus:outline-none"
             >
-              <ChevronLeft size={24} />
+              <div className="p-1.5 rounded-full bg-black/40 backdrop-blur-md text-white/90 shadow-lg">
+                <ChevronLeft size={18} />
+              </div>
             </button>
             <button 
+              type="button"
               onClick={(e) => { e.stopPropagation(); playSoundEffect('click', soundEnabled); setActiveMediaIndex(prev => prev < mediaItems.length - 1 ? prev + 1 : 0); }}
-              className="p-3 rounded-full ${t.bgCard} opacity-90 ${t.textMain} backdrop-blur-sm hover:${t.bgApp}/70 transition-all shadow-lg active:scale-95"
+              aria-label="Media Berikutnya"
+              className="absolute inset-y-12 right-0 w-16 z-20 flex items-center justify-end pr-2 text-white/60 hover:text-white transition-opacity active:scale-95 focus:outline-none"
             >
-              <ChevronRight size={24} />
+              <div className="p-1.5 rounded-full bg-black/40 backdrop-blur-md text-white/90 shadow-lg">
+                <ChevronRight size={18} />
+              </div>
             </button>
-          </div>
+          </>
         )}
         
         {/* Media Indicators */}
         {mediaItems.length > 1 && (
-          <div className="absolute top-4 left-0 right-0 flex items-center justify-center gap-2 z-20">
+          <div className="absolute top-4 left-0 right-0 flex items-center justify-center gap-1.5 z-20">
             {mediaItems.map((_, idx) => (
               <button
                 key={idx}
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
+                  playSoundEffect('click', soundEnabled);
                   setActiveMediaIndex(idx);
                 }}
                 aria-label={`Media ${idx + 1}`}
-                className={`h-2.5 rounded-full transition-all duration-300 cursor-pointer ${
-                  idx === activeMediaIndex 
-                    ? `w-8 ${t.bgAccent} shadow-md` 
-                    : 'w-2.5 bg-white/50 hover:bg-white/80'
-                }`}
-              />
+                className="p-2 -m-1 flex items-center justify-center focus:outline-none"
+              >
+                <span
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    idx === activeMediaIndex 
+                      ? `w-8 ${t.bgAccent} shadow-md` 
+                      : 'w-2 bg-white/40 hover:bg-white/70'
+                  }`}
+                />
+              </button>
             ))}
           </div>
         )}
@@ -1350,70 +1506,20 @@ const ImmersiveWorkout = ({
             return (
               <div key={ex.id} className="w-full flex flex-col">
                   <div className="flex items-center justify-center gap-4">
-                    {exType === 'weight' && (() => {
-                      const eqConf = getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile);
-                      const actW = getSetActualWeight(itemSet, eqConf);
-                      const inputW = Number(itemSet?.input_w !== undefined ? itemSet?.input_w : itemSet?.w) || 0;
-                      const hasWeightDiff = eqConf.baseWeight > 0 && actW > 0;
-                      return (
-                        <div className="flex-1 flex flex-col items-center relative">
-                          <div className="h-7 mb-2 flex items-center justify-center gap-1.5 relative z-30">
-                             <span className="body-md uppercase font-bold">{isImp ? 'LBS' : 'KG'}</span>
-                             <div className="relative">
-                               <button 
-                                 type="button"
-                                 onClick={(e) => { e.stopPropagation(); setShowWeightInfo(prev => !prev); }}
-                                 className={`p-0.5 rounded-full transition-all ${showWeightInfo ? 'text-sky-400 scale-110' : 'text-slate-400 hover:text-sky-400'}`}
-                                 title="Info Beban Total"
-                               >
-                                 <Info size={14} strokeWidth={2.2} />
-                               </button>
-
-                               {/* Tooltip Popover (Glassmorphism Dark, Ringkas, Klik luar untuk tutup) */}
-                               {showWeightInfo && (
-                                 <>
-                                   <div 
-                                     className="fixed inset-0 z-30 bg-transparent overscroll-contain touch-none" data-close-modal="true"
-                                     onClick={(e) => { e.stopPropagation(); setShowWeightInfo(false); }} 
-                                   />
-                                   <div 
-                                     className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-max max-w-[240px] px-3.5 py-2 rounded-2xl bg-[#0a1022] border border-white/15 backdrop-blur-xl text-left shadow-2xl shadow-black/80 z-40 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto"
-                                     onClick={(e) => e.stopPropagation()}
-                                   >
-                                     <div className="font-bold text-xs text-sky-400 whitespace-nowrap">
-                                       {eqConf.inputRule === 'plates_total' || eqConf.inputRule === 'total_plates' ? 'Input Total Plat 2 Sisi' :
-                                        eqConf.inputRule === 'plate_per_side' ? 'Input Plat 1 Sisi' :
-                                        eqConf.inputRule === 'pin' ? 'Input Pin Beban' :
-                                        eqConf.inputRule === 'per_side_or_pin' ? (eqConf.baseWeight > 0 ? 'Input Plat / Pin' : 'Input Beban 1 Sisi / Pin') :
-                                        eqConf.inputRule === 'dumbbell_single' ? 'Input 1 Dumbbell' :
-                                        eqConf.inputRule === 'bodyweight_plus' ? 'Input Tambahan Beban' :
-                                        `Input ${eqConf.label}`}
-                                     </div>
-                                     {eqConf.baseWeight > 0 && (
-                                       <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-300 font-medium">
-                                         <span>{getBaseWeightLabel(eqConf)}</span>
-                                       </div>
-                                     )}
-                                   </div>
-                                 </>
-                               )}
-                             </div>
-                          </div>
-                          <ScrollPicker 
-                            value={isImp ? Math.round(Number(itemSet?.w || 0) * 2.20462 * 10)/10 : (itemSet?.w || 0)} 
-                            onChange={(val) => onSetChange(ex.id, activeSetIdx, 'w', isImp ? Number((val / 2.20462).toFixed(2)) : val, ex)}
-                            min={0} max={isImp ? 440 : 200} step={eqConf.increment || (isImp ? 5 : 2.5)} width="w-full" theme={theme} t={t}
-                          />
-                          {hasWeightDiff && (
-                            <div className="h-5 mt-1 flex items-center justify-center">
-                              <span className="text-xs text-sky-400 font-bold">
-                                Total: {isImp ? Number((actW * 2.20462).toFixed(1)) + ' lbs' : actW + ' kg'}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
+                    {exType === 'weight' && (
+                      <ImmersiveWeightPickerCell
+                        itemSet={itemSet}
+                        activeSetIdx={activeSetIdx}
+                        ex={ex}
+                        eqConf={getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile)}
+                        isImp={isImp}
+                        theme={theme}
+                        t={t}
+                        showWeightInfo={showWeightInfo}
+                        setShowWeightInfo={setShowWeightInfo}
+                        onSetChange={onSetChange}
+                      />
+                    )}
                   
                   {isCardio ? (
                     (() => {
@@ -1572,18 +1678,17 @@ const ImmersiveWorkout = ({
         </div>
 
         {/* Actions Row (Full Width) */}
-        <div className="w-full relative flex flex-col gap-2.5">
-          {restTargetTime !== null && !isAllDone && (
+        <div className="w-full relative">
+          {restTargetTime !== null && !isAllDone ? (
             <ImmersiveRestBar
               restTargetTime={restTargetTime}
               setRestTargetTime={setRestTargetTime}
               formatTime={formatTime}
               theme={theme}
               t={t}
+              soundEnabled={soundEnabled}
             />
-          )}
-
-          {!isAllDone ? (
+          ) : !isAllDone ? (
             <div className="flex gap-2 w-full">
               {(() => {
                 const s = getLogsForEx(ex)[activeSetIdx] || {};
