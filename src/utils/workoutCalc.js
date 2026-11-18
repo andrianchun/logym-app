@@ -1,4 +1,4 @@
-import { manualFieldValue, resolveLoggedExercise, defaultEquipmentConfig, normalizeEquipmentName, cleanExerciseNameForMatching, getLocalYMD } from '../data/constants.js';
+import { manualFieldValue, resolveLoggedExercise, defaultEquipmentConfig, normalizeEquipmentName, cleanExerciseNameForMatching, getLocalYMD, adhocSessionSignature } from '../data/constants.js';
 import { dayBmr } from './bmr.js';
 
 // MET (Metabolic Equivalent) untuk latihan beban/resistance training. Dipakai konsisten di
@@ -900,26 +900,84 @@ export const canonicalExId = (name) => {
  * latihan yang masih hidup (target/equipment terbaru) — bukan salinan beku dari riwayat.
  */
 const _historyExercisesCache = new WeakMap();
+let _lastHistoryExSnapshot = null;
+const _lookupMemoList = [];
+
+const buildHistoryWorkoutsSnapshot = (history) => {
+  const keys = [];
+  const workouts = [];
+  const allKeys = Object.keys(history);
+  for (let i = 0; i < allKeys.length; i++) {
+    const k = allKeys[i];
+    const w = history[k]?.workouts;
+    if (Array.isArray(w) && w.length > 0) {
+      keys.push(k);
+      workouts.push(w);
+    }
+  }
+  return { keys, workouts };
+};
+
+const matchHistoryWorkoutsSnapshot = (history, snap) => {
+  if (!snap || !history || typeof history !== 'object') return false;
+  const allKeys = Object.keys(history);
+  let matched = 0;
+  for (let i = 0; i < allKeys.length; i++) {
+    const k = allKeys[i];
+    const w = history[k]?.workouts;
+    if (!Array.isArray(w) || w.length === 0) continue;
+    if (matched >= snap.keys.length) return false;
+    if (k !== snap.keys[matched] || w !== snap.workouts[matched]) return false;
+    matched++;
+  }
+  return matched === snap.keys.length;
+};
+
 const getHistoryExercises = (history) => {
   if (!history || typeof history !== 'object') return [];
   const cached = _historyExercisesCache.get(history);
   if (cached) return cached;
+  // Jika hanya _activeSession / bioData / wellness yang berubah (array workouts berisi sesi identik),
+  // pakai ulang daftar latihan agar buildExLookupByName & Memo downstream tidak ikut rebuild.
+  if (matchHistoryWorkoutsSnapshot(history, _lastHistoryExSnapshot)) {
+    _historyExercisesCache.set(history, _lastHistoryExSnapshot.list);
+    return _lastHistoryExSnapshot.list;
+  }
+  const snap = buildHistoryWorkoutsSnapshot(history);
   const list = [];
-  Object.values(history).forEach((day) =>
-    (day?.workouts || []).forEach((w) => {
+  for (let ki = 0; ki < snap.workouts.length; ki++) {
+    const wks = snap.workouts[ki];
+    for (let wi = 0; wi < wks.length; wi++) {
+      const w = wks[wi];
       if (Array.isArray(w?.exercises)) {
         for (let i = 0; i < w.exercises.length; i++) list.push(w.exercises[i]);
       }
       if (Array.isArray(w?.overriddenExercises)) {
         for (let i = 0; i < w.overriddenExercises.length; i++) list.push(w.overriddenExercises[i]);
       }
-    })
-  );
+    }
+  }
+  _lastHistoryExSnapshot = { keys: snap.keys, workouts: snap.workouts, list };
   _historyExercisesCache.set(history, list);
   return list;
 };
 
 export const buildExLookupByName = (history, ...exLists) => {
+  const histExercises = getHistoryExercises(history);
+  for (let mi = 0; mi < _lookupMemoList.length; mi++) {
+    const m = _lookupMemoList[mi];
+    if (m.histExercises === histExercises && m.exLists.length === exLists.length) {
+      let sameLists = true;
+      for (let li = 0; li < exLists.length; li++) {
+        if (m.exLists[li] !== exLists[li]) {
+          sameLists = false;
+          break;
+        }
+      }
+      if (sameLists) return m.out;
+    }
+  }
+
   const kanonik = {};
   const out = {};
   const daftarkan = (ex) => {
@@ -928,9 +986,9 @@ export const buildExLookupByName = (history, ...exLists) => {
     let rawName = String(ex?.name || '').trim().toLowerCase();
     let nama = cleanExerciseNameForMatching ? cleanExerciseNameForMatching(ex?.name || '') : rawName;
     if (!nama && !rawName) return;
-    const finalKey = nama || rawName;
+    let finalKey = nama || rawName;
     if ((String(id) === '104' || String(ex?.originalId) === '104') && (finalKey === 'cable seated lateral raise' || finalKey === 'seated cable lateral raise')) {
-      nama = 'standing cable lateral raise';
+      finalKey = 'standing cable lateral raise';
     }
     const c = kanonik[finalKey] || (kanonik[finalKey] = { ...ex, id: canonicalExId(finalKey), name: ex.name });
     if (!out[String(id)]) out[String(id)] = c;
@@ -938,7 +996,10 @@ export const buildExLookupByName = (history, ...exLists) => {
     if (rawName && !kanonik[rawName]) kanonik[rawName] = c;
   };
   exLists.forEach((list) => (list || []).forEach(daftarkan));
-  getHistoryExercises(history).forEach(daftarkan);
+  histExercises.forEach(daftarkan);
+
+  if (_lookupMemoList.length >= 4) _lookupMemoList.shift();
+  _lookupMemoList.push({ histExercises, exLists, out });
   return out;
 };
 
@@ -992,6 +1053,7 @@ export const recomputeStrengthRecords = (history, logKeys, exLookup, gymProfiles
 // seluruh latihan sekaligus dan setiap panggilan berikutnya O(1) (< 0.01 ms).
 const _rm10IndexCache = new WeakMap();
 const _EMPTY_ARR = Object.freeze([]);
+let _lastRm10Snap = null;
 
 const getOrBuildRm10Index = (history, exLookup, gymProfiles, activeGymId, userProfile) => {
   if (!history || typeof history !== 'object') return new Map();
@@ -1018,9 +1080,24 @@ const getOrBuildRm10Index = (history, exLookup, gymProfiles, activeGymId, userPr
     _rm10IndexCache.set(history, bucket);
   }
 
+  // Fast-path jika hanya _activeSession/bioData yang berubah pada history baru:
+  if (
+    _lastRm10Snap &&
+    _lastRm10Snap.exLookup === exLookup &&
+    _lastRm10Snap.gymProfiles === normGyms &&
+    _lastRm10Snap.activeGymId === normGymId &&
+    _lastRm10Snap.userProfile === normProfile &&
+    matchHistoryWorkoutsSnapshot(history, _lastRm10Snap.snap)
+  ) {
+    if (bucket.length >= 4) bucket.shift();
+    bucket.push({ exLookup, gymProfiles: normGyms, activeGymId: normGymId, userProfile: normProfile, byExId: _lastRm10Snap.byExId });
+    return _lastRm10Snap.byExId;
+  }
+
   const byExId = new Map();
   const eqConfCache = new WeakMap();
-  const sortedDates = Object.keys(history).sort();
+  const snap = buildHistoryWorkoutsSnapshot(history);
+  const sortedDates = [...snap.keys].sort();
 
   for (let di = 0; di < sortedDates.length; di++) {
     const dateStr = sortedDates[di];
@@ -1073,6 +1150,14 @@ const getOrBuildRm10Index = (history, exLookup, gymProfiles, activeGymId, userPr
     }
   }
 
+  _lastRm10Snap = {
+    exLookup,
+    gymProfiles: normGyms,
+    activeGymId: normGymId,
+    userProfile: normProfile,
+    snap,
+    byExId,
+  };
   if (bucket.length >= 4) bucket.shift();
   bucket.push({ exLookup, gymProfiles: normGyms, activeGymId: normGymId, userProfile: normProfile, byExId });
   return byExId;
@@ -1188,9 +1273,9 @@ export const deduplicateWorkouts = (workouts) => {
   const result = [];
   byId.forEach(w => {
     if (w.programId === 'adhoc') {
-      const exKey = (w.exercises || []).map(e => String(e.originalId || e.id)).sort().join('|');
-      if (exKey && seenAdhocKeys.has(exKey)) return;
-      if (exKey) seenAdhocKeys.add(exKey);
+      const sig = adhocSessionSignature(w);
+      if (sig && seenAdhocKeys.has(sig)) return;
+      if (sig) seenAdhocKeys.add(sig);
     }
     result.push(w);
   });

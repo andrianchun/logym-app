@@ -14,7 +14,7 @@ import React, { useRef, useImperativeHandle, forwardRef } from 'react';
  * - touchAction='pan-y' di container → browser langsung tahu boleh scroll vertikal tanpa
  *   menunggu JS, tapi horizontal masih bisa dicegah via preventDefault setelah lock.
  */
-const PanoramicSlider = forwardRef(({
+const PanoramicSlider = forwardRef(function PanoramicSlider({
   onSwipeLeft,
   onSwipeRight,
   renderPanel,
@@ -23,7 +23,7 @@ const PanoramicSlider = forwardRef(({
   onDownSwipe,
   className = '',
   fillHeight = false,
-}, ref) => {
+}, ref) {
   const containerRef = useRef(null);
   const trackRef    = useRef(null);   // div yang di-translate
   const animating   = useRef(false);  // true saat snap/swipe animation berjalan

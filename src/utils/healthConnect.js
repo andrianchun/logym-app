@@ -540,6 +540,120 @@ export const sleepPerDay = (samples) => {
   return out;
 };
 
+// Prioritas sumber langkah kaki — mencegah double-counting ketika 2+ aplikasi (mis. Samsung Health
+// + Google Fit / Mi Fitness / Strava) atau 2 perangkat (Jam + HP) menulis StepsRecord dengan
+// timestamp sedikit bergeser sehingga Health Connect queryAggregated menjumlahkan keduanya.
+const stepSourceRank = (sourceId = '') => {
+  const s = String(sourceId || '').toLowerCase();
+  if (s.includes('shealth') || s.includes('samsung')) return 100;
+  if (/(garmin|polar|whoop|fitbit|oura|huawei|huami|zepp|mi\.health|xiaomi|suunto|coros)/.test(s)) return 90;
+  if (s.includes('google.android.apps.fitness')) return 80;
+  return 50;
+};
+
+/**
+ * Deduplikasi sampel langkah kaki (`StepsRecord` dari `readSamples`) per hari:
+ *  1. Pisahkan per `sourceId` (aplikasi penulis) dan pilih SATU sumber prioritas utama
+ *     (Samsung Health > wearable utama > Google Fit > lainnya) agar dua aplikasi tidak
+ *     saling menumpuk langkah yang sama.
+ *  2. Di dalam sumber terpilih, buang interval yang saling tumpang-tindih (> 30% durasi
+ *     interval lebih pendek) untuk mencegah double-count dari 2 perangkat (HP + Watch)
+ *     atau ringkasan jam + rincian menit yang tumpang-tindih.
+ *  3. Hitung total langkah dan sebaran per jam untuk `stepMinutesFromHourly`.
+ */
+export const deduplicateStepSamples = (samples = []) => {
+  const byDaySource = {};
+  (samples || []).forEach((s) => {
+    const val = Number(s?.value) || 0;
+    if (val <= 0 || !s?.startDate) return;
+    const startMs = new Date(s.startDate).getTime();
+    if (!Number.isFinite(startMs)) return;
+    const rawEnd = s.endDate ? new Date(s.endDate).getTime() : startMs + 60000;
+    const endMs = Number.isFinite(rawEnd) && rawEnd > startMs ? rawEnd : startMs + 1000;
+    const ymd = ymdOf(s.startDate);
+    const srcKey = String(s.sourceId || s.sourceName || 'unknown').toLowerCase();
+    if (!byDaySource[ymd]) byDaySource[ymd] = {};
+    if (!byDaySource[ymd][srcKey]) byDaySource[ymd][srcKey] = [];
+    byDaySource[ymd][srcKey].push({
+      startMs,
+      endMs,
+      durMs: Math.max(1000, endMs - startMs),
+      val,
+    });
+  });
+
+  const dedupIntervals = (records) => {
+    // Urutkan dari langkah terbesar (lalu durasi terpanjang) agar ringkasan utuh / sensor utama menang
+    const sorted = [...records].sort((a, b) => (b.val - a.val) || (b.durMs - a.durMs));
+    const acceptedByHourBucket = new Map();
+    const accepted = [];
+
+    for (let i = 0; i < sorted.length; i++) {
+      const cand = sorted[i];
+      const bStart = Math.floor(cand.startMs / 3600000);
+      const bEnd = Math.floor(cand.endMs / 3600000);
+
+      let isDup = false;
+      for (let b = bStart; b <= bEnd && !isDup; b++) {
+        const list = acceptedByHourBucket.get(b);
+        if (!list) continue;
+        for (let j = 0; j < list.length; j++) {
+          const acc = list[j];
+          const ovStart = Math.max(cand.startMs, acc.startMs);
+          const ovEnd = Math.min(cand.endMs, acc.endMs);
+          const ovMs = ovEnd - ovStart;
+          if (ovMs <= 0) continue;
+          const minDur = Math.min(cand.durMs, acc.durMs);
+          // Overlap > 30% dari interval lebih pendek -> duplikat perangkat/ringkasan
+          if (ovMs / minDur > 0.30) {
+            isDup = true;
+            break;
+          }
+        }
+      }
+
+      if (!isDup) {
+        accepted.push(cand);
+        for (let b = bStart; b <= bEnd; b++) {
+          let list = acceptedByHourBucket.get(b);
+          if (!list) { list = []; acceptedByHourBucket.set(b, list); }
+          list.push(cand);
+        }
+      }
+    }
+    return accepted;
+  };
+
+  const out = {};
+  Object.entries(byDaySource).forEach(([ymd, sourcesMap]) => {
+    const sourceEntries = Object.entries(sourcesMap).map(([srcKey, recs]) => {
+      const clean = dedupIntervals(recs);
+      const total = clean.reduce((sum, r) => sum + r.val, 0);
+      return { srcKey, rank: stepSourceRank(srcKey), clean, total };
+    });
+
+    if (sourceEntries.length === 0) return;
+    // Pilih 1 sumber utama: prioritas tracker dulu, tie-break total langkah tertinggi
+    sourceEntries.sort((a, b) => (b.rank - a.rank) || (b.total - a.total));
+    const winner = sourceEntries[0];
+
+    const hourly = new Array(24).fill(0);
+    winner.clean.forEach((r) => {
+      const h = new Date(r.startMs).getHours();
+      if (h >= 0 && h < 24) hourly[h] += r.val;
+    });
+
+    out[ymd] = {
+      steps: Math.round(winner.total),
+      stepMinutes: stepMinutesFromHourly(hourly.filter((v) => v > 0)),
+      sourceId: winner.srcKey,
+      sourceCount: sourceEntries.length,
+    };
+  });
+
+  return out;
+};
+
 // Tarik ringkasan kesehatan sehari-hari dalam SATU rentang tanggal sekaligus (bukan loop
 // per-hari — tiap query native ada overhead round-trip, jadi 1 query lebar jauh lebih murah
 // daripada N query sempit). Dipakai baik buat "hari ini" (range 1 hari) maupun backfill
@@ -552,21 +666,61 @@ export const hcReadRange = async (startYmd, endYmd) => {
   const H = Health;
   const startISO = new Date(`${startYmd}T00:00:00`).toISOString();
   const endISO = new Date(`${endYmd}T23:59:59`).toISOString();
+  const spanDays = Math.max(1, Math.round((new Date(`${endYmd}T12:00:00`) - new Date(`${startYmd}T12:00:00`)) / 86400000) + 1);
   const byDay = {};
   const put = (ymd, patch) => { byDay[ymd] = { ...(byDay[ymd] || {}), ...patch }; };
 
   await Promise.all([
-    // Langkah diambil per JAM, bukan per hari: totalnya sama persis, tapi sebarannya dibutuhkan
-    // buat menaksir DURASI jalan (lihat stepMinutesFromHourly — cap 60 menit/jam cuma bermakna
-    // kalau sebaran per jamnya tahu). Kalau agregasi per jam gagal/kosong, jatuh balik ke bucket
-    // harian: durasinya hilang, tapi jumlah langkahnya JANGAN sampai ikut hilang.
+    // Langkah diambil via readSamples + deduplicateStepSamples untuk rentang <= 14 hari agar
+    // 100% bebas double-counting dari multi-app (Samsung Health + Google Fit) atau multi-device
+    // (Jam + HP). Untuk hari yang belum tercakup / rentang backfill panjang, fallback aman ke
+    // queryAggregated per jam/hari.
     (async () => {
+      const coveredDays = new Set();
+      try {
+        const sampleStartYmd = spanDays <= 14
+          ? startYmd
+          : (() => {
+              const d = new Date(`${endYmd}T12:00:00`);
+              d.setDate(d.getDate() - 6);
+              return ymdOf(d);
+            })();
+        const sampleStartISO = new Date(`${sampleStartYmd}T00:00:00`).toISOString();
+        const rawRes = await H.readSamples({
+          dataType: 'steps',
+          startDate: sampleStartISO,
+          endDate: endISO,
+          limit: 5000,
+          ascending: false,
+        });
+        const rawSamples = rawRes?.samples || [];
+        if (rawSamples.length > 0) {
+          const deduped = deduplicateStepSamples(rawSamples);
+          const hitCap = rawSamples.length >= 4900;
+          const sortedDays = Object.keys(deduped).sort();
+          sortedDays.forEach((ymd, idx) => {
+            // Jika menabrak limit 5000 (descending), tanggal paling lama bisa terpotong -> lewati ke fallback
+            if (hitCap && idx === 0 && sortedDays.length > 1) return;
+            const d = deduped[ymd];
+            if (d.steps > 0) {
+              put(ymd, { steps: d.steps, stepMinutes: d.stepMinutes });
+              coveredDays.add(ymd);
+              if (d.sourceCount > 1) {
+                console.log(`[HC Steps] ${ymd}: ${d.steps} langkah (pilih ${d.sourceId} dari ${d.sourceCount} sumber — anti double-count)`);
+              }
+            }
+          });
+          if (spanDays <= 14 && !hitCap) return;
+        }
+      } catch (e) { console.warn('hcReadRange steps readSamples dedup gagal:', e); }
+
       try {
         const res = await H.queryAggregated({ dataType: 'steps', startDate: startISO, endDate: endISO, bucket: 'hour', aggregation: 'sum' });
         const perDay = {};
         (res?.samples || []).forEach((s) => {
           if (!(s.value > 0)) return;
           const ymd = ymdOf(s.startDate);
+          if (coveredDays.has(ymd)) return;
           (perDay[ymd] = perDay[ymd] || []).push(s.value);
         });
         if (Object.keys(perDay).length > 0) {
@@ -579,7 +733,10 @@ export const hcReadRange = async (startYmd, endYmd) => {
       } catch (e) { console.warn('hcReadRange steps per jam gagal:', e); }
       try {
         const res = await H.queryAggregated({ dataType: 'steps', startDate: startISO, endDate: endISO, bucket: 'day', aggregation: 'sum' });
-        (res?.samples || []).forEach((s) => { if (s.value > 0) put(ymdOf(s.startDate), { steps: Math.round(s.value) }); });
+        (res?.samples || []).forEach((s) => {
+          const ymd = ymdOf(s.startDate);
+          if (s.value > 0 && !coveredDays.has(ymd)) put(ymd, { steps: Math.round(s.value) });
+        });
       } catch (e) { console.warn('hcReadRange steps gagal:', e); }
     })(),
 

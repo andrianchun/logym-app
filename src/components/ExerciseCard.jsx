@@ -19,7 +19,7 @@ export const getBaseWeightLabel = (eqConf) => {
   return `Bar ${eqConf.baseWeight} kg`;
 };
 
-const SetWeightCell = React.memo(({
+const SetWeightCell = React.memo(function SetWeightCell({
   s,
   setIdx,
   exId,
@@ -29,12 +29,24 @@ const SetWeightCell = React.memo(({
   soundEnabled,
   t,
   onUpdateSet
-}) => {
+}) {
   const [liveW, setLiveW] = useState(null);
+  const onUpdateSetRef = useRef(onUpdateSet);
+  onUpdateSetRef.current = onUpdateSet;
+  const isImpRef = useRef(isImp);
+  isImpRef.current = isImp;
 
+  const handleLiveEnd = React.useCallback(() => setLiveW(null), []);
+  const handleWeightCommit = React.useCallback((val) => {
+    setLiveW(null);
+    const stored = isImpRef.current ? Number((val / 2.20462).toFixed(2)) : val;
+    onUpdateSetRef.current?.(exId, setIdx, 'w', stored);
+  }, [exId, setIdx]);
+
+  const inputValue = isImp ? Math.round(Number(s.w || 0) * 2.20462 * 10) / 10 : s.w;
   const displayW = liveW !== null 
     ? liveW 
-    : (isImp ? Math.round(Number(s.w || 0) * 2.20462 * 10) / 10 : (s.w || 0));
+    : (inputValue || 0);
   const effectiveKg = isImp ? (Number(displayW || 0) / 2.20462) : Number(displayW || 0);
   const actW = liveW !== null 
     ? calculateActualWeight(effectiveKg, eqConfig) 
@@ -46,13 +58,10 @@ const SetWeightCell = React.memo(({
     <div className="flex flex-col items-center w-full">
       <SwipeInput 
         language={lang?.id || 'ID'} 
-        value={isImp ? Math.round(Number(s.w || 0) * 2.20462 * 10) / 10 : s.w} 
+        value={inputValue}
         onLiveChange={setLiveW}
-        onLiveEnd={() => setLiveW(null)}
-        onChange={(val) => {
-          setLiveW(null);
-          onUpdateSet(exId, setIdx, 'w', isImp ? Number((val / 2.20462).toFixed(2)) : val);
-        }} 
+        onLiveEnd={handleLiveEnd}
+        onChange={handleWeightCommit}
         disabled={s.done} 
         step={customStep} 
         min={0} 
@@ -89,7 +98,25 @@ const ExerciseCard = ({
   const progressPercent = totalSets > 0 ? (doneCount / totalSets) * 100 : 0;
   const [showHint, setShowHint] = useState(false);
   const [showWeightInfo, setShowWeightInfo] = useState(false);
-  const eqConfig = getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile);
+  const eqConfig = React.useMemo(
+    () => getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile),
+    [gymProfiles, activeGymId, ex, userProfile]
+  );
+  // Memoize resolusi metadata & gambar agar card tidak scan 873 master exercises berulang setiap ketuk set.
+  const resolvedMeta = React.useMemo(() => {
+    const canonical = canonicalizeExercise(ex);
+    const masterMatch = findMatchingMasterExercise(canonical, defaultMasterExercises);
+    const apiExercises = getCachedExercises();
+    const apiMatch = (!canonical.gifUrl && !canonical.thumbnailUrl && !isCustom)
+      ? findMatchingMasterExercise(canonical, apiExercises)
+      : null;
+    const finalImgUrl = masterMatch?.thumbnailUrl || canonical.thumbnailUrl || masterMatch?.gifUrl || canonical.gifUrl || apiMatch?.thumbnailUrl || apiMatch?.gifUrl;
+    const ytId = getVideoId(masterMatch?.ytVideo || canonical.ytVideo || apiMatch?.ytVideo);
+    const effectiveTargets = canonical?.target || ex.target;
+    const displayName = canonical?.name || ex.name;
+    const displayEquipment = canonical.equipment || ex.equipment;
+    return { finalImgUrl, ytId, effectiveTargets, displayName, displayEquipment };
+  }, [ex, isCustom]);
   const lastCelebrated10RM = React.useRef(
     (typeof window !== 'undefined' && window.logymCelebrated10RM?.[ex?.id]) || 0
   );
@@ -370,23 +397,18 @@ const ExerciseCard = ({
   };
 
   return (
-    <div className={`mb-6 mx-0 sm:mx-4 ${ex.supersetId ? 'rounded-l-3xl rounded-r-none sm:rounded-[2.5rem]' : 'rounded-3xl sm:rounded-[2.5rem]'} bg-white/90 dark:bg-black/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.4)] border-y sm:border border-white/40 dark:border-white/10 overflow-hidden transition-all duration-300 ${isSkip ? 'opacity-50 grayscale scale-95' : 'opacity-100'}`}>
+    <div className={`mb-6 mx-0 sm:mx-4 ${ex.supersetId ? 'rounded-l-3xl rounded-r-none sm:rounded-[2.5rem]' : 'rounded-3xl sm:rounded-[2.5rem]'} bg-white/90 dark:bg-black/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.4)] border-y sm:border border-white/40 dark:border-white/10 overflow-hidden transition-opacity duration-200 ${isSkip ? 'opacity-50 grayscale scale-95' : 'opacity-100'}`}>
       
       {/* HEADER IMAGE / GIF FULL WIDTH */}
       <div className="relative w-full h-[280px] sm:h-[320px] bg-slate-100 dark:bg-slate-800">
          {(() => {
-            const canonical = canonicalizeExercise(ex);
-            const masterMatch = findMatchingMasterExercise(canonical, defaultMasterExercises);
-            const apiExercises = getCachedExercises();
-            const apiMatch = (!canonical.gifUrl && !canonical.thumbnailUrl && !isCustom) ? findMatchingMasterExercise(canonical, apiExercises) : null;
-            const finalImgUrl = masterMatch?.thumbnailUrl || canonical.thumbnailUrl || masterMatch?.gifUrl || canonical.gifUrl || apiMatch?.thumbnailUrl || apiMatch?.gifUrl;
-            const ytId = getVideoId(masterMatch?.ytVideo || canonical.ytVideo || apiMatch?.ytVideo);
+            const { finalImgUrl, ytId, displayName, displayEquipment } = resolvedMeta;
             
             if (finalImgUrl) {
                 return (
                   <img 
                     src={finalImgUrl} 
-                    alt={canonical.name || ex.name} 
+                    alt={displayName} 
                     loading="lazy" 
                     decoding="async"
                     className="absolute inset-0 w-full h-full object-cover" 
@@ -407,13 +429,13 @@ const ExerciseCard = ({
                       e.target.src = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
                     }
                   }}
-                  alt={canonical.name || ex.name} 
+                  alt={displayName} 
                   loading="lazy" 
                   decoding="async"
                   className="absolute inset-0 w-full h-full object-cover" 
                 />;
             } else {
-                return <div className="absolute inset-0 flex items-center justify-center opacity-10"><EquipmentIcon equipment={canonical.equipment || ex.equipment} size={120} /></div>;
+                return <div className="absolute inset-0 flex items-center justify-center opacity-10"><EquipmentIcon equipment={displayEquipment} size={120} /></div>;
             }
          })()}
          
@@ -474,7 +496,7 @@ const ExerciseCard = ({
                {/* MUSCLE TARGETS */}
                <div className="flex gap-1.5 flex-wrap">
                   {(() => {
-                     const effectiveTargets = canonicalizeExercise(ex)?.target || ex.target;
+                     const effectiveTargets = resolvedMeta.effectiveTargets;
                      if (Array.isArray(effectiveTargets)) {
                        return effectiveTargets.map(m => (
                          <span key={m} className="px-2 py-0.5 rounded-lg bg-black/40 border border-white/10 text-white/90 text-xs font-bold tracking-wider">{formatTarget(m, lang?.id)}</span>
@@ -489,7 +511,7 @@ const ExerciseCard = ({
                   )}
                </div>
                <h3 className="text-2xl sm:text-3xl font-black text-white leading-[1.1] drop-shadow-md pr-4 mt-2">
-                  {idx + 1}. {canonicalizeExercise(ex)?.name || ex.name}
+                  {idx + 1}. {resolvedMeta.displayName}
                </h3>
             </div>
          </div>
@@ -590,7 +612,7 @@ const ExerciseCard = ({
 
                                         {/* 5. Badge Beban (Beban Plat, Bar, dll jika ada perbedaan beban) */}
                                         {overloadHint.weightLabel && (
-                                          <span className="text-[11px] font-bold uppercase tracking-wider text-sky-400/90 mb-1.5 px-2.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20">
+                                          <span className="text-xs font-bold uppercase tracking-wider text-sky-400/90 mb-1.5 px-2.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20">
                                             Beban {overloadHint.weightLabel}
                                           </span>
                                         )}
@@ -650,7 +672,7 @@ const ExerciseCard = ({
                                         </h3>
 
                                         {overloadHint.weightLabel && (
-                                          <span className="text-[11px] font-bold uppercase tracking-wider text-sky-400/90 mb-1.5 px-2.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20">
+                                          <span className="text-xs font-bold uppercase tracking-wider text-sky-400/90 mb-1.5 px-2.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20">
                                             Beban {overloadHint.weightLabel}
                                           </span>
                                         )}
@@ -926,7 +948,7 @@ const ExerciseCard = ({
                 const hasWeightDiff = exType === 'weight' && eqConfig.baseWeight > 0 && actW > 0;
 
                 return (
-                  <div key={setIdx} className={`grid ${exType==='weight' ? 'grid-cols-[1fr_2fr_2fr_1fr_1fr]' : 'grid-cols-[1fr_3fr_1fr_1fr]'} gap-2 ${hasWeightDiff ? 'items-start' : 'items-center'} text-center transition-all ${s.skipped ? 'opacity-50' : s.done ? 'opacity-60' : ''}`}>
+                  <div key={setIdx} className={`grid ${exType==='weight' ? 'grid-cols-[1fr_2fr_2fr_1fr_1fr]' : 'grid-cols-[1fr_3fr_1fr_1fr]'} gap-2 ${hasWeightDiff ? 'items-start' : 'items-center'} text-center transition-opacity ${s.skipped ? 'opacity-50' : s.done ? 'opacity-60' : ''}`}>
                     
                     <div className="flex flex-col items-center justify-center">
                       <button 
@@ -941,7 +963,7 @@ const ExerciseCard = ({
                           }
                         }}
                         onBlur={() => setDeletingSetIdx(null)}
-                        className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all font-black text-sm ${deletingSetIdx === setIdx ? 'bg-rose-500 text-white shadow-lg scale-110' : (s.type === 'warmup' ? 'bg-amber-500/10 text-amber-500' : 'bg-black/5 dark:bg-white/5 text-slate-500 dark:text-slate-400')}`}
+                        className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-transform font-black text-sm ${deletingSetIdx === setIdx ? 'bg-rose-500 text-white shadow-lg scale-110' : (s.type === 'warmup' ? 'bg-amber-500/10 text-amber-500' : 'bg-black/5 dark:bg-white/5 text-slate-500 dark:text-slate-400')}`}
                       >
                         {deletingSetIdx === setIdx ? <X size={16}/> : (s.type === 'warmup' ? <Flame size={16} className="opacity-80"/> : getWorkingSetNumber(setIdx))}
                       </button>

@@ -671,6 +671,65 @@ const WorkoutTab = ({
     () => buildExLookupByName(history, exerciseLibrary, extraExercises, ...(programs || []).map(p => p.exercises)),
     [history, exerciseLibrary, extraExercises, programs]);
 
+  // Stabilkan targetPlan + default sets + overloadHint per latihan agar ketukan/swipe di satu
+  // kartu TIDAK menghitung ulang atau memicu re-render pada kartu latihan lain, dan sinkronisasi
+  // _activeSession / bioData tidak membuang cache target ketika array workouts hari tak berubah.
+  const prevWorkoutsSnapRef = React.useRef(null);
+  const workoutsRevRef = React.useRef(0);
+  const completedHistoryVersion = React.useMemo(() => {
+    const keys = Object.keys(history || {});
+    const nextEntries = [];
+    for (let i = 0; i < keys.length; i++) {
+      const k = keys[i];
+      const w = history[k]?.workouts;
+      if (Array.isArray(w) && w.length > 0) nextEntries.push([k, w]);
+    }
+    const prev = prevWorkoutsSnapRef.current;
+    let same = Boolean(prev && nextEntries.length === prev.length);
+    if (same) {
+      for (let i = 0; i < nextEntries.length; i++) {
+        if (nextEntries[i][0] !== prev[i][0] || nextEntries[i][1] !== prev[i][1]) {
+          same = false;
+          break;
+        }
+      }
+    }
+    if (!same) {
+      prevWorkoutsSnapRef.current = nextEntries;
+      workoutsRevRef.current += 1;
+    }
+    return workoutsRevRef.current;
+  }, [history]);
+
+  const targetPlanCache = React.useMemo(
+    () => new WeakMap(),
+    [completedHistoryVersion, rmLookup, exerciseLibrary, programs, extraExercises, gymProfiles, activeGymId, userProfile, units?.weight, currentWellness] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  const getCachedTargetPlan = (exItem) => {
+    if (!exItem || typeof exItem !== 'object') return null;
+    const hit = targetPlanCache.get(exItem);
+    if (hit) return hit;
+    const plan = resolveExerciseProgressiveTarget({
+      ex: exItem,
+      history,
+      exerciseLibrary,
+      programs,
+      extraExercises,
+      gymProfiles,
+      activeGymId,
+      userProfile,
+      isImperial: units?.weight === 'lbs',
+      wellness: currentWellness,
+      exLookup: rmLookup,
+    });
+    targetPlanCache.set(exItem, plan);
+    return plan;
+  };
+
+  const defaultLogsCacheRef = React.useRef(new WeakMap());
+  const overloadHintCacheRef = React.useRef(new Map());
+
   // Fungsi untuk memanggil log per set dari App.jsx
   const getSetLogs = (ex) => {
     // 1. Check live in-memory session logs first
@@ -712,26 +771,18 @@ const WorkoutTab = ({
     }
 
     // 3. Default: empty template dari Single Source of Truth (SSOT Engine)
-    const targetPlan = resolveExerciseProgressiveTarget({
-      ex,
-      history,
-      exerciseLibrary,
-      programs,
-      extraExercises,
-      gymProfiles,
-      activeGymId,
-      userProfile,
-      isImperial: units?.weight === 'lbs',
-      wellness: currentWellness,
-      exLookup: rmLookup,
-    });
+    const targetPlan = getCachedTargetPlan(ex);
+    const cachedDef = defaultLogsCacheRef.current.get(ex);
+    if (cachedDef && cachedDef.targetPlan === targetPlan) {
+      return cachedDef.logs;
+    }
 
     const suggestedWeight = targetPlan.inputWeight;
     const suggestedReps = targetPlan.targetReps;
     const eqConf = targetPlan.eqConf || getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile);
     const total_w = targetPlan.totalWeight;
 
-    return Array.from({length: ex.sets || 3}).map(() => ({
+    const generated = Array.from({length: ex.sets || 3}).map(() => ({
         w: suggestedWeight,
         input_w: suggestedWeight,
         base_w: eqConf.baseWeight,
@@ -742,6 +793,8 @@ const WorkoutTab = ({
         done: false,
         skipped: false
     }));
+    defaultLogsCacheRef.current.set(ex, { targetPlan, logs: generated });
+    return generated;
   };
 
   const historicalStatsRef = React.useRef({});
@@ -753,19 +806,18 @@ const WorkoutTab = ({
   const getOverloadHint = (exItem) => {
     if (!exItem || !exerciseLibrary || exItem.type === 'time' || exItem.type === 'cardio' || exItem.target?.includes('Cardio')) return null;
 
-    const targetPlan = resolveExerciseProgressiveTarget({
-      ex: exItem,
-      history,
-      exerciseLibrary,
-      programs,
-      extraExercises,
-      gymProfiles,
-      activeGymId,
-      userProfile,
-      isImperial: units?.weight === 'lbs',
-      wellness: currentWellness,
-      exLookup: rmLookup,
-    });
+    const targetPlan = getCachedTargetPlan(exItem);
+    const currentLogs = getSetLogs(exItem) || exerciseLogs[exItem.id] || [];
+    const hintKey = String(exItem.id);
+    const cachedHint = overloadHintCacheRef.current.get(hintKey);
+    if (
+      cachedHint &&
+      cachedHint.exItem === exItem &&
+      cachedHint.targetPlan === targetPlan &&
+      cachedHint.currentLogs === currentLogs
+    ) {
+      return cachedHint.result;
+    }
 
     const { best10RM, last10RM, lastSessionWeight, lastSessionInputWeight, lastSessionReps, eqConf: eqConfNow } = targetPlan;
 
@@ -784,7 +836,6 @@ const WorkoutTab = ({
     let targetAchieved = false;
     let targetExceeded = false;
 
-    const currentLogs = getSetLogs(exItem) || exerciseLogs[exItem.id] || [];
     currentLogs.forEach(s => {
       if (s.done && !s.skipped && s.type !== 'warmup' && (Number(s.w) > 0 || Number(s.total_w) > 0) && s.r > 0) {
         const actW = getSetActualWeight(s, eqConfNow);
@@ -873,8 +924,13 @@ const WorkoutTab = ({
       return `${formatted} ${uStr}`;
     };
 
+    const saveHint = (result) => {
+      overloadHintCacheRef.current.set(hintKey, { exItem, targetPlan, currentLogs, result });
+      return result;
+    };
+
     if (isNewRecord) {
-      return {
+      return saveHint({
         title: "Rekor Baru!",
         targetWeightNumber: hasWeightDiff ? calculateInputWeight(currentMaxWeight, eqConfNow) : currentMaxWeight,
         targetRepsNumber: currentMaxReps,
@@ -893,7 +949,7 @@ const WorkoutTab = ({
         benchmark: formatHeroTarget(currentMaxWeight, currentMaxReps),
         benchmarkDetail: formatSubTotal(currentMaxWeight),
         text: `Rekor 10RM baru: ${currentMax10RM} ${uStr} (${currentMaxWeight} ${uStr} × ${currentMaxReps} reps)! Pertahankan!`
-      };
+      });
     }
 
     if (targetExceeded) {
@@ -903,7 +959,7 @@ const WorkoutTab = ({
         ? `Luar biasa! ${heroReps} reps melampaui target hari ini (${displayTargetReps} reps). Progressive overload sukses!`
         : `Luar biasa! Performa set melampaui target beban hari ini. Progressive overload sukses!`;
 
-      return {
+      return saveHint({
         title: "Target Terlampaui!",
         targetWeightNumber: hasWeightDiff ? calculateInputWeight(heroWeight, eqConfNow) : heroWeight,
         targetRepsNumber: heroReps,
@@ -922,7 +978,7 @@ const WorkoutTab = ({
         benchmark: formatHeroTarget(targetActualWeight, displayTargetReps),
         benchmarkDetail: formatSubTotal(targetActualWeight),
         text: msg
-      };
+      });
     }
 
     if (targetAchieved) {
@@ -932,7 +988,7 @@ const WorkoutTab = ({
         ? `Target deload ${displayTargetReps} reps tuntas dengan form bersih. Pemulihan berjalan optimal!`
         : `Mantap! Target ${displayTargetReps} reps berhasil dicapai dengan solid. Beban siap dinaikkan sesi depan!`;
 
-      return {
+      return saveHint({
         title: targetPlan.isDeload ? "Target Deload Tuntas!" : "Target Tercapai!",
         targetWeightNumber: hasWeightDiff ? calculateInputWeight(heroWeight, eqConfNow) : heroWeight,
         targetRepsNumber: heroReps,
@@ -951,7 +1007,7 @@ const WorkoutTab = ({
         benchmark: formatHeroTarget(targetActualWeight, displayTargetReps),
         benchmarkDetail: formatSubTotal(targetActualWeight),
         text: msg
-      };
+      });
     }
 
     if (isFirstRecord) {
@@ -962,7 +1018,7 @@ const WorkoutTab = ({
         ? `Rekor 10RM baru terpecahkan! Pertahankan performa ini!`
         : `10RM pertama tercatat! Angka ini jadi target acuan sesi berikutnya.`;
 
-      return {
+      return saveHint({
         title: titleText,
         targetWeightNumber: hasWeightDiff ? calculateInputWeight(currentMaxWeight, eqConfNow) : currentMaxWeight,
         targetRepsNumber: currentMaxReps,
@@ -983,11 +1039,11 @@ const WorkoutTab = ({
         text: isProgressRecord
           ? `Rekor 10RM baru: ${currentMax10RM} ${uStr} (${currentMaxWeight} ${uStr} × ${currentMaxReps} reps)! Pertahankan!`
           : `10RM acuan pertama tercatat: ${currentMax10RM} ${uStr}. Otomatis jadi acuan sesi berikutnya!`
-      };
+      });
     }
 
     if (targetPlan.isDeload && targetPlan.hasHistory) {
-      return {
+      return saveHint({
         title: "Mode Deload",
         targetWeightNumber: targetInputWeight,
         targetRepsNumber: displayTargetReps,
@@ -1005,11 +1061,11 @@ const WorkoutTab = ({
         benchmark: formatHeroTarget(targetActualWeight, displayTargetReps),
         benchmarkDetail: formatSubTotal(targetActualWeight),
         text: `Target beban dipangkas ~17.5% untuk pemulihan (${targetActualWeight} ${uStr} × ${displayTargetReps} reps). Fokus kontrol gerakan.`
-      };
+      });
     }
 
     if (targetPlan.isDoms && targetPlan.hasHistory) {
-      return {
+      return saveHint({
         title: "Mode Pegal / Fokus Form",
         targetWeightNumber: targetInputWeight,
         targetRepsNumber: displayTargetReps,
@@ -1026,11 +1082,11 @@ const WorkoutTab = ({
         benchmark: formatHeroTarget(targetActualWeight, displayTargetReps),
         benchmarkDetail: formatSubTotal(targetActualWeight),
         text: `Beban dipertahankan (${targetActualWeight} ${uStr} × ${displayTargetReps} reps). Otot sedang pegal, prioritaskan kontrol form!`
-      };
+      });
     }
 
     if (targetPlan.hasHistory) {
-      return {
+      return saveHint({
         title: targetPlan.title || "Target Hari Ini",
         targetWeightNumber: targetInputWeight,
         targetRepsNumber: displayTargetReps,
@@ -1047,9 +1103,9 @@ const WorkoutTab = ({
         benchmark: formatHeroTarget(targetActualWeight, displayTargetReps),
         benchmarkDetail: formatSubTotal(targetActualWeight),
         text: targetPlan.message
-      };
+      });
     } else if (currentMax10RM > 0) {
-      return {
+      return saveHint({
         title: "Target Hari Ini",
         targetWeightNumber: hasWeightDiff ? calculateInputWeight(currentMaxWeight, eqConfNow) : currentMaxWeight,
         targetRepsNumber: currentMaxReps,
@@ -1066,9 +1122,9 @@ const WorkoutTab = ({
         benchmark: formatHeroTarget(currentMaxWeight, currentMaxReps),
         benchmarkDetail: formatSubTotal(currentMaxWeight),
         text: `Beban terbaik sesi ini: ${currentMaxWeight} ${uStr} × ${currentMaxReps} reps (10RM: ${currentMax10RM} ${uStr}).`
-      };
+      });
     } else {
-      return {
+      return saveHint({
         title: "Target Hari Ini",
         targetWeightNumber: targetInputWeight,
         targetRepsNumber: displayTargetReps,
@@ -1085,7 +1141,7 @@ const WorkoutTab = ({
         benchmark: formatHeroTarget(targetActualWeight, displayTargetReps),
         benchmarkDetail: formatSubTotal(targetActualWeight),
         text: `Target: ${targetActualWeight} ${uStr} x ${displayTargetReps} Reps\n\n${targetPlan.message}`
-      };
+      });
     }
   };
 
@@ -1250,6 +1306,7 @@ const WorkoutTab = ({
     const doStart = () => {
       playSoundEffect('success', soundEnabled);
       setSessionToRun(progId);
+      const currentProg = activeProgramsList.find(p => p.workoutId === progId || p.id === progId);
       if (setActiveProgramId) {
         let realProgId = progId;
         if (typeof realProgId === 'string' && realProgId.startsWith('projected_')) {
@@ -1260,7 +1317,6 @@ const WorkoutTab = ({
       }
 
       // Temukan latihan pertama yang belum selesai agar saat resume langsung ke latihan tersebut
-      const currentProg = activeProgramsList.find(p => p.workoutId === progId || p.id === progId);
       const exList = progId === 'extra' ? displayExtraExercises : (currentProg?.exercises || []);
       const firstIncomplete = exList.find(ex => {
         if (skippedExercises[ex.id]) return false;
@@ -1481,8 +1537,6 @@ const WorkoutTab = ({
               soundEnabled={soundEnabled} playSoundEffect={playSoundEffect}
               warmupVideos={effectiveWarmupVideos}
               onOpenWarmup={handleOpenWarmup}
-              cooldownVideos={effectiveCooldownVideos}
-              onOpenCooldown={handleOpenCooldown}
               wellnessConfig={wellnessConfig}
               onOpenWellness={() => setShowWellnessModal(true)}
             />
@@ -1823,7 +1877,7 @@ const WorkoutTab = ({
                       playSoundEffect('click', soundEnabled);
                       handleOpenCooldown();
                     }}
-                    className="shrink-0 flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-[2rem] transition-all active:scale-95 bg-cyan-500/15 border border-cyan-500/30 hover:bg-cyan-500/25 text-cyan-500 dark:text-cyan-400 shadow-sm shadow-cyan-950/10"
+                    className="shrink-0 flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-[2rem] transition-transform active:scale-95 bg-cyan-500/15 border border-cyan-500/30 hover:bg-cyan-500/25 text-cyan-500 dark:text-cyan-400 shadow-sm shadow-cyan-950/10"
                     title="Pendinginan (Cooldown)"
                   >
                     <Snowflake size={24} strokeWidth={2.2} />
@@ -1966,7 +2020,7 @@ const WorkoutTab = ({
                       }, 2000);
                     }
                   }}
-                  className={`pointer-events-auto w-full max-w-2xl mx-auto py-5 rounded-full text-xl font-black flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-95 bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_8px_30px_rgb(0,0,0,0.25)]`}
+                  className={`pointer-events-auto w-full max-w-2xl mx-auto py-5 rounded-full text-xl font-black flex items-center justify-center gap-3 transition-transform hover:scale-[1.02] active:scale-95 bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_8px_30px_rgb(0,0,0,0.25)]`}
                 >
                   <CheckCircle size={24} /> SIMPAN SESI
                 </button>
@@ -1979,7 +2033,7 @@ const WorkoutTab = ({
               <div className="fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom,20px))] left-0 right-0 px-4 z-40 pointer-events-none flex justify-center animate-in fade-in duration-200">
                 <button 
                   disabled={true}
-                  className={`pointer-events-auto w-full max-w-2xl mx-auto py-5 rounded-full text-xl font-black flex items-center justify-center gap-3 transition-all ${t.bgAccent} text-white shadow-lg opacity-85 cursor-default`}
+                  className={`pointer-events-auto w-full max-w-2xl mx-auto py-5 rounded-full text-xl font-black flex items-center justify-center gap-3 transition-transform ${t.bgAccent} text-white shadow-lg opacity-85 cursor-default`}
                 >
                   <CheckCircle size={24} /> SESI SELESAI
                 </button>
@@ -2013,7 +2067,7 @@ const WorkoutTab = ({
                     }, 2000);
                   }
                 }}
-                className={`pointer-events-auto w-full max-w-2xl mx-auto py-5 rounded-full text-xl font-black flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-95 bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_8px_30px_rgb(0,0,0,0.25)]`}
+                className={`pointer-events-auto w-full max-w-2xl mx-auto py-5 rounded-full text-xl font-black flex items-center justify-center gap-3 transition-transform hover:scale-[1.02] active:scale-95 bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_8px_30px_rgb(0,0,0,0.25)]`}
               >
                 <CheckCircle size={24} /> SIMPAN SESI
               </button>
@@ -2039,7 +2093,7 @@ const WorkoutTab = ({
                 }, 100);
                 handleStartWorkout(targetSession.workoutId);
               }}
-              className={`pointer-events-auto w-full max-w-2xl mx-auto py-5 rounded-full text-xl font-black flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-95 ${t.bgAccent} shadow-[0_8px_30px_rgb(0,0,0,0.25)] text-white`}
+              className={`pointer-events-auto w-full max-w-2xl mx-auto py-5 rounded-full text-xl font-black flex items-center justify-center gap-3 transition-transform hover:scale-[1.02] active:scale-95 ${t.bgAccent} shadow-[0_8px_30px_rgb(0,0,0,0.25)] text-white`}
             >
               {btnIcon} {btnText}
             </button>

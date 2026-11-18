@@ -4,6 +4,7 @@ import { db } from '../firebase';
 import { collection, query, orderBy, getDocs, doc, deleteDoc, addDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { getBannedUsers, unbanUserGlobal, banUserGlobal } from '../utils/moderationApi';
 import { getCurrentWeekId } from '../utils/communityApi';
+import { cleanFirestoreData } from '../utils/historySync';
 
 export default function ModerationPanel({ isDark, t, onClose, onNavigateToPost, onNavigateToUser }) {
   const [activeTab, setActiveTab] = useState('reports');
@@ -123,7 +124,7 @@ export default function ModerationPanel({ isDark, t, onClose, onNavigateToPost, 
         scores[d.id] = { name: d.name, photoUrl: d.photo, score: d.score };
       });
 
-      await setDoc(lbRef, { scores }, { merge: true });
+      await setDoc(lbRef, cleanFirestoreData({ scores }), { merge: true });
       alert("Berhasil mengisi 10 dummy akun di Leaderboard!");
     } catch(e) {
       console.error(e);

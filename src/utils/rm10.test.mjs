@@ -190,8 +190,10 @@ console.log('rm10 OK', { r100x10: estimate10RM(100, 10), bulat42_5step5: roundDo
   const seri = rm10Series(hist, canonicalExId(NAMA), lookup);
   assert.deepEqual(seri.map(p => p.date), ['2026-08-01', '2026-08-03', '2026-08-05'],
     'ketiga sesi harus terbaca, dari program mana pun asalnya');
-  assert.equal(seri[seri.length - 1].rm10, estimate10RM(70, 10), '10RM terakhir = sesi 05/08');
-  assert.equal(seri.reduce((m, p) => Math.max(m, p.rm10), 0), estimate10RM(70, 10));
+  // Catatan: Smith Machine Squat meng-infer equipment 'Smith Machine' (baseWeight default 15 kg),
+  // sehingga 70 kg plat di log tanpa total_w -> beban aktual 70 + 15 = 85 kg.
+  assert.equal(seri[seri.length - 1].rm10, estimate10RM(85, 10), '10RM terakhir = sesi 05/08 (70 plat + 15 Smith bar)');
+  assert.equal(seri.reduce((m, p) => Math.max(m, p.rm10), 0), estimate10RM(85, 10));
 
   // Id pustaka juga harus menunjuk ke objek kanonik yang sama, supaya App.jsx bisa menulis
   // rm10 balik ke pustaka lewat records[canonicalExId(e.name)].
@@ -295,4 +297,31 @@ console.log('rm10 OK', { r100x10: estimate10RM(100, 10), bulat42_5step5: roundDo
   assert.equal(celebrated, 55);
 
   console.log('multi-set 10RM progression OK');
+}
+
+// ---- Stabilitas cache lintas _activeSession & bioData (anti-lag saat workout) ----
+{
+  const { buildExLookupByName, canonicalExId, rm10Series } = await import('./workoutCalc.js');
+  const libEx = [{ id: 101, name: 'Bench Press', equipment: 'Barbell' }];
+  const wksDay1 = [{ status: 'completed', id: 'w-cache-1', exercises: [libEx[0]], log: { '101-w-cache-1': [{ w: 60, total_w: 80, base_w: 20, r: 10, done: true }] } }];
+  const h1 = { '2026-10-01': { workouts: wksDay1 } };
+  const l1 = buildExLookupByName(h1, libEx);
+  const s1 = rm10Series(h1, canonicalExId('Bench Press'), l1);
+
+  // Mutasi _activeSession / bioData menghasilkan objek history baru tanpa menyentuh array workouts
+  const h2 = { ...h1, '2026-10-02': { bioData: { steps: 1200 }, _activeSession: { exerciseLogs: { 101: [{ w: 65, r: 10, done: true }] } } } };
+  const l2 = buildExLookupByName(h2, libEx);
+  const s2 = rm10Series(h2, canonicalExId('Bench Press'), l2);
+  assert.equal(l2, l1, 'buildExLookupByName wajib mengembalikan referensi identik jika hanya _activeSession/bioData berubah');
+  assert.equal(s2, s1, 'rm10Series wajib mengembalikan referensi array identik saat array workouts tidak berubah');
+
+  // Penambahan sesi completed baru wajib langsung memutus cache
+  const wksDay2 = [{ status: 'completed', id: 'w-cache-2', exercises: [libEx[0]], log: { '101-w-cache-2': [{ w: 70, total_w: 90, base_w: 20, r: 10, done: true }] } }];
+  const h3 = { ...h2, '2026-10-02': { ...h2['2026-10-02'], workouts: wksDay2 } };
+  const l3 = buildExLookupByName(h3, libEx);
+  const s3 = rm10Series(h3, canonicalExId('Bench Press'), l3);
+  assert.equal(s3.length, 2, 'sesi baru wajib terbaca segera tanpa terjebak cache');
+  assert.equal(s3[1].rm10, estimate10RM(90, 10));
+
+  console.log('cache stability _activeSession OK');
 }

@@ -9,6 +9,7 @@ import {
   cleanSourceAppName,
   formatExternalWorkoutName,
   getWorkoutSortMinutes,
+  deduplicateStepSamples,
 } from './healthConnect.js';
 import { dailyBurnCalories, splitWorkoutCalories, calculateSmartWorkoutCalories } from './workoutCalc.js';
 
@@ -155,5 +156,35 @@ assert.equal(burn.workout, 700, 'burn.workout harus mencakup 700 kcal (380 + 320
 assert.equal(burn.sessions, 2, 'burn.sessions harus 2');
 assert.ok(burn.total >= 1600 + (5000 * 0.04) + 700, 'Total kalori harian harus mencakup EAT lengkap');
 console.log('✅ Integrasi Energi SSOT (workoutCalc & dailyBurnCalories) passed');
+
+// 8. deduplicateStepSamples (Anti Double-Counting Multi-App & Multi-Device HP+Watch)
+{
+  // Kasus A: Samsung Health + Google Fit menulis di hari yang sama -> pilih Samsung Health saja
+  const multiApp = deduplicateStepSamples([
+    { sourceId: 'com.sec.android.app.shealth', startDate: '2026-11-18T08:00:00+07:00', endDate: '2026-11-18T08:30:00+07:00', value: 3000 },
+    { sourceId: 'com.sec.android.app.shealth', startDate: '2026-11-18T12:00:00+07:00', endDate: '2026-11-18T12:30:00+07:00', value: 2200 },
+    { sourceId: 'com.google.android.apps.fitness', startDate: '2026-11-18T08:05:00+07:00', endDate: '2026-11-18T08:35:00+07:00', value: 2900 },
+    { sourceId: 'com.google.android.apps.fitness', startDate: '2026-11-18T12:05:00+07:00', endDate: '2026-11-18T12:35:00+07:00', value: 2000 },
+  ]);
+  assert.equal(multiApp['2026-11-18'].steps, 5200, 'Harus memilih Samsung Health (5200), bukan menjumlahkan dengan Google Fit (10100)');
+  assert.equal(multiApp['2026-11-18'].sourceCount, 2);
+
+  // Kasus B: Overlap Watch + HP di dalam Samsung Health yang sama
+  const watchAndPhone = deduplicateStepSamples([
+    { sourceId: 'com.sec.android.app.shealth', sourceName: 'samsung SM-R960', startDate: '2026-11-18T10:00:00+07:00', endDate: '2026-11-18T10:15:00+07:00', value: 1200 },
+    { sourceId: 'com.sec.android.app.shealth', sourceName: 'samsung SM-S928B', startDate: '2026-11-18T10:02:00+07:00', endDate: '2026-11-18T10:16:00+07:00', value: 1100 },
+    { sourceId: 'com.sec.android.app.shealth', sourceName: 'samsung SM-R960', startDate: '2026-11-18T10:15:00+07:00', endDate: '2026-11-18T10:30:00+07:00', value: 800 },
+  ]);
+  assert.equal(watchAndPhone['2026-11-18'].steps, 2000, 'Interval overlap Watch+HP harus dideduplikasi (1200 + 800 = 2000)');
+
+  // Kasus C: Ringkasan 1 jam + pecahan sub-interval di dalamnya tidak boleh dihitung 2x
+  const summaryAndSub = deduplicateStepSamples([
+    { sourceId: 'com.sec.android.app.shealth', startDate: '2026-11-18T14:00:00+07:00', endDate: '2026-11-18T15:00:00+07:00', value: 1500 },
+    { sourceId: 'com.sec.android.app.shealth', startDate: '2026-11-18T14:00:00+07:00', endDate: '2026-11-18T14:15:00+07:00', value: 400 },
+    { sourceId: 'com.sec.android.app.shealth', startDate: '2026-11-18T14:15:00+07:00', endDate: '2026-11-18T14:30:00+07:00', value: 500 },
+  ]);
+  assert.equal(summaryAndSub['2026-11-18'].steps, 1500, 'Ringkasan 1 jam tidak boleh ditumpuk sub-interval di dalamnya');
+  console.log('✅ deduplicateStepSamples (Anti Double-Counting Langkah) passed');
+}
 
 console.log('🎉 All External Cardio & Strength Sync unit tests PASSED successfully!');

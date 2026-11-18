@@ -19,7 +19,7 @@ import { cleanSourceAppName, formatExternalWorkoutName } from '../utils/healthCo
 
 // Panel bulan di-memoize agar klik 1 tanggal di mode bulanan HANYA merender ulang 1-2 bulan
 // yang terdampak (bukan seluruh 19 bulan / ~570 sel tanggal sekaligus).
-const CalendarMonthPanel = React.memo(({
+const CalendarMonthPanel = React.memo(function CalendarMonthPanel({
   panelDate,
   isID,
   weekStartDay,
@@ -35,7 +35,7 @@ const CalendarMonthPanel = React.memo(({
   userWeight,
   activityTargets,
   onSelectDayRef,
-}) => {
+}) {
   const panelYear = panelDate.getFullYear();
   const panelMonth = panelDate.getMonth();
   const panelMonthName = panelDate.toLocaleString(isID ? 'id-ID' : 'en-US', { month: 'long' });
@@ -253,18 +253,53 @@ const CalendarTab = ({
   const [showBottomSheet, setShowBottomSheet] = useState(false);
   const [showMonthlyStats, setShowMonthlyStats] = useState(false);
 
-  // Mode Bulanan: daftar bulan yang bisa di-scroll vertikal terus-menerus (bukan swipe per-bulan).
-  // Rentang awal 24 bulan ke belakang, 12 ke depan — cukup luas untuk "puluhan bulan" tanpa
-  // merender ratusan panel yang berat di device low-end. Meluas otomatis (lihat ensureMonthInRange)
-  // kalau user lompat lewat picker tahun/bulan ke luar rentang ini.
+  // Rentang awal -3..+2 (6 bulan) agar mount & layout awal kalender >3x lebih ringan.
+  // Meluas otomatis saat scroll mendekati ujung atas/bawah atau melompat lewat picker/tanggal.
   const [monthRange, setMonthRange] = useState(() => {
     const base = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), 1);
     const range = [];
-    for (let i = -12; i <= 6; i++) {
+    for (let i = -3; i <= 2; i++) {
       range.push(new Date(base.getFullYear(), base.getMonth() + i, 1));
     }
     return range;
   });
+  const isExtendingMonthsRef = useRef(0);
+  const handleMonthListScroll = useCallback((e) => {
+    const el = e.currentTarget;
+    if (!el || isProgrammaticScroll.current) return;
+    const now = performance.now();
+    if (now < isExtendingMonthsRef.current) return;
+    if (el.scrollTop < 180) {
+      isExtendingMonthsRef.current = now + 180;
+      const prevHeight = el.scrollHeight;
+      setMonthRange(prev => {
+        const first = prev[0];
+        if (!first) return prev;
+        const prepend = [];
+        for (let i = -3; i <= -1; i++) {
+          prepend.push(new Date(first.getFullYear(), first.getMonth() + i, 1));
+        }
+        return [...prepend, ...prev];
+      });
+      requestAnimationFrame(() => {
+        if (monthListRef.current) {
+          const delta = monthListRef.current.scrollHeight - prevHeight;
+          if (delta > 0) monthListRef.current.scrollTop += delta;
+        }
+      });
+    } else if (el.scrollTop + el.clientHeight > el.scrollHeight - 220) {
+      isExtendingMonthsRef.current = now + 180;
+      setMonthRange(prev => {
+        const last = prev[prev.length - 1];
+        if (!last) return prev;
+        const append = [];
+        for (let i = 1; i <= 3; i++) {
+          append.push(new Date(last.getFullYear(), last.getMonth() + i, 1));
+        }
+        return [...prev, ...append];
+      });
+    }
+  }, []);
   const monthListRef = useRef(null);
   const isProgrammaticScroll = useRef(false);
 
@@ -304,13 +339,19 @@ const CalendarTab = ({
   // scroll ke bulan yang sedang aktif. Sengaja hanya bereaksi ke perubahan MODE, bukan tiap
   // kali calendarDate berubah — karena calendarDate juga di-update oleh scroll observer di
   // bawah, dan kalau effect ini ikut dengar calendarDate akan jadi tarik-menarik dengan scroll user.
+  const lastMonthlyAutoScrollRef = useRef('');
   useEffect(() => {
     if (isActive && calendarMode === 'monthly') {
       ensureMonthInRange(calendarDate);
+      const key = `${calendarDate.getFullYear()}-${calendarDate.getMonth()}`;
+      if (lastMonthlyAutoScrollRef.current === key) return;
+      lastMonthlyAutoScrollRef.current = key;
       // Delay supaya render ulang monthRange (kalau diperluas oleh ensureMonthInRange) sempat
       // masuk DOM dulu sebelum kita cari elemennya untuk di-scroll.
-      const timer = setTimeout(() => scrollToMonth(calendarDate, 'auto'), 50);
+      const timer = setTimeout(() => scrollToMonth(calendarDate, 'auto'), 30);
       return () => clearTimeout(timer);
+    } else if (calendarMode !== 'monthly') {
+      lastMonthlyAutoScrollRef.current = '';
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calendarMode, isActive]);
@@ -464,11 +505,16 @@ const CalendarTab = ({
 
   // Ukur tinggi peek di mode bulanan agar kartu pertama (beserta tombol "Selesai" & durasi)
   // tampil utuh di atas BottomNav tanpa terpotong.
+  const lastPeekSigRef = useRef('');
   useEffect(() => {
     if (!isActive || calendarMode !== 'monthly') return;
+    const workouts = sharedGetDayWorkouts(history, programs, activePlanIds, calendarSelectedDate);
+    const sig = `${calendarSelectedDate}|${bottomNavClearance}|${workouts?.[0]?.id || 'none'}|${workouts?.length || 0}`;
+    if (lastPeekSigRef.current === sig) return;
+    lastPeekSigRef.current = sig;
+
     const measurePeek = () => {
       const defaultClearance = bottomNavClearance || 90;
-      const workouts = sharedGetDayWorkouts(history, programs, activePlanIds, calendarSelectedDate);
       const hasWorkouts = Array.isArray(workouts) && workouts.length > 0;
 
       if (!sheetRef.current) {
@@ -1470,7 +1516,8 @@ const CalendarTab = ({
         ) : (
           <div
             ref={monthListRef}
-            className={`flex-1 min-h-0 overflow-y-auto hide-scrollbar pb-32 px-1 pt-2 animate-in fade-in duration-300 ease-out`}
+            onScroll={handleMonthListScroll}
+            className={`flex-1 min-h-0 overflow-y-auto hide-scrollbar pb-32 px-1 pt-2`}
             style={{ flex: '1 1 0%', minHeight: 0 }}
           >
             {monthRange.map(monthDate => {
@@ -2073,7 +2120,7 @@ const CalendarTab = ({
                                                              {zoneNode}
                                                            </div>
                                                            {aktualStr && (
-                                                             <div className="whitespace-nowrap text-[11px] opacity-50 tabular-nums leading-tight mt-0.5">
+                                                             <div className="whitespace-nowrap text-xs opacity-50 tabular-nums leading-tight mt-0.5">
                                                                {aktualStr}
                                                              </div>
                                                            )}

@@ -4,6 +4,7 @@ import Cropper from 'react-easy-crop';
 import { updateProfile } from 'firebase/auth';
 import { doc, updateDoc, setDoc, getDoc, runTransaction } from 'firebase/firestore';
 import { auth, storage, db } from '../firebase';
+import { cleanFirestoreData } from '../utils/historySync';
 import { ref, deleteObject } from 'firebase/storage';
 import { uploadImageToFirebase } from '../utils/storage';
 import ShareCardGenerator from '../components/ShareCardGenerator';
@@ -275,7 +276,7 @@ export default function ProfileModal({
             const userRef = doc(db, 'logym_users', user.uid);
             const now = Date.now();
 
-            await setDoc(userRef, { photoURL, lastPhotoUpdate: now }, { merge: true });
+            await setDoc(userRef, cleanFirestoreData({ photoURL, lastPhotoUpdate: now }), { merge: true });
             await updateUserProfileInFeed(user.uid, undefined, photoURL);
             if (setUser) setUser(prev => ({ ...prev, photoURL, lastPhotoUpdate: now }));
             setUploadStatus({ show: true, success: true, message: 'Foto profil berhasil diperbarui!' });
@@ -761,7 +762,7 @@ export default function ProfileModal({
                                             // memang mem-parsing dot-notation sebagai path. Field nested settings.userProfile
                                             // yang asli jadi tidak pernah ke-update, dan echo onSnapshot balikin state lokal
                                             // ke data lama (bug: username/nama/gender di profil sendiri "bandel" tidak berubah).
-                                            await updateDoc(userRef, updatePayload);
+                                            await updateDoc(userRef, cleanFirestoreData(updatePayload));
                                         } catch(e) { 
                                             if (e.message === "USERNAME_TAKEN") {
                                                 if (typeof showAlert === 'function') showAlert('Username sudah dipakai orang lain.', { type: 'error' });

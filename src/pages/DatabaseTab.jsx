@@ -406,10 +406,10 @@ const DatabaseTab = ({ isActive = true, t, lang, exerciseLibrary, setExerciseLib
   }, []);
 
   useEffect(() => {
-    if (!onlineFetched && !onlineLoading) {
+    if (isActive && !onlineFetched && !onlineLoading) {
       handleFetchOnline();
     }
-  }, [onlineFetched, onlineLoading, handleFetchOnline]);
+  }, [isActive, onlineFetched, onlineLoading, handleFetchOnline]);
 
   const handleRefreshOnline = () => {
     playSoundEffect('click', soundEnabled);
@@ -421,14 +421,14 @@ const DatabaseTab = ({ isActive = true, t, lang, exerciseLibrary, setExerciseLib
   // ── Combine Local and Online Library ─────────────────────────────
   const combinedLibrary = useMemo(() => {
     const onlineMap = new Map();
-    onlineExercises.forEach(ex => {
-      const canonicalOnline = canonicalizeExercise(ex);
+    const canonicalOnlineList = onlineExercises.map(ex => canonicalizeExercise(ex));
+    canonicalOnlineList.forEach((canonicalOnline) => {
       const cleanName = cleanExerciseNameForMatching(canonicalOnline.name);
       onlineMap.set(cleanName, canonicalOnline);
-      if (ex.id) onlineMap.set(String(ex.id), canonicalOnline);
-      if (ex.exerciseId) {
-        onlineMap.set(String(ex.exerciseId), canonicalOnline);
-        onlineMap.set(`edb-${ex.exerciseId}`, canonicalOnline);
+      if (canonicalOnline.id) onlineMap.set(String(canonicalOnline.id), canonicalOnline);
+      if (canonicalOnline.exerciseId) {
+        onlineMap.set(String(canonicalOnline.exerciseId), canonicalOnline);
+        onlineMap.set(`edb-${canonicalOnline.exerciseId}`, canonicalOnline);
       }
     });
 
@@ -448,9 +448,9 @@ const DatabaseTab = ({ isActive = true, t, lang, exerciseLibrary, setExerciseLib
         enrichedEx.instructions = onlineEx.instructions || enrichedEx.instructions;
         enrichedEx.instructions_id = onlineEx.instructions_id || enrichedEx.instructions_id;
         enrichedEx.instructions_en = onlineEx.instructions_en || enrichedEx.instructions_en;
-        enrichedEx.gifUrl = enrichedEx.gifUrl || onlineEx.gifUrl;
-        enrichedEx.videoUrl = enrichedEx.videoUrl || onlineEx.videoUrl;
-        enrichedEx.thumbnailUrl = enrichedEx.thumbnailUrl || onlineEx.thumbnailUrl;
+        enrichedEx.gifUrl = onlineEx.gifUrl || enrichedEx.gifUrl;
+        enrichedEx.videoUrl = onlineEx.videoUrl || enrichedEx.videoUrl;
+        enrichedEx.thumbnailUrl = onlineEx.thumbnailUrl || enrichedEx.thumbnailUrl;
         if (!enrichedEx.ytVideo && (onlineEx.ytVideo || onlineEx.videoUrl)) {
           enrichedEx.ytVideo = onlineEx.ytVideo || onlineEx.videoUrl;
         }
@@ -475,8 +475,7 @@ const DatabaseTab = ({ isActive = true, t, lang, exerciseLibrary, setExerciseLib
     });
 
     const deduplicatedLocal = Array.from(localMap.values());
-    const onlineToAdd = onlineExercises
-      .map(ex => canonicalizeExercise(ex))
+    const onlineToAdd = canonicalOnlineList
       .filter(ex => !localMap.has(cleanExerciseNameForMatching(ex.name)));
     
     return [...deduplicatedLocal, ...onlineToAdd];
@@ -494,19 +493,47 @@ const DatabaseTab = ({ isActive = true, t, lang, exerciseLibrary, setExerciseLib
     });
   }, []);
 
-  // ── Pemakaian sendiri ─────────────────────────────────────────────
+  // ── Pemakaian sendiri (hanya dihitung ulang ketika daftar `workouts` riwayat berubah) ───
+  const prevWorkoutsSnapRef = React.useRef(null);
+  const stableHistoryWorkouts = React.useMemo(() => {
+    const keys = Object.keys(history || {});
+    const entries = [];
+    for (let i = 0; i < keys.length; i++) {
+      const k = keys[i];
+      const w = history[k]?.workouts;
+      if (Array.isArray(w) && w.length > 0) entries.push([k, w]);
+    }
+    const prev = prevWorkoutsSnapRef.current;
+    if (prev && prev.entries.length === entries.length) {
+      let same = true;
+      for (let i = 0; i < entries.length; i++) {
+        if (prev.entries[i][0] !== entries[i][0] || prev.entries[i][1] !== entries[i][1]) {
+          same = false;
+          break;
+        }
+      }
+      if (same) return prev.mapObj;
+    }
+    const mapObj = {};
+    for (let i = 0; i < entries.length; i++) {
+      mapObj[entries[i][0]] = { workouts: entries[i][1] };
+    }
+    prevWorkoutsSnapRef.current = { entries, mapObj };
+    return mapObj;
+  }, [history]);
+
   const exLookup = useMemo(() => {
-    return buildExLookupByName(history, exerciseLibrary);
-  }, [history, exerciseLibrary]);
+    return buildExLookupByName(stableHistoryWorkouts, exerciseLibrary);
+  }, [stableHistoryWorkouts, exerciseLibrary]);
 
   const ownScores = useMemo(() => {
-    return computeOwnExerciseUsage(history, exLookup);
-  }, [history, exLookup]);
+    return computeOwnExerciseUsage(stableHistoryWorkouts, exLookup);
+  }, [stableHistoryWorkouts, exLookup]);
 
   // Hitung frekuensi latihan per kelompok otot dari riwayat user
   const musclePopularityScores = useMemo(() => {
     const mScores = {};
-    Object.values(history || {}).forEach(day => {
+    Object.values(stableHistoryWorkouts || {}).forEach(day => {
       (day.workouts || []).forEach(w => {
         (w.overriddenExercises || w.exercises || []).forEach(ex => {
           const targets = Array.isArray(ex?.target) ? ex.target : [ex?.target || ''];
@@ -518,34 +545,21 @@ const DatabaseTab = ({ isActive = true, t, lang, exerciseLibrary, setExerciseLib
       });
     });
     return mScores;
-  }, [history]);
-
-  // Gabungan: pemakaian sendiri dikalikan supaya kebiasaan user tetap menang atas tren global —
-  // daftar ini dipakai buat memilih latihan berikutnya, jadi yang sering dia pakai harus di depan.
-  // Bonus +1000 untuk 22 latihan master yang dulu di-hardcode sudah dibuang: itu mengunci urutan
-  // ke daftar tetap dan menutupi data sungguhan.
-  const popularityScores = useMemo(() => {
-    const merged = { ...globalScores };
-    Object.entries(ownScores).forEach(([k, v]) => { merged[k] = (merged[k] || 0) + v * 10; });
-    return merged;
-  }, [globalScores, ownScores]);
+  }, [stableHistoryWorkouts]);
 
   // ── Apply Gym Constraints First ──────────────────────────────────
   const gymFilteredLibrary = useMemo(() => {
-    let list = [...combinedLibrary];
     const activeGym = gymProfiles.find(g => g.id === activeGymId) || gymProfiles[0];
-    list = filterByGymEquipment(list, activeGym);
-    return list;
+    return filterByGymEquipment(combinedLibrary, activeGym);
   }, [combinedLibrary, gymProfiles, activeGymId]);
 
-  // Pre-index library untuk pencarian ultra-cepat & relevansi cerdas tanpa format string berulang
-  const indexedLibrary = useMemo(() => {
-    return gymFilteredLibrary.map(ex => prepareSearchableExercise(ex, lang?.id));
-  }, [gymFilteredLibrary, lang?.id]);
+  // Cache indeks pencarian lazily hanya saat user mengetik query agar buka tab Database instan
+  const searchPrepCacheRef = useRef(new WeakMap());
+  const langId = lang?.id;
 
   // ── Filter and Sort ──────────────────────────────────────────────
   const filteredList = useMemo(() => {
-    let list = [...indexedLibrary];
+    let list = gymFilteredLibrary;
 
     // Mode Filter (Custom Only)
     // ID custom biasanya hasil Date.now() yang > 1000000, ID default < 1000, source API='exercisedb'
@@ -556,16 +570,6 @@ const DatabaseTab = ({ isActive = true, t, lang, exerciseLibrary, setExerciseLib
     // Favorites Filter
     if (showFavoritesOnly) {
       list = list.filter(ex => ex.isFavorite);
-    }
-
-    // Search (Smart scoring & synonym expansion)
-    const isSearching = Boolean(deferredSearch && deferredSearch.trim());
-    if (isSearching) {
-      list = list.map(ex => {
-        const usage = ownScores[ex._slug] || ownScores[String(ex.id)] || 0;
-        const score = scoreExerciseMatch(ex, deferredSearch, usage);
-        return { ...ex, _searchScore: score };
-      }).filter(ex => ex._searchScore > -1);
     }
 
     // Muscle filter
@@ -586,75 +590,74 @@ const DatabaseTab = ({ isActive = true, t, lang, exerciseLibrary, setExerciseLib
       list = list.filter(ex => levelFilter.includes(ex.level || 'beginner'));
     }
 
-    // (Active Gym Equipment Filter moved to gymFilteredLibrary)
-
-    // Urutan di dalam kelompok. Favoritnya sendiri diangkat setelah ini.
-    const byOrder = (a, b) => {
-      if (sortOrder === 'popular') {
-        if (isSearching) {
-          const diff = (b._searchScore || 0) - (a._searchScore || 0);
-          if (diff !== 0) return diff;
+    // Search (Smart scoring & synonym expansion)
+    const isSearching = Boolean(deferredSearch && deferredSearch.trim());
+    if (isSearching) {
+      const cache = searchPrepCacheRef.current;
+      const scored = [];
+      for (let i = 0; i < list.length; i++) {
+        const rawEx = list[i];
+        let prepared = cache.get(rawEx);
+        if (!prepared || prepared._langId !== langId) {
+          prepared = prepareSearchableExercise(rawEx, langId);
+          prepared._langId = langId;
+          cache.set(rawEx, prepared);
         }
-
-        // Prioritas UTAMA: Latihan yang benar-benar pernah dilatih oleh user di riwayatnya
-        const ownA = ownScores[a._slug || exerciseSlug(a.name)] || ownScores[String(a.id)] || (a.exerciseId ? ownScores[exerciseSlug(a.exerciseId)] : 0) || 0;
-        const ownB = ownScores[b._slug || exerciseSlug(b.name)] || ownScores[String(b.id)] || (b.exerciseId ? ownScores[exerciseSlug(b.exerciseId)] : 0) || 0;
-        if (ownB !== ownA) return ownB - ownA;
-
-        // Jika sama-sama belum pernah dilatih user (own === 0), urutkan berdasarkan popularitas global/komunitas
-        const globA = globalScores[a._slug || exerciseSlug(a.name)] || 0;
-        const globB = globalScores[b._slug || exerciseSlug(b.name)] || 0;
-        if (globB !== globA) return globB - globA;
-
-        // Fallback jika sudah habis / sama-sama belum pernah dilatih (score === 0):
-        // 1. Urutkan berdasarkan kelompok otot yang paling sering dilatih user
-        const targetA = Array.isArray(a.target) && a.target.length > 0 ? a.target[0] : (a.target || '');
-        const targetB = Array.isArray(b.target) && b.target.length > 0 ? b.target[0] : (b.target || '');
-        const mKeyA = normalizeMuscleKey(targetA);
-        const mKeyB = normalizeMuscleKey(targetB);
-
-        const mUsageA = musclePopularityScores[mKeyA] || 0;
-        const mUsageB = musclePopularityScores[mKeyB] || 0;
-        if (mUsageB !== mUsageA) return mUsageB - mUsageA;
-
-        // 2. Urutkan berdasarkan kelompok hierarki anatomis otot (Dada -> Punggung -> Bahu -> Lengan -> Kaki -> Core -> Kardio)
-        const anatA = MUSCLE_ANATOMICAL_ORDER[mKeyA] ?? 99;
-        const anatB = MUSCLE_ANATOMICAL_ORDER[mKeyB] ?? 99;
-        if (anatA !== anatB) return anatA - anatB;
-
-        // 3. Di dalam kelompok otot yang sama, urutkan A-Z
-        return a.name.localeCompare(b.name);
+        const slug = prepared._slug || exerciseSlug(prepared.name);
+        const usage = ownScores[slug] || ownScores[String(prepared.id)] || 0;
+        const score = scoreExerciseMatch(prepared, deferredSearch, usage);
+        if (score > -1) {
+          scored.push({ ...prepared, _searchScore: score });
+        }
       }
-      if (sortOrder === 'az') return a.name.localeCompare(b.name);
-      if (sortOrder === 'za') return b.name.localeCompare(a.name);
-      // "Terbaru" = terakhir DITAMBAHKAN user. Latihan buatan/tambahan sendiri memakai
-      // `id: Date.now()`, jadi id-nya sudah berupa stempel waktu — id terbesar = paling baru.
-      // Latihan bawaan (id kecil) dan latihan online (bukan angka) turun dengan sendirinya.
-      const ta = Number(a.id);
-      const tb = Number(b.id);
-      const va = Number.isFinite(ta) ? ta : -1;
-      const vb = Number.isFinite(tb) ? tb : -1;
-      if (vb !== va) return vb - va;
-      return a.name.localeCompare(b.name);
-    };
+      list = scored;
+    }
 
-    // Favorit selalu naik ke puncak, apa pun urutan yang dipilih — urutan yang dipilih tetap
-    // berlaku DI DALAM masing-masing kelompok, jadi tidak ada pilihan dropdown yang jadi mubazir.
-    list.sort((a, b) => {
-      const fa = a.isFavorite ? 1 : 0;
-      const fb = b.isFavorite ? 1 : 0;
-      if (fa !== fb) return fb - fa;
-      return byOrder(a, b);
+    // Precompute sort keys once per item (O(N)) rather than inside O(N log N) comparator
+    const decorated = list.map((ex) => {
+      const slug = ex._slug || exerciseSlug(ex.name);
+      const target0 = Array.isArray(ex.target) && ex.target.length > 0 ? ex.target[0] : (ex.target || '');
+      const mKey = sortOrder === 'popular' ? normalizeMuscleKey(target0) : '';
+      const numId = Number(ex.id);
+      return {
+        ex,
+        fav: ex.isFavorite ? 1 : 0,
+        searchScore: ex._searchScore || 0,
+        own: sortOrder === 'popular'
+          ? (ownScores[slug] || ownScores[String(ex.id)] || (ex.exerciseId ? ownScores[exerciseSlug(ex.exerciseId)] : 0) || 0)
+          : 0,
+        glob: sortOrder === 'popular' ? (globalScores[slug] || 0) : 0,
+        mUsage: sortOrder === 'popular' ? (musclePopularityScores[mKey] || 0) : 0,
+        anat: sortOrder === 'popular' ? (MUSCLE_ANATOMICAL_ORDER[mKey] ?? 99) : 99,
+        tsId: Number.isFinite(numId) ? numId : -1,
+        nameLower: (ex.name || '').toLowerCase()
+      };
     });
 
-    return list;
-  }, [indexedLibrary, viewMode, showFavoritesOnly, deferredSearch, muscleFilter, equipFilter, levelFilter, sortOrder, popularityScores, musclePopularityScores, ownScores]);
+    decorated.sort((a, b) => {
+      if (a.fav !== b.fav) return b.fav - a.fav;
+      if (sortOrder === 'popular') {
+        if (isSearching && a.searchScore !== b.searchScore) return b.searchScore - a.searchScore;
+        if (a.own !== b.own) return b.own - a.own;
+        if (a.glob !== b.glob) return b.glob - a.glob;
+        if (a.mUsage !== b.mUsage) return b.mUsage - a.mUsage;
+        if (a.anat !== b.anat) return a.anat - b.anat;
+        return a.nameLower < b.nameLower ? -1 : (a.nameLower > b.nameLower ? 1 : 0);
+      }
+      if (sortOrder === 'az') return a.nameLower < b.nameLower ? -1 : (a.nameLower > b.nameLower ? 1 : 0);
+      if (sortOrder === 'za') return b.nameLower < a.nameLower ? -1 : (b.nameLower > a.nameLower ? 1 : 0);
+      if (a.tsId !== b.tsId) return b.tsId - a.tsId;
+      return a.nameLower < b.nameLower ? -1 : (a.nameLower > b.nameLower ? 1 : 0);
+    });
 
-  // Pagination for performance (Render top 30 initially, load more on demand)
-  const [displayCount, setDisplayCount] = useState(30);
+    return decorated.map(d => d.ex);
+  }, [gymFilteredLibrary, langId, viewMode, showFavoritesOnly, deferredSearch, muscleFilter, equipFilter, levelFilter, sortOrder, globalScores, musclePopularityScores, ownScores]);
+
+  // Pagination for performance (Render top 20 initially, load more on demand)
+  const [displayCount, setDisplayCount] = useState(20);
 
   useEffect(() => {
-    setDisplayCount(30);
+    setDisplayCount(20);
   }, [deferredSearch, muscleFilter, equipFilter, levelFilter, viewMode, showFavoritesOnly]);
 
   const displayedList = useMemo(() => {
@@ -1019,18 +1022,19 @@ const DatabaseTab = ({ isActive = true, t, lang, exerciseLibrary, setExerciseLib
               {displayedList.map((ex, idx) => {
                 const isCustom = ex.id > 1000000 && ex.source !== 'exercisedb';
                 return (
-                  <UnifiedExerciseCard
-                    key={ex.id || `${ex.name}-${idx}`}
-                    t={t}
-                    lang={lang}
-                    ex={ex}
-                    index={idx}
-                    isCustom={isCustom}
-                    onToggleFavorite={handleToggleFavorite}
-                    onEdit={() => handleStartEdit(ex)}
-                    onDelete={() => handleDelete(ex)}
-                    onOpenDetail={() => onOpenDetail(ex)}
-                  />
+                  <div key={ex.id || `${ex.name}-${idx}`} className="cv-auto">
+                    <UnifiedExerciseCard
+                      t={t}
+                      lang={lang}
+                      ex={ex}
+                      index={idx}
+                      isCustom={isCustom}
+                      onToggleFavorite={handleToggleFavorite}
+                      onEdit={() => handleStartEdit(ex)}
+                      onDelete={() => handleDelete(ex)}
+                      onOpenDetail={() => onOpenDetail(ex)}
+                    />
+                  </div>
                 );
               })}
             </div>

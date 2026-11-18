@@ -1,5 +1,6 @@
 import { db } from '../firebase';
 import { collection, addDoc, getDoc, getDocs, query, where, doc, updateDoc, setDoc, increment, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { cleanFirestoreData } from './historySync';
 
 export const BAD_WORDS = [
     // INDONESIA
@@ -57,7 +58,7 @@ export const reportPost = async (postId, reporterId, reason) => {
             const currentReports = (postSnap.data().reportCount || 0) + 1;
             const updateData = { reportCount: increment(1) };
             if (currentReports >= 3) updateData.isHidden = true;
-            await updateDoc(postRef, updateData);
+            await updateDoc(postRef, cleanFirestoreData(updateData));
         }
         const localHidden = JSON.parse(localStorage.getItem('lyfit_hidden_posts') || '[]');
         if (!localHidden.includes(postId)) {
@@ -74,11 +75,11 @@ export const reportPost = async (postId, reporterId, reason) => {
 export const banUserGlobal = async (userId) => {
     try {
         const userRef = doc(db, 'logym_users', userId);
-        await setDoc(userRef, {
+        await setDoc(userRef, cleanFirestoreData({
             isBanned: true,
             hasBeenBanned: true,
             bannedAt: serverTimestamp()
-        }, { merge: true });
+        }), { merge: true });
 
         // Hide all posts from this user
         const q = query(collection(db, 'logym_community_posts'), where('userId', '==', userId));
@@ -99,9 +100,9 @@ export const banUserGlobal = async (userId) => {
 export const unbanUserGlobal = async (userId) => {
     try {
         const userRef = doc(db, 'logym_users', userId);
-        await setDoc(userRef, {
+        await setDoc(userRef, cleanFirestoreData({
             isBanned: false
-        }, { merge: true });
+        }), { merge: true });
         return true;
     } catch (error) {
         console.error('Gagal membuka Ban:', error);

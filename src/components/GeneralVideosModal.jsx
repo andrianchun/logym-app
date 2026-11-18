@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Plus, Play, Flame, Snowflake, AlertTriangle } from 'lucide-react';
 import { getVideoId } from '../data/constants';
 import { playSoundEffect } from '../utils/audio';
@@ -29,6 +29,7 @@ const GeneralVideosModal = ({
   const [cooldownList, setCooldownList] = useState(() => parseVideoList(cooldownVideos));
   const [selectedVideoUrl, setSelectedVideoUrl] = useState('');
   const [isAutoPlay, setIsAutoPlay] = useState(false);
+  const iframeRef = useRef(null);
   const [itemToDelete, setItemToDelete] = useState(null);
   const [hasSaved, setHasSaved] = useState(false);
 
@@ -57,10 +58,24 @@ const GeneralVideosModal = ({
     }
   }, [isOpen, warmupVideos, cooldownVideos]);
 
-  if (!isOpen) return null;
-
   const currentList = activeTab === 'warmup' ? warmupList : cooldownList;
   const setCurrentList = activeTab === 'warmup' ? setWarmupList : setCooldownList;
+  const activeVideoId = getVideoId(selectedVideoUrl || currentList[0] || '');
+
+  useEffect(() => {
+    if (!isOpen || !activeVideoId) return;
+    const win = iframeRef.current?.contentWindow;
+    if (!win) return;
+    try {
+      win.postMessage(JSON.stringify({
+        event: 'command',
+        func: isAutoPlay ? 'playVideo' : 'pauseVideo',
+        args: []
+      }), '*');
+    } catch (_) {}
+  }, [isOpen, isAutoPlay, activeVideoId]);
+
+  if (!isOpen) return null;
 
   const handleUpdateItem = (index, value) => {
     const updated = [...currentList];
@@ -120,8 +135,6 @@ const GeneralVideosModal = ({
       onClose();
     }, 400);
   };
-
-  const activeVideoId = getVideoId(selectedVideoUrl || currentList[0] || '');
 
   return (
     <div 
@@ -194,8 +207,17 @@ const GeneralVideosModal = ({
           {activeVideoId ? (
             <div className="rounded-2xl overflow-hidden border border-black/10 dark:border-white/10 bg-black aspect-video relative shadow-lg">
               <iframe
-                key={`${activeVideoId}-${isAutoPlay ? 'autoplay' : 'normal'}`}
-                src={`https://www.youtube-nocookie.com/embed/${activeVideoId}?rel=0&modestbranding=1&enablejsapi=1${isAutoPlay ? '&autoplay=1' : ''}`}
+                ref={iframeRef}
+                key={activeVideoId}
+                src={`https://www.youtube-nocookie.com/embed/${activeVideoId}?rel=0&modestbranding=1&enablejsapi=1`}
+                onLoad={(e) => {
+                  try {
+                    e.target.contentWindow?.postMessage(JSON.stringify({ event: 'listening' }), '*');
+                    if (isAutoPlay) {
+                      e.target.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
+                    }
+                  } catch (_) {}
+                }}
                 title="Preview Video Instruksi"
                 className="w-full h-full"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"

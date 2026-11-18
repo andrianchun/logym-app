@@ -2027,6 +2027,34 @@ export const cleanExerciseNameForMatching = (name) => {
   return str;
 };
 
+const masterListIndexCache = new WeakMap();
+
+const getMasterListIndex = (masterList) => {
+  if (!Array.isArray(masterList)) return null;
+  let cached = masterListIndexCache.get(masterList);
+  if (cached && cached.len === masterList.length) return cached;
+  const byIdOrEx = new Map();
+  const byCleanName = new Map();
+  const byAliasName = new Map();
+  for (let i = 0; i < masterList.length; i++) {
+    const m = masterList[i];
+    if (!m) continue;
+    const primaryKey = String(m.id || m.exerciseId);
+    if (!byIdOrEx.has(primaryKey)) byIdOrEx.set(primaryKey, m);
+    const cname = cleanExerciseNameForMatching(m.name);
+    if (cname && !byCleanName.has(cname)) byCleanName.set(cname, m);
+    if (Array.isArray(m.aliases)) {
+      for (let j = 0; j < m.aliases.length; j++) {
+        const aname = cleanExerciseNameForMatching(m.aliases[j]);
+        if (aname && !byAliasName.has(aname)) byAliasName.set(aname, m);
+      }
+    }
+  }
+  cached = { len: masterList.length, byIdOrEx, byCleanName, byAliasName };
+  masterListIndexCache.set(masterList, cached);
+  return cached;
+};
+
 /**
  * Mencocokkan exercise dengan defaultMasterExercises atau daftar katalog lainnya secara cerdas.
  * Mendukung variasi nama seperti "Lat Pulldown" -> "Wide-Grip Lat Pulldown",
@@ -2035,13 +2063,14 @@ export const cleanExerciseNameForMatching = (name) => {
  * "Cable Lateral Raises" -> "Cable Seated Lateral Raise", "Rumanian Deadlift" -> "Romanian Deadlift", dll.
  */
 export const findMatchingMasterExercise = (targetEx, masterList = defaultMasterExercises) => {
-  if (!targetEx) return null;
+  if (!targetEx || !Array.isArray(masterList) || masterList.length === 0) return null;
+  const idx = getMasterListIndex(masterList);
   const rawId = targetEx.originalId || targetEx.id;
   const rawName = cleanExerciseNameForMatching(targetEx.name);
 
   // 1. Cocokkan berdasarkan ID
   if (rawId !== undefined && rawId !== null) {
-    const byId = masterList.find(m => String(m.id || m.exerciseId) === String(rawId));
+    const byId = idx.byIdOrEx.get(String(rawId));
     if (byId) return byId;
 
     // 1b. Cocokkan ID via exerciseAliasMap jika targetEx membawa originalId/id
@@ -2049,10 +2078,10 @@ export const findMatchingMasterExercise = (targetEx, masterList = defaultMasterE
       const aliasTarget = exerciseAliasMap[String(rawId)];
       if (aliasTarget) {
         const cleanAlias = aliasTarget.replace(/^edb-/, '');
-        const byAliasMap = masterList.find(m => 
-          String(m.id) === aliasTarget || 
-          String(m.id) === cleanAlias || 
-          String(m.exerciseId) === cleanAlias || 
+        const byAliasMap = masterList.find(m =>
+          String(m.id) === aliasTarget ||
+          String(m.id) === cleanAlias ||
+          String(m.exerciseId) === cleanAlias ||
           String(m.exerciseId) === aliasTarget
         );
         if (byAliasMap) return byAliasMap;
@@ -2063,11 +2092,11 @@ export const findMatchingMasterExercise = (targetEx, masterList = defaultMasterE
   if (!rawName) return null;
 
   // 2. Cocokkan nama persis / setelah normalisasi typo
-  const byExact = masterList.find(m => cleanExerciseNameForMatching(m.name) === rawName);
+  const byExact = idx.byCleanName.get(rawName);
   if (byExact) return byExact;
 
   // 2b. Cocokkan dari field aliases di masterList bila ada
-  const byMasterAlias = masterList.find(m => Array.isArray(m.aliases) && m.aliases.some(a => cleanExerciseNameForMatching(a) === rawName));
+  const byMasterAlias = idx.byAliasName.get(rawName);
   if (byMasterAlias) return byMasterAlias;
 
   // 3. Cocokkan ALIAS KANONIKAL RESMI SAJA (tanpa mencaplok variasi berbeda!)
@@ -2230,9 +2259,9 @@ export const findMatchingMasterExercise = (targetEx, masterList = defaultMasterE
     const cands = Array.isArray(canonicalEntry) ? canonicalEntry : [canonicalEntry];
     for (const cand of cands) {
       const candClean = cleanExerciseNameForMatching(cand);
-      const byCanonical = masterList.find(m => cleanExerciseNameForMatching(m.name) === candClean);
+      const byCanonical = idx.byCleanName.get(candClean);
       if (byCanonical) return byCanonical;
-      const byMasterAlias = masterList.find(m => Array.isArray(m.aliases) && m.aliases.some(a => cleanExerciseNameForMatching(a) === candClean));
+      const byMasterAlias = idx.byAliasName.get(candClean);
       if (byMasterAlias) return byMasterAlias;
     }
   }
@@ -3202,6 +3231,12 @@ export const getWorkoutSortMinutes = (w) => {
   return 900;
 };
 
+export const adhocSessionSignature = (w) => {
+  const exKey = (w?.exercises || []).map(e => String(e.originalId || e.id)).sort().join('|');
+  if (!exKey) return '';
+  return `${exKey}::${w?.timestamp || ''}::${w?.duration || ''}::${JSON.stringify(w?.log || {})}`;
+};
+
 export const getDayWorkouts = (history, programs, activePlanIds, dateStr) => {
   const dData = history?.[dateStr] || {};
   const historical = Array.isArray(dData.workouts) ? dData.workouts : [];
@@ -3246,12 +3281,13 @@ export const getDayWorkouts = (history, programs, activePlanIds, dateStr) => {
   }
 
   // Deduplikasi adhoc kembar (misal akibat spam klik simpan atau re-trigger konfirmasi pindah sesi)
+  // Sertakan timestamp/durasi/log agar dua sesi ekstra sah di hari sama (mis. pagi & sore) tidak terhapus.
   const deduplicatedEkstra = [];
   const seenAdhocKeys = new Set();
   ekstra.forEach(w => {
-    const exKey = (w.exercises || []).map(e => String(e.originalId || e.id)).sort().join('|');
-    if (!seenAdhocKeys.has(exKey)) {
-      seenAdhocKeys.add(exKey);
+    const sig = adhocSessionSignature(w);
+    if (!seenAdhocKeys.has(sig)) {
+      seenAdhocKeys.add(sig);
       deduplicatedEkstra.push(w);
     }
   });

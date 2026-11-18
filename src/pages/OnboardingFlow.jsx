@@ -5,6 +5,7 @@ import useSwipeStep from '../hooks/useSwipeStep';
 import { getSharedSteps, SharedStepRenderer, isValidAge } from '../components/SharedSteps';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase';
+import { cleanFirestoreData } from '../utils/historySync';
 import { hcAvailable, hcRequestPermissions } from '../utils/healthConnect';
 
 // Naikkan tanggal ini tiap teks consent direvisi
@@ -120,9 +121,9 @@ const OnboardingFlow = ({ t, theme, onComplete }) => {
         };
 
         if (docSnap.exists()) {
-          await updateDoc(userRef, payload);
+          await updateDoc(userRef, cleanFirestoreData(payload));
         } else {
-          await setDoc(userRef, { ...payload, createdAt: serverTimestamp() });
+          await setDoc(userRef, cleanFirestoreData({ ...payload, createdAt: serverTimestamp() }));
         }
       } catch (e) {
         console.error("Gagal menyimpan profil:", e);

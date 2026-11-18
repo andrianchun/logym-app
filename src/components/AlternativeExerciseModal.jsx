@@ -385,7 +385,7 @@ const AlternativeExerciseModal = ({
           {/* Recent Searches Chips ("Terakhir Dicari") */}
           {!searchTerm && recentSearches.length > 0 && (
             <div className="flex items-center gap-1.5 pt-1 overflow-x-auto no-scrollbar py-0.5">
-              <div className="flex items-center gap-1 text-[11px] font-bold text-slate-400 shrink-0 mr-0.5">
+              <div className="flex items-center gap-1 text-xs font-bold text-slate-400 shrink-0 mr-0.5">
                 <Clock size={12} className="text-slate-400" />
                 <span>Terakhir:</span>
               </div>
@@ -406,7 +406,7 @@ const AlternativeExerciseModal = ({
               <button
                 type="button"
                 onClick={clearRecentSearches}
-                className="text-[10px] font-bold text-slate-500 hover:text-rose-400 px-1 py-0.5 whitespace-nowrap transition-colors"
+                className="text-xs font-bold text-slate-500 hover:text-rose-400 px-1 py-0.5 whitespace-nowrap transition-colors"
                 title="Hapus riwayat pencarian"
               >
                 Hapus

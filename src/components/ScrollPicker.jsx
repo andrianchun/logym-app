@@ -14,18 +14,43 @@ const ScrollPicker = ({
   t 
 }) => {
   const containerRef = useRef(null);
+  const itemRefs = useRef([]);
   const isScrollingRef = useRef(false);
-  const [activeOpt, setActiveOpt] = useState(value);
+  const activeIndexRef = useRef(-1);
   const activeOptRef = useRef(value);
   const scrollTimeout = useRef(null);
   const lastScrollEndAt = useRef(0);
   const pointerDownPos = useRef(null);
+
+  const onChangeRef = useRef(onChange);
+  const onLiveChangeRef = useRef(onLiveChange);
+  const onLiveEndRef = useRef(onLiveEnd);
+  onChangeRef.current = onChange;
+  onLiveChangeRef.current = onLiveChange;
+  onLiveEndRef.current = onLiveEnd;
 
   // Ketik manual — dipencet (tanpa geser) akan membuka input teks biasa,
   // sama seperti SwipeInput di tempat lain.
   const [isEditing, setIsEditing] = useState(false);
   const [draftValue, setDraftValue] = useState('');
   const editInputRef = useRef(null);
+
+  const borderClass = t?.borderAccent || 'border-[#3b82f6]';
+  const bgSoftClass = t?.bgAccentSoft || 'bg-[#3b82f6]/20';
+  const textAccentClass = t?.textAccent || (theme === 'dark' ? 'text-[#9db8d6]' : 'text-[#41759b]');
+  const textMutedClass = t?.textMuted || (theme === 'dark' ? 'text-slate-400' : 'text-slate-600');
+
+  // Update visual item aktif langsung di DOM (0 React re-render saat roda digulir cepat).
+  const setActiveDomIndex = (nextIdx) => {
+    const prevIdx = activeIndexRef.current;
+    if (prevIdx === nextIdx) return;
+    const prevEl = itemRefs.current[prevIdx];
+    const nextEl = itemRefs.current[nextIdx];
+    const baseItemCls = 'h-[40px] flex items-center justify-center snap-center font-bold text-lg select-none';
+    if (prevEl) prevEl.className = `${baseItemCls} opacity-20 ${textMutedClass}`;
+    if (nextEl) nextEl.className = `${baseItemCls} opacity-100 ${textAccentClass}`;
+    activeIndexRef.current = nextIdx;
+  };
 
   // Memoize options agar tidak alokasi array baru di tiap render
   const options = useMemo(() => {
@@ -38,6 +63,11 @@ const ScrollPicker = ({
     }
     return opts;
   }, [min, max, step]);
+
+  // Bersihkan timer pending saat unmount / pindah latihan agar tidak menembak nilai basi
+  useEffect(() => () => {
+    if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
+  }, []);
 
   // Handle initial / external scroll position secara stabil tanpa interupsi gestur
   useEffect(() => {
@@ -61,9 +91,9 @@ const ScrollPicker = ({
         containerRef.current.scrollTop = targetScroll;
       }
       activeOptRef.current = options[index];
-      setActiveOpt(options[index]);
+      setActiveDomIndex(index);
     }
-  }, [value, options, isEditing]);
+  }, [value, options, isEditing, textAccentClass, textMutedClass]);
 
   useEffect(() => {
     if (isEditing && editInputRef.current) {
@@ -80,10 +110,10 @@ const ScrollPicker = ({
     
     if (index >= 0 && index < options.length) {
       const currentOpt = options[index];
+      setActiveDomIndex(index);
       if (currentOpt !== activeOptRef.current) {
         activeOptRef.current = currentOpt;
-        setActiveOpt(currentOpt);
-        if (onLiveChange) onLiveChange(currentOpt);
+        if (onLiveChangeRef.current) onLiveChangeRef.current(currentOpt);
       }
     }
 
@@ -96,11 +126,11 @@ const ScrollPicker = ({
       if (index >= 0 && index < options.length) {
         const newValue = options[index];
         if (newValue !== value) {
-          onChange(newValue);
+          onChangeRef.current(newValue);
         }
       }
-      if (onLiveEnd) onLiveEnd();
-    }, 120); // Debounce scroll end yang responsif
+      if (onLiveEndRef.current) onLiveEndRef.current();
+    }, 100); // Debounce scroll end lebih sigap tanpa menahan momentum native
   };
 
   const handlePointerDown = (e) => {
@@ -117,7 +147,8 @@ const ScrollPicker = ({
       const dy = Math.abs(point.clientY - pointerDownPos.current.y);
       if (dx > 6 || dy > 6) return; // ini geser, bukan tap
     }
-    setDraftValue(String(value ?? ''));
+    setDraftValue(String(activeOptRef.current ?? value ?? ''));
+    activeIndexRef.current = -1;
     setIsEditing(true);
   };
 
@@ -127,14 +158,9 @@ const ScrollPicker = ({
     if (!isNaN(parsed)) {
       const clamped = Math.min(max, Math.max(min, parsed));
       const snapped = Math.round(clamped / step) * step;
-      onChange(Number(snapped.toFixed(2)));
+      onChangeRef.current(Number(snapped.toFixed(2)));
     }
   };
-
-  const borderClass = t?.borderAccent || (theme === 'dark' ? 'border-[#3b82f6]' : 'border-[#3b82f6]');
-  const bgSoftClass = t?.bgAccentSoft || (theme === 'dark' ? 'bg-[#3b82f6]/20' : 'bg-[#3b82f6]/20');
-  const textAccentClass = t?.textAccent || (theme === 'dark' ? 'text-[#9db8d6]' : 'text-[#41759b]');
-  const textMutedClass = t?.textMuted || (theme === 'dark' ? 'text-slate-400' : 'text-slate-600');
 
   const paddingHeight = Math.max(0, (height - 40) / 2);
 
@@ -175,16 +201,18 @@ const ScrollPicker = ({
         onMouseUp={handleTap}
         onTouchEnd={handleTap}
         className="h-full w-full overflow-y-auto snap-y snap-mandatory hide-scrollbar relative z-20 overscroll-contain"
-        style={{ touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' }}
+        style={{ touchAction: 'pan-y', WebkitOverflowScrolling: 'touch', willChange: 'scroll-position', contain: 'layout style' }}
       >
         {/* Padding items to allow snapping to first and last */}
         <div style={{ height: `${paddingHeight}px` }} className="snap-center shrink-0"></div>
 
-        {options.map((opt) => (
+        {options.map((opt, idx) => (
           <div
             key={opt}
+            ref={(el) => { itemRefs.current[idx] = el; }}
+            style={{ contain: 'strict', height: '40px' }}
             className={`h-[40px] flex items-center justify-center snap-center font-bold text-lg select-none ${
-              opt === activeOpt ? `opacity-100 ${textAccentClass}` : `opacity-20 ${textMutedClass}`
+              opt === activeOptRef.current ? `opacity-100 ${textAccentClass}` : `opacity-20 ${textMutedClass}`
             }`}
           >
             {opt}

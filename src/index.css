@@ -64,6 +64,10 @@ button, a, [role="button"] {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
+.cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 260px;
+}
 
 /* --- ENTRANCE ANIMATION --- */
 @keyframes riseIn {

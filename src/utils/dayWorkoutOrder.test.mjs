@@ -28,10 +28,11 @@ const urut = (r) => r.map(w => w.programId);
 
 // 3. Beberapa Ekstra tetap urut relatif satu sama lain, semuanya di bawah.
 {
-  const e2 = { ...ekstra, id: 'a2' };
-  const hist = { [TGL]: { workouts: [ekstra, e2] } };
+  const e2 = { ...ekstra, id: 'a2', exercises: [{ id: 'e10' }] };
+  const e3SameExEvening = { ...ekstra, id: 'a3_eve', timestamp: '19:00', duration: '20:00' };
+  const hist = { [TGL]: { workouts: [ekstra, e2, e3SameExEvening] } };
   const r = getDayWorkouts(hist, [prog], ['custom'], TGL);
-  assert.deepEqual(r.map(w => w.id), ['projected_p1_' + TGL, 'a1', 'a2']);
+  assert.deepEqual(r.map(w => w.id), ['projected_p1_' + TGL, 'a1', 'a2', 'a3_eve']);
 }
 
 // 4. Hari tanpa sesi Ekstra tidak berubah perilakunya.

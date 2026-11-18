@@ -119,7 +119,7 @@ const SortableExerciseItem = ({
               className="cursor-pointer group/title"
             >
               <p className={`text-sm sm:text-base font-bold ${t.textMain} truncate w-full leading-tight group-hover/title:${t.textAccent} transition-colors`}>{ex.name}</p>
-              <p className={`text-[11px] font-bold ${t.textMuted} uppercase tracking-wider truncate w-full leading-snug mt-0.5`}>
+              <p className={`text-xs font-bold ${t.textMuted} uppercase tracking-wider truncate w-full leading-snug mt-0.5`}>
                 {ex.equipment || 'BODYWEIGHT'} &bull; {formatTarget(ex.target, lang?.id)}
               </p>
             </div>
@@ -127,7 +127,7 @@ const SortableExerciseItem = ({
             {/* Sets Reps */}
             <div className="flex items-center gap-2 sm:gap-2.5 mt-0.5">
               <div className="flex items-center gap-1.5">
-                <span className={`text-[10px] sm:text-[11px] font-bold ${t.textMuted} uppercase`}>Sets</span>
+                <span className={`text-xs font-bold ${t.textMuted} uppercase`}>Sets</span>
                 <div className={`w-10 sm:w-11 h-7 rounded-lg ${t.inputBg} ${t.textMain} font-bold text-sm focus-within:ring-2 focus-within:${t.ringAccent} transition-all overflow-hidden`}>
                   <input
                     type="number"
@@ -147,7 +147,7 @@ const SortableExerciseItem = ({
               </div>
               {isTime ? (
                 <div className="flex items-center gap-1.5">
-                  <span className={`text-[10px] sm:text-[11px] font-bold ${t.textMuted} uppercase`}>Min</span>
+                  <span className={`text-xs font-bold ${t.textMuted} uppercase`}>Min</span>
                   <div className={`w-10 sm:w-11 h-7 rounded-lg ${t.inputBg} ${t.textMain} font-bold text-sm focus-within:ring-2 focus-within:${t.ringAccent} transition-all overflow-hidden`}>
                     <input
                       type="number"
@@ -167,7 +167,7 @@ const SortableExerciseItem = ({
                 </div>
               ) : (
                 <div className="flex items-center gap-1.5">
-                  <span className={`text-[10px] sm:text-[11px] font-bold ${t.textMuted} uppercase`}>Reps</span>
+                  <span className={`text-xs font-bold ${t.textMuted} uppercase`}>Reps</span>
                   <div className={`w-10 sm:w-11 h-7 rounded-lg ${t.inputBg} ${t.textMain} font-bold text-sm focus-within:ring-2 focus-within:${t.ringAccent} transition-all overflow-hidden`}>
                     <input
                       type="number"
@@ -1061,7 +1061,7 @@ const ProgramTab = ({
                                                <span className="text-xs text-slate-200 font-semibold leading-snug break-words w-full" title={ex.name}>
                                                  {ex.name}
                                                </span>
-                                               <span className="text-[11px] text-slate-400 font-bold text-left">
+                                               <span className="text-xs text-slate-400 font-bold text-left">
                                                  {ex.sets || 3} &times; {ex.reps || (ex.duration ? (Number(ex.duration) > 5 && Number(ex.duration) % 60 !== 0 ? `${ex.duration}s` : `${Number(ex.duration) > 5 ? Number(ex.duration) / 60 : ex.duration}m`) : '1m')}
                                                </span>
                                              </div>

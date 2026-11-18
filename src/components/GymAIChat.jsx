@@ -7,6 +7,7 @@ import { buildSystemPrompt, summarizeWorkoutLogs, summarizeHealthAndRecovery, su
 import { fetchExercisesFromApi, pickRelevantExercises } from '../utils/exerciseDbApi';
 import renderMiniMarkdown from '../utils/miniMarkdown';
 import { db } from '../firebase';
+import { cleanFirestoreData } from '../utils/historySync';
 import { useWakeLock } from '../hooks/useWakeLock';
 
 const sendBackgroundNotification = async (title, body) => {
@@ -215,7 +216,7 @@ export default function GymAIChat({
                     }
                 }
                 loadedSessions.forEach(s => {
-                    setDoc(doc(db, 'logym_users', uid, 'ai_sessions', s.id), s).catch(err => console.warn('Migrasi sesi chat ke cloud gagal:', err));
+                    setDoc(doc(db, 'logym_users', uid, 'ai_sessions', s.id), cleanFirestoreData(s)).catch(err => console.warn('Migrasi sesi chat ke cloud gagal:', err));
                 });
             }
 
@@ -270,7 +271,7 @@ export default function GymAIChat({
                 const json = JSON.stringify(s);
                 newBaseline[s.id] = json;
                 if (baseline[s.id] === json) return; // tidak berubah sejak save terakhir
-                setDoc(doc(db, 'logym_users', user.uid, 'ai_sessions', s.id), s).catch(err => console.error('Sync sesi chat gagal:', err));
+                setDoc(doc(db, 'logym_users', user.uid, 'ai_sessions', s.id), cleanFirestoreData(s)).catch(err => console.error('Sync sesi chat gagal:', err));
             });
 
             Object.keys(baseline).forEach(id => {
@@ -557,7 +558,7 @@ export default function GymAIChat({
             if (isOpenRef.current && activeSessionIdRef.current === currentSessionId) {
                 // Drop the empty thinking placeholder and provide offline rule-based guidance
                 const isOfflineError = (typeof navigator !== 'undefined' && !navigator.onLine) || err.message?.includes('Failed to fetch') || err.message?.includes('Semua jalur AI gagal') || err.message?.includes('network');
-                const offlineFallbackText = generateOfflineAiReply(currentInput, { history, programs, userProfile, readiness, plateauInsights });
+                const offlineFallbackText = generateOfflineAiReply(userMsg.content, { history, programs, userProfile, readiness, plateauInsights });
                 
                 let fallbackMsg = offlineFallbackText;
                 if (!isOfflineError && (err.message?.includes('quota') || err.message?.includes('RATE_LIMIT'))) {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Flame, Snowflake } from 'lucide-react';
+import { Flame } from 'lucide-react';
 
 const WorkoutHeader = ({
   t,
@@ -9,8 +9,6 @@ const WorkoutHeader = ({
   playSoundEffect,
   warmupVideos,
   onOpenWarmup,
-  cooldownVideos,
-  onOpenCooldown,
   wellnessConfig,
   onOpenWellness
 }) => {
@@ -35,20 +33,10 @@ const WorkoutHeader = ({
             <button
               type="button"
               onClick={() => { playSoundEffect('click', soundEnabled); onOpenWarmup(); }}
-              className="flex items-center justify-center w-11 h-11 rounded-full transition-all active:scale-95 bg-orange-500/15 border border-orange-500/30 hover:bg-orange-500/25 text-orange-500 dark:text-orange-400 shadow-sm shadow-orange-950/10"
+              className="flex items-center justify-center w-11 h-11 rounded-full transition-transform active:scale-95 bg-orange-500/15 border border-orange-500/30 hover:bg-orange-500/25 text-orange-500 dark:text-orange-400 shadow-sm shadow-orange-950/10"
               title="Pemanasan (Warmup)"
             >
               <Flame size={20} strokeWidth={2.2} />
-            </button>
-          )}
-          {cooldownVideos && (
-            <button
-              type="button"
-              onClick={() => { playSoundEffect('click', soundEnabled); onOpenCooldown(); }}
-              className="flex items-center justify-center w-11 h-11 rounded-full transition-all active:scale-95 bg-cyan-500/15 border border-cyan-500/30 hover:bg-cyan-500/25 text-cyan-500 dark:text-cyan-400 shadow-sm shadow-cyan-950/10"
-              title="Pendinginan (Cooldown)"
-            >
-              <Snowflake size={20} strokeWidth={2.2} />
             </button>
           )}
           {wellnessConfig && (
@@ -58,7 +46,7 @@ const WorkoutHeader = ({
                 playSoundEffect('click', soundEnabled);
                 onOpenWellness?.();
               }}
-              className={`flex items-center justify-center w-11 h-11 rounded-full transition-all active:scale-95 border shadow-sm ${wellnessConfig.btnStyle || 'bg-white/5 border-white/10 text-white'}`}
+              className={`flex items-center justify-center w-11 h-11 rounded-full transition-transform active:scale-95 border shadow-sm ${wellnessConfig.btnStyle || 'bg-white/5 border-white/10 text-white'}`}
               title={`Kondisi Tubuh: ${wellnessConfig.label} (Ketuk untuk detail / ubah)`}
             >
               {wellnessConfig.icon}

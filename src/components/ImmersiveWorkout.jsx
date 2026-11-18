@@ -232,7 +232,7 @@ const ImmersiveRestBar = ({ restTargetTime, setRestTargetTime, formatTime, theme
   );
 };
 
-const ImmersiveWeightPickerCell = React.memo(({
+const ImmersiveWeightPickerCell = React.memo(function ImmersiveWeightPickerCell({
   itemSet,
   activeSetIdx,
   ex,
@@ -243,15 +243,35 @@ const ImmersiveWeightPickerCell = React.memo(({
   showWeightInfo,
   setShowWeightInfo,
   onSetChange
-}) => {
+}) {
   const [liveW, setLiveW] = useState(null);
+  const onSetChangeRef = React.useRef(onSetChange);
+  onSetChangeRef.current = onSetChange;
+  const exRef = React.useRef(ex);
+  exRef.current = ex;
+  const setIdxRef = React.useRef(activeSetIdx);
+  setIdxRef.current = activeSetIdx;
+  const isImpRef = React.useRef(isImp);
+  isImpRef.current = isImp;
 
-  const rawDisplayW = liveW !== null ? liveW : (isImp ? Math.round(Number(itemSet?.w || 0) * 2.20462 * 10) / 10 : (itemSet?.w || 0));
+  const handleLiveEnd = React.useCallback(() => setLiveW(null), []);
+  const handleWeightCommit = React.useCallback((val) => {
+    setLiveW(null);
+    const curEx = exRef.current;
+    if (!curEx) return;
+    const stored = isImpRef.current ? Number((val / 2.20462).toFixed(2)) : val;
+    onSetChangeRef.current?.(curEx.id, setIdxRef.current, 'w', stored, curEx);
+  }, []);
+
+  const pickerValue = isImp ? Math.round(Number(itemSet?.w || 0) * 2.20462 * 10) / 10 : (itemSet?.w || 0);
+  const rawDisplayW = liveW !== null ? liveW : pickerValue;
   const effectiveKg = isImp ? (Number(rawDisplayW || 0) / 2.20462) : Number(rawDisplayW || 0);
   const actW = liveW !== null 
     ? calculateActualWeight(effectiveKg, eqConf) 
     : getSetActualWeight(itemSet, eqConf);
   const hasWeightDiff = eqConf.baseWeight > 0 && actW > 0;
+  const stepVal = eqConf.increment || (isImp ? 5 : 2.5);
+  const maxVal = isImp ? 440 : 200;
 
   return (
     <div className="flex-1 flex flex-col items-center relative">
@@ -261,7 +281,7 @@ const ImmersiveWeightPickerCell = React.memo(({
           <button 
             type="button"
             onClick={(e) => { e.stopPropagation(); setShowWeightInfo(prev => !prev); }}
-            className={`p-0.5 rounded-full transition-all ${showWeightInfo ? 'text-sky-400 scale-110' : 'text-slate-400 hover:text-sky-400'}`}
+            className={`p-0.5 rounded-full transition-colors ${showWeightInfo ? 'text-sky-400 scale-110' : 'text-slate-400 hover:text-sky-400'}`}
             title="Info Beban Total"
           >
             <Info size={14} strokeWidth={2.2} />
@@ -274,7 +294,7 @@ const ImmersiveWeightPickerCell = React.memo(({
                 onClick={(e) => { e.stopPropagation(); setShowWeightInfo(false); }} 
               />
               <div 
-                className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-max max-w-[240px] px-3.5 py-2 rounded-2xl bg-[#0a1022] border border-white/15 backdrop-blur-xl text-left shadow-2xl shadow-black/80 z-40 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto"
+                className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-max max-w-[240px] px-3.5 py-2 rounded-2xl bg-[#0a1022]/95 border border-white/15 text-left shadow-2xl shadow-black/80 z-40 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="font-bold text-xs text-sky-400 whitespace-nowrap">
@@ -297,14 +317,11 @@ const ImmersiveWeightPickerCell = React.memo(({
         </div>
       </div>
       <ScrollPicker 
-        value={isImp ? Math.round(Number(itemSet?.w || 0) * 2.20462 * 10) / 10 : (itemSet?.w || 0)} 
+        value={pickerValue}
         onLiveChange={setLiveW}
-        onLiveEnd={() => setLiveW(null)}
-        onChange={(val) => {
-          setLiveW(null);
-          onSetChange(ex.id, activeSetIdx, 'w', isImp ? Number((val / 2.20462).toFixed(2)) : val, ex);
-        }}
-        min={0} max={isImp ? 440 : 200} step={eqConf.increment || (isImp ? 5 : 2.5)} width="w-full" theme={theme} t={t}
+        onLiveEnd={handleLiveEnd}
+        onChange={handleWeightCommit}
+        min={0} max={maxVal} step={stepVal} width="w-full" theme={theme} t={t}
       />
       {hasWeightDiff && (
         <div className="h-5 mt-1 flex items-center justify-center">
@@ -514,13 +531,17 @@ const ImmersiveWorkout = ({
     setSelectedSetIdx(null);
   }, [currentIndex]);
 
-  // 3. Current Set Logic
+  // 3. Current Set Logic (dihitung 1x per render, bukan 6-7x)
   const logs = ex ? getLogsForEx(ex) : [];
+  const eqConf = React.useMemo(
+    () => (ex ? getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile) : { baseWeight: 0, ratio: 1, increment: 2.5 }),
+    [gymProfiles, activeGymId, ex, userProfile]
+  );
 
   let activeSetIdx = 0;
   if (ex) {
-     const incompleteIdx = getLogsForEx(ex).findIndex(s => !s.done);
-     const defaultIdx = incompleteIdx !== -1 ? incompleteIdx : Math.max(0, getLogsForEx(ex).length - 1);
+     const incompleteIdx = logs.findIndex(s => !s.done);
+     const defaultIdx = incompleteIdx !== -1 ? incompleteIdx : Math.max(0, logs.length - 1);
      if (selectedSetIdx !== null && selectedSetIdx >= 0 && selectedSetIdx < logs.length) {
        activeSetIdx = selectedSetIdx;
      } else {
@@ -529,7 +550,27 @@ const ImmersiveWorkout = ({
   }
 
   const activeSet = logs[activeSetIdx];
-  const isAllDone = ex && getLogsForEx(ex).length > 0 && getLogsForEx(ex).every(s => s.done || s.skipped);
+  const isAllDone = ex && logs.length > 0 && logs.every(s => s.done || s.skipped);
+
+  const handleCardioChangeRef = React.useRef(null);
+  const onSetChangeRef = React.useRef(onSetChange);
+  onSetChangeRef.current = onSetChange;
+  const curExRef = React.useRef(ex);
+  curExRef.current = ex;
+  const activeSetIdxRef = React.useRef(activeSetIdx);
+  activeSetIdxRef.current = activeSetIdx;
+
+  const handleDistancePick = React.useCallback((val) => handleCardioChangeRef.current?.('distance', val), []);
+  const handleDurationPick = React.useCallback((val) => handleCardioChangeRef.current?.('duration', val), []);
+  const handleSpeedPick = React.useCallback((val) => handleCardioChangeRef.current?.('speed', val), []);
+  const handleTimeDurPick = React.useCallback((val) => {
+    const curEx = curExRef.current;
+    if (curEx) onSetChangeRef.current?.(curEx.id, activeSetIdxRef.current, 'd', val, curEx);
+  }, []);
+  const handleRepsPick = React.useCallback((val) => {
+    const curEx = curExRef.current;
+    if (curEx) onSetChangeRef.current?.(curEx.id, activeSetIdxRef.current, 'r', val, curEx);
+  }, []);
 
   const [activeTimer, setActiveTimer] = React.useState(() => {
      if (window.logymActiveTimer && window.logymActiveTimer.exId === ex?.id) {
@@ -741,8 +782,17 @@ const ImmersiveWorkout = ({
     direction: null, // 'horizontal' | 'vertical' | null
   });
 
-  const [dragOffsetPx, setDragOffsetPx] = React.useState(0);
-  const [isSwipingMedia, setIsSwipingMedia] = React.useState(false);
+  // Track swipe carousel directly via DOM ref (0 React re-renders saat geser horizontal)
+  const mediaTrackRef = React.useRef(null);
+  const mediaCount = Math.max(1, mediaItems.length);
+  const baseMediaPct = activeMediaIndex * (100 / mediaCount);
+
+  React.useLayoutEffect(() => {
+    const el = mediaTrackRef.current;
+    if (!el) return;
+    el.style.transition = 'transform 260ms cubic-bezier(0.25, 1, 0.5, 1)';
+    el.style.transform = `translate3d(-${baseMediaPct}%, 0, 0)`;
+  }, [baseMediaPct]);
 
   const onTouchStart = (e) => {
     if (diLuarImmersive(e)) return;
@@ -756,8 +806,6 @@ const ImmersiveWorkout = ({
       isDragging: true,
       direction: null,
     };
-    setIsSwipingMedia(false);
-    setDragOffsetPx(0);
   };
 
   const onTouchMove = (e) => {
@@ -778,21 +826,26 @@ const ImmersiveWorkout = ({
       }
     }
 
-    // Jika horizontal & ada lebih dari 1 media: geser kartu visual secara visual di layar
+    // Jika horizontal & ada lebih dari 1 media: geser track langsung di GPU layer tanpa re-render React
     if (touchStateRef.current.direction === 'horizontal' && mediaItems.length > 1) {
       if (e.cancelable) e.preventDefault();
-      setIsSwipingMedia(true);
-      // Batasi tarikan visual elastis
       const clampedOffset = Math.max(-140, Math.min(140, diffX));
-      setDragOffsetPx(clampedOffset);
+      const el = mediaTrackRef.current;
+      if (el) {
+        el.style.transition = 'none';
+        el.style.transform = `translate3d(calc(-${baseMediaPct}% + ${clampedOffset}px), 0, 0)`;
+      }
       return;
     }
 
     // Jika vertikal ke bawah: minimize saat ditarik > 45px
     if (touchStateRef.current.direction === 'vertical' && diffY > 45 && diffY > Math.abs(diffX) * 1.4) {
       touchStateRef.current.isDragging = false;
-      setIsSwipingMedia(false);
-      setDragOffsetPx(0);
+      const el = mediaTrackRef.current;
+      if (el) {
+        el.style.transition = 'transform 260ms cubic-bezier(0.25, 1, 0.5, 1)';
+        el.style.transform = `translate3d(-${baseMediaPct}%, 0, 0)`;
+      }
       playSoundEffect('click', soundEnabled);
       handleMinimize();
     }
@@ -808,8 +861,11 @@ const ImmersiveWorkout = ({
     const elapsed = Math.max(1, Date.now() - startTime);
     const velocityX = Math.abs(deltaX) / elapsed; // px per ms
 
-    setIsSwipingMedia(false);
-    setDragOffsetPx(0);
+    const el = mediaTrackRef.current;
+    if (el) {
+      el.style.transition = 'transform 260ms cubic-bezier(0.25, 1, 0.5, 1)';
+      el.style.transform = `translate3d(-${baseMediaPct}%, 0, 0)`;
+    }
 
     // 1. Geser Horizontal -> ganti media (sangat ringan & responsif)
     if (direction === 'horizontal' || Math.abs(deltaX) > Math.abs(deltaY)) {
@@ -835,12 +891,9 @@ const ImmersiveWorkout = ({
     }
   };
 
-  // Top bar swipe logic for minimizing (swipe down from header/drag handle area)
+  // Top bar swipe logic using ref (0 re-renders saat menarik header ke bawah)
   const rootRef = React.useRef(null);
-  const [topTouchStartX, setTopTouchStartX] = React.useState(null);
-  const [topTouchStartY, setTopTouchStartY] = React.useState(null);
-  const [topTouchEndX, setTopTouchEndX] = React.useState(null);
-  const [topTouchEndY, setTopTouchEndY] = React.useState(null);
+  const topTouchRef = React.useRef({ startX: null, startY: null, endX: null, endY: null });
 
   const diLuarImmersive = (e) => {
     const el = e.target;
@@ -852,32 +905,37 @@ const ImmersiveWorkout = ({
     if (activeSetDetail !== null || showFinishConfirm) return;
     if (diLuarImmersive(e)) return;
     if (e.target.closest('button') || e.target.closest('input')) return;
-    setTopTouchEndX(null);
-    setTopTouchEndY(null);
-    setTopTouchStartX(e.targetTouches[0].clientX);
-    setTopTouchStartY(e.targetTouches[0].clientY);
+    topTouchRef.current = {
+      startX: e.targetTouches[0].clientX,
+      startY: e.targetTouches[0].clientY,
+      endX: null,
+      endY: null,
+    };
   };
 
   const onTopBarTouchMove = (e) => {
     if (activeSetDetail !== null || showFinishConfirm) return;
+    const tState = topTouchRef.current;
+    if (tState.startY === null) return;
     const curX = e.targetTouches[0].clientX;
     const curY = e.targetTouches[0].clientY;
-    setTopTouchEndX(curX);
-    setTopTouchEndY(curY);
+    tState.endX = curX;
+    tState.endY = curY;
 
     // Langsung minimize seketika dari area header saat ditarik ke bawah > 40px!
-    if (topTouchStartY !== null && (curY - topTouchStartY) > 40 && (curY - topTouchStartY) > Math.abs(curX - (topTouchStartX || curX)) * 1.1) {
-      setTopTouchStartY(null);
-      setTopTouchStartX(null);
+    if ((curY - tState.startY) > 40 && (curY - tState.startY) > Math.abs(curX - (tState.startX || curX)) * 1.1) {
+      topTouchRef.current = { startX: null, startY: null, endX: null, endY: null };
       playSoundEffect('click', soundEnabled);
       handleMinimize();
     }
   };
 
   const onTopBarTouchEnd = () => {
-    if (activeSetDetail !== null || showFinishConfirm || topTouchStartY === null || topTouchEndY === null) return;
-    const deltaY = topTouchEndY - topTouchStartY; // positive = swipe down
-    const deltaX = (topTouchEndX !== null && topTouchStartX !== null) ? topTouchEndX - topTouchStartX : 0;
+    const tState = topTouchRef.current;
+    if (activeSetDetail !== null || showFinishConfirm || tState.startY === null || tState.endY === null) return;
+    const deltaY = tState.endY - tState.startY; // positive = swipe down
+    const deltaX = (tState.endX !== null && tState.startX !== null) ? tState.endX - tState.startX : 0;
+    topTouchRef.current = { startX: null, startY: null, endX: null, endY: null };
     
     // Tarik ke bawah > 40px dan arah dominan ke bawah -> Langsung Minimize!
     if (deltaY > 40 && deltaY > Math.abs(deltaX) * 1.1) {
@@ -901,7 +959,10 @@ const ImmersiveWorkout = ({
     return -1;
   };
 
-  const isAllWorkoutDone = validExercises.length > 0 && validExercises.every(eItem => isExerciseFullyDone(eItem));
+  const isAllWorkoutDone = React.useMemo(
+    () => validExercises.length > 0 && validExercises.every(eItem => isExerciseFullyDone(eItem)),
+    [validExercises, skippedExercises, exerciseLogs, getSetLogs] // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   const handleNextEx = () => {
     playSoundEffect('click', soundEnabled);
@@ -985,6 +1046,7 @@ const ImmersiveWorkout = ({
          }
       }
   };
+  handleCardioChangeRef.current = handleCardioChange;
 
   const handleDoneClick = () => {
     if (!ex) return;
@@ -1122,11 +1184,12 @@ const ImmersiveWorkout = ({
           onTouchEnd={onTouchEnd}
         >
         <div 
+          ref={mediaTrackRef}
           className="flex h-full w-full"
           style={{ 
-            transform: `translateX(calc(-${activeMediaIndex * (100 / Math.max(1, mediaItems.length))}% + ${dragOffsetPx}px))`,
-            width: `${Math.max(1, mediaItems.length) * 100}%`,
-            transition: isSwipingMedia ? 'none' : 'transform 280ms cubic-bezier(0.25, 1, 0.5, 1)',
+            transform: `translate3d(-${baseMediaPct}%, 0, 0)`,
+            width: `${mediaCount * 100}%`,
+            willChange: mediaCount > 1 ? 'transform' : undefined,
           }}
         >
           {mediaItems.length === 0 ? (
@@ -1143,7 +1206,7 @@ const ImmersiveWorkout = ({
                         src={resolvedEx.thumbnailUrl || resolvedEx.gifUrl} 
                         alt="" 
                         aria-hidden="true" 
-                        className="absolute inset-0 w-full h-full object-cover opacity-25 blur-2xl scale-125 pointer-events-none" 
+                        className="absolute inset-0 w-full h-full object-cover opacity-20 blur-md scale-110 pointer-events-none" 
                       />
                     )}
                     <video 
@@ -1178,7 +1241,7 @@ const ImmersiveWorkout = ({
                       src={media.url} 
                       alt="" 
                       aria-hidden="true" 
-                      className="absolute inset-0 w-full h-full object-cover opacity-25 blur-2xl scale-125 pointer-events-none" 
+                      className="absolute inset-0 w-full h-full object-cover opacity-20 blur-md scale-110 pointer-events-none" 
                     />
                     <img 
                       src={media.url} 
@@ -1201,7 +1264,7 @@ const ImmersiveWorkout = ({
               aria-label="Media Sebelumnya"
               className="absolute inset-y-12 left-0 w-16 z-20 flex items-center justify-start pl-2 text-white/60 hover:text-white transition-opacity active:scale-95 focus:outline-none"
             >
-              <div className="p-1.5 rounded-full bg-black/40 backdrop-blur-md text-white/90 shadow-lg">
+              <div className="p-1.5 rounded-full bg-black/55 border border-white/10 text-white/90 shadow-lg">
                 <ChevronLeft size={18} />
               </div>
             </button>
@@ -1211,7 +1274,7 @@ const ImmersiveWorkout = ({
               aria-label="Media Berikutnya"
               className="absolute inset-y-12 right-0 w-16 z-20 flex items-center justify-end pr-2 text-white/60 hover:text-white transition-opacity active:scale-95 focus:outline-none"
             >
-              <div className="p-1.5 rounded-full bg-black/40 backdrop-blur-md text-white/90 shadow-lg">
+              <div className="p-1.5 rounded-full bg-black/55 border border-white/10 text-white/90 shadow-lg">
                 <ChevronRight size={18} />
               </div>
             </button>
@@ -1234,7 +1297,7 @@ const ImmersiveWorkout = ({
                 className="p-2 -m-1 flex items-center justify-center focus:outline-none"
               >
                 <span
-                  className={`h-2 rounded-full transition-all duration-300 ${
+                  className={`h-2 rounded-full transition-all duration-200 ${
                     idx === activeMediaIndex 
                       ? `w-8 ${t.bgAccent} shadow-md` 
                       : 'w-2 bg-white/40 hover:bg-white/70'
@@ -1254,7 +1317,7 @@ const ImmersiveWorkout = ({
 
         <button 
           onClick={() => onOpenDetail(ex)}
-          className="absolute top-4 right-4 bg-black/30 backdrop-blur-md p-2 rounded-xl text-white/80 hover:text-white transition shadow-lg z-20"
+          className="absolute top-4 right-4 bg-black/55 border border-white/10 p-2 rounded-xl text-white/85 hover:text-white transition-colors shadow-lg z-20"
         >
           <Info size={24} />
         </button>
@@ -1347,7 +1410,7 @@ const ImmersiveWorkout = ({
 
                                     {/* 5. Badge Beban (Beban Plat, Bar, dll jika ada perbedaan beban) */}
                                     {hint.weightLabel && (
-                                      <span className="text-[11px] font-bold uppercase tracking-wider text-sky-400/90 mb-1.5 px-2.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20">
+                                      <span className="text-xs font-bold uppercase tracking-wider text-sky-400/90 mb-1.5 px-2.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20">
                                         Beban {hint.weightLabel}
                                       </span>
                                     )}
@@ -1407,7 +1470,7 @@ const ImmersiveWorkout = ({
                                     </h3>
 
                                     {hint.weightLabel && (
-                                      <span className="text-[11px] font-bold uppercase tracking-wider text-sky-400/90 mb-1.5 px-2.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20">
+                                      <span className="text-xs font-bold uppercase tracking-wider text-sky-400/90 mb-1.5 px-2.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20">
                                         Beban {hint.weightLabel}
                                       </span>
                                     )}
@@ -1503,8 +1566,7 @@ const ImmersiveWorkout = ({
         {/* Scroll Pickers */}
         <div className="flex flex-col gap-6 no-swipe-minimize">
           {(() => {
-            const itemLogs = getLogsForEx(ex);
-            const itemSet = itemLogs[activeSetIdx] || itemLogs[0];
+            const itemSet = logs[activeSetIdx] || logs[0];
             return (
               <div key={ex.id} className="w-full flex flex-col">
                   <div className="flex items-center justify-center gap-4">
@@ -1513,7 +1575,7 @@ const ImmersiveWorkout = ({
                         itemSet={itemSet}
                         activeSetIdx={activeSetIdx}
                         ex={ex}
-                        eqConf={getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile)}
+                        eqConf={eqConf}
                         isImp={isImp}
                         theme={theme}
                         t={t}
@@ -1542,14 +1604,14 @@ const ImmersiveWorkout = ({
                                </div>
                                <ScrollPicker 
                                  value={itemSet?.distance || 0} 
-                                 onChange={(val) => handleCardioChange('distance', val)}
+                                 onChange={handleDistancePick}
                                  min={0} max={50} step={0.1} width="w-full" theme={theme} t={t}
                                />
                              </div>
                              <div className="flex-1 flex flex-col items-center">
                                <div className="h-7 mb-2 w-full flex items-center justify-center gap-2 relative">
                                  <span className="body-md uppercase font-bold">Mnt</span>
-                                 <button onClick={() => toggleTimer(activeSetIdx, itemSet?.duration, true)} className={`p-1.5 rounded-full text-white transition-all ${activeTimer.idx === activeSetIdx ? 'bg-rose-500 shadow-md scale-110' : t.bgAccent}`}>
+                                 <button onClick={() => toggleTimer(activeSetIdx, itemSet?.duration, true)} className={`p-1.5 rounded-full text-white transition-colors ${activeTimer.idx === activeSetIdx ? 'bg-rose-500 shadow-md scale-110' : t.bgAccent}`}>
                                    {activeTimer.idx === activeSetIdx ? <Square size={12}/> : <Play size={12} className="ml-[1px]"/>}
                                  </button>
                                </div>
@@ -1560,7 +1622,7 @@ const ImmersiveWorkout = ({
                                ) : (
                                   <ScrollPicker 
                                     value={itemSet?.duration || 0} 
-                                    onChange={(val) => handleCardioChange('duration', val)}
+                                    onChange={handleDurationPick}
                                     min={0} max={300} step={1} width="w-full" theme={theme} t={t}
                                   />
                                )}
@@ -1570,14 +1632,14 @@ const ImmersiveWorkout = ({
                                  <span className="body-md uppercase font-bold">
                                    {isTreadmillMode ? 'Kec (km/j)' : 'Pace'}
                                  </span>
-                                 <button onClick={handleToggleTreadmill} className={`absolute right-0 sm:right-2 p-1.5 rounded-full ${t.bgAccentSoft} ${t.textAccent} hover:scale-110 transition`} title="Ganti Mode (Treadmill / Lari)">
+                                 <button onClick={handleToggleTreadmill} className={`absolute right-0 sm:right-2 p-1.5 rounded-full ${t.bgAccentSoft} ${t.textAccent} hover:scale-110 transition-transform`} title="Ganti Mode (Treadmill / Lari)">
                                    <ArrowLeftRight size={12} />
                                  </button>
                                </div>
                                {isTreadmillMode ? (
                                  <ScrollPicker 
                                    value={itemSet?.speed || 0} 
-                                   onChange={(val) => handleCardioChange('speed', val)}
+                                   onChange={handleSpeedPick}
                                    min={0} max={30} step={0.5} width="w-full" theme={theme} t={t}
                                  />
                                ) : (
@@ -1594,7 +1656,7 @@ const ImmersiveWorkout = ({
                     <div className="flex-1 flex flex-col items-center">
                       <div className="h-7 mb-2 w-full flex items-center justify-center gap-2 relative">
                          <span className="body-md uppercase font-bold">Durasi (dtk)</span>
-                         <button onClick={() => toggleTimer(activeSetIdx, itemSet?.d, false)} className={`p-1.5 rounded-full text-white transition-all ${activeTimer.idx === activeSetIdx ? 'bg-rose-500 shadow-md scale-110' : t.bgAccent}`}>
+                         <button onClick={() => toggleTimer(activeSetIdx, itemSet?.d, false)} className={`p-1.5 rounded-full text-white transition-colors ${activeTimer.idx === activeSetIdx ? 'bg-rose-500 shadow-md scale-110' : t.bgAccent}`}>
                            {activeTimer.idx === activeSetIdx ? <Square size={12}/> : <Play size={12} className="ml-[1px]"/>}
                          </button>
                       </div>
@@ -1605,16 +1667,14 @@ const ImmersiveWorkout = ({
                       ) : (
                          <ScrollPicker 
                            value={itemSet?.d === undefined ? 0 : itemSet.d} 
-                           onChange={(val) => onSetChange(ex.id, activeSetIdx, 'd', val, ex)}
+                           onChange={handleTimeDurPick}
                            min={0} max={300} step={5} width="w-full" theme={theme} t={t}
                          />
                       )}
                     </div>
                   ) : (
                     (exType === 'weight' || exType === 'reps') && (() => {
-                      const eqConf = getEquipmentConfig(gymProfiles, activeGymId, ex, userProfile);
                       const actW = getSetActualWeight(itemSet, eqConf);
-                      const inputW = Number(itemSet?.input_w !== undefined ? itemSet?.input_w : itemSet?.w) || 0;
                       const hasWeightDiff = exType === 'weight' && eqConf.baseWeight > 0 && actW > 0;
                       return (
                         <div className="flex-1 flex flex-col items-center">
@@ -1623,7 +1683,7 @@ const ImmersiveWorkout = ({
                           </div>
                           <ScrollPicker 
                             value={itemSet?.r || 10} 
-                            onChange={(val) => onSetChange(ex.id, activeSetIdx, 'r', val, ex)}
+                            onChange={handleRepsPick}
                             min={1} max={50} step={1} width="w-full" theme={theme} t={t}
                           />
                           {hasWeightDiff && <div className="h-5 mt-1"></div>}
@@ -1693,7 +1753,7 @@ const ImmersiveWorkout = ({
           ) : !isAllDone ? (
             <div className="flex gap-2 w-full">
               {(() => {
-                const s = getLogsForEx(ex)[activeSetIdx] || {};
+                const s = logs[activeSetIdx] || {};
                 const isFilled = s.notes || s.rir || s.rpe;
                 // Tombol catatan kardio (nadi/elevasi/incline) muncul untuk semua latihan berbasis
                 // waktu, termasuk plank — sengaja lebih longgar daripada resolveExerciseKind saja.
@@ -1999,4 +2059,4 @@ const ImmersiveWorkout = ({
   );
 };
 
-export default ImmersiveWorkout;
+export default React.memo(ImmersiveWorkout);

@@ -3,7 +3,7 @@ import { Heart, Edit2, X } from 'lucide-react';
 import { formatTarget, getVideoId, exerciseTypeLabels, getExerciseDisplayName } from '../data/constants';
 import EquipmentIcon from './EquipmentIcon';
 
-const UnifiedExerciseCard = React.memo(({ t, lang, ex, onEdit, onDelete, onToggleFavorite, index, onOpenDetail, isCustom, actionButton }) => {
+const UnifiedExerciseCard = React.memo(function UnifiedExerciseCard({ t, lang, ex, onEdit, onDelete, onToggleFavorite, index, onOpenDetail, isCustom, actionButton }) {
   const isFav = !!ex.isFavorite;
   const finalGifUrl = ex.gifUrl;
   const ytId = getVideoId(ex.ytVideo);

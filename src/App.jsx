@@ -673,18 +673,18 @@ export default function App() {
       return;
     }
     hcSyncing.current = true;
+    let filled = 0;
+    let externalPulled = 0;
     try {
     if (!silent) {
       try { await hcRequestPermissions(); } catch (e) { console.warn('re-request izin gagal:', e); }
     }
     const status = silent ? null : await hcCheckStatus();
-    let filled = 0;
     const hcByDay = {};
     await hcBackfillHistory(days, () => false, (ymd, summary) => { filled++; hcByDay[ymd] = summary; });
     if (filled > 0) mergeHcDays(hcByDay);
 
     // Tarik sesi latihan eksternal (Samsung Health / Strava / dll)
-    let externalPulled = 0;
     try {
       const endD = new Date();
       const startD = new Date();
@@ -917,33 +917,28 @@ export default function App() {
 
 
   const [activeTab, _setActiveTab] = useState('dashboard');
-  // Transisi optimistik: activeTab merespons instan 0ms untuk BottomNav,
-  // sedangkan contentTab dialihkan via startTransition agar render tab berat tidak memblokir UI
-  const [contentTab, setContentTab] = useState('dashboard');
   const [mountedTabs, setMountedTabs] = useState(() => new Set(['dashboard', activeTab]));
-  useEffect(() => {
-    setMountedTabs(prev => {
-      if (prev.has(contentTab)) return prev;
-      const next = new Set(prev);
-      next.add(contentTab);
-      return next;
-    });
-  }, [contentTab]);
 
-  // Pre-mount tab esensial secara bertahap saat browser idle agar tidak membebani memori awal
+  // Pre-mount hanya tab 'workout' saat idle (tab terbanyak diakses dari Dasbor);
+  // Kalender, Program, dan Database dimount lazily saat pertama dikunjungi agar boot & switch instan.
   useEffect(() => {
     if (isInitialSplash) return;
-    const scheduleWarmup = typeof window !== 'undefined' && 'requestIdleCallback' in window
-      ? window.requestIdleCallback
-      : (cb) => setTimeout(cb, 1500);
-
-    const handle = scheduleWarmup(() => {
-      setMountedTabs(prev => new Set([...prev, 'workout', 'calendar']));
+    const scheduleIdle = typeof window !== 'undefined' && 'requestIdleCallback' in window
+      ? (cb) => window.requestIdleCallback(cb, { timeout: 1200 })
+      : (cb) => setTimeout(cb, 650);
+    const handle = scheduleIdle(() => {
+      setMountedTabs(prev => {
+        if (prev.has('workout')) return prev;
+        const next = new Set(prev);
+        next.add('workout');
+        return next;
+      });
     });
-
     return () => {
       if (typeof window !== 'undefined' && 'cancelIdleCallback' in window && typeof handle === 'number') {
         window.cancelIdleCallback(handle);
+      } else {
+        clearTimeout(handle);
       }
     };
   }, [isInitialSplash]);
@@ -1002,17 +997,11 @@ export default function App() {
                  setPrograms(prev => prev.filter(p => !emptyCustomPrograms.some(emp => emp.id === p.id)));
                  setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null, onCancel: null });
                  _setActiveTab(newTab);
-                 React.startTransition(() => {
-                   setContentTab(newTab);
-                 });
              },
              onCancel: () => {
                  const targetProg = emptyCustomPrograms[0];
                  setFocusRoutineId(targetProg.id);
                  _setActiveTab('program');
-                 React.startTransition(() => {
-                   setContentTab('program');
-                 });
                  setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null, onCancel: null });
              }
          });
@@ -1021,9 +1010,6 @@ export default function App() {
     }
 
     _setActiveTab(newTab);
-    React.startTransition(() => {
-      setContentTab(newTab);
-    });
   }, []);
 
   const [focusRoutineId, setFocusRoutineId] = useState(null);
@@ -1472,32 +1458,36 @@ export default function App() {
 
   useEffect(() => {
     const timers = [];
-    // Sengaja contentTab, bukan activeTab: yang menentukan tinggi dokumen adalah isi yang
-    // benar-benar sudah ter-commit, bukan pill nav yang sudah pindah duluan.
-    if (prevTab.current !== contentTab) {
-      prevTab.current = contentTab;
+    const rafIds = [];
+    if (prevTab.current !== activeTab) {
+      prevTab.current = activeTab;
       // Posisi dibaca SEKARANG, bukan di dalam timeout. Begitu tab lama dilepas dokumen
       // memendek, browser menembakkan event scroll (clamp ke 0) yang mendarat di listener
       // tab BARU — jadi posisi tersimpan sudah jadi 0 sebelum sempat dipulihkan.
-      const target = scrollPositions.current[contentTab] || 0;
-      restoringUntil.current = Date.now() + 300; // abaikan clamp selama tab baru menata diri
-      if (contentTab !== 'calendar' && (target > 0 || window.scrollY > 0)) {
-        const restore = () => requestAnimationFrame(() => window.scrollTo(0, target));
-        restore();
-        if (target > 0) timers.push(setTimeout(restore, 100));
+      const target = scrollPositions.current[activeTab] || 0;
+      restoringUntil.current = Date.now() + 220; // abaikan clamp selama tab baru menata diri
+      if (activeTab !== 'calendar' && (target > 0 || window.scrollY > 0)) {
+        const rafId = requestAnimationFrame(() => {
+          window.scrollTo(0, target);
+          if (target > 0 && Math.abs(window.scrollY - target) > 6) {
+            timers.push(setTimeout(() => window.scrollTo(0, target), 60));
+          }
+        });
+        rafIds.push(rafId);
       }
     }
 
     const handleScroll = () => {
       if (Date.now() < restoringUntil.current) return;
-      scrollPositions.current[contentTab] = window.scrollY;
+      scrollPositions.current[activeTab] = window.scrollY;
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => {
       timers.forEach(clearTimeout);
+      rafIds.forEach(cancelAnimationFrame);
       window.removeEventListener('scroll', handleScroll);
     };
-  }, [contentTab]);
+  }, [activeTab]);
 
   useEffect(() => {
     if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
@@ -1507,6 +1497,7 @@ export default function App() {
     if (Capacitor.isNativePlatform()) {
       LocalNotifications.addListener('localNotificationActionPerformed', (notification) => {
         if (notification.notification.id === 9999) {
+          setMountedTabs(prev => (prev.has('workout') ? prev : new Set([...prev, 'workout'])));
           _setActiveTab('workout');
           if (sessionToRunRef.current) {
             setFocusWorkoutId(sessionToRunRef.current);
@@ -2826,8 +2817,8 @@ export default function App() {
 
     // Debounce 1200ms agar setiap swipe/centang tidak memicu mutasi `history` sinkron
     // yang membangunkan ulang cache, fingerprint, achievement, dan memo lintas tab.
-    // Langsung di-flush saat pindah tab (contentTab !== 'workout') atau app di-minimize.
-    const delay = contentTab !== 'workout' ? 0 : 1200;
+    // Langsung di-flush saat pindah tab (activeTab !== 'workout') atau app di-minimize.
+    const delay = activeTab !== 'workout' ? 0 : 1200;
     if (delay === 0) {
       syncActiveToHistory();
       return;
@@ -2838,7 +2829,7 @@ export default function App() {
       clearTimeout(timer);
       pendingActiveHistorySyncRef.current = null;
     };
-  }, [exerciseLogs, skippedExercises, extraExercises, selectedDate, contentTab]);
+  }, [exerciseLogs, skippedExercises, extraExercises, selectedDate, activeTab]);
 
   const deviceId = useRef(null);
   if (!deviceId.current) {
@@ -3558,6 +3549,7 @@ export default function App() {
     inputBg: theme === 'dark' ? 'bg-white/5' : 'bg-black/[0.03]',
     btnBg: theme === 'dark' ? 'bg-white/[0.06] hover:bg-white/10' : 'bg-black/5 hover:bg-black/10',
     navBg: theme === 'dark' ? 'bg-white/[0.04] glass-nav' : 'bg-white/70 glass-nav',
+    bottomNavBg: theme === 'dark' ? 'bg-[#0b1326]/[0.96]' : 'bg-white/[0.97]',
     navIconActive: 'text-[#3b82f6]',
     navIconInactive: theme === 'dark' ? 'text-slate-500' : 'text-slate-400',
     navBorderActive: 'border-[#3b82f6]/30',
@@ -5003,7 +4995,7 @@ export default function App() {
   return (
     <>
       <div 
-      className={`min-h-screen flex flex-col ${t.bgApp} ${t.textMain} font-sans ${contentTab === 'calendar' ? 'h-[100dvh] overflow-hidden' : 'pb-32'} w-full`}
+      className={`min-h-screen flex flex-col ${t.bgApp} ${t.textMain} font-sans ${activeTab === 'calendar' ? 'h-[100dvh] overflow-hidden' : 'pb-32'} w-full`}
     >
       <ConfirmModal confirmModal={confirmModal} setConfirmModal={setConfirmModal} t={t} lang={lang} soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} />
 
@@ -5163,11 +5155,11 @@ export default function App() {
         }}
       />
       
-      <main className={`${contentTab === 'calendar' ? 'p-0 flex-1 flex flex-col min-h-0 overflow-hidden' : contentTab === 'database' ? 'px-4 pb-4 pt-0 min-h-[70vh] max-w-5xl mx-auto w-full' : 'p-4 min-h-[70vh] max-w-5xl mx-auto w-full'}`}>
-        <TabSlider activeTab={contentTab} tabIndex={['dashboard','workout','calendar','program','database'].indexOf(contentTab)} className={contentTab === 'calendar' ? 'flex-1 flex flex-col min-h-0' : ''}>
-         <div style={{ display: contentTab === 'dashboard' ? 'block' : 'none' }} className="w-full">
+      <main className={`${activeTab === 'calendar' ? 'p-0 flex-1 flex flex-col min-h-0 overflow-hidden' : activeTab === 'database' ? 'px-4 pb-4 pt-0 min-h-[70vh] max-w-5xl mx-auto w-full' : 'p-4 min-h-[70vh] max-w-5xl mx-auto w-full'}`}>
+        <TabSlider activeTab={activeTab} tabIndex={['dashboard','workout','calendar','program','database'].indexOf(activeTab)} className={activeTab === 'calendar' ? 'flex-1 flex flex-col min-h-0' : ''}>
+         <div style={{ display: activeTab === 'dashboard' ? 'block' : 'none', contain: 'layout style' }} className="w-full">
              <DashboardTab setConfirmModal={setConfirmModal} 
-               isActive={contentTab === 'dashboard'}
+               isActive={activeTab === 'dashboard'}
                t={t} lang={lang} language={language} user={user} 
                history={history} setHistory={setHistory} 
                programs={programs} exerciseLibrary={exerciseLibrary} 
@@ -5191,9 +5183,9 @@ export default function App() {
          </div>
          
          {mountedTabs.has('workout') && (
-             <div style={{ display: contentTab === 'workout' ? 'block' : 'none' }} className="w-full">
+             <div style={{ display: activeTab === 'workout' ? 'block' : 'none', contain: 'layout style' }} className="w-full">
                  <WorkoutTab 
-                  isActive={contentTab === 'workout'}
+                  isActive={activeTab === 'workout'}
                   setConfirmModal={setConfirmModal}
                   t={t} theme={theme} lang={lang} language={language} programs={programs} selectedDate={selectedDate} setSelectedDate={setSelectedDate}
                   history={history} setHistory={setHistory} setActiveTab={setActiveTab}
@@ -5230,9 +5222,9 @@ export default function App() {
          )}
          
          {mountedTabs.has('calendar') && (
-             <div style={{ display: contentTab === 'calendar' ? 'flex' : 'none' }} className="flex-1 flex flex-col min-h-0 w-full">
+             <div style={{ display: activeTab === 'calendar' ? 'flex' : 'none', contain: 'layout style' }} className="flex-1 flex flex-col min-h-0 w-full">
                  <CalendarTab 
-                   isActive={contentTab === 'calendar'}
+                   isActive={activeTab === 'calendar'}
                    setConfirmModal={setConfirmModal} 
                    t={t} lang={lang} theme={theme} history={history} setHistory={setHistory} programs={programs} 
                    soundEnabled={soundEnabled} playSoundEffect={playSoundEffect} navigateToWorkoutDate={navigateToWorkoutDate} 
@@ -5257,9 +5249,9 @@ export default function App() {
          )}
 
          {mountedTabs.has('program') && (
-             <div style={{ display: contentTab === 'program' ? 'block' : 'none' }} className="w-full">
+             <div style={{ display: activeTab === 'program' ? 'block' : 'none', contain: 'layout style' }} className="w-full">
                  <ProgramTab setConfirmModal={setConfirmModal} 
-                   isActive={contentTab === 'program'}
+                   isActive={activeTab === 'program'}
                    onPostCreated={handlePostCreated}
                    weekStartDay={weekStartDay}
                    t={t} theme={theme} lang={lang} programs={programs} setPrograms={setPrograms} 
@@ -5287,9 +5279,9 @@ export default function App() {
          )}
 
          {mountedTabs.has('database') && (
-             <div style={{ display: contentTab === 'database' ? 'block' : 'none' }} className="w-full">
+             <div style={{ display: activeTab === 'database' ? 'block' : 'none', contain: 'layout style' }} className="w-full">
                  <DatabaseTab setConfirmModal={setConfirmModal} 
-                    isActive={contentTab === 'database'}
+                    isActive={activeTab === 'database'}
                     t={t} lang={lang}
                     exerciseLibrary={exerciseLibrary} setExerciseLibrary={setExerciseLibrary} 
                     history={history}

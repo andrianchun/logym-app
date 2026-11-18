@@ -11,14 +11,14 @@ export const registerToCommunity = async (userId, userProfile) => {
   if (!userId) return;
   try {
     const userRef = doc(db, 'logym_community_users', userId);
-    await setDoc(userRef, {
+    await setDoc(userRef, cleanFirestoreData({
       name: userProfile.name || 'Lyfit User',
       photoUrl: userProfile.photoUrl || '',
       totalWorkouts: userProfile.totalWorkouts || 0,
       totalVolume: userProfile.totalVolume || 0,
       badges: userProfile.badges || [],
       lastActive: serverTimestamp()
-    }, { merge: true });
+    }), { merge: true });
   } catch (err) {
     console.error("Gagal update profil komunitas:", err);
   }
@@ -41,7 +41,7 @@ export const updateLeaderboardScore = async (userId, userName, userPhoto, scoreC
     // PENTING: setDoc (walau dengan merge) TIDAK menafsirkan titik sebagai nested path —
     // key "scores.uid.score" akan jadi nama field literal. Gunakan objek nested agar
     // merge:true melakukan deep-merge dan getWeeklyLeaderboard bisa membaca data.scores.
-    await setDoc(lbRef, {
+    await setDoc(lbRef, cleanFirestoreData({
       scores: {
         [userId]: {
           score: increment(scoreChange),
@@ -49,7 +49,7 @@ export const updateLeaderboardScore = async (userId, userName, userPhoto, scoreC
           photoUrl: userPhoto || null,
         }
       }
-    }, { merge: true });
+    }), { merge: true });
   } catch(e) { console.error("Update LB Error:", e); }
 };
 
@@ -488,7 +488,7 @@ export const updateUserProfileInFeed = async (userId, newName, newPhoto, newUser
     if (newGender !== undefined) userUpdate.gender = newGender;
     if (newAge !== undefined) userUpdate.age = newAge;
     if (Object.keys(userUpdate).length > 0) {
-      await setDoc(userRef, userUpdate, { merge: true });
+      await setDoc(userRef, cleanFirestoreData(userUpdate), { merge: true });
     }
 
     // 1.5 Update leaderboard for the current week
@@ -502,7 +502,7 @@ export const updateUserProfileInFeed = async (userId, newName, newPhoto, newUser
            const lbUpdate = {};
            if (newName !== undefined) lbUpdate[`scores.${userId}.name`] = newName;
            if (newPhoto !== undefined) lbUpdate[`scores.${userId}.photoUrl`] = newPhoto;
-           if (Object.keys(lbUpdate).length > 0) await updateDoc(lbRef, lbUpdate);
+           if (Object.keys(lbUpdate).length > 0) await updateDoc(lbRef, cleanFirestoreData(lbUpdate));
         }
       }
     }

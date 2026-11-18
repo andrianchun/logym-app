@@ -4,6 +4,7 @@ import { Camera, Image, Download, Share2, Loader2, ChevronRight, ChevronLeft, Fo
 const loadToPng = async () => (await import('html-to-image')).toPng;
 import { doc, updateDoc } from 'firebase/firestore';
 import { db, storage } from '../firebase';
+import { cleanFirestoreData } from '../utils/historySync';
 import { ref, deleteObject } from 'firebase/storage';
 import { uploadImageToFirebase } from '../utils/storage';
 import { getLocalYMD } from '../data/constants';
@@ -57,7 +58,7 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
         const timer = setTimeout(() => {
             if (!user?.uid) return;
             const userRef = doc(db, 'logym_users', user.uid);
-            updateDoc(userRef, { customCardSettings: currentSettings }).catch(console.error);
+            updateDoc(userRef, cleanFirestoreData({ customCardSettings: currentSettings })).catch(console.error);
             initialSettingsStr.current = JSON.stringify(currentSettings);
             if (setUser) setUser(prev => ({ ...prev, customCardSettings: currentSettings }));
         }, 500);
@@ -463,11 +464,11 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
             const newUploadedBackgrounds = { ...(user?.uploadedBackgrounds || {}) };
             newUploadedBackgrounds[fileSignature] = downloadUrl;
 
-            await updateDoc(userRef, { 
+            await updateDoc(userRef, cleanFirestoreData({ 
                 customCardBg: downloadUrl,
                 cardBgUploads: newUploads,
                 uploadedBackgrounds: newUploadedBackgrounds
-            });
+            }));
             if (setUser) setUser(prev => ({ ...prev, customCardBg: downloadUrl, cardBgUploads: newUploads, uploadedBackgrounds: newUploadedBackgrounds }));
         } catch (err) {
             console.error("Error uploading background:", err);

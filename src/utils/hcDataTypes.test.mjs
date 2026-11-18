@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const ENUM_PATH = 'node_modules/@capgo/capacitor-health/android/src/main/java/app/capgo/plugin/health/HealthDataType.kt';
+const PLUGIN_PATH = 'node_modules/@capgo/capacitor-health/android/src/main/java/app/capgo/plugin/health/HealthPlugin.kt';
 const HC_PATH = 'src/utils/healthConnect.js';
 
 if (!fs.existsSync(ENUM_PATH)) {
@@ -25,6 +26,12 @@ const known = new Set([...enumSrc.matchAll(/^\s+[A-Z0-9_]+\("([^"]+)"/gm)].map(m
 assert.ok(known.size > 10, `enum plugin tidak terbaca (cuma ${known.size} tipe) — format berubah?`);
 assert.ok(known.has('steps'), 'sanity: "steps" harus ada di enum plugin');
 
+// HealthPlugin.kt menangani 'workouts' khusus pada list "read" lewat parseTypeListWithWorkouts
+const pluginSrc = fs.existsSync(PLUGIN_PATH) ? fs.readFileSync(PLUGIN_PATH, 'utf8') : '';
+const supportsWorkoutsRead = /parseTypeListWithWorkouts\s*\([\s\S]*?"read"/.test(pluginSrc) && /identifier\s*==\s*"workouts"/.test(pluginSrc);
+const knownRead = new Set(known);
+if (supportsWorkoutsRead) knownRead.add('workouts');
+
 const hcSrc = fs.readFileSync(HC_PATH, 'utf8');
 const listOf = (name) => {
   const m = hcSrc.match(new RegExp(`const ${name} = \\[([^\\]]*)\\]`));
@@ -36,12 +43,12 @@ const read = listOf('READ_TYPES');
 const write = listOf('WRITE_TYPES');
 assert.ok(read.length > 5 && write.length > 2, 'daftar tipe terbaca kosong — regex-nya rusak?');
 
-for (const [label, list] of [['READ_TYPES', read], ['WRITE_TYPES', write]]) {
+for (const [label, list, allowed] of [['READ_TYPES', read, knownRead], ['WRITE_TYPES', write, known]]) {
   for (const t of list) {
-    assert.ok(known.has(t),
+    assert.ok(allowed.has(t),
       `${label} memakai '${t}' yang TIDAK ADA di HealthDataType plugin.\n` +
       `  Akibatnya seluruh koneksi Health Connect gagal: "Unsupported data type: ${t}".\n` +
-      `  Tipe yang dikenal: ${[...known].sort().join(', ')}`);
+      `  Tipe yang dikenal: ${[...allowed].sort().join(', ')}`);
   }
 }
 
