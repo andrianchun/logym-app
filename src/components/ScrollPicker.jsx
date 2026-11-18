@@ -55,12 +55,14 @@ const ScrollPicker = ({
   // Memoize options agar tidak alokasi array baru di tiap render
   const options = useMemo(() => {
     const opts = [];
-    const validMin = Number(min) || 0;
-    const validMax = Number(max) || 200;
-    const validStep = Number(step) || 1;
-    for (let i = validMin; i <= validMax; i += validStep) {
+    const validMin = Number.isFinite(Number(min)) ? Number(min) : 0;
+    const validMax = Number.isFinite(Number(max)) ? Number(max) : 200;
+    const rawStep = Number(step);
+    const validStep = Number.isFinite(rawStep) && rawStep > 0 ? rawStep : 1;
+    for (let i = validMin; i <= validMax + validStep * 1e-6 && opts.length < 5000; i += validStep) {
       opts.push(Number(i.toFixed(1)));
     }
+    if (opts.length === 0) opts.push(validMin);
     return opts;
   }, [min, max, step]);
 

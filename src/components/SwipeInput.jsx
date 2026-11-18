@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import { playSoundEffect } from '../utils/audio';
 import { formatNumber, parseFormattedNumber } from '../utils/numberFormat';
 
@@ -75,8 +74,6 @@ const SwipeInput = ({
   const containerRef = useRef(null);
   const displayTextRef = useRef(null);
   const inputRef = useRef(null);
-  const hudValRef = useRef(null);
-  const hudDeltaRef = useRef(null);
 
   const dragRef = useRef({
     active: false,
@@ -93,7 +90,6 @@ const SwipeInput = ({
 
   const [isFocused, setIsFocused] = useState(false);
   const [localValue, setLocalValue] = useState(value);
-  const [hudRect, setHudRect] = useState(null);
 
   const propsRef = useRef({
     disabled, step, min, max, wrap, soundEnabled, language, isTimeFormat, isSecondsFormat, formatValue, onChange, onLiveChange, onLiveEnd, value
@@ -151,25 +147,6 @@ const SwipeInput = ({
       displayTextRef.current.textContent = formatted;
       displayTextRef.current.style.opacity = '1';
     }
-    if (hudValRef.current) {
-      hudValRef.current.textContent = formatted;
-    }
-    if (hudDeltaRef.current) {
-      const delta = Number((nextVal - dragRef.current.startVal).toFixed(2));
-      if (delta === 0) {
-        hudDeltaRef.current.textContent = '•';
-        hudDeltaRef.current.className = 'text-xs font-bold tabular-nums text-slate-400';
-      } else {
-        const sign = delta > 0 ? '+' : '';
-        const deltaStr = p.isTimeFormat
-          ? `${sign}${delta}${p.isSecondsFormat ? 's' : 'm'}`
-          : `${sign}${formatNumber(delta, p.language)}`;
-        hudDeltaRef.current.textContent = deltaStr;
-        hudDeltaRef.current.className = `text-xs font-black tabular-nums ${delta > 0 ? 'text-emerald-400' : 'text-rose-400'}`;
-      }
-    }
-    dragRef.current.hudFormatted = formatted;
-    dragRef.current.hudDeltaVal = Number((nextVal - dragRef.current.startVal).toFixed(2));
   }, []);
 
   const notifyStepFeedback = useCallback((nextVal) => {
@@ -220,19 +197,12 @@ const SwipeInput = ({
       }
       if (Math.abs(dy) < 5) return;
       d.locked = true;
+      if (containerRef.current) {
+        containerRef.current.dataset.scrubbing = '1';
+      }
       const newValue = computeNextStepValue(dy);
       d.lastValue = newValue;
       applyDragDomUpdate(newValue);
-      if (containerRef.current) {
-        containerRef.current.dataset.scrubbing = '1';
-        const r = containerRef.current.getBoundingClientRect();
-        setHudRect({
-          centerX: Math.min(Math.max(56, r.left + r.width / 2), (window.innerWidth || 400) - 56),
-          top: Math.max(12, r.top - 52),
-          val: d.hudFormatted,
-          delta: d.hudDeltaVal
-        });
-      }
       if (newValue !== d.startVal) {
         notifyStepFeedback(newValue);
       }
@@ -270,7 +240,6 @@ const SwipeInput = ({
     if (displayTextRef.current) {
       displayTextRef.current.style.opacity = '';
     }
-    setHudRect(null);
 
     if (wasLocked) {
       if (preventDefaultFn) preventDefaultFn();
@@ -463,27 +432,6 @@ const SwipeInput = ({
             {hasValue ? displayStr : placeholderStr}
           </span>
         </div>
-      )}
-
-      {hudRect && typeof document !== 'undefined' && createPortal(
-        <div
-          className="fixed z-[999999] pointer-events-none -translate-x-1/2"
-          style={{ left: hudRect.centerX, top: hudRect.top }}
-        >
-          <div className="bg-[#0B132B]/95 text-white border border-sky-400/50 shadow-[0_12px_30px_rgba(2,6,23,0.75)] rounded-2xl px-3.5 py-1.5 flex items-center gap-2.5 min-w-[84px] justify-center">
-            <span className="text-xs text-sky-400 font-black leading-none">▲▼</span>
-            <span ref={hudValRef} className="text-lg font-black tabular-nums tracking-tight leading-none text-white">
-              {hudRect.val ?? displayStr}
-            </span>
-            <span
-              ref={hudDeltaRef}
-              className={`text-xs font-black tabular-nums ${hudRect.delta > 0 ? 'text-emerald-400' : hudRect.delta < 0 ? 'text-rose-400' : 'text-slate-400'}`}
-            >
-              {hudRect.delta ? `${hudRect.delta > 0 ? '+' : ''}${isTimeFormat ? `${hudRect.delta}${isSecondsFormat ? 's' : 'm'}` : formatNumber(hudRect.delta, language)}` : '•'}
-            </span>
-          </div>
-        </div>,
-        document.body
       )}
     </>
   );

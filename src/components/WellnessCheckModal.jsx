@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Zap, Activity, ShieldAlert, X, Check } from 'lucide-react';
 import { playSoundEffect } from '../utils/audio';
 
@@ -24,7 +25,7 @@ const WellnessCheckModal = ({ isOpen, onSelect, onClose, t, soundEnabled, curren
 
   const activeOption = currentWellness || 'prima';
 
-  return (
+  const modal = (
     <div 
       className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in overscroll-contain touch-none no-swipe"
       onClick={onClose}
@@ -113,6 +114,8 @@ const WellnessCheckModal = ({ isOpen, onSelect, onClose, t, soundEnabled, curren
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modal, document.body) : modal;
 };
 
 export default WellnessCheckModal;

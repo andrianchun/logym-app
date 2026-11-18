@@ -3,7 +3,7 @@ import { Clock, X, Flame } from 'lucide-react';
 import { playSoundEffect } from '../utils/audio';
 import { calculateLiveWorkoutCalories } from '../utils/workoutCalc';
 import { Capacitor } from '@capacitor/core';
-import { WorkoutTimerPlugin } from '../App';
+import { WorkoutTimerPlugin } from '../utils/workoutTimerPlugin';
 
 const FloatingTimer = ({
   restTargetTime, defaultRestTime, t, soundEnabled,

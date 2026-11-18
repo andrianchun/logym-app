@@ -5,8 +5,9 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 import { StatusBar } from '@capacitor/status-bar';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { App as CapApp } from '@capacitor/app';
+import { WorkoutTimerPlugin } from './utils/workoutTimerPlugin';
 
-export const WorkoutTimerPlugin = registerPlugin('WorkoutTimer');
+export { WorkoutTimerPlugin };
 export const ApkInstallerPlugin = registerPlugin('ApkInstaller');
 
 
@@ -5157,7 +5158,7 @@ export default function App() {
       
       <main className={`${activeTab === 'calendar' ? 'p-0 flex-1 flex flex-col min-h-0 overflow-hidden' : activeTab === 'database' ? 'px-4 pb-4 pt-0 min-h-[70vh] max-w-5xl mx-auto w-full' : 'p-4 min-h-[70vh] max-w-5xl mx-auto w-full'}`}>
         <TabSlider activeTab={activeTab} tabIndex={['dashboard','workout','calendar','program','database'].indexOf(activeTab)} className={activeTab === 'calendar' ? 'flex-1 flex flex-col min-h-0' : ''}>
-         <div style={{ display: activeTab === 'dashboard' ? 'block' : 'none', contain: 'layout style' }} className="w-full">
+         <div style={{ display: activeTab === 'dashboard' ? 'block' : 'none' }} className="w-full">
              <DashboardTab setConfirmModal={setConfirmModal} 
                isActive={activeTab === 'dashboard'}
                t={t} lang={lang} language={language} user={user} 
@@ -5183,7 +5184,7 @@ export default function App() {
          </div>
          
          {mountedTabs.has('workout') && (
-             <div style={{ display: activeTab === 'workout' ? 'block' : 'none', contain: 'layout style' }} className="w-full">
+             <div style={{ display: activeTab === 'workout' ? 'block' : 'none' }} className="w-full">
                  <WorkoutTab 
                   isActive={activeTab === 'workout'}
                   setConfirmModal={setConfirmModal}
@@ -5222,7 +5223,7 @@ export default function App() {
          )}
          
          {mountedTabs.has('calendar') && (
-             <div style={{ display: activeTab === 'calendar' ? 'flex' : 'none', contain: 'layout style' }} className="flex-1 flex flex-col min-h-0 w-full">
+             <div style={{ display: activeTab === 'calendar' ? 'flex' : 'none' }} className="flex-1 flex flex-col min-h-0 w-full">
                  <CalendarTab 
                    isActive={activeTab === 'calendar'}
                    setConfirmModal={setConfirmModal} 
@@ -5249,7 +5250,7 @@ export default function App() {
          )}
 
          {mountedTabs.has('program') && (
-             <div style={{ display: activeTab === 'program' ? 'block' : 'none', contain: 'layout style' }} className="w-full">
+             <div style={{ display: activeTab === 'program' ? 'block' : 'none' }} className="w-full">
                  <ProgramTab setConfirmModal={setConfirmModal} 
                    isActive={activeTab === 'program'}
                    onPostCreated={handlePostCreated}
@@ -5279,7 +5280,7 @@ export default function App() {
          )}
 
          {mountedTabs.has('database') && (
-             <div style={{ display: activeTab === 'database' ? 'block' : 'none', contain: 'layout style' }} className="w-full">
+             <div style={{ display: activeTab === 'database' ? 'block' : 'none' }} className="w-full">
                  <DatabaseTab setConfirmModal={setConfirmModal} 
                     isActive={activeTab === 'database'}
                     t={t} lang={lang}

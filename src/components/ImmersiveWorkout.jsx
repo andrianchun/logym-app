@@ -6,7 +6,7 @@ import { exerciseTypeLabels, defaultMasterExercises, findMatchingMasterExercise,
 import { playSoundEffect } from '../utils/audio';
 import { calculateWorkoutCalories, calculateLiveWorkoutCalories, resolveExerciseKind, defaultSetWeight, gymStepFor, getEquipmentConfig, calculateActualWeight, getSetActualWeight, resolveExerciseProgressiveTarget, resolveDefaultExerciseDuration } from '../utils/workoutCalc';
 import { getCachedExercises } from '../utils/exerciseDbApi';
-import { WorkoutTimerPlugin } from '../App';
+import { WorkoutTimerPlugin } from '../utils/workoutTimerPlugin';
 import TwoFrameMotionLoop from './TwoFrameMotionLoop';
 import { getBaseWeightLabel } from './ExerciseCard';
 import { renderFormattedCoachMessage } from '../utils/miniMarkdown';
@@ -753,11 +753,13 @@ const ImmersiveWorkout = ({
     const videoObjs = document.querySelectorAll('.immersive-video-html5');
     
     iframes.forEach((iframe, idx) => {
-      if (idx === activeMediaIndex) {
-        iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
-      } else {
-        iframe.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
-      }
+      try {
+        if (idx === activeMediaIndex) {
+          iframe.contentWindow?.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
+        } else {
+          iframe.contentWindow?.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
+        }
+      } catch {}
     });
 
     videoObjs.forEach((videoObj, idx) => {
@@ -1110,10 +1112,12 @@ const ImmersiveWorkout = ({
   const theme = t?.bgApp?.includes('05070d') ? 'dark' : 'light';
 
   const handleIframeLoad = (e) => {
-    e.target.contentWindow.postMessage(JSON.stringify({event: "listening"}), "*");
+    try {
+      e.target?.contentWindow?.postMessage(JSON.stringify({event: "listening"}), "*");
+    } catch {}
   };
 
-  return (
+  const immersiveContent = (
     <div 
       ref={rootRef}
       className={`fixed inset-0 z-[100] flex flex-col ${t.bgApp} ${t.textMain} overflow-hidden duration-300 ${isClosing ? 'animate-out slide-out-to-bottom-full' : 'animate-in slide-in-from-bottom-full'} no-swipe overscroll-contain`}
@@ -1347,7 +1351,7 @@ const ImmersiveWorkout = ({
                 <Brain size={24} className="animate-pulse" />
               </button>
               {showHint && createPortal(
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 overscroll-contain touch-none">
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 overscroll-contain touch-none">
                   <div className="absolute inset-0 bg-black/70 backdrop-blur-md animate-in fade-in" data-close-modal="true" onClick={() => setShowHint(false)} />
                   <div 
                     className="relative w-full max-w-[340px] mt-28 animate-in fade-in zoom-in-95 duration-300 pointer-events-auto text-center"
@@ -2057,6 +2061,8 @@ const ImmersiveWorkout = ({
 
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(immersiveContent, document.body) : immersiveContent;
 };
 
 export default React.memo(ImmersiveWorkout);
