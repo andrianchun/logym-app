@@ -1858,9 +1858,18 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                      }
                      return (
                          <div>
-                             <div className="flex items-center space-x-1.5 mb-1">
-                                 <Zap size={14} className="text-sky-400" />
-                                 <span className={`text-sm font-bold uppercase tracking-widest ${t.textMuted}`}>Skor Energi</span>
+                             <div className="flex items-center justify-between gap-2 mb-1">
+                                 <div className="flex items-center space-x-1.5">
+                                     <Zap size={14} className="text-sky-400" />
+                                     <span className={`text-sm font-bold uppercase tracking-widest ${t.textMuted}`}>Skor Energi</span>
+                                 </div>
+                                 {sleepReadiness.status !== 'unknown' && sleepReadiness.curve?.avgScore != null && (
+                                     <span className="text-xs font-bold text-slate-400 tabular-nums">
+                                         {sleepDate === todayStr
+                                             ? `Saat ini · Rata-rata ${sleepReadiness.curve.avgScore}`
+                                             : `Rata-rata harian`}
+                                     </span>
+                                 )}
                              </div>
                              <div className="flex flex-wrap items-baseline gap-2.5 mt-1">
                                  <div className="flex items-baseline space-x-1">
@@ -2015,34 +2024,9 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                      </button>
                 </div>
 
-                {/* SUB-TOGGLE ENERGI: Harian (Bar) vs Per Jam (Line Chart) */}
+                {/* KONTEN ENERGI: Grafik dulu, Sub-toggle full-width di BAWAH grafik */}
                 {recoveryMainTab === 'energi' && (
                   <>
-                    <div className="flex items-center justify-center mb-5">
-                      <div className={`inline-flex p-1 rounded-full border ${t.border} ${t.bgCardSoft}`}>
-                        <button
-                          onClick={() => { playSoundEffect('click', soundEnabled); setEnergySubTab('daily'); }}
-                          className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
-                            energySubTab === 'daily'
-                              ? 'bg-sky-500 text-white shadow-sm'
-                              : `${t.textMuted} hover:${t.textMain}`
-                          }`}
-                        >
-                          Harian
-                        </button>
-                        <button
-                          onClick={() => { playSoundEffect('click', soundEnabled); setEnergySubTab('hourly'); }}
-                          className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
-                            energySubTab === 'hourly'
-                              ? 'bg-sky-500 text-white shadow-sm'
-                              : `${t.textMuted} hover:${t.textMain}`
-                          }`}
-                        >
-                          Per Jam
-                        </button>
-                      </div>
-                    </div>
-
                     {energySubTab === 'daily' ? (
                       <ActivityChart
                         t={t} theme={theme} history={history}
@@ -2063,60 +2047,47 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                         language={language}
                       />
                     )}
+
+                    {/* SUB-TOGGLE ENERGI (Full-width di bawah grafik, sepadan dengan toggle utama) */}
+                    <div className={`relative flex w-full p-1.5 rounded-full ${t.btnBg} mt-5`} style={{ zIndex: 10 }}>
+                      <div
+                        className="absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] rounded-full transition-transform duration-300 ease-out bg-sky-500 shadow-sm"
+                        style={{
+                          transform: energySubTab === 'daily' ? 'translateX(0)' : 'translateX(100%)',
+                          left: '6px',
+                          zIndex: 1,
+                        }}
+                      ></div>
+                      <button
+                        onClick={() => { playSoundEffect('click', soundEnabled); setEnergySubTab('daily'); }}
+                        className={`flex-1 py-2 rounded-full text-sm font-black relative transition-colors duration-300 ${energySubTab === 'daily' ? 'text-white' : t.textMuted}`}
+                        style={{ zIndex: 2 }}
+                      >
+                        Harian
+                      </button>
+                      <button
+                        onClick={() => { playSoundEffect('click', soundEnabled); setEnergySubTab('hourly'); }}
+                        className={`flex-1 py-2 rounded-full text-sm font-black relative transition-colors duration-300 ${energySubTab === 'hourly' ? 'text-white' : t.textMuted}`}
+                        style={{ zIndex: 2 }}
+                      >
+                        Per Jam
+                      </button>
+                    </div>
                   </>
                 )}
 
-                {/* SUB-TOGGLE TIDUR: Durasi | Detail | Hipnogram */}
-                {recoveryMainTab === 'tidur' && (
-                  <>
-                    <div className="flex items-center justify-center mb-5">
-                      <div className={`inline-flex p-1 rounded-full border ${t.border} ${t.bgCardSoft}`}>
-                        <button
-                          onClick={() => { playSoundEffect('click', soundEnabled); setSleepSubTab('durasi'); }}
-                          className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
-                            sleepSubTab === 'durasi'
-                              ? 'bg-indigo-500 text-white shadow-sm'
-                              : `${t.textMuted} hover:${t.textMain}`
-                          }`}
-                        >
-                          Durasi
-                        </button>
-                        <button
-                          onClick={() => { playSoundEffect('click', soundEnabled); setSleepSubTab('detail'); }}
-                          className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
-                            sleepSubTab === 'detail'
-                              ? 'bg-indigo-500 text-white shadow-sm'
-                              : `${t.textMuted} hover:${t.textMain}`
-                          }`}
-                        >
-                          Detail
-                        </button>
-                        <button
-                          onClick={() => { playSoundEffect('click', soundEnabled); setSleepSubTab('somnogram'); }}
-                          className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
-                            sleepSubTab === 'somnogram'
-                              ? 'bg-indigo-500 text-white shadow-sm'
-                              : `${t.textMuted} hover:${t.textMain}`
-                          }`}
-                        >
-                          Hipnogram
-                        </button>
-                      </div>
-                    </div>
-
-                    {sleepSubTab === 'durasi' && (
-                      <ActivityChart
-                        t={t} theme={theme} history={history}
-                        soundEnabled={soundEnabled} playSoundEffect={playSoundEffect}
-                        onPointClick={navigateToWorkoutDate}
-                        language={language}
-                        lomealToday={lomealToday}
-                        metricKeys={['sleep']}
-                        storageKey="lyfit_sleep_only_chart"
-                        activityTargets={activityTargets} userProfile={userProfile}
-                      />
-                    )}
-                  </>
+                {/* KONTEN TIDUR (DURASI) */}
+                {recoveryMainTab === 'tidur' && sleepSubTab === 'durasi' && (
+                  <ActivityChart
+                    t={t} theme={theme} history={history}
+                    soundEnabled={soundEnabled} playSoundEffect={playSoundEffect}
+                    onPointClick={navigateToWorkoutDate}
+                    language={language}
+                    lomealToday={lomealToday}
+                    metricKeys={['sleep']}
+                    storageKey="lyfit_sleep_only_chart"
+                    activityTargets={activityTargets} userProfile={userProfile}
+                  />
                 )}
 
                 {recoveryMainTab === 'tidur' && (sleepSubTab === 'detail' || sleepSubTab === 'somnogram') && (() => {
@@ -2405,6 +2376,41 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                         </div>
                     );
                 })()}
+
+                {/* SUB-TOGGLE TIDUR (Full-width di bawah grafik/detail, sepadan dengan toggle utama) */}
+                {recoveryMainTab === 'tidur' && (
+                  <div className={`relative flex w-full p-1.5 rounded-full ${t.btnBg} mt-5`} style={{ zIndex: 10 }}>
+                    <div
+                      className="absolute top-1.5 bottom-1.5 w-[calc(33.333%-4px)] rounded-full transition-transform duration-300 ease-out bg-indigo-500 shadow-sm"
+                      style={{
+                        transform: sleepSubTab === 'durasi' ? 'translateX(0)' : sleepSubTab === 'detail' ? 'translateX(100%)' : 'translateX(200%)',
+                        left: '6px',
+                        zIndex: 1,
+                      }}
+                    ></div>
+                    <button
+                      onClick={() => { playSoundEffect('click', soundEnabled); setSleepSubTab('durasi'); }}
+                      className={`flex-1 py-2 rounded-full text-sm font-black relative transition-colors duration-300 ${sleepSubTab === 'durasi' ? 'text-white' : t.textMuted}`}
+                      style={{ zIndex: 2 }}
+                    >
+                      Durasi
+                    </button>
+                    <button
+                      onClick={() => { playSoundEffect('click', soundEnabled); setSleepSubTab('detail'); }}
+                      className={`flex-1 py-2 rounded-full text-sm font-black relative transition-colors duration-300 ${sleepSubTab === 'detail' ? 'text-white' : t.textMuted}`}
+                      style={{ zIndex: 2 }}
+                    >
+                      Detail
+                    </button>
+                    <button
+                      onClick={() => { playSoundEffect('click', soundEnabled); setSleepSubTab('somnogram'); }}
+                      className={`flex-1 py-2 rounded-full text-sm font-black relative transition-colors duration-300 ${sleepSubTab === 'somnogram' ? 'text-white' : t.textMuted}`}
+                      style={{ zIndex: 2 }}
+                    >
+                      Hipnogram
+                    </button>
+                  </div>
+                )}
             </div>
             )}
           </div>

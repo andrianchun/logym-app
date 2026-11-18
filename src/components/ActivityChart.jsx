@@ -248,9 +248,14 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
                           lomealDay: lomealFresh || null,
                           isToday: true,
                       });
-                      return r.status === 'unknown' ? null : r.score;
+                      return r.status === 'unknown' ? null : (r.curve?.avgScore ?? r.score);
                   }
-                  const r = calculateReadiness(histBio, restingHrBaseline(history, entry.dateStr));
+                  const r = calculateDynamicReadiness(histBio, restingHrBaseline(history, entry.dateStr), {
+                      history,
+                      ymd: entry.dateStr,
+                      workouts: history?.[entry.dateStr]?.workouts || [],
+                      isToday: false,
+                  });
                   return r.status === 'unknown' ? null : r.score;
               })(),
               targetSteps: histBio?.targetSteps || targetSteps,

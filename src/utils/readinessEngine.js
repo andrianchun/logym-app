@@ -390,8 +390,8 @@ export const extractWorkoutDrainEvents = (workouts = []) => {
     const kcal = Number(w.calories) || 0;
     const durMins = typeof w.duration === 'number' ? w.duration : 0;
     const drain = kcal > 0
-      ? Math.max(5, Math.min(16, Math.round(kcal / 35)))
-      : Math.max(5, Math.min(14, Math.round(durMins / 5)));
+      ? Math.max(4, Math.min(9, Math.round(kcal / 65)))
+      : Math.max(4, Math.min(8, Math.round(durMins / 10)));
     res.push({
       hour,
       drain,
@@ -469,43 +469,50 @@ export const generateIntradayEnergyCurve = ({
   const wakeHour = resolveWakeHour(bio, explicitWakeHour);
   const workoutDrains = extractWorkoutDrainEvents(workouts);
 
-  // Laju kelelahan per jam bangun (adenosine pressure):
-  // Jika tidur cukup (>=7j), energi bertahan stabil seharian; jika kurang tidur (<6j), sore cepat drop.
-  const hourlyDecay = sleep >= 7 ? 0.75 : (sleep >= 6 ? 1.3 : 1.95);
-  const dipDepth = sleep >= 7 ? 5 : (sleep >= 6 ? 10 : 16);
+  // Laju kelelahan per jam bangun (adenosine pressure) yang realistis & proporsional:
+  // - Tidur cukup (>=7j): turun perlahan sepanjang hari (~6-10 poin dari pagi ke malam).
+  // - Tidur sedang (6-7j): turun moderat (~10-14 poin) dengan dip sore terasa tipis.
+  // - Tidur kurang (<6j): dip sore lebih terasa (~11 poin di jam 15:00), lalu tetap manusiawi di malam hari.
+  const hourlyDecay = sleep >= 7 ? 0.45 : (sleep >= 6 ? 0.75 : 1.05);
+  const dipDepth = sleep >= 7 ? 4 : (sleep >= 6 ? 7 : 11);
+  const circadianFloor = Math.max(20, morningScore - 28);
 
   const points = [];
   for (let h = wakeHour; h <= 23; h++) {
     const hoursAwake = h - wakeHour;
 
-    // A. Cortisol Awakening Response (0-2 jam setelah bangun -> puncak segar pagi)
-    const morningLift = hoursAwake <= 2 ? Math.round(Math.sin((hoursAwake / 2) * Math.PI) * 3) : 0;
+    // A. Cortisol Awakening Response (0-3 jam setelah bangun -> puncak segar pagi)
+    const morningLift = hoursAwake <= 3 ? Math.round(Math.sin((hoursAwake / 3) * Math.PI) * 3) : 0;
 
-    // B. Penumpukan adenosin linear sejak bangun
+    // B. Penumpukan adenosin bertahap sejak bangun
     const awakeFatigue = hoursAwake * hourlyDecay;
 
-    // C. Afternoon Circadian Dip (kurva lonceng berpusat di jam 15:30)
-    const distFromDip = h - 15.5;
-    const circadianDip = dipDepth * Math.exp(-(distFromDip * distFromDip) / 4.5);
+    // C. Afternoon Circadian Dip (berpusat di jam 15:00) + Evening Second Wind (~18:30)
+    const distFromDip = h - 15.0;
+    const circadianDip = dipDepth * Math.exp(-(distFromDip * distFromDip) / 4.0);
+    const distFromWind = h - 18.5;
+    const secondWind = 2.5 * Math.exp(-(distFromWind * distFromWind) / 3.0);
 
-    // D. Evening Wind-Down (melatonin naik setelah jam 20:00)
-    const eveningDrop = h >= 20 ? (h - 19) * 2.5 : 0;
+    // D. Evening Wind-Down lembut (melatonin mulai naik setelah jam 21:00)
+    const eveningDrop = h >= 21 ? (h - 20) * 1.5 : 0;
 
-    // E. Workout Drain (kelelahan fisik pasca olahraga, perlahan pulih sebagian dalam 4 jam)
+    // E. Workout Drain (kelelahan akut ringan pasca olahraga, pulih bertahap ~50% dalam 3 jam)
     let totalWorkoutDrain = 0;
     let workoutLabel = null;
     for (const w of workoutDrains) {
       const dtW = h - w.hour;
       if (dtW >= 0) {
-        const recovery = Math.min(0.35, dtW * 0.08);
+        const recovery = Math.min(0.5, dtW * 0.16);
         totalWorkoutDrain += w.drain * (1 - recovery);
         if (dtW < 1) workoutLabel = w.name;
       }
     }
 
+    const rawNatural = Math.round(morningScore + morningLift + secondWind - awakeFatigue - circadianDip - eveningDrop);
+    const naturalScore = Math.max(circadianFloor, rawNatural);
     const baseScore = Math.max(
-      5,
-      Math.min(100, Math.round(morningScore + morningLift - awakeFatigue - circadianDip - eveningDrop - totalWorkoutDrain))
+      15,
+      Math.min(100, Math.round(naturalScore - totalWorkoutDrain))
     );
 
     // F. Caffeine / Stimulant Boost dari Lomeal
