@@ -18,6 +18,7 @@ import SharedProfileView from '../components/SharedProfileView';
 import UnifiedBadge from '../components/UnifiedBadge';
 import useDialog from '../hooks/useDialog';
 import DeveloperTools from '../components/DeveloperTools';
+import LogymToast from '../components/LogymToast';
 
 let globalProfileScrolls = {};
 let globalProfileLastTab = 'beranda';
@@ -370,19 +371,12 @@ export default function ProfileModal({
                     </div>
                 )}
 
-                {/* Upload Status Toast (Success) */}
-                {uploadStatus.show && uploadStatus.success && (
-                    <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] bg-emerald-500/90 text-white text-xs font-bold px-5 py-3 rounded-2xl md:rounded-full shadow-2xl border border-emerald-400/50 animate-in zoom-in-95 fade-in duration-300 text-center max-w-[80vw] backdrop-blur-sm">
-                        Foto diperbarui
-                    </div>
-                )}
-
-                {/* Upload Status Toast (Error) */}
-                {uploadStatus.show && !uploadStatus.success && (
-                    <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] bg-rose-500/90 text-white text-xs font-bold px-5 py-3 rounded-2xl md:rounded-full shadow-2xl border border-rose-400/50 animate-in zoom-in-95 fade-in duration-300 text-center max-w-[80vw] backdrop-blur-sm">
-                        {uploadStatus.message}
-                    </div>
-                )}
+                {/* Upload Status Toast — seragam LogymToast */}
+                <LogymToast
+                    open={uploadStatus.show}
+                    message={uploadStatus.success ? 'Foto diperbarui' : uploadStatus.message}
+                    variant={uploadStatus.success ? 'success' : 'error'}
+                />
 
                 {/* Header */}
                 <div 

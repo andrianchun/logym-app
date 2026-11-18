@@ -10,6 +10,7 @@ import { WorkoutTimerPlugin } from '../App';
 import TwoFrameMotionLoop from './TwoFrameMotionLoop';
 import { getBaseWeightLabel } from './ExerciseCard';
 import { renderFormattedCoachMessage } from '../utils/miniMarkdown';
+import LogymToast from './LogymToast';
 
 const LiveWorkoutStats = ({ workoutStartTime, userProfile, validExercises, exerciseLogs, t, formatTime }) => {
   const [workoutSeconds, setWorkoutSeconds] = useState(() => {
@@ -1486,12 +1487,13 @@ const ImmersiveWorkout = ({
           )}
         </div>
 
-        {/* Toast Lanjut Latihan Berikutnya (Immersive Only) */}
-        <div className={`absolute top-1/2 left-0 right-0 -translate-y-1/2 z-50 pointer-events-none flex justify-center transition-all duration-500 ease-in-out ${showSupersetToast ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
-          <div className={`w-full py-5 flex items-center justify-center ${t.bgAccent} bg-opacity-90 ${t.textButton}`}>
-            <span className="font-black whitespace-nowrap text-base tracking-widest uppercase opacity-90 mix-blend-overlay text-center px-4">Lanjut Latihan Berikutnya!</span>
-          </div>
-        </div>
+        {/* Toast Lanjut Latihan Berikutnya (Immersive Only — seragam LogymToast) */}
+        <LogymToast
+          open={Boolean(showSupersetToast)}
+          message="Lanjut Latihan Berikutnya!"
+          variant="accent"
+          containerPosition="absolute"
+        />
       </div>
 
       {/* CONTROLS (Bottom) */}

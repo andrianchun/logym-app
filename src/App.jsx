@@ -36,6 +36,7 @@ import ProgramTab from './pages/ProgramTab';
 
 // --- IMPORT MODALS ---
 import ConfirmModal from './modals/ConfirmModal';
+import LogymToast from './components/LogymToast';
 // Lazy: modal-modal sekunder baru diunduh saat pertama kali dibuka — memangkas bundle awal.
 const ExerciseDetailModal = React.lazy(() => import('./components/ExerciseDetailModal'));
 const AddExerciseModal = React.lazy(() => import('./modals/AddExerciseModal'));
@@ -3265,17 +3266,31 @@ export default function App() {
   }, [isHistoryLoaded, user?.uid]);
 
 
-  useEffect(() => {
-    window.history.pushState({ lyfit: true }, '');
+  const backHandlerStateRef = useRef({});
+  backHandlerStateRef.current = {
+    globalDetailExercise,
+    showProfileModal,
+    showSettings,
+    showHelp,
+    confirmModalOpen: confirmModal.isOpen,
+    activeAddModalTarget,
+    activeTab,
+  };
+  const exitToastTimerRef = useRef(null);
+  const isExitingAppRef = useRef(false);
 
-    const handlePopState = () => {
+  useEffect(() => {
+    const handleBackAction = () => {
+      const s = backHandlerStateRef.current;
+
+      // 1. Tutup modal overlay paling atas (termasuk ImmersiveWorkout / dialog)
       const activeModals = Array.from(document.querySelectorAll('.fixed.inset-0:not(.pointer-events-none)')).filter(el => window.getComputedStyle(el).display !== 'none');
       if (activeModals.length > 0) {
         const topModal = activeModals[activeModals.length - 1];
         const designatedCloseBtn = topModal.querySelector('[data-close-modal="true"]') || (topModal.getAttribute('data-close-modal') === 'true' ? topModal : null);
         if (designatedCloseBtn) designatedCloseBtn.click();
         else {
-          const closeBtn = Array.from(topModal.querySelectorAll('button')).find(b => ['batal', 'tutup'].includes((b.textContent||'').trim().toLowerCase()));
+          const closeBtn = Array.from(topModal.querySelectorAll('button')).find(b => ['batal', 'tutup'].includes((b.textContent || '').trim().toLowerCase()));
           if (closeBtn) closeBtn.click();
           else {
             const xIcon = topModal.querySelector('svg.lucide-x');
@@ -3283,31 +3298,75 @@ export default function App() {
             else topModal.click();
           }
         }
-        window.history.pushState({ lyfit: true }, '');
-        return;
+        return true;
       }
 
-      if (globalDetailExercise) { setGlobalDetailExercise(null); window.history.pushState({ lyfit: true }, ''); return; }
-      if (showProfileModal) { setShowProfileModal(false); window.history.pushState({ lyfit: true }, ''); return; }
-      if (showSettings) { setShowSettings(false); window.history.pushState({ lyfit: true }, ''); return; }
-      if (showHelp) { setShowHelp(false); window.history.pushState({ lyfit: true }, ''); return; }
-      if (confirmModal.isOpen) { setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null }); window.history.pushState({ lyfit: true }, ''); return; }
-      if (activeAddModalTarget) { setActiveAddModalTarget(null); window.history.pushState({ lyfit: true }, ''); return; }
+      if (s.globalDetailExercise) { setGlobalDetailExercise(null); return true; }
+      if (s.showProfileModal) { setShowProfileModal(false); return true; }
+      if (s.showSettings) { setShowSettings(false); return true; }
+      if (s.showHelp) { setShowHelp(false); return true; }
+      if (s.confirmModalOpen) { setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null }); return true; }
+      if (s.activeAddModalTarget) { setActiveAddModalTarget(null); return true; }
 
-      if (activeTab !== 'dashboard') { setActiveTab('dashboard'); window.history.pushState({ lyfit: true }, ''); return; }
+      // 2. Jika bukan di Dasbor, kembali ke Dasbor dulu
+      if (s.activeTab !== 'dashboard') {
+        setActiveTab('dashboard');
+        return true;
+      }
 
+      // 3. Di Dasbor: tekan Back kedua kalinya dalam 2.2 detik -> KELUAR SUNGGUHAN
       if (backPressedOnce.current) {
-        return;
+        backPressedOnce.current = false;
+        if (exitToastTimerRef.current) clearTimeout(exitToastTimerRef.current);
+        setShowExitToast(false);
+        if (Capacitor.isNativePlatform()) {
+          CapApp.exitApp().catch(() => {});
+        } else {
+          isExitingAppRef.current = true;
+          window.history.back();
+        }
+        return false;
       }
+
+      // 4. Tekan Back pertama di Dasbor -> tampilkan pill konfirmasi
       backPressedOnce.current = true;
       setShowExitToast(true);
-      window.history.pushState({ lyfit: true }, '');
-      setTimeout(() => { backPressedOnce.current = false; setShowExitToast(false); }, 2000);
+      if (exitToastTimerRef.current) clearTimeout(exitToastTimerRef.current);
+      exitToastTimerRef.current = setTimeout(() => {
+        backPressedOnce.current = false;
+        setShowExitToast(false);
+      }, 2200);
+      return true;
     };
 
+    // Di Android Native (Capacitor): intercept hardware/gesture Back langsung via CapApp
+    // agar tidak menumpuk dummy history dan tombol Back kedua benar-benar menutup aplikasi via CapApp.exitApp().
+    if (Capacitor.isNativePlatform()) {
+      let listenerHandle = null;
+      CapApp.addListener('backButton', () => {
+        handleBackAction();
+      }).then((h) => { listenerHandle = h; }).catch(() => {});
+      return () => {
+        if (exitToastTimerRef.current) clearTimeout(exitToastTimerRef.current);
+        if (listenerHandle) listenerHandle.remove();
+      };
+    }
+
+    // Di Web/PWA: push SATU sentinel saja saat mount (bukan tiap ganti tab!)
+    window.history.pushState({ lyfit: true }, '');
+    const handlePopState = () => {
+      if (isExitingAppRef.current) return;
+      const handled = handleBackAction();
+      if (handled) {
+        window.history.pushState({ lyfit: true }, '');
+      }
+    };
     window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [globalDetailExercise, showProfileModal, showSettings, showHelp, confirmModal.isOpen, activeAddModalTarget, activeTab]);
+    return () => {
+      if (exitToastTimerRef.current) clearTimeout(exitToastTimerRef.current);
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
 
   // Menggunakan ref tanpa re-render (sinkronisasi _activeSession ke history sudah ditangani
   // secara debounced di pendingActiveHistorySyncRef di atas — menghilangkan render ganda &
@@ -5306,14 +5365,19 @@ export default function App() {
         </React.Suspense>
       )}
       {aiDialog}
-      {/* Toast "Tekan Back Sekali Lagi" */}
-      {showExitToast && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <div className={`px-5 py-2.5 rounded-full shadow-lg text-sm font-medium ${theme === 'dark' ? 'bg-slate-700 text-white' : 'bg-slate-800 text-white'}`}>
-            Tekan sekali lagi untuk keluar
-          </div>
-        </div>
-      )}
+      {/* Toast "Tekan Back Sekali Lagi" — seragam di tengah layar (LogymToast) */}
+      <LogymToast
+        open={showExitToast}
+        message="Tekan sekali lagi untuk keluar"
+        variant="info"
+      />
+
+      {/* Toast Restore Sesi Lintas Perangkat */}
+      <LogymToast
+        open={Boolean(showRestoreToast)}
+        message={showRestoreToast}
+        variant="info"
+      />
 
       {/* Toast Urungkan Hapus Set (Standar design.md: Glassmorphism, Primary Gradient, Touch Target >= 44px, Tanpa Ikon Sampah Redundan) */}
       {undoDeletedSet && undoDeletedSet.length > 0 && (
@@ -5333,14 +5397,12 @@ export default function App() {
         </div>
       )}
 
-      {/* Toast Lanjut Latihan Berikutnya */}
-      {!isImmersiveMode && (
-        <div className={`fixed top-1/2 left-0 right-0 -translate-y-1/2 z-[100] pointer-events-none flex justify-center transition-all duration-500 ease-in-out ${showSupersetToast ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
-          <div className={`w-full py-5 flex items-center justify-center ${t.bgAccent} bg-opacity-90 ${t.textButton}`}>
-            <span className="font-black whitespace-nowrap text-base tracking-widest uppercase opacity-90 mix-blend-overlay">Lanjut Latihan Berikutnya!</span>
-          </div>
-        </div>
-      )}
+      {/* Toast Lanjut Latihan Berikutnya — seragam di tengah layar (LogymToast) */}
+      <LogymToast
+        open={!isImmersiveMode && showSupersetToast}
+        message="Lanjut Latihan Berikutnya!"
+        variant="accent"
+      />
       {/* OVERLAYS & NOTIFICATIONS */}
       {otaDialog}
       <UpdaterAlert

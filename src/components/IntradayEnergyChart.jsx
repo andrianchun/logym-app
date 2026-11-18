@@ -10,7 +10,89 @@ import {
   Tooltip,
   ReferenceLine,
 } from 'recharts';
-import { Zap, Coffee, Dumbbell } from 'lucide-react';
+import { Zap } from 'lucide-react';
+
+// Pin chat-bubble bulat biru Logym + ikon barbel putih yang menunjuk tepat ke titik jam latihan
+const WorkoutBubblePin = ({ cx, cy, count = 1, isDark }) => {
+  const bubbleY = cy - 22;
+  const ringStroke = isDark ? '#0f172a' : '#ffffff';
+  return (
+    <g pointerEvents="none">
+      {/* Titik jangkar di garis kurva */}
+      <circle cx={cx} cy={cy} r={3.5} fill="#3b82f6" stroke={ringStroke} strokeWidth={1.75} />
+      {/* Ekor chat bubble menunjuk ke titik kurva */}
+      <polygon
+        points={`${cx - 4},${bubbleY + 8} ${cx + 4},${bubbleY + 8} ${cx},${cy - 5}`}
+        fill="#2563eb"
+      />
+      {/* Lingkaran chat bubble biru Logym */}
+      <circle cx={cx} cy={bubbleY} r={10.5} fill="#2563eb" stroke={ringStroke} strokeWidth={1.75} />
+      {/* Ikon barbel putih crisp (terpusat di cx, bubbleY) */}
+      <g
+        transform={`translate(${cx - 6}, ${bubbleY - 6}) scale(0.5)`}
+        fill="none"
+        stroke="#ffffff"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M6.5 6.5h11" />
+        <path d="M6.5 17.5h11" />
+        <path d="M3 10v4" />
+        <path d="M21 10v4" />
+        <rect x="5" y="7" width="3" height="10" rx="1" fill="#ffffff" stroke="none" />
+        <rect x="16" y="7" width="3" height="10" rx="1" fill="#ffffff" stroke="none" />
+        <line x1="8" y1="12" x2="16" y2="12" strokeWidth="2.8" />
+      </g>
+      {count > 1 && (
+        <g>
+          <circle cx={cx + 8.5} cy={bubbleY - 8.5} r={5.5} fill="#0ea5e9" stroke={ringStroke} strokeWidth={1.25} />
+          <text
+            x={cx + 8.5}
+            y={bubbleY - 5.8}
+            textAnchor="middle"
+            fill="#ffffff"
+            fontSize="7.5"
+            fontWeight="900"
+          >
+            {count}
+          </text>
+        </g>
+      )}
+    </g>
+  );
+};
+
+// Pin chat-bubble kecil warna amber untuk konsumsi kafein Lomeal (kopi/matcha/pre-workout)
+const CaffeineBubblePin = ({ cx, cy, offsetY = 0, isDark }) => {
+  const bubbleY = cy - 22 - offsetY;
+  const ringStroke = isDark ? '#0f172a' : '#ffffff';
+  return (
+    <g pointerEvents="none">
+      {offsetY === 0 && (
+        <>
+          <circle cx={cx} cy={cy} r={3.5} fill="#f59e0b" stroke={ringStroke} strokeWidth={1.75} />
+          <polygon
+            points={`${cx - 3.5},${bubbleY + 7.5} ${cx + 3.5},${bubbleY + 7.5} ${cx},${cy - 5}`}
+            fill="#f59e0b"
+          />
+        </>
+      )}
+      <circle cx={cx} cy={bubbleY} r={9.5} fill="#f59e0b" stroke={ringStroke} strokeWidth={1.6} />
+      <g
+        transform={`translate(${cx - 5.2}, ${bubbleY - 5.2}) scale(0.43)`}
+        fill="none"
+        stroke="#ffffff"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M17 8h1a4 4 0 1 1 0 8h-1" />
+        <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z" />
+      </g>
+    </g>
+  );
+};
 
 const IntradayEnergyChart = ({
   t,
@@ -41,7 +123,6 @@ const IntradayEnergyChart = ({
   const currentLabel = `${String(nowHour).padStart(2, '0')}:00`;
   const hasCurrentMarker = isToday && points.some((p) => p.hour === nowHour);
   const hasAnyCaffeine = points.some((p) => p.caffeineBoost > 0);
-  const hasAnyWorkout = points.some((p) => p.workoutDrain > 0);
 
   const lineStroke = isDark ? '#38bdf8' : '#0284c7';
   const baseLineStroke = isDark ? 'rgba(148,163,184,0.55)' : 'rgba(100,116,139,0.55)';
@@ -79,6 +160,16 @@ const IntradayEnergyChart = ({
           <span className="opacity-75">Skor Energi</span>
           <span className="font-black text-sm tabular-nums">{p.score} / 100</span>
         </div>
+        {Array.isArray(p.workoutEvents) && p.workoutEvents.length > 0 && (
+          <div className="mt-1.5 pt-1.5 border-t border-slate-500/20 space-y-0.5">
+            {p.workoutEvents.map((w, idx) => (
+              <div key={idx} className="flex items-center justify-between gap-3 text-blue-400 font-bold">
+                <span className="truncate max-w-[140px]">{w.name}</span>
+                <span className="tabular-nums opacity-90">{w.timeStr || p.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
         {p.caffeineBoost > 0 && (
           <>
             <div className="flex items-center justify-between gap-4 mt-1 opacity-75">
@@ -91,9 +182,9 @@ const IntradayEnergyChart = ({
             </div>
           </>
         )}
-        {p.workoutDrain > 0 && (
-          <div className="flex items-center justify-between gap-4 mt-1 text-rose-400 font-bold">
-            <span>Beban Latihan</span>
+        {p.workoutDrain > 0 && (!p.workoutEvents || p.workoutEvents.length === 0) && (
+          <div className="flex items-center justify-between gap-4 mt-1 text-sky-400/90 font-bold">
+            <span>Lelah Latihan</span>
             <span className="tabular-nums">-{p.workoutDrain}</span>
           </div>
         )}
@@ -104,7 +195,7 @@ const IntradayEnergyChart = ({
   return (
     <div className="w-full">
       {/* Header Legend Ringkas */}
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
         <div className="flex items-center gap-3 text-xs font-bold">
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-sky-400 inline-block" />
@@ -117,24 +208,12 @@ const IntradayEnergyChart = ({
             </div>
           )}
         </div>
-        <div className="flex items-center gap-2 text-xs">
-          {hasAnyCaffeine && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-bold border border-amber-500/25">
-              <Coffee size={12} /> Lomeal
-            </span>
-          )}
-          {hasAnyWorkout && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-400 font-bold border border-rose-500/25">
-              <Dumbbell size={12} /> Sesi
-            </span>
-          )}
-        </div>
       </div>
 
       {/* Kurva Line / Area Intraday */}
-      <div className="w-full h-52 select-none">
+      <div className="w-full h-56 select-none">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={points} margin={{ top: 14, right: 10, left: -24, bottom: 0 }}>
+          <ComposedChart data={points} margin={{ top: 36, right: 22, left: -24, bottom: 0 }}>
             <defs>
               <linearGradient id="intradayEnergyFill" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor={lineStroke} stopOpacity={0.35} />
@@ -148,7 +227,7 @@ const IntradayEnergyChart = ({
               axisLine={false}
               tickLine={false}
               interval="preserveStartEnd"
-              minTickGap={24}
+              minTickGap={26}
             />
             <YAxis
               domain={[0, 100]}
@@ -197,37 +276,46 @@ const IntradayEnergyChart = ({
               dot={(props) => {
                 const { cx, cy, payload } = props;
                 if (!cx || !cy || !payload) return null;
-                if (payload.eventType === 'caffeine') {
-                  return (
-                    <circle
-                      key={`caf-${payload.hour}`}
-                      cx={cx}
-                      cy={cy}
-                      r={4.5}
-                      fill="#f59e0b"
-                      stroke={isDark ? '#0f172a' : '#ffffff'}
-                      strokeWidth={2}
-                    />
-                  );
-                }
-                if (isToday && payload.hour === nowHour) {
-                  return (
-                    <circle
-                      key={`now-${payload.hour}`}
-                      cx={cx}
-                      cy={cy}
-                      r={5}
-                      fill="#10b981"
-                      stroke={isDark ? '#0f172a' : '#ffffff'}
-                      strokeWidth={2}
-                    />
-                  );
-                }
-                return null;
+                const hasWorkout = Array.isArray(payload.workoutEvents) && payload.workoutEvents.length > 0;
+                const hasCaffeine = Array.isArray(payload.caffeineMoments) && payload.caffeineMoments.length > 0;
+                const isNowDot = isToday && payload.hour === nowHour;
+
+                if (!hasWorkout && !hasCaffeine && !isNowDot) return null;
+
+                return (
+                  <g key={`dot-${payload.hour}`}>
+                    {isNowDot && !hasWorkout && !hasCaffeine && (
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={5}
+                        fill="#10b981"
+                        stroke={isDark ? '#0f172a' : '#ffffff'}
+                        strokeWidth={2}
+                      />
+                    )}
+                    {hasWorkout && (
+                      <WorkoutBubblePin
+                        cx={cx}
+                        cy={cy}
+                        count={payload.workoutEvents.length}
+                        isDark={isDark}
+                      />
+                    )}
+                    {hasCaffeine && (
+                      <CaffeineBubblePin
+                        cx={cx}
+                        cy={cy}
+                        offsetY={hasWorkout ? 22 : 0}
+                        isDark={isDark}
+                      />
+                    )}
+                  </g>
+                );
               }}
               activeDot={{ r: 5, fill: lineStroke, stroke: isDark ? '#0f172a' : '#ffffff', strokeWidth: 2 }}
               isAnimationActive={true}
-              animationDuration={450}
+              animationDuration={400}
             />
           </ComposedChart>
         </ResponsiveContainer>

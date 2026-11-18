@@ -385,15 +385,18 @@ export const extractWorkoutDrainEvents = (workouts = []) => {
     if (!w) continue;
     const isCompleted = w.status === 'completed' || Number(w.calories) > 0 || Number(w.duration) > 0;
     if (!isCompleted) continue;
-    const hour = parseHourFromTimestamp(w.completedAt ?? w.timestamp ?? w.endTime ?? w.startTime ?? w.time);
+    const hour = parseHourFromTimestamp(w.startedAt ?? w.timestamp ?? w.completedAt ?? w.endTime ?? w.startTime ?? w.time);
     if (hour === null) continue;
     const kcal = Number(w.calories) || 0;
     const durMins = typeof w.duration === 'number' ? w.duration : 0;
     const drain = kcal > 0
       ? Math.max(4, Math.min(9, Math.round(kcal / 65)))
       : Math.max(4, Math.min(8, Math.round(durMins / 10)));
+    const hh = String(Math.floor(hour)).padStart(2, '0');
+    const mm = String(Math.round((hour % 1) * 60) % 60).padStart(2, '0');
     res.push({
       hour,
+      timeStr: `${hh}:${mm}`,
       drain,
       name: w.programName || w.name || 'Latihan',
     });
@@ -498,13 +501,16 @@ export const generateIntradayEnergyCurve = ({
 
     // E. Workout Drain (kelelahan akut ringan pasca olahraga, pulih bertahap ~50% dalam 3 jam)
     let totalWorkoutDrain = 0;
-    let workoutLabel = null;
+    const workoutsAtHour = [];
     for (const w of workoutDrains) {
+      const clampedW = Math.max(wakeHour, Math.min(23, Math.floor(w.hour)));
+      if (clampedW === h) {
+        workoutsAtHour.push(w);
+      }
       const dtW = h - w.hour;
       if (dtW >= 0) {
         const recovery = Math.min(0.5, dtW * 0.16);
         totalWorkoutDrain += w.drain * (1 - recovery);
-        if (dtW < 1) workoutLabel = w.name;
       }
     }
 
@@ -520,7 +526,9 @@ export const generateIntradayEnergyCurve = ({
     const score = Math.max(5, Math.min(100, baseScore + caf.boost));
 
     // Tandai momen konsumsi kafein tepat di jam tersebut
-    const cafMoment = caffeineEvents.find((ev) => Math.floor(ev.hour) === h);
+    const cafMoments = caffeineEvents.filter((ev) => Math.max(wakeHour, Math.min(23, Math.floor(ev.hour))) === h);
+    const cafMoment = cafMoments[0] || null;
+    const workoutLabel = workoutsAtHour.length > 0 ? workoutsAtHour.map(w => w.name).join(', ') : null;
 
     points.push({
       hour: h,
@@ -530,8 +538,10 @@ export const generateIntradayEnergyCurve = ({
       caffeineBoost: caf.boost,
       caffeineSource: caf.primarySource,
       workoutDrain: Math.round(totalWorkoutDrain),
-      eventType: cafMoment ? 'caffeine' : (workoutLabel ? 'workout' : null),
-      eventLabel: cafMoment ? cafMoment.source : (workoutLabel || null),
+      workoutEvents: workoutsAtHour,
+      caffeineMoments: cafMoments,
+      eventType: workoutsAtHour.length > 0 ? 'workout' : (cafMoment ? 'caffeine' : null),
+      eventLabel: workoutLabel || (cafMoment ? cafMoment.source : null),
     });
   }
 
@@ -549,6 +559,7 @@ export const generateIntradayEnergyCurve = ({
     avgScore,
     wakeHour,
     caffeineEvents,
+    workoutEvents: workoutDrains,
     baseReadiness: base,
   };
 };

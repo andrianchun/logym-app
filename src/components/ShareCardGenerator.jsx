@@ -13,6 +13,7 @@ import { MuscleProgress } from './MuscleProgress';
 import { shareWorkoutToFeed } from '../utils/communityApi';
 import CreatePostModal from './CreatePostModal';
 import ActivityRings from './ActivityRings';
+import LogymToast from './LogymToast';
 import { parseWorkoutDurationMinutes, calculateWorkoutCalories, calculateSmartWorkoutCalories, dailyBurnCalories, dailyActiveMinutes, calcDynamicTarget } from '../utils/workoutCalc';
 let globalTemplateIndex = 0; // default to bodycomp
 
@@ -1259,12 +1260,12 @@ export default function ShareCardGenerator({ user, setUser, t, theme, history, a
                     {isSharing ? <Loader2 className="animate-spin" size={20}/> : <Share2 size={20}/>}
                 </button>
             </div>
-            {/* Toast Notification */}
-            {toastMsg && (
-                <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] bg-rose-500/90 text-white text-[12px] font-bold px-5 py-3 rounded-2xl shadow-2xl border border-rose-400/50 animate-in zoom-in-95 fade-in duration-300 max-w-[80vw] text-center backdrop-blur-sm">
-                    {toastMsg}
-                </div>
-            )}
+            {/* Toast Notification — seragam LogymToast */}
+            <LogymToast
+                open={Boolean(toastMsg)}
+                message={toastMsg}
+                variant={/berhasil/i.test(toastMsg) ? 'success' : /gagal|kesalahan|habis|maksimal|tidak/i.test(toastMsg) ? 'error' : 'info'}
+            />
 
             {/* Create Post Modal (Staging Area) */}
             {pendingShareFiles && (

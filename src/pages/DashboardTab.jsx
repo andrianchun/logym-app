@@ -1859,10 +1859,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                      return (
                          <div>
                              <div className="flex items-center justify-between gap-2 mb-1">
-                                 <div className="flex items-center space-x-1.5">
-                                     <Zap size={14} className="text-sky-400" />
-                                     <span className={`text-sm font-bold uppercase tracking-widest ${t.textMuted}`}>Skor Energi</span>
-                                 </div>
+                                 <span className={`text-sm font-bold uppercase tracking-widest ${t.textMuted}`}>Skor Energi</span>
                                  {sleepReadiness.status !== 'unknown' && sleepReadiness.curve?.avgScore != null && (
                                      <span className="text-xs font-bold text-slate-400 tabular-nums">
                                          {sleepDate === todayStr
@@ -1931,10 +1928,7 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                              title="Klik untuk menentukan target durasi tidur"
                          >
                              <div className="flex items-center justify-between gap-2 mb-1">
-                                 <div className="flex items-center space-x-1.5">
-                                     <Moon size={14} className="text-indigo-400" />
-                                     <span className={`text-sm font-bold uppercase tracking-widest ${t.textMuted} group-hover:text-indigo-400 transition-colors`}>Skor Tidur</span>
-                                 </div>
+                                 <span className={`text-sm font-bold uppercase tracking-widest ${t.textMuted} group-hover:text-indigo-400 transition-colors`}>Skor Tidur</span>
                                  <span className="text-xs font-bold text-slate-400 tabular-nums">
                                      {durasiRingkas} / {targetSleepLabel}
                                  </span>
