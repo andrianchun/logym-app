@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Activity, Zap, Brain, Footprints, HeartPulse, Moon, Droplets, Droplet, Dumbbell, Scale, RefreshCw, Trophy, Link2, Pencil, Settings, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Wind, Utensils, Flame, Clock, Cloud, CloudOff, Target, Coffee } from 'lucide-react';
 import { getLocalYMD, hasDeletedProjected, isLomealOwned } from '../data/constants';
-import { calculateDynamicReadiness, restingHrBaseline } from '../utils/readinessEngine';
+import { calculateDynamicReadiness, calculateSleepScore, restingHrBaseline } from '../utils/readinessEngine';
 import DashboardModals from '../components/DashboardModals';
 import DashboardChart from '../components/DashboardChart';
 import ActivityChart from '../components/ActivityChart';
@@ -355,6 +355,8 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
       localStorage.setItem('lyfit_sleep_expanded', JSON.stringify(isSleepExpanded));
   }, [isSleepExpanded]);
 
+  const [recoveryMainTab, setRecoveryMainTab] = useState('energi');
+  const [energySubTab, setEnergySubTab] = useState('hourly');
   const [sleepSubTab, setSleepSubTab] = useState('durasi');
   const prefillBioRef = useRef(null);
   // Navigasi tanggal KHUSUS kartu tidur (0 = hari ini, 1 = kemarin, dst). Turunannya
@@ -503,6 +505,10 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
       isToday: sleepDate === todayStr,
     }),
     [sleepBio, history, sleepDate, todayStr, lomealToday]
+  );
+  const sleepScoreObj = useMemo(
+    () => calculateSleepScore(sleepBio, Number(activityTargets?.sleep || 8)),
+    [sleepBio, activityTargets?.sleep]
   );
   const sleepDateLabel = sleepOffset === 0
     ? 'Semalam'
@@ -1830,167 +1836,124 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
                  </div>
              </div>
 
-             <div className="flex flex-col mb-2 mt-4 space-y-4 relative z-20">
+             <div className="flex flex-col mb-2 mt-4 space-y-5 relative z-20">
+                 {/* 1. SKOR ENERGI (UTAMA — paling representatif untuk kesiapan gym, dinamis per jam) */}
+                 {(() => {
+                     const energyScore = sleepReadiness.status === 'unknown' ? 0 : sleepReadiness.score;
+                     let statusText = 'Butuh Perhatian';
+                     let badgeColor = 'bg-rose-500/90 text-white border-rose-500/20';
+                     let barColor = 'bg-rose-500';
+                     if (energyScore >= 85) {
+                         statusText = 'Sangat Baik';
+                         badgeColor = 'bg-emerald-500/90 text-white border-emerald-500/20';
+                         barColor = 'bg-emerald-500';
+                     } else if (energyScore >= 70) {
+                         statusText = 'Baik';
+                         badgeColor = 'bg-sky-500/90 text-white border-sky-500/20';
+                         barColor = 'bg-sky-500';
+                     } else if (energyScore >= 60) {
+                         statusText = 'Cukup';
+                         badgeColor = 'bg-amber-500/90 text-white border-amber-500/20';
+                         barColor = 'bg-amber-500';
+                     }
+                     return (
+                         <div>
+                             <div className="flex items-center space-x-1.5 mb-1">
+                                 <Zap size={14} className="text-sky-400" />
+                                 <span className={`text-sm font-bold uppercase tracking-widest ${t.textMuted}`}>Skor Energi</span>
+                             </div>
+                             <div className="flex flex-wrap items-baseline gap-2.5 mt-1">
+                                 <div className="flex items-baseline space-x-1">
+                                     <span className={`text-4xl font-black tracking-tighter tabular-nums ${t.textMain}`}>
+                                         {sleepReadiness.status !== 'unknown' ? formatNumber(energyScore, language) : '-'}
+                                     </span>
+                                     <span className={`text-sm font-bold ${t.textMuted}`}>/ 100</span>
+                                 </div>
+                                 {energyScore > 0 && (
+                                     <span className={`px-2 py-0.5 rounded-full text-xs uppercase font-bold tracking-wider ${badgeColor} border shadow-sm`}>
+                                         {statusText}
+                                     </span>
+                                 )}
+                                 {sleepReadiness.caffeineBoost > 0 && (
+                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                                         <Coffee size={11} />
+                                         <span>+{sleepReadiness.caffeineBoost}</span>
+                                     </span>
+                                 )}
+                             </div>
+                             {energyScore > 0 && (
+                                 <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden mt-2 shrink-0">
+                                     <div
+                                         className={`h-full ${barColor} rounded-full transition-all duration-500`}
+                                         style={{ width: `${Math.min(100, energyScore)}%` }}
+                                     />
+                                 </div>
+                             )}
+                             <p className={`text-sm leading-snug mt-2 ${t.textMuted}`}>{sleepReadiness.message}</p>
+                         </div>
+                     );
+                 })()}
+
+                 {/* 2. SKOR TIDUR (klik untuk atur target durasi tidur) */}
                  {(() => {
                      const targetSleepHours = Number(activityTargets?.sleep || 8);
                      const targetSleepH = Math.floor(targetSleepHours);
                      const targetSleepM = Math.round((targetSleepHours % 1) * 60);
                      const targetSleepLabel = targetSleepM > 0 ? `${targetSleepH}j ${targetSleepM}m` : `${targetSleepH} jam`;
                      const sleepHrs = parseFloat(sleepBio.sleep) || 0;
+                     const { jam, menit } = sleepHoursToParts(sleepBio.sleep) || { jam: 0, menit: 0 };
+                     const durasiRingkas = sleepHrs > 0 ? `${jam}j ${menit}m` : '-';
+
+                     const sScore = sleepScoreObj.status === 'unknown' ? 0 : sleepScoreObj.score;
+                     let sBadgeColor = 'bg-rose-500/90 text-white border-rose-500/20';
+                     if (sScore >= 85) sBadgeColor = 'bg-emerald-500/90 text-white border-emerald-500/20';
+                     else if (sScore >= 70) sBadgeColor = 'bg-indigo-500/90 text-white border-indigo-500/20';
+                     else if (sScore >= 55) sBadgeColor = 'bg-amber-500/90 text-white border-amber-500/20';
+
                      return (
-                         <div 
+                         <div
                              onClick={() => {
                                  playSoundEffect('click', soundEnabled);
                                  setEditSleepHours(targetSleepH);
                                  setEditSleepMinutes(targetSleepM);
                                  setShowSleepTargetModal(true);
                              }}
-                             className="cursor-pointer group active:opacity-85 transition-opacity"
+                             className="cursor-pointer group active:opacity-85 transition-opacity pt-3 border-t border-dashed border-slate-500/20 pb-1"
                              title="Klik untuk menentukan target durasi tidur"
                          >
-                             <div className="flex items-center space-x-1.5 mb-1">
-                                 <Moon size={14} className="text-indigo-400" />
-                                 <span className={`text-sm font-bold uppercase tracking-widest ${t.textMuted} group-hover:text-indigo-400 transition-colors`}>Durasi Tidur</span>
-                             </div>
-                             <div className="flex items-baseline space-x-3 mt-1">
-                                 <div className="flex items-baseline space-x-1">
-                                     {(() => {
-                                         const sleepStr = sleepBio.sleep;
-                                         if (!sleepStr || parseFloat(sleepStr) <= 0) {
-                                             return <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>-</span>;
-                                         }
-                                         if (typeof sleepStr === 'string' && sleepStr.includes('h')) {
-                                             const parts = sleepStr.split(' ');
-                                             const h = parts[0]?.replace('h', '') || '0';
-                                             const m = parts[1]?.replace('m', '') || '0';
-                                             return (
-                                                 <>
-                                                     <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>{h}</span>
-                                                     <span className={`body-lg font-bold ${t.textMuted} mr-1`}>jam</span>
-                                                     <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>{m}</span>
-                                                     <span className={`body-lg font-bold ${t.textMuted}`}>mnt</span>
-                                                 </>
-                                             );
-                                         }
-                                         const { jam, menit } = sleepHoursToParts(sleepStr) || { jam: 0, menit: 0 };
-                                         return (
-                                             <>
-                                                 <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>{jam}</span>
-                                                 <span className={`body-lg font-bold ${t.textMuted} mr-1`}>jam</span>
-                                                 <span className={`text-4xl font-black tracking-tighter ${t.textMain}`}>{menit}</span>
-                                                 <span className={`body-lg font-bold ${t.textMuted}`}>mnt</span>
-                                             </>
-                                         );
-                                     })()}
-                                     <span className="text-xs text-slate-400 font-semibold whitespace-nowrap ml-1">/ {targetSleepLabel}</span>
+                             <div className="flex items-center justify-between gap-2 mb-1">
+                                 <div className="flex items-center space-x-1.5">
+                                     <Moon size={14} className="text-indigo-400" />
+                                     <span className={`text-sm font-bold uppercase tracking-widest ${t.textMuted} group-hover:text-indigo-400 transition-colors`}>Skor Tidur</span>
                                  </div>
-                                 {(() => {
-                                     if (sleepHrs <= 0) return null;
-                                     
-                                     let text = 'Sangat Kurang';
-                                     let color = 'bg-rose-500/90 text-white border-rose-500/20';
-                                     if (sleepHrs >= 9) {
-                                         text = 'Berlebih';
-                                         color = 'bg-amber-500/90 text-white border-amber-500/20';
-                                     } else if (sleepHrs >= 7) {
-                                         text = 'Optimal';
-                                         color = 'bg-emerald-500/90 text-white border-emerald-500/20';
-                                     } else if (sleepHrs >= 6) {
-                                         text = 'Cukup';
-                                         color = 'bg-sky-500/90 text-white border-sky-500/20';
-                                     } else if (sleepHrs >= 4) {
-                                         text = 'Kurang';
-                                         color = 'bg-amber-500/90 text-white border-amber-500/20';
-                                     }
-                                     return <span className={`px-2 py-0.5 rounded-full text-xs uppercase font-bold tracking-wider ${color} border shadow-sm`}>{text}</span>;
-                                 })()}
+                                 <span className="text-xs font-bold text-slate-400 tabular-nums">
+                                     {durasiRingkas} / {targetSleepLabel}
+                                 </span>
                              </div>
-                             {sleepHrs > 0 && (
+                             <div className="flex flex-wrap items-baseline gap-2.5 mt-1">
+                                 <div className="flex items-baseline space-x-1">
+                                     <span className={`text-3xl font-black tracking-tighter tabular-nums ${t.textMain}`}>
+                                         {sleepScoreObj.status !== 'unknown' ? formatNumber(sScore, language) : '-'}
+                                     </span>
+                                     <span className={`text-sm font-bold ${t.textMuted}`}>/ 100</span>
+                                 </div>
+                                 {sScore > 0 && (
+                                     <span className={`px-2 py-0.5 rounded-full text-xs uppercase font-bold tracking-wider ${sBadgeColor} border shadow-sm`}>
+                                         {sleepScoreObj.label}
+                                     </span>
+                                 )}
+                             </div>
+                             {sScore > 0 && (
                                  <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden mt-2 shrink-0">
-                                     <div 
-                                         className="h-full bg-indigo-500 rounded-full transition-all duration-500" 
-                                         style={{ width: `${Math.min(100, Math.round((sleepHrs / targetSleepHours) * 100))}%` }}
+                                     <div
+                                         className="h-full bg-indigo-500 rounded-full transition-all duration-500"
+                                         style={{ width: `${Math.min(100, sScore)}%` }}
                                      />
                                  </div>
                              )}
                          </div>
                      );
                  })()}
-
-                 {/* SKOR KESIAPAN — dihitung Logym sendiri dari tidur, tahap tidur, dan deviasi
-                     nadi istirahat terhadap kebiasaan 14 hari. Dulu di sini tampil "Skor Energi"
-                     milik Samsung, yang harus diketik manual karena Samsung tidak pernah
-                     mengekspornya ke Health Connect — praktisnya selalu kosong. */}
-                 <div className="pb-1">
-                     <div className="flex items-center justify-between gap-2">
-                         <span className={`text-sm font-bold uppercase tracking-widest ${t.textMuted}`}>Skor Kesiapan</span>
-                         <button
-                             type="button"
-                             onClick={(e) => {
-                                 e.stopPropagation();
-                                 playSoundEffect('click', soundEnabled);
-                                 const alreadyShowingIntraday = isSleepExpanded && sleepSubTab === 'intraday';
-                                 if (alreadyShowingIntraday) {
-                                     setIsSleepExpanded(false);
-                                 } else {
-                                     setSleepSubTab('intraday');
-                                     setIsSleepExpanded(true);
-                                     setTimeout(() => {
-                                         const el = document.getElementById('sleep-subcard');
-                                         if (el) {
-                                             const bottom = el.getBoundingClientRect().bottom;
-                                             if (bottom > window.innerHeight - 100) {
-                                                 window.scrollTo({ top: bottom + window.scrollY - window.innerHeight + 120, behavior: 'smooth' });
-                                             }
-                                         }
-                                     }, 320);
-                                 }
-                             }}
-                             className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border transition-all active:scale-95 ${
-                                 isSleepExpanded && sleepSubTab === 'intraday'
-                                     ? `${t.bgAccent} text-white border-transparent shadow-sm`
-                                     : `${t.btnBg} ${t.textMuted} ${t.border} hover:${t.textMain}`
-                             }`}
-                             title="Lihat kurva energi dinamis per jam"
-                         >
-                             <Activity size={13} />
-                             <span>Per Jam</span>
-                         </button>
-                     </div>
-                     <div className="flex flex-wrap items-baseline gap-2.5 mt-1">
-                         <div className="flex items-baseline space-x-1">
-                             <span className={`text-3xl font-black tracking-tighter ${t.textMain}`}>{sleepReadiness.status !== 'unknown' ? formatNumber(sleepReadiness.score, language) : '-'}</span>
-                             <span className={`text-sm font-bold ${t.textMuted}`}>/ 100</span>
-                         </div>
-                         {(() => {
-                             const score = sleepReadiness.status === 'unknown' ? 0 : sleepReadiness.score;
-                             if (score <= 0) return null;
-                             
-                             let text = 'Butuh Perhatian';
-                             let color = 'bg-rose-500/90 text-white border-rose-500/20';
-                             if (score >= 85) {
-                                 text = 'Sangat Baik';
-                                 color = 'bg-emerald-500/90 text-white border-emerald-500/20';
-                             } else if (score >= 70) {
-                                 text = 'Baik';
-                                 color = 'bg-sky-500/90 text-white border-sky-500/20';
-                             } else if (score >= 60) {
-                                 text = 'Cukup';
-                                 color = 'bg-amber-500/90 text-white border-amber-500/20';
-                             }
-                             return <span className={`px-2 py-0.5 rounded-full text-xs uppercase font-bold tracking-wider ${color} border shadow-sm`}>{text}</span>;
-                         })()}
-                         {sleepReadiness.caffeineBoost > 0 && (
-                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                                 <Coffee size={11} />
-                                 <span>+{sleepReadiness.caffeineBoost}</span>
-                             </span>
-                         )}
-                     </div>
-                     {/* Alasannya ikut ditulis. Skor tanpa sebab itu kotak hitam — persis keluhan
-                         yang bikin Skor Energi Samsung tidak berguna di sini. */}
-                     <p className={`text-sm leading-snug mt-1.5 ${t.textMuted}`}>{sleepReadiness.message}</p>
-                 </div>
              </div>
 
              <button
@@ -2024,45 +1987,139 @@ const DashboardTab = ({ isActive = true, t, lang, language, user, history, setHi
           <div className="overflow-hidden">
             {isSleepExpanded && (
               <div className={`rounded-b-2xl border border-t-0 ${t.border} ${t.bgSunken} shadow-inner relative z-10 p-6 no-swipe`} onTouchStart={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()} onTouchEnd={e => e.stopPropagation()}>
-                <div className={`relative flex w-full p-1.5 rounded-full ${t.btnBg} mb-6`} style={{ zIndex: 10 }}>
+                {/* TOGGLE UTAMA (2 PILL): Kiri Energi, Kanan Tidur */}
+                <div className={`relative flex w-full p-1.5 rounded-full ${t.btnBg} mb-4`} style={{ zIndex: 10 }}>
                      <div
-                         className={`absolute top-1.5 bottom-1.5 w-[calc(25%-3px)] rounded-full transition-transform duration-300 ease-out ${t.bgAccent} shadow-sm`}
+                         className={`absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] rounded-full transition-transform duration-300 ease-out ${t.bgAccent} shadow-sm`}
                          style={{
-                             transform: sleepSubTab === 'intraday' ? 'translateX(0)' : sleepSubTab === 'durasi' ? 'translateX(100%)' : sleepSubTab === 'detail' ? 'translateX(200%)' : 'translateX(300%)',
+                             transform: recoveryMainTab === 'energi' ? 'translateX(0)' : 'translateX(100%)',
                              left: '6px',
                              zIndex: 1,
                          }}
                      ></div>
-                     <button onClick={() => { playSoundEffect('click', soundEnabled); setSleepSubTab('intraday'); }} className={`flex-1 py-2.5 rounded-full text-xs font-black relative transition-colors duration-300 ${sleepSubTab === 'intraday' ? 'text-white' : t.textMuted}`} style={{ zIndex: 2 }}>Per Jam</button>
-                     <button onClick={() => { playSoundEffect('click', soundEnabled); setSleepSubTab('durasi'); }} className={`flex-1 py-2.5 rounded-full text-xs font-black relative transition-colors duration-300 ${sleepSubTab === 'durasi' ? 'text-white' : t.textMuted}`} style={{ zIndex: 2 }}>Tren</button>
-                     <button onClick={() => { playSoundEffect('click', soundEnabled); setSleepSubTab('detail'); }} className={`flex-1 py-2.5 rounded-full text-xs font-black relative transition-colors duration-300 ${sleepSubTab === 'detail' ? 'text-white' : t.textMuted}`} style={{ zIndex: 2 }}>Detail</button>
-                     <button onClick={() => { playSoundEffect('click', soundEnabled); setSleepSubTab('somnogram'); }} className={`flex-1 py-2.5 rounded-full text-xs font-black relative transition-colors duration-300 ${sleepSubTab === 'somnogram' ? 'text-white' : t.textMuted}`} style={{ zIndex: 2 }}>Hipnogram</button>
+                     <button
+                         onClick={() => { playSoundEffect('click', soundEnabled); setRecoveryMainTab('energi'); }}
+                         className={`flex-1 py-2.5 rounded-full body-md font-black relative transition-colors duration-300 flex items-center justify-center gap-1.5 ${recoveryMainTab === 'energi' ? 'text-white' : t.textMuted}`}
+                         style={{ zIndex: 2 }}
+                     >
+                         <Zap size={15} />
+                         <span>Energi</span>
+                     </button>
+                     <button
+                         onClick={() => { playSoundEffect('click', soundEnabled); setRecoveryMainTab('tidur'); }}
+                         className={`flex-1 py-2.5 rounded-full body-md font-black relative transition-colors duration-300 flex items-center justify-center gap-1.5 ${recoveryMainTab === 'tidur' ? 'text-white' : t.textMuted}`}
+                         style={{ zIndex: 2 }}
+                     >
+                         <Moon size={15} />
+                         <span>Tidur</span>
+                     </button>
                 </div>
 
-                {sleepSubTab === 'intraday' && (
-                  <IntradayEnergyChart
-                     t={t}
-                     theme={theme}
-                     readiness={sleepReadiness}
-                     isToday={sleepDate === todayStr}
-                     language={language}
-                  />
+                {/* SUB-TOGGLE ENERGI: Harian (Bar) vs Per Jam (Line Chart) */}
+                {recoveryMainTab === 'energi' && (
+                  <>
+                    <div className="flex items-center justify-center mb-5">
+                      <div className={`inline-flex p-1 rounded-full border ${t.border} ${t.bgCardSoft}`}>
+                        <button
+                          onClick={() => { playSoundEffect('click', soundEnabled); setEnergySubTab('daily'); }}
+                          className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                            energySubTab === 'daily'
+                              ? 'bg-sky-500 text-white shadow-sm'
+                              : `${t.textMuted} hover:${t.textMain}`
+                          }`}
+                        >
+                          Harian
+                        </button>
+                        <button
+                          onClick={() => { playSoundEffect('click', soundEnabled); setEnergySubTab('hourly'); }}
+                          className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                            energySubTab === 'hourly'
+                              ? 'bg-sky-500 text-white shadow-sm'
+                              : `${t.textMuted} hover:${t.textMain}`
+                          }`}
+                        >
+                          Per Jam
+                        </button>
+                      </div>
+                    </div>
+
+                    {energySubTab === 'daily' ? (
+                      <ActivityChart
+                        t={t} theme={theme} history={history}
+                        soundEnabled={soundEnabled} playSoundEffect={playSoundEffect}
+                        onPointClick={navigateToWorkoutDate}
+                        language={language}
+                        lomealToday={lomealToday}
+                        metricKeys={['energyScore']}
+                        storageKey="lyfit_energy_daily_chart"
+                        activityTargets={activityTargets} userProfile={userProfile}
+                      />
+                    ) : (
+                      <IntradayEnergyChart
+                        t={t}
+                        theme={theme}
+                        readiness={sleepReadiness}
+                        isToday={sleepDate === todayStr}
+                        language={language}
+                      />
+                    )}
+                  </>
                 )}
 
-                {sleepSubTab === 'durasi' && (
-                  <ActivityChart
-                     t={t} theme={theme} history={history}
-                     soundEnabled={soundEnabled} playSoundEffect={playSoundEffect}
-                     onPointClick={navigateToWorkoutDate}
-                     language={language}
-                     lomealToday={lomealToday}
-                     metricKeys={['sleep', 'energyScore']}
-                     storageKey="lyfit_sleep_chart"
-                     activityTargets={activityTargets} userProfile={userProfile}
-                  />
+                {/* SUB-TOGGLE TIDUR: Durasi | Detail | Hipnogram */}
+                {recoveryMainTab === 'tidur' && (
+                  <>
+                    <div className="flex items-center justify-center mb-5">
+                      <div className={`inline-flex p-1 rounded-full border ${t.border} ${t.bgCardSoft}`}>
+                        <button
+                          onClick={() => { playSoundEffect('click', soundEnabled); setSleepSubTab('durasi'); }}
+                          className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                            sleepSubTab === 'durasi'
+                              ? 'bg-indigo-500 text-white shadow-sm'
+                              : `${t.textMuted} hover:${t.textMain}`
+                          }`}
+                        >
+                          Durasi
+                        </button>
+                        <button
+                          onClick={() => { playSoundEffect('click', soundEnabled); setSleepSubTab('detail'); }}
+                          className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                            sleepSubTab === 'detail'
+                              ? 'bg-indigo-500 text-white shadow-sm'
+                              : `${t.textMuted} hover:${t.textMain}`
+                          }`}
+                        >
+                          Detail
+                        </button>
+                        <button
+                          onClick={() => { playSoundEffect('click', soundEnabled); setSleepSubTab('somnogram'); }}
+                          className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                            sleepSubTab === 'somnogram'
+                              ? 'bg-indigo-500 text-white shadow-sm'
+                              : `${t.textMuted} hover:${t.textMain}`
+                          }`}
+                        >
+                          Hipnogram
+                        </button>
+                      </div>
+                    </div>
+
+                    {sleepSubTab === 'durasi' && (
+                      <ActivityChart
+                        t={t} theme={theme} history={history}
+                        soundEnabled={soundEnabled} playSoundEffect={playSoundEffect}
+                        onPointClick={navigateToWorkoutDate}
+                        language={language}
+                        lomealToday={lomealToday}
+                        metricKeys={['sleep']}
+                        storageKey="lyfit_sleep_only_chart"
+                        activityTargets={activityTargets} userProfile={userProfile}
+                      />
+                    )}
+                  </>
                 )}
 
-                {(sleepSubTab === 'detail' || sleepSubTab === 'somnogram') && (() => {
+                {recoveryMainTab === 'tidur' && (sleepSubTab === 'detail' || sleepSubTab === 'somnogram') && (() => {
                     const sAwake = parseFloat(sleepBio.sleepAwake);
                     const sRem = parseFloat(sleepBio.sleepRem);
                     const sLight = parseFloat(sleepBio.sleepLight);

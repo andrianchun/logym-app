@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import {
   calculateReadiness,
+  calculateSleepScore,
   restingHrBaseline,
   sleepHistoryBaseline,
   extractCaffeineEvents,
@@ -147,6 +148,20 @@ const hari = (ymd, bio) => ({ [ymd]: { bioData: bio } });
   assert.ok(denganKopi.score > tanpaKopi.score, `kafein harus menaikkan skor sore (${denganKopi.score} vs ${tanpaKopi.score})`);
   assert.ok(denganKopi.caffeineBoost > 0);
   assert.equal(denganKopi.caffeineSource, 'Pre-Workout');
+}
+
+// 14. calculateSleepScore: kosong -> unknown, tidur optimal + deep/REM tinggi -> Sangat Baik, tidur 4j -> Kurang.
+{
+  const kosong = calculateSleepScore({});
+  assert.equal(kosong.status, 'unknown');
+  assert.equal(kosong.score, 0);
+
+  const mantap = calculateSleepScore({ sleep: 8, sleepDeep: 100, sleepRem: 100, sleepLight: 260, sleepAwake: 20 }, 8);
+  assert.ok(mantap.score >= 90 && mantap.score <= 100, `skor tidur optimal harus tinggi: ${mantap.score}`);
+  assert.equal(mantap.label, 'Sangat Baik');
+
+  const kurang = calculateSleepScore({ sleep: 4, sleepDeep: 20, sleepRem: 20, sleepLight: 160, sleepAwake: 40 }, 8);
+  assert.ok(kurang.score < 60, `skor tidur 4 jam harus rendah: ${kurang.score}`);
 }
 
 console.log('readiness OK');

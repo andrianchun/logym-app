@@ -124,6 +124,89 @@ export const calculateReadiness = (bio, baselineRhr = null) => {
 };
 
 /**
+ * Skor Tidur 0-100 — dihitung terpisah dari Skor Energi agar user melihat kualitas tidur
+ * murni (durasi terhadap target + porsi Deep/REM + efisiensi terjaga).
+ * @param {object} bio - bioData malam yang dinilai
+ * @param {number} targetSleepHours - target durasi tidur (default 8 jam)
+ * @returns {{score:number, status:string, label:string, durationScore:number, qualityScore:number, restorativePct:number|null}}
+ */
+export const calculateSleepScore = (bio, targetSleepHours = 8) => {
+  const b = bio || {};
+  const sleep = parseFloat(b.sleep) || 0;
+  if (sleep <= 0) {
+    return {
+      score: 0,
+      status: 'unknown',
+      label: 'Belum Diisi',
+      durationScore: 0,
+      qualityScore: 0,
+      restorativePct: null,
+    };
+  }
+
+  const target = Math.max(6, Math.min(10, Number(targetSleepHours) || 8));
+  const deep = Number(b.sleepDeep) || 0;
+  const rem = Number(b.sleepRem) || 0;
+  const light = Number(b.sleepLight) || 0;
+  const awake = Number(b.sleepAwake) || 0;
+  const totalStage = deep + rem + light + awake;
+
+  // 1. Skor Durasi (maks 65 poin)
+  let durationScore = 65;
+  if (sleep < target * 0.92 && sleep < 7.25) {
+    const denom = Math.max(6.5, target * 0.92);
+    durationScore = Math.max(10, Math.round(65 * Math.min(1, sleep / denom)));
+  } else if (sleep > Math.max(9.5, target + 1.5)) {
+    const excess = sleep - Math.max(9.5, target + 1.5);
+    durationScore = Math.max(45, Math.round(65 - excess * 5));
+  }
+
+  let qualityScore = 0;
+  let restorativePct = null;
+  let score = 0;
+
+  // 2. Skor Kualitas Tahapan (maks 35 poin: 25 Deep+REM + 10 efisiensi terjaga)
+  if (totalStage > 0) {
+    const restorativeRatio = (deep + rem) / totalStage;
+    const awakeRatio = awake / totalStage;
+    restorativePct = Math.round(restorativeRatio * 100);
+
+    const restorativePts = Math.round(25 * Math.min(1, restorativeRatio / 0.38));
+    const efficiencyPts = awakeRatio <= 0.08
+      ? 10
+      : Math.max(0, Math.round(10 * (1 - (awakeRatio - 0.08) / 0.22)));
+    qualityScore = restorativePts + efficiencyPts;
+    score = Math.max(0, Math.min(100, durationScore + qualityScore));
+  } else {
+    // Tanpa rincian tahapan (input durasi saja): skala proporsional maks 95
+    score = Math.max(0, Math.min(95, Math.round((durationScore / 65) * 95)));
+    qualityScore = Math.max(0, score - durationScore);
+  }
+
+  let status = 'critical';
+  let label = 'Kurang';
+  if (score >= 85) {
+    status = 'optimal';
+    label = 'Sangat Baik';
+  } else if (score >= 70) {
+    status = 'good';
+    label = 'Baik';
+  } else if (score >= 55) {
+    status = 'warning';
+    label = 'Cukup';
+  }
+
+  return {
+    score,
+    status,
+    label,
+    durationScore,
+    qualityScore,
+    restorativePct,
+  };
+};
+
+/**
  * Konversi status readiness ke kategori wellness harian (prima | doms | deload).
  * Dipakai sebagai nilai awal otomatis di WorkoutTab, namun user tetap bebas mengubahnya manual.
  * @param {{score:number, status:string}|null} readiness

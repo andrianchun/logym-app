@@ -91,7 +91,7 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
       },
       // Key-nya tetap `energyScore` supaya tab yang tersimpan di localStorage user tidak reset.
       // Isinya sekarang skor kesiapan hitungan Logym — lihat titik pengisiannya di bawah.
-      { key: 'energyScore', label: 'Skor Kesiapan', color: theme === 'dark' ? '#94a3b8' : '#64748b', type: 'single' }, // Slate — tidak punya target
+      { key: 'energyScore', label: 'Skor Energi', color: theme === 'dark' ? '#38bdf8' : '#0284c7', type: 'single' },
   ];
   const chartMetricsList = [
       ...(metricKeys ? allMetrics.filter(m => metricKeys.includes(m.key)) : allMetrics),
@@ -1230,16 +1230,18 @@ const ActivityChart = ({ t, theme, history, soundEnabled, playSoundEffect, onPoi
            </div>
        )}
 
-         <div className="flex gap-2 overflow-x-auto pb-4 hide-scrollbar snap-x" style={{ WebkitOverflowScrolling: 'touch' }}>
-            {chartMetricsList.map(metric => {
-                const isActive = activeMetric === metric.key;
-                return (
-                    <button key={metric.key} onClick={() => toggleChartMetric(metric.key)} className="px-3 py-1.5 rounded-full caption font-black transition-all border active:scale-95 whitespace-nowrap snap-start flex items-center justify-center h-8" style={{ backgroundColor: isActive ? metric.color : 'transparent', borderColor: metric.color, color: isActive ? '#fff' : metric.color, opacity: isActive ? 1 : 0.5 }}>
-                        {metric.label}
-                    </button>
-                )
-            })}
-         </div>
+         {chartMetricsList.length > 1 && (
+           <div className="flex gap-2 overflow-x-auto pb-4 hide-scrollbar snap-x" style={{ WebkitOverflowScrolling: 'touch' }}>
+              {chartMetricsList.map(metric => {
+                  const isActive = activeMetric === metric.key;
+                  return (
+                      <button key={metric.key} onClick={() => toggleChartMetric(metric.key)} className="px-3 py-1.5 rounded-full caption font-black transition-all border active:scale-95 whitespace-nowrap snap-start flex items-center justify-center h-8" style={{ backgroundColor: isActive ? metric.color : 'transparent', borderColor: metric.color, color: isActive ? '#fff' : metric.color, opacity: isActive ? 1 : 0.5 }}>
+                          {metric.label}
+                      </button>
+                  )
+              })}
+           </div>
+         )}
     </div>
   );
 };
